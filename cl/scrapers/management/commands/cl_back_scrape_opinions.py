@@ -24,4 +24,4 @@ class Command(cl_scrape_opinions.Command):
             self.scrape_court(site, full_crawl=True)
 
     def save_everything(self, items, index=False, backscrape=True):
-        super(Command, self).save_everything(items, index, backscrape)
+        super().save_everything(items, index, backscrape)

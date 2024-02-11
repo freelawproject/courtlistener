@@ -1,4 +1,5 @@
 import random
+import re
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -7,6 +8,7 @@ from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
+from elasticsearch_dsl import AttrList
 
 from cl.search.models import Docket, DocketEntry
 
@@ -193,3 +195,28 @@ def citation(obj) -> SafeString:
     if ecf:
         result = f"{result} ECF No. {ecf}"
     return result
+
+
+@register.simple_tag
+def contains_highlights(content: str) -> bool:
+    """Check if a given string contains the mark tag used in highlights.
+
+    :param content: The input string to check.
+    :return: True if the mark highlight tag is found, otherwise False.
+    """
+    pattern = r"<mark>.*?</mark>"
+    matches = re.findall(pattern, content)
+    return bool(matches)
+
+
+@register.filter
+def render_string_or_list(value: any) -> any:
+    """Filter to render list of strings separated by commas or the original
+    value.
+
+    :param value: The value to be rendered.
+    :return: The original value or comma-separated values.
+    """
+    if isinstance(value, list) or isinstance(value, AttrList):
+        return ", ".join(str(item) for item in value)
+    return value

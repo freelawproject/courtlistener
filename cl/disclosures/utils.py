@@ -2,7 +2,7 @@ from cl.custom_filters.templatetags.text_filters import oxford_join
 from cl.people_db.models import Person
 
 
-def make_disclosure_data(person: Person) -> tuple[str, str]:
+async def make_disclosure_data(person: Person) -> tuple[str, str]:
     """Make a CSV of the years and the IDs of somebody's disclosures
 
     :param person: The Person we're making data for
@@ -16,7 +16,7 @@ def make_disclosure_data(person: Person) -> tuple[str, str]:
     )
     years = []
     ids = []
-    for yr, id in forms:
+    async for yr, id in forms:
         years.append((str(yr)))
         ids.append(str(id))
     for x in set(years):
@@ -48,11 +48,8 @@ def make_disclosure_year_range(person: Person) -> str:
     the `disclosures` attribute.
     :returns: A string of the years of their disclosures
     """
-    years = set()
-    for fd in person.disclosures:
-        years.add(fd.year)
+    years = sorted({fd.year for fd in person.disclosures})
 
-    years = sorted(list(years))
     year_count = len(years)
     if year_count <= 3:
         # "2000", "2000 and 2001", "2000, 2001, and 2002"

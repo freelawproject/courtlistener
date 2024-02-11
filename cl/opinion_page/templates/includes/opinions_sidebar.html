@@ -1,6 +1,17 @@
 {% load text_filters %}
-
+{% load waffle_tags %}
 <ul>
+  {% flag "o-es-active" %}
+    {% for opinion in opinions.object_list %}
+        <li>
+            <a href="{{ opinion.absolute_url }}?{{ request.META.QUERY_STRING }}">
+                {% with opinion.title as title  %}
+                  {{ opinion.caseName|default:title|default_if_none:"N/A"|safe|truncatewords:10|v_wrapper }}
+                {% endwith %}
+            </a>
+        </li>
+    {% endfor %}
+  {% else %}
     {% for opinion in opinions %}
         <li>
             <a href="{{ opinion.absolute_url }}?{{ request.META.QUERY_STRING }}">
@@ -10,6 +21,7 @@
             </a>
         </li>
     {% endfor %}
+  {% endflag %}
 </ul>
 <p>
     <a href="{{ full_list_url }}" class="btn btn-default">

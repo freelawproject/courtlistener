@@ -5,7 +5,7 @@ local environment, you only need to pass the type and object id and run it.
 manage.py clone_from_cl --type search.OpinionCluster --id 9355884
 manage.py clone_from_cl --type search.Docket --id 5377675
 manage.py clone_from_cl --type people_db.Person --id 16207
-manage.py clone_from_cl --type search,Court --id usnmcmilrev
+manage.py clone_from_cl --type search.Court --id usnmcmilrev
 
 This tool is only for development purposes, so it only works when
 the DEVELOPMENT env is set to True. It also relies on the CL_API_TOKEN
@@ -27,8 +27,22 @@ permissions, for example:
 
 manage.py clone_from_cl --type search.Docket --id 17090923 --add-docket-entries
 
+Now you can clone people positions, for example:
+
+manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --clone-person-positions
+manage.py clone_from_cl --type people_db.Person --id 4173 --clone-person-positions
+manage.py clone_from_cl --type search.Docket --id 5377675 --clone-person-positions
+
+Also, you can decide whether the cloned objects should be indexed in solr or not,
+this only applies for OpinionCluster and Docket objects (In the future this will need
+to be replaced with elasticsearch), for example:
+
+manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --add-to-solr
+
+
 This is still work in progress, some data is not cloned yet.
 """
+
 import json
 import os
 import pathlib
@@ -45,7 +59,7 @@ from django.utils.dateparse import parse_date
 from requests import Session
 
 from cl.people_db.models import Person
-from cl.search.models import Citation, Opinion, RECAPDocument
+from cl.search.models import Citation, Court, Opinion, RECAPDocument
 from cl.search.tasks import add_items_to_solr
 
 VALID_TYPES = (
@@ -75,6 +89,8 @@ def clone_opinion_cluster(
     cluster_ids: list,
     download_cluster_files: bool,
     add_docket_entries: bool,
+    add_to_solr: bool = False,
+    person_positions: bool = False,
     object_type="search.OpinionCluster",
 ):
     """Download opinion cluster data from courtlistener.com and add it to
@@ -83,6 +99,8 @@ def clone_opinion_cluster(
     :param cluster_ids: a list of opinion cluster ids
     :param download_cluster_files: True if it should download cluster files
     :param add_docket_entries: flag to clone docket entries and recap docs
+    :param person_positions: True if we should clone person positions
+    :param add_to_solr: True if we should add objects to solr
     :param object_type: OpinionCluster app name with model name
     :return: list of opinion cluster objects
     """
@@ -114,7 +132,13 @@ def clone_opinion_cluster(
         cluster_url = f"{domain}{cluster_path}"
         cluster_datum = session.get(cluster_url, timeout=120).json()
         docket_id = get_id_from_url(cluster_datum["docket"])
-        docket = clone_docket(session, [docket_id], add_docket_entries)[0]
+        docket = clone_docket(
+            session,
+            [docket_id],
+            add_docket_entries,
+            person_positions,
+            add_to_solr,
+        )[0]
         citation_data = cluster_datum["citations"]
         panel_data = cluster_datum["panel"]
         non_participating_judges_data = cluster_datum[
@@ -165,7 +189,7 @@ def clone_opinion_cluster(
 
                 except Exception:
                     print(
-                        f"Can't download filepath_json_harvard file for "
+                        "Can't download filepath_json_harvard file for "
                         f"cluster id: {cluster_id}"
                     )
 
@@ -177,7 +201,12 @@ def clone_opinion_cluster(
 
         if panel_data_ids:
             added_panel_ids.extend(
-                [p.pk for p in clone_person(session, panel_data_ids)]
+                [
+                    p.pk
+                    for p in clone_person(
+                        session, panel_data_ids, person_positions
+                    )
+                ]
             )
 
         # Clone non participating judges data
@@ -192,7 +221,9 @@ def clone_opinion_cluster(
                 [
                     p.pk
                     for p in clone_person(
-                        session, non_participating_judges_data_ids
+                        session,
+                        non_participating_judges_data_ids,
+                        person_positions,
                     )
                 ]
             )
@@ -219,7 +250,7 @@ def clone_opinion_cluster(
 
             if author:
                 cloned_person = clone_person(
-                    session, [get_id_from_url(author)]
+                    session, [get_id_from_url(author)], person_positions
                 )
 
                 if cloned_person:
@@ -272,13 +303,15 @@ def clone_opinion_cluster(
                 reverse("view_case", args=[opinion_cluster.pk, docket.slug]),
             )
 
-        # Add opinions to search engine
-        add_items_to_solr.delay(added_opinions_ids, "search.Opinion")
+        if add_to_solr:
+            # Add opinions to search engine
+            add_items_to_solr.delay(added_opinions_ids, "search.Opinion")
 
-    # Add opinion clusters to search engine
-    add_items_to_solr.delay(
-        [oc.pk for oc in opinion_clusters], "search.OpinionCluster"
-    )
+    if add_to_solr:
+        # Add opinion clusters to search engine
+        add_items_to_solr.delay(
+            [oc.pk for oc in opinion_clusters], "search.OpinionCluster"
+        )
 
     return opinion_clusters
 
@@ -287,6 +320,8 @@ def clone_docket(
     session: Session,
     docket_ids: list,
     add_docket_entries: bool,
+    person_positions: bool = False,
+    add_to_solr: bool = False,
     object_type="search.Docket",
 ):
     """Download docket data from courtlistener.com and add it to local
@@ -294,6 +329,9 @@ def clone_docket(
     :param session: a Requests session
     :param docket_ids: a list of docket ids
     :param add_docket_entries: flag to clone docket entries and recap docs
+    :param person_positions: True is we should clone person positions
+    :param person_positions: True is we should clone person positions
+    :param add_to_solr: True if we should add objects to solr
     :param object_type: Docket app name with model name
     :return: list of docket objects
     """
@@ -337,6 +375,7 @@ def clone_docket(
             "audio_files",
             "tags",
             "panel",
+            "idb_data",
         ]:
             del docket_data[f]
 
@@ -360,9 +399,21 @@ def clone_docket(
 
             docket_data["assigned_to"] = (
                 clone_person(
-                    session, [get_id_from_url(docket_data["assigned_to"])]
+                    session,
+                    [get_id_from_url(docket_data["assigned_to"])],
+                    person_positions,
                 )[0]
                 if docket_data["assigned_to"]
+                else None
+            )
+
+            docket_data["referred_to"] = (
+                clone_person(
+                    session,
+                    [get_id_from_url(docket_data["referred_to"])],
+                    person_positions,
+                )[0]
+                if docket_data["referred_to"]
                 else None
             )
 
@@ -381,8 +432,9 @@ def clone_docket(
                 ),
             )
 
-    # Add dockets to search engine
-    add_items_to_solr.delay([doc.pk for doc in dockets], "search.Docket")
+    if add_to_solr:
+        # Add dockets to search engine
+        add_items_to_solr.delay([doc.pk for doc in dockets], "search.Docket")
 
     return dockets
 
@@ -503,10 +555,19 @@ def clone_recap_documents(
             session, [get_id_from_url(tag_url) for tag_url in tags_data]
         )
 
-        if cloned_tags:
-            recap_document.tags.add(*cloned_tags)
+        if recap_document:
+            if cloned_tags:
+                recap_document.tags.add(*cloned_tags)
 
-        created_recap_documents.append(recap_document)
+            created_recap_documents.append(recap_document)
+
+            print(
+                "View cloned recap document here:",
+                reverse(
+                    "recapdocument-detail",
+                    args=["v3", recap_document_data["id"]],
+                ),
+            )
 
     return created_recap_documents
 
@@ -551,23 +612,152 @@ def clone_tag(
         except (IntegrityError, ValidationError):
             tag = model.objects.filter(pk=tag_data["id"])[0]
 
-        created_tags.append(tag)
+        if tag:
+            created_tags.append(tag)
 
-        print(
-            "View cloned tag here:",
-            reverse("tag-detail", args=["v3", tag_id]),
-        )
+            print(
+                "View cloned tag here:",
+                reverse("tag-detail", args=["v3", tag_id]),
+            )
 
     return created_tags
 
 
+def clone_position(
+    session: Session,
+    position_ids: list,
+    person_id: int,
+    object_type="people_db.Position",
+):
+    """Download position data from courtlistener.com and add it to local environment
+    :param session: a Requests session
+    :param position_ids: a list of position ids
+    :param person_id: id of the person the positions belong to
+    :param object_type: Position app name with model name
+    :return: list of position objects
+    """
+    model = apps.get_model(object_type)
+
+    positions = []
+
+    for position_id in position_ids:
+        print(f"Cloning position id: {position_id}")
+        try:
+            position = model.objects.get(pk=position_id, person_id=person_id)
+            print(
+                "Position already exists here:",
+                reverse("position-detail", args=["v3", position.pk]),
+            )
+            continue
+        except model.DoesNotExist:
+            pass
+
+        # Create position
+        position_path = reverse(
+            "position-detail",
+            kwargs={"version": "v3", "pk": position_id},
+        )
+        position_url = f"{domain}{position_path}"
+        position_data = session.get(position_url, timeout=120).json()
+
+        # delete unneeded fields
+        for f in [
+            "resource_uri",
+            "retention_events",
+            "person",
+            "supervisor",
+            "predecessor",
+            "school",
+            "appointer",
+        ]:
+            del position_data[f]
+
+        # Prepare values
+        if position_data["date_nominated"]:
+            position_data["date_nominated"] = parse_date(
+                position_data["date_nominated"]
+            )
+
+        if position_data["date_elected"]:
+            position_data["date_elected"] = parse_date(
+                position_data["date_elected"]
+            )
+
+        if position_data["date_recess_appointment"]:
+            position_data["date_recess_appointment"] = parse_date(
+                position_data["date_recess_appointment"]
+            )
+
+        if position_data["date_referred_to_judicial_committee"]:
+            position_data["date_referred_to_judicial_committee"] = parse_date(
+                position_data["date_referred_to_judicial_committee"]
+            )
+
+        if position_data["date_judicial_committee_action"]:
+            position_data["date_judicial_committee_action"] = parse_date(
+                position_data["date_judicial_committee_action"]
+            )
+
+        if position_data["date_hearing"]:
+            position_data["date_hearing"] = parse_date(
+                position_data["date_hearing"]
+            )
+
+        if position_data["date_confirmation"]:
+            position_data["date_confirmation"] = parse_date(
+                position_data["date_confirmation"]
+            )
+
+        if position_data["date_start"]:
+            position_data["date_start"] = parse_date(
+                position_data["date_start"]
+            )
+
+        if position_data["date_termination"]:
+            position_data["date_termination"] = parse_date(
+                position_data["date_termination"]
+            )
+
+        if position_data["date_retirement"]:
+            position_data["date_retirement"] = parse_date(
+                position_data["date_retirement"]
+            )
+
+        position_data["court"] = (
+            clone_court(session, [position_data["court"].get("id")])[0]
+            if position_data["court"]
+            else None
+        )
+
+        position_data["person_id"] = person_id
+
+        try:
+            pos, created = model.objects.get_or_create(**position_data)
+        except (IntegrityError, ValidationError, ValueError):
+            pos = model.objects.filter(pk=position_data["id"]).first()
+
+        if pos:
+            positions.append(pos)
+
+            print(
+                "View cloned position here:",
+                reverse("position-detail", args=["v3", position_id]),
+            )
+
+
 def clone_person(
-    session: Session, people_ids: list, object_type="people_db.Person"
+    session: Session,
+    people_ids: list,
+    positions=False,
+    add_to_solr: bool = False,
+    object_type="people_db.Person",
 ):
     """Download person data from courtlistener.com and add it to local
     environment
     :param session: a Requests session
     :param people_ids: a list of person ids
+    :param positions: True if we should clone person positions
+    :param add_to_solr: True if we should add objects to solr
     :param object_type: Person app name with model name
     :return: list of person objects
     """
@@ -586,7 +776,8 @@ def clone_person(
                 reverse("person-detail", args=["v3", person.pk]),
             )
             people.append(person)
-            continue
+            if not positions:
+                continue
         except model.DoesNotExist:
             pass
 
@@ -604,29 +795,57 @@ def clone_person(
             "race",
             "sources",
             "educations",
-            "positions",
             "political_affiliations",
+            "is_alias_of",
         ]:
             del person_data[f]
+
+        person_positions_data = None
+        if not positions:
+            del person_data["positions"]
+        else:
+            person_positions_data = person_data.pop("positions")
+
         # Prepare some values
         if person_data["date_dob"]:
             person_data["date_dob"] = parse_date(person_data["date_dob"])
+        if person_data["date_dod"]:
+            person_data["date_dod"] = parse_date(person_data["date_dod"])
+        if person_data["religion"]:
+            person_data["religion"] = next(
+                (
+                    item[0]
+                    for item in model.RELIGIONS
+                    if item[1] == person_data["religion"]
+                ),
+                "",
+            )
+
         try:
             person, created = model.objects.get_or_create(**person_data)
-        except (IntegrityError, ValidationError):
-            person = model.objects.filter(pk=person_data["id"])[0]
+        except (IntegrityError, ValidationError, ValueError):
+            person = model.objects.filter(pk=person_data["id"]).first()
 
-        people.append(person)
+        if person:
+            people.append(person)
 
-        print(
-            "View cloned person here:",
-            reverse("person-detail", args=["v3", person_id]),
+            print(
+                "View cloned person here:",
+                reverse("person-detail", args=["v3", person_id]),
+            )
+
+        if person_positions_data:
+            position_ids = [
+                get_id_from_url(p) for p in person_positions_data if p
+            ]
+            with transaction.atomic():
+                clone_position(session, position_ids, person_id)
+
+    if add_to_solr:
+        # Add people to search engine
+        add_items_to_solr.delay(
+            [person.pk for person in people], "people_db.Person"
         )
-
-    # Add people to search engine
-    add_items_to_solr.delay(
-        [person.pk for person in people], "people_db.Person"
-    )
 
     return people
 
@@ -668,17 +887,46 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
         # delete resource_uri value generated by DRF
         del court_data["resource_uri"]
 
+        # fk parent_court
+        if court_data["parent_court"]:
+            added_parent_court = [
+                p.pk
+                for p in clone_court(
+                    session, [get_id_from_url(court_data["parent_court"])]
+                )
+            ]
+            if added_parent_court:
+                court_data["parent_court_id"] = added_parent_court[0]
+        del court_data["parent_court"]
+
+        # m2m appeals_to
+        appeals_to_data = court_data["appeals_to"]
+        appeals_to_data_ids = [get_id_from_url(url) for url in appeals_to_data]
+        added_appeals_to = []
+        if appeals_to_data_ids:
+            added_appeals_to.extend(
+                [p.pk for p in clone_court(session, appeals_to_data_ids)]
+            )
+        del court_data["appeals_to"]
+
         try:
             ct, created = model.objects.get_or_create(**court_data)
         except (IntegrityError, ValidationError):
             ct = model.objects.filter(pk=court_data["id"])[0]
 
-        courts.append(ct)
+        if ct:
+            if added_appeals_to:
+                # Add m2m objects
+                ct.appeals_to.add(
+                    *Court.objects.filter(id__in=added_appeals_to)
+                )
 
-        print(
-            "View cloned court here:",
-            reverse("court-detail", args=["v3", court_id]),
-        )
+            courts.append(ct)
+            print(
+                "View cloned court here:",
+                reverse("court-detail", args=["v3", court_id]),
+            )
+
     return courts
 
 
@@ -689,11 +937,13 @@ class Command(BaseCommand):
     )
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.type = None
         self.ids = []
         self.download_cluster_files = False
         self.add_docket_entries = False
+        self.clone_person_positions = False
+        self.add_to_solr = False
 
         self.s = requests.session()
         self.s.headers = {
@@ -739,11 +989,28 @@ class Command(BaseCommand):
             "raise 403 error.",
         )
 
+        parser.add_argument(
+            "--clone-person-positions",
+            action="store_true",
+            default=False,
+            help="Use this flag to clone person positions. This will make more API "
+            "calls.",
+        )
+
+        parser.add_argument(
+            "--add-to-solr",
+            action="store_true",
+            default=False,
+            help="Add cloned objects to solr search engine.",
+        )
+
     def handle(self, *args, **options):
         self.type = options.get("type")
         self.ids = options.get("ids")
         self.download_cluster_files = options.get("download_cluster_files")
         self.add_docket_entries = options.get("add_docket_entries")
+        self.clone_person_positions = options.get("clone_person_positions")
+        self.add_to_solr = options.get("add_to_solr")
 
         if not settings.DEVELOPMENT:
             self.stdout.write("Command not enabled for production environment")
@@ -755,14 +1022,27 @@ class Command(BaseCommand):
                     self.ids,
                     self.download_cluster_files,
                     self.add_docket_entries,
+                    self.clone_person_positions,
+                    self.add_to_solr,
                     self.type,
                 )
             case "search.Docket":
                 clone_docket(
-                    self.s, self.ids, self.add_docket_entries, self.type
+                    self.s,
+                    self.ids,
+                    self.add_docket_entries,
+                    self.clone_person_positions,
+                    self.add_to_solr,
+                    self.type,
                 )
             case "people_db.Person":
-                clone_person(self.s, self.ids, self.type)
+                clone_person(
+                    self.s,
+                    self.ids,
+                    self.clone_person_positions,
+                    self.add_to_solr,
+                    self.type,
+                )
             case "search.Court":
                 clone_court(self.s, self.ids, self.type)
             case _:

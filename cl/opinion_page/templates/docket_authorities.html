@@ -1,0 +1,24 @@
+{% extends "docket_tabs.html" %}
+{% load humanize %}
+
+{% block title %}Authorities for {{ title }} – CourtListener.com{% endblock %}
+{% block og_title %}Authorities for {{ title }} - CourtListener.com{% endblock %}
+{% block description %}Authorities for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a
+non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block og_description %}Authorities for {{ title }} — Brought to you by the RECAP Initiative and Free Law Project, a
+non-profit dedicated to creating high quality open legal information.{% endblock %}
+
+{% block nav-authorities %}active{% endblock %}
+
+{% block tab-content %}
+<div class="flex flex-column justify-content-center col-xs-12 col-md-10 col-lg-12">
+  <div class="col-xs-12 col-md-10 col-lg-10">
+    {% with authorities_count=docket.authority_count %}
+      <h3>The filings in this docket cite {{authorities_count|intcomma}} opinion{{authorities_count|pluralize}}</h3>
+    {% endwith %}
+    <hr>
+    {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+    {% include 'includes/authorities_list.html' with authorities=authorities %}
+  </div>
+</div>
+{% endblock %}

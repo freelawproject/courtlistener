@@ -56,7 +56,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         if options["sweep"] is False:
             # Only allow one script at a time per court combination.

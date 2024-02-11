@@ -1,7 +1,7 @@
-import random
 from datetime import date
 from typing import Any, Dict, Tuple, Union
 
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils.encoding import force_bytes
@@ -41,7 +41,7 @@ def save_everything(
     candidate_judges = []
     if af.docket.court_id != "scotus":
         if af.judges:
-            candidate_judges = lookup_judges_by_messy_str(
+            candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
                 af.judges, docket.court.pk, af.docket.date_argued
             )
     else:
@@ -127,7 +127,8 @@ class Command(cl_scrape_opinions.Command):
         for i, item in enumerate(site):
             msg, r = get_binary_content(
                 item["download_urls"],
-                site.cookies,
+                site,
+                headers={"User-Agent": "CourtListener"},
                 method=site.method,
             )
             if msg:

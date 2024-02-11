@@ -5,6 +5,7 @@ import pghistory
 from django.db import models
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
+from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.date_time import midnight_pt
@@ -45,7 +46,7 @@ class Audio(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the audio file, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,
@@ -62,7 +63,7 @@ class Audio(AbstractDateTimeModel):
     case_name_full = models.TextField(
         help_text="The full name of the case", blank=True
     )
-    panel = models.ManyToManyField(
+    panel = models.ManyToManyField(  # type: ignore[var-annotated]
         Person,
         help_text="The judges that heard the oral arguments",
         related_name="oral_argument_panel_members",
@@ -90,7 +91,7 @@ class Audio(AbstractDateTimeModel):
         blank=True,
     )
     local_path_mp3 = models.FileField(
-        help_text=f"The location in AWS S3 where our enhanced copy of the "
+        help_text="The location in AWS S3 where our enhanced copy of the "
         f"original audio file is stored. {s3_warning_note}",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
@@ -98,7 +99,7 @@ class Audio(AbstractDateTimeModel):
         db_index=True,
     )
     local_path_original_file = models.FileField(
-        help_text=f"The location in AWS S3 where the original audio file "
+        help_text="The location in AWS S3 where the original audio file "
         f"downloaded from the court is stored. {s3_warning_note}",
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
@@ -147,6 +148,22 @@ class Audio(AbstractDateTimeModel):
         blank=True,
     )
 
+    es_oa_field_tracker = FieldTracker(
+        fields=[
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "duration",
+            "download_url",
+            "local_path_mp3",
+            "judges",
+            "sha1",
+            "source",
+            "stt_google_response",
+            "docket_id",
+        ]
+    )
+
     @property
     def transcript(self) -> str:
         j = json.loads(self.stt_google_response)
@@ -188,7 +205,7 @@ class Audio(AbstractDateTimeModel):
         :param force_commit: Should a commit be performed in solr after
         indexing it?
         """
-        super(Audio, self).save(*args, **kwargs)  # type: ignore
+        super().save(*args, **kwargs)  # type: ignore
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -203,7 +220,7 @@ class Audio(AbstractDateTimeModel):
         Update the index as items are deleted.
         """
         id_cache = self.pk
-        super(Audio, self).delete(*args, **kwargs)  # type: ignore
+        super().delete(*args, **kwargs)  # type: ignore
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "audio.Audio")

@@ -11,36 +11,35 @@ eval "$(sentry-cli bash-hook)"
 apt install -y awscli gnupg
 
 # Install latest version of pg_dump (else we get an error about version mismatch
-echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+echo "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 curl --silent 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' |  apt-key add -
 apt-get update
 apt-get install -y postgresql-client
 
-# Stream to S3
+# We only need to set PGPASSWORD once
+export PGPASSWORD=$DB_PASSWORD
 
-echo "Streaming search_court to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY search_court (
-	       id, pacer_court_id, pacer_has_rss_feed, pacer_rss_entry_types, fjc_court_id,
-	       date_modified, in_use, has_opinion_scraper, has_oral_argument_scraper, position,
-	       citation_string, short_name, full_name, url, start_date, end_date,
-	       jurisdiction, notes
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/courts-`date -I`.csv.bz2 --acl public-read
+# search_court
+court_fields='(
+	       id, pacer_court_id, pacer_has_rss_feed, pacer_rss_entry_types, date_last_pacer_contact,
+	       fjc_court_id, date_modified, in_use, has_opinion_scraper,
+	       has_oral_argument_scraper, position, citation_string, short_name, full_name,
+	       url, start_date, end_date, jurisdiction, notes, parent_court_id
+	       )'
+court_csv_filename="courts-$(date -I).csv"
 
-echo "Streaming search_docket to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY search_docket (
-	       id, date_created, date_modified, source, appeal_from_str,
+# search_courthouse
+courthouse_fields='(id, court_seat, building_name, address1, address2, city, county,
+state, zip_code, country_code, court_id)'
+courthouse_csv_filename="courthouses-$(date -I).csv"
+
+# Through table for courts m2m field: appeals_to
+# search_court_appeals_to
+court_appeals_to_fields='(id, from_court_id, to_court_id)'
+court_appeals_to_csv_filename="court-appeals-to-$(date -I).csv"
+
+# search_docket
+docket_fields='(id, date_created, date_modified, source, appeal_from_str,
 	       assigned_to_str, referred_to_str, panel_str, date_last_index, date_cert_granted,
 	       date_cert_denied, date_argued, date_reargued,
 	       date_reargument_denied, date_filed, date_terminated,
@@ -51,19 +50,20 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       filepath_local, filepath_ia, filepath_ia_json, ia_upload_failure_count, ia_needs_upload,
 	       ia_date_first_change, view_count, date_blocked, blocked, appeal_from_id, assigned_to_id,
 	       court_id, idb_data_id, originating_court_information_id, referred_to_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/dockets-`date -I`.csv.bz2 --acl public-read
+	       )'
+dockets_csv_filename="dockets-$(date -I).csv"
 
-echo "Streaming recap_fjcintegrateddatabase to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY recap_fjcintegrateddatabase (
+# search_originatingcourtinformation
+originatingcourtinformation_fields='(
+	       id, date_created, date_modified, docket_number, assigned_to_str,
+	       ordering_judge_str, court_reporter, date_disposed, date_filed, date_judgment,
+	       date_judgment_eod, date_filed_noa, date_received_coa, assigned_to_id,
+	       ordering_judge_id
+	       )'
+originatingcourtinformation_csv_filename="originating-court-information-$(date -I).csv"
+
+# recap_fjcintegrateddatabase
+fjcintegrateddatabase_fields='(
 	       id, date_created, date_modified, dataset_source, office,
 	       docket_number, origin, date_filed, jurisdiction, nature_of_suit,
 	       title, section, subsection, diversity_of_residence, class_action,
@@ -74,19 +74,11 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       termination_class_action_status, procedural_progress, disposition,
 	       nature_of_judgement, amount_received, judgment, pro_se,
 	       year_of_tape, nature_of_offense, version, circuit_id, district_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/fjc-integrated-database-`date -I`.csv.bz2 --acl public-read
+	   )'
+fjcintegrateddatabase_csv_filename="fjc-integrated-database-$(date -I).csv"
 
-echo "Streaming search_opinioncluster to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY search_opinioncluster (
+# search_opinioncluster
+opinioncluster_fields='(
 	       id, date_created, date_modified, judges, date_filed,
 	       date_filed_is_approximate, slug, case_name_short, case_name,
 	       case_name_full, scdb_id, scdb_decision_direction, scdb_votes_majority,
@@ -95,128 +87,64 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       history, other_dates, cross_reference, correction, citation_count,
 	       precedential_status, date_blocked, blocked, filepath_json_harvard, docket_id,
 	       arguments, headmatter
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/opinion-clusters-`date -I`.csv.bz2 --acl public-read
+	   )'
+opinioncluster_csv_filename="opinion-clusters-$(date -I).csv"
 
-echo "Streaming search_opinion to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY search_opinion (
+# search_opinion
+opinion_fields='(
 	       id, date_created, date_modified, author_str, per_curiam, joined_by_str,
 	       type, sha1, page_count, download_url, local_path, plain_text, html,
 	       html_lawbox, html_columbia, html_anon_2020, xml_harvard,
 	       html_with_citations, extracted_by_ocr, author_id, cluster_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/opinions-`date -I`.csv.bz2 --acl public-read
+	   )'
+opinions_csv_filename="opinions-$(date -I).csv"
 
-echo "Streaming search_opinionscited to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY search_opinionscited (
+# search_opinionscited
+opinionscited_fields='(
 	       id, depth, cited_opinion_id, citing_opinion_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/citation-map-`date -I`.csv.bz2 --acl public-read
+	   )'
+opinionscited_csv_filename="citation-map-$(date -I).csv"
 
-echo "Streaming search_citation to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY search_citation (
+# search_citation
+citation_fields='(
 	       id, volume, reporter, page, type, cluster_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/citations-`date -I`.csv.bz2 --acl public-read
+	   )'
+citations_csv_filename="citations-$(date -I).csv"
 
-echo "Streaming search_parenthetical to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY search_parenthetical (
+# search_parenthetical
+parentheticals_fields='(
 	       id, text, score, described_opinion_id, describing_opinion_id, group_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/parentheticals-`date -I`.csv.bz2 --acl public-read
+	   )'
+parentheticals_csv_filename="parentheticals-$(date -I).csv"
 
-echo "Streaming audio_audio to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY audio_audio (
+# audio_audio
+oralarguments_fields='(
 	       id, date_created, date_modified, source, case_name_short,
 	       case_name, case_name_full, judges, sha1, download_url, local_path_mp3,
 	       local_path_original_file, filepath_ia, ia_upload_failure_count, duration,
 	       processing_complete, date_blocked, blocked, stt_status, stt_google_response,
 	       docket_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/oral-arguments-`date -I`.csv.bz2 --acl public-read
+	   )'
+oralarguments_csv_filename="oral-arguments-$(date -I).csv"
 
-echo "Streaming people_db_person to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY people_db_person (
+# people_db_person
+people_db_person_fields='(
 	       id, date_created, date_modified, date_completed, fjc_id, slug, name_first,
 	       name_middle, name_last, name_suffix, date_dob, date_granularity_dob,
 	       date_dod, date_granularity_dod, dob_city, dob_state, dob_country,
 	       dod_city, dod_state, dod_country, gender, religion, ftm_total_received,
 	       ftm_eid, has_photo, is_alias_of_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-people-`date -I`.csv.bz2 --acl public-read
+	   )'
+people_db_person_csv_filename="people-db-people-$(date -I).csv"
 
-echo "Streaming people_db_school to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY people_db_school (
+# people_db_school
+people_db_school_fields='(
 	       id, date_created, date_modified, name, ein, is_alias_of_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-schools-`date -I`.csv.bz2 --acl public-read
+	   )'
+people_db_school_csv_filename="people-db-schools-$(date -I).csv"
 
-echo "Streaming people_db_position to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY people_db_position (
+# people_db_position
+people_db_position_fields='(
 	       id, date_created, date_modified, position_type, job_title,
 	       sector, organization_name, location_city, location_state,
 	       date_nominated, date_elected, date_recess_appointment,
@@ -227,205 +155,167 @@ PGPASSWORD=$DB_PASSWORD psql \
 	       voice_vote, votes_yes, votes_no, votes_yes_percent, votes_no_percent, how_selected,
 	       has_inferred_values, appointer_id, court_id, person_id, predecessor_id, school_id,
 	       supervisor_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-positions-`date -I`.csv.bz2 --acl public-read
+	   )'
+people_db_position_csv_filename="people-db-positions-$(date -I).csv"
 
-echo "Streaming people_db_retentionevent to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY people_db_retentionevent (
+# people_db_retentionevent
+people_db_retentionevent_fields='(
 	       id, date_created, date_modified, retention_type, date_retention,
 	       votes_yes, votes_no, votes_yes_percent, votes_no_percent, unopposed,
 	       won, position_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-retention-events-`date -I`.csv.bz2 --acl public-read
+	   )'
+people_db_retentionevent_csv_filename="people-db-retention-events-$(date -I).csv"
 
-echo "Streaming people_db_education to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY people_db_education (
+# people_db_education
+people_db_education_fields='(
 	       id, date_created, date_modified, degree_level, degree_detail,
 	       degree_year, person_id, school_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-educations-`date -I`.csv.bz2 --acl public-read
+	   )'
+people_db_education_csv_filename="people-db-educations-$(date -I).csv"
 
-echo "Streaming people_db_politicalaffiliation to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY people_db_politicalaffiliation (
+# people_db_politicalaffiliation
+politicalaffiliation_fields='(
 	       id, date_created, date_modified, political_party, source,
 	       date_start, date_granularity_start, date_end,
 	       date_granularity_end, person_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/people-db-political-affiliations-`date -I`.csv.bz2 --acl public-read
+	   )'
+politicalaffiliation_csv_filename="people-db-political-affiliations-$(date -I).csv"
 
-echo "Streaming disclosures_financialdisclosure to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_financialdisclosure (
+# people_db_person_race
+people_db_person_race_fields='(
+	       id, person_id, race_id
+	   )'
+people_db_person_race_csv_filename="people-db-races-$(date -I).csv"
+
+# disclosures_financialdisclosure
+financialdisclosure_fields='(
 	       id, date_created, date_modified, year, download_filepath, filepath, thumbnail,
 	       thumbnail_status, page_count, sha1, report_type, is_amended, addendum_content_raw,
 	       addendum_redacted, has_been_extracted, person_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosures-`date -I`.csv.bz2 --acl public-read
+	   )'
+financialdisclosure_csv_filename="financial-disclosures-$(date -I).csv"
 
-echo "Streaming disclosures_investment to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_investment (
+# disclosures_investment
+investment_fields='(
 	       id, date_created, date_modified, page_number, description, redacted,
 	       income_during_reporting_period_code, income_during_reporting_period_type,
 	       gross_value_code, gross_value_method,
 	       transaction_during_reporting_period, transaction_date_raw,
 	       transaction_date, transaction_value_code, transaction_gain_code,
 	       transaction_partner, has_inferred_values, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosure-investments-`date -I`.csv.bz2 --acl public-read
+	   )'
+investment_csv_filename="financial-disclosure-investments-$(date -I).csv"
 
-echo "Streaming disclosures_position to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_position (
+# disclosures_position
+disclosures_position_fields='(
 	       id, date_created, date_modified, position, organization_name,
 	       redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosures-positions-`date -I`.csv.bz2 --acl public-read
+	   )'
+disclosures_position_csv_filename="financial-disclosures-positions-$(date -I).csv"
 
-echo "Streaming disclosures_agreement to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_agreement (
+# disclosures_agreement
+disclosures_agreement_fields='(
 	       id, date_created, date_modified, date_raw, parties_and_terms,
 	       redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosures-agreements-`date -I`.csv.bz2 --acl public-read
+	   )'
+disclosures_agreement_csv_filename="financial-disclosures-agreements-$(date -I).csv"
 
-echo "Streaming disclosures_noninvestmentincome to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_noninvestmentincome (
+# disclosures_noninvestmentincome
+noninvestmentincome_fields='(
 	       id, date_created, date_modified, date_raw, source_type,
 	       income_amount, redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosures-non-investment-income-`date -I`.csv.bz2 --acl public-read
+	   )'
+noninvestmentincome_csv_filename="financial-disclosures-non-investment-income-$(date -I).csv"
 
-echo "Streaming disclosures_spouseincome to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_spouseincome (
+# disclosures_spouseincome
+spouseincome_fields='(
 	       id, date_created, date_modified, source_type, date_raw, redacted,
 	       financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosures-spousal-income-`date -I`.csv.bz2 --acl public-read
+	   )'
+spouseincome_csv_filename="financial-disclosures-spousal-income-$(date -I).csv"
 
-echo "Streaming disclosures_reimbursement to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_reimbursement (
+# disclosures_reimbursement
+disclosures_reimbursement_fields='(
 	       id, date_created, date_modified, source, date_raw, location,
 	       purpose, items_paid_or_provided, redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosures-reimbursements-`date -I`.csv.bz2 --acl public-read
+	   )'
+disclosures_reimbursement_csv_filename="financial-disclosures-reimbursements-$(date -I).csv"
 
-echo "Streaming disclosures_gift to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_gift (
+# disclosures_gift
+disclosures_gift_fields='(
 	       id, date_created, date_modified, source, description, value,
 	       redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
-	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
-	--dbname courtlistener | \
-	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosures-gifts-`date -I`.csv.bz2 --acl public-read
+	   )'
+disclosures_gift_csv_filename="financial-disclosures-gifts-$(date -I).csv"
 
-echo "Streaming disclosures_debt to S3"
-PGPASSWORD=$DB_PASSWORD psql \
-	--command \
-	  'set statement_timeout to 0;
-	   COPY disclosures_debt (
+# disclosures_debt
+disclosures_debt_fields='(
 	       id, date_created, date_modified, creditor_name, description,
 	       value_code, redacted, financial_disclosure_id
-	   ) TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)' \
+	   )'
+disclosures_debt_csv_filename="financial-disclosures-debts-$(date -I).csv"
+
+# If you add or remove a table, you need to update this number
+NUM_TABLES=28
+
+# Every new table added to bulk script should be added as an associative array
+declare -a t_1=("search_court" "$court_fields" "$court_csv_filename")
+declare -a t_2=("search_courthouse" "$courthouse_fields" "$courthouse_csv_filename")
+declare -a t_3=("search_court_appeals_to" "$court_appeals_to_fields" "$court_appeals_to_csv_filename")
+declare -a t_4=("search_docket" "$docket_fields" "$dockets_csv_filename")
+declare -a t_5=("search_originatingcourtinformation" "$originatingcourtinformation_fields" "$originatingcourtinformation_csv_filename")
+declare -a t_6=("recap_fjcintegrateddatabase" "$fjcintegrateddatabase_fields" "$fjcintegrateddatabase_csv_filename")
+declare -a t_7=("search_opinioncluster" "$opinioncluster_fields" "$opinioncluster_csv_filename")
+declare -a t_8=("search_opinion" "$opinion_fields" "$opinions_csv_filename")
+declare -a t_9=("search_opinionscited" "$opinionscited_fields" "$opinionscited_csv_filename")
+declare -a t_10=("search_citation" "$citation_fields" "$citations_csv_filename")
+declare -a t_11=("search_parenthetical" "$parentheticals_fields" "$parentheticals_csv_filename")
+declare -a t_12=("audio_audio" "$oralarguments_fields" "$oralarguments_csv_filename")
+declare -a t_13=("people_db_person" "$people_db_person_fields" "$people_db_person_csv_filename")
+declare -a t_14=("people_db_school" "$people_db_school_fields" "$people_db_school_csv_filename")
+declare -a t_15=("people_db_position" "$people_db_position_fields" "$people_db_position_csv_filename")
+declare -a t_16=("people_db_retentionevent" "$people_db_retentionevent_fields" "$people_db_retentionevent_csv_filename")
+declare -a t_17=("people_db_education" "$people_db_education_fields" "$people_db_education_csv_filename")
+declare -a t_18=("people_db_politicalaffiliation" "$politicalaffiliation_fields" "$politicalaffiliation_csv_filename")
+declare -a t_19=("people_db_person_race" "$people_db_person_race_fields" "$people_db_person_race_csv_filename")
+declare -a t_20=("disclosures_financialdisclosure" "$financialdisclosure_fields" "$financialdisclosure_csv_filename")
+declare -a t_21=("disclosures_investment" "$investment_fields" "$investment_csv_filename")
+declare -a t_22=("disclosures_position" "$disclosures_position_fields" "$disclosures_position_csv_filename")
+declare -a t_23=("disclosures_agreement" "$disclosures_agreement_fields" "$disclosures_agreement_csv_filename")
+declare -a t_24=("disclosures_noninvestmentincome" "$noninvestmentincome_fields" "$noninvestmentincome_csv_filename")
+declare -a t_25=("disclosures_spouseincome" "$spouseincome_fields" "$spouseincome_csv_filename")
+declare -a t_26=("disclosures_reimbursement" "$disclosures_reimbursement_fields" "$disclosures_reimbursement_csv_filename")
+declare -a t_27=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gift_csv_filename")
+declare -a t_28=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
+
+# Create a new array with the data of each associative array
+declare -a listOfLists
+for (( i=1; i<=$NUM_TABLES; i++ )); do
+    declare -n table_array="t_$i"
+    listOfLists+=("(${table_array[*]@Q})")
+done
+
+# Stream to S3
+for group in "${listOfLists[@]}"; do
+declare -a lst="$group"
+echo "Streaming ${lst[0]} to S3"
+psql \
+	--command \
+	  "set statement_timeout to 0;
+	   COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, FORCE_QUOTE *)" \
 	--quiet \
-	--host $DB_HOST \
-	--username $DB_USER \
+	--host "$DB_HOST" \
+	--username "$DB_USER" \
 	--dbname courtlistener | \
 	bzip2 | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/financial-disclosures-debts-`date -I`.csv.bz2 --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/"${lst[2]}".bz2 --acl public-read
+done
 
 echo "Exporting schema to S3"
-PGPASSWORD=$DB_PASSWORD pg_dump \
-    --host $DB_HOST \
-    --username $DB_USER \
+schema_filename="schema-$(date -I).sql"
+pg_dump \
+    --host "$DB_HOST" \
+    --username "$DB_USER" \
     --create \
     --schema-only \
     --table 'search_*' \
@@ -434,6 +324,75 @@ PGPASSWORD=$DB_PASSWORD pg_dump \
     --no-privileges \
     --no-publications \
     --no-subscriptions courtlistener | \
-	aws s3 cp - s3://com-courtlistener-storage/bulk-data/schema-`date -I`.sql --acl public-read
+	aws s3 cp - s3://com-courtlistener-storage/bulk-data/"$schema_filename" --acl public-read
+
+echo "Generating and streaming load bulk data script to S3"
+BULK_SCRIPT_FILENAME="load-bulk-data-$(date -I).sh"
+# Create a temp file to store the script
+OUT="$(mktemp /tmp/temp_load_bulk_load_data.XXXXXXXXXX)" || { echo "Failed to create temp file"; exit 1; }
+# Start creating the script to load bulk data
+cat > "$OUT" <<- EOF
+#!/bin/bash
+set -e
+# You must place all uncompressed bulk files in the same directory and set
+# environment variable BULK_DIR, BULK_DB_HOST, BULK_DB_USER, BULK_DB_PASSWORD
+# NOTES:
+# 1. If you have your postgresql instance on a docker service, you need to mount
+# the directory where the bulk files are, otherwise you will get this error:
+# ERROR:  could not open file No such file or directory
+# 2. You may need to grant execute permissions to this file
+
+if [[ -z \${BULK_DIR} ]];
+then
+echo "Variable having name 'BULK_DIR' is not set. BULK_DIR is where all the unzipped files are."
+exit
+fi
+
+if [[ -z \${BULK_DB_HOST} ]];
+then
+echo "Variable having name 'BULK_DB_HOST' is not set."
+exit
+fi
+
+if [[ -z \${BULK_DB_USER} ]];
+then
+echo "Variable having name 'BULK_DB_USER' is not set."
+exit
+fi
+
+if [[ -z \${BULK_DB_PASSWORD} ]];
+then
+echo "Variable having name 'BULK_DB_PASSWORD' is not set."
+exit
+fi
+
+# Default from schema is 'courtlistener'
+export BULK_DB_NAME=courtlistener
+export PGPASSWORD=\$BULK_DB_PASSWORD
+
+echo "Loading schema to database: $schema_filename"
+psql -f "\$BULK_DIR"/$schema_filename --host "\$BULK_DB_HOST" --username "\$BULK_DB_USER"
+
+EOF
+
+# Start adding the code to the script to load the tables
+for group in "${listOfLists[@]}"; do
+declare -a lst="$group"
+cat >> "$OUT" <<- EOF
+echo "Loading ${lst[2]} to database"
+psql --command \
+"COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, HEADER)" \
+--host "\$BULK_DB_HOST" \
+--username "\$BULK_DB_USER" \
+--dbname "\$BULK_DB_NAME"
+
+EOF
+done
+
+# Upload generated file to S3
+aws s3 cp "$OUT" s3://com-courtlistener-storage/bulk-data/"$BULK_SCRIPT_FILENAME" --acl public-read
+
+# Remove the temp file when script ends to execute
+trap "rm -f $OUT" EXIT
 
 echo "Done."

@@ -1,3 +1,4 @@
+from asgiref.sync import sync_to_async
 from django.db import transaction
 from django.db.models import QuerySet
 
@@ -5,7 +6,7 @@ from cl.citations.group_parentheticals import compute_parenthetical_groups
 from cl.search.models import OpinionCluster, ParentheticalGroup
 
 
-def get_or_create_parenthetical_groups(
+async def get_or_create_parenthetical_groups(
     cluster: OpinionCluster,
 ) -> QuerySet[ParentheticalGroup]:
     """
@@ -15,10 +16,15 @@ def get_or_create_parenthetical_groups(
     :param cluster: An OpinionCluster object
     :return: A list of ParentheticalGroup's for the given cluster
     """
-    if cluster.parentheticals.filter(group__isnull=True).count():
-        with transaction.atomic():
-            create_parenthetical_groups(cluster)
+    if await cluster.parentheticals.filter(group__isnull=True).acount():
+        await atomic_create_parenthetical_groups(cluster)
     return cluster.parenthetical_groups
+
+
+@sync_to_async
+@transaction.atomic
+def atomic_create_parenthetical_groups(cluster: OpinionCluster) -> None:
+    create_parenthetical_groups(cluster)
 
 
 def create_parenthetical_groups(cluster: OpinionCluster) -> None:

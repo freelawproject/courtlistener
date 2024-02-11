@@ -3,10 +3,10 @@ name: docker build and test
 on:
   push:
     branches:
-      - '**'
+      - "**"
   pull_request:
     branches:
-      - 'main'
+      - "main"
 
 jobs:
   build:
@@ -17,7 +17,7 @@ jobs:
         tag_flags: ["--exclude-tag selenium", "--tag selenium"]
     steps:
       - name: Check out solr
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: freelawproject/courtlistener-solr-server
           ref: main
@@ -34,7 +34,7 @@ jobs:
           sudo find data -type f -exec chmod 664 {} \;
           sudo find solr -type f -exec chmod 664 {} \;
       - name: Check out CourtListener
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: courtlistener
 
@@ -56,24 +56,12 @@ jobs:
         uses: docker/setup-buildx-action@v2
         with:
           driver-opts: network=host
-      - name: Build latest docker django image
-        uses: docker/build-push-action@v4
+      - name: Prebuild docker images
+        uses: docker/build-push-action@v5
         with:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
           load: true
-          target: web-dev
-          build-args: |
-            BUILD_ENV=dev
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Build latest docker celery image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./courtlistener
-          file: ./courtlistener/docker/django/Dockerfile
-          load: true
-          target: celery
           build-args: |
             BUILD_ENV=dev
           cache-from: type=gha

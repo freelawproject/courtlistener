@@ -2,6 +2,7 @@ import datetime
 import operator
 from datetime import date
 from functools import reduce
+from unittest import mock
 
 from django.urls import reverse
 from elasticsearch_dsl import Q
@@ -29,7 +30,13 @@ from cl.search.factories import (
     ParentheticalGroupFactory,
 )
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Citation
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.search.tasks import es_save_document, update_es_document
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 
 
 class ParentheticalESTest(ESIndexTestCase, TestCase):
@@ -37,7 +44,6 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("search.ParentheticalGroup")
         cls.c1 = CourtFactory(id="canb", jurisdiction="I")
         cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
         cls.c3 = CourtFactory(id="cacd", jurisdiction="FB")
@@ -158,10 +164,11 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         cls.p3.save()
         cls.p4.group = cls.pg4
         cls.p4.save()
+        cls.rebuild_index("search.ParentheticalGroup")
 
     @classmethod
     def setUpClass(cls):
-        super(ParentheticalESTest, cls).setUpClass()
+        super().setUpClass()
         cls.rebuild_index("search.ParentheticalGroup")
 
     def test_filter_search(self) -> None:
@@ -304,9 +311,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             "type": "pa",
         }
         search_query = ParentheticalGroupDocument.search()
-        s, total_query_results, top_hits_limit = build_es_main_query(
-            search_query, cd
-        )
+        s, *_ = build_es_main_query(search_query, cd)
         self.assertEqual(s.count(), 1)
 
     def test_cd_query_2(self) -> None:
@@ -502,22 +507,23 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
         )
 
 
-class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
+class ParentheticalESSignalProcessorTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
     """Parenthetical ES indexing related tests"""
 
-    @classmethod
-    def setUpTestData(cls):
-        # Create factories for the test.
-        cls.c1 = CourtFactory(id="canb", jurisdiction="I")
-        cls.c2 = CourtFactory(id="ca1", jurisdiction="F")
-        cls.cluster_1 = OpinionClusterFactory(
+    def setUp(self):
+        super().setUp()
+        self.c1 = CourtFactory(id="canb", jurisdiction="I")
+        self.c2 = CourtFactory(id="ca1", jurisdiction="F")
+        self.cluster_1 = OpinionClusterFactory(
             case_name="Lorem Ipsum",
             case_name_short="Ipsum",
             judges="Lorem 2",
             scdb_id="0000",
             nature_of_suit="410",
             docket=DocketFactory(
-                court=cls.c1,
+                court=self.c1,
                 docket_number="1:95-cr-11111",
                 date_reargued=date(1986, 1, 30),
                 date_reargument_denied=date(1986, 5, 30),
@@ -526,9 +532,9 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
             source="H",
             precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
         )
-        cls.cluster_2 = OpinionClusterFactory(
+        self.cluster_2 = OpinionClusterFactory(
             docket=DocketFactory(
-                court=cls.c1,
+                court=self.c1,
                 docket_number="1:25-cr-1111",
                 date_reargued=date(1986, 1, 30),
                 date_reargument_denied=date(1986, 5, 30),
@@ -537,30 +543,26 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
             source="H",
             precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
         )
-        cls.o = OpinionWithParentsFactory(
-            cluster=cls.cluster_1,
+        self.o = OpinionWithParentsFactory(
+            cluster=self.cluster_1,
             type="Plurality Opinion",
             extracted_by_ocr=True,
         )
-        cls.o_2 = OpinionWithParentsFactory(
-            cluster=cls.cluster_2,
+        self.o_2 = OpinionWithParentsFactory(
+            cluster=self.cluster_2,
         )
-        cls.p5 = ParentheticalFactory(
-            describing_opinion=cls.o_2,
-            described_opinion=cls.o_2,
+        self.p5 = ParentheticalFactory(
+            describing_opinion=self.o_2,
+            described_opinion=self.o_2,
             group=None,
             text="Lorem Ipsum Dolor.",
             score=0.4218,
         )
-        cls.pg_test = ParentheticalGroupFactory(
-            opinion=cls.o, representative=cls.p5, score=0.3236, size=1
+        self.pg_test = ParentheticalGroupFactory(
+            opinion=self.o, representative=self.p5, score=0.3236, size=1
         )
-        cls.p5.group = cls.pg_test
-        cls.p5.save()
-
-    def setUp(self):
-        super().setUp()
-        self.rebuild_index("search.ParentheticalGroup")
+        self.p5.group = self.pg_test
+        self.p5.save()
 
     def test_keep_in_sync_related_pa_objects_on_save(self) -> None:
         """Test PA documents are updated in ES when related objects change."""
@@ -647,11 +649,11 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
         self.assertEqual(0.70, doc.representative_score)
 
         # Confirm related object fields using display value are properly indexed.
-        self.assertEqual("Non-Precedential", doc.status)
+        self.assertEqual("Unpublished", doc.status)
         self.cluster_1.precedential_status = PRECEDENTIAL_STATUS.PUBLISHED
         self.cluster_1.save()
         doc = ParentheticalGroupDocument.get(id=self.pg_test.pk)
-        self.assertEqual("Precedential", doc.status)
+        self.assertEqual("Published", doc.status)
         self.pg_test.delete()
 
     def test_keep_in_sync_related_pa_objects_on_m2m_change(self) -> None:
@@ -717,21 +719,105 @@ class ParentheticalESSignalProcessorTest(ESIndexTestCase, TestCase):
         self.pg_test.delete()
         self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_id))
 
-        # Confirm we can index a document if it doesn't exist when trying to
-        # update a related document.
-        # Simulate new document is not indexed in ES yet, index it and delete
-        # the document from ES but keep the object in DB.
-        pg_1 = ParentheticalGroupFactory(
-            opinion=self.o, representative=self.p5, score=0.3236, size=1
-        )
-        pg_1_id = pg_1.pk
-        doc = ParentheticalGroupDocument.get(id=pg_1.pk)
-        doc.delete()
-        self.assertEqual(False, ParentheticalGroupDocument.exists(id=pg_1_id))
+    def test_parenthetical_indexing_and_tasks_count(self) -> None:
+        """Confirm a ParentheticalGroup is properly indexed in ES with the
+        right number of indexing tasks.
+        """
 
-        # Try to update a related object field.
-        self.cluster_1.precedential_status = PRECEDENTIAL_STATUS.IN_CHAMBERS
-        self.cluster_1.save()
-        # Document is indexed in ES again.
-        self.assertEqual(True, ParentheticalGroupDocument.exists(id=pg_1_id))
-        pg_1.delete()
+        # Index ParentheticalGroup on creation.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            cluster_1 = OpinionClusterFactory(
+                docket=self.cluster_1.docket, case_name="Salt & Pepper"
+            )
+            cluster_2 = OpinionClusterFactory(
+                docket=self.cluster_2.docket, case_name="Etiam vs volutpat"
+            )
+            o = OpinionWithParentsFactory(
+                cluster=cluster_1,
+            )
+            o_2 = OpinionWithParentsFactory(
+                cluster=cluster_2,
+            )
+            p5 = ParentheticalFactory(
+                describing_opinion=o_2,
+                described_opinion=o_2,
+                group=None,
+                text="Lorem Ipsum Dolor.",
+                score=0.4218,
+            )
+            pg_test = ParentheticalGroupFactory(
+                opinion=o, representative=p5, score=0.3236, size=1
+            )
+            p5.group = pg_test
+            p5.save()
+
+        # 5 es_save_document task calls for ParentheticalGroup creation.
+        # 2 Clusters, 2 Opinions and 1 ParentheticalGroup
+        # Persons created by OpinionWithParentsFactory shouldn't call tasks
+        # since they are not Judges.
+        self.reset_and_assert_task_count(expected=5)
+        self.assertTrue(ParentheticalGroupDocument.exists(id=pg_test.pk))
+
+        # Update a ParentheticalGroup without changes.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            pg_test.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update a ParentheticalGroup tracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            p6 = ParentheticalFactory(
+                describing_opinion=o,
+                described_opinion=o,
+                group=None,
+                text="Phasellus porta",
+                score=0.4218,
+            )
+            pg_test.opinion = o_2
+            pg_test.representative = p6
+            pg_test.save()
+
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        pg_doc = ParentheticalGroupDocument.get(id=pg_test.pk)
+        self.assertEqual(pg_doc.caseName, o_2.cluster.case_name)
+        self.assertEqual(pg_doc.representative_text, p6.text)
+
+        # Confirm a ParentheticalGroup is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        # Clean the ParentheticalGroup index.
+        self.delete_index("search.ParentheticalGroup")
+        self.create_index("search.ParentheticalGroup")
+
+        self.assertFalse(ParentheticalGroupDocument.exists(id=pg_test.pk))
+        # ParentheticalGroup creation on update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            pg_test.opinion = o
+            pg_test.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
+        pg_doc = ParentheticalGroupDocument.get(id=pg_test.pk)
+        self.assertEqual(pg_doc.caseName, o.cluster.case_name)
+
+        pg_test.delete()

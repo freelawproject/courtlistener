@@ -19,6 +19,7 @@ from cl.people_db.factories import PersonFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
@@ -26,6 +27,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
@@ -195,7 +197,7 @@ class OpinionClusterFactoryWithChildrenAndParents(
         OpinionWithChildrenFactory,
         factory_related_name="cluster",
     )
-    precedential_status = ("Published", "Precedential")  # Always precedential
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
 
 
 class OpinionClusterWithParentsFactory(
@@ -266,10 +268,6 @@ class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
 
-    idb_data = RelatedFactory(
-        "cl.recap.factories.FjcIntegratedDatabaseFactory",
-        factory_related_name="docket",
-    )
     source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
     court = SubFactory(CourtFactory)
     appeal_from = SubFactory(CourtFactory)
@@ -313,6 +311,28 @@ class OpinionsCitedWithParentsFactory(DjangoModelFactory):
 
     citing_opinion = SubFactory(
         "cl.search.factories.OpinionFactory",
+    )
+    cited_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )
+
+
+class BankruptcyInformationFactory(DjangoModelFactory):
+    class Meta:
+        model = BankruptcyInformation
+
+    chapter = Faker("random_id_string")
+    trustee_str = Faker("name_female")
+
+
+class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
+    """Make a OpinionsCitedByRECAPDocument with parents"""
+
+    class Meta:
+        model = OpinionsCitedByRECAPDocument
+
+    citing_document = SubFactory(
+        "cl.search.factories.RECAPDocumentFactory",
     )
     cited_opinion = SubFactory(
         "cl.search.factories.OpinionFactory",

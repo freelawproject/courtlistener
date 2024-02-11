@@ -29,7 +29,7 @@ CleanedUserFormType = Dict[str, str]
 
 class DecimalOrOtherChoiceField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
-        super(DecimalOrOtherChoiceField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def to_python(self, value):
         """Makes sure that the value returned is either returned as a decimal
@@ -39,17 +39,16 @@ class DecimalOrOtherChoiceField(forms.ChoiceField):
         if value == "other":
             return value
         else:
-            return super(DecimalOrOtherChoiceField, self).to_python(value)
+            return super().to_python(value)
 
     def validate(self, value):
         if value == "other":
             return value
         else:
-            return super(DecimalOrOtherChoiceField, self).validate(value)
+            return super().validate(value)
 
 
 class ProfileForm(ModelForm):
-    wants_newsletter = forms.BooleanField(required=False)
     STATE_CHOICES = list(STATE_CHOICES)
     STATE_CHOICES.insert(0, ("", "---------"))
     state = USStateField(
@@ -69,7 +68,6 @@ class ProfileForm(ModelForm):
             "city",
             "state",
             "zip_code",
-            "wants_newsletter",
         )
         widgets = {
             "address1": forms.TextInput(attrs={"class": "form-control"}),
@@ -79,10 +77,7 @@ class ProfileForm(ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        super(ProfileForm, self).__init__(*args, **kwargs)
-        self.fields[
-            "wants_newsletter"
-        ].label = "Send me the monthly Free Law Project newsletter"
+        super().__init__(*args, **kwargs)
         for key in ["address1", "city", "state", "zip_code"]:
             self.fields[key].required = True
 
@@ -101,7 +96,7 @@ class UserForm(ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        super(UserForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # Make all fields required on the donation form
         for key in self.fields:
             self.fields[key].required = True

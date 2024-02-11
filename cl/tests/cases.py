@@ -51,7 +51,7 @@ class RestartRateLimitMixin:
     """
 
     @classmethod
-    def restart_rate_limit(self):
+    def restart_rate_limit(cls):
         r = make_redis_interface("CACHE")
         keys = r.keys(":1:rl:*")
         if keys:
@@ -67,9 +67,9 @@ class RestartSentEmailQuotaMixin:
     """Restart sent email quota in redis."""
 
     @classmethod
-    def restart_sent_email_quota(self):
+    def restart_sent_email_quota(cls, prefix="email"):
         r = make_redis_interface("CACHE")
-        keys = r.keys("email:*")
+        keys = r.keys(f"{prefix}:*")
 
         if keys:
             r.delete(*keys)
@@ -153,16 +153,52 @@ class ESIndexTestCase(SimpleTestCase):
         super().tearDownClass()
 
     @classmethod
-    def rebuild_index(self, model):
+    def rebuild_index(cls, model):
         """Create and populate the Elasticsearch index and mapping"""
         call_command("search_index", "--rebuild", "-f", "--models", model)
 
     @classmethod
-    def create_index(self, model):
+    def create_index(cls, model):
         """Create the elasticsearch index."""
         call_command("search_index", "--create", "-f", "--models", model)
 
     @classmethod
-    def delete_index(self, model):
+    def delete_index(cls, model):
         """Delete the elasticsearch index."""
         call_command("search_index", "--delete", "-f", "--models", model)
+
+    @classmethod
+    def restart_celery_throttle_key(cls):
+        r = make_redis_interface("CACHE")
+        keys = r.keys("celery_throttle:*")
+        if keys:
+            r.delete(*keys)
+        keys = r.keys("celery_throttle:*")
+
+    def tearDown(self) -> None:
+        self.restart_celery_throttle_key()
+        super().tearDown()
+
+
+class CountESTasksTestCase(SimpleTestCase):
+    def setUp(self):
+        self.task_call_count = 0
+
+    def count_task_calls(self, task, *args, **kwargs) -> None:
+        """Wraps the task to count its calls and assert the expected count."""
+        # Increment the call count
+        self.task_call_count += 1
+
+        # Call the task
+        if task.__name__ == "es_save_document":
+            return task.s(*args, **kwargs)
+        else:
+            task.apply_async(args=args, kwargs=kwargs)
+
+    def reset_and_assert_task_count(self, expected) -> None:
+        """Resets the task call count and asserts the expected number of calls."""
+
+        assert (
+            self.task_call_count == expected
+        ), f"Expected {expected} task calls, but got {self.task_call_count}"
+        self.task_call_count = 0

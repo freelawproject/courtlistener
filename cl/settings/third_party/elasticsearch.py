@@ -6,19 +6,43 @@ from ..django import TESTING
 
 if TESTING:
     ELASTICSEARCH_DISABLED = True
+    ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = False
+    ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = False
+    ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = True
+    ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED = True
+    ES_HIGHLIGHTER = "fvh"
 else:
     ELASTICSEARCH_DISABLED = env(
         "ELASTICSEARCH_DISABLED",
         default=False,
     )
-
+    ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = env(
+        "ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED",
+        default=False,
+    )
+    ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = env(
+        "ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED",
+        default=False,
+    )
+    ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = env(
+        "ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED",
+        default=True,
+    )
+    ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED = env(
+        "ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED",
+        default=True,
+    )
+    ES_HIGHLIGHTER = env(
+        "ES_HIGHLIGHTER",
+        default="fvh",
+    )
 #
 # Connection settings
 #
 ELASTICSEARCH_DSL_HOST = env(
     "ELASTICSEARCH_DSL_HOST",
     default=[
-        "cl-es:9200",
+        "https://cl-es:9200",
     ],
 )
 ELASTICSEARCH_USER = env(
@@ -33,14 +57,21 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
+ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=3500)
+
+base_connection_params = {
+    "hosts": ELASTICSEARCH_DSL_HOST,
+    "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
+    "verify_certs": False,
+    "ca_certs": ELASTICSEARCH_CA_CERT,
+    "timeout": ELASTICSEARCH_TIMEOUT,
+}
+no_retry_conn = base_connection_params.copy()
+no_retry_conn["max_retries"] = 0
+
 ELASTICSEARCH_DSL = {
-    "default": {
-        "hosts": ELASTICSEARCH_DSL_HOST,
-        "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
-        "use_ssl": True,
-        "verify_certs": False,
-        "ca_certs": ELASTICSEARCH_CA_CERT,
-    },
+    "default": base_connection_params,
+    "no_retry_connection": no_retry_conn,
     "analysis": {
         "analyzer": {
             "text_en_splitting_cl": {
@@ -68,6 +99,16 @@ ELASTICSEARCH_DSL = {
                     "remove_duplicates",
                 ],
             },
+            "search_analyzer_exact": {
+                "type": "custom",
+                "tokenizer": "whitespace",
+                "filter": [
+                    "lowercase",
+                    "custom_word_delimiter_filter",
+                    "remove_leading_zeros",
+                    "english_stop",
+                ],
+            },
             "english_exact": {
                 "type": "custom",
                 "tokenizer": "whitespace",
@@ -76,7 +117,6 @@ ELASTICSEARCH_DSL = {
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",
                     "english_stop",
-                    "remove_duplicates",
                 ],
             },
         },
@@ -134,6 +174,31 @@ ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS = env(
     "ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS", default=0
 )
 
+# RECAP Search index shards and replicas
+ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS", default=0
+)
+
+
+# People Search index shards and replicas
+ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS", default=0
+)
+
+# Opinions Search index shards and replicas
+ELASTICSEARCH_OPINION_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_OPINION_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS", default=0
+)
+
 # ES Auto refresh. In production, it's suggested to wait for ES periodically
 # refresh (every ~1 second) since it's a resource-intensive operation.
 # This setting is overridden for testing.
@@ -142,12 +207,27 @@ ELASTICSEARCH_DSL_AUTO_REFRESH = env(
     "ELASTICSEARCH_DSL_AUTO_REFRESH", default=True
 )
 
-####################################
-# Percolator batch size for Alerts #
-####################################
-PERCOLATOR_PAGE_SIZE = 100
+#############################################################
+# Batch size for Elasticsearch queries utilizing pagination #
+# such as Percolator              #
+#############################################################
+ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 
 ###################################################
 # The maximum number of scheduled hits per alert. #
 ###################################################
 SCHEDULED_ALERT_HITS_LIMIT = 30
+
+################################
+# ES bulk indexing batch size #
+################################
+ELASTICSEARCH_BULK_BATCH_SIZE = env(
+    "ELASTICSEARCH_BULK_BATCH_SIZE", default=200
+)
+
+######################################################
+# ES parallel bulk indexing number of threads to use #
+######################################################
+ELASTICSEARCH_PARALLEL_BULK_THREADS = env(
+    "ELASTICSEARCH_PARALLEL_BULK_THREADS", default=5
+)

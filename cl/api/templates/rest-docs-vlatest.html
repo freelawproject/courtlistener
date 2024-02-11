@@ -2,9 +2,9 @@
 {% load static %}
 {% load extras %}
 
-{% block title %}REST API, v3.14 &ndash; CourtListener.com{% endblock %}
-{% block description %}REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
-{% block og_description %}REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
+{% block title %}REST API, v3.15 &ndash; CourtListener.com{% endblock %}
+{% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
+{% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -17,7 +17,7 @@
     {% include "includes/toc_sidebar.html" %}
   </div>
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <h1 id="about">REST API &ndash; v3.14</h1>
+    <h1 id="about">REST API &ndash; v3.15</h1>
 
     <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
@@ -575,18 +575,26 @@
       </li>
       <li>The <code>sha1</code> field provides a unique cryptographic hash of every item in our collection.
       </li>
-      <li>Some of the <code>plain_text</code>, <code>html</code>, <code>html_lawbox</code>, <code>html_columbia</code> and <code>html_with_citations</code> fields will be populated depending on the <code>Opinion Cluster's</code> <code>source</code> field:
+      <li>Some of the text fields will be populated depending on the <code>Opinion Cluster's</code> <code>source</code> field. The best approach is to choose the first of these fields that is populated, according to the following order (from best to worst):
         <ul>
-          <li><code>plain_text</code> will be populated if we got the opinion from a court's website as a PDF or Microsoft Word document.
+          <li>
+            <code>html_with_citations</code> is a special field that is populated by parsing one of the above fields for citations, generating an HTML file with hyperlinked citations. All items should eventually have this field, though it can be empty initially or if the cross-linker crashes. In general, this is the field that is used to generate pages on CourtListener and the one we recommend.
           </li>
-          <li><code>html</code> will be populated if we got the opinion from a court's website as a Word Perfect or HTML document, or if we got the opinion from Resource.org, which provides HTML documents.
+          <li>
+            <code>html_columbia</code> will be populated if we got the content from the Columbia collaboration.
           </li>
-          <li><code>html_lawbox</code> will be populated if we got the content from the Lawbox donation.
+          <li>
+            <code>html_lawbox</code> will be populated if we got the content from the Lawbox donation.
           </li>
-          <li><code>html_columbia</code> will be populated if we got the content from the Columbia collaboration.
+          <li>
+            <code>xml_harvard</code> will be populated if the source was Harvard's Caselaw Access Project. This field has a lot of data but is inferior to others due to being created by OCR instead of by humans.</li>
+          <li>
+            <code>html_anon_2020</code> will be populated if we got the content from our anonymous source in 2020.</li>
+          <li>
+            <code>html</code> will be populated if we got the opinion from a court's website as a Word Perfect or HTML document, or if we got the opinion from Resource.org, which provides HTML documents.
           </li>
-          <li><code>html_anon_2020</code> will be populated if we got the content from our anonymous source in 2020.</li>
-          <li><code>html_with_citations</code> is a special field that is populated by parsing one of the above fields for citations, generating an HTML file with linkified citations. All items should eventually have this field (though processing can take some time). In general, this is the field that is used to generate pages on CourtListener.
+          <li>
+            <code>plain_text</code> will be populated if we got the opinion from a court's website as a PDF or Microsoft Word document.
           </li>
         </ul>
       </li>

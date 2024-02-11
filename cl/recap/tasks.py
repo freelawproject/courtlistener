@@ -94,7 +94,11 @@ from cl.recap.models import (
 )
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
-from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
+from cl.search.tasks import (
+    add_items_to_solr,
+    add_or_update_recap_docket,
+    index_docket_parties_in_es,
+)
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -167,40 +171,61 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     return result
 
 
-async def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
+async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
     """Mark the processing queue item as successfully completed.
 
     :param pq: The ProcessingQueue object to manipulate
+    :return: A two tuple, the PQ status, the PQ error message.
+    """
+    # Ditch the original file
+    await sync_to_async(pq.filepath_local.delete)(save=False)
+    message = "Successful upload! Nice work."
+    if pq.debug:
+        message = "Successful debugging upload! Nice work."
+    return await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
+
+
+async def associate_related_instances(
+    pq: ProcessingQueue | EmailProcessingQueue,
+    d_id: int | None = None,
+    de_id: int | None = None,
+    rd_id: int | list[int] | None = None,
+) -> None:
+    """Associate the related upload instances.
+
+    :param pq: The ProcessingQueue or EmailProcessingQueue object to manipulate
     :param d_id: The docket PK to associate with this upload. Either the docket
     that the RECAPDocument is associated with, or the docket that was uploaded.
     :param de_id: The docket entry to associate with this upload. Only applies
     to document uploads, which are associated with docket entries.
     :param rd_id: The RECAPDocument PK to associate with this upload. Only
-    applies to document uploads (obviously).
+    applies to document uploads (obviously). If the pq is a EmailProcessingQueue
+    this param accepts a list of RDs Pks.
+    :return: None
     """
-    # Ditch the original file
-    await sync_to_async(pq.filepath_local.delete)(save=False)
-    if pq.debug:
-        pq.error_message = "Successful debugging upload! Nice work."
+
+    if isinstance(pq, EmailProcessingQueue):
+        await pq.recap_documents.aadd(*rd_id)
     else:
-        pq.error_message = "Successful upload! Nice work."
-    pq.status = PROCESSING_STATUS.SUCCESSFUL
-    pq.docket_id = d_id
-    pq.docket_entry_id = de_id
-    pq.recap_document_id = rd_id
-    await pq.asave()
-    return pq.status, pq.error_message
+        pq.docket_id = d_id
+        pq.docket_entry_id = de_id
+        pq.recap_document_id = rd_id
+        await pq.asave()
 
 
 async def mark_pq_status(
-    pq, msg, status, message_property_name="error_message"
-):
+    pq: ProcessingQueue,
+    msg: str,
+    status: int,
+    message_property_name: str = "error_message",
+) -> tuple[int, str]:
     """Mark the processing queue item as some process, and log the message.
 
     :param pq: The ProcessingQueue object to manipulate
     :param msg: The message to log and to save to pq's error_message field.
     :param status: A pq status code as defined on the ProcessingQueue model.
     :param message_property_name: The message property to attach the msg argument to.
+    :return: A two tuple, the PQ status, the PQ error message.
     """
     if msg:
         logger.info(msg)
@@ -243,7 +268,7 @@ async def process_recap_pdf(pk):
                 d = await Docket.objects.aget(
                     pacer_case_id=pq.pacer_case_id, court_id=pq.court_id
                 )
-            except Docket.DoesNotExist as exc:
+            except Docket.DoesNotExist:
                 # No Docket and no RECAPDocument. Do a retry. Hopefully
                 # the docket will be in place soon (it could be in a
                 # different upload task that hasn't yet been processed).
@@ -278,7 +303,7 @@ async def process_recap_pdf(pk):
                 de = await DocketEntry.objects.aget(
                     docket=d, entry_number=pq.document_number
                 )
-            except DocketEntry.DoesNotExist as exc:
+            except DocketEntry.DoesNotExist:
                 logger.warning(
                     f"Unable to find docket entry for processing queue '{pq}'."
                 )
@@ -317,7 +342,11 @@ async def process_recap_pdf(pk):
                     )
                 break
 
-    rd.document_number = pq.document_number
+    # document_number field is a CharField in RECAPDocument and a
+    # BigIntegerField in ProcessingQueue. To prevent the ES signal
+    # processor fields tracker from detecting it as a value change, it should
+    # be converted to a string.
+    rd.document_number = str(pq.document_number)
     rd.attachment_number = pq.attachment_number
 
     # Do the file, finally.
@@ -384,15 +413,17 @@ async def process_recap_pdf(pk):
             ).apply_async
         )()
 
-    de = await DocketEntry.objects.aget(recap_documents=rd)
-    await mark_pq_successful(
-        pq,
-        d_id=de.docket_id,
-        de_id=rd.docket_entry_id,
-        rd_id=rd.pk,
-    )
-    docket = await Docket.objects.aget(id=de.docket_id)
-    await sync_to_async(mark_ia_upload_needed)(docket, save_docket=True)
+    if not pq.debug:
+        de = await DocketEntry.objects.aget(recap_documents=rd)
+        await associate_related_instances(
+            pq,
+            d_id=de.docket_id,
+            de_id=de.pk,
+            rd_id=rd.pk,
+        )
+        await mark_pq_successful(pq)
+        docket = await Docket.objects.aget(id=de.docket_id)
+        await mark_ia_upload_needed(docket, save_docket=True)
     return rd
 
 
@@ -540,12 +571,13 @@ async def process_recap_docket(pk):
     )
 
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
+    await update_docket_metadata(d, data)
     if not d.pacer_case_id:
         d.pacer_case_id = pq.pacer_case_id
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     await d.asave()
@@ -559,18 +591,20 @@ async def process_recap_docket(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await add_docket_entries(
+    items_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
-    await sync_to_async(process_orphan_documents)(
-        rds_created, pq.court_id, d.date_filed
-    )
+    if data["parties"]:
+        # Index or re-index parties only if the docket has parties.
+        await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+    await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -627,7 +661,7 @@ async def process_recap_attachment(
         document_number = att_data["document_number"]
     try:
         court = await Court.objects.aget(id=pq.court_id)
-        rds_affected, de = await sync_to_async(merge_attachment_page_data)(
+        rds_affected, de = await merge_attachment_page_data(
             court,
             pq.pacer_case_id,
             att_data["pacer_doc_id"],
@@ -653,9 +687,8 @@ async def process_recap_attachment(
         return pq_status, msg, []
 
     await add_tags_to_objs(tag_names, rds_affected)
-    pq_status, msg = await mark_pq_successful(
-        pq, d_id=de.docket_id, de_id=de.pk
-    )
+    await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = await mark_pq_successful(pq)
     return pq_status, msg, rds_affected
 
 
@@ -716,13 +749,13 @@ async def process_recap_claims_register(pk):
 
     # Merge the contents into CL
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
+    await update_docket_metadata(d, data)
 
     retries = 5
     while True:
         try:
             await d.asave()
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -752,8 +785,8 @@ async def process_recap_claims_register(pk):
         "claims_registry.html",
         ContentFile(text.encode()),
     )
-
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {"docket_pk": d.pk}
 
 
@@ -805,17 +838,18 @@ async def process_recap_docket_history_report(pk):
     )
 
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
+    await update_docket_metadata(d, data)
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     retries = 5
     while True:
         try:
             await d.asave()
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -842,17 +876,16 @@ async def process_recap_docket_history_report(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await add_docket_entries(
+    items_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
-    await sync_to_async(process_orphan_documents)(
-        rds_created, pq.court_id, d.date_filed
-    )
+    await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -909,7 +942,7 @@ async def process_case_query_page(pk):
     )
     current_case_name = d.case_name
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
+    await update_docket_metadata(d, data)
 
     # Update the docket in SOLR if the case name has changed and contains
     # docket entries
@@ -919,7 +952,8 @@ async def process_case_query_page(pk):
             content_updated = True
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     retries = 5
@@ -927,7 +961,7 @@ async def process_case_query_page(pk):
         try:
             await d.asave()
             await sync_to_async(add_bankruptcy_data_to_docket)(d, data)
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -953,8 +987,8 @@ async def process_case_query_page(pk):
         "case_report.html",
         ContentFile(text.encode()),
     )
-
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": content_updated,
@@ -984,7 +1018,6 @@ async def process_recap_appellate_docket(pk):
         }
 
     This value is a dict so that it can be ingested in a Celery chain.
-
     """
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -1024,13 +1057,14 @@ async def process_recap_appellate_docket(pk):
     )
 
     d.add_recap_source()
-    await sync_to_async(update_docket_metadata)(d, data)
-    d, og_info = await sync_to_async(update_docket_appellate_metadata)(d, data)
+    await update_docket_metadata(d, data)
+    d, og_info = await update_docket_appellate_metadata(d, data)
     if not d.pacer_case_id:
         d.pacer_case_id = pq.pacer_case_id
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     if og_info is not None:
@@ -1047,18 +1081,20 @@ async def process_recap_appellate_docket(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await add_docket_entries(
+    items_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
-    await sync_to_async(process_orphan_documents)(
-        rds_created, pq.court_id, d.date_filed
-    )
+    if data["parties"]:
+        # Index or re-index parties only if the docket has parties.
+        await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+    await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -1107,7 +1143,7 @@ async def process_recap_appellate_attachment(
 
     try:
         court = await Court.objects.aget(id=pq.court_id)
-        rds_affected, de = await sync_to_async(merge_attachment_page_data)(
+        rds_affected, de = await merge_attachment_page_data(
             court,
             pq.pacer_case_id,
             att_data["pacer_doc_id"],
@@ -1125,16 +1161,15 @@ async def process_recap_appellate_attachment(
             pq, msg, PROCESSING_STATUS.FAILED
         )
         return pq_status, msg, []
-    except RECAPDocument.DoesNotExist as exc:
+    except RECAPDocument.DoesNotExist:
         msg = "Could not find docket to associate with attachment metadata"
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED
         )
         return pq_status, msg, []
 
-    pq_status, msg = await mark_pq_successful(
-        pq, d_id=de.docket_id, de_id=de.pk
-    )
+    await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = await mark_pq_successful(pq)
     return pq_status, msg, rds_affected
 
 
@@ -1542,7 +1577,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         return
 
     try:
-        merge_attachment_page_data(
+        async_to_sync(merge_attachment_page_data)(
             rd.docket_entry.docket.court,
             rd.docket_entry.docket.pacer_case_id,
             att_data["pacer_doc_id"],
@@ -2050,6 +2085,7 @@ def get_and_copy_recap_attachment_docs(
 class DocketUpdatedData:
     docket: Docket
     des_returned: list
+    rds_updated: list
     rds_created: list
     content_updated: bool
 
@@ -2259,7 +2295,7 @@ def process_recap_email(
                 docket_data["docket_number"],
             )
             docket.add_recap_source()
-            update_docket_metadata(docket, docket_data)
+            async_to_sync(update_docket_metadata)(docket, docket_data)
 
             if not docket.pacer_case_id:
                 docket.pacer_case_id = docket_entry["pacer_case_id"]
@@ -2275,12 +2311,17 @@ def process_recap_email(
                 ContentFile(body.encode()),
             )
             # Add docket entries for each docket
-            des_returned, rds_created, content_updated = async_to_sync(
-                add_docket_entries
-            )(docket, docket_data["docket_entries"])
+            (
+                (des_returned, rds_updated),
+                rds_created,
+                content_updated,
+            ) = async_to_sync(add_docket_entries)(
+                docket, docket_data["docket_entries"]
+            )
             d_updated = DocketUpdatedData(
                 docket=docket,
                 des_returned=des_returned,
+                rds_updated=rds_updated,
                 rds_created=rds_created,
                 content_updated=content_updated,
             )
@@ -2317,7 +2358,8 @@ def process_recap_email(
 
     # Send docket alerts and webhooks for each docket updated.
     recap_email_recipients = get_recap_email_recipients(epq.destination_emails)
-    all_main_rds = []
+    all_created_rds = []
+    all_updated_rds = []
     for docket_updated in dockets_updated:
         if docket_updated.content_updated:
             newly_enqueued = enqueue_docket_alert(docket_updated.docket.pk)
@@ -2337,9 +2379,19 @@ def process_recap_email(
                 recap_email_recipients,
                 des_pks,
             )
-        all_main_rds += docket_updated.rds_created
+        all_created_rds += docket_updated.rds_created
+        all_updated_rds += docket_updated.rds_updated
 
-    rds_to_extract_add_to_solr = all_attachment_rds + all_main_rds
+    rds_to_extract_add_to_solr = all_attachment_rds + all_created_rds
+    rds_updated_or_created = (
+        all_attachment_rds + all_created_rds + all_updated_rds
+    )
+    async_to_sync(associate_related_instances)(
+        epq,
+        d_id=None,
+        de_id=None,
+        rd_id=[rd.pk for rd in rds_updated_or_created],
+    )
     msg = "Successful upload! Nice work."
     async_to_sync(mark_pq_status)(
         epq, msg, PROCESSING_STATUS.SUCCESSFUL, "status_message"

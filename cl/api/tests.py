@@ -9,7 +9,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
-from django.test.client import AsyncClient, RequestFactory
+from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.exceptions import NotFound
@@ -125,8 +125,8 @@ class BasicAPIPageTest(TestCase):
 
 
 class CoverageTests(IndexedSolrTestCase):
-    def test_coverage_data_view_provides_court_data(self) -> None:
-        response = coverage_data(HttpRequest(), "v2", "ca1")
+    async def test_coverage_data_view_provides_court_data(self) -> None:
+        response = await coverage_data(HttpRequest(), "v2", "ca1")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, "annual_counts")
@@ -197,7 +197,7 @@ class ApiQueryCountTests(TransactionTestCase):
                 bad_query = 'IN (SELECT U0."id" FROM "search_docket" U0)'
                 if bad_query in query["sql"]:
                     self.fail(
-                        f"DRF made a nasty query we thought we "
+                        "DRF made a nasty query we thought we "
                         f"banished: {bad_query=}"
                     )
 
@@ -269,9 +269,9 @@ class ApiEventCreationTestCase(TestCase):
         if keys:
             self.r.delete(*keys)
 
-    def hit_the_api(self) -> None:
+    async def hit_the_api(self) -> None:
         path = reverse("audio-list", kwargs={"version": "v3"})
-        request = RequestFactory().get(path)
+        request = AsyncRequestFactory().get(path)
 
         # Create the view and change the milestones to be something we can test
         # (Otherwise, we need to make 1,000 requests in this test)
@@ -281,14 +281,20 @@ class ApiEventCreationTestCase(TestCase):
         # Set the attributes needed in the absence of middleware
         request.user = self.user
 
-        view(request)
+        await sync_to_async(view)(request)
 
-    def test_are_events_created_properly(self) -> None:
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    async def test_are_events_created_properly(
+        self, mock_logging_prefix
+    ) -> None:
         """Are event objects created as API requests are made?"""
-        self.hit_the_api()
+        await self.hit_the_api()
 
         expected_event_count = 1
-        self.assertEqual(expected_event_count, Event.objects.count())
+        self.assertEqual(expected_event_count, await Event.objects.acount())
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.
@@ -296,10 +302,10 @@ class ApiEventCreationTestCase(TestCase):
         "cl.api.utils.get_logging_prefix",
         return_value="api:Test",
     )
-    def test_api_logged_correctly(self, mock_logging_prefix) -> None:
+    async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
         self.assertEqual(mock_logging_prefix.called, 0)
-        self.hit_the_api()
+        await self.hit_the_api()
         self.assertEqual(mock_logging_prefix.called, 1)
         self.assertEqual(int(self.r.get("api:Test.count")), 1)
 
@@ -356,7 +362,7 @@ class DRFOrderingTests(TestCase):
         )
 
 
-class FilteringCountTestCase(object):
+class FilteringCountTestCase:
     """Mixin for adding an additional test assertion."""
 
     # noinspection PyPep8Naming
@@ -388,43 +394,43 @@ class DRFJudgeApiFilterTests(
     @async_to_sync
     async def setUp(self) -> None:
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
-        self.q: Dict[Any, Any] = dict()
+        self.q: Dict[Any, Any] = {}
 
-    def test_judge_filtering_by_first_name(self) -> None:
+    async def test_judge_filtering_by_first_name(self) -> None:
         """Can we filter by first name?"""
         self.path = reverse("person-list", kwargs={"version": "v3"})
 
         # Filtering with good values brings back 1 result.
         self.q = {"name_first__istartswith": "judith"}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Filtering with bad values brings back no results.
         self.q = {"name_first__istartswith": "XXX"}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
-    def test_judge_filtering_by_date(self) -> None:
+    async def test_judge_filtering_by_date(self) -> None:
         """Do the various date filters work properly?"""
         self.path = reverse("person-list", kwargs={"version": "v3"})
 
         # Exact match for her birthday
         correct_date = date(1942, 10, 21)
         self.q = {"date_dob": correct_date.isoformat()}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # People born after the day before her birthday
         before = correct_date - timedelta(days=1)
         self.q = {"date_dob__gt": before.isoformat()}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Flip the logic. This should return no results.
         self.q = {"date_dob__lt": before.isoformat()}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
-    def test_nested_judge_filtering(self) -> None:
+    async def test_nested_judge_filtering(self) -> None:
         """Can we filter across various relations?
 
         Each of these assertions adds another parameter making our final test
@@ -434,135 +440,135 @@ class DRFJudgeApiFilterTests(
 
         # No results for a bad query
         self.q["educations__degree_level"] = "cert"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         # One result for a good query
         self.q["educations__degree_level"] = "jd"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Again, no results
         self.q["educations__degree_year"] = 1400
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         # But with the correct year...one result
         self.q["educations__degree_year"] = 1965
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Judy went to "New York Law School"
         self.q["educations__school__name__istartswith"] = "New York Law"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Moving on to careers. Bad value, then good.
         self.q["positions__job_title__icontains"] = "XXX"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["positions__job_title__icontains"] = "lawyer"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Moving on to titles...bad value, then good.
         self.q["positions__position_type"] = "act-jud"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["positions__position_type"] = "prac"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Political affiliation filtering...bad, then good.
         self.q["political_affiliations__political_party"] = "r"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["political_affiliations__political_party"] = "d"
-        self.assertCountInResults(2)
+        await self.assertCountInResults(2)
 
         # Sources
         about_now = "2015-12-17T00:00:00Z"
         self.q["sources__date_modified__gt"] = about_now
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q.pop("sources__date_modified__gt")  # Next key doesn't overwrite.
         self.q["sources__date_modified__lt"] = about_now
-        self.assertCountInResults(2)
+        await self.assertCountInResults(2)
 
         # ABA Ratings
         self.q["aba_ratings__rating"] = "q"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["aba_ratings__rating"] = "nq"
-        self.assertCountInResults(2)
+        await self.assertCountInResults(2)
 
-    def test_education_filtering(self) -> None:
+    async def test_education_filtering(self) -> None:
         """Can we filter education objects?"""
         self.path = reverse("education-list", kwargs={"version": "v3"})
 
         # Filter by degree
         self.q["degree_level"] = "cert"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["degree_level"] = "jd"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Filter by degree's related field, School
         self.q["school__name__istartswith"] = "XXX"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["school__name__istartswith"] = "New York"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
-    def test_title_filtering(self) -> None:
+    async def test_title_filtering(self) -> None:
         """Can Judge Titles be filtered?"""
         self.path = reverse("position-list", kwargs={"version": "v3"})
 
         # Filter by title_name
         self.q["position_type"] = "act-jud"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["position_type"] = "c-jud"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
-    def test_reverse_filtering(self) -> None:
+    async def test_reverse_filtering(self) -> None:
         """Can we filter Source objects by judge name?"""
         # I want any source notes about judge judy.
         self.path = reverse("source-list", kwargs={"version": "v3"})
         self.q = {"person": 2}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
-    def test_position_filters(self) -> None:
+    async def test_position_filters(self) -> None:
         """Can we filter on positions"""
         self.path = reverse("position-list", kwargs={"version": "v3"})
 
         # I want positions to do with judge #2 (Judy)
         self.q["person"] = 2
-        self.assertCountInResults(2)
+        await self.assertCountInResults(2)
 
         # Retention events
         self.q["retention_events__retention_type"] = "reapp_gov"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Appointer was Bill, id of 1
         self.q["appointer"] = 1
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q["appointer"] = 3
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
-    def test_racial_filters(self) -> None:
+    async def test_racial_filters(self) -> None:
         """Can we filter by race?"""
         self.path = reverse("person-list", kwargs={"version": "v3"})
         self.q = {"race": "w"}
-        self.assertCountInResults(2)
+        await self.assertCountInResults(2)
 
         # Do an OR. This returns judges that are either black or white (not
         # that it matters, MJ)
         self.q["race"] = ["w", "b"]
-        self.assertCountInResults(3)
+        await self.assertCountInResults(3)
 
-    def test_circular_relationships(self) -> None:
+    async def test_circular_relationships(self) -> None:
         """Do filters configured using strings instead of classes work?"""
         self.path = reverse("education-list", kwargs={"version": "v3"})
 
         # Traverse person, position
         self.q["person__positions__job_title__icontains"] = "xxx"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["person__positions__job_title__icontains"] = "lawyer"
-        self.assertCountInResults(2)
+        await self.assertCountInResults(2)
 
         # Just traverse to the judge table
         self.q["person__name_first"] = "Judy"  # Nope.
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["person__name_first"] = "Judith"  # Yep.
-        self.assertCountInResults(2)
+        await self.assertCountInResults(2)
 
-    def test_exclusion_filters(self) -> None:
+    async def test_exclusion_filters(self) -> None:
         """Can we exclude using !'s?"""
         self.path = reverse("position-list", kwargs={"version": "v3"})
 
@@ -570,7 +576,7 @@ class DRFJudgeApiFilterTests(
         # Note the exclamation mark. In a URL this would look like
         # "?judge!=1". Fun stuff.
         self.q["person!"] = 2
-        self.assertCountInResults(1)  # Bill
+        await self.assertCountInResults(1)  # Bill
 
 
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
@@ -592,141 +598,141 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
     @async_to_sync
     async def setUp(self) -> None:
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
-        self.q: Dict[Any, Any] = dict()
+        self.q: Dict[Any, Any] = {}
 
-    def test_docket_entry_to_docket_filters(self) -> None:
+    async def test_docket_entry_to_docket_filters(self) -> None:
         """Do a variety of docket entry filters work?"""
         self.path = reverse("docketentry-list", kwargs={"version": "v3"})
 
         # Docket filters...
         self.q["docket__id"] = 1
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q["docket__id"] = 10000000000
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q = {"docket__id!": 100000000}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
-    def test_docket_tag_filters(self) -> None:
+    async def test_docket_tag_filters(self) -> None:
         """Can we filter dockets by tags?"""
         self.path = reverse("docket-list", kwargs={"version": "v3"})
 
         self.q = {"docket_entries__recap_documents__tags": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"docket_entries__recap_documents__tags": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
-    def test_docket_entry_docket_court_filters(self) -> None:
+    async def test_docket_entry_docket_court_filters(self) -> None:
         self.path = reverse("docketentry-list", kwargs={"version": "v3"})
 
         # Across docket to court...
         self.q["docket__court__id"] = "ca1"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q["docket__court__id"] = "foo"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
-    def test_nested_recap_document_filters(self) -> None:
+    async def test_nested_recap_document_filters(self) -> None:
         self.path = reverse("docketentry-list", kwargs={"version": "v3"})
 
         self.q["id"] = 1
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"recap_documents__id": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"recap_documents__id": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         self.q = {"recap_documents__tags": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"recap_documents__tags": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         # Something wacky...
         self.q = {"recap_documents__docket_entry__docket__id": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"recap_documents__docket_entry__docket__id": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
-    def test_recap_document_filters(self) -> None:
+    async def test_recap_document_filters(self) -> None:
         self.path = reverse("recapdocument-list", kwargs={"version": "v3"})
 
         self.q["id"] = 1
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q["id"] = 2
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         self.q = {"pacer_doc_id": 17711118263}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"pacer_doc_id": "17711118263-nope"}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         self.q = {"docket_entry__id": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"docket_entry__id": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         self.q = {"tags": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"tags": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q = {"tags__name": "test"}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"tags__name": "test2"}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
-    def test_attorney_filters(self) -> None:
+    async def test_attorney_filters(self) -> None:
         self.path = reverse("attorney-list", kwargs={"version": "v3"})
 
         self.q["id"] = 1
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q["id"] = 2
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         self.q = {"docket__id": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"docket__id": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         self.q = {"parties_represented__id": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"parties_represented__id": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q = {"parties_represented__name__contains": "Honker"}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"parties_represented__name__contains": "Honker-Nope"}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
-    def test_party_filters(self) -> None:
+    async def test_party_filters(self) -> None:
         self.path = reverse("party-list", kwargs={"version": "v3"})
 
         self.q["id"] = 1
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q["id"] = 2
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         # This represents dockets that the party was a part of.
         self.q = {"docket__id": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"docket__id": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         # Contrasted with this, which joins based on their attorney.
         self.q = {"attorney__docket__id": 1}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"attorney__docket__id": 2}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         self.q = {"name": "Honker"}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"name": "Cardinal Bonds"}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
         self.q = {"attorney__name__icontains": "Juneau"}
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q = {"attorney__name__icontains": "Juno"}
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
@@ -748,23 +754,23 @@ class DRFSearchAppAndAudioAppApiFilterTest(
     @async_to_sync
     async def setUp(self) -> None:
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
-        self.q: Dict[Any, Any] = dict()
+        self.q: Dict[Any, Any] = {}
 
-    def test_cluster_filters(self) -> None:
+    async def test_cluster_filters(self) -> None:
         """Do a variety of cluster filters work?"""
         self.path = reverse("opinioncluster-list", kwargs={"version": "v3"})
 
         # Related filters
         self.q["panel__id"] = 2
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q["non_participating_judges!"] = 1  # Exclusion filter.
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
         self.q["sub_opinions__author"] = 2
-        self.assertCountInResults(4)
+        await self.assertCountInResults(4)
 
         # Citation filters
         self.q = {
@@ -772,119 +778,115 @@ class DRFSearchAppAndAudioAppApiFilterTest(
             "citations__reporter": "F.2d",
             "citations__page": "9",
         }
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Integer lookups
-        self.q = dict()
-        self.q["scdb_votes_majority__gt"] = 10
-        self.assertCountInResults(0)
+        self.q = {"scdb_votes_majority__gt": 10}
+        await self.assertCountInResults(0)
         self.q["scdb_votes_majority__gt"] = 1
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
-    def test_opinion_filter(self) -> None:
+    async def test_opinion_filter(self) -> None:
         """Do a variety of opinion filters work?"""
         self.path = reverse("opinion-list", kwargs={"version": "v3"})
 
         # Simple filters
         self.q["sha1"] = "asdfasdfasdfasdfasdfasddf-nope"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["sha1"] = "asdfasdfasdfasdfasdfasddf"
-        self.assertCountInResults(6)
+        await self.assertCountInResults(6)
 
         # Boolean filter
         self.q["per_curiam"] = False
-        self.assertCountInResults(6)
+        await self.assertCountInResults(6)
 
         # Related filters
         self.q["cluster__panel"] = 1
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["cluster__panel"] = 2
-        self.assertCountInResults(4)
+        await self.assertCountInResults(4)
 
-        self.q = dict()
-        self.q["author__name_first__istartswith"] = "Nope"
-        self.assertCountInResults(0)
+        self.q = {"author__name_first__istartswith": "Nope"}
+        await self.assertCountInResults(0)
         self.q["author__name_first__istartswith"] = "jud"
-        self.assertCountInResults(6)
+        await self.assertCountInResults(6)
 
-        self.q = dict()
-        self.q["joined_by__name_first__istartswith"] = "Nope"
-        self.assertCountInResults(0)
+        self.q = {"joined_by__name_first__istartswith": "Nope"}
+        await self.assertCountInResults(0)
         self.q["joined_by__name_first__istartswith"] = "jud"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
-        self.q = dict()
         types = [Opinion.COMBINED]
-        self.q["type"] = types
-        self.assertCountInResults(5)
+        self.q = {"type": types}
+        await self.assertCountInResults(5)
         types.append(Opinion.LEAD)
-        self.assertCountInResults(6)
+        await self.assertCountInResults(6)
 
-    def test_docket_filters(self) -> None:
+    async def test_docket_filters(self) -> None:
         """Do a variety of docket filters work?"""
         self.path = reverse("docket-list", kwargs={"version": "v3"})
 
         # Simple filter
         self.q["docket_number"] = "14-1165-nope"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["docket_number"] = "docket number 1 005"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Related filters
         self.q["court"] = "test"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         self.q["clusters__panel__name_first__istartswith"] = "jud-nope"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["clusters__panel__name_first__istartswith"] = "jud"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
-        self.q[
-            "audio_files__sha1"
-        ] = "de8cff186eb263dc06bdc5340860eb6809f898d3-nope"
-        self.assertCountInResults(0)
-        self.q[
-            "audio_files__sha1"
-        ] = "de8cff186eb263dc06bdc5340860eb6809f898d3"
-        self.assertCountInResults(1)
+        self.q["audio_files__sha1"] = (
+            "de8cff186eb263dc06bdc5340860eb6809f898d3-nope"
+        )
+        await self.assertCountInResults(0)
+        self.q["audio_files__sha1"] = (
+            "de8cff186eb263dc06bdc5340860eb6809f898d3"
+        )
+        await self.assertCountInResults(1)
 
-    def test_audio_filters(self) -> None:
+    async def test_audio_filters(self) -> None:
         self.path = reverse("audio-list", kwargs={"version": "v3"})
 
         # Simple filter
         self.q["sha1"] = "de8cff186eb263dc06bdc5340860eb6809f898d3-nope"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["sha1"] = "de8cff186eb263dc06bdc5340860eb6809f898d3"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Related filter
         self.q["docket__court"] = "test"
-        self.assertCountInResults(1)
+        await self.assertCountInResults(1)
 
         # Multiple choice filter
-        self.q = dict()
-        sources = [SOURCES.COURT_WEBSITE]
-        self.q["source"] = sources
-        self.assertCountInResults(2)
-        sources.append(SOURCES.COURT_M_RESOURCE)
-        self.assertCountInResults(3)
 
-    def test_opinion_cited_filters(self) -> None:
+        sources = [SOURCES.COURT_WEBSITE]
+        self.q = {"source": sources}
+        await self.assertCountInResults(2)
+        sources.append(SOURCES.COURT_M_RESOURCE)
+        await self.assertCountInResults(3)
+
+    async def test_opinion_cited_filters(self) -> None:
         """Do the filters on the opinions_cited work?"""
         self.path = reverse("opinionscited-list", kwargs={"version": "v3"})
 
         # Simple related filter
         self.q["citing_opinion__sha1"] = "asdf-nope"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["citing_opinion__sha1"] = "asdfasdfasdfasdfasdfasddf"
-        self.assertCountInResults(4)
+        await self.assertCountInResults(4)
 
         # Fancy filter: Citing Opinions written by judges with first name
         # istartingwith "jud"
         self.q["citing_opinion__author__name_first__istartswith"] = "jud-nope"
-        self.assertCountInResults(0)
+        await self.assertCountInResults(0)
         self.q["citing_opinion__author__name_first__istartswith"] = "jud"
-        self.assertCountInResults(4)
+        await self.assertCountInResults(4)
 
 
 class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
@@ -903,7 +905,7 @@ class DRFFieldSelectionTest(SimpleUserDataMixin, TestCase):
         fields_to_return = ["educations", "date_modified", "slug"]
         q = {"fields": ",".join(fields_to_return)}
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
@@ -980,7 +982,7 @@ class DRFRecapPermissionTest(TestCase):
     async def test_has_access(self) -> None:
         """Does the RECAP user have access to all of the RECAP endpoints?"""
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="recap-user", password="password"
             )
         )
@@ -993,7 +995,7 @@ class DRFRecapPermissionTest(TestCase):
     async def test_lacks_access(self) -> None:
         """Does a normal user lack access to the RECPAP endpoints?"""
         self.assertTrue(
-            await sync_to_async(self.async_client.login)(
+            await self.async_client.alogin(
                 username="pandora", password="password"
             )
         )
@@ -1125,10 +1127,10 @@ class WebhooksMilestoneEventsTest(TestCase):
         "cl.api.utils.get_webhook_logging_prefix",
         return_value="webhook:test_1",
     )
-    def test_webhook_milestone_events_creation(self, mock_prefix):
+    async def test_webhook_milestone_events_creation(self, mock_prefix):
         """Are webhook events properly tracked and milestone events created?"""
 
-        webhook_event_1 = WebhookEventFactory(
+        webhook_event_1 = await sync_to_async(WebhookEventFactory)(
             webhook=self.webhook_user_1,
             content="{'message': 'ok_1'}",
             event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
@@ -1140,12 +1142,13 @@ class WebhooksMilestoneEventsTest(TestCase):
                 200, mock_raw=True
             ),
         ):
-            send_webhook_event(webhook_event_1)
+            await sync_to_async(send_webhook_event)(webhook_event_1)
 
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(webhook_events.count(), 1)
+        self.assertEqual(await webhook_events.acount(), 1)
+        webhook_events_first = await webhook_events.afirst()
         self.assertEqual(
-            webhook_events[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+            webhook_events_first.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
         )
 
         total_events = Event.objects.filter(user=None).order_by("date_created")
@@ -1154,19 +1157,21 @@ class WebhooksMilestoneEventsTest(TestCase):
         ).order_by("date_created")
 
         # Confirm one webhook global event and a webhook user event are created
-        self.assertEqual(total_events.count(), 1)
-        self.assertEqual(user_1_events.count(), 1)
+        self.assertEqual(await total_events.acount(), 1)
+        self.assertEqual(await user_1_events.acount(), 1)
         global_description = (
             f"User '{self.webhook_user_1.user.username}' "
             f"has placed their {intcomma(ordinal(1))} webhook event."
         )
-        self.assertEqual(user_1_events[0].description, global_description)
+        user_1_events_first = await user_1_events.afirst()
+        self.assertEqual(user_1_events_first.description, global_description)
         user_description = "Webhooks have logged 1 total successful events."
-        self.assertEqual(total_events[0].description, user_description)
+        total_events_first = await total_events.afirst()
+        self.assertEqual(total_events_first.description, user_description)
 
         # Send 4 more new webhook events for user_1:
-        for i in range(4):
-            webhook_event = WebhookEventFactory(
+        for _ in range(4):
+            webhook_event = await sync_to_async(WebhookEventFactory)(
                 webhook=self.webhook_user_1,
                 content="{'message': 'ok_1'}",
                 event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
@@ -1177,25 +1182,27 @@ class WebhooksMilestoneEventsTest(TestCase):
                     200, mock_raw=True
                 ),
             ):
-                send_webhook_event(webhook_event)
+                await sync_to_async(send_webhook_event)(webhook_event)
 
-        self.assertEqual(webhook_events.count(), 5)
+        self.assertEqual(await webhook_events.acount(), 5)
 
         # Confirm new global and user webhook events are created.
-        self.assertEqual(total_events.count(), 2)
-        self.assertEqual(user_1_events.count(), 2)
+        self.assertEqual(await total_events.acount(), 2)
+        self.assertEqual(await user_1_events.acount(), 2)
         # Confirm the new events counter were properly increased.
         user_description = (
             f"User '{self.webhook_user_1.user.username}' "
             f"has placed their {intcomma(ordinal(5))} webhook event."
         )
-        self.assertEqual(user_1_events[1].description, user_description)
+        user_1_events_last = await user_1_events.alast()
+        self.assertEqual(user_1_events_last.description, user_description)
         global_description = "Webhooks have logged 5 total successful events."
-        self.assertEqual(total_events[1].description, global_description)
+        total_events_last = await total_events.alast()
+        self.assertEqual(total_events_last.description, global_description)
 
         # Send 5 new webhook events for user_2
-        for i in range(5):
-            webhook_event_2 = WebhookEventFactory(
+        for _ in range(5):
+            webhook_event_2 = await sync_to_async(WebhookEventFactory)(
                 webhook=self.webhook_user_2,
                 content="{'message': 'ok_2'}",
                 event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
@@ -1206,7 +1213,7 @@ class WebhooksMilestoneEventsTest(TestCase):
                     200, mock_raw=True
                 ),
             ):
-                send_webhook_event(webhook_event_2)
+                await sync_to_async(send_webhook_event)(webhook_event_2)
 
         user_2_events = Event.objects.filter(
             user=self.webhook_user_2.user
@@ -1217,20 +1224,24 @@ class WebhooksMilestoneEventsTest(TestCase):
             f"User '{self.webhook_user_2.user.username}' "
             f"has placed their {intcomma(ordinal(5))} webhook event."
         )
-        self.assertEqual(user_2_events[1].description, user_description)
+        user_2_events_last = await user_2_events.alast()
+        self.assertEqual(user_2_events_last.description, user_description)
 
         # Confirm 10 global webhook milestone event
         global_description = "Webhooks have logged 10 total successful events."
-        self.assertEqual(total_events[2].description, global_description)
+        total_events_last = await total_events.alast()
+        self.assertEqual(total_events_last.description, global_description)
 
     @mock.patch(
         "cl.api.utils.get_webhook_logging_prefix",
         return_value="webhook:test_2",
     )
-    def test_avoid_logging_not_successful_webhook_events(self, mock_prefix):
+    async def test_avoid_logging_not_successful_webhook_events(
+        self, mock_prefix
+    ):
         """Can we avoid logging debug and failing webhook events?"""
 
-        webhook_event_1 = WebhookEventFactory(
+        webhook_event_1 = await sync_to_async(WebhookEventFactory)(
             webhook=self.webhook_user_1,
             content="{'message': 'ok_1'}",
             event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
@@ -1242,19 +1253,19 @@ class WebhooksMilestoneEventsTest(TestCase):
                 500, mock_raw=True
             ),
         ):
-            send_webhook_event(webhook_event_1)
+            await sync_to_async(send_webhook_event)(webhook_event_1)
 
         webhook_events = WebhookEvent.objects.all()
-        webhook_event_1.refresh_from_db()
+        await webhook_event_1.arefresh_from_db()
         self.assertEqual(
             webhook_event_1.event_status, WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY
         )
-        self.assertEqual(webhook_events.count(), 1)
+        self.assertEqual(await webhook_events.acount(), 1)
         # Confirm no milestone event should be created.
         milestone_events = Event.objects.all()
-        self.assertEqual(milestone_events.count(), 0)
+        self.assertEqual(await milestone_events.acount(), 0)
 
-        webhook_event_2 = WebhookEventFactory(
+        webhook_event_2 = await sync_to_async(WebhookEventFactory)(
             webhook=self.webhook_user_1,
             content="{'message': 'ok_1'}",
             event_status=WEBHOOK_EVENT_STATUS.IN_PROGRESS,
@@ -1267,12 +1278,12 @@ class WebhooksMilestoneEventsTest(TestCase):
                 200, mock_raw=True
             ),
         ):
-            send_webhook_event(webhook_event_2)
+            await sync_to_async(send_webhook_event)(webhook_event_2)
 
-        webhook_event_2.refresh_from_db()
+        await webhook_event_2.arefresh_from_db()
         self.assertEqual(
             webhook_event_2.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
         )
-        self.assertEqual(webhook_events.count(), 2)
+        self.assertEqual(await webhook_events.acount(), 2)
         # Confirm no milestone event should be created.
-        self.assertEqual(milestone_events.count(), 0)
+        self.assertEqual(await milestone_events.acount(), 0)

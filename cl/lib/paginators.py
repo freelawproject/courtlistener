@@ -7,18 +7,29 @@ class ESPaginator(Paginator):
     Paginator for Elasticsearch hits(results).
     """
 
-    def __init__(self, *args, **kwargs):
-        super(ESPaginator, self).__init__(*args, **kwargs)
-        self._count = (
-            self.object_list.hits.total.value
-            if hasattr(self.object_list, "hits")
-            else len(self.object_list)
+    def __init__(self, total_query_results: int | None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if total_query_results:
+            self._count = total_query_results
+        elif hasattr(self.object_list, "hits"):
+            self._count = self.object_list.hits.total.value
+        else:
+            self._count = len(self.object_list)
+        self._aggregations = (
+            self.object_list.aggregations
+            if hasattr(self.object_list, "aggregations")
+            else {}
         )
 
     @cached_property
-    def count(self):
-        """Set the global number of objects, across all pages."""
+    def count(self) -> int:
+        """Get the global number of objects, across all pages."""
         return self._count
+
+    @cached_property
+    def aggregations(self):
+        """Set the aggregation object, across all pages."""
+        return self._aggregations
 
     def page(self, number):
         number = self.validate_number(number)

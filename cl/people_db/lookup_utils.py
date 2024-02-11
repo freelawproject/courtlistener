@@ -11,7 +11,7 @@ from django.utils.html import strip_tags
 from nameparser import HumanName
 from unidecode import unidecode
 
-from cl.corpus_importer.utils import wrap_text
+from cl.lib.utils import wrap_text
 from cl.people_db.models import SUFFIX_LOOKUP, Person
 
 # list of words that aren't judge names
@@ -274,6 +274,9 @@ def find_all_judges(judge_text: str) -> [str]:
     cleaned_text = cleaned_text.replace("By the Court", "")
     cleaned_text = cleaned_text.replace(" and", ", and").replace(",,", ",")
 
+    if "PER CURIAM" in cleaned_text.upper():
+        return ["PER CURIAM"]
+
     if len(cleaned_text.split()) == 1:
         # You have only one name
         return [cleaned_text]
@@ -283,15 +286,16 @@ def find_all_judges(judge_text: str) -> [str]:
         cleaned_text,
     )
     query2 = re.findall(
+        # Compile ahead of time
         r",\sand\s(((Van|VAN|De|DE|Da|DA)\s)?\b[A-Z][\w\-'']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.)[\s|\b])?)",
         cleaned_text,
     )
     query = query1 + query2
     if query:
-        matches = [
+        matches = {
             name[0] for name in query if name[0].lower() not in NOT_JUDGE_WORDS
-        ]
-        return sorted(list(set(matches)))
+        }
+        return sorted(matches)
     return []
 
 
@@ -420,7 +424,7 @@ def extract_judge_last_name(
     return last_names
 
 
-def lookup_judge_by_full_name(
+async def lookup_judge_by_full_name(
     name: Union[HumanName, str],
     court_id: str,
     event_date: Optional[date] = None,
@@ -538,16 +542,17 @@ def lookup_judge_by_full_name(
     for filter_set in filter_sets:
         applied_filters.extend(filter_set)
         candidates = Person.objects.filter(*applied_filters)
-        if len(candidates) == 0:
+        count = await candidates.acount()
+        if count == 0:
             # No luck finding somebody. Abort.
             return None
-        elif len(candidates) == 1:
+        elif count == 1:
             # Got somebody unique!
-            return candidates.first()
+            return await candidates.afirst()
     return None
 
 
-def lookup_judge_by_full_name_and_set_attr(
+async def lookup_judge_by_full_name_and_set_attr(
     item: object,
     target_field: str,
     full_name: Union[HumanName, str],
@@ -565,12 +570,12 @@ def lookup_judge_by_full_name_and_set_attr(
     """
     if not full_name:
         return None
-    judge = lookup_judge_by_full_name(full_name, court_id, event_date)
+    judge = await lookup_judge_by_full_name(full_name, court_id, event_date)
     if judge is not None:
         setattr(item, target_field, judge)
 
 
-def lookup_judge_by_last_name(
+async def lookup_judge_by_last_name(
     last_name: str,
     court_id: str,
     event_date: Optional[date] = None,
@@ -579,12 +584,12 @@ def lookup_judge_by_last_name(
     """Look up the judge using their last name, a date and court"""
     hn = HumanName()
     hn.last = last_name
-    return lookup_judge_by_full_name(
+    return await lookup_judge_by_full_name(
         hn, court_id, event_date, require_living_judge
     )
 
 
-def lookup_judges_by_last_name_list(
+async def lookup_judges_by_last_name_list(
     last_names: List[str],
     court_id: str,
     event_date: Optional[date] = None,
@@ -595,7 +600,7 @@ def lookup_judges_by_last_name_list(
     for last_name in last_names:
         hn = HumanName()
         hn.last = last_name
-        person = lookup_judge_by_full_name(
+        person = await lookup_judge_by_full_name(
             hn, court_id, event_date, require_living_judge
         )
         if person is not None:
@@ -603,7 +608,7 @@ def lookup_judges_by_last_name_list(
     return found_people
 
 
-def lookup_judges_by_messy_str(
+async def lookup_judges_by_messy_str(
     s: str,
     court_id: str,
     event_date: Optional[date] = None,
@@ -612,7 +617,9 @@ def lookup_judges_by_messy_str(
     names. (This is the least accurate way to look up judges.)
     """
     last_names = extract_judge_last_name(s)
-    return lookup_judges_by_last_name_list(last_names, court_id, event_date)
+    return await lookup_judges_by_last_name_list(
+        last_names, court_id, event_date
+    )
 
 
 def sort_judge_list(judges: QuerySet, search_terms: Set[str]) -> QuerySet:

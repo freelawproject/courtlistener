@@ -8,6 +8,7 @@ from localflavor.us.models import (
     USStateField,
     USZipCodeField,
 )
+from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.extras import granular_date
 from cl.lib.date_time import midnight_pt
@@ -207,6 +208,23 @@ class Person(AbstractDateTimeModel):
         "the judge pics project.",
         default=False,
     )
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "name_full",
+            "name_full_reverse",
+            "religion",
+            "gender",
+            "dob_city",
+            "dob_state",
+            "fjc_id",
+            "date_dob",
+            "date_dod",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "slug",
+        ]
+    )
+    es_rd_field_tracker = FieldTracker(fields=["name_full"])
 
     def __str__(self) -> str:
         return f"{self.pk}: {self.name_full}"
@@ -222,27 +240,25 @@ class Person(AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"slug"}.union(update_fields)
         self.full_clean()
-        super(Person, self).save(update_fields=update_fields, *args, **kwargs)
+        super().save(update_fields=update_fields, *args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ["dob", "dod"])
         validate_is_not_alias(self, ["is_alias_of"])
         validate_has_full_name(self)
-        super(Person, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
     @property
     def name_full(self):
         return " ".join(
-            [
-                v
-                for v in [
-                    self.name_first,
-                    self.name_middle,
-                    self.name_last,
-                    self.get_name_suffix_display(),
-                ]
-                if v
+            v
+            for v in [
+                self.name_first,
+                self.name_middle,
+                self.name_last,
+                self.get_name_suffix_display(),
             ]
+            if v
         ).strip()
 
     @property
@@ -252,18 +268,17 @@ class Person(AbstractDateTimeModel):
         ).strip(", ")
 
     @property
-    def is_alias(self):
-        return True if self.is_alias_of is not None else False
+    def is_alias(self) -> bool:
+        return self.is_alias_of is not None
 
     @property
-    def is_judge(self):
+    def is_judge(self) -> bool:
         """Examine the positions a person has had and identify if they were ever
         a judge.
         """
-        for position in self.positions.all():
-            if position.is_judicial_position:
-                return True
-        return False
+        return any(
+            position.is_judicial_position for position in self.positions.all()
+        )
 
     def as_search_dict(self):
         """Create a dict that can be ingested by Solr"""
@@ -414,6 +429,7 @@ class School(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["name"])
 
     def __str__(self) -> str:
         if self.is_alias_of:
@@ -427,12 +443,12 @@ class School(AbstractDateTimeModel):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        super(School, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         # An alias cannot be an alias.
         validate_is_not_alias(self, ["is_alias_of"])
-        super(School, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -951,6 +967,35 @@ class Position(AbstractDateTimeModel):
         default=False,
     )
 
+    es_p_field_tracker = FieldTracker(
+        fields=[
+            "court_id",
+            "organization_name",
+            "job_title",
+            "position_type",
+            "date_nominated",
+            "date_elected",
+            "date_recess_appointment",
+            "date_referred_to_judicial_committee",
+            "date_judicial_committee_action",
+            "date_hearing",
+            "date_confirmation",
+            "date_start",
+            "date_granularity_start",
+            "date_retirement",
+            "date_termination",
+            "date_granularity_termination",
+            "judicial_committee_action",
+            "nomination_process",
+            "how_selected",
+            "termination_reason",
+            "person_id",
+            "appointer_id",
+            "supervisor_id",
+            "predecessor_id",
+        ]
+    )
+
     def __str__(self) -> str:
         return f"{self.pk}: {self.person.name_full} at {self.court_id}"
 
@@ -1043,7 +1088,7 @@ class Position(AbstractDateTimeModel):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        super(Position, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ["start", "termination"])
@@ -1061,7 +1106,7 @@ class Position(AbstractDateTimeModel):
         validate_nomination_fields_ok(self)
         validate_supervisor(self)
 
-        super(Position, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -1128,12 +1173,12 @@ class RetentionEvent(AbstractDateTimeModel):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        super(RetentionEvent, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_all_or_none(self, ["votes_yes", "votes_no"])
         validate_all_or_none(self, ["votes_yes_percent", "votes_no_percent"])
-        super(RetentionEvent, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -1196,12 +1241,12 @@ class Education(AbstractDateTimeModel):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        super(Education, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         # Note that this isn't run during updates, alas.
         validate_is_not_alias(self, ["person", "school"])
-        super(Education, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -1294,15 +1339,16 @@ class PoliticalAffiliation(AbstractDateTimeModel):
         max_length=15,
         blank=True,
     )
+    es_p_field_tracker = FieldTracker(fields=["political_party"])
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        super(PoliticalAffiliation, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_partial_date(self, ["start", "end"])
         validate_is_not_alias(self, ["person"])
-        super(PoliticalAffiliation, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -1356,6 +1402,7 @@ class ABARating(AbstractDateTimeModel):
         choices=ABA_RATINGS,
         max_length=5,
     )
+    es_p_field_tracker = FieldTracker(fields=["rating"])
 
     class Meta:
         verbose_name = "American Bar Association Rating"
@@ -1363,11 +1410,11 @@ class ABARating(AbstractDateTimeModel):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        super(ABARating, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     def clean_fields(self, *args, **kwargs):
         validate_is_not_alias(self, ["person"])
-        super(ABARating, self).clean_fields(*args, **kwargs)
+        super().clean_fields(*args, **kwargs)
 
 
 class PartyType(models.Model):
@@ -1460,7 +1507,7 @@ class CriminalCount(models.Model):
     )
 
     @staticmethod
-    def normalize_status(status_str):
+    def normalize_status(status_str: str):
         """Convert a status string into one of COUNT_STATUSES"""
         if status_str == "pending":
             return CriminalCount.PENDING

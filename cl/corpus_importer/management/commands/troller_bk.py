@@ -96,7 +96,7 @@ def add_new_docket_from_rss(
     date_filed, time_filed = localize_date_and_time(
         court_id, docket["docket_entries"][0]["date_filed"]
     )
-    update_docket_metadata(d, docket)
+    async_to_sync(update_docket_metadata)(d, docket)
     d.pacer_case_id = docket["pacer_case_id"]
     d.slug = slugify(trunc(best_case_name(d), 75))
     d.date_last_filing = date_filed
@@ -266,9 +266,9 @@ async def merge_rss_data(
     dockets_to_create: list[Docket] = []
     unique_dockets: dict[str, Any] = {}
     des_to_add_existing_docket: list[tuple[int, dict[str, Any]]] = []
-    des_to_add_no_existing_docket: DefaultDict[
-        str, list[dict[str, Any]]
-    ] = defaultdict(list)
+    des_to_add_no_existing_docket: DefaultDict[str, list[dict[str, Any]]] = (
+        defaultdict(list)
+    )
     for docket in feed_data:
         skip_or_break = await check_for_early_termination(court_id, docket)
         if skip_or_break == "continue":
@@ -343,10 +343,10 @@ async def merge_rss_data(
             try:
                 await d.asave(update_fields=["source"])
                 await sync_to_async(add_bankruptcy_data_to_docket)(d, docket)
-            except (DataError, IntegrityError) as exc:
+            except (DataError, IntegrityError):
                 # Trouble. Log and move on
                 logger.warn(
-                    f"Got DataError or IntegrityError while saving docket."
+                    "Got DataError or IntegrityError while saving docket."
                 )
 
     rds_created_pks, dockets_created = await sync_to_async(do_bulk_additions)(
@@ -663,7 +663,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         if not options["file"]:
             raise argparse.ArgumentError(
                 "The 'file' argument is required for that action."

@@ -24,6 +24,8 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour"},
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Didn't respond to emails, 2023-10-02
+        "Tylersuard": "10/hour",
         # Didn't respond to emails, 2023-08-04
         "skalecorn12": "10/hour",
         # Didn't respond to emails; looks unsavory.

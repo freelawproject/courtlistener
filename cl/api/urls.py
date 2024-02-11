@@ -8,6 +8,7 @@ from cl.alerts import api_views as alert_views
 from cl.api import views
 from cl.audio import api_views as audio_views
 from cl.disclosures import api_views as disclosure_views
+from cl.donate import api_views as donate_views
 from cl.favorites import api_views as favorite_views
 from cl.people_db import api_views as people_views
 from cl.recap import views as recap_views
@@ -137,6 +138,13 @@ router.register(
     r"docket-alerts", alert_views.DocketAlertViewSet, basename="docket-alert"
 )
 
+# Neon webhooks
+router.register(
+    r"memberships",
+    donate_views.MembershipWebhookViewSet,
+    basename="membership-webhooks",
+)
+
 API_TITLE = "CourtListener Legal Data API"
 
 
@@ -169,6 +177,11 @@ urlpatterns_base = [
         r"^api/rest/v(?P<version>[123])/coverage/(?P<court>.+)/$",
         views.coverage_data,
         name="coverage_data",
+    ),
+    re_path(
+        r"^api/rest/v4/coverage/opinions/",
+        views.coverage_data_opinions,
+        name="coverage_data_opinions",
     ),
     re_path(
         r"^api/rest/v(?P<version>[123])/alert-frequency/(?P<day_count>\d+)/$",

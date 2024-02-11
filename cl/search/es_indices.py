@@ -9,7 +9,7 @@ parenthetical_group_index.settings(
 )
 
 # Define oral arguments elasticsearch index
-oral_arguments_index = Index("oral_arguments")
+oral_arguments_index = Index("oral_arguments_vectors")
 oral_arguments_index.settings(
     number_of_shards=settings.ELASTICSEARCH_OA_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_OA_NUMBER_OF_REPLICAS,
@@ -17,10 +17,38 @@ oral_arguments_index.settings(
 )
 
 
-# Define oral arguments elasticsearch index
-oral_arguments_percolator_index = Index("oral_arguments_percolator")
+# Define oral arguments alerts elasticsearch index
+oral_arguments_percolator_index = Index("oral_arguments_percolator_vectors")
 oral_arguments_percolator_index.settings(
     number_of_shards=settings.ELASTICSEARCH_OA_ALERTS_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_OA_ALERTS_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
+)
+
+
+# Define people elasticsearch index
+people_db_index = Index("people_vectors")
+people_db_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
+)
+
+
+# Define RECAP elasticsearch index
+recap_index = Index("recap_vectors")
+recap_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+    analysis=settings.ELASTICSEARCH_DSL["analysis"],
+)
+
+
+# Define people elasticsearch index
+# Define opinion elasticsearch index
+opinion_index = Index("opinion_index")
+opinion_index.settings(
+    number_of_shards=settings.ELASTICSEARCH_OPINION_NUMBER_OF_SHARDS,
+    number_of_replicas=settings.ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS,
     analysis=settings.ELASTICSEARCH_DSL["analysis"],
 )

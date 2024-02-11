@@ -1,0 +1,20 @@
+A new user signed up for CourtListener and we tried to match their email address
+to Neon. Alas, it didn't work because the email address '{{ user.email }}' appears
+is in Neon more than once.
+
+Please take the following actions to fix this situation:
+
+1. Please review the "Partial Match Queue" in Neon, as documented here:
+
+    https://support.neonone.com/hc/en-us/articles/4407408776717-Account-Match-Queue
+
+In that queue, you should find this user and you should be able to merge their records.
+
+2. Once that's completed, please add the Neon account ID of the merged record to
+CourtListener at the following link:
+
+    https://www.courtlistener.com/admin/user/{{ user.id }}
+
+Thank you for keeping everything tidy and good!
+
+The bots at CourtListener

@@ -164,7 +164,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "all_dockets":
             get_dockets(options)

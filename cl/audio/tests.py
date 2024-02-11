@@ -1,3 +1,4 @@
+import datetime
 from unittest import mock
 
 from django.urls import reverse
@@ -27,17 +28,21 @@ class PodcastTest(ESIndexTestCase, TestCase):
             citation_string="Appeals. CA8.",
         )
         with mock.patch(
-            "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-            side_effect=lambda x, y, z: False,
-        ):
+            "cl.lib.es_signal_processor.allow_es_audio_indexing",
+            side_effect=lambda x, y: True,
+        ), cls.captureOnCommitCallbacks(execute=True):
             cls.audio = AudioWithParentsFactory.create(
-                docket=DocketFactory(court=cls.court_1),
+                docket=DocketFactory(
+                    court=cls.court_1, date_argued=datetime.date(2014, 8, 16)
+                ),
                 local_path_mp3__data=ONE_SECOND_MP3_BYTES,
                 local_path_original_file__data=ONE_SECOND_MP3_BYTES,
                 duration=1,
             )
-            AudioWithParentsFactory.create(
-                docket=cls.audio.docket,
+            cls.audio_2 = AudioWithParentsFactory.create(
+                docket=DocketFactory(
+                    court=cls.court_1, date_argued=datetime.date(2016, 8, 17)
+                ),
                 local_path_mp3__data=SMALL_WAV_BYTES,
                 local_path_original_file__data=SMALL_WAV_BYTES,
                 duration=0,
@@ -49,11 +54,11 @@ class PodcastTest(ESIndexTestCase, TestCase):
                 duration=5,
             )
 
-    def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
+    async def test_do_jurisdiction_podcasts_have_good_content(self) -> None:
         """Can we simply load a jurisdiction podcast page?"""
 
         # Test jurisdiction_podcast for a court.
-        response = self.client.get(
+        response = await self.async_client.get(
             reverse(
                 "jurisdiction_podcast",
                 kwargs={"court": self.court_1.id},
@@ -82,8 +87,28 @@ class PodcastTest(ESIndexTestCase, TestCase):
                 "Instead found: %s" % (count, test, node_count),
             )
 
+        # Confirm items are ordered by dateArgued desc
+        pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
+        first_item_pub_date_str = str(
+            xml_tree.xpath("//channel/item[1]/pubDate")[0].text  # type: ignore
+        )
+        second_item_pub_date_str = str(
+            xml_tree.xpath("//channel/item[2]/pubDate")[0].text  # type: ignore
+        )
+        first_item_pub_date_dt = datetime.datetime.strptime(
+            first_item_pub_date_str, pub_date_format
+        )
+        second_item_pub_date_dt = datetime.datetime.strptime(
+            second_item_pub_date_str, pub_date_format
+        )
+        self.assertGreater(
+            first_item_pub_date_dt,
+            second_item_pub_date_dt,
+            msg="The first item should be newer than the second item.",
+        )
+
         # Test all_jurisdictions_podcast
-        response = self.client.get(
+        response = await self.async_client.get(
             reverse(
                 "all_jurisdictions_podcast",
             )
@@ -146,9 +171,32 @@ class PodcastTest(ESIndexTestCase, TestCase):
         )
         self.assertTrue(pubdate_present)
 
+        # Confirm items are ordered by dateArgued desc
+        pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
+        first_item_pub_date_str = str(
+            xml_tree.xpath("//channel/item[1]/pubDate")[0].text  # type: ignore
+        )
+        second_item_pub_date_str = str(
+            xml_tree.xpath("//channel/item[2]/pubDate")[0].text  # type: ignore
+        )
+        first_item_pub_date_dt = datetime.datetime.strptime(
+            first_item_pub_date_str, pub_date_format
+        )
+        second_item_pub_date_dt = datetime.datetime.strptime(
+            second_item_pub_date_str, pub_date_format
+        )
+        self.assertGreater(
+            first_item_pub_date_dt,
+            second_item_pub_date_dt,
+            msg="The first item should be newer than the second item.",
+        )
+
         # pubDate key must be omitted in Audios without date_argued.
-        self.audio.docket.date_argued = None
-        self.audio.docket.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.audio.docket.date_argued = None
+            self.audio.docket.save()
+            self.audio_2.docket.date_argued = None
+            self.audio_2.docket.save()
         response = self.client.get(
             reverse("search_podcast", args=["search"]),
             params,

@@ -2,7 +2,6 @@ import datetime
 from unittest import mock
 
 from django.core.cache import cache
-from django.db import transaction
 from django.urls import reverse
 from elasticsearch_dsl import connections
 from lxml import html
@@ -18,9 +17,15 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.test_helpers import AudioESTestCase
 from cl.search.documents import AudioDocument, AudioPercolator
-from cl.search.factories import DocketFactory
+from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import SEARCH_TYPES
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.search.tasks import es_save_document, update_es_document
+from cl.tests.cases import (
+    CountESTasksTestCase,
+    ESIndexTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 
 
 class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
@@ -34,7 +39,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         cls.rebuild_index("alerts.Alert")
 
     @classmethod
-    def delete_documents_from_index(self, index_alias, queries):
+    def delete_documents_from_index(cls, index_alias, queries):
         es_conn = connections.get_connection()
         for query_id in queries:
             es_conn.delete(index=index_alias, id=query_id)
@@ -67,7 +72,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     @staticmethod
     def save_percolator_query(cd):
         search_query = AudioDocument.search()
-        query = build_es_base_query(search_query, cd)
+        query, _ = build_es_base_query(search_query, cd)
         query_dict = query.to_dict()["query"]
         percolator_query = AudioPercolator(
             percolator_query=query_dict, rate=Alert.REAL_TIME
@@ -335,8 +340,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Hong</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Hong</mark>"), 1)
+        self.assertIn("<mark>Hong Liu Yang</mark>", r.content.decode())
 
         # Docket number highlights
         r = self.client.get(
@@ -350,7 +354,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>19", r.content.decode())
+        self.assertIn(
+            f"<mark>{self.audio_2.docket.docket_number}</mark>",
+            r.content.decode(),
+        )
 
         # Judge highlights
         r = self.client.get(
@@ -364,8 +371,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>John</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>John</mark>"), 1)
+        self.assertIn("<mark>John Smith</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>John Smith</mark>"), 1
+        )
 
         # Court citation string highlights
         r = self.client.get(
@@ -379,8 +388,13 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Bankr.</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Bankr.</mark>"), 1)
+        self.assertIn(
+            "<mark>Bankr.&nbsp;C.D.&nbsp;Cal</mark>", r.content.decode()
+        )
+        self.assertEqual(
+            r.content.decode().count("<mark>Bankr.&nbsp;C.D.&nbsp;Cal</mark>"),
+            1,
+        )
 
     def test_oa_case_name_filtering(self) -> None:
         """Filter by case_name"""
@@ -938,7 +952,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f'docketNumber:"19 5734"',
+            "q": 'docketNumber:"19 5734"',
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1108,22 +1122,24 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             )
 
     @mock.patch(
-        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-        side_effect=lambda x, y, z: False,
+        "cl.lib.es_signal_processor.allow_es_audio_indexing",
+        side_effect=lambda x, y: True,
     )
     def test_oa_results_pagination(self, mock_abort_audio) -> None:
         created_audios = []
         audios_to_create = 20
-        for i in range(audios_to_create):
-            audio = AudioFactory.create(
-                docket_id=self.audio_3.docket.pk,
-            )
-            created_audios.append(audio)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            for _ in range(audios_to_create):
+                audio = AudioFactory.create(
+                    docket_id=self.audio_3.docket.pk,
+                )
+                created_audios.append(audio)
 
         # Confirm that fetch_es_results works properly with different sorting
         # types, returning sequential results for each requested page.
         page_size = 5
-        total_pages = int(audios_to_create / page_size) + 1
+        total_audios = Audio.objects.all().count()
+        total_pages = int(total_audios / page_size) + 1
         order_types = [
             "score desc",
             "dateArgued desc",
@@ -1138,17 +1154,17 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
                     "order_by": order,
                 }
                 search_query = AudioDocument.search()
-                s, total_query_results, top_hits_limit = build_es_main_query(
-                    search_query, cd
+                s, child_docs_query, *_ = build_es_main_query(search_query, cd)
+                hits, *_ = fetch_es_results(
+                    cd,
+                    s,
+                    child_docs_query,
+                    page=page + 1,
+                    rows_per_page=page_size,
                 )
-                hits, query_time, error = fetch_es_results(
-                    cd, s, page=page + 1, rows_per_page=5
-                )
-                results = hits.hits
-                for result in results:
-                    self.assertNotIn(result.id, ids_in_results)
+                for result in hits.hits:
                     ids_in_results.append(result.id)
-            self.assertEqual(len(ids_in_results), Audio.objects.all().count())
+            self.assertEqual(len(ids_in_results), total_audios)
 
         # Test pagination requests.
         search_params = {
@@ -1216,7 +1232,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"Freedom of Info",
+            "q": "Freedom of Info",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1225,7 +1241,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Freedom</mark>", r.content.decode())
+        self.assertIn("<mark>Freedom of Inform</mark>", r.content.decode())
         # API
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}), search_params
@@ -1245,7 +1261,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>ptsd</mark>", r.content.decode())
+        # When using FVH, if the abbreviation term is indexed, then performing
+        # a search using the whole term does not highlight the abbreviation.
+        self.assertNotIn("<mark>ptsd</mark>", r.content.decode())
 
         # Split terms post traumatic
         search_params["q"] = "post traumatic stress disorder"
@@ -1256,7 +1274,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>ptsd</mark>", r.content.decode())
+        # When using FVH, if the abbreviation term is indexed, then performing
+        # a search using the whole term does not highlight the abbreviation.
+        self.assertNotIn("<mark>ptsd</mark>", r.content.decode())
 
         # Search acronym "apa"
         search_params["q"] = "apa"
@@ -1267,10 +1287,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 2
         self.assertEqual(actual, expected)
+        # Note that if the whole term is indexed and a search is performed
+        # using the abbreviation term, the whole term is properly highlighted.
         self.assertIn("<mark>apa</mark>", r.content.decode())
-        self.assertIn("<mark>Administrative</mark>", r.content.decode())
-        self.assertIn("<mark>procedures</mark>", r.content.decode())
-        self.assertIn("<mark>act</mark>", r.content.decode())
+        self.assertIn(
+            "<mark>Administrative procedures act</mark>", r.content.decode()
+        )
 
         # Search by "Administrative procedures act"
         search_params["q"] = "Administrative procedures act"
@@ -1281,10 +1303,12 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 2
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>apa</mark>", r.content.decode())
         self.assertIn("<mark>Administrative</mark>", r.content.decode())
         self.assertIn("<mark>procedures</mark>", r.content.decode())
         self.assertIn("<mark>act</mark>", r.content.decode())
+        # When using FVH, if the abbreviation term is indexed, then performing
+        # a search using the whole term does not highlight the abbreviation.
+        self.assertNotIn("<mark>apa</mark>", r.content.decode())
 
         # Search by "Administrative" shouldn't return results for "apa" but for
         # "Administrative" and "Administrative procedures act".
@@ -1329,7 +1353,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"judge:Wallace and Friedland",
+            "q": "judge:Wallace and Friedland",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1342,7 +1366,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"judge:Wallace to Friedland",
+            "q": "judge:Wallace to Friedland",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1356,7 +1380,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Special stopwords are not found.
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"xx-xxxx",
+            "q": "xx-xxxx",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1371,7 +1395,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f'caseName:"Freedom of Inform"',
+            "q": 'caseName:"Freedom of Inform"',
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1380,7 +1404,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(actual, expected)
-        self.assertIn("<mark>Freedom</mark>", r.content.decode())
+        self.assertIn("<mark>Freedom of Inform</mark>", r.content.decode())
         # API
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v3"}), search_params
@@ -1561,7 +1585,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # and 1:21-cv-1234-ABC
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"21-1234",
+            "docket_number": "21-1234",
         }
         # Frontend
         r = self.client.get(
@@ -1710,97 +1734,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Freedom of", r.content.decode())
 
-    @mock.patch(
-        "cl.lib.es_signal_processor.avoid_es_audio_indexing",
-        side_effect=lambda x, y, z: False,
-    )
-    def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
-        """Test Audio documents are updated when related objects change."""
-        with transaction.atomic():
-            docket_5 = DocketFactory.create(
-                docket_number="1:22-bk-12345",
-                court_id=self.court_1.pk,
-                date_argued=datetime.date(2015, 8, 16),
-            )
-            audio_6 = AudioFactory.create(
-                case_name="Lorem Ipsum Dolor vs. USA",
-                docket_id=docket_5.pk,
-            )
-            audio_7 = AudioFactory.create(
-                case_name="Lorem Ipsum Dolor vs. IRS",
-                docket_id=docket_5.pk,
-            )
-            cd = {
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "q": "Lorem Ipsum Dolor vs. United States",
-                "order_by": "score desc",
-            }
-            search_query = AudioDocument.search()
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
-            self.assertEqual(s.count(), 1)
-            results = s.execute()
-            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
-            self.assertEqual(results[0].docketNumber, "1:22-bk-12345")
-            self.assertEqual(results[0].panel_ids, [])
-
-            # Update docket number and dateArgued
-            docket_5.docket_number = "23-98765"
-            docket_5.date_argued = datetime.date(2023, 5, 15)
-            docket_5.date_reargued = datetime.date(2022, 5, 15)
-            docket_5.date_reargument_denied = datetime.date(2021, 5, 15)
-            docket_5.save()
-            # Confirm docket number and dateArgued are updated in the index.
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
-            self.assertEqual(s.count(), 1)
-            results = s.execute()
-            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
-            self.assertEqual(results[0].docketNumber, "23-98765")
-            self.assertIn("15 May 2023", results[0].dateArgued_text)
-            self.assertIn("15 May 2022", results[0].dateReargued_text)
-            self.assertIn("15 May 2021", results[0].dateReargumentDenied_text)
-            self.assertEqual(
-                results[0].dateArgued, datetime.datetime(2023, 5, 15, 0, 0)
-            )
-
-            # Trigger a ManyToMany insert.
-            audio_7.refresh_from_db()
-            audio_7.panel.add(self.author)
-            # Confirm ManyToMany field is updated in the index.
-            cd["q"] = "Lorem Ipsum Dolor vs. IRS"
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
-            self.assertEqual(s.count(), 1)
-            results = s.execute()
-            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
-            self.assertEqual(results[0].panel_ids, [self.author.pk])
-
-            # Confirm duration is updated in the index after Audio is updated.
-            audio_7.duration = 322
-            audio_7.save()
-            audio_7.refresh_from_db()
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
-            self.assertEqual(s.count(), 1)
-            results = s.execute()
-            self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
-            self.assertEqual(results[0].duration, audio_7.duration)
-
-            # Delete parent docket.
-            docket_5.delete()
-            # Confirm that docket-related audio objects are removed from the
-            # index.
-            cd["q"] = "Lorem Ipsum Dolor"
-            s, total_query_results, top_hits_limit = build_es_main_query(
-                search_query, cd
-            )
-            self.assertEqual(s.count(), 0)
-
     def test_exact_and_synonyms_query(self) -> None:
         """Test exact and synonyms in the same query."""
 
@@ -1808,7 +1741,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # 'learning rd'.
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"learn road",
+            "q": "learn road",
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1818,12 +1751,11 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 2
         self.assertEqual(actual, expected)
         self.assertIn("<mark>Learn</mark>", r.content.decode())
-        self.assertIn("<mark>Learning</mark>", r.content.decode())
-        self.assertIn("<mark>rd</mark>", r.content.decode())
+        self.assertIn("<mark>Learning rd</mark>", r.content.decode())
 
         # Search for '"learning" road' should return only a result for
         # 'Learning rd'
-        search_params["q"] = f'"learning" road'
+        search_params["q"] = '"learning" road'
         r = self.client.get(
             reverse("show_results"),
             search_params,
@@ -1837,7 +1769,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # A phrase search for '"learn road"' should execute an exact and phrase
         # search simultaneously. It shouldn't return any results,
         # given that the indexed string is 'Learn of rd'.
-        search_params["q"] = f'"learn road"'
+        search_params["q"] = '"learn road"'
         r = self.client.get(
             reverse("show_results"),
             search_params,
@@ -1883,7 +1815,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"1:21-bk-1234",
+            "docket_number": "1:21-bk-1234",
             "q": "",
             "order_by": "score desc",
         }
@@ -1898,8 +1830,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"1:21-cv-1234-ABC",
-            "court": f"cabc",
+            "docket_number": "1:21-cv-1234-ABC",
+            "court": "cabc",
             "q": "",
             "order_by": "score desc",
         }
@@ -1915,8 +1847,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"1:21-bk-1234",
-            "court": f"cabc",
+            "docket_number": "1:21-bk-1234",
+            "court": "cabc",
             "argued_after": datetime.date(2015, 8, 16),
             "q": "",
             "order_by": "score desc",
@@ -1933,8 +1865,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "docket_number": f"19-5734",
-            "court": f"cabc",
+            "docket_number": "19-5734",
+            "court": "cabc",
             "argued_after": datetime.date(2015, 8, 15),
             "q": "Loretta NOT (Hong Liu)",
             "order_by": "score desc",
@@ -1950,9 +1882,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "court": f"nyed",
+            "court": "nyed",
             "argued_after": datetime.date(2015, 8, 14),
-            "q": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+            "q": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
             "order_by": "score desc",
         }
 
@@ -1969,39 +1901,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             AudioPercolator._index._name, created_queries_ids
         )
 
-    def test_handle_unbalanced_parenthesis(self) -> None:
-        """Test can we avoid unbalanced parenthesis break queries?"""
-
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "(Loretta OR (SEC) AND Jose",
-        }
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        self.assertIn(
-            "Did you forget to close one or more parentheses?",
-            r.content.decode(),
-        )
-        self.assertIn("Did you mean", r.content.decode())
-        self.assertIn("(Loretta OR SEC) AND Jose", r.content.decode())
-
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "(Loretta AND Jose",
-        }
-        r = self.client.get(
-            reverse("show_results"),
-            search_params,
-        )
-        self.assertIn(
-            "Did you forget to close one or more parentheses?",
-            r.content.decode(),
-        )
-        self.assertIn("Did you mean", r.content.decode())
-        self.assertIn("Loretta AND Jose", r.content.decode())
-
     def test_search_transcript(self) -> None:
         """Test search transcript."""
 
@@ -2017,4 +1916,207 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 1
         self.assertEqual(actual, expected)
         # Transcript highlights
-        self.assertIn("<mark>transcript</mark>", r.content.decode())
+        self.assertIn(
+            "<mark>This is the best transcript</mark>", r.content.decode()
+        )
+
+
+class OralArgumentIndexingTest(
+    CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
+):
+    def setUp(self):
+        self.court_1 = CourtFactory(
+            id="cabc",
+            full_name="Testing Supreme Court",
+            jurisdiction="FB",
+            citation_string="Bankr. C.D. Cal.",
+        )
+        self.docket = DocketFactory.create(
+            court_id=self.court_1.pk,
+        )
+        self.docket_2 = DocketFactory.create(
+            court_id=self.court_1.pk,
+        )
+
+        super().setUp()
+
+    @mock.patch(
+        "cl.lib.es_signal_processor.allow_es_audio_indexing",
+        side_effect=lambda x, y: True,
+    )
+    def test_keep_in_sync_related_OA_objects(self, mock_abort_audio) -> None:
+        """Test Audio documents are updated when related objects change."""
+
+        docket_5 = DocketFactory.create(
+            docket_number="1:22-bk-12345",
+            court_id=self.court_1.pk,
+            date_argued=datetime.date(2015, 8, 16),
+        )
+        audio_6 = AudioFactory.create(
+            case_name="Lorem Ipsum Dolor vs. USA",
+            docket_id=docket_5.pk,
+        )
+        audio_7 = AudioFactory.create(
+            case_name="Lorem Ipsum Dolor vs. IRS",
+            docket_id=docket_5.pk,
+        )
+        cd = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Lorem Ipsum Dolor vs. United States",
+            "order_by": "score desc",
+        }
+        search_query = AudioDocument.search()
+        s, *_ = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 1)
+        results = s.execute()
+        self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
+        self.assertEqual(results[0].docketNumber, "1:22-bk-12345")
+        self.assertEqual(results[0].panel_ids, [])
+
+        # Update docket number and dateArgued
+        docket_5.docket_number = "23-98765"
+        docket_5.date_argued = datetime.date(2023, 5, 15)
+        docket_5.date_reargued = datetime.date(2022, 5, 15)
+        docket_5.date_reargument_denied = datetime.date(2021, 5, 15)
+        docket_5.save()
+        # Confirm docket number and dateArgued are updated in the index.
+        s, *_ = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 1)
+        results = s.execute()
+        self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
+        self.assertEqual(results[0].docketNumber, "23-98765")
+        self.assertIn("15 May 2023", results[0].dateArgued_text)
+        self.assertIn("15 May 2022", results[0].dateReargued_text)
+        self.assertIn("15 May 2021", results[0].dateReargumentDenied_text)
+        self.assertEqual(
+            results[0].dateArgued, datetime.datetime(2023, 5, 15, 0, 0)
+        )
+
+        # Trigger a ManyToMany insert.
+        audio_7.refresh_from_db()
+        author = PersonFactory.create()
+        audio_7.panel.add(author)
+        # Confirm ManyToMany field is updated in the index.
+        cd["q"] = "Lorem Ipsum Dolor vs. IRS"
+        s, *_ = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 1)
+        results = s.execute()
+        self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
+        self.assertEqual(results[0].panel_ids, [author.pk])
+
+        # Confirm duration is updated in the index after Audio is updated.
+        audio_7.duration = 322
+        audio_7.save()
+        audio_7.refresh_from_db()
+        s, *_ = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 1)
+        results = s.execute()
+        self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. IRS")
+        self.assertEqual(results[0].duration, audio_7.duration)
+
+        # Delete parent docket.
+        docket_5.delete()
+        # Confirm that docket-related audio objects are removed from the
+        # index.
+        cd["q"] = "Lorem Ipsum Dolor"
+        s, *_ = build_es_main_query(search_query, cd)
+        self.assertEqual(s.count(), 0)
+
+    def test_oa_indexing_and_tasks_count(self) -> None:
+        """Confirm an Audio is properly indexed in ES with the right number of
+        indexing tasks.
+        """
+
+        # When the Audio is created the file processing is not complete.
+        # The Audio indexing is avoided.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            audio = AudioFactory.create(
+                case_name="Lorem Ipsum Dolor vs. USA",
+                docket_id=self.docket.pk,
+            )
+        # 0 es_save_document task calls for Audio creation, due to processing
+        # is not complete.
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(AudioDocument.exists(id=audio.pk))
+
+        # Index the document for first time when file processing is completed.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            audio.save(
+                update_fields=[
+                    "processing_complete",
+                ]
+            )
+        # 1 es_save_document task calls for Audio after processing is complete
+        self.reset_and_assert_task_count(expected=1)
+        self.assertTrue(AudioDocument.exists(id=audio.pk))
+
+        # Update an Audio without changes.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.save()
+        # update_es_document task shouldn't be called on save() without changes
+        self.reset_and_assert_task_count(expected=0)
+
+        # Update an Audio tracked field.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.case_name = "Bank vs America"
+            audio.save()
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.caseName, "Bank vs America")
+
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.docket = self.docket_2
+            audio.save()
+        # update_es_document task should be called 1 on tracked fields updates
+        self.reset_and_assert_task_count(expected=1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.docket_id, self.docket_2.pk)
+
+        # Confirm an Audio is indexed if it doesn't exist in the
+        # index on a tracked field update.
+        self.delete_index("audio.Audio")
+        self.create_index("audio.Audio")
+
+        self.assertFalse(AudioDocument.exists(id=audio.pk))
+        # Audio creation on update.
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            audio.case_name = "Lorem Ipsum"
+            audio.save()
+
+        # update_es_document task should be called 1 on tracked fields update
+        self.reset_and_assert_task_count(expected=1)
+        a_doc = AudioDocument.get(id=audio.pk)
+        self.assertEqual(a_doc.caseName, "Lorem Ipsum")
+
+        audio.delete()
