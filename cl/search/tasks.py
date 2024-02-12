@@ -1464,6 +1464,9 @@ def remove_parent_and_child_docs_by_query(
 
     es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
+    # For EventTable.DOCKET and EventTable.DOCKET_ENTRY, main_instance_ids is
+    # a list containing a single element, which is the parent ID used to remove
+    # its child documents.
     instance_id = main_instance_ids[0]
 
     match event_table:

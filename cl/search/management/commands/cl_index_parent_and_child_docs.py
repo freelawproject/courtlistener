@@ -47,7 +47,7 @@ def compose_redis_key(
     :return: A Redis key as a string.
     """
     if event_doc_type:
-        return f"es_{search_type}_{event_doc_type.value}_indexing:log"
+        return f"es_{search_type}_{event_doc_type}_indexing:log"
     return f"es_{search_type}_indexing:log"
 
 
@@ -203,15 +203,15 @@ def get_documents_to_update_or_remove(
         # Fetch event objects and current instances in bulk for the current
         # chunk, thereby minimizing database queries and mitigating memory
         # issues simultaneously.
-        event_ids = list(event_ids_chunk)
+        event_ids_chunk = list(event_ids_chunk)
         events_bulk = {
             event.id: event
-            for event in events_to_update.filter(id__in=event_ids)
+            for event in events_to_update.filter(id__in=event_ids_chunk)
         }
         current_instances_bulk = document_model.objects.filter(
-            pk__in=event_ids
+            pk__in=event_ids_chunk
         ).in_bulk()
-        for event_id in event_ids:
+        for event_id in event_ids_chunk:
             event = events_bulk.get(event_id)
             current_instance = current_instances_bulk.get(event_id)
             if not current_instance:
@@ -303,10 +303,11 @@ class Command(VerboseCommand):
             "--update-from-event-tables",
             type=str,
             required=False,
-            choices=[member.value for member in EventTable],
+            choices=[member for member in EventTable],
             help=f"The document type to update from event history tables. "
-            f"'docket' for dockets, 'de' for docket entries or 'rd' for "
-            f"RECAP Documents.",
+            f"'search.Docket' for dockets, 'search.DocketEntry' for docket "
+            f"entries or 'search.RECAPDocument' for RECAP Documents.",
+            default="",
         )
         parser.add_argument(
             "--start-date",
@@ -329,7 +330,7 @@ class Command(VerboseCommand):
         chunk_size = self.options["chunk_size"]
         pk_offset = options["pk_offset"]
         auto_resume = options.get("auto_resume", False)
-        update_from_event_tables = EventTable.get_member(
+        update_from_event_tables = EventTable(
             options.get("update_from_event_tables", None)
         )
         if auto_resume:
@@ -432,8 +433,8 @@ class Command(VerboseCommand):
         :return: None
         """
 
-        event_doc_type = EventTable.get_member(
-            self.options.get("update_from_event_tables", None)
+        event_doc_type = EventTable(
+            self.options.get("update_from_event_tables", "")
         )
         queue = self.options["queue"]
         testing_mode = self.options.get("testing_mode", False)
@@ -506,7 +507,7 @@ class Command(VerboseCommand):
                         processed_count,
                         count,
                         processed_count * 1.0 / count,
-                        event_doc_type.value if event_doc_type else "",
+                        event_doc_type if event_doc_type else "",
                         item_id,
                     )
                 )
@@ -530,8 +531,8 @@ class Command(VerboseCommand):
         :param search_type: The search type related to the update/remove action.
         :return: None
         """
-        event_doc_type = EventTable.get_member(
-            self.options.get("update_from_event_tables", None)
+        event_doc_type = EventTable(
+            self.options.get("update_from_event_tables", "")
         )
         chunk_size = self.options["chunk_size"]
         (

@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal, Type, Union
 
 from elasticsearch_dsl.response import Hit
@@ -101,14 +101,8 @@ SaveDocumentResponseType = tuple[str, ESDictDocument]
 SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 
 
-class EventTable(Enum):
+class EventTable(StrEnum):
     DOCKET = "search.Docket"
     DOCKET_ENTRY = "search.DocketEntry"
     RECAP_DOCUMENT = "search.RECAPDocument"
-
-    @classmethod
-    def get_member(cls, value):
-        for member in cls:
-            if member.value == value:
-                return member
-        return None
+    UNDEFINED = ""
