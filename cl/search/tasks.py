@@ -16,6 +16,7 @@ from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ConflictError,
     ConnectionError,
+    ConnectionTimeout,
     NotFoundError,
     RequestError,
 )
@@ -277,7 +278,7 @@ def get_instance_from_db(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError),
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
     max_retries=5,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
@@ -469,7 +470,7 @@ def document_fields_to_update(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError),
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
     max_retries=5,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
@@ -612,7 +613,7 @@ def get_doc_from_es(
 
 def handle_ubq_retries(
     self: Task,
-    exc: ConnectionError | ConflictError,
+    exc: ConnectionError | ConflictError | ConnectionTimeout,
     count_query=QuerySet | None,
 ) -> None:
     """Handles the retry logic for update_children_docs_by_query task based on
@@ -629,9 +630,9 @@ def handle_ubq_retries(
     if retry_count >= self.max_retries:
         raise exc
 
-    if isinstance(exc, ConnectionError) and count_query:
+    if isinstance(exc, ConnectionError | ConnectionTimeout) and count_query:
         num_documents = count_query.count()
-        estimated_time_ms = num_documents * 15  # 15ms per document
+        estimated_time_ms = num_documents * 90  # 90ms per document
         # Convert ms to seconds
         estimated_delay_sec = round(estimated_time_ms / 1000)
         # Apply exponential backoff with jitter
@@ -767,7 +768,7 @@ def update_children_docs_by_query(
     ubq = ubq.script(source=script_source, params=params)
     try:
         ubq.execute()
-    except (ConnectionError, ConflictError) as exc:
+    except (ConnectionError, ConflictError, ConnectionTimeout) as exc:
         handle_ubq_retries(self, exc, count_query=count_query)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -777,7 +778,12 @@ def update_children_docs_by_query(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, NotFoundError, ConflictError),
+    autoretry_for=(
+        ConnectionError,
+        NotFoundError,
+        ConflictError,
+        ConnectionTimeout,
+    ),
     max_retries=5,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
@@ -1153,7 +1159,7 @@ def index_parent_or_child_docs(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError),
+    autoretry_for=(ConnectionError, ConflictError, ConnectionTimeout),
     max_retries=5,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
@@ -1310,7 +1316,12 @@ def build_bulk_cites_doc(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError, ConflictError, NotFoundError),
+    autoretry_for=(
+        ConnectionError,
+        ConflictError,
+        NotFoundError,
+        ConnectionTimeout,
+    ),
     max_retries=6,
     retry_backoff=2 * 60,
     retry_backoff_max=20 * 60,
