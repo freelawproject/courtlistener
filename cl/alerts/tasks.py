@@ -38,6 +38,7 @@ from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
+    ESDocumentNameType,
     PercolatorResponseType,
     SaveDocumentResponseType,
     SearchAlertHitType,
@@ -660,7 +661,7 @@ def send_or_schedule_alerts(
 def es_save_alert_document(
     self: Task,
     alert_id: int,
-    es_document_name: str,
+    es_document_name: ESDocumentNameType,
 ) -> None:
     """Helper method to prepare and index an Alert object into Elasticsearch.
 
