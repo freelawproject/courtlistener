@@ -208,9 +208,9 @@ def get_documents_to_update_or_remove(
             event.id: event
             for event in events_to_update.filter(id__in=event_ids_chunk)
         }
-        current_instances_bulk = document_model.objects.filter(
-            pk__in=event_ids_chunk
-        ).in_bulk()
+        current_instances_bulk = document_model.objects.in_bulk(
+            event_ids_chunk
+        )
         for event_id in event_ids_chunk:
             event = events_bulk.get(event_id)
             current_instance = current_instances_bulk.get(event_id)
