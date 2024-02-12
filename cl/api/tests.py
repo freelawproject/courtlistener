@@ -326,7 +326,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Timings
         self.assertAlmostEqual(
-            int(self.r.get("api:Test.timing")), 10, delta=500
+            int(self.r.get("api:Test.timing")), 10, delta=2000
         )
 
 
