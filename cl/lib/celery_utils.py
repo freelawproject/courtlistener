@@ -37,7 +37,7 @@ def make_queue_name_for_pri(queue: str, pri: int) -> str:
 
      - batch1\x06\x163 <-- P3 queue named batch1
 
-    There's more information about this in Github, but it doesn't look like it
+    There's more information about this in GitHub, but it doesn't look like it
     will change any time soon:
 
       - https://github.com/celery/kombu/issues/422
