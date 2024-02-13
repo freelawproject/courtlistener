@@ -156,4 +156,9 @@
         {% endfor %}
     {% endfor %}
 </div>
+{% if parties_paginator.has_other_pages %}
+<div class="col-xs-12" >
+  {% include "includes/pagination.html" with page_obj=parties_paginator hide_last=True %}
+</div>
+{% endif %}
 {% endblock %}
