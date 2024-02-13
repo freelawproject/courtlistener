@@ -207,15 +207,13 @@ def get_documents_to_update_or_remove(
         # Fetch event objects and current instances in bulk for the current
         # chunk, thereby minimizing database queries and mitigating memory
         # issues simultaneously.
-        event_ids_chunk = list(event_ids_chunk)
+        event_ids_list = list(event_ids_chunk)
         events_bulk = {
             event.id: event
-            for event in events_to_update.filter(id__in=event_ids_chunk)
+            for event in events_to_update.filter(id__in=event_ids_list)
         }
-        current_instances_bulk = document_model.objects.in_bulk(
-            event_ids_chunk
-        )
-        for event_id in event_ids_chunk:
+        current_instances_bulk = document_model.objects.in_bulk(event_ids_list)
+        for event_id in event_ids_list:
             event = events_bulk.get(event_id)
             current_instance = current_instances_bulk.get(event_id)
             if not current_instance:
@@ -240,7 +238,7 @@ def get_documents_to_update_or_remove(
                         (event_id, fields_to_update)
                     )
 
-        processed_count += len(event_ids_chunk)
+        processed_count += len(event_ids_list)
         logger.info(
             "\rChecking documents to update:  {}/{} ({:.0%})".format(
                 processed_count,
