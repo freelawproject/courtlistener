@@ -9,7 +9,7 @@ from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Prefetch, Q, QuerySet
+from django.db.models import Q, QuerySet
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str

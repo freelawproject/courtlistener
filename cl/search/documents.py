@@ -1221,9 +1221,9 @@ class DocketDocument(DocketBaseDocument):
 
         # Extract only required parties values.
         party_values = instance.parties.values_list("pk", "name")
-        if party_values:
-            out["party_id"].update([pk for pk, _ in party_values])
-            out["party"].update([name for _, name in party_values])
+        for pk, name in party_values.iterator():
+            out["party_id"].add(pk)
+            out["party"].add(name)
 
         # Extract only required attorney values.
         atty_values = (
@@ -1231,9 +1231,9 @@ class DocketDocument(DocketBaseDocument):
             .distinct()
             .values_list("pk", "name")
         )
-        if atty_values:
-            out["attorney_id"].update([pk for pk, _ in atty_values])
-            out["attorney"].update([name for _, name in atty_values])
+        for pk, name in atty_values.iterator():
+            out["attorney_id"].add(pk)
+            out["attorney"].add(name)
 
         # Extract only required firm values.
         firms_values = (
@@ -1243,9 +1243,9 @@ class DocketDocument(DocketBaseDocument):
             .distinct()
             .values_list("pk", "name")
         )
-        if firms_values:
-            out["firm_id"].update([pk for pk, _ in firms_values])
-            out["firm"].update([name for _, name in firms_values])
+        for pk, name in firms_values.iterator():
+            out["firm_id"].add(pk)
+            out["firm"].add(name)
 
         return out
 

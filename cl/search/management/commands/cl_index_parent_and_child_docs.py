@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from itertools import batched
 from typing import Iterable, Mapping
 
 from django.conf import settings
@@ -12,7 +13,6 @@ from cl.lib.es_signal_processor import (
     get_fields_to_update,
 )
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.utils import chunks
 from cl.people_db.models import Person
 from cl.search.documents import ESRECAPDocument
 from cl.search.models import (
@@ -202,7 +202,7 @@ def get_documents_to_update_or_remove(
     event_ids_count = len(event_ids)
     processed_count = 0
     for i, event_ids_chunk in enumerate(
-        chunks(event_ids, chunk_size), start=1
+        batched(event_ids, chunk_size), start=1
     ):
         # Fetch event objects and current instances in bulk for the current
         # chunk, thereby minimizing database queries and mitigating memory
