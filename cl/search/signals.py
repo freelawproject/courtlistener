@@ -555,7 +555,7 @@ def handle_recap_doc_change(
     # When we get updated text for a doc, we want to parse it for citations.
     if update_fields is not None and "plain_text" in update_fields:
         # Even though the task itself filters for qualifying ocr_status,
-        # we don't want to clog the TQ with unncessary items.
+        # we don't want to clog the TQ with unnecessary items.
         if instance.ocr_status in (
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,

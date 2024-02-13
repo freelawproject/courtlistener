@@ -2982,7 +2982,7 @@ class HarvardMergerTests(TestCase):
 
         test_pairs = [
             (
-                # Test if we are tripped up by mulitple judge names in tag
+                # Test if we are tripped up by multiple judge names in tag
                 "ARNOLD, Circuit Judge, with whom BRIGHT, Senior Circuit Judge, and McMILLIAN and MAGILL, Circuit Judges, join,:",
                 "Arnold",
             ),
@@ -3061,7 +3061,7 @@ class HarvardMergerTests(TestCase):
 
         test_pairs = [
             (
-                # Test if we are tripped up by mulitple judge names in tag
+                # Test if we are tripped up by multiple judge names in tag
                 "ARNOLD, Circuit Judge, with whom BRIGHT, Senior Circuit Judge, and McMILLIAN and MAGILL, Circuit Judges, join,:",
                 ["ARNOLD", "BRIGHT", "MAGILL", "McMILLIAN"],
             ),
