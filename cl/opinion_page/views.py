@@ -319,7 +319,7 @@ async def view_parties(
 
     @sync_to_async
     def paginate_parties(party_queryset, parties_page):
-        paginator = Paginator(party_queryset, 100)
+        paginator = Paginator(party_queryset, 1000)
         try:
             return paginator.page(parties_page)
         except PageNotAnInteger:

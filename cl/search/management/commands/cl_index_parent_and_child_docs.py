@@ -6,7 +6,7 @@ from django.db.models import QuerySet
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
-from cl.lib.command_utils import VerboseCommand
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.es_signal_processor import (
     check_fields_that_changed,
     get_fields_to_update,
@@ -199,7 +199,11 @@ def get_documents_to_update_or_remove(
     child_documents_to_update = []
     documents_to_delete = []
     event_ids = list(events_to_update.values_list("id", flat=True))
-    for event_ids_chunk in chunks(event_ids, chunk_size):
+    event_ids_count = len(event_ids)
+    processed_count = 0
+    for i, event_ids_chunk in enumerate(
+        chunks(event_ids, chunk_size), start=1
+    ):
         # Fetch event objects and current instances in bulk for the current
         # chunk, thereby minimizing database queries and mitigating memory
         # issues simultaneously.
@@ -236,6 +240,14 @@ def get_documents_to_update_or_remove(
                         (event_id, fields_to_update)
                     )
 
+        processed_count += len(event_ids_chunk)
+        logger.info(
+            "\rChecking documents to update:  {}/{} ({:.0%})".format(
+                processed_count,
+                event_ids_count,
+                processed_count / event_ids_count,
+            )
+        )
     return (
         main_documents_to_update,
         child_documents_to_update,
