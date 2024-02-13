@@ -49,6 +49,7 @@ from cl.search.tasks import (
     index_related_cites_fields,
     update_es_document,
 )
+from cl.search.types import EventTable
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
@@ -3011,19 +3012,16 @@ class IndexDocketRECAPDocumentsCommandTest(
             pk_offset=0,
             document_type="parent",
         )
-
         # Two dockets should be indexed.
         s = DocketDocument.search()
         s = s.query(Q("match", docket_child="docket"))
         self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
-
         # No RECAPDocuments should be indexed.
         s = DocketDocument.search()
         s = s.query(Q("match", docket_child="recap_document"))
         self.assertEqual(
             s.count(), 0, msg="Wrong number of RECAPDocuments returned."
         )
-
         # Now index only RECAPDocuments.
         call_command(
             "cl_index_parent_and_child_docs",
@@ -3038,7 +3036,6 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(
             s.count(), 3, msg="Wrong number of RECAPDocuments returned."
         )
-
         # RECAPDocuments are indexed.
         rds_pks = [
             self.rd.pk,
@@ -4176,3 +4173,333 @@ class RECAPIndexingTest(
         r_doc = ESRECAPDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.plain_text, "Lorem ipsum control chars .")
         de_1.docket.delete()
+
+
+class RECAPHistoryTablesIndexingTest(
+    RECAPSearchTestCase, ESIndexTestCase, TestCase
+):
+    """RECAP Document indexing from history tables events."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        cls.rebuild_index("search.Docket")
+        super().setUpTestData()
+
+    def setUp(self):
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+        self.r = make_redis_interface("CACHE")
+        keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
+        if keys:
+            self.r.delete(*keys)
+
+    def test_docket_history_table_indexing(self) -> None:
+        """Confirm that dockets and their child documents are properly updated
+        based on events from their history tables.
+        """
+
+        # Trigger docket events based on changes.
+        docket_instance = self.de.docket
+        docket_instance.case_name = "SUBPOENAS SERVED LOREM"
+        docket_instance.docket_number = "1:21-bk-0000"
+        docket_instance.save()
+
+        docket_instance_2 = self.de_1.docket
+        docket_instance_2.cause = "Test cause"
+        docket_instance_2.save()
+
+        # Data remains the same after update.
+        docket_doc = DocketDocument.get(id=docket_instance.pk)
+        self.assertEqual(docket_doc.caseName, "SUBPOENAS SERVED ON")
+        self.assertEqual(docket_doc.docketNumber, "1:21-bk-1234")
+        rd_1_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd.pk).RECAP)
+        self.assertEqual(rd_1_doc.caseName, "SUBPOENAS SERVED ON")
+        self.assertEqual(rd_1_doc.docketNumber, "1:21-bk-1234")
+        rd_2_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_att.pk).RECAP)
+        self.assertEqual(rd_2_doc.caseName, "SUBPOENAS SERVED ON")
+        self.assertEqual(rd_2_doc.docketNumber, "1:21-bk-1234")
+
+        docket_doc_2 = DocketDocument.get(id=docket_instance_2.pk)
+        self.assertEqual(docket_doc_2.cause, "")
+        rd_3_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_2.pk).RECAP)
+        self.assertEqual(rd_3_doc.cause, "")
+        # Call the indexing command for "docket" to update documents based on
+        # events within the specified date range.
+        start_date = datetime.datetime.now() - datetime.timedelta(days=2)
+        end_date = datetime.datetime.now() + datetime.timedelta(days=2)
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            testing_mode=True,
+            update_from_event_tables=EventTable.DOCKET.value,
+            start_date=start_date.date().isoformat(),
+            end_date=end_date.date().isoformat(),
+        )
+
+        # New data should now be updated in the docket and its child documents
+        docket_doc = DocketDocument.get(id=docket_instance.pk)
+        self.assertEqual(docket_doc.caseName, "SUBPOENAS SERVED LOREM")
+        self.assertEqual(docket_doc.docketNumber, "1:21-bk-0000")
+
+        rd_1_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd.pk).RECAP)
+        self.assertEqual(rd_1_doc.caseName, "SUBPOENAS SERVED LOREM")
+        self.assertEqual(rd_1_doc.docketNumber, "1:21-bk-0000")
+        rd_2_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_att.pk).RECAP)
+        self.assertEqual(rd_2_doc.caseName, "SUBPOENAS SERVED LOREM")
+        self.assertEqual(rd_2_doc.docketNumber, "1:21-bk-0000")
+
+        docket_doc_2 = DocketDocument.get(id=docket_instance_2.pk)
+        self.assertEqual(docket_doc_2.cause, "Test cause")
+
+        rd_3_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_2.pk).RECAP)
+        self.assertEqual(rd_3_doc.cause, "Test cause")
+
+        # Deletion of docket.
+        docket_instance_id = docket_instance.pk
+        with mock.patch(
+            "cl.lib.es_signal_processor.remove_document_from_es_index"
+        ):
+            docket_instance.delete()
+            docket_instance_2.delete()
+
+        # Documents should still exist in the index at this stage.
+        docket_doc_exists = DocketDocument.exists(id=docket_instance_id)
+        self.assertTrue(docket_doc_exists)
+        rd_1_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(self.rd.pk).RECAP
+        )
+        rd_2_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(self.rd_att.pk).RECAP
+        )
+        self.assertTrue(rd_1_doc_exists)
+        self.assertTrue(rd_2_doc_exists)
+
+        # Call the indexing command for "docket" to update documents based on
+        # events within the specified date range.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            testing_mode=True,
+            update_from_event_tables=EventTable.DOCKET.value,
+            start_date=start_date.date().isoformat(),
+            end_date=end_date.date().isoformat(),
+        )
+        # The docket should be removed from the index.
+        docket_doc_exists = DocketDocument.exists(id=docket_instance_id)
+        self.assertFalse(docket_doc_exists)
+
+        # RECAPDocuments should be also removed from the index.
+        rd_1_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(self.rd.pk).RECAP
+        )
+        rd_2_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(self.rd_att.pk).RECAP
+        )
+        self.assertFalse(rd_1_doc_exists)
+        self.assertFalse(rd_2_doc_exists)
+
+        # Clean up last_pk indexed.
+        keys = self.r.keys(
+            compose_redis_key(SEARCH_TYPES.RECAP, EventTable.DOCKET)
+        )
+        if keys:
+            self.r.delete(*keys)
+
+    def test_docket_entry_history_table_indexing(self) -> None:
+        """Confirm that docket entries changes are properly updated into
+        ESRECAPDocuments based on events from their history tables."""
+
+        # Trigger docket entry events based on changes.
+        de_instance = self.de
+        de_instance.description = "Hearing for Leave to File Amicus"
+        de_instance.entry_number = 10
+        de_instance.save()
+
+        # Data remains the same after update.
+        rd_1_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd.pk).RECAP)
+        rd_2_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_att.pk).RECAP)
+        self.assertEqual(
+            rd_1_doc.description,
+            "MOTION for Leave to File Amicus Curiae Lorem",
+        )
+        self.assertEqual(rd_1_doc.entry_number, 1)
+        self.assertEqual(
+            rd_2_doc.description,
+            "MOTION for Leave to File Amicus Curiae Lorem",
+        )
+        self.assertEqual(rd_2_doc.entry_number, 1)
+
+        # Call the indexing command for "de" to update documents based on
+        # events within the specified date range.
+        start_date = datetime.datetime.now() - datetime.timedelta(days=2)
+        end_date = datetime.datetime.now() + datetime.timedelta(days=2)
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            testing_mode=True,
+            update_from_event_tables=EventTable.DOCKET_ENTRY.value,
+            start_date=start_date.date().isoformat(),
+            end_date=end_date.date().isoformat(),
+        )
+        # New data should now be updated in the RECAP Documents.
+        rd_1_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd.pk).RECAP)
+        rd_2_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_att.pk).RECAP)
+        self.assertEqual(
+            rd_1_doc.description, "Hearing for Leave to File Amicus"
+        )
+        self.assertEqual(rd_1_doc.entry_number, 10)
+        self.assertEqual(
+            rd_2_doc.description, "Hearing for Leave to File Amicus"
+        )
+        self.assertEqual(rd_2_doc.entry_number, 10)
+
+        # Deletion of docket entry.
+        with mock.patch(
+            "cl.lib.es_signal_processor.remove_document_from_es_index"
+        ):
+            de_instance.delete()
+
+        # Documents should still exist in the index at this stage.
+        rd_1_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(self.rd.pk).RECAP
+        )
+        rd_2_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(self.rd_att.pk).RECAP
+        )
+        self.assertTrue(rd_1_doc_exists)
+        self.assertTrue(rd_2_doc_exists)
+        # Call the indexing command for "de" to update documents based on
+        # events within the specified date range.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            testing_mode=True,
+            update_from_event_tables=EventTable.DOCKET_ENTRY.value,
+            start_date=start_date.date().isoformat(),
+            end_date=end_date.date().isoformat(),
+        )
+        # RECAPDocuments should be from the index.
+        rd_1_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(self.rd.pk).RECAP
+        )
+        rd_2_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(self.rd_att.pk).RECAP
+        )
+        self.assertFalse(rd_1_doc_exists)
+        self.assertFalse(rd_2_doc_exists)
+
+        # Clean up last_pk indexed.
+        keys = self.r.keys(
+            compose_redis_key(SEARCH_TYPES.RECAP, EventTable.DOCKET_ENTRY)
+        )
+        if keys:
+            self.r.delete(*keys)
+
+    def test_recap_history_table_indexing(self) -> None:
+        """Confirm that RECAPDocument changes are properly updated into
+        ESRECAPDocuments based on events from their history tables."""
+
+        # Trigger RECAPDocument events based on changes.
+        rd_instance = self.rd
+        rd_instance.description = "Leave to File Amicus"
+        rd_instance.document_number = "5"
+        rd_instance.save()
+
+        rd_instance_2 = self.rd_att
+        rd_instance_2.description = "Leave Attachment"
+        rd_instance_2.plain_text = "Lorem ipsum attachment text"
+        rd_instance_2.save()
+
+        # Data remains the same after update.
+        rd_1_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd.pk).RECAP)
+        self.assertEqual(
+            rd_1_doc.short_description,
+            "Leave to File",
+        )
+        self.assertEqual(rd_1_doc.document_number, 1)
+
+        rd_2_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_att.pk).RECAP)
+        self.assertEqual(
+            rd_2_doc.short_description,
+            "Document attachment",
+        )
+        self.assertEqual(rd_2_doc.plain_text, "")
+
+        # Call the indexing command for "rd" to update documents based on
+        # events within the specified date range.
+        start_date = datetime.datetime.now() - datetime.timedelta(days=2)
+        end_date = datetime.datetime.now() + datetime.timedelta(days=2)
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            testing_mode=True,
+            update_from_event_tables=EventTable.RECAP_DOCUMENT.value,
+            start_date=start_date.date().isoformat(),
+            end_date=end_date.date().isoformat(),
+        )
+        # New data should now be updated in the RECAP Documents.
+        rd_1_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd.pk).RECAP)
+        self.assertEqual(rd_1_doc.short_description, "Leave to File Amicus")
+        self.assertEqual(rd_1_doc.document_number, 5)
+        rd_2_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_att.pk).RECAP)
+        self.assertEqual(rd_2_doc.short_description, "Leave Attachment")
+        self.assertEqual(rd_2_doc.plain_text, "Lorem ipsum attachment text")
+
+        rd_instance_id = rd_instance.pk
+        rd_instance_2_id = rd_instance_2.pk
+        # Deletion of RECAPDocument.
+        with mock.patch(
+            "cl.lib.es_signal_processor.remove_document_from_es_index"
+        ):
+            rd_instance.delete()
+            rd_instance_2.delete()
+
+        # Documents should still exist in the index at this stage.
+        rd_1_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(rd_instance_id).RECAP
+        )
+        rd_2_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(rd_instance_2_id).RECAP
+        )
+        self.assertTrue(rd_1_doc_exists)
+        self.assertTrue(rd_2_doc_exists)
+
+        # Call the indexing command for "rd" to update documents based on
+        # events within the specified date range.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            testing_mode=True,
+            update_from_event_tables=EventTable.RECAP_DOCUMENT.value,
+            start_date=start_date.date().isoformat(),
+            end_date=end_date.date().isoformat(),
+        )
+
+        # RECAPDocuments should be from the index.
+        rd_1_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(rd_instance_id).RECAP
+        )
+        rd_2_doc_exists = ESRECAPDocument.exists(
+            id=ES_CHILD_ID(rd_instance_2_id).RECAP
+        )
+        self.assertFalse(rd_1_doc_exists)
+        self.assertFalse(rd_2_doc_exists)
+
+        # Clean up last_pk indexed.
+        keys = self.r.keys(
+            compose_redis_key(SEARCH_TYPES.RECAP, EventTable.RECAP_DOCUMENT)
+        )
+        if keys:
+            self.r.delete(*keys)
