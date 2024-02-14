@@ -70,7 +70,7 @@ jobs:
           -p cl.simple_pages
 
       # Add files here as they're ready
-      - name: mypy Static Type Cheker (files)
+      - name: mypy Static Type Checker (files)
         run: |
           mypy \
           --follow-imports=skip \

@@ -1,8 +1,6 @@
 from django.urls import include, path, re_path
 from django.views.generic import RedirectView
-from rest_framework.renderers import JSONOpenAPIRenderer
 from rest_framework.routers import DefaultRouter
-from rest_framework.schemas import get_schema_view
 
 from cl.alerts import api_views as alert_views
 from cl.api import views
@@ -148,7 +146,7 @@ router.register(
 API_TITLE = "CourtListener Legal Data API"
 
 
-urlpatterns_base = [
+urlpatterns = [
     path(
         "api-auth/",
         include("rest_framework.urls", namespace="rest_framework"),
@@ -229,15 +227,4 @@ urlpatterns_base = [
         "api/replication/",
         RedirectView.as_view(pattern_name="replication_docs", permanent=True),
     ),
-]
-
-schema_view = get_schema_view(
-    title=API_TITLE,
-    url="https://www.courtlistener.com/api/rest/v3/",
-    renderer_classes=[JSONOpenAPIRenderer],
-    patterns=urlpatterns_base,
-)
-
-urlpatterns = urlpatterns_base + [
-    path("api/swagger/", schema_view, name="swagger_schema"),
 ]

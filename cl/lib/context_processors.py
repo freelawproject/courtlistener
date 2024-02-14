@@ -42,7 +42,7 @@ info_tips = (
     'Free Law Project is a member of the <a href="http://www.falm.info/">Free Access to Law Movement</a> and relies heavily on <a href="%s?referrer=tip">your donations</a>. <i class="fa fa-heart red"></i>'
     % DONATE_URL,
     'Free Law Project, the non-profit behind CourtListener, provides <a href="https://free.law/data-consulting/">data consulting and client services</a> for those that need help with our data.',
-    'If you have a Github account, you <a href="https://github.com/sponsors/freelawproject/">can sponsor our work</a> so we can do more of it. <i class="fa fa-heart red"></i>',
+    'If you have a GitHub account, you <a href="https://github.com/sponsors/freelawproject/">can sponsor our work</a> so we can do more of it. <i class="fa fa-heart red"></i>',
     # Recognition
     'Free Law Project\'s founders were <a href="https://free.law/2014/07/14/free-law-project-co-founders-named-to-fastcase-50-for-2014/">selected as FastCase 50 winners in 2014</a>.',
     'Oral Arguments were <a href="https://free.law/2014/12/04/free-law-project-recognized-in-two-of-top-ten-legal-hacks-of-2014-by-dc-legal-hackers/">selected as a Top Ten Legal Hack of 2014</a>.',
