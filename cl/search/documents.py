@@ -15,7 +15,12 @@ from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
 from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
-from cl.people_db.models import Person, Position
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    Person,
+    Position,
+)
 from cl.search.constants import o_type_index_map
 from cl.search.es_indices import (
     opinion_index,
@@ -1213,15 +1218,35 @@ class DocketDocument(DocketBaseDocument):
             "firm_id": set(),
             "firm": set(),
         }
-        for p in instance.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
+
+        # Extract only required parties values.
+        party_values = instance.parties.values_list("pk", "name")
+        for pk, name in party_values.iterator():
+            out["party_id"].add(pk)
+            out["party"].add(name)
+
+        # Extract only required attorney values.
+        atty_values = (
+            Attorney.objects.filter(roles__docket=instance)
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in atty_values.iterator():
+            out["attorney_id"].add(pk)
+            out["attorney"].add(name)
+
+        # Extract only required firm values.
+        firms_values = (
+            AttorneyOrganization.objects.filter(
+                attorney_organization_associations__docket=instance
+            )
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in firms_values.iterator():
+            out["firm_id"].add(pk)
+            out["firm"].add(name)
+
         return out
 
     def prepare(self, instance):
