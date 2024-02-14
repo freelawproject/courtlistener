@@ -4101,7 +4101,7 @@ class RECAPIndexingTest(
             "type": SEARCH_TYPES.RECAP,
         }
 
-        results_per_page = settings.SEARCH_PAGE_SIZE
+        results_per_page = settings.RECAP_SEARCH_PAGE_SIZE
         # 100 results, 10 pages.
         total_results = 100
         with mock.patch(

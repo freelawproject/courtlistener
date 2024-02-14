@@ -66,7 +66,8 @@ QUERY_RESULTS_CACHE = 60 * 60 * 6
 # Search pagination #
 #####################
 MAX_SEARCH_PAGINATION_DEPTH = 100
-SEARCH_PAGE_SIZE = 10
+SEARCH_PAGE_SIZE = 20
+RECAP_SEARCH_PAGE_SIZE = 10
 CHILD_HITS_PER_RESULT = 5
 VIEW_MORE_CHILD_HITS = 99
 # The amount of text to return from the beginning of the field if there are no
