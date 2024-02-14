@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from itertools import batched
 from typing import Iterable, Mapping
 
 from django.conf import settings
@@ -6,13 +7,12 @@ from django.db.models import QuerySet
 
 from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
-from cl.lib.command_utils import VerboseCommand
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.es_signal_processor import (
     check_fields_that_changed,
     get_fields_to_update,
 )
 from cl.lib.redis_utils import make_redis_interface
-from cl.lib.utils import chunks
 from cl.people_db.models import Person
 from cl.search.documents import ESRECAPDocument
 from cl.search.models import (
@@ -199,19 +199,19 @@ def get_documents_to_update_or_remove(
     child_documents_to_update = []
     documents_to_delete = []
     event_ids = list(events_to_update.values_list("id", flat=True))
-    for event_ids_chunk in chunks(event_ids, chunk_size):
+    event_ids_count = len(event_ids)
+    processed_count = 0
+    for event_ids_chunk in batched(event_ids, chunk_size):
         # Fetch event objects and current instances in bulk for the current
         # chunk, thereby minimizing database queries and mitigating memory
         # issues simultaneously.
-        event_ids_chunk = list(event_ids_chunk)
+        event_ids_list = list(event_ids_chunk)
         events_bulk = {
             event.id: event
-            for event in events_to_update.filter(id__in=event_ids_chunk)
+            for event in events_to_update.filter(id__in=event_ids_list)
         }
-        current_instances_bulk = document_model.objects.in_bulk(
-            event_ids_chunk
-        )
-        for event_id in event_ids_chunk:
+        current_instances_bulk = document_model.objects.in_bulk(event_ids_list)
+        for event_id in event_ids_list:
             event = events_bulk.get(event_id)
             current_instance = current_instances_bulk.get(event_id)
             if not current_instance:
@@ -236,6 +236,14 @@ def get_documents_to_update_or_remove(
                         (event_id, fields_to_update)
                     )
 
+        processed_count += len(event_ids_list)
+        logger.info(
+            "\rChecking documents to update:  {}/{} ({:.0%})".format(
+                processed_count,
+                event_ids_count,
+                processed_count / event_ids_count,
+            )
+        )
     return (
         main_documents_to_update,
         child_documents_to_update,
