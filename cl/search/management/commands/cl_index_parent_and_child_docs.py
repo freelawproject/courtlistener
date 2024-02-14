@@ -201,9 +201,7 @@ def get_documents_to_update_or_remove(
     event_ids = list(events_to_update.values_list("id", flat=True))
     event_ids_count = len(event_ids)
     processed_count = 0
-    for i, event_ids_chunk in enumerate(
-        batched(event_ids, chunk_size), start=1
-    ):
+    for event_ids_chunk in batched(event_ids, chunk_size):
         # Fetch event objects and current instances in bulk for the current
         # chunk, thereby minimizing database queries and mitigating memory
         # issues simultaneously.
