@@ -3032,9 +3032,9 @@ class OpinionCluster(AbstractDateTimeModel):
         delete_items.delay([id_cache], "search.Opinion")
 
         if send_webhook:
-            from cl.api.webhooks import send_opinion_cluster_deleted_webhook
+            from cl.api.webhooks import send_opinion_clusters_deleted_webhook
 
-            send_opinion_cluster_deleted_webhook(self)
+            send_opinion_clusters_deleted_webhook(ids=[self.id])
 
     def as_search_list(self):
         # IDs

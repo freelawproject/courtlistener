@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Dict, Any
 
 import requests
 from django.conf import settings
@@ -230,7 +230,7 @@ def send_opinion_created_webhook(opinion: Opinion) -> None:
         send_webhook_event(webhook_event, json_bytes)
 
 
-def send_opinion_deleted_webhook(ids: List[str]) -> None:
+def send_opinions_deleted_webhook(ids: List[str]) -> None:
     """Send a webhook for the deleted opinion cluster
 
     :param ids: The list of ids deleted.
@@ -280,7 +280,7 @@ def send_opinion_cluster_created_webhook(
         send_webhook_event(webhook_event, json_bytes)
 
 
-def send_opinion_cluster_deleted_webhook(ids: List[str]) -> None:
+def send_opinion_clusters_deleted_webhook(ids: List[str]) -> None:
     """Send a webhook for deleted opinion cluster.
 
     :param id: The id of the deleted opinion cluster.
