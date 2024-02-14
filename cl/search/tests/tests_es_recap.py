@@ -1,9 +1,11 @@
 import datetime
+import math
 import re
 import unittest
 from unittest import mock
 
 from asgiref.sync import async_to_sync, sync_to_async
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import AsyncClient, override_settings
@@ -4099,14 +4101,16 @@ class RECAPIndexingTest(
             "type": SEARCH_TYPES.RECAP,
         }
 
-        # 100 results, 5 pages.
+        results_per_page = settings.SEARCH_PAGE_SIZE
+        # 100 results, 10 pages.
+        total_results = 100
         with mock.patch(
             "cl.search.views.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
                 False,
-                100,
+                total_results,
                 1000,
             ),
         ):
@@ -4114,17 +4118,19 @@ class RECAPIndexingTest(
                 reverse("show_results"),
                 search_params,
             )
+        expected_page = math.ceil(total_results / results_per_page)
         self.assertIn("100 Results", r.content.decode())
-        self.assertIn("1 of 5", r.content.decode())
+        self.assertIn(f"1 of {expected_page:,}", r.content.decode())
 
-        # 101 results, 6 pages.
+        # 101 results, 11 pages.
+        total_results = 101
         with mock.patch(
             "cl.search.views.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
                 False,
-                101,
+                total_results,
                 1000,
             ),
         ):
@@ -4132,17 +4138,19 @@ class RECAPIndexingTest(
                 reverse("show_results"),
                 search_params,
             )
+        expected_page = math.ceil(total_results / results_per_page)
         self.assertIn("101 Results", r.content.decode())
-        self.assertIn("1 of 6", r.content.decode())
+        self.assertIn(f"1 of {expected_page:,}", r.content.decode())
 
-        # 20,000 results, 1,000 pages.
+        # 20,000 results, 2,000 pages.
+        total_results = 20_000
         with mock.patch(
             "cl.search.views.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
                 False,
-                20_000,
+                total_results,
                 1000,
             ),
         ):
@@ -4150,8 +4158,9 @@ class RECAPIndexingTest(
                 reverse("show_results"),
                 search_params,
             )
+        expected_page = math.ceil(total_results / results_per_page)
         self.assertIn("20,000 Results", r.content.decode())
-        self.assertIn("1 of 1,000", r.content.decode())
+        self.assertIn(f"1 of {expected_page:,}", r.content.decode())
 
     def test_remove_control_chars_on_plain_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
