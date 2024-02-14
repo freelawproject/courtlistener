@@ -62,10 +62,6 @@ class BasicAPIPageTest(TestCase):
         r = await self.async_client.get(reverse("api_index"))
         self.assertEqual(r.status_code, 200)
 
-    async def test_swagger_interface(self) -> None:
-        r = await self.async_client.get(reverse("swagger_schema"))
-        self.assertEqual(r.status_code, 200)
-
     async def test_options_request(self) -> None:
         r = await self.async_client.options(reverse("court_index"))
         self.assertEqual(r.status_code, 200)

@@ -1268,7 +1268,7 @@ class Race(models.Model):
     )
 
     def __str__(self) -> str:
-        # This is used in the API via the StringRelatedField. Do not cthange.
+        # This is used in the API via the StringRelatedField. Do not change.
         return f"{self.race}"
 
 

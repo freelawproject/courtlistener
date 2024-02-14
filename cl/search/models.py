@@ -7,9 +7,11 @@ import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q, QuerySet
+from django.db.models.functions import MD5
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
@@ -635,7 +637,6 @@ class Docket(AbstractDateTimeModel):
         "the correction field on the Opinion Cluster.",
         blank=True,
         null=True,
-        db_index=True,
     )
     docket_number_core = models.CharField(
         help_text=(
@@ -809,13 +810,21 @@ class Docket(AbstractDateTimeModel):
     )
 
     class Meta:
-        unique_together = ("docket_number", "pacer_case_id", "court")
+        constraints = [
+            models.UniqueConstraint(
+                MD5("docket_number"),
+                "pacer_case_id",
+                "court_id",
+                name="unique_docket_per_court",
+            ),
+        ]
         indexes = [
             models.Index(fields=["court_id", "id"]),
             models.Index(
                 fields=["court_id", "docket_number_core", "pacer_case_id"],
                 name="district_court_docket_lookup_idx",
             ),
+            HashIndex("docket_number", name="hash_docket_number_lookup_idx"),
         ]
 
     def __str__(self) -> str:
