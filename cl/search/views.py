@@ -40,7 +40,6 @@ from cl.lib.elasticsearch_utils import (
     limit_inner_hits,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
-    sanitize_unbalanced_parenthesis,
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
@@ -56,6 +55,10 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     regroup_snippets,
 )
+from cl.lib.utils import (
+    sanitize_unbalanced_parenthesis,
+    sanitize_unbalanced_quotes,
+)
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
@@ -64,7 +67,11 @@ from cl.search.documents import (
     ParentheticalGroupDocument,
     PersonDocument,
 )
-from cl.search.exception import UnbalancedQuery
+from cl.search.exception import (
+    BadProximityQuery,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -702,6 +709,8 @@ def do_es_search(
             document_type = PersonDocument
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
+            # Set a different number of results per page for RECAP SEARCH
+            rows = settings.RECAP_SEARCH_PAGE_SIZE
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
 
@@ -756,10 +765,24 @@ def do_es_search(
                 related_cluster = OpinionCluster.objects.get(
                     sub_opinions__pk__in=related_pks
                 )
-        except UnbalancedQuery:
+        except UnbalancedParenthesesQuery as e:
             error = True
-            error_message = "has incorrect syntax. Did you forget to close one or more parentheses?"
-            suggested_query = sanitize_unbalanced_parenthesis(cd.get("q", ""))
+            error_message = "unbalanced_parentheses"
+            if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
+                suggested_query = sanitize_unbalanced_parenthesis(
+                    cd.get("q", "")
+                )
+        except UnbalancedQuotesQuery as e:
+            error = True
+            error_message = "unbalanced_quotes"
+            if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
+                suggested_query = sanitize_unbalanced_quotes(cd.get("q", ""))
+        except BadProximityQuery as e:
+            error = True
+            error_message = "bad_proximity_token"
+            suggested_query = "proximity_filter"
+            if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
+                suggested_query = "proximity_query"
     else:
         error = True
 

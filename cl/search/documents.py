@@ -132,11 +132,13 @@ class AudioDocumentBase(Document):
     absolute_url = fields.KeywordField(index=False)
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
-            )
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -175,6 +177,7 @@ class AudioDocumentBase(Document):
         attr="docket.court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        term_vector="with_positions_offsets",
     )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")
@@ -215,11 +218,13 @@ class AudioDocumentBase(Document):
     docketNumber = fields.TextField(
         attr="docket.docket_number",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="docket.docket_number",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -232,11 +237,13 @@ class AudioDocumentBase(Document):
     judge = fields.TextField(
         attr="judges",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="judges",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -250,10 +257,12 @@ class AudioDocumentBase(Document):
     source = fields.KeywordField(attr="source", index=False)
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -382,10 +391,12 @@ class PersonBaseDocument(Document):
     fjc_id = fields.TextField()
     name = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -409,10 +420,12 @@ class PersonBaseDocument(Document):
     dod = fields.DateField(attr="date_dod")
     dob_city = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -431,10 +444,12 @@ class PersonBaseDocument(Document):
     political_affiliation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
                 "exact": fields.TextField(
                     analyzer="english_exact",
                     search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
                 ),
             },
             search_analyzer="search_analyzer",
@@ -457,10 +472,12 @@ class PersonBaseDocument(Document):
     school = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
                 "exact": fields.TextField(
                     analyzer="english_exact",
                     search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
                 ),
             },
             search_analyzer="search_analyzer",

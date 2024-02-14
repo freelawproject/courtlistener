@@ -29,6 +29,21 @@
               {% endfor %}
           </tbody>
         </table>
+        {% if type == "recap_archive" %}
+          <p>
+            <sup>*</sup> <code>party</code> and <code>attorney</code> values are associated with dockets, not filings. Therefore, avoid combining non-docket fields with <code>party</code> and <code>attorney</code> in the main query box, as such combinations won't yield any results. For example, a query like:
+          </p>
+          <ul>
+            <li><code>party:(Party Name) AND attorney:(Attorney) AND description:(some description)</code></li>
+          </ul>
+          <p>Will not return any results. To achieve the desired results, utilize filters available in the sidebar:</p>
+          <ul>
+            <li><code>Document Description: "some description"</code></li>
+            <li><code>Party Name: "The party name"</code></li>
+            <li><code>Attorney  Name: "The attorney name"</code></li>
+          </ul>
+          <p>This approach will retrieve filings that match the specified document description in dockets with the specified parties and attorneys.</p>
+        {% endif %}
       </div>
     </div>
   {% endfor %}

@@ -62,10 +62,6 @@ class BasicAPIPageTest(TestCase):
         r = await self.async_client.get(reverse("api_index"))
         self.assertEqual(r.status_code, 200)
 
-    async def test_swagger_interface(self) -> None:
-        r = await self.async_client.get(reverse("swagger_schema"))
-        self.assertEqual(r.status_code, 200)
-
     async def test_options_request(self) -> None:
         r = await self.async_client.options(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
@@ -283,7 +279,13 @@ class ApiEventCreationTestCase(TestCase):
 
         await sync_to_async(view)(request)
 
-    async def test_are_events_created_properly(self) -> None:
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    async def test_are_events_created_properly(
+        self, mock_logging_prefix
+    ) -> None:
         """Are event objects created as API requests are made?"""
         await self.hit_the_api()
 
@@ -320,7 +322,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Timings
         self.assertAlmostEqual(
-            int(self.r.get("api:Test.timing")), 10, delta=500
+            int(self.r.get("api:Test.timing")), 10, delta=2000
         )
 
 

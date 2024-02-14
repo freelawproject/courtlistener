@@ -85,7 +85,6 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
-from cl.users.tasks import update_moosend_subscription
 
 
 class UserTest(LiveServerTestCase):
@@ -2104,9 +2103,14 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             stored_email[1].bcc, ["bcc@example.com", "bcc@example.com"]
         )
 
+    @patch(
+        "cl.lib.email_backends.get_email_prefix",
+        return_value="test-email-counter",
+    )
     @override_settings(EMAIL_MAX_TEMP_COUNTER=5)
-    def test_redis_email_counter(self) -> None:
+    def test_redis_email_counter(self, mock_prefix) -> None:
         """Test logic to count the number of emails sent by the app"""
+        self.restart_sent_email_quota("test-email-counter")
         for i in range(23):
             email = EmailMessage(
                 f"This is the subject {i}",
@@ -2117,17 +2121,21 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             email.send()
 
         r = make_redis_interface("CACHE")
-        self.assertEqual(int(r.get("email:temp_counter")), 3)
-        self.assertEqual(r.zcard("email:delivery_attempts"), 4)
+        self.assertEqual(int(r.get("test-email-counter:temp_counter")), 3)
+        self.assertEqual(r.zcard("test-email-counter:delivery_attempts"), 4)
         email_counter = get_email_count(r)
         self.assertEqual(email_counter, 23)
 
+    @patch(
+        "cl.lib.email_backends.get_email_prefix",
+        return_value="test-emergency-break",
+    )
     @override_settings(
         EMAIL_EMERGENCY_THRESHOLD=5,
     )
-    def test_daily_quota_emergency_brake(self) -> None:
+    def test_daily_quota_emergency_brake(self, mock_prefix) -> None:
         """Test email daily quota emergency brake"""
-
+        self.restart_sent_email_quota("test-emergency-break")
         # Send 5 emails independently.
         for i in range(5):
             email = EmailMessage(
@@ -2160,12 +2168,16 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # No additional messsage should be stored.
         self.assertEqual(stored_email.count(), 5)
 
+    @patch(
+        "cl.lib.email_backends.get_email_prefix",
+        return_value="test-mass-email",
+    )
     @override_settings(
         EMAIL_EMERGENCY_THRESHOLD=5,
     )
-    def test_daily_quota_emergency_brake_mass_mail(self) -> None:
+    def test_daily_quota_emergency_brake_mass_mail(self, mock_prefix) -> None:
         """Test email daily quota emergency brake sending mass email."""
-
+        self.restart_sent_email_quota("test-mass-email")
         # Send 5 emails at once.
         messages = []
         for i in range(5):
@@ -3072,73 +3084,6 @@ class MockResponse:
         return self.json_data
 
 
-class MoosendTest(TestCase):
-    email = "testing@courtlistener.com"  # Test email address
-
-    def mock_subscribe_valid(*args, **kwargs):
-        data = {
-            "Code": 0,
-            "Error": None,
-            "Context": {
-                "ID": "38fb8eb6-cca5-43d5-b61b-2c36334ad7d0",
-                "Name": None,
-                "Mobile": None,
-                "Email": "testing@courtlistener.com",
-                "CreatedOn": "/Date(1655320447877)/",
-                "UpdatedOn": None,
-                "UnsubscribedOn": None,
-                "UnsubscribedFromID": None,
-                "SubscribeType": 1,
-                "SubscribeMethod": 2,
-                "CustomFields": [],
-                "RemovedOn": None,
-                "Tags": [],
-            },
-        }
-
-        return MockResponse(data, 200)
-
-    def mock_unsubscribe_valid(*args, **kwargs):
-        data = {"Code": 0, "Error": None, "Context": None}
-        return MockResponse(data, 200)
-
-    @mock.patch(
-        "cl.users.tasks.requests.post", side_effect=mock_subscribe_valid
-    )
-    def test_subscribe(self, mocked_post) -> None:
-        """This test checks that moosend mailing list subscription is successful"""
-        logger = logging.getLogger("cl.users.tasks")
-        action = "subscribe"
-        with mock.patch.object(logger, "info") as mock_info:
-            update_moosend_subscription.delay(self.email, action)
-            # It's implemented like this because logging library is optimized to use %s
-            # formatting style, avoids call  __str__() method automatically, also logs
-            # from update_moosend_subscription are in %s style
-            mock_info.assert_called_once_with(
-                "Successfully completed '%s' action on '%s' in moosend.",
-                action,
-                self.email,
-            )
-
-    @mock.patch(
-        "cl.users.tasks.requests.post", side_effect=mock_unsubscribe_valid
-    )
-    def test_unsubscribe(self, mocked_post) -> None:
-        """This test checks that moosend mailing list unsubscription is successful"""
-        logger = logging.getLogger("cl.users.tasks")
-        action = "unsubscribe"
-        with mock.patch.object(logger, "info") as mock_info:
-            update_moosend_subscription.delay(self.email, action)
-            # It's implemented like this because logging library is optimized to use %s
-            # formatting style, avoids call __str__() method automatically, also logs
-            # from update_moosend_subscription are in %s style
-            mock_info.assert_called_once_with(
-                "Successfully completed '%s' action on '%s' in moosend.",
-                action,
-                self.email,
-            )
-
-
 class WebhooksHTMXTests(APITestCase):
     """Check that API CRUD operations are working well for search webhooks."""
 
@@ -3405,3 +3350,107 @@ class WebhooksHTMXTests(APITestCase):
         self.assertEqual(response.status_code, HTTP_200_OK)
         # There should be results for user_1
         self.assertNotEqual(response.content, b"\n\n")
+
+
+@override_settings(DEVELOPMENT=False)
+@patch("cl.users.tasks.NeonClient")
+class NeonAccountCreationTest(TestCase):
+
+    async def test_can_send_email_for_multiple_neon_accounts(
+        self, mock_neon_client
+    ) -> None:
+        """Tests whether we can send the email notification when multiple
+        neon accounts are found
+        """
+        # mock the search_account_by_email method to return array with two elements
+        mock_neon_client.return_value.search_account_by_email.return_value = [
+            {},
+            {},
+        ]
+
+        # Update the expiration since the fixture has one some time ago.
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+
+        r = await self.async_client.get(
+            reverse("email_confirm", args=[up.activation_key])
+        )
+        self.assertEqual(
+            200,
+            r.status_code,
+            msg="Did not get 200 code when activating account. "
+            "Instead got %s" % r.status_code,
+        )
+
+        self.assertIn("[Action Needed]:", mail.outbox[-1].subject)
+        self.assertIn(up.user.email, mail.outbox[-1].subject)
+
+        self.assertIn(f"'{up.user.email}'", mail.outbox[-1].body)
+        self.assertIn(
+            f"https://www.courtlistener.com/admin/user/{up.user.pk}",
+            mail.outbox[-1].body,
+        )
+        self.assertIn(
+            "https://support.neonone.com/hc/en-us/articles/4407408776717-Account-Match-Queue",
+            mail.outbox[-1].body,
+        )
+
+    async def test_can_update_profile_with_neon_data(
+        self, mock_neon_client
+    ) -> None:
+        """Tests whether we can use the existing neon account to set
+        the neon_account_id in the user's profile.
+        """
+
+        # mock the search_account_by_email method to return array with one element
+        mock_neon_client.return_value.search_account_by_email.return_value = [
+            {"Account ID": "1256"}
+        ]
+
+        # Update the expiration since the fixture has one some time ago.
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+
+        r = await self.async_client.get(
+            reverse("email_confirm", args=[up.activation_key])
+        )
+        self.assertEqual(
+            200,
+            r.status_code,
+            msg="Did not get 200 code when activating account. "
+            "Instead got %s" % r.status_code,
+        )
+
+        await up.arefresh_from_db()
+        self.assertEqual(up.neon_account_id, "1256")
+
+    async def test_can_create_neon_account(self, mock_neon_client) -> None:
+        """Tests whether we can create a new neon account after we
+        confirm the email address
+        """
+
+        # mock the search_account_by_email method to return am empty array
+        mock_neon_client.return_value.search_account_by_email.return_value = []
+
+        # mock the method to create a new user
+        mock_neon_client.return_value.create_account.return_value = 9876
+
+        # Update the expiration since the fixture has one some time ago.
+        up = await sync_to_async(UserProfileWithParentsFactory.create)(
+            email_confirmed=False
+        )
+
+        r = await self.async_client.get(
+            reverse("email_confirm", args=[up.activation_key])
+        )
+        self.assertEqual(
+            200,
+            r.status_code,
+            msg="Did not get 200 code when activating account. "
+            "Instead got %s" % r.status_code,
+        )
+
+        await up.arefresh_from_db()
+        self.assertEqual(up.neon_account_id, "9876")

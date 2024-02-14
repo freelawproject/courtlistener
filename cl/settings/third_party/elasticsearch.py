@@ -8,7 +8,6 @@ if TESTING:
     ELASTICSEARCH_DISABLED = True
     ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = False
     ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = False
-    ELASTICSEARCH_RECAP_CITES_ENABLED = True
     ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = True
     ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED = True
     ES_HIGHLIGHTER = "fvh"
@@ -23,10 +22,6 @@ else:
     )
     ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = env(
         "ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED",
-        default=False,
-    )
-    ELASTICSEARCH_RECAP_CITES_ENABLED = env(
-        "ELASTICSEARCH_RECAP_CITES_ENABLED",
         default=False,
     )
     ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = env(
@@ -62,7 +57,7 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
-ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=200)
+ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=3500)
 
 base_connection_params = {
     "hosts": ELASTICSEARCH_DSL_HOST,
@@ -109,7 +104,6 @@ ELASTICSEARCH_DSL = {
                 "tokenizer": "whitespace",
                 "filter": [
                     "lowercase",
-                    "synonym_filter",
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",
                     "english_stop",

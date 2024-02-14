@@ -67,9 +67,9 @@ class RestartSentEmailQuotaMixin:
     """Restart sent email quota in redis."""
 
     @classmethod
-    def restart_sent_email_quota(cls):
+    def restart_sent_email_quota(cls, prefix="email"):
         r = make_redis_interface("CACHE")
-        keys = r.keys("email:*")
+        keys = r.keys(f"{prefix}:*")
 
         if keys:
             r.delete(*keys)

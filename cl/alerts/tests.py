@@ -1717,7 +1717,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertIn(rt_oral_argument.case_name, html_content)
         # Highlighting tags are set for other fields.
         self.assertIn("<strong>19-5735</strong>", html_content)
-        self.assertIn("<strong>RT</strong>", html_content)
+        self.assertIn("<strong>RT Test OA</strong>", html_content)
 
         # Confirm that order_by is overridden in the 'View Full Results' URL by
         # dateArgued+desc.
@@ -2015,7 +2015,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(day=30, hour=0)
+            mock_date = now().replace(month=1, day=30, hour=0)
             with time_machine.travel(mock_date, tick=False):
                 # Call mly command
                 with self.assertRaises(InvalidDateError):

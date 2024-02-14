@@ -5,10 +5,10 @@
 {% load text_filters %}
 {% load extras %}
 
-{% block title %}Opinion Coverage — CourtListener.com{% endblock %}
-{% block og_title %}Opinion Coverage — CourtListener.com{% endblock %}
-{% block description %}Opinion Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
-{% block og_description %}Opinion Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
+{% block title %}Case Law Coverage — CourtListener.com{% endblock %}
+{% block og_title %}Case Law Coverage — CourtListener.com{% endblock %}
+{% block description %}Case Law Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
+{% block og_description %}Case Law Coverage for Free Law Project, a 501(c)(3) nonprofit.{% endblock %}
 
 {% block sidebar %}
   <div id="toc-container" class="col-xs-12 col-sm-12 col-md-3">
@@ -58,29 +58,29 @@
 
 {% block content %}
   <div class="col-xs-12 col-sm-12 col-md-8 col-lg-6" role="main">
-    <h1>Data Coverage — What Opinions Do We Have?</h1>
+    <h1>Data Coverage — What Case Law Do We Have?</h1>
     <p class="lead">Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet.</p>
-    <p>Having access to complete and reliable data is crucial for making informed decisions in the legal field. As of 2023, we believe CourtListener has one of the most complete collections of legal opinions on the internet. Our database encompasses more than 99% of all precedential legal opinions published in the United States. We have made that possible by collecting our data from a wide variety of sources over many years. Scroll down, use the Table of Contents to inspect particular jurisdictions, or read on to learn more about how we do it.</p>
+    <p>Having access to complete and reliable data is crucial for making informed decisions in the legal field. As of 2023, we believe CourtListener has one of the most complete collections of case law on the internet. Our database encompasses more than 99% of all precedential legal case law published in the United States. We have made that possible by collecting our data from a wide variety of sources over many years. Scroll down, use the Table of Contents to inspect particular jurisdictions, or read on to learn more about how we do it.</p>
 
     <p><strong>Diverse Sources —</strong>
     Our data is sourced from a wide range of reputable institutions and organizations, including prestigious institutions like Resource.org, the <a href="https://scdb.wustl.edu/">Supreme Court Database</a>, Columbia, Harvard, and the Law Library of Congress, among others. These institutions have contributed to the richness and diversity of our data collection. For example, thanks to the <a href="https://case.law/">Caselaw Access Project</a> and <a href="https://free.law/2022/09/12/vlex-partnership/">our partnership with vLex</a>, we have every legal opinion from Harvard University’s law library, going back over 365 years.</p>
 
     <p><strong>Continuous Updates —</strong>
-    The legal landscape is constantly evolving. To ensure that our users have access to the most recent legal opinions, we collect opinions as they are released by the courts. This technology allows us to continuously update and expand our database, providing users with the most current legal opinions available the moment they happen. As of 2023, our scrapers have added more than 1.75 million court opinions.</p>
+    The legal landscape is constantly evolving. To ensure that our users have access to the most recent case law, we collect case law as it is released by the courts. This technology allows us to continuously update and expand our database, providing users with the most current legal case law available the moment it happens. As of 2023, our scrapers have added more than 1.75 million case law records.</p>
 
     <p><strong>Publishing —</strong>
-    In 2020, <a href="https://free.law">Free Law Project</a>, the non-profit behind CourtListener, began <a href="https://free.law/2022/08/02/maine-supreme-and-tennessee-workers-comp/">partnering with courts</a> throughout the United States to enable direct publishing of opinions. Whether Supreme or Limited Jurisdiction, we work with courts to publish with us and make sure that <a href="https://www.courtlistener.com/faq/#explain-neutral-citations">neutral citations</a> are generated at the time of issuance.</p>
+    In 2020, <a href="https://free.law">Free Law Project</a>, the non-profit behind CourtListener, began <a href="https://free.law/2022/08/02/maine-supreme-and-tennessee-workers-comp/">partnering with courts</a> throughout the United States to enable direct publishing of case law. Whether Supreme or Limited Jurisdiction, we work with courts to publish with us and make sure that <a href="https://www.courtlistener.com/faq/#explain-neutral-citations">neutral citations</a> are generated at the time of issuance.</p>
 
-    <p><strong>Over Nine Million Opinions and 2000+ Courts —</strong>
-    Our commitment to completeness is reflected in our database's size, which currently contains nine million legal opinions. This extensive collection ensures that you can find the information you need. While our extensive collection of scraped opinions does not have every page number and every citation, we are working with law libraries to make that a reality.</p>
+    <p><strong>Over Nine Million Legal Decisions and 2000+ Courts —</strong>
+    Our commitment to completeness is reflected in our database's size, which currently contains nine million legal decisions. This extensive collection ensures that you can find the information you need. While our extensive collection of scraped opinions does not have every page number and every citation, we are working with law libraries to make that a reality.</p>
 
     <p><strong>Quality —</strong>
-    While we emphasize quantity, we also prioritize quality. Our team constantly is working to improve each and every opinion, and has used machine learning and human resources to make over a million corrections to other datasets. Incomplete or inaccurate data can have serious consequences in the legal field, and we are dedicated to maintaining the highest standards. Beyond providing the most accurate information, we also are unique in providing primary source documents found on court websites.</p>
+    While we emphasize quantity, we also prioritize quality. Our team constantly is working to improve each and every decision, and has used machine learning and human resources to make over a million corrections to other datasets. Incomplete or inaccurate data can have serious consequences in the legal field, and we are dedicated to maintaining the highest standards. Beyond providing the most accurate information, we also are unique in providing primary source documents found on court websites.</p>
     <p><strong>Data for All —</strong>
     We make our data available in <a href="https://www.courtlistener.com/help/api/">numerous formats</a>. Our hope is that when our work is done, it will never need to be done again — All American jurisprudence will be available to all, forever.</p>
 
     <p><strong>Support —</strong>
-    Questions about our coverage can be sent to our <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our Github Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.</p>
+    Questions about our coverage can be sent to our <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our GitHub Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.</p>
 
     <p><strong>Finally —</strong> Don’t take our word for it, check it out below.</p>
     <h1 id="federal">Federal Courts</h1>
