@@ -305,7 +305,7 @@ def send_opinion_clusters_deleted_webhook(ids: List[str]) -> None:
 
 
 def send_opinion_cluster_updated_webhook(
-    id: str, updated_filds: Dict[str, Any]
+    id: str, updated_fields: Dict[str, Any]
 ) -> None:
     """Send a webhook for updates to an opinion cluster.
 
@@ -316,7 +316,7 @@ def send_opinion_cluster_updated_webhook(
     ):
         post_content = {
             "webhook": generate_webhook_key_content(webhook),
-            "payload": {"id": id, "updated_filds": updated_filds},
+            "payload": {"id": id, "updated_fields": updated_fields},
         }
         renderer = JSONRenderer()
         json_bytes = renderer.render(
