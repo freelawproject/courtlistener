@@ -18,9 +18,9 @@ class SearchConfig(AppConfig):
 
         if settings.DEVELOPMENT and not settings.TESTING:
             # Only for DEVELOPMENT and not in TESTING:
-            # Execute create_search_index after the post_migrate signal
+            # Execute create_search_indices after the post_migrate signal
             # is triggered in the search app.
-            post_migrate.connect(create_search_index, sender=self)
+            post_migrate.connect(create_search_indices, sender=self)
 
 
 @retry((ConnectionError, ConnectionTimeout), tries=5, delay=5)
@@ -42,7 +42,7 @@ def check_and_create_es_index(es_document) -> None:
         )
 
 
-def create_search_index(sender, **kwargs):
+def create_search_indices(sender, **kwargs):
     """Runs the Elasticsearch index creation process for a predefined set of
     document models. Iterates through a list of Elasticsearch document models,
     and for each, it checks if the corresponding index exists in the ES cluster.
