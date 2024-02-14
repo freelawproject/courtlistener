@@ -104,7 +104,7 @@
         <h3>Recent CWCC&nbsp;Decisions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
         {% if request.user|in_group:"tenn_work_uploaders" %}
           <p><a href="{% url "court_publish_page" pk="tennworkcompcl" %}"
-                class="btn btn-default">Upload New CWCC Opinion</a></p>
+                class="btn btn-default">Upload New CWCC Decision</a></p>
         {% endif %}
         {% if results_tennworkcompcl.paginator.count > 0 %}
           {% include "includes/search_result.html" with results=results_tennworkcompcl type_override=SEARCH_TYPES.OPINION simple=True %}
@@ -122,7 +122,7 @@
         <h3>Recent Appeals Board&nbsp;Decisions&nbsp;<i class="gray fa fa-file-text-o"></i></h3>
         {% if request.user|in_group:"tenn_work_uploaders" %}
           <p><a href="{% url "court_publish_page" pk="tennworkcompapp" %}"
-                class="btn btn-default">Upload New Appeals Board Opinion</a></p>
+                class="btn btn-default">Upload New Appeals Board Decision</a></p>
         {% endif %}
         {% if results_tennworkcompapp.paginator.count > 0 %}
           {% include "includes/search_result.html" with results=results_tennworkcompapp type_override=SEARCH_TYPES.OPINION simple=True %}

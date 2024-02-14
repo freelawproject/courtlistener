@@ -51,7 +51,6 @@ class ProfileForm(ModelForm):
             "city",
             "state",
             "zip_code",
-            "wants_newsletter",
             "is_tester",
             "docket_default_order_desc",
             "barmembership",
@@ -105,10 +104,18 @@ class UserForm(ModelForm):
         )
         widgets = {
             "first_name": forms.TextInput(
-                attrs={"class": "form-control", "autocomplete": "given-name"}
+                attrs={
+                    "class": "form-control",
+                    "autocomplete": "given-name",
+                    "required": True,
+                }
             ),
             "last_name": forms.TextInput(
-                attrs={"class": "form-control", "autocomplete": "family-name"}
+                attrs={
+                    "class": "form-control",
+                    "autocomplete": "family-name",
+                    "required": True,
+                }
             ),
         }
 
@@ -137,8 +144,8 @@ class UserCreationFormExtended(UserCreationForm):
         self.fields["email"].label = "Email Address*"
         self.fields["password1"].label = "Password*"
         self.fields["password2"].label = "Confirm Password*"
-        self.fields["first_name"].label = "First Name"
-        self.fields["last_name"].label = "Last Name"
+        self.fields["first_name"].label = "First Name*"
+        self.fields["last_name"].label = "Last Name*"
 
         # Give all fields a form-control class.
         for field in self.fields.values():
@@ -156,10 +163,10 @@ class UserCreationFormExtended(UserCreationForm):
             {"autocomplete": "new-password"}
         )
         self.fields["first_name"].widget.attrs.update(
-            {"autocomplete": "given-name"}
+            {"autocomplete": "given-name", "required": True}
         )
         self.fields["last_name"].widget.attrs.update(
-            {"autocomplete": "family-name"}
+            {"autocomplete": "family-name", "required": True}
         )
 
     class Meta:

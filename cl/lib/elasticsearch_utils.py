@@ -9,7 +9,6 @@ from datetime import date, datetime
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
-import regex
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import caches
@@ -37,6 +36,9 @@ from cl.lib.types import (
     ESRangeQueryParams,
 )
 from cl.lib.utils import (
+    check_for_proximity_tokens,
+    check_unbalanced_parenthesis,
+    check_unbalanced_quotes,
     cleanup_main_query,
     get_array_of_selected_fields,
     lookup_child_courts,
@@ -45,7 +47,8 @@ from cl.people_db.models import Position
 from cl.search.constants import (
     ALERTS_HL_TAG,
     BOOSTS,
-    MULTI_VALUE_HL_FIELDS,
+    PEOPLE_ES_HL_FIELDS,
+    PEOPLE_ES_HL_KEYWORD_FIELDS,
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
@@ -60,9 +63,13 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
-    SOLR_PEOPLE_ES_HL_FIELDS,
 )
-from cl.search.exception import UnbalancedQuery
+from cl.search.exception import (
+    BadProximityQuery,
+    QueryType,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
 from cl.search.forms import SearchForm
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -245,49 +252,6 @@ def add_fields_boosting(
     return make_es_boost_list(qf)
 
 
-def check_unbalanced_parenthesis(query: str) -> bool:
-    """Check whether the query string has unbalanced opening or closing parentheses.
-
-    :param query: The input query string
-    :return: Whether the query is balanced or not.
-    """
-    opening_count = query.count("(")
-    closing_count = query.count(")")
-
-    return opening_count != closing_count
-
-
-def sanitize_unbalanced_parenthesis(query: str) -> str:
-    """Sanitize a query by removing unbalanced opening or closing parentheses.
-
-    :param query: The input query string
-    :return: The sanitized query string, after removing unbalanced parentheses.
-    """
-    opening_count = query.count("(")
-    closing_count = query.count(")")
-    while opening_count > closing_count:
-        # Find last unclosed opening parenthesis position
-        last_parenthesis_opened_pos = query.rfind("(")
-        # Remove the parenthesis from the query.
-        query = (
-            query[:last_parenthesis_opened_pos]
-            + query[last_parenthesis_opened_pos + 1 :]
-        )
-        opening_count -= 1
-
-    while closing_count > opening_count:
-        # Find last unclosed closing parenthesis position
-        last_parenthesis_closed_pos = query.rfind(")")
-        # Remove the parenthesis from the query.
-        query = (
-            query[:last_parenthesis_closed_pos]
-            + query[last_parenthesis_closed_pos + 1 :]
-        )
-        closing_count -= 1
-
-    return query
-
-
 def append_query_conjunctions(query: str) -> str:
     """Append default AND conjunctions to the query string.
     :param query: The input query string
@@ -336,6 +300,32 @@ def append_query_conjunctions(query: str) -> str:
     return " ".join(clean_q)
 
 
+def validate_query_syntax(value: str, query_type: QueryType) -> None:
+    """Validate the syntax of a query string. It checks for common syntax
+    errors in query strings, such as unbalanced parentheses, unbalanced quotes,
+    and unrecognized proximity tokens. If any of these errors are found, the
+    corresponding exception is raised.
+
+    :param value: The query string to validate.
+    :param query_type: The type of the query, used to specify the context in
+    which the validation is being performed.
+    :return: None, it raises the corresponding exception.
+    """
+
+    if check_unbalanced_parenthesis(value):
+        raise UnbalancedParenthesesQuery(
+            "The query contains unbalanced parentheses.", query_type
+        )
+    if check_unbalanced_quotes(value):
+        raise UnbalancedQuotesQuery(
+            "The query contains unbalanced quotes.", query_type
+        )
+    if check_for_proximity_tokens(value):
+        raise BadProximityQuery(
+            "The query contains an unrecognized proximity token.", query_type
+        )
+
+
 def build_fulltext_query(
     fields: list[str], value: str, only_queries=False
 ) -> QueryString | List:
@@ -349,8 +339,7 @@ def build_fulltext_query(
     :return: A Elasticsearch QueryString or [] if the "value" param is empty.
     """
     if value:
-        if check_unbalanced_parenthesis(value):
-            raise UnbalancedQuery("The query contains unbalanced parentheses.")
+        validate_query_syntax(value, QueryType.QUERY_STRING)
         # In Elasticsearch, the colon (:) character is used to separate the
         # field name and the field value in a query.
         # To avoid parsing errors escape any colon characters in the value
@@ -420,6 +409,9 @@ def build_term_query(
     if not value:
         return []
 
+    if isinstance(value, str):
+        validate_query_syntax(value, QueryType.FILTER)
+
     if make_phrase:
         return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
 
@@ -443,7 +435,10 @@ def build_text_filter(field: str, value: str) -> List:
     :param value: the phrase to find
     :return: Empty list or list with DSL Phrase query
     """
+
     if value:
+        if isinstance(value, str):
+            validate_query_syntax(value, QueryType.FILTER)
         return [
             Q(
                 "query_string",
@@ -1137,8 +1132,8 @@ def add_es_highlighting(
     """
     fields_to_exclude = []
     highlighting_fields = []
+    highlighting_keyword_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
-    matched_fields = False
     match cd["type"]:
         case SEARCH_TYPES.ORAL_ARGUMENT:
             highlighting_fields = (
@@ -1148,26 +1143,29 @@ def add_es_highlighting(
             )
             fields_to_exclude = ["sha1"]
         case SEARCH_TYPES.PEOPLE:
-            highlighting_fields = SOLR_PEOPLE_ES_HL_FIELDS
+            highlighting_fields = PEOPLE_ES_HL_FIELDS
+            highlighting_keyword_fields = PEOPLE_ES_HL_KEYWORD_FIELDS
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             highlighting_fields = SEARCH_RECAP_HL_FIELDS
-            matched_fields = True
         case SEARCH_TYPES.OPINION:
             highlighting_fields = SEARCH_OPINION_HL_FIELDS
-            matched_fields = True
 
     search_query = search_query.source(excludes=fields_to_exclude)
+    # Use FVH in testing and documents that already support FVH.
     for field in highlighting_fields:
-        if matched_fields:
-            search_query = search_query.highlight(
-                field,
-                type=settings.ES_HIGHLIGHTER,
-                matched_fields=[field, f"{field}.exact"],
-                number_of_fragments=0,
-                pre_tags=[f"<{hl_tag}>"],
-                post_tags=[f"</{hl_tag}>"],
-            )
-        else:
+        search_query = search_query.highlight(
+            field,
+            type=settings.ES_HIGHLIGHTER,
+            matched_fields=[field, f"{field}.exact"],
+            number_of_fragments=0,
+            pre_tags=[f"<{hl_tag}>"],
+            post_tags=[f"</{hl_tag}>"],
+        )
+    # Keyword fields do not support term_vector indexing; thus, FVH is not
+    # supported either. Use plain text in this case. Keyword fields don't
+    # have an exact version, so no HL merging is required either.
+    if highlighting_keyword_fields:
+        for field in highlighting_keyword_fields:
             search_query = search_query.highlight(
                 field,
                 type="plain",
@@ -1179,160 +1177,25 @@ def add_es_highlighting(
     return search_query
 
 
-def replace_highlight(
-    cleaned_str: str, unique_hl_strings: list[str], tag: str
-) -> str:
-    """Replaces each term that needs to be highlighted by the marked term into
-     the clean string.
-
-    :param cleaned_str: The original string without html tags.
-    :param unique_hl_strings: A list of strings to be highlighted.
-    :param tag: The HTML tag to use for marking the term.
-    :return: The highlighted string.
-    """
-
-    for word in unique_hl_strings:
-        # Create a pattern to match the word as a whole word.
-        pattern = rf"(?<!\w){word}(?!\w)"
-
-        # Replace with the specified tag
-        replacement = f"<{tag}>{word}</{tag}>"
-        cleaned_str = regex.sub(pattern, replacement, cleaned_str)
-
-    return cleaned_str
-
-
-def select_unique_hl(
-    cleaned_unique_strings: list[str], cleaned_str: str, field: str
-) -> list[str]:
-    """Select the longest string to be highlighted. This is required when the
-    field contains HL for the "normal" and the "exact" version.
-
-    :param cleaned_unique_strings: The list holding the unique highlighted str
-    :param cleaned_str: The incoming string to potentially add to the list.
-    :param field: The HL field being analyzed.
-    :return: The updated cleaned_unique_strings
-    """
-
-    if field in MULTI_VALUE_HL_FIELDS:
-        # Multi-value fields like "citation" require complete distinctness to
-        # avoid duplicate strings.
-        if cleaned_str not in cleaned_unique_strings:
-            cleaned_unique_strings.append(cleaned_str)
-    else:
-        # Select the longer string between cleaned_str and the longest in
-        # cleaned_unique_strings
-        longest_str = max(cleaned_unique_strings, key=len, default="")
-        return [max(cleaned_str, longest_str, key=len)]
-
-    return cleaned_unique_strings
-
-
 def merge_highlights_into_result(
     highlights: dict[str, Any],
     result: AttrDict | dict[str, Any],
-    tag: str,
-    search_type: str | None = None,
 ) -> None:
-    """Merges the highlight terms into the search result.
-    This function processes highlighted fields in the `highlights` attribute
-    dictionary, then updates the `result` attribute dictionary with the
-    combined highlighted terms.
+    """Merges the highlighted terms into the search result.
+    This function integrates highlighted terms from the meta highlights result
+    into the corresponding search results.
 
     :param highlights: The AttrDict object containing highlighted fields and
     their highlighted terms.
-    :param result: The AttrDict object containing search results.
-    :param tag: The HTML tag used to mark highlighted terms.
-    :param search_type: The search type being performed.
+    :param result: The result AttrDict object
     :return: None, the function updates the results in place.
     """
 
-    exact_hl_fields = []
     for (
         field,
         highlight_list,
     ) in highlights.items():
-        if search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.OPINION]:
-            # For RECAP and Opinions Search that use FVH, highlighted results
-            # are already combined. Simply assign them to the _source field.
-            result[field] = highlight_list
-            continue
-
-        # If a query highlights fields, the "field.exact", "field" or
-        # both versions are available. Highlighted terms in each
-        # version can differ, so the best thing to do is combine
-        # highlighted terms from each version and set it.
-
-        marked_strings_exact: list[str] = []
-        marked_strings: list[str] = []
-        cleaned_unique_strings: list[str] = []
-
-        # Abort HL merging if the field has already been completed.
-        if field in exact_hl_fields:
-            continue
-
-        if "exact" in field:
-            field = field.split(".exact")[0]
-
-        # Extract all unique marked strings from "field.exact"
-        if f"{field}.exact" in highlights:
-            for hl in highlight_list:
-                cleaned_hl = re.sub(r"</?mark>", "", hl)
-                cleaned_unique_strings = select_unique_hl(
-                    cleaned_unique_strings, cleaned_hl, field
-                )
-                marked_strings.extend(
-                    [
-                        word
-                        for phrase in re.findall(rf"<{tag}>(.*?)</{tag}>", hl)
-                        for word in phrase.split()
-                    ]
-                )
-        if field in highlights:
-            # Extract all unique marked strings from "field" if
-            # available
-
-            for hl in highlights[field]:
-                cleaned_hl = re.sub(r"</?mark>", "", hl)
-                cleaned_unique_strings = select_unique_hl(
-                    cleaned_unique_strings, cleaned_hl, field
-                )
-                marked_strings_exact.extend(
-                    [
-                        word
-                        for phrase in re.findall(rf"<{tag}>(.*?)</{tag}>", hl)
-                        for word in phrase.split()
-                    ]
-                )
-
-        # Merge highlights if there were HL terms in "field" or "field.exact".
-        # This avoids merging highlights when there are no matching terms,
-        # yet highlights are returned due to the NO_MATCH_HL_SIZE setting.
-        if marked_strings or marked_strings_exact:
-            unique_marked_strings = list(
-                set(marked_strings + marked_strings_exact)
-            )
-            merged_hl = []
-            for original_string in cleaned_unique_strings:
-                # Create a regex pattern to match each unique term
-                combined_highlights = replace_highlight(
-                    original_string, unique_marked_strings, tag
-                )
-                # Remove nested <mark> tags after replace.
-                combined_highlights = re.sub(
-                    rf"<{tag}><{tag}>(.*?)</{tag}></{tag}>",
-                    rf"<{tag}>\1</{tag}>",
-                    combined_highlights,
-                )
-                merged_hl.append(combined_highlights)
-
-            result[field] = merged_hl
-            exact_hl_fields.append(field)
-
-        if field not in exact_hl_fields:
-            # If the "field.exact" version has not been set, set
-            # the "field" version.
-            result[field] = highlight_list
+        result[field] = highlight_list
 
 
 def set_results_highlights(results: Page | Response, search_type: str) -> None:
@@ -1366,8 +1229,6 @@ def set_results_highlights(results: Page | Response, search_type: str) -> None:
                 merge_highlights_into_result(
                     highlights,
                     result,
-                    SEARCH_HL_TAG,
-                    search_type,
                 )
 
             # Merge child document highlights
@@ -1379,8 +1240,6 @@ def set_results_highlights(results: Page | Response, search_type: str) -> None:
                     merge_highlights_into_result(
                         highlights,
                         child_doc["_source"],
-                        SEARCH_HL_TAG,
-                        search_type,
                     )
 
 

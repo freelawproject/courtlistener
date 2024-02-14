@@ -42,9 +42,6 @@ from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
 
-# Custom signal for use with bulk_create.
-bulk_create_signal = Signal()
-
 
 class PRECEDENTIAL_STATUS:
     PUBLISHED = "Published"
@@ -3583,15 +3580,6 @@ class OpinionJoinedBy(Opinion.joined_by.through):
         proxy = True
 
 
-class BulkCreateManager(models.Manager):
-    """Custom manager that will trigger a signal on bulk_create."""
-
-    def bulk_create_with_signal(self, objs, *args, **kwargs):
-        created_objs = super().bulk_create(objs, *args, **kwargs)
-        bulk_create_signal.send(sender=self.model, instances=created_objs)
-        return created_objs
-
-
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion, related_name="cited_opinions", on_delete=models.CASCADE
@@ -3634,8 +3622,6 @@ class OpinionsCitedByRECAPDocument(models.Model):
         "in the citing document",
         default=1,
     )
-
-    objects = BulkCreateManager()
 
     def __str__(self) -> str:
         return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"

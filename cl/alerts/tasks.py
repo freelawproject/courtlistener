@@ -36,9 +36,9 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.constants import ALERTS_HL_TAG
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
+    ESDocumentNameType,
     PercolatorResponseType,
     SaveDocumentResponseType,
     SearchAlertHitType,
@@ -532,7 +532,6 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
             merge_highlights_into_result(
                 hit.meta.highlight.to_dict(),
                 document_content_copy,
-                ALERTS_HL_TAG,
             )
 
         # Override order_by to show the latest items when clicking the
@@ -662,7 +661,7 @@ def send_or_schedule_alerts(
 def es_save_alert_document(
     self: Task,
     alert_id: int,
-    es_document_name: str,
+    es_document_name: ESDocumentNameType,
 ) -> None:
     """Helper method to prepare and index an Alert object into Elasticsearch.
 

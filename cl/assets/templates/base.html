@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
 
   {% block meta %}
-  <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
+  <meta name="description" content="{% block description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
 
   {# Open Search Plugin #}
   <link rel="search"
@@ -18,7 +18,7 @@
 
   {# MS Application Icons #}
   <meta name="application-name" content="CourtListener"/>
-  <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
+  <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest case law."/>
   <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
   <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
@@ -31,7 +31,7 @@
   <meta property="og:type" content="website"/>
   <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
   <meta property="og:description"
-        content="{% block og_description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
+        content="{% block og_description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
   <meta property="og:url" content="{% block og_url %}{% get_full_host %}{{ request.path }}{% endblock %}"/>
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
@@ -241,12 +241,12 @@
               <a href="#"
                  class="dropdown-toggle"
                  tabindex="100"
-                 data-toggle="dropdown">Opinions&nbsp;<span
+                 data-toggle="dropdown">Case Law&nbsp;<span
                 class="caret"></span>
               </a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_o" %}" tabindex="101">Opinions Search</a>
+                  <a href="{% url "advanced_o" %}" tabindex="101">Case Law Search</a>
                 </li>
                 {% flag "parenthetical-search" %}
                   <li>
@@ -307,30 +307,18 @@
   </div>
 
   {% block newsletter %}
-    {% if user.is_anonymous or user.is_authenticated and not user.profile.wants_newsletter %}
     <div class="row base-newsletter hidden-print">
       <div class="col-sm-6">
         <p class="bold bottom">Newsletter</p>
         <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
       </div>
       <div class="col-sm-6 right">
-        <form action="https://freelawproject.m-pages.com/free-law-project-newsletter"
-          method="get" target="_blank" class="form-inline">
-          <div class="form-group">
-            <input name="EMAIL" class="form-control" id="mce-EMAIL"
-                   type="email" placeholder="Email Address"
-                   value="{{ user.email|default:"" }}">
-          </div>
-          <!-- Honey pot -->
-          <div style="position: absolute; left: -5000px;" aria-hidden="true">
-            <input name="b_4ea266fe7d0d074abd3f6a2ae_ba547fa86b" tabindex="-1"
-                   value="" type="text">
-          </div>
-          <button type="submit" class="btn btn-default"><i class="fa fa-newspaper-o"></i>&nbsp;Subscribe</button>
-        </form>
+        <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?forwardedFromSecureDomain=1&subscription=9"
+          class="btn btn-default">
+          <i class="fa fa-newspaper-o"></i>&nbsp;Subscribe
+        </a>
       </div>
     </div>
-    {% endif %}
   {% endblock %}
 
   {% block footer %}
