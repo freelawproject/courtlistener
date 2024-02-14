@@ -16,9 +16,10 @@ class SearchConfig(AppConfig):
         # Implicitly connect a signal handlers decorated with @receiver.
         from cl.search import signals
 
-        if settings.DEVELOPMENT:
-            # Only in DEVELOPMENT: Executes create_search_index after the
-            # post_migrate signal is triggered in the search app.
+        if settings.DEVELOPMENT and not settings.TESTING:
+            # Only for DEVELOPMENT and not in TESTING:
+            # Execute create_search_index after the post_migrate signal
+            # is triggered in the search app.
             post_migrate.connect(create_search_index, sender=self)
 
 
