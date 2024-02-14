@@ -3454,3 +3454,57 @@ class NeonAccountCreationTest(TestCase):
 
         await up.arefresh_from_db()
         self.assertEqual(up.neon_account_id, "9876")
+
+
+@override_settings(DEVELOPMENT=False)
+@patch("cl.users.views.create_neon_account")
+@patch("cl.users.views.update_neon_account")
+class NeonAccountUpdateTest(TestCase):
+
+    def setUp(self) -> None:
+        self.client = AsyncClient()
+        self.up = UserProfileWithParentsFactory.create(
+            user__username="pandora",
+            user__password=make_password("password"),
+        )
+
+    async def test_can_call_update_task_when_account_id_found(
+        self, update_account_mock, create_account_mock
+    ) -> None:
+        """Tests whether we use the update task when the account has a neon_account_id"""
+        self.up.neon_account_id = "12345"
+        await self.up.asave()
+
+        await self.client.alogin(username="pandora", password="password")
+        r = await self.client.post(
+            reverse("view_settings"),
+            {
+                "first_name": "test_name",
+                "last_name": "test_last_name",
+                "email": self.up.user.email,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        update_account_mock.delay.assert_called_once_with(self.up.user.pk)
+        create_account_mock.delay.assert_not_called()
+
+    async def test_can_call_create_task_when_no_account_id_found(
+        self, update_account_mock, create_account_mock
+    ) -> None:
+        """Tests whether we use the create task when the account does not have a neon_account_id"""
+        await self.client.alogin(username="pandora", password="password")
+        r = await self.client.post(
+            reverse("view_settings"),
+            {
+                "first_name": "test_name",
+                "last_name": "test_last_name",
+                "email": self.up.user.email,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(r.status_code, HTTP_200_OK)
+        create_account_mock.delay.assert_called_once_with(self.up.user.pk)
+        update_account_mock.delay.assert_not_called()

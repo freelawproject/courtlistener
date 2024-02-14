@@ -2211,8 +2211,9 @@ def get_and_merge_rd_attachments(
         PacerLoginException,
         RedisConnectionError,
     ),
-    max_retries=5,
-    interval_start=5 * 60,
+    max_retries=10,
+    retry_backoff=2 * 60,
+    retry_backoff_max=60 * 60,
 )
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
