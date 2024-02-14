@@ -2978,7 +2978,9 @@ class OpinionCluster(AbstractDateTimeModel):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if update_fields is None:
             if send_webhook:
-                from cl.api.webhooks import send_opinion_cluster_created_webhook
+                from cl.api.webhooks import (
+                    send_opinion_cluster_created_webhook,
+                )
 
                 send_opinion_cluster_created_webhook(self)
         else:
@@ -2988,7 +2990,7 @@ class OpinionCluster(AbstractDateTimeModel):
                     send_opinion_cluster_updated_webhook,
                 )
 
-                update_data = { k: getattr(self, k) for k in update_fields }
+                update_data = {k: getattr(self, k) for k in update_fields}
                 send_opinion_cluster_updated_webhook(self.id, update_data)
         super(OpinionCluster, self).save(
             update_fields=update_fields, *args, **kwargs
@@ -3018,11 +3020,7 @@ class OpinionCluster(AbstractDateTimeModel):
             **kwargs,
         )
 
-    def delete(self,
-        send_webhook=True,
-        *args, 
-        **kwargs
-    ):
+    def delete(self, send_webhook=True, *args, **kwargs):
         """
         Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
@@ -3030,9 +3028,9 @@ class OpinionCluster(AbstractDateTimeModel):
         id_cache = self.pk
         super(OpinionCluster, self).delete(*args, **kwargs)
         from cl.search.tasks import delete_items
-        
+
         delete_items.delay([id_cache], "search.Opinion")
-        
+
         if send_webhook:
             from cl.api.webhooks import send_opinion_cluster_deleted_webhook
 
