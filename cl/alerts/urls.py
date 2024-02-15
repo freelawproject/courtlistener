@@ -7,6 +7,7 @@ from cl.alerts.views import (
     edit_alert_redirect,
     enable_alert,
     new_docket_alert,
+    one_click_docket_alert_unsubscribe,
     toggle_docket_alert,
     toggle_docket_alert_confirmation,
 )
@@ -37,5 +38,10 @@ urlpatterns = [
         "alert/docket/(unsubscribe|subscribe)/([a-zA-Z0-9]{40})/",
         toggle_docket_alert_confirmation,
         name="toggle_docket_alert_confirmation",
+    ),
+    re_path(
+        "alert/docket/one_click_unsubscribe/([a-zA-Z0-9]{40})/",
+        one_click_docket_alert_unsubscribe,
+        name="one_click_docket_alert_unsubscribe",
     ),
 ]

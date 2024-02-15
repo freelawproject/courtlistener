@@ -1,15 +1,18 @@
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
+    HttpResponseNotFound,
     HttpResponseRedirect,
 )
 from django.shortcuts import get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.views.decorators.http import require_http_methods
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from cl.alerts.forms import DocketAlertConfirmForm
@@ -285,3 +288,26 @@ def toggle_docket_alert_confirmation(
             "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
         },
     )
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def one_click_docket_alert_unsubscribe(
+    request: HttpRequest,
+    secret_key: str,
+) -> HttpResponse:
+    """Unsubscribes a user from docket alerts for a specific docket.
+
+    :param request: The HttpRequest from the client
+    :param secret_key: The secret key for the docket alert
+    :return: The HttpResponse to send to the client
+    """
+    try:
+        docket_alert = DocketAlert.objects.get(secret_key=secret_key)
+    except DocketAlert.DoesNotExist:
+        return HttpResponseNotFound(
+            "Your attempt to unsubscribe was unsuccessful."
+        )
+
+    set_docket_alert_state(docket_alert, DocketAlert.UNSUBSCRIPTION)
+
+    return HttpResponse("You have been successfully unsubscribed!")
