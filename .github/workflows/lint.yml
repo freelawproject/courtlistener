@@ -70,7 +70,7 @@ jobs:
           -p cl.simple_pages
 
       # Add files here as they're ready
-      - name: mypy Static Type Cheker (files)
+      - name: mypy Static Type Checker (files)
         run: |
           mypy \
           --follow-imports=skip \
@@ -93,7 +93,8 @@ jobs:
           cl/users/management/commands/cl_delete_old_emails.py \
           cl/users/management/commands/cl_retry_failed_email.py \
           cl/users/tasks.py \
-          cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py
+          cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py \
+          cl/search/management/commands/cl_index_parent_and_child_docs.py
 
 
 

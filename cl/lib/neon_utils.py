@@ -102,7 +102,7 @@ class NeonClient:
 
         Returns:
             dict[str, dict[str, NeonContact]]:A dictionary containing the
-            extracted data, ready to be used as a payload for the create/update ç
+            extracted data, ready to be used as a payload for the create/update
             request.
         """
         contact_data: NeonContact = {
