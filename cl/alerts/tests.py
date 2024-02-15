@@ -177,7 +177,9 @@ class DocketAlertTest(TestCase):
         )
 
         # Add an alert for it
-        DocketAlert.objects.create(docket=self.docket, user=self.user)
+        self.alert = DocketAlert.objects.create(
+            docket=self.docket, user=self.user
+        )
 
         # Add a new docket entry to it
         de = DocketEntry.objects.create(docket=self.docket, entry_number=1)
@@ -201,6 +203,18 @@ class DocketAlertTest(TestCase):
 
         # Does the alert go out? It should.
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].extra_headers["X-Entity-Ref-ID"],
+            f"docket.alert:{self.docket.pk}",
+        )
+        self.assertEqual(
+            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
+            f"List-Unsubscribe=One-Click",
+        )
+        self.assertEqual(
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+            f"<https://www.courtlistener.com/alert/docket/one_click_unsubscribe/{self.alert.secret_key}/>",
+        )
 
     def test_nothing_happens_for_timers_after_de_creation(self) -> None:
         """Do we avoid sending alerts for timers after the de was created?"""
@@ -2810,3 +2824,33 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
             AudioPercolator.exists(id=valid_alert.pk),
             msg=f"Alert id: {valid_alert.pk} was not indexed.",
         )
+
+
+class OneClickUnsubscribeTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.alert = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            user=cls.user_profile.user,
+        )
+
+    def test_can_unsubscribe_docket_alert_with_post_request(self):
+        """Confirm the one click unsubscribe endpoint updates the alert state."""
+        self.assertEqual(self.alert.alert_type, DocketAlert.SUBSCRIPTION)
+
+        response = self.client.post(
+            reverse(
+                "one_click_docket_alert_unsubscribe",
+                args=[self.alert.secret_key],
+            )
+        )
+        self.alert.refresh_from_db()
+
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(self.alert.alert_type, DocketAlert.UNSUBSCRIPTION)
+
+        # check unsubscription confirmation email
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("[Unsubscribed]", mail.outbox[0].subject)
