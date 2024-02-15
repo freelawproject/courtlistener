@@ -84,7 +84,6 @@ jobs:
           cl/api/utils.py \
           cl/api/views.py \
           cl/api/webhooks.py \
-          cl/donate/management/commands/charge_monthly_donors.py \
           cl/donate/utils.py \
           cl/tests/utils.py \
           cl/users/email_handlers.py \
