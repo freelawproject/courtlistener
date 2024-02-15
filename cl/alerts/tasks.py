@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 
@@ -222,6 +223,9 @@ def make_alert_messages(
         notes, tags = get_docket_notes_and_tags_by_user(
             d.pk, recipient.user_pk
         )
+        unsubscribe_url = reverse(
+            "one_click_docket_alert_unsubscribe", args=[recipient.secret_key]
+        )
         email_context["notes"] = notes
         email_context["tags"] = tags
         email_context["username"] = recipient.username
@@ -237,7 +241,11 @@ def make_alert_messages(
             body=txt_template.render(email_context),
             from_email=settings.DEFAULT_ALERTS_EMAIL,
             to=[recipient.email_address],
-            headers={"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
+            headers={
+                "X-Entity-Ref-ID": f"docket.alert:{d.pk}",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": f"<https://www.courtlistener.com{unsubscribe_url}>",
+            },
         )
         html = html_template.render(email_context)
         msg.attach_alternative(html, "text/html")
