@@ -1063,8 +1063,12 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.get_or_cache_pacer_cookies",
         side_effect=lambda x, y, z: None,
     )
+    @mock.patch(
+        "cl.recap.tasks.is_docket_entry_sealed",
+        return_value=False,
+    )
     async def test_email_processing_queue_create(
-        self, mock_bucket_open, mock_cookies
+        self, mock_is_docket_entry_sealed, mock_bucket_open, mock_cookies
     ):
         self.assertEqual(await EmailProcessingQueue.objects.acount(), 0)
         await self.async_client.post(self.path, self.data, format="json")
@@ -2505,6 +2509,10 @@ class IdbMergeTest(TestCase):
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
 )
+@mock.patch(
+    "cl.recap.tasks.is_docket_entry_sealed",
+    return_value=False,
+)
 class RecapEmailDocketAlerts(TestCase):
     """Test recap email docket alerts"""
 
@@ -2686,6 +2694,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -2760,6 +2769,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -2852,6 +2862,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -2914,6 +2925,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3010,6 +3022,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
@@ -3050,6 +3063,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3205,6 +3219,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3274,6 +3289,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3367,6 +3383,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3517,6 +3534,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3611,6 +3629,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
         mock_att_response,
@@ -3766,6 +3785,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_pacer_court_accessible,
         mock_cookies,
+        mock_docket_entry_sealed,
         mock_cookie,
         mock_download_pdf,
         mock_webhook_post,
@@ -3810,6 +3830,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
@@ -3860,6 +3881,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_webhook_post,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
@@ -3935,6 +3957,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
@@ -4007,6 +4030,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_cookie,
         mock_download_pdf,
         mock_att_response,
@@ -4176,6 +4200,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
         mock_get_document_number_appellate,
@@ -4260,6 +4285,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
@@ -4306,6 +4332,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
         mock_att_response,
@@ -4355,6 +4382,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_get_document_number_appellate,
         mock_webhook_post,
         mock_is_pacer_doc_sealed,
@@ -4396,6 +4424,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_webhook_post,
     ):
         """Can we add docket entries from a minute entry recap email
@@ -4436,6 +4465,183 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Failed to get docket entry"),
+    )
+    @mock.patch("cl.recap.tasks.add_docket_entries")
+    async def test_recap_email_sealed_entry_no_attachments(
+        self,
+        mock_add_docket_entries,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks if a docket entry without attachments that is
+        sealed on PACER is ignored.
+        """
+        mock_docket_entry_sealed.return_value = True
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[RECAPEmailDocketEntryDataFactory()],
+                )
+            ],
+        )
+
+        court = await sync_to_async(CourtFactory)(
+            id="sealed", jurisdiction="FB"
+        )
+        notification_payload = {
+            "court": court.id,
+            "mail": self.data["mail"],
+            "receipt": self.data["receipt"],
+        }
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            return_value=(email_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            await self.async_client.post(
+                self.path, notification_payload, format="json"
+            )
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        mock_docket_entry_sealed.assert_called_once_with(
+            court.pk,
+            docket_entry[0]["pacer_case_id"],
+            docket_entry[0]["pacer_doc_id"],
+        )
+
+        # the process_recap_email task returns before trying to add a new entry
+        mock_add_docket_entries.assert_not_called()
+
+        pq_query = ProcessingQueue.objects.filter(
+            pacer_doc_id=docket_entry[0]["pacer_doc_id"],
+            pacer_case_id=docket_entry[0]["pacer_case_id"],
+        )
+        self.assertEqual(await pq_query.acount(), 1)
+        processing_queue = await pq_query.afirst()
+        self.assertIn(
+            "Failed to get docket entry", processing_queue.error_message
+        )
+
+        epq_query = EmailProcessingQueue.objects.filter(court_id=court.pk)
+        self.assertEqual(await pq_query.acount(), 1)
+        email_processing_queue = await epq_query.afirst()
+        self.assertEqual(
+            "Could not retrieve Docket Entry",
+            email_processing_queue.status_message,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Failed to get docket entry"),
+    )
+    @mock.patch("cl.recap.tasks.process_recap_attachment")
+    @mock.patch("cl.recap.tasks.get_and_copy_recap_attachment_docs")
+    @mock.patch("cl.recap.tasks.get_attachment_page_by_url")
+    async def test_recap_email_sealed_entry_with_attachments(
+        self,
+        mock_get_attachment_page,
+        mock_copy_recap_attachment_docs,
+        mock_process_recap_attachment,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks if a docket entry with attachments that is
+        sealed on PACER is ignored.
+        """
+        mock_get_attachment_page.return_value = "<!doctype html>"
+        mock_docket_entry_sealed.return_value = True
+        mock_process_recap_attachment.return_value = (
+            PROCESSING_STATUS.INVALID_CONTENT,
+            "Not a valid attachment page upload.",
+            [],
+        )
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[RECAPEmailDocketEntryDataFactory()],
+                )
+            ],
+        )
+
+        court = await sync_to_async(CourtFactory)(
+            id="sealed2", jurisdiction="FB"
+        )
+        notification_payload = {
+            "court": court.id,
+            "mail": self.data["mail"],
+            "receipt": self.data["receipt"],
+        }
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            return_value=(email_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            await self.async_client.post(
+                self.path, notification_payload, format="json"
+            )
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        mock_docket_entry_sealed.assert_called_once_with(
+            court.pk,
+            docket_entry[0]["pacer_case_id"],
+            docket_entry[0]["pacer_doc_id"],
+        )
+
+        # call the helper to copy the attachments but pass an empty list of documents
+        mock_copy_recap_attachment_docs.assert_called_once_with(
+            ANY,
+            [],
+            court.pk,
+            docket_entry[0]["pacer_magic_num"],
+            docket_entry[0]["pacer_case_id"],
+            ANY,
+        )
+
+        # check we didn't create a docket entry
+        docket_entry_query = DocketEntry.objects.filter(
+            docket__pacer_case_id=docket_entry[0]["pacer_case_id"],
+            entry_number=docket_entry[0]["document_number"],
+        )
+        self.assertEqual(await docket_entry_query.acount(), 0)
+
+        pq_query = ProcessingQueue.objects.filter(
+            pacer_doc_id=docket_entry[0]["pacer_doc_id"],
+            pacer_case_id=docket_entry[0]["pacer_case_id"],
+        )
+        self.assertEqual(await pq_query.acount(), 1)
+        processing_queue = await pq_query.afirst()
+        self.assertIn(
+            "Failed to get docket entry", processing_queue.error_message
+        )
+
+        epq_query = EmailProcessingQueue.objects.filter(court_id=court.pk)
+        self.assertEqual(await pq_query.acount(), 1)
+        email_processing_queue = await epq_query.afirst()
+        self.assertEqual(
+            "Could not retrieve Docket Entry",
+            email_processing_queue.status_message,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
@@ -4448,6 +4654,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
