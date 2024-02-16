@@ -211,9 +211,12 @@ class DocketAlertTest(TestCase):
             mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
             f"List-Unsubscribe=One-Click",
         )
-        self.assertEqual(
+        unsubscribe_url = reverse(
+            "one_click_docket_alert_unsubscribe", args=[self.alert.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
             mail.outbox[0].extra_headers["List-Unsubscribe"],
-            f"<https://www.courtlistener.com/alert/docket/one_click_unsubscribe/{self.alert.secret_key}/>",
         )
 
     def test_nothing_happens_for_timers_after_de_creation(self) -> None:
@@ -672,9 +675,12 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
             f"List-Unsubscribe=One-Click",
         )
-        self.assertEqual(
+        unsubscribe_url = reverse(
+            "disable_alert", args=[self.search_alert.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
             mail.outbox[0].extra_headers["List-Unsubscribe"],
-            f"<https://www.courtlistener.com/alert/disable/{self.search_alert.secret_key}/>",
         )
 
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
@@ -683,9 +689,12 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             mail.outbox[1].extra_headers["List-Unsubscribe-Post"],
             f"List-Unsubscribe=One-Click",
         )
-        self.assertEqual(
+        unsubscribe_url = reverse(
+            "disable_alert", args=[self.search_alert_2.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
             mail.outbox[1].extra_headers["List-Unsubscribe"],
-            f"<https://www.courtlistener.com/alert/disable/{self.search_alert_2.secret_key}/>",
         )
 
         self.assertEqual(mail.outbox[2].to[0], self.user_profile.user.email)
@@ -694,9 +703,12 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             mail.outbox[2].extra_headers["List-Unsubscribe-Post"],
             f"List-Unsubscribe=One-Click",
         )
-        self.assertEqual(
+        unsubscribe_url = reverse(
+            "disable_alert", args=[self.search_alert_oa.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
             mail.outbox[2].extra_headers["List-Unsubscribe"],
-            f"<https://www.courtlistener.com/alert/disable/{self.search_alert_oa.secret_key}/>",
         )
 
         # Two webhook events should be sent, both of them to user_profile user

@@ -40,7 +40,7 @@ urlpatterns = [
         name="toggle_docket_alert_confirmation",
     ),
     re_path(
-        "alert/docket/one_click_unsubscribe/([a-zA-Z0-9]{40})/",
+        "alert/docket/one-click-unsubscribe/([a-zA-Z0-9]{40})/",
         one_click_docket_alert_unsubscribe,
         name="one_click_docket_alert_unsubscribe",
     ),
