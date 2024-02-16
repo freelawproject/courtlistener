@@ -668,10 +668,36 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         self.assertEqual(len(mail.outbox), 3)
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
         self.assertIn("daily opinion alert", mail.outbox[0].body)
+        self.assertEqual(
+            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
+            f"List-Unsubscribe=One-Click",
+        )
+        self.assertEqual(
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+            f"<https://www.courtlistener.com/alert/disable/{self.search_alert.secret_key}/>",
+        )
+
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
         self.assertIn("daily opinion alert", mail.outbox[1].body)
+        self.assertEqual(
+            mail.outbox[1].extra_headers["List-Unsubscribe-Post"],
+            f"List-Unsubscribe=One-Click",
+        )
+        self.assertEqual(
+            mail.outbox[1].extra_headers["List-Unsubscribe"],
+            f"<https://www.courtlistener.com/alert/disable/{self.search_alert_2.secret_key}/>",
+        )
+
         self.assertEqual(mail.outbox[2].to[0], self.user_profile.user.email)
         self.assertIn("daily oral argument alert ", mail.outbox[2].body)
+        self.assertEqual(
+            mail.outbox[2].extra_headers["List-Unsubscribe-Post"],
+            f"List-Unsubscribe=One-Click",
+        )
+        self.assertEqual(
+            mail.outbox[2].extra_headers["List-Unsubscribe"],
+            f"<https://www.courtlistener.com/alert/disable/{self.search_alert_oa.secret_key}/>",
+        )
 
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()

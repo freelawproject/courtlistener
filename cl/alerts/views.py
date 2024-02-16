@@ -1,5 +1,4 @@
 from django.conf import settings
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import (
@@ -293,6 +292,7 @@ def toggle_docket_alert_confirmation(
             "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
         },
     )
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
