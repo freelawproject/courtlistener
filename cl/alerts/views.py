@@ -72,6 +72,7 @@ def disable_alert(request, secret_key):
     alert.rate = Alert.OFF
     alert.save()
     if request.method == "POST":
+        # Mail clients send POSTs; an ugly response is OK.
         return HttpResponse("You have been successfully unsubscribed!")
     return render(
         request,
