@@ -119,8 +119,9 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
     :return: list with opinion content from cl
     """
     cl_cleaned_opinions = []
-    opinions_from_cluster = Opinion.objects.filter(cluster_id=cluster_id).exclude(
-        type="010combined")
+    opinions_from_cluster = Opinion.objects.filter(
+        cluster_id=cluster_id
+    ).exclude(type="010combined")
     is_harvard = False
 
     for i, op in enumerate(opinions_from_cluster):
@@ -153,7 +154,7 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
 
 
 def update_matching_opinions(
-        matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
+    matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
 ) -> None:
     """Store matching opinion content in html_columbia field from Opinion object
 
@@ -183,8 +184,8 @@ def update_matching_opinions(
         else:
             if author_str:
                 if (
-                        find_just_name(op.author_str).lower()
-                        != find_just_name(author_str).lower()
+                    find_just_name(op.author_str).lower()
+                    != find_just_name(author_str).lower()
                 ):
                     # last resort, use distance between words to solve typos
                     s = SequenceMatcher(
@@ -209,8 +210,8 @@ def update_matching_opinions(
 
 
 def map_and_merge_opinions(
-        cluster_id: int,
-        columbia_opinions: list[dict],
+    cluster_id: int,
+    columbia_opinions: list[dict],
 ) -> None:
     """Map and merge opinion data
 
@@ -275,7 +276,7 @@ def map_and_merge_opinions(
 
 
 def merge_date_filed(
-        cluster: OpinionCluster, columbia_data: dict
+    cluster: OpinionCluster, columbia_data: dict
 ) -> dict[str, Any]:
     """Merge date filed
 
@@ -318,10 +319,10 @@ def update_cluster_source(cluster: OpinionCluster) -> None:
 
 
 def merge_field(
-        cluster: OpinionCluster,
-        file_value: Optional[str],
-        field_name: str,
-        skip_judge_merger: bool = False,
+    cluster: OpinionCluster,
+    file_value: Optional[str],
+    field_name: str,
+    skip_judge_merger: bool = False,
 ) -> dict:
     """Try to merge the cluster data and file field data
 
@@ -373,8 +374,8 @@ def merge_docket_data(docket_data: dict, cluster: OpinionCluster) -> None:
         merge_docket_numbers(cluster, docket_data["docket_number"])
         cluster.docket.refresh_from_db()
     if (
-            docket_data["date_cert_granted"]
-            and not cluster.docket.date_cert_granted
+        docket_data["date_cert_granted"]
+        and not cluster.docket.date_cert_granted
     ):
         data_to_update["date_cert_granted"] = docket_data["date_cert_granted"]
 
@@ -388,8 +389,8 @@ def merge_docket_data(docket_data: dict, cluster: OpinionCluster) -> None:
         data_to_update["date_reargued"] = docket_data["date_reargued"]
 
     if (
-            docket_data["date_reargument_denied"]
-            and not cluster.docket.date_reargument_denied
+        docket_data["date_reargument_denied"]
+        and not cluster.docket.date_reargument_denied
     ):
         data_to_update["date_reargument_denied"] = docket_data[
             "date_reargument_denied"
@@ -400,9 +401,9 @@ def merge_docket_data(docket_data: dict, cluster: OpinionCluster) -> None:
 
 
 def process_cluster(
-        cluster_id: int,
-        filepath: str,
-        skip_judge_merger: bool = False,
+    cluster_id: int,
+    filepath: str,
+    skip_judge_merger: bool = False,
 ) -> None:
     """Merge specified cluster id
 
@@ -473,14 +474,14 @@ def process_cluster(
         k: v
         for k, v in columbia_data.items()
         if k
-           in [
-               "docket_number",
-               "date_cert_granted",
-               "date_cert_denied",
-               "date_argued",
-               "date_reargued",
-               "date_reargument_denied",
-           ]
+        in [
+            "docket_number",
+            "date_cert_granted",
+            "date_cert_denied",
+            "date_argued",
+            "date_reargued",
+            "date_reargument_denied",
+        ]
     }
 
     try:
@@ -491,10 +492,10 @@ def process_cluster(
             for field in ["syllabus", "attorneys", "posture", "judges"]:
                 columbia_value = columbia_data.get(field)
                 if data := merge_field(
-                        cluster,
-                        columbia_value,
-                        field,
-                        skip_judge_merger=skip_judge_merger,
+                    cluster,
+                    columbia_value,
+                    field,
+                    skip_judge_merger=skip_judge_merger,
                 ):
                     merged_data.update(data)
 
@@ -515,7 +516,7 @@ def process_cluster(
 
             # Merge results into a single dict
             data_to_update = (
-                    merged_data | case_names_to_update | date_filed_to_update
+                merged_data | case_names_to_update | date_filed_to_update
             )
 
             if data_to_update:
