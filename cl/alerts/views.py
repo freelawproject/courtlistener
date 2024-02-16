@@ -12,6 +12,7 @@ from django.http import (
 from django.shortcuts import get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
@@ -63,12 +64,16 @@ def delete_alert_confirm(request, pk):
     )
 
 
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
 def disable_alert(request, secret_key):
     """Disable an alert based on a secret key."""
     alert = get_object_or_404(Alert, secret_key=secret_key)
     prev_rate = alert.rate
     alert.rate = Alert.OFF
     alert.save()
+    if request.method == "POST":
+        return HttpResponse("You have been successfully unsubscribed!")
     return render(
         request,
         "disable_alert.html",
