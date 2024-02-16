@@ -10,6 +10,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
 from django.http import QueryDict
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
@@ -63,10 +64,21 @@ def send_alert(user_profile, hits):
     txt_template = loader.get_template("alert_email.txt")
     html_template = loader.get_template("alert_email.html")
     context = {"hits": hits}
+
+    alert = hits[0][0]
+    disable_url = reverse("disable_alert", args=[alert.secret_key])
+
     txt = txt_template.render(context)
     html = html_template.render(context)
     msg = EmailMultiAlternatives(
-        subject, txt, settings.DEFAULT_ALERTS_EMAIL, [user_profile.user.email]
+        subject,
+        txt,
+        settings.DEFAULT_ALERTS_EMAIL,
+        [user_profile.user.email],
+        headers={
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",
+        },
     )
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=False)
