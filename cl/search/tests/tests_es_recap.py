@@ -1,9 +1,11 @@
 import datetime
+import math
 import re
 import unittest
 from unittest import mock
 
 from asgiref.sync import async_to_sync, sync_to_async
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import AsyncClient, override_settings
@@ -4099,14 +4101,16 @@ class RECAPIndexingTest(
             "type": SEARCH_TYPES.RECAP,
         }
 
-        # 100 results, 5 pages.
+        results_per_page = settings.RECAP_SEARCH_PAGE_SIZE
+        # 100 results, 10 pages.
+        total_results = 100
         with mock.patch(
             "cl.search.views.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
                 False,
-                100,
+                total_results,
                 1000,
             ),
         ):
@@ -4114,17 +4118,19 @@ class RECAPIndexingTest(
                 reverse("show_results"),
                 search_params,
             )
+        expected_page = math.ceil(total_results / results_per_page)
         self.assertIn("100 Results", r.content.decode())
-        self.assertIn("1 of 5", r.content.decode())
+        self.assertIn(f"1 of {expected_page:,}", r.content.decode())
 
-        # 101 results, 6 pages.
+        # 101 results, 11 pages.
+        total_results = 101
         with mock.patch(
             "cl.search.views.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
                 False,
-                101,
+                total_results,
                 1000,
             ),
         ):
@@ -4132,17 +4138,19 @@ class RECAPIndexingTest(
                 reverse("show_results"),
                 search_params,
             )
+        expected_page = math.ceil(total_results / results_per_page)
         self.assertIn("101 Results", r.content.decode())
-        self.assertIn("1 of 6", r.content.decode())
+        self.assertIn(f"1 of {expected_page:,}", r.content.decode())
 
-        # 20,000 results, 1,000 pages.
+        # 20,000 results, 2,000 pages.
+        total_results = 20_000
         with mock.patch(
             "cl.search.views.fetch_es_results",
             side_effect=lambda *x: (
                 [],
                 1,
                 False,
-                20_000,
+                total_results,
                 1000,
             ),
         ):
@@ -4150,8 +4158,9 @@ class RECAPIndexingTest(
                 reverse("show_results"),
                 search_params,
             )
+        expected_page = math.ceil(total_results / results_per_page)
         self.assertIn("20,000 Results", r.content.decode())
-        self.assertIn("1 of 1,000", r.content.decode())
+        self.assertIn(f"1 of {expected_page:,}", r.content.decode())
 
     def test_remove_control_chars_on_plain_text_indexing(self) -> None:
         """Confirm control chars are removed at indexing time."""
@@ -4173,6 +4182,87 @@ class RECAPIndexingTest(
         r_doc = ESRECAPDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
         self.assertEqual(r_doc.plain_text, "Lorem ipsum control chars .")
         de_1.docket.delete()
+
+    def test_prepare_parties(self) -> None:
+        """Confirm prepare_parties return the expected values."""
+
+        d = docket = DocketFactory(
+            court=self.court,
+        )
+        firm = AttorneyOrganizationFactory(
+            lookup_key="00kingofprussiaroadradnorkesslertopazmeltzercheck1908",
+            name="Law Firm LLP",
+        )
+        attorney = AttorneyFactory(
+            name="Emily Green",
+            organizations=[firm],
+            docket=d,
+        )
+        firm_2 = AttorneyOrganizationFactory(
+            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck000",
+            name="Law Firm LLP 2",
+        )
+        firm_2_1 = AttorneyOrganizationFactory(
+            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck111",
+            name="Law Firm LLP 2_1",
+        )
+        attorney_2 = AttorneyFactory(
+            name="Atty Lorem",
+            organizations=[firm_2, firm_2_1],
+            docket=d,
+        )
+        party_type = PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Mary Williams Corp.",
+                docket=d,
+                attorneys=[attorney, attorney_2],
+            ),
+            docket=d,
+        )
+
+        firm_1_2 = AttorneyOrganizationFactory(
+            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck1908",
+            name="Law Firm LLP",
+        )
+        attorney_1_2 = AttorneyFactory(
+            name="Emily Green",
+            organizations=[firm_1_2],
+            docket=d,
+        )
+        party_type_1_2 = PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Mary Williams Corp.",
+                docket=d,
+                attorneys=[attorney_1_2],
+            ),
+            docket=d,
+        )
+
+        parties_prepared = DocketDocument().prepare_parties(docket)
+        self.assertEqual(
+            parties_prepared["party_id"],
+            {party_type.party.pk, party_type_1_2.party.pk},
+        )
+        self.assertEqual(
+            parties_prepared["party"],
+            {party_type.party.name, party_type_1_2.party.name},
+        )
+        self.assertEqual(
+            parties_prepared["attorney_id"],
+            {attorney.pk, attorney_2.pk, attorney_1_2.pk},
+        )
+        self.assertEqual(
+            parties_prepared["attorney"],
+            {attorney.name, attorney_2.name, attorney_1_2.name},
+        )
+        self.assertEqual(
+            parties_prepared["firm_id"],
+            {firm.pk, firm_2.pk, firm_2_1.pk, firm_1_2.pk},
+        )
+        self.assertEqual(
+            parties_prepared["firm"],
+            {firm.name, firm_2.name, firm_2_1.name, firm_1_2.name},
+        )
 
 
 class RECAPHistoryTablesIndexingTest(
