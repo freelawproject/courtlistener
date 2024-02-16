@@ -1,6 +1,8 @@
 import datetime
+import math
 from unittest import mock
 
+from django.conf import settings
 from django.core.cache import cache
 from django.urls import reverse
 from elasticsearch_dsl import connections
@@ -1171,20 +1173,23 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         # Frontend
+        results_per_page = settings.SEARCH_PAGE_SIZE
+        total_results = 25
         r = self.client.get(
             reverse("show_results"),
             search_params,
         )
         actual = self.get_article_count(r)
-        expected = 20
+        expected = results_per_page
+        expected_page = math.ceil(total_results / results_per_page)
         self.assertEqual(actual, expected)
-        self.assertIn("25 Results", r.content.decode())
-        self.assertIn("1 of 2", r.content.decode())
+        self.assertIn(f"{total_results} Results", r.content.decode())
+        self.assertIn(f"1 of {expected_page:,}", r.content.decode())
 
         # Test next page.
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "page": 2,
+            "page": expected_page,
         }
         r = self.client.get(
             reverse("show_results"),
@@ -1193,8 +1198,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         actual = self.get_article_count(r)
         expected = 5
         self.assertEqual(actual, expected)
-        self.assertIn("25 Results", r.content.decode())
-        self.assertIn("2 of 2", r.content.decode())
+        self.assertIn(f"{total_results} Results", r.content.decode())
+        self.assertIn(
+            f"{expected_page} of {expected_page:,}", r.content.decode()
+        )
 
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,

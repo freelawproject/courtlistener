@@ -709,6 +709,8 @@ def do_es_search(
             document_type = PersonDocument
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
+            # Set a different number of results per page for RECAP SEARCH
+            rows = settings.RECAP_SEARCH_PAGE_SIZE
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
 

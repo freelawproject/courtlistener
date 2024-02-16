@@ -354,7 +354,10 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
         user_form.save()
 
         if not settings.DEVELOPMENT:
-            update_neon_account.delay(user.pk)
+            if up.neon_account_id:
+                update_neon_account.delay(user.pk)
+            else:
+                create_neon_account.delay(user.pk)
 
         return HttpResponseRedirect(reverse("view_settings"))
 
@@ -603,7 +606,10 @@ def confirm_email(request, activation_key):
         up.email_confirmed = True
         up.save()
         if not settings.DEVELOPMENT:
-            create_neon_account.delay(up.user.pk)
+            if up.neon_account_id:
+                update_neon_account.delay(up.user.pk)
+            else:
+                create_neon_account.delay(up.user.pk)
 
     return TemplateResponse(
         request, "register/confirm.html", {"success": True, "private": True}
