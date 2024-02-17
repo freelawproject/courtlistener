@@ -613,7 +613,7 @@ def get_doc_from_es(
 
 def handle_ubq_retries(
     self: Task,
-    exc: ConnectionError | ConflictError | ConnectionTimeout,
+    exc: ConnectionError | ConflictError | ConnectionTimeout | NotFoundError,
     count_query=QuerySet | None,
 ) -> None:
     """Handles the retry logic for update_children_docs_by_query task based on
@@ -640,7 +640,7 @@ def handle_ubq_retries(
         jitter_sec = randint(10, 30)
         countdown_sec = ((retry_count + 1) * min_delay_sec) + jitter_sec
     else:
-        # Default case for ConflictError
+        # Default case for ConflictError and NotFoundError
         min_delay_sec = 10  # 10 seconds
         max_delay_sec = 15  # 15 seconds
         countdown_sec = ((retry_count + 1) * min_delay_sec) + randint(
@@ -768,7 +768,12 @@ def update_children_docs_by_query(
     ubq = ubq.script(source=script_source, params=params)
     try:
         ubq.execute()
-    except (ConnectionError, ConflictError, ConnectionTimeout) as exc:
+    except (
+        ConnectionError,
+        ConflictError,
+        ConnectionTimeout,
+        NotFoundError,
+    ) as exc:
         handle_ubq_retries(self, exc, count_query=count_query)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
@@ -1515,7 +1520,7 @@ def remove_parent_and_child_docs_by_query(
         client.delete_by_query(
             index=es_document._index._name, body={"query": query}
         )
-    except ConnectionError as exc:
+    except (ConnectionError, NotFoundError) as exc:
         handle_ubq_retries(self, exc, count_query=count_query)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
