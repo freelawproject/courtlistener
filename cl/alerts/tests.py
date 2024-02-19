@@ -57,7 +57,7 @@ from cl.api.models import (
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
-from cl.donate.models import Donation
+from cl.donate.models import Donation, NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
 from cl.search.documents import AudioDocument, AudioPercolator
@@ -308,10 +308,6 @@ class UnlimitedAlertsTest(TestCase):
             msg="Grantlist allowed even though email should not be on list.",
         )
         self.assertFalse(
-            up.is_monthly_donor,
-            msg="User is marked as monthly donor, but isn't.",
-        )
-        self.assertFalse(
             up.can_make_another_alert,
             msg="Was able to make alerts even though the max free "
             "alerts was overridden to zero.",
@@ -395,7 +391,7 @@ class AlertAPITests(APITestCase):
     def tearDown(cls):
         Alert.objects.all().delete()
 
-    def make_an_alert(
+    async def make_an_alert(
         self,
         client,
         alert_name="testing_name",
@@ -407,48 +403,48 @@ class AlertAPITests(APITestCase):
             "query": alert_query,
             "rate": alert_rate,
         }
-        return client.post(self.alert_path, data, format="json")
+        return await client.post(self.alert_path, data, format="json")
 
-    def test_make_an_alert(self) -> None:
+    async def test_make_an_alert(self) -> None:
         """Can we make an alert?"""
 
         # Make a simple search alert
         search_alert = Alert.objects.all()
-        response = self.make_an_alert(self.client)
-        self.assertEqual(search_alert.count(), 1)
+        response = await self.make_an_alert(self.client)
+        self.assertEqual(await search_alert.acount(), 1)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
 
-    def test_list_users_alerts(self) -> None:
+    async def test_list_users_alerts(self) -> None:
         """Can we list user's own alerts?"""
 
         # Make two alerts for user_1
-        self.make_an_alert(self.client, alert_name="alert_1")
-        self.make_an_alert(self.client, alert_name="alert_2")
+        await self.make_an_alert(self.client, alert_name="alert_1")
+        await self.make_an_alert(self.client, alert_name="alert_2")
 
         # Make one alert for user_2
-        self.make_an_alert(self.client_2, alert_name="alert_3")
+        await self.make_an_alert(self.client_2, alert_name="alert_3")
 
         # Get the alerts for user_1, should be 2
-        response = self.client.get(self.alert_path)
+        response = await self.client.get(self.alert_path)
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response.json()["count"], 2)
 
         # Get the alerts for user_2, should be 1
-        response_2 = self.client_2.get(self.alert_path)
+        response_2 = await self.client_2.get(self.alert_path)
         self.assertEqual(response_2.status_code, HTTP_200_OK)
         self.assertEqual(response_2.json()["count"], 1)
 
-    def test_delete_alert(self) -> None:
+    async def test_delete_alert(self) -> None:
         """Can we delete an alert?
         Avoid users from deleting other users' alerts.
         """
 
         # Make two alerts for user_1
-        alert_1 = self.make_an_alert(self.client, alert_name="alert_1")
-        alert_2 = self.make_an_alert(self.client, alert_name="alert_2")
+        alert_1 = await self.make_an_alert(self.client, alert_name="alert_1")
+        alert_2 = await self.make_an_alert(self.client, alert_name="alert_2")
 
         search_alert = Alert.objects.all()
-        self.assertEqual(search_alert.count(), 2)
+        self.assertEqual(await search_alert.acount(), 2)
 
         alert_1_path_detail = reverse(
             "alert-detail",
@@ -456,9 +452,9 @@ class AlertAPITests(APITestCase):
         )
 
         # Delete the alert for user_1
-        response = self.client.delete(alert_1_path_detail)
+        response = await self.client.delete(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
-        self.assertEqual(search_alert.count(), 1)
+        self.assertEqual(await search_alert.acount(), 1)
 
         alert_2_path_detail = reverse(
             "alert-detail",
@@ -466,39 +462,39 @@ class AlertAPITests(APITestCase):
         )
 
         # user_2 tries to delete a user_1 alert, it should fail
-        response = self.client_2.delete(alert_2_path_detail)
+        response = await self.client_2.delete(alert_2_path_detail)
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
-        self.assertEqual(search_alert.count(), 1)
+        self.assertEqual(await search_alert.acount(), 1)
 
-    def test_alert_detail(self) -> None:
+    async def test_alert_detail(self) -> None:
         """Can we get the details of an alert?
         Avoid users from getting other users' alerts.
         """
 
         # Make one alerts for user_1
-        alert_1 = self.make_an_alert(self.client, alert_name="alert_1")
+        alert_1 = await self.make_an_alert(self.client, alert_name="alert_1")
         search_alert = Alert.objects.all()
-        self.assertEqual(search_alert.count(), 1)
+        self.assertEqual(await search_alert.acount(), 1)
         alert_1_path_detail = reverse(
             "alert-detail",
             kwargs={"pk": alert_1.json()["id"], "version": "v3"},
         )
 
         # Get the alert detail for user_1
-        response = self.client.get(alert_1_path_detail)
+        response = await self.client.get(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTP_200_OK)
 
         # user_2 tries to get user_1 alert, it should fail
-        response = self.client_2.get(alert_1_path_detail)
+        response = await self.client_2.get(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
 
-    def test_alert_update(self) -> None:
+    async def test_alert_update(self) -> None:
         """Can we update an alert?"""
 
         # Make one alerts for user_1
-        alert_1 = self.make_an_alert(self.client, alert_name="alert_1")
+        alert_1 = await self.make_an_alert(self.client, alert_name="alert_1")
         search_alert = Alert.objects.all()
-        self.assertEqual(search_alert.count(), 1)
+        self.assertEqual(await search_alert.acount(), 1)
         alert_1_path_detail = reverse(
             "alert-detail",
             kwargs={"pk": alert_1.json()["id"], "version": "v3"},
@@ -510,7 +506,7 @@ class AlertAPITests(APITestCase):
             "query": alert_1.json()["query"],
             "rate": alert_1.json()["rate"],
         }
-        response = self.client.put(alert_1_path_detail, data_updated)
+        response = await self.client.put(alert_1_path_detail, data_updated)
 
         # Check that the alert was updated
         self.assertEqual(response.status_code, HTTP_200_OK)
@@ -526,11 +522,8 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         cls.rebuild_index("alerts.Alert")
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_1 = UserProfileWithParentsFactory()
-        cls.donation = DonationFactory(
-            donor=cls.user_profile.user,
-            amount=20,
-            status=Donation.PROCESSED,
-            send_annual_reminder=True,
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY, user=cls.user_profile.user
         )
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
@@ -851,7 +844,7 @@ class DocketAlertAPITests(APITestCase):
     def tearDown(cls):
         DocketAlert.objects.all().delete()
 
-    def make_a_docket_alert(
+    async def make_a_docket_alert(
         self,
         client,
         docket_pk=None,
@@ -863,53 +856,54 @@ class DocketAlertAPITests(APITestCase):
         data = {
             "docket": docket_id,
         }
-        return client.post(self.docket_alert_path, data, format="json")
+        return await client.post(self.docket_alert_path, data, format="json")
 
-    def test_make_a_docket_alert(self) -> None:
+    async def test_make_a_docket_alert(self) -> None:
         """Can we make a docket alert?"""
 
         # Make a simple docket alert
         docket_alert = DocketAlert.objects.all()
         ten_days_ahead = now() + timedelta(days=10)
         with time_machine.travel(ten_days_ahead, tick=False):
-            response = self.make_a_docket_alert(self.client)
-        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
-        self.assertEqual(docket_alert.count(), 1)
+            response = await self.make_a_docket_alert(self.client)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
+        self.assertEqual(await docket_alert.acount(), 1)
         self.assertEqual(response.status_code, HTTP_201_CREATED)
 
-    def test_list_users_docket_alerts(self) -> None:
+    async def test_list_users_docket_alerts(self) -> None:
         """Can we list user's own alerts?"""
 
         # Make two docket alerts for user_1
-        self.make_a_docket_alert(self.client)
-        self.make_a_docket_alert(self.client, docket_pk=self.docket_1.id)
+        await self.make_a_docket_alert(self.client)
+        await self.make_a_docket_alert(self.client, docket_pk=self.docket_1.id)
 
         # Make one docket alert for user_2
-        self.make_a_docket_alert(self.client_2)
+        await self.make_a_docket_alert(self.client_2)
 
         # Get the docket alerts for user_1, should be 2
-        response = self.client.get(self.docket_alert_path)
+        response = await self.client.get(self.docket_alert_path)
         self.assertEqual(response.status_code, HTTP_200_OK)
         self.assertEqual(response.json()["count"], 2)
 
         # Get the docket alerts for user_2, should be 1
-        response_2 = self.client_2.get(self.docket_alert_path)
+        response_2 = await self.client_2.get(self.docket_alert_path)
         self.assertEqual(response_2.status_code, HTTP_200_OK)
         self.assertEqual(response_2.json()["count"], 1)
 
-    def test_delete_docket_alert(self) -> None:
+    async def test_delete_docket_alert(self) -> None:
         """Can we delete an docket alert?
         Avoid users from deleting other users' docket alerts.
         """
 
         # Make two docket alerts for user_1
-        docket_alert_1 = self.make_a_docket_alert(self.client)
-        docket_alert_2 = self.make_a_docket_alert(
+        docket_alert_1 = await self.make_a_docket_alert(self.client)
+        docket_alert_2 = await self.make_a_docket_alert(
             self.client, docket_pk=self.docket_1.id
         )
 
         docket_alert = DocketAlert.objects.all()
-        self.assertEqual(docket_alert.count(), 2)
+        self.assertEqual(await docket_alert.acount(), 2)
 
         docket_alert_1_path_detail = reverse(
             "docket-alert-detail",
@@ -917,9 +911,9 @@ class DocketAlertAPITests(APITestCase):
         )
 
         # Delete the docket_alert for user_1
-        response = self.client.delete(docket_alert_1_path_detail)
+        response = await self.client.delete(docket_alert_1_path_detail)
         self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
 
         docket_alert_2_path_detail = reverse(
             "docket-alert-detail",
@@ -927,40 +921,43 @@ class DocketAlertAPITests(APITestCase):
         )
 
         # user_2 tries to delete a user_1 docket alert, it should fail
-        response = self.client_2.delete(docket_alert_2_path_detail)
+        response = await self.client_2.delete(docket_alert_2_path_detail)
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
 
-    def test_docket_alert_detail(self) -> None:
+    async def test_docket_alert_detail(self) -> None:
         """Can we get the details of a docket alert?
         Avoid users from getting other users' docket alerts.
         """
 
         # Make one docket alert for user_1
-        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert_1 = await self.make_a_docket_alert(self.client)
         docket_alert = DocketAlert.objects.all()
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
         docket_alert_1_path_detail = reverse(
             "docket-alert-detail",
             kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
         )
 
         # Get the docket alert detail for user_1
-        response = self.client.get(docket_alert_1_path_detail)
+        response = await self.client.get(docket_alert_1_path_detail)
         self.assertEqual(response.status_code, HTTP_200_OK)
 
         # user_2 tries to get user_1 docket alert, it should fail
-        response = self.client_2.get(docket_alert_1_path_detail)
+        response = await self.client_2.get(docket_alert_1_path_detail)
         self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
 
-    def test_docket_alert_update(self) -> None:
+    async def test_docket_alert_update(self) -> None:
         """Can we update a docket alert?"""
 
         # Make one alerts for user_1
-        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert_1 = await self.make_a_docket_alert(self.client)
         docket_alert = DocketAlert.objects.all()
-        self.assertEqual(docket_alert.count(), 1)
-        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        self.assertEqual(await docket_alert.acount(), 1)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(
+            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION  # type: ignore[union-attr]
+        )
         docket_alert_1_path_detail = reverse(
             "docket-alert-detail",
             kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
@@ -974,12 +971,13 @@ class DocketAlertAPITests(APITestCase):
 
         ten_days_ahead = now() + timedelta(days=10)
         with time_machine.travel(ten_days_ahead, tick=False):
-            response = self.client.put(
+            response = await self.client.put(
                 docket_alert_1_path_detail, data_updated
             )
 
         # Confirm date_modified is updated on put method
-        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
 
         # Check that the alert was updated
         self.assertEqual(response.status_code, HTTP_200_OK)
@@ -988,14 +986,17 @@ class DocketAlertAPITests(APITestCase):
         )
         self.assertEqual(response.json()["id"], docket_alert_1.json()["id"])
 
-    def test_docket_alert_patch(self) -> None:
+    async def test_docket_alert_patch(self) -> None:
         """Can we update a docket alert?"""
 
         # Make one alerts for user_1
-        docket_alert_1 = self.make_a_docket_alert(self.client)
+        docket_alert_1 = await self.make_a_docket_alert(self.client)
         docket_alert = DocketAlert.objects.all()
-        self.assertEqual(docket_alert.count(), 1)
-        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        self.assertEqual(await docket_alert.acount(), 1)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(
+            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION  # type: ignore[union-attr]
+        )
         docket_alert_1_path_detail = reverse(
             "docket-alert-detail",
             kwargs={"pk": docket_alert_1.json()["id"], "version": "v3"},
@@ -1008,12 +1009,13 @@ class DocketAlertAPITests(APITestCase):
 
         ten_days_ahead = now() + timedelta(days=10)
         with time_machine.travel(ten_days_ahead, tick=False):
-            response = self.client.patch(
+            response = await self.client.patch(
                 docket_alert_1_path_detail, data_updated
             )
 
         # Confirm date_modified is updated on patch method
-        self.assertEqual(docket_alert[0].date_modified, ten_days_ahead)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
 
         # Check that the alert was updated
         self.assertEqual(response.status_code, HTTP_200_OK)
@@ -1026,12 +1028,13 @@ class DocketAlertAPITests(APITestCase):
         data_updated = {"docket": self.docket_1.pk}
         eleven_days_ahead = now() + timedelta(days=11)
         with time_machine.travel(eleven_days_ahead, tick=False):
-            response = self.client.patch(
+            response = await self.client.patch(
                 docket_alert_1_path_detail, data_updated
             )
 
         # date_modified is updated on patch method when updating any other field
-        self.assertEqual(docket_alert[0].date_modified, eleven_days_ahead)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(docket_alert_first.date_modified, eleven_days_ahead)  # type: ignore[union-attr]
 
 
 class OldDocketAlertsReportToggleTest(TestCase):
@@ -1556,18 +1559,12 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             citation_string="Bankr. C.D. Cal.",
         )
         cls.user_profile = UserProfileWithParentsFactory()
-        cls.donation = DonationFactory(
-            donor=cls.user_profile.user,
-            amount=20,
-            status=Donation.PROCESSED,
-            send_annual_reminder=True,
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY, user=cls.user_profile.user
         )
         cls.user_profile_2 = UserProfileWithParentsFactory()
-        cls.donation = DonationFactory(
-            donor=cls.user_profile_2.user,
-            amount=20,
-            status=Donation.PROCESSED,
-            send_annual_reminder=True,
+        NeonMembership.objects.create(
+            level=NeonMembership.LEGACY, user=cls.user_profile_2.user
         )
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
@@ -1720,7 +1717,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertIn(rt_oral_argument.case_name, html_content)
         # Highlighting tags are set for other fields.
         self.assertIn("<strong>19-5735</strong>", html_content)
-        self.assertIn("<strong>RT</strong>", html_content)
+        self.assertIn("<strong>RT Test OA</strong>", html_content)
 
         # Confirm that order_by is overridden in the 'View Full Results' URL by
         # dateArgued+desc.
@@ -2018,7 +2015,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 200, mock_raw=True
             ),
         ):
-            mock_date = now().replace(day=30, hour=0)
+            mock_date = now().replace(month=1, day=30, hour=0)
             with time_machine.travel(mock_date, tick=False):
                 # Call mly command
                 with self.assertRaises(InvalidDateError):
@@ -2152,9 +2149,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         contains more than ELASTICSEARCH_PAGINATION_BATCH_SIZE results. So additional
         requests are performed in order to retrieve all the available results.
         """
-
-        donations = Donation.objects.all()
-        self.assertEqual(donations.count(), 2)
+        memberships = NeonMembership.objects.all()
+        self.assertEqual(memberships.count(), 2)
         self.assertEqual(len(mail.outbox), 0)
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 0)
@@ -2165,13 +2161,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             user_profile = UserProfileWithParentsFactory.create()
 
             if i != 1:
-                # Avoid creating a donation for one User in order to test this
+                # Avoid creating a membership for one User in order to test this
                 # RT Alert is not sent.
-                DonationFactory.create(
-                    amount=20,
-                    donor=user_profile.user,
-                    status=Donation.PROCESSED,
-                    send_annual_reminder=True,
+                NeonMembership.objects.create(
+                    user=user_profile.user, level=NeonMembership.LEGACY
                 )
             WebhookFactory(
                 user=user_profile.user,
@@ -2189,8 +2182,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         webhooks = Webhook.objects.all()
         self.assertEqual(len(webhooks), 11)
-        donations = Donation.objects.all()
-        self.assertEqual(len(donations), 11)
+        memberships = NeonMembership.objects.all()
+        self.assertEqual(len(memberships), 11)
         total_rt_alerts = Alert.objects.filter(rate=Alert.REAL_TIME)
         # 2 created in setUpTestData + 10
         self.assertEqual(total_rt_alerts.count(), 12)

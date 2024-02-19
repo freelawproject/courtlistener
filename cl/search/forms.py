@@ -438,6 +438,7 @@ class SearchForm(forms.Form):
     def __init__(self, *args, **kwargs):
         request = kwargs.pop("request", None)
         self.is_es_form = kwargs.pop("is_es_form", None)
+        self.courts = kwargs.pop("courts", None)
         super().__init__(*args, **kwargs)
 
         """
@@ -457,8 +458,9 @@ class SearchForm(forms.Form):
             default_status = "Published"
             status_index = 0
 
-        courts = Court.objects.filter(in_use=True)
-        for court in courts:
+        if not self.courts:
+            self.courts = Court.objects.filter(in_use=True)
+        for court in self.courts:
             self.fields[f"court_{court.pk}"] = forms.BooleanField(
                 label=court.short_name,
                 required=False,
@@ -711,7 +713,7 @@ def _clean_form(get_params, cd, courts, is_es_form=False):
     # fine to leave it here until there's a reason to remove it. It could be
     # helpful if somebody finds a way not to use the datepickers (js off, say)
     for date_field in SearchForm(
-        get_params, is_es_form=is_es_form
+        get_params, is_es_form=is_es_form, courts=courts
     ).get_date_field_names():
         clean_up_date_formats(cd, date_field, get_params)
 
@@ -727,6 +729,6 @@ def _clean_form(get_params, cd, courts, is_es_form=False):
         ]
 
     # Ensure that we have the cleaned_data and other related attributes set.
-    form = SearchForm(get_params, is_es_form=is_es_form)
+    form = SearchForm(get_params, is_es_form=is_es_form, courts=courts)
     form.is_valid()
     return form

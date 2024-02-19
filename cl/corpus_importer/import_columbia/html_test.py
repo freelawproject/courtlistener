@@ -595,9 +595,11 @@ def get_text(file_path):
                 raw_info.setdefault("opinions", []).append(
                     {
                         "type": opinion_type,
-                        "byline": current_byline["name"]
-                        if current_byline["type"] == opinion_type
-                        else None,
+                        "byline": (
+                            current_byline["name"]
+                            if current_byline["type"] == opinion_type
+                            else None
+                        ),
                         "opinion": get_xml_string(child),
                     }
                 )

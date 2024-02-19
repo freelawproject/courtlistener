@@ -5,24 +5,45 @@ from unittest import skipIf
 from unittest.mock import MagicMock, patch
 
 import stripe
+import time_machine
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import mail
-from django.test.client import AsyncClient
+from django.test import override_settings
+from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
-from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
+from rest_framework.status import HTTP_200_OK, HTTP_201_CREATED, HTTP_302_FOUND
 
-from cl.donate.factories import DonationFactory
+from cl.donate.api_views import MembershipWebhookViewSet
+from cl.donate.factories import (
+    DonationFactory,
+    MonthlyDonationFactory,
+    NeonWebhookEventFactory,
+)
+from cl.donate.management.commands.charge_monthly_donors import (
+    Command as ChargeMonthlyDonorsCommand,
+)
 from cl.donate.management.commands.cl_send_donation_reminders import (
     Command as DonationReminderCommand,
 )
-from cl.donate.models import FREQUENCIES, PROVIDERS, Donation, MonthlyDonation
+from cl.donate.models import (
+    FREQUENCIES,
+    PROVIDERS,
+    Donation,
+    MonthlyDonation,
+    NeonMembership,
+    NeonWebhookEvent,
+)
+from cl.donate.utils import PaymentFailureException
 
 # From: https://stripe.com/docs/testing#cards
-from cl.donate.utils import emails
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import (
+    SimpleUserDataMixin,
+    UserProfileWithParentsFactory,
+)
 from cl.tests.cases import TestCase
+from cl.users.models import UserProfile
 
 stripe_test_numbers = {
     "good": {"visa": "4242424242424242"},
@@ -47,49 +68,6 @@ class EmailCommandTest(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("you donated $", mail.outbox[0].body)
         self.assertIn("you donated $", mail.outbox[0].alternatives[0][0])
-
-
-@skipIf(
-    settings.PAYPAL_SECRET_KEY is None or settings.PAYPAL_SECRET_KEY == "",
-    "Only run PayPal tests if we have an API key available.",
-)
-@patch("hcaptcha.fields.hCaptchaField.validate", return_value=True)
-class DonationFormSubmissionTest(TestCase):
-    def setUp(self) -> None:
-        self.async_client = AsyncClient()
-        self.params = {
-            "address1": "123 Sesame St.",
-            "city": "New York",
-            "state": "NY",
-            "zip_code": "12345",
-            "wants_newsletter": True,
-            "first_name": "Elmo",
-            "last_name": "Muppet",
-            "email": "pandora@courtlistener.com",
-            "send_annual_reminder": True,
-            "payment_provider": "paypal",
-            "frequency": "once",
-        }
-
-    async def test_paypal_with_other_value_as_anonymous(
-        self, mock: MagicMock
-    ) -> None:
-        """Can a paypal donation go through using the "Other" field?"""
-        self.params.update({"amount": "other", "amount_other": "5"})
-        r = await self.async_client.post(
-            reverse("donate"), self.params, follow=True
-        )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
-
-    async def test_paypal_with_regular_value_as_anonymous(
-        self, mock: MagicMock
-    ) -> None:
-        """Can a stripe donation go through using the "Other" field?"""
-        self.params.update({"amount": "25"})
-        r = await self.async_client.post(
-            reverse("donate"), self.params, follow=True
-        )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
 
 
 def get_stripe_event(fingerprint):
@@ -120,46 +98,6 @@ def get_stripe_event(fingerprint):
 class StripeTest(TestCase):
     def setUp(self) -> None:
         self.async_client = AsyncClient()
-
-    async def make_a_donation(
-        self, cc_number, amount, amount_other="", param_overrides=None
-    ):
-        if param_overrides is None:
-            param_overrides = {}
-
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-        # Create a stripe token (this would normally be done via javascript in
-        # the front end when the submit button was pressed)
-        token = stripe.Token.create(
-            card={
-                "number": cc_number,
-                "exp_month": "6",
-                "exp_year": str(datetime.today().year + 1),
-                "cvc": "123",
-            }
-        )
-
-        # Place a donation as an anonymous (not logged in) person using the
-        # token we just got
-        params = {
-            "amount": amount,
-            "amount_other": amount_other,
-            "payment_provider": "cc",
-            "first_name": "Barack",
-            "last_name": "Obama",
-            "address1": "1600 Pennsylvania Ave.",
-            "address2": "The Whitehouse",
-            "city": "DC",
-            "state": "DC",
-            "zip_code": "20500",
-            "email": "barack@freelawproject.org",
-            "referrer": "tests.py",
-            "stripeToken": token.id,
-            "frequency": "once",
-        }
-        params.update(param_overrides)
-        r = await self.async_client.post(reverse("donate"), data=params)
-        return token, r
 
     async def assertEventPostsCorrectly(self, token):
         event = get_stripe_event(token.card.fingerprint)
@@ -287,7 +225,6 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
             "state": "NY",
             "zip_code": "12345",
             # Tailing checkboxes
-            "wants_newsletter": True,
             "send_annual_reminder": True,
         }
 
@@ -345,138 +282,325 @@ class DonationIntegrationTest(SimpleUserDataMixin, TestCase):
             content_type="application/json",
         )
 
-    async def test_one_time_paypal_logged_in_donation(
-        self, mock: MagicMock
-    ) -> None:
-        self.assertTrue(await self.async_client.alogin(**self.credentials))
-        await self.do_post_and_assert(reverse("donate"))
 
-    async def test_one_time_paypal_logged_out_donation_existing_account(
-        self, mock: MagicMock
-    ) -> None:
-        await self.async_client.alogout()
-        await self.do_post_and_assert(reverse("donate"))
+class ChargeMonthlyDonationTest(TestCase):
+    def setUp(self) -> None:
+        twenty_days_ago = now() - timedelta(days=20)
+        with time_machine.travel(twenty_days_ago, tick=False):
+            self.monthly_donation = MonthlyDonationFactory(
+                stripe_customer_id="test_1"
+            )
+        self.monthly_donation.monthly_donation_day = now().date().day
+        self.monthly_donation.save()
 
-    async def test_one_time_paypal_logged_out_donation_new_stub(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_new_stub_params()
-        await self.do_post_and_assert(reverse("donate"))
-        # Did we create an account?
-        self.assertTrue(
-            await User.objects.filter(email=self.new_email).aexists()
+    @patch(
+        "cl.donate.management.commands.charge_monthly_donors.process_stripe_payment",
+        side_effect=PaymentFailureException("failed charge"),
+    )
+    def test_can_send_failed_subscription_email(
+        self, mock_process_stripe_payment
+    ):
+        ChargeMonthlyDonorsCommand().handle()
+
+        self.monthly_donation.refresh_from_db()
+        self.assertFalse(self.monthly_donation.enabled)
+        self.assertEqual(self.monthly_donation.failure_count, 1)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(
+            "https://donate.free.law/forms/membership", mail.outbox[0].body
+        )
+        self.assertIn(
+            "https://donate.free.law/forms/supportflp", mail.outbox[0].body
         )
 
-    async def test_one_time_stripe_logged_in_donation(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        self.assertTrue(await self.async_client.alogin(**self.credentials))
-        await self.do_post_and_assert(reverse("donate"))
 
-    async def test_one_time_stripe_logged_out_donation_existing_account(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        await self.do_post_and_assert(reverse("donate"))
+class MembershipWebhookTest(TestCase):
+    def setUp(self) -> None:
+        self.async_client = AsyncClient()
+        self.user_profile = UserProfileWithParentsFactory()
+        self.user_profile.neon_account_id = "1234"
+        self.user_profile.save()
 
-    async def test_one_time_stripe_logged_out_donation_new_stub(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        self.set_new_stub_params()
-        await self.do_post_and_assert(reverse("donate"))
+        self.data = {
+            "eventTimestamp": "2017-05-04T03:42:59.000-06:00",
+            "data": {
+                "membership": {
+                    "membershipId": "12345",
+                    "accountId": "1234",
+                    "membershipName": "CL Membership - Tier 1",
+                    "termEndDate": "2024-01-01-05:00",
+                    "status": "SUCCEEDED",
+                }
+            },
+        }
 
-    async def test_monthly_stripe_logged_in_donation(
-        self, mock: MagicMock
+    @override_settings(NEON_MAX_WEBHOOK_NUMBER=10)
+    @patch(
+        "cl.donate.api_views.MembershipWebhookViewSet._handle_membership_creation_or_update",
+    )
+    def test_store_and_truncate_webhook_data(
+        self, mock_membership_creation
     ) -> None:
-        self.set_monthly_params()
-        self.set_stripe_params()
-        self.assertTrue(await self.async_client.alogin(**self.credentials))
-        await self.do_post_and_assert(reverse("donate"))
-        await self.check_monthly_donation_created()
-
-    async def test_monthly_stripe_logged_out_donation_existing_account(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_monthly_params()
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        await self.do_post_and_assert(reverse("donate"))
-        await self.check_monthly_donation_created()
-
-    async def test_monthly_stripe_logged_out_donation_new_stub(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_monthly_params()
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        self.set_new_stub_params()
-        await self.do_post_and_assert(reverse("donate"))
-        await self.check_monthly_donation_created()
-
-    async def test_one_time_stripe_logged_in_payment(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        self.assertTrue(await self.async_client.alogin(**self.credentials))
-        await self.do_post_and_assert(reverse("cc_payment"))
-
-    async def test_one_time_stripe_logged_out_payment_existing_account(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        await self.do_post_and_assert(reverse("cc_payment"))
-
-    async def test_one_time_stripe_logged_out_payment_new_stub(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        self.set_new_stub_params()
-        await self.do_post_and_assert(reverse("cc_payment"))
-
-    #
-    # Test redirection and emails
-    #
-    # Paypal does some annoying redirection stuff that requires a log-in and
-    # makes it nearly impossible to test as we do Stripe. Below we should have
-    # a test for email and redirection of paypal payments, but it just wasn't
-    # possible without undue effort. This is why we like Stripe.
-    async def test_email_and_redirection_regular_donation_stripe(
-        self, mock: MagicMock
-    ) -> None:
-        self.set_stripe_params()
-        await self.async_client.alogout()
-        await self.do_post_and_assert(
-            reverse("donate"), target=reverse("donate_complete")
+        self.data["eventTrigger"] = "createMembership"
+        client = Client()
+        r = client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
         )
-        await self.do_stripe_callback()
-        self.assertEmailSubject(emails["donation_thanks"]["subject"])
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(NeonWebhookEvent.objects.all().count(), 1)
 
-    async def test_email_and_redirection_monthly_donation(
-        self, mock: MagicMock
-    ) -> None:
-        await self.async_client.alogout()
-        self.set_stripe_params()
-        self.set_monthly_params()
-        await self.do_post_and_assert(
-            reverse("donate"), target=reverse("donate_complete")
-        )
-        await self.check_monthly_donation_created()
-        await self.do_stripe_callback()
-        self.assertEmailSubject(emails["donation_thanks_recurring"]["subject"])
+        # Make sure to save the webhook payload even if an error occurs.
+        mock_membership_creation.side_effect = Exception()
+        self.data["data"]["membership"]["accountId"] = "9999"
+        with self.assertRaises(Exception):
+            client.post(
+                reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+                data=self.data,
+                content_type="application/json",
+            )
+        failed_log_query = NeonWebhookEvent.objects.filter(account_id="9999")
+        self.assertEqual(failed_log_query.count(), 1)
+        self.assertEqual(NeonWebhookEvent.objects.all().count(), 2)
+        profile_query = UserProfile.objects.filter(neon_account_id="9999")
+        self.assertEqual(profile_query.count(), 0)
 
-    async def test_email_and_redirection_one_time_payment(
-        self, mock: MagicMock
-    ) -> None:
-        await self.async_client.alogout()
-        self.set_stripe_params()
-        await self.do_post_and_assert(
-            reverse("cc_payment"), target=reverse("payment_complete")
+        NeonWebhookEventFactory.create_batch(17)
+
+        # Update the trigger type and Adds a new webhook to the log. After
+        # adding this new record the post_save signal should truncate the
+        # events table and keep the latest NEON_MAX_WEBHOOK_NUMBER records
+        self.data["eventTrigger"] = "editMembership"
+        mock_membership_creation.side_effect = None
+        r = client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
         )
-        await self.do_stripe_callback()
-        self.assertEmailSubject(emails["payment_thanks"]["subject"])
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(NeonWebhookEvent.objects.all().count(), 10)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_create_new_membership(self, mock_store_webhook) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(membership.user_id, self.user_profile.user.pk)
+        self.assertEqual(membership.level, NeonMembership.TIER_1)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_avoid_creating_membership_for_failed_transaction(
+        self, mock_store_webhook
+    ) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["status"] = "FAILED"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 0)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_skip_update_membership_webhook_with_old_data(
+        self, mock_store_webhook
+    ) -> None:
+        self.data["eventTrigger"] = "createMembership"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        self.data["eventTrigger"] = "updateMembership"
+        self.data["data"]["membership"]["membershipId"] = "12344"
+        self.data["data"]["membership"][
+            "membershipName"
+        ] = "CL Membership - Tier 4"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        # checks the neon_id was not updated
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        # checks the level was not updated
+        membership = await query.afirst()
+        self.assertEqual(membership.level, NeonMembership.TIER_1)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_update_membership(self, mock_store_webhook) -> None:
+        await NeonMembership.objects.acreate(
+            user=self.user_profile.user,
+            neon_id="12345",
+            level=NeonMembership.TIER_1,
+        )
+
+        # Update the membership level and the trigger type
+        self.data["eventTrigger"] = "editMembership"
+        self.data["data"]["membership"][
+            "membershipName"
+        ] = "CL Membership - Tier 4"
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        membership = await NeonMembership.objects.aget(neon_id="12345")
+
+        self.assertEqual(membership.neon_id, "12345")
+        self.assertEqual(membership.level, NeonMembership.TIER_4)
+
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_delete_membership(self, mock_store_webhook) -> None:
+        await NeonMembership.objects.acreate(
+            user=self.user_profile.user,
+            neon_id="9876",
+            level=NeonMembership.BASIC,
+        )
+
+        # Update trigger type and membership id
+        self.data["eventTrigger"] = "deleteMembership"
+        self.data["data"]["membership"]["membershipId"] = "9876"
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        query = NeonMembership.objects.filter(neon_id="9876")
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(await query.acount(), 0)
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_create_stub_account_missing_address(
+        self, mock_store_webhook, mock_get_account
+    ):
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "1245"
+
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "1245",
+            "primaryContact": {
+                "email1": "test@free.law",
+                "firstName": "test",
+                "lastName": "test",
+                "addresses": [],
+            },
+        }
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_can_create_stub_account_properly(
+        self, mock_store_webhook, mock_get_account
+    ):
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "9524"
+
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "9524",
+            "primaryContact": {
+                "email1": "test@free.law",
+                "firstName": "test",
+                "lastName": "test",
+                "addresses": [
+                    {
+                        "addressId": "91449",
+                        "addressLine1": "Suite 338 886 Hugh Shoal",
+                        "addressLine2": "",
+                        "addressLine3": None,
+                        "addressLine4": None,
+                        "city": "New Louveniamouth",
+                        "stateProvince": {
+                            "code": "WA",
+                            "name": "Washington",
+                            "status": None,
+                        },
+                        "country": {
+                            "id": "1",
+                            "name": "United States of America",
+                            "status": None,
+                        },
+                        "territory": None,
+                        "zipCode": "30716",
+                    }
+                ],
+            },
+        }
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTP_201_CREATED)
+
+        query = NeonMembership.objects.select_related(
+            "user", "user__profile"
+        ).filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        membership = await query.afirst()
+        self.assertEqual(membership.user.email, "test@free.law")
+        self.assertEqual(membership.user.profile.neon_account_id, "9524")

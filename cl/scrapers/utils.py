@@ -5,16 +5,17 @@ from datetime import date
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
+import httpx
 import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
 from django.db.models import QuerySet
+from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 from requests import Response, Session
-from requests.cookies import RequestsCookieJar
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
@@ -81,8 +82,8 @@ def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
 
 @retry(
     (
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.TimeoutException,
     ),
     tries=3,
     delay=5,
@@ -135,8 +136,8 @@ def follow_redirections(r: Response, s: Session) -> Response:
 
 @retry(
     (
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.TimeoutException,
     ),
     tries=3,
     delay=5,
@@ -153,7 +154,7 @@ def get_extension(content: bytes) -> str:
 
 def get_binary_content(
     download_url: str,
-    cookies: RequestsCookieJar,
+    site: AbstractSite,
     headers: dict,
     method: str = "GET",
 ) -> Tuple[str, Optional[Response]]:
@@ -161,7 +162,7 @@ def get_binary_content(
     certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
-    :param cookies: Cookies that might be necessary to download the item.
+    :param site: Site object used to download data
     :param headers: Headers that might be necessary to download the item.
     :param method: The HTTP method used to get the item, or "LOCAL" to get an
     item during testing
@@ -183,13 +184,16 @@ def get_binary_content(
     else:
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
-        s = requests.session()
-
+        s = (
+            site.request["session"]
+            if hasattr(site, "cipher")
+            else requests.session()
+        )
         r = s.get(
             download_url,
             verify=False,  # WA has a certificate we don't understand
             headers=headers,
-            cookies=cookies,
+            cookies=site.cookies,
             timeout=300,
         )
 
@@ -197,6 +201,19 @@ def get_binary_content(
         if len(r.content) == 0:
             msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
             return msg, None
+
+        # test for expected content type (thanks mont for nil)
+        if site.expected_content_types:
+            content_type = r.headers.get("Content-Type").lower()
+            m = any(
+                content_type in mime for mime in site.expected_content_types
+            )
+            if not m:
+                msg = (
+                    f"UnexpectedContentTypeError: {download_url}\n"
+                    f"'\"{r.headers.get('Content-Type').lower()}\" not in {site.expected_content_types}"
+                )
+                return msg, None
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)

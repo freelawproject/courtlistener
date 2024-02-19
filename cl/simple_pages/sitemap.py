@@ -45,7 +45,6 @@ class SimpleSitemap(sitemaps.Sitemap):
             make_url_dict("help_home", priority=0.5, changefreq="monthly"),
             make_url_dict("markdown_help", priority=0.4, changefreq="never"),
             make_url_dict("alert_help", priority=0.4, changefreq="monthly"),
-            make_url_dict("donation_help", priority=0.4, changefreq="monthly"),
             make_url_dict("delete_help", priority=0.3, changefreq="monthly"),
             make_url_dict("advanced_search", priority=0.5),
             make_url_dict(

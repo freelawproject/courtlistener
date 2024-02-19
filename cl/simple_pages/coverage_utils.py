@@ -127,7 +127,7 @@ def build_chart_data(court_ids: list[str]):
         solr = ExtraSolrInterface(
             settings.SOLR_OPINION_URL,
             http_connection=session,
-            mode="r"
+            mode="r",
             # type: ignore
         )
         # Query solr for the first and last date

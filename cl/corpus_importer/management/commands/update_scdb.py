@@ -16,6 +16,7 @@ Once located, we update items:
  - votes_majority & votes_minority
  - decision_direction
 """
+
 import csv
 import string
 from datetime import datetime

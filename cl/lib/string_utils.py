@@ -110,7 +110,7 @@ def normalize_dashes(text: str) -> str:
     :return: the better text
     """
     # Simple variables b/c in monospace code, you can't see the difference
-    # othewise.
+    # otherwise.
     normal_dash = "-"
     en_dash = "–"
     em_dash = "—"

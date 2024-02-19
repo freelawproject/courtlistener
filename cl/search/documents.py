@@ -13,8 +13,14 @@ from cl.custom_filters.templatetags.text_filters import (
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
+from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
-from cl.people_db.models import Person, Position
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    Person,
+    Position,
+)
 from cl.search.constants import o_type_index_map
 from cl.search.es_indices import (
     opinion_index,
@@ -131,11 +137,13 @@ class AudioDocumentBase(Document):
     absolute_url = fields.KeywordField(index=False)
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
-            )
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -174,6 +182,7 @@ class AudioDocumentBase(Document):
         attr="docket.court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        term_vector="with_positions_offsets",
     )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")
@@ -214,11 +223,13 @@ class AudioDocumentBase(Document):
     docketNumber = fields.TextField(
         attr="docket.docket_number",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="docket.docket_number",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -231,11 +242,13 @@ class AudioDocumentBase(Document):
     judge = fields.TextField(
         attr="judges",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="judges",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -249,10 +262,12 @@ class AudioDocumentBase(Document):
     source = fields.KeywordField(attr="source", index=False)
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -381,10 +396,12 @@ class PersonBaseDocument(Document):
     fjc_id = fields.TextField()
     name = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -408,10 +425,12 @@ class PersonBaseDocument(Document):
     dod = fields.DateField(attr="date_dod")
     dob_city = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -430,10 +449,12 @@ class PersonBaseDocument(Document):
     political_affiliation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
                 "exact": fields.TextField(
                     analyzer="english_exact",
                     search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
                 ),
             },
             search_analyzer="search_analyzer",
@@ -456,10 +477,12 @@ class PersonBaseDocument(Document):
     school = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
                 "exact": fields.TextField(
                     analyzer="english_exact",
                     search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
                 ),
             },
             search_analyzer="search_analyzer",
@@ -1097,7 +1120,7 @@ class ESRECAPDocument(DocketBaseDocument):
             )
 
     def prepare_plain_text(self, instance):
-        return escape(instance.plain_text)
+        return escape(instance.plain_text.translate(null_map))
 
     def prepare_cites(self, instance):
         return list(
@@ -1195,15 +1218,35 @@ class DocketDocument(DocketBaseDocument):
             "firm_id": set(),
             "firm": set(),
         }
-        for p in instance.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
+
+        # Extract only required parties values.
+        party_values = instance.parties.values_list("pk", "name")
+        for pk, name in party_values.iterator():
+            out["party_id"].add(pk)
+            out["party"].add(name)
+
+        # Extract only required attorney values.
+        atty_values = (
+            Attorney.objects.filter(roles__docket=instance)
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in atty_values.iterator():
+            out["attorney_id"].add(pk)
+            out["attorney"].add(name)
+
+        # Extract only required firm values.
+        firms_values = (
+            AttorneyOrganization.objects.filter(
+                attorney_organization_associations__docket=instance
+            )
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in firms_values.iterator():
+            out["firm_id"].add(pk)
+            out["firm"].add(name)
+
         return out
 
     def prepare(self, instance):
@@ -1595,17 +1638,25 @@ class OpinionDocument(OpinionBaseDocument):
 
     def prepare_text(self, instance):
         if instance.html_columbia:
-            return html_decode(strip_tags(instance.html_columbia))
+            return html_decode(
+                strip_tags(instance.html_columbia.translate(null_map))
+            )
         elif instance.html_lawbox:
-            return html_decode(strip_tags(instance.html_lawbox))
+            return html_decode(
+                strip_tags(instance.html_lawbox.translate(null_map))
+            )
         elif instance.xml_harvard:
-            return html_decode(strip_tags(instance.xml_harvard))
+            return html_decode(
+                strip_tags(instance.xml_harvard.translate(null_map))
+            )
         elif instance.html_anon_2020:
-            return html_decode(strip_tags(instance.html_anon_2020))
+            return html_decode(
+                strip_tags(instance.html_anon_2020.translate(null_map))
+            )
         elif instance.html:
-            return html_decode(strip_tags(instance.html))
+            return html_decode(strip_tags(instance.html.translate(null_map)))
         else:
-            return instance.plain_text
+            return escape(instance.plain_text.translate(null_map))
 
     def prepare_cluster_id(self, instance):
         return instance.cluster.pk

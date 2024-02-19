@@ -1144,9 +1144,15 @@ class TrollerBKTests(TestCase):
             pacer_case_id="12524",
         )
 
+    @classmethod
+    def restart_troller_log(cls):
+        r = make_redis_interface("STATS")
+        key = r.keys("troller_bk:log")
+        if key:
+            r.delete(*key)
+
     def setUp(self) -> None:
-        self.r = make_redis_interface("STATS")
-        self.r.flushdb()
+        self.restart_troller_log()
 
     def test_merge_district_rss_before_2018(self):
         """1 Test merge district RSS file before 2018-4-20 into an existing
@@ -1808,7 +1814,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(last_values["total_rds"], 180)
         self.assertEqual(last_values["last_line"], 100)
 
-        self.r.flushdb()
+        self.restart_troller_log()
 
     def test_merge_mapped_court_rss_before_2018(self):
         """Merge a court mapped RSS file before 2018-4-20
@@ -2976,7 +2982,7 @@ class HarvardMergerTests(TestCase):
 
         test_pairs = [
             (
-                # Test if we are tripped up by mulitple judge names in tag
+                # Test if we are tripped up by multiple judge names in tag
                 "ARNOLD, Circuit Judge, with whom BRIGHT, Senior Circuit Judge, and McMILLIAN and MAGILL, Circuit Judges, join,:",
                 "Arnold",
             ),
@@ -3055,7 +3061,7 @@ class HarvardMergerTests(TestCase):
 
         test_pairs = [
             (
-                # Test if we are tripped up by mulitple judge names in tag
+                # Test if we are tripped up by multiple judge names in tag
                 "ARNOLD, Circuit Judge, with whom BRIGHT, Senior Circuit Judge, and McMILLIAN and MAGILL, Circuit Judges, join,:",
                 ["ARNOLD", "BRIGHT", "MAGILL", "McMILLIAN"],
             ),

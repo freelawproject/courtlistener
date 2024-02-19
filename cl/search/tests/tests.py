@@ -15,6 +15,7 @@ from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
 from django.urls import reverse
+from django.utils.timezone import now
 from factory import RelatedFactory
 from lxml import html
 from rest_framework.status import HTTP_200_OK
@@ -57,6 +58,9 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.management.commands.cl_calculate_pagerank import Command
+from cl.search.management.commands.cl_index_parent_and_child_docs import (
+    get_unique_oldest_history_rows,
+)
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -64,6 +68,7 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
+    DocketEvent,
     Opinion,
     OpinionCluster,
     RECAPDocument,
@@ -73,6 +78,7 @@ from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     get_es_doc_id_and_parent_id,
 )
+from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
@@ -483,7 +489,7 @@ class AdvancedTest(IndexedSolrTestCase):
         )
 
 
-class ExtendChildCourtsSearchTest(ESIndexTestCase, TestCase):
+class ESCommonSearchTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("search.OpinionCluster")
@@ -758,6 +764,133 @@ class ExtendChildCourtsSearchTest(ESIndexTestCase, TestCase):
         self.assertIn("Bank", r.content.decode())
         self.assertIn("National", r.content.decode())
         self.assertIn("Nevada", r.content.decode())
+
+    async def test_es_bad_syntax_proximity_tokens(self) -> None:
+        """Can we make a suggestion for queries that use unrecognized proximity
+        search?
+        """
+
+        # On string queries
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"q": "This query contains /s proximity token"},
+        )
+        self.assertIn(
+            "Are you attempting to perform a proximity search?",
+            r.content.decode(),
+        )
+        self.assertNotIn("Did you mean:", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"q": "This query contains /p proximity token"},
+        )
+        self.assertIn(
+            "Are you attempting to perform a proximity search?",
+            r.content.decode(),
+        )
+        self.assertNotIn("Did you mean:", r.content.decode())
+
+        # On filters
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"case_name": "This query contains /p proximity token"},
+        )
+        self.assertIn(
+            "Are you attempting to perform a proximity search within a filter?",
+            r.content.decode(),
+        )
+        r = await self.async_client.get(
+            reverse("show_results"),
+            {"docket_number": "12-2345 /p"},
+        )
+        self.assertIn(
+            "Are you attempting to perform a proximity search within a filter?",
+            r.content.decode(),
+        )
+
+    async def test_es_unbalanced_quotes(self) -> None:
+        """Can we make a suggestion for queries that use include unbalanced
+        quotes?
+        """
+
+        # On string queries
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": 'Test query with "quotes'}
+        )
+        self.assertIn(
+            "Did you forget to close one or more quotes?", r.content.decode()
+        )
+        self.assertIn("Did you mean:", r.content.decode())
+        self.assertIn("Test query with quotes", r.content.decode())
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": 'Test query with "quotes""'}
+        )
+        self.assertIn(
+            "Did you forget to close one or more quotes?", r.content.decode()
+        )
+        self.assertIn("Did you mean:", r.content.decode())
+        self.assertIn("Test query with &quot;quotes&quot;", r.content.decode())
+
+        # On filters
+        r = await self.async_client.get(
+            reverse("show_results"), {"case_name": 'Test query with "quotes""'}
+        )
+        self.assertIn(
+            "Did you forget to close one or more quotes?", r.content.decode()
+        )
+        self.assertNotIn("Did you mean:", r.content.decode())
+
+    def test_handle_unbalanced_parentheses(self) -> None:
+        """Can we make a suggestion for queries that use include unbalanced
+        parentheses?
+        """
+
+        # On string queries
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "(Loretta OR (SEC) AND Jose",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertIn(
+            "Did you forget to close one or more parentheses?",
+            r.content.decode(),
+        )
+        self.assertIn("Did you mean", r.content.decode())
+        self.assertIn("(Loretta OR SEC) AND Jose", r.content.decode())
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "(Loretta AND Jose",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertIn(
+            "Did you forget to close one or more parentheses?",
+            r.content.decode(),
+        )
+        self.assertIn("Did you mean", r.content.decode())
+        self.assertIn("Loretta AND Jose", r.content.decode())
+
+        # On filters
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "case_name": "(Loretta OR (SEC) AND Jose",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertIn(
+            "Did you forget to close one or more parentheses?",
+            r.content.decode(),
+        )
+        self.assertNotIn("Did you mean", r.content.decode())
 
 
 class PagerankTest(TestCase):
@@ -1678,7 +1811,11 @@ class ESIndexingTasksUtils(TestCase):
             nomination_process="fed_senate",
         )
         cls.de = DocketEntryWithParentsFactory(
-            docket=DocketFactory(court=cls.court),
+            docket=DocketFactory(
+                court=cls.court,
+                docket_number="12-09876",
+                case_name="People v. Lorem",
+            ),
             entry_number=1,
         )
         cls.rd = RECAPDocumentFactory(
@@ -1686,6 +1823,19 @@ class ESIndexingTasksUtils(TestCase):
             document_number="1",
             is_available=True,
         )
+
+    @staticmethod
+    def mock_pgh_created_at(mock_date) -> int:
+        """Since it is not possible to use time_machine to mock the
+        pgh_created_at field on instances created by triggers, this method
+        assigns the mock_date to the most recently created event.
+        """
+        docket_events = DocketEvent.objects.all().order_by("pgh_created_at")
+        latest_d_event = docket_events.last()
+        latest_d_event.pgh_created_at = mock_date
+        latest_d_event.save()
+
+        return latest_d_event.pk
 
     def test_get_es_doc_id_and_parent_id(self) -> None:
         """Confirm that get_es_doc_id_and_parent_id returns the correct doc_id
@@ -1725,3 +1875,81 @@ class ESIndexingTasksUtils(TestCase):
             )
             self.assertEqual(doc_id, test["expected_doc_id"])
             self.assertEqual(parent_id, test["expected_parent_id"])
+
+    def test_get_unique_oldest_date_range_rows(self) -> None:
+        """Can we retrieve the unique oldest rows from history tables within a
+        specified date range?
+        """
+
+        docket_2 = DocketFactory(
+            court=self.court,
+            docket_number="21-55555",
+            case_name="Enterprises, Inc v. Lorem",
+        )
+        docket_1 = self.de.docket
+        expected_event_ids = set()
+        # Events created outside (before) the date_range.
+        mock_date = now().replace(year=2024, month=1, day=15, hour=1)
+        # docket_1 updates.
+        docket_1.docket_number = "12-00000-v1"
+        docket_1.case_name = "The People v. Lorem v1"
+        docket_1.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # docket_2 updates.
+        docket_2.docket_number = "21-00000-v1"
+        docket_2.case_name = "Enterprises, Inc v. The People v1"
+        docket_2.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # Events created within the date_range.
+        mock_date = now().replace(year=2024, month=1, day=16, hour=1)
+        # docket_1 updates.
+        docket_1.docket_number = "12-00000-v2"
+        docket_1.case_name = "The People v. Lorem v2"
+        docket_1.save()
+        # Oldest event within the data_range is expected.
+        expected_id = self.mock_pgh_created_at(mock_date)
+        expected_event_ids.add(expected_id)
+
+        mock_date = now().replace(year=2024, month=1, day=16, hour=2)
+        docket_1.docket_number = "12-00000-v3"
+        docket_1.save()
+        self.mock_pgh_created_at(mock_date)
+
+        mock_date = now().replace(year=2024, month=1, day=18, hour=1)
+        # docket_2 updates.
+        docket_2.docket_number = "21-00000-v2"
+        docket_2.save()
+        # Oldest event within the data_range is expected.
+        expected_id = self.mock_pgh_created_at(mock_date)
+        expected_event_ids.add(expected_id)
+
+        mock_date = now().replace(year=2024, month=1, day=19, hour=1)
+        docket_2.case_name = "Enterprises, Inc v. The People v3"
+        docket_2.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # Events created outside (after) the date_range
+        mock_date = now().replace(year=2024, month=1, day=20, hour=0)
+        # docket_1 updates.
+        docket_1.docket_number = "12-00000-v-latest"
+        docket_1.case_name = "The People v. Lorem v-latest"
+        docket_1.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # docket_1 updates.
+        docket_2.docket_number = "21-00000-v-lates"
+        docket_2.case_name = "Enterprises, Inc v. The People v-latest"
+        docket_2.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # date_range dates.
+        date_start = now().replace(year=2024, month=1, day=16, hour=0)
+        date_end = now().replace(year=2024, month=1, day=19, hour=1)
+        unique_events = get_unique_oldest_history_rows(
+            date_start, date_end, 0, EventTable.DOCKET
+        )
+        # Confirm the expected events are returned.
+        unique_event_ids = set(unique_events.values_list("pgh_id", flat=True))
+        self.assertEqual(unique_event_ids, expected_event_ids)

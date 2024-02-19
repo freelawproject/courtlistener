@@ -49,7 +49,6 @@ class DecimalOrOtherChoiceField(forms.ChoiceField):
 
 
 class ProfileForm(ModelForm):
-    wants_newsletter = forms.BooleanField(required=False)
     STATE_CHOICES = list(STATE_CHOICES)
     STATE_CHOICES.insert(0, ("", "---------"))
     state = USStateField(
@@ -69,7 +68,6 @@ class ProfileForm(ModelForm):
             "city",
             "state",
             "zip_code",
-            "wants_newsletter",
         )
         widgets = {
             "address1": forms.TextInput(attrs={"class": "form-control"}),
@@ -80,9 +78,6 @@ class ProfileForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields[
-            "wants_newsletter"
-        ].label = "Send me the monthly Free Law Project newsletter"
         for key in ["address1", "city", "state", "zip_code"]:
             self.fields[key].required = True
 

@@ -282,9 +282,10 @@ async def view_parties(
     docket_id: int,
     slug: str,
 ) -> HttpResponse:
-    """Show the parties and attorneys tab on the docket."""
-    docket, context = await core_docket_data(request, docket_id)
+    """Show the parties and attorneys tab on the docket with pagination."""
 
+    page = request.GET.get("page", 1)
+    docket, context = await core_docket_data(request, docket_id)
     # We work with this data at the level of party_types so that we can group
     # the parties by this field. From there, we do a whole mess of prefetching,
     # which reduces the number of queries needed for this down to four instead
@@ -316,8 +317,19 @@ async def view_parties(
         .order_by("name", "party__name")
     )
 
+    @sync_to_async
+    def paginate_parties(party_queryset, parties_page):
+        paginator = Paginator(party_queryset, 1000)
+        try:
+            return paginator.page(parties_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
+
+    party_types_paginator = await paginate_parties(party_types, page)
     parties: Dict[str, list] = {}
-    async for party_type in party_types:
+    async for party_type in party_types_paginator.object_list:
         if party_type.name not in parties:
             parties[party_type.name] = []
         parties[party_type.name].append(party_type)
@@ -325,6 +337,7 @@ async def view_parties(
     context.update(
         {
             "parties": parties,
+            "parties_paginator": party_types_paginator,
             "docket_entries": await docket.docket_entries.aexists(),
         }
     )
@@ -397,9 +410,11 @@ async def make_rd_title(rd: RECAPDocument) -> str:
     return "{desc}#{doc_num}{att_num} in {case_name} ({court}{docket_number})".format(
         desc=f"{rd.description} &ndash; " if rd.description else "",
         doc_num=rd.document_number,
-        att_num=f", Att. #{rd.attachment_number}"
-        if rd.document_type == RECAPDocument.ATTACHMENT
-        else "",
+        att_num=(
+            f", Att. #{rd.attachment_number}"
+            if rd.document_type == RECAPDocument.ATTACHMENT
+            else ""
+        ),
         case_name=best_case_name(d),
         court=court.citation_string,
         docket_number=f", {d.docket_number}" if d.docket_number else "",
@@ -1283,9 +1298,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
         docket_pk = (
             pk
             if obj_type == "docket"
-            else cluster.docket_id
-            if cluster is not None
-            else None
+            else cluster.docket_id if cluster is not None else None
         )
         if not docket_pk:
             return HttpResponse("It worked")

@@ -4,6 +4,7 @@ from collections import OrderedDict
 from datetime import timedelta
 from email.utils import parseaddr
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
@@ -58,7 +59,7 @@ from cl.users.forms import (
     UserForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import update_moosend_subscription
+from cl.users.tasks import create_neon_account, update_neon_account
 from cl.users.utils import (
     convert_to_stub_account,
     delete_user_assets,
@@ -201,7 +202,7 @@ def view_donations(request: AuthenticatedHttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "profile/donations.html",
-        {"page": "profile_donations", "private": True},
+        {"page": "profile_your_support", "private": True},
     )
 
 
@@ -309,7 +310,6 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
 @never_cache
 def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     old_email = request.user.email  # this line has to be at the top to work.
-    old_wants_newsletter = request.user.profile.wants_newsletter
     user = request.user
     up = user.profile
     user_form = UserForm(request.POST or None, instance=user)
@@ -324,10 +324,6 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             up.activation_key = sha1_activation_key(user.username)
             up.key_expires = now() + timedelta(5)
             up.email_confirmed = False
-
-            # Unsubscribe the old address in moosend (we'll
-            # resubscribe it when they confirm it later).
-            update_moosend_subscription.delay(old_email, "unsubscribe")
 
             # Send an email to the new and old addresses. New for verification;
             # old for notification of the change.
@@ -353,19 +349,15 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             msg = message_dict["settings_changed_successfully"]
             messages.add_message(request, msg["level"], msg["message"])
 
-        new_wants_newsletter = profile_cd["wants_newsletter"]
-        if old_wants_newsletter != new_wants_newsletter:
-            if new_wants_newsletter is True and not changed_email:
-                # They just subscribed. If they didn't *also* update their
-                # email address, subscribe them.
-                update_moosend_subscription.delay(new_email, "subscribe")
-            elif new_wants_newsletter is False:
-                # They just unsubscribed
-                update_moosend_subscription.delay(new_email, "unsubscribe")
-
         # New email address and changes above are saved here.
         profile_form.save()
         user_form.save()
+
+        if not settings.DEVELOPMENT:
+            if up.neon_account_id:
+                update_neon_account.delay(user.pk)
+            else:
+                create_neon_account.delay(user.pk)
 
         return HttpResponseRedirect(reverse("view_settings"))
 
@@ -401,9 +393,6 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             )
             delete_user_assets(request.user)
             user = convert_to_stub_account(request.user)
-            update_moosend_subscription.delay(
-                request.user.email, "unsubscribe"
-            )
             update_session_auth_hash(request, user)
             logout(request)
             return HttpResponseRedirect(reverse("delete_profile_done"))
@@ -532,7 +521,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     email["from_email"],
                     email["to"],
                 )
-                tally_stat("user.created")
+                async_to_sync(tally_stat)("user.created")
                 get_str = "?next=%s&email=%s" % (
                     urlencode(redirect_to),
                     urlencode(user.email),
@@ -579,8 +568,7 @@ def confirm_email(request, activation_key):
     """Confirms email addresses for a user and sends an email to the admins.
 
     Checks if a hash in a confirmation link is valid, and if so sets the user's
-    email address as valid. If they are subscribed to the newsletter, ensures
-    that moosend is updated.
+    email address as valid.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -615,10 +603,13 @@ def confirm_email(request, activation_key):
 
     # Tests pass; Save the profile
     for up in ups:
-        if up.wants_newsletter:
-            update_moosend_subscription.delay(up.user.email, "subscribe")
         up.email_confirmed = True
         up.save()
+        if not settings.DEVELOPMENT:
+            if up.neon_account_id:
+                update_neon_account.delay(up.user.pk)
+            else:
+                create_neon_account.delay(up.user.pk)
 
     return TemplateResponse(
         request, "register/confirm.html", {"success": True, "private": True}
@@ -715,40 +706,6 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
         "profile/password_form.html",
         {"form": form, "page": "profile_password", "private": False},
     )
-
-
-@csrf_exempt  # nosemgrep
-def moosend_webhook(request: HttpRequest) -> HttpResponse:
-    logger.info("Got moosend webhook with %s method.", request.method)
-
-    if request.method == "POST":
-        # The body is returned as a byte string
-        body = request.body.decode("utf-8")
-        json_body = json.loads(body)
-        webhook_event = json_body.get("Event")
-        if webhook_event:
-            webhook_event_name = webhook_event.get("EventName")
-            webhook_contact_context = webhook_event.get("ContactContext")
-            wants_newsletter = None
-            email = None
-            if webhook_contact_context:
-                email = webhook_contact_context.get("EmailAddress")
-            if webhook_event_name == "SUBSCRIBED":
-                wants_newsletter = True
-            elif webhook_event_name == "UNSUBSCRIBED":
-                wants_newsletter = False
-            if wants_newsletter is not None and email is not None:
-                profiles = UserProfile.objects.filter(user__email=email)
-                logger.info(
-                    "Updating %s profiles for email %s",
-                    profiles.count(),
-                    email,
-                )
-                profiles.update(wants_newsletter=wants_newsletter)
-
-    # Moosend does a GET when you create/edit the automation workflow,
-    # so we need to return a 200 even for GETs.
-    return HttpResponse("<h1>200: OK</h1>")
 
 
 @login_required

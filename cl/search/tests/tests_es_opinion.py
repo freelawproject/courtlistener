@@ -1077,9 +1077,9 @@ class OpinionsESSearchTest(
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("1 Opinion", r.content.decode())
 
-        search_params[
-            "q"
-        ] = "dateFiled:[1895-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"
+        search_params["q"] = (
+            "dateFiled:[1895-01-01T00:00:00Z TO 2015-12-31T00:00:00Z]"
+        )
         r = await self._test_article_count(
             search_params, 2, "citation range query"
         )
@@ -1094,11 +1094,10 @@ class OpinionsESSearchTest(
         params = {"q": "'Howard v. Honda'"}
 
         r = await self._test_article_count(params, 1, "highlights case name")
-        self.assertIn("<mark>Howard</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Howard</mark>"), 1)
-
-        self.assertIn("<mark>Honda</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Honda</mark>"), 1)
+        self.assertIn("<mark>Howard v. Honda</mark>", r.content.decode())
+        self.assertEqual(
+            r.content.decode().count("<mark>Howard v. Honda</mark>"), 1
+        )
 
         # Highlight Citation. Multiple HL fields are properly merged.
         params = {"q": "citation:(22 AL) OR citation:(33 state)"}
@@ -1110,23 +1109,18 @@ class OpinionsESSearchTest(
 
         params = {"q": '"22 AL 339"'}
         r = await self._test_article_count(params, 1, "highlights case name")
-        self.assertIn("<mark>22</mark>", r.content.decode())
-        self.assertIn("<mark>AL</mark>", r.content.decode())
-        self.assertIn("<mark>339</mark>", r.content.decode())
+        self.assertIn("<mark>22 AL 339</mark>", r.content.decode())
 
         params = {"q": '22 AL OR "Yeates 1"'}
         r = await self._test_article_count(params, 1, "highlights case name")
         self.assertIn("<mark>22</mark>", r.content.decode())
         self.assertIn("<mark>AL</mark>", r.content.decode())
-        self.assertIn("<mark>Yeates</mark>", r.content.decode())
-        self.assertIn("<mark>1</mark>", r.content.decode())
+        self.assertIn("<mark>Yeates 1</mark>", r.content.decode())
 
         # Highlight docketNumber.
         params = {"q": 'docketNumber:"docket number 2"'}
         r = await self._test_article_count(params, 1, "highlights case name")
-        self.assertIn("<mark>docket</mark>", r.content.decode())
-        self.assertIn("<mark>number</mark>", r.content.decode())
-        self.assertIn("<mark>2</mark>", r.content.decode())
+        self.assertIn("<mark>docket number 2</mark>", r.content.decode())
 
         # Highlight suitNature.
         params = {"q": '"copyright"'}
@@ -2169,6 +2163,35 @@ class EsOpinionsIndexingTest(
         docket.delete()
         opinion_cluster.delete()
 
+    def test_remove_control_chars_on_text_indexing(self) -> None:
+        """Confirm control chars are removed at indexing time."""
+
+        o_c = OpinionClusterFactory.create(
+            case_name_full="Testing v. Cluster",
+            date_filed=datetime.date(2034, 8, 14),
+            slug="case-name-cluster",
+            precedential_status="Errata",
+            docket=self.docket,
+        )
+        o = OpinionFactory.create(
+            author=self.person,
+            plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+            cluster=o_c,
+            type="020lead",
+        )
+        o_2 = OpinionFactory.create(
+            author=self.person,
+            html="<p>Lorem html ipsum control chars \x07\x08\x0B.</p>",
+            cluster=o_c,
+            type="020lead",
+        )
+
+        o_doc = OpinionDocument.get(id=ES_CHILD_ID(o.pk).OPINION)
+        self.assertEqual(o_doc.text, "Lorem ipsum control chars .")
+        o_2_doc = OpinionDocument.get(id=ES_CHILD_ID(o_2.pk).OPINION)
+        self.assertEqual(o_2_doc.text, "Lorem html ipsum control chars .")
+        o_c.docket.delete()
+
 
 class OpinionFeedTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
@@ -2477,3 +2500,73 @@ class OpinionFeedTest(
             )
         except Exception as e:
             self.fail(f"Could not call get_feed(): {e}")
+
+    def test_cleanup_control_characters_for_xml_rendering(self) -> None:
+        """Can we clean up control characters in the text for a proper XML
+        rendering?
+        """
+        with mock.patch(
+            "cl.search.documents.escape",
+            return_value="Lorem ipsum control chars \x07\x08\x0B.",
+        ), self.captureOnCommitCallbacks(execute=True):
+            court = CourtFactory(
+                id="ca1_test",
+                jurisdiction="FB",
+            )
+            o_c = OpinionClusterFactoryWithChildrenAndParents(
+                date_filed=datetime.date(2020, 8, 15),
+                docket=DocketFactory(court=court, docket_number="123456"),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                syllabus="some rando syllabus",
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    plain_text="Lorem ipsum control chars \x07\x08\x0B.",
+                ),
+            )
+
+        # Opinions Search Feed
+        params = {
+            "q": "Lorem ipsum control chars",
+            "type": SEARCH_TYPES.OPINION,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entry_summary = "//atom:entry/atom:summary"
+
+        # Confirm the summary is properly rendered without control chars.
+        # And without highlighting
+        expected_summary = "Lorem ipsum control chars ."
+        actual_summary = xml_tree.xpath(entry_summary, namespaces=namespaces)[
+            0
+        ].text
+        self.assertIn(expected_summary, actual_summary)
+
+        # Jurisdiction Feed
+        response = self.client.get(
+            reverse("jurisdiction_feed", kwargs={"court": court.pk})
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        entry_summary = "//atom:entry/atom:summary"
+
+        # Confirm the summary is properly rendered without control chars.
+        # And without highlighting
+        expected_summary = "Lorem ipsum control chars ."
+        actual_summary = xml_tree.xpath(entry_summary, namespaces=namespaces)[
+            0
+        ].text
+        self.assertIn(expected_summary, actual_summary)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            o_c.delete()

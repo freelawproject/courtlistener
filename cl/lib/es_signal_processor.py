@@ -1,10 +1,10 @@
 from functools import partial
 
 from celery.canvas import chain
-from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist, ObjectDoesNotExist
 from django.db import transaction
 from django.db.models.signals import m2m_changed, post_delete, post_save
+from model_utils.tracker import FieldInstanceTracker
 
 from cl.alerts.tasks import (
     process_percolator_response,
@@ -36,11 +36,8 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
-    OpinionsCited,
-    OpinionsCitedByRECAPDocument,
     ParentheticalGroup,
     RECAPDocument,
-    bulk_create_signal,
 )
 from cl.search.tasks import (
     es_save_document,
@@ -59,6 +56,56 @@ def compose_app_label(instance: ESModelType) -> str:
     :return: A string combining the app label and the Model class name.
     """
     return f"{instance._meta.app_label}.{instance.__class__.__name__}"
+
+
+def check_fields_that_changed(
+    current_instance: ESModelType,
+    tracked_set: FieldInstanceTracker,
+    previous_instance: ESModelType | None = None,
+) -> list[str]:
+    """Identify which fields have changed between two instances of a model or
+    between an instance and its previous state.
+
+    :param current_instance: The current instance of the model to check for
+    changes.
+    :param tracked_set: An instance of FieldInstanceTracker for tracking field
+    changes.
+    :param previous_instance: Optional the previous instance of the model to
+    compare against. If None, the function compares against the tracked
+    previous values.
+    :return: A list of strings representing the names of the fields that have
+    changed.
+    """
+    changed_fields = []
+    for field in tracked_set.fields:
+        current_value = getattr(current_instance, field)
+        if previous_instance:
+            previous_value = getattr(previous_instance, field)
+        else:
+            previous_value = tracked_set.previous(field)
+        try:
+            # If field is a ForeignKey relation, the current value is the
+            # related object, while the previous value is the ID, get the id.
+            # See https://django-model-utils.readthedocs.io/en/latest/utilities.html#field-tracker
+            field_type = current_instance.__class__._meta.get_field(field)
+            if (
+                field_type.get_internal_type() == "ForeignKey"
+                and current_value
+                and not field.endswith("_id")
+            ):
+                current_value = current_value.pk
+        except FieldDoesNotExist:
+            # Support tracking for properties, only abort if it's not a model
+            # property
+            if not hasattr(current_instance, field) and not isinstance(
+                getattr(current_instance.__class__, field, None), property
+            ):
+                continue
+
+        if current_value != previous_value:
+            changed_fields.append(field)
+
+    return changed_fields
 
 
 def updated_fields(
@@ -89,30 +136,7 @@ def updated_fields(
         return []
 
     # Check each tracked field to see if it has changed
-    changed_fields = []
-    for field in tracked_set.fields:
-        current_value = getattr(instance, field)
-        try:
-            # If field is a ForeignKey relation, the current value is the
-            # related object, while the previous value is the ID, get the id.
-            # See https://django-model-utils.readthedocs.io/en/latest/utilities.html#field-tracker
-            field_type = instance.__class__._meta.get_field(field)
-            if (
-                field_type.get_internal_type() == "ForeignKey"
-                and current_value
-                and not field.endswith("_id")
-            ):
-                current_value = current_value.pk
-        except FieldDoesNotExist:
-            # Support tracking for properties, only abort if it's not a model
-            # property
-            if not hasattr(instance, field) and not isinstance(
-                getattr(instance.__class__, field, None), property
-            ):
-                continue
-
-        if current_value != tracked_set.previous(field):
-            changed_fields.append(field)
+    changed_fields = check_fields_that_changed(instance, tracked_set)
     return changed_fields
 
 
@@ -649,9 +673,6 @@ class ESSignalProcessor:
         models_reverse_foreign_key_delete = list(
             self.documents_model_mapping["reverse-delete"].keys()
         )
-        models_bulk_create = list(
-            self.documents_model_mapping["bulk-create"].keys()
-        )
         main_model = self.main_model.__name__.lower()
 
         # Connect signals for save
@@ -686,14 +707,6 @@ class ESSignalProcessor:
             self.handle_reverse_actions_delete,
             {
                 post_delete: f"update_reverse_related_{main_model}_on_delete",
-            },
-        )
-        # Connect signals for bulk-create keys
-        self.connect_signals(
-            models_bulk_create,
-            self.handle_bulk_create,
-            {
-                bulk_create_signal: f"update_bulk_create_{main_model}",
             },
         )
 
@@ -834,41 +847,6 @@ class ESSignalProcessor:
                 query_string,
                 affected_fields,
                 fields_map,
-            )
-
-    @elasticsearch_enabled
-    def handle_bulk_create(self, sender, instances=None, **kwargs):
-        """Receiver function that gets called after a bulk_create_with_signal
-        action.
-        """
-
-        if not instances:
-            return
-        instance = instances[0]
-        match instance:
-            case OpinionsCitedByRECAPDocument() if self.es_document is ESRECAPDocument:  # type: ignore
-                if not settings.ELASTICSEARCH_RECAP_CITES_ENABLED:
-                    # Disable indexing the ESRECAPDocument cites field until
-                    # the required mapping changes are landed in production.
-                    return
-                main_object = instances[0].citing_document
-            case OpinionsCited() if self.es_document is OpinionDocument:  # type: ignore
-                main_object = instances[0].citing_opinion
-            case _:
-                return
-
-        mapping_fields = self.documents_model_mapping["bulk-create"][sender]
-        for query_string, fields_map in mapping_fields.items():
-            affected_fields = fields_map["all"]
-            transaction.on_commit(
-                partial(
-                    update_es_document.delay,
-                    self.es_document.__name__,
-                    affected_fields,
-                    (compose_app_label(main_object), main_object.pk),
-                    None,
-                    None,
-                )
             )
 
     @elasticsearch_enabled

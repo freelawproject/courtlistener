@@ -47,7 +47,9 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
 
 
 def chunks(iterable, chunk_size: int):
-    """Like the chunks function, but the iterable can be a generator.
+    """Warning: If you're considering using this method, you might want to
+    consider using itertools.batched instead.
+    Like the chunks function, but the iterable can be a generator.
 
     Note that the chunks must be *consumed* for it to work properly. Usually
     that means converting them to a list in your loop.
@@ -291,3 +293,94 @@ def cleanup_main_query(query_string: str) -> str:
     # reintegrate them into the original query.
     final_query = modify_court_id_queries(cleaned_query)
     return final_query
+
+
+def check_for_proximity_tokens(query: str) -> bool:
+    """Check whether the query contains an unrecognized proximity token from
+    other common search providers.
+
+    :param query: The input query string
+    :return: True if the query contains an unrecognized proximity token.
+    Otherwise False
+    """
+
+    return "/s" in query or "/p" in query
+
+
+def check_unbalanced_parenthesis(query: str) -> bool:
+    """Check whether the query string has unbalanced opening or closing
+    parentheses.
+
+    :param query: The input query string
+    :return: True if the query contains unbalanced parenthesis. Otherwise False
+    """
+    opening_count = query.count("(")
+    closing_count = query.count(")")
+
+    return opening_count != closing_count
+
+
+def check_unbalanced_quotes(query: str) -> bool:
+    """Check whether the query string has unbalanced quotes.
+
+    :param query: The input query string
+    :return: True if the query contains unbalanced quotes. Otherwise False
+    """
+    quotes_count = query.count('"')
+    return quotes_count % 2 != 0
+
+
+def remove_last_symbol_occurrence(
+    query: str, symbol_count: int, symbol: str
+) -> tuple[str, int]:
+    """Remove the last occurrence of a specified symbol from a query string and
+     update the symbol count.
+
+    :param query: The query string.
+    :param symbol_count: The current count of the symbol in the query.
+    :param symbol: The symbol to be removed from the query.
+    :return: A tuple containing the updated query string and the updated symbol
+     count.
+    """
+    # Find last unclosed symbol position.
+    last_symbol_pos = query.rfind(symbol)
+    # Remove the last symbol from the query.
+    query = query[:last_symbol_pos] + query[last_symbol_pos + 1 :]
+    # Update the symbol count.
+    symbol_count -= 1
+    return query, symbol_count
+
+
+def sanitize_unbalanced_parenthesis(query: str) -> str:
+    """Sanitize a query by removing unbalanced opening or closing parentheses.
+
+    :param query: The input query string
+    :return: The sanitized query string, after removing unbalanced parentheses.
+    """
+    opening_count = query.count("(")
+    closing_count = query.count(")")
+    while opening_count > closing_count:
+        # Find last unclosed opening parenthesis position
+        query, opening_count = remove_last_symbol_occurrence(
+            query, opening_count, "("
+        )
+    while closing_count > opening_count:
+        # Find last unclosed closing parenthesis position
+        query, closing_count = remove_last_symbol_occurrence(
+            query, closing_count, ")"
+        )
+    return query
+
+
+def sanitize_unbalanced_quotes(query: str) -> str:
+    """Sanitize a query by removing unbalanced quotes.
+
+    :param query: The input query string
+    :return: The sanitized query string, after removing unbalanced quotes.
+    """
+    quotes_count = query.count('"')
+    while quotes_count % 2 != 0:
+        query, quotes_count = remove_last_symbol_occurrence(
+            query, quotes_count, '"'
+        )
+    return query
