@@ -197,7 +197,7 @@ class OpinionClusterFactoryWithChildrenAndParents(
         OpinionWithChildrenFactory,
         factory_related_name="cluster",
     )
-    precedential_status = ("Published", "Precedential")  # Always precedential
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
 
 
 class OpinionClusterWithParentsFactory(

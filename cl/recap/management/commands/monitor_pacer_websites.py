@@ -10,7 +10,7 @@ from cl.search.models import Court
 
 
 @retry(requests.RequestException, tries=2, backoff=1)
-def check_and_log_url(session, url, timeout=10):
+def check_and_log_url(session: requests.Session, url: str, timeout: int = 10):
     """Check if a URL is accessible by sending it a GET request
 
     :param session: A requests.Session object
@@ -48,14 +48,14 @@ def check_if_global_outage(session, url, timeout=5):
     return response
 
 
-def make_simple_url(court):
+def make_simple_url(court) -> str:
     if court.pk == "cavc":
         return "https://efiling.uscourts.cavc.gov/"
     else:
         return f"https://ecf.{map_cl_to_pacer_id(court.pk)}.uscourts.gov/"
 
 
-def down_for_only_me(session, url):
+def down_for_only_me(session: requests.Session, url: str) -> bool:
     """Check if a URL is down just our server, or globally
 
     :return: True if the url is only down for me, or False if entirely up or
@@ -113,6 +113,6 @@ class Command(VerboseCommand):
     )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         courts = Court.federal_courts.all_pacer_courts()
         iterate_and_log_courts(courts)

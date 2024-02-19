@@ -8,7 +8,9 @@ if TESTING:
     ELASTICSEARCH_DISABLED = True
     ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = False
     ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = False
-    ELASTICSEARCH_RECAP_CITES_ENABLED = True
+    ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = True
+    ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED = True
+    ES_HIGHLIGHTER = "fvh"
 else:
     ELASTICSEARCH_DISABLED = env(
         "ELASTICSEARCH_DISABLED",
@@ -22,11 +24,18 @@ else:
         "ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED",
         default=False,
     )
-    ELASTICSEARCH_RECAP_CITES_ENABLED = env(
-        "ELASTICSEARCH_RECAP_CITES_ENABLED",
-        default=False,
+    ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = env(
+        "ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED",
+        default=True,
     )
-
+    ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED = env(
+        "ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED",
+        default=True,
+    )
+    ES_HIGHLIGHTER = env(
+        "ES_HIGHLIGHTER",
+        default="fvh",
+    )
 #
 # Connection settings
 #
@@ -48,7 +57,7 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
-ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=200)
+ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=3500)
 
 base_connection_params = {
     "hosts": ELASTICSEARCH_DSL_HOST,
@@ -95,7 +104,6 @@ ELASTICSEARCH_DSL = {
                 "tokenizer": "whitespace",
                 "filter": [
                     "lowercase",
-                    "synonym_filter",
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",
                     "english_stop",
@@ -183,6 +191,14 @@ ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS = env(
     "ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS", default=0
 )
 
+# Opinions Search index shards and replicas
+ELASTICSEARCH_OPINION_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_OPINION_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS", default=0
+)
+
 # ES Auto refresh. In production, it's suggested to wait for ES periodically
 # refresh (every ~1 second) since it's a resource-intensive operation.
 # This setting is overridden for testing.
@@ -191,10 +207,11 @@ ELASTICSEARCH_DSL_AUTO_REFRESH = env(
     "ELASTICSEARCH_DSL_AUTO_REFRESH", default=True
 )
 
-####################################
-# Percolator batch size for Alerts #
-####################################
-PERCOLATOR_PAGE_SIZE = 100
+#############################################################
+# Batch size for Elasticsearch queries utilizing pagination #
+# such as Percolator              #
+#############################################################
+ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 
 ###################################################
 # The maximum number of scheduled hits per alert. #

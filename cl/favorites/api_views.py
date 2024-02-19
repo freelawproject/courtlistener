@@ -11,7 +11,7 @@ from cl.favorites.models import DocketTag, UserTag
 
 
 class UserTagViewSet(ModelViewSet):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     serializer_class = UserTagSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = UserTagFilter
@@ -32,7 +32,7 @@ class UserTagViewSet(ModelViewSet):
 class DocketTagViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsTagOwner]
     serializer_class = DocketTagSerializer
-    filter_class = DocketTagFilter
+    filterset_class = DocketTagFilter
     pagination_class = MediumAdjustablePagination
 
     def get_queryset(self):

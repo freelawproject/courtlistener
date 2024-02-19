@@ -16,6 +16,7 @@ Once located, we update items:
  - votes_majority & votes_minority
  - decision_direction
 """
+
 import csv
 import string
 from datetime import datetime
@@ -64,7 +65,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.debug = options["debug"]
         self.file = options["file"]
         self.skip_human_review = options["skip_human_review"]

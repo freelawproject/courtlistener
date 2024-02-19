@@ -47,7 +47,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.options = options
         time_now = datetime.now()
         recipients = get_welcome_recipients(time_now)

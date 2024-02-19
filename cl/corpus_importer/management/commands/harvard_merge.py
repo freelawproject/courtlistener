@@ -661,15 +661,15 @@ def map_and_merge_opinions(
                     xml_harvard=str(op),
                     cluster_id=cluster.id,
                     type=opinion_type,
-                    author_str=titlecase(
-                        find_just_name(author.text.strip(":"))
-                    )
-                    if author
-                    else "",
+                    author_str=(
+                        titlecase(find_just_name(author.text.strip(":")))
+                        if author
+                        else ""
+                    ),
                 )
             else:
                 raise OpinionTypeException(
-                    f"Harvard opinion has no type "
+                    "Harvard opinion has no type "
                     f"attribute: {cluster.filepath_json_harvard}"
                 )
     else:

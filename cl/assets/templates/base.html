@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
 
   {% block meta %}
-  <meta name="description" content="{% block description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
+  <meta name="description" content="{% block description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}"/>
 
   {# Open Search Plugin #}
   <link rel="search"
@@ -18,7 +18,7 @@
 
   {# MS Application Icons #}
   <meta name="application-name" content="CourtListener"/>
-  <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest court opinions."/>
+  <meta name="msapplication-tooltip" content="Create alerts, search for and browse the latest case law."/>
   <meta name="msapplication-starturl" content="https://www.courtlistener.com"/>
   <meta name="msapplication-navbutton-color" content="#6683B7"/>
 
@@ -31,7 +31,7 @@
   <meta property="og:type" content="website"/>
   <meta property="og:title" content="{% block og_title %}CourtListener{% endblock %}"/>
   <meta property="og:description"
-        content="{% block og_description %}Create alerts, search for and browse the latest court opinions, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
+        content="{% block og_description %}Create alerts, search for and browse the latest case law, PACER documents, judges, and oral arguments. Updated automatically with the latest court documents. An initiative of Free Law Project.{% endblock %}">
   <meta property="og:url" content="{% block og_url %}{% get_full_host %}{{ request.path }}{% endblock %}"/>
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
@@ -98,16 +98,12 @@
   <header class="row">
     <!-- Donate Banner -->
     {% if FUNDRAISING_MODE and not request.COOKIES.no_banner %}
-    <div class="navbar navbar-default subnav alert-danger alert-dismissible" role="navigation">
+    <div class="navbar navbar-default subnav alert-info alert-dismissible" role="navigation">
       <div class="container-fluid">
         <div class="row">
           <div class="col-xs-12 col-md-9 col-lg-10">
             <div class="navbar-text lead">
-              <p>CourtListener is hosted by Free Law Project, the leading nonprofit using data, technology, and advocacy to make the legal system more equitable.</p>
-              <p>We host some of the world's largest open legal databases to ensure that you can access, study, and improve the American legal system.<p>
-              <p>Your support will enhance our collections and improve accessibility.</p>
-              <p>Please make your donation today. Any contribution helps, whether it is $5 or $500.</p>
-              <p>Thank you.</p>
+              <p>&#127873; A year in the making, today we are launching a huge new search engine for the RECAP Archive.</p>
             </div>
           </div>
           <div class="col-xs-12 col-md-3 col-lg-2">
@@ -115,7 +111,7 @@
               <div class="col-xs-12">
                 <button type="button" class="close"
                         data-cookie-name="no_banner"
-                        data-duration="5"
+                        data-duration="20"
                         aria-label="Close">
                     <span aria-hidden="true"
                           class="x-large">&times;</span></button>
@@ -124,8 +120,8 @@
             <div class="row">
               <div class="col-xs-12">
                 <p class="right">
-                  <a href="https://donate.free.law/forms/23eoy"
-                     class="btn btn-danger btn-lg v-offset-above-1"><i class="fa fa-heart-o"></i>&nbsp;Donate Now</a>
+                  <a href="https://free.law/2024/01/18/new-recap-archive-search-is-live"
+                     class="btn btn-primary btn-lg v-offset-above-1"><i class="fa fa-search"></i>&nbsp;Learn More</a>
                 </p>
               </div>
             </div>
@@ -200,15 +196,16 @@
                     <li><a href="{% url "tag_list" username=user.username %}"
                            tabindex="205"><i class="fa fa-tags gray fa-fw"></i>&nbsp;Tags</a></li>
                     <li class="divider"></li>
-                    <li><a href="{% url "profile_donations" %}"
-                           tabindex="206"><i class="fa fa-money gray fa-fw"></i>&nbsp;Donations</a></li>
+                    <li><a href="{% url "profile_your_support" %}"
+                           tabindex="206"><i class="fa fa-money gray fa-fw"></i>&nbsp;Your Support</a></li>
                     <li><a href="{% url "view_settings" %}"
                            tabindex="207"><i class="fa fa-user gray fa-fw"></i>&nbsp;Account</a></li>
                     <li>
                       <form id="logout-form" method="post" action="/sign-out/">
                         {% csrf_token %}
-                        <i class="fa fa-sign-out gray fa-fw"></i>
-                        <button type="submit" class="btn btn-link" tabindex="208">&nbsp;Sign out</button>
+                        <button type="submit" class="btn btn-link" tabindex="208">
+                          <i class="fa fa-sign-out gray fa-fw"></i>&nbsp;Sign out
+                        </button>
                       </form>
                     </li>
                   </ul>
@@ -219,8 +216,8 @@
                 <li><a href="https://free.law/about/" tabindex="200">About</a></li>
                 <li><a href="{% url "faq" %}" tabindex="201">FAQ</a></li>
                 <li class="visible-xs">
-                  <a href="{% url "donate" %}?referrer=navbar"
-                     tabindex="203">Donate</a>
+                  <a href="https://donate.free.law/forms/membership"
+                     tabindex="203">Become a Member</a>
                 </li>
                 <li><a href="{% url "sign-in" %}"
                        tabindex="205">Sign in / Register</a></li>
@@ -244,12 +241,12 @@
               <a href="#"
                  class="dropdown-toggle"
                  tabindex="100"
-                 data-toggle="dropdown">Opinions&nbsp;<span
+                 data-toggle="dropdown">Case Law&nbsp;<span
                 class="caret"></span>
               </a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_o" %}" tabindex="101">Opinions Search</a>
+                  <a href="{% url "advanced_o" %}" tabindex="101">Case Law Search</a>
                 </li>
                 {% flag "parenthetical-search" %}
                   <li>
@@ -281,7 +278,7 @@
           <ul class="nav navbar-nav navbar-right">
             <li
               class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
-              <a href="{% url "donate" %}?referrer=navbar-v2"
+              <a href="https://donate.free.law/forms/membership"
                  tabindex="109"
                  class="donate"><i class="fa fa-heart-o"></i>&nbsp;Donate</a>
             </li>
@@ -310,30 +307,18 @@
   </div>
 
   {% block newsletter %}
-    {% if user.is_anonymous or user.is_authenticated and not user.profile.wants_newsletter %}
     <div class="row base-newsletter hidden-print">
       <div class="col-sm-6">
         <p class="bold bottom">Newsletter</p>
         <p>Sign up to receive the Free Law Project newsletter with tips and announcements.</p>
       </div>
       <div class="col-sm-6 right">
-        <form action="https://freelawproject.m-pages.com/free-law-project-newsletter"
-          method="get" target="_blank" class="form-inline">
-          <div class="form-group">
-            <input name="EMAIL" class="form-control" id="mce-EMAIL"
-                   type="email" placeholder="Email Address"
-                   value="{{ user.email|default:"" }}">
-          </div>
-          <!-- Honey pot -->
-          <div style="position: absolute; left: -5000px;" aria-hidden="true">
-            <input name="b_4ea266fe7d0d074abd3f6a2ae_ba547fa86b" tabindex="-1"
-                   value="" type="text">
-          </div>
-          <button type="submit" class="btn btn-default"><i class="fa fa-newspaper-o"></i>&nbsp;Subscribe</button>
-        </form>
+        <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?forwardedFromSecureDomain=1&subscription=9"
+          class="btn btn-default">
+          <i class="fa fa-newspaper-o"></i>&nbsp;Subscribe
+        </a>
       </div>
     </div>
-    {% endif %}
   {% endblock %}
 
   {% block footer %}
@@ -349,7 +334,7 @@
               <a href="{% url "help_home" %}">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "donate" %}?referrer=footer-link">Donate</a>
+              <a href="https://donate.free.law/forms/membership">Donate</a>
             </div>
           </div>
 
@@ -408,7 +393,7 @@
       </div>
     </div>
     <div class="col-sm-4 text-right" id="donate-image">
-      <a href="{% url "donate" %}?referrer=footer-button">
+      <a href="https://donate.free.law/forms/membership">
         <img src="{% static "png/donate-button.png" %}"
              alt="Donate to support our work"
              height="75"
@@ -464,7 +449,7 @@
 <script type="text/javascript" src="{% static "js/base.js" %}"></script>
 <script type="text/javascript" nonce="{{ request.csp_nonce }}">
   {# Default values are to ensure JS parsing even if 500 error thrown #}
-  var totalDonatedLastYear = parseFloat({{ user.profile.total_donated_last_year|safe|default:0}}),
+  var isMember = {{ user.profile.is_member|yesno:"true,false" }},
       userAlertCount = {{ user.docket_alerts.subscriptions.count|default:"0" }},
       priceRtAlerts = parseFloat({{ MIN_DONATION.rt_alerts|default:0 }}),
       maxFreeDocketAlerts = {{ MAX_FREE_DOCKET_ALERTS|default:0 }},

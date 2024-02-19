@@ -17,6 +17,7 @@ manage.py columbia_merge --debug --csv-file /opt/courtlistener/cl/assets/media/t
 
 
 """
+
 import os.path
 import re
 from difflib import SequenceMatcher
@@ -254,9 +255,11 @@ def map_and_merge_opinions(
                 per_curiam=op["per_curiam"],
                 cluster_id=cluster_id,
                 type=opinion_type,
-                author_str=titlecase(find_just_name(author.strip(":")))
-                if author
-                else "",
+                author_str=(
+                    titlecase(find_just_name(author.strip(":")))
+                    if author
+                    else ""
+                ),
             )
 
             logger.info(f"Opinion created for cluster: {cluster_id}")
@@ -450,9 +453,9 @@ def process_cluster(
         "file": filepath,
         "attorneys": attorneys,
         "citations": fetch_simple_tags(soup, "citation"),
-        "docket_number": clean_docket_number(docket_number)
-        if docket_number
-        else None,
+        "docket_number": (
+            clean_docket_number(docket_number) if docket_number else None
+        ),
         "panel": extract_judge_last_name(panel_tags),
         "posture": posture,
         "case_name": format_case_name(reporter_captions),

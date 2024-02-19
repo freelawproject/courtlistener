@@ -3,6 +3,7 @@ import datetime
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
 from django.http import (
@@ -11,7 +12,8 @@ from django.http import (
     HttpResponseNotAllowed,
     HttpResponseRedirect,
 )
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import aget_object_or_404
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
@@ -32,20 +34,21 @@ from cl.visualizations.utils import build_visualization, message_dict
 SCDB_LATEST_CASE = datetime.datetime(2019, 6, 27)
 
 
-def render_visualization_page(
+async def render_visualization_page(
     request: HttpRequest,
     pk: int,
     embed: bool,
 ) -> HttpResponse:
-    viz = get_object_or_404(SCOTUSMap, pk=pk)
-    increment_view_count(viz, request)
+    viz = await aget_object_or_404(SCOTUSMap, pk=pk)
+    await increment_view_count(viz, request)
 
     status = None
     if viz.deleted:
         status = statuses.HTTP_410_GONE
         title = "Visualization Deleted by Creator"
     else:
-        if viz.published is False and viz.user != request.user:
+        user = await User.objects.aget(pk=viz.user_id)
+        if viz.published is False and user != await request.auser():
             # Not deleted, private and not the owner
             status = statuses.HTTP_401_UNAUTHORIZED
             title = "Private Visualization"
@@ -57,7 +60,7 @@ def render_visualization_page(
             # Log the referer if it's set, and the item is live.
             referer_url = request.META.get("HTTP_REFERER")
             if referer_url is not None:
-                referer, created = Referer.objects.get_or_create(
+                referer, created = await Referer.objects.aget_or_create(
                     url=referer_url, map_id=viz.pk
                 )
                 if created:
@@ -66,7 +69,7 @@ def render_visualization_page(
         template = "visualization_embedded.html"
     else:
         template = "visualization.html"
-    return render(
+    return TemplateResponse(
         request,
         template,
         {"viz": viz, "title": title, "private": False},
@@ -75,27 +78,31 @@ def render_visualization_page(
 
 
 @xframe_options_exempt
-def view_embedded_visualization(request: HttpRequest, pk: int) -> HttpResponse:
+async def view_embedded_visualization(
+    request: HttpRequest, pk: int
+) -> HttpResponse:
     """Return the embedded network page.
 
     Exempts the default xframe options, and allows standard caching.
     """
-    return render_visualization_page(request, pk, embed=True)
+    return await render_visualization_page(request, pk, embed=True)
 
 
 @never_cache
-def view_visualization(
+async def view_visualization(
     request: HttpRequest,
     pk: int,
     slug: str,
 ) -> HttpResponse:
     """Return the network page."""
-    return render_visualization_page(request, pk, embed=False)
+    return await render_visualization_page(request, pk, embed=False)
 
 
+@sync_to_async
 @login_required
+@async_to_sync
 @never_cache
-def new_visualization(request: HttpRequest) -> HttpResponse:
+async def new_visualization(request: HttpRequest) -> HttpResponse:
     demo_viz = (
         SCOTUSMap.objects.filter(published=True, deleted=False)
         .annotate(Count("clusters"))
@@ -115,7 +122,7 @@ def new_visualization(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = VizForm(request.POST)
         context["form"] = form
-        if form.is_valid():
+        if await sync_to_async(form.is_valid)():
             # Process the data in form.cleaned_data
             cd = form.cleaned_data
             start, end = reverse_endpoints_if_needed(
@@ -129,15 +136,17 @@ def new_visualization(request: HttpRequest) -> HttpResponse:
                 title=cd["title"],
                 notes=cd["notes"],
             )
-            status, viz = build_visualization(viz)
+            status, viz = await build_visualization(viz)
             if status == "too_many_nodes":
                 msg = message_dict[status]
                 messages.add_message(request, msg["level"], msg["message"])
-                return render(request, "new_visualization.html", context)
+                return TemplateResponse(
+                    request, "new_visualization.html", context
+                )
             elif status == "too_few_nodes":
                 msg = message_dict[status]
                 messages.add_message(request, msg["level"], msg["message"])
-                return render(
+                return TemplateResponse(
                     request,
                     "new_visualization.html",
                     {"form": form, "private": True},
@@ -151,22 +160,24 @@ def new_visualization(request: HttpRequest) -> HttpResponse:
             )
     else:
         context["form"] = VizForm()
-    return render(request, "new_visualization.html", context)
+    return TemplateResponse(request, "new_visualization.html", context)
 
 
+@sync_to_async
 @login_required
-def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
+@async_to_sync
+async def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
     # This could apparently also be done with formsets? But they seem awful.
-    viz = get_object_or_404(SCOTUSMap, pk=pk, user=request.user)
+    viz = await aget_object_or_404(SCOTUSMap, pk=pk, user=request.user)
     if request.method == "POST":
         form_viz = VizEditForm(request.POST, instance=viz)
-        if form_viz.is_valid():
+        if await sync_to_async(form_viz.is_valid)():
             cd_viz = form_viz.cleaned_data
 
             viz.title = cd_viz["title"]
             viz.notes = cd_viz["notes"]
             viz.published = cd_viz["published"]
-            viz.save()
+            await viz.asave()
 
             return HttpResponseRedirect(
                 reverse(
@@ -176,7 +187,7 @@ def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
             )
     else:
         form_viz = VizEditForm(instance=viz)
-    return render(
+    return TemplateResponse(
         request,
         "edit_visualization.html",
         {"form_viz": form_viz, "private": True},
@@ -256,9 +267,9 @@ async def privatize_visualization(request: HttpRequest) -> HttpResponse:
         )
 
 
-def mapper_homepage(request: HttpRequest) -> HttpResponse:
+async def mapper_homepage(request: HttpRequest) -> HttpResponse:
     if not is_bot(request):
-        tally_stat("visualization.scotus_homepage_loaded")
+        await tally_stat("visualization.scotus_homepage_loaded")
 
     visualizations = (
         SCOTUSMap.objects.filter(published=True, deleted=False)
@@ -270,7 +281,7 @@ def mapper_homepage(request: HttpRequest) -> HttpResponse:
         .order_by("-date_published", "-date_modified", "-date_created")[:2]
     )
 
-    return render(
+    return TemplateResponse(
         request,
         "visualization_home.html",
         {"visualizations": visualizations, "private": False},
@@ -278,7 +289,7 @@ def mapper_homepage(request: HttpRequest) -> HttpResponse:
 
 
 @never_cache
-def gallery(request: HttpRequest) -> HttpResponse:
+async def gallery(request: HttpRequest) -> HttpResponse:
     visualizations = (
         SCOTUSMap.objects.filter(published=True, deleted=False)
         .annotate(Count("clusters"))
@@ -287,12 +298,12 @@ def gallery(request: HttpRequest) -> HttpResponse:
     paginator = Paginator(visualizations, 5)
     page = request.GET.get("page", 1)
     try:
-        paged_vizes = paginator.page(page)
+        paged_vizes = await sync_to_async(paginator.page)(page)
     except PageNotAnInteger:
-        paged_vizes = paginator.page(1)
+        paged_vizes = await sync_to_async(paginator.page)(1)
     except EmptyPage:
-        paged_vizes = paginator.page(paginator.num_pages)
-    return render(
+        paged_vizes = await sync_to_async(paginator.page)(paginator.num_pages)
+    return TemplateResponse(
         request,
         "gallery.html",
         {"results": paged_vizes, "private": False},

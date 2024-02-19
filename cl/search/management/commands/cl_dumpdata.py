@@ -1,6 +1,7 @@
 """
     Hopefully this makes slicing out production data simpler.
 """
+
 import calendar
 import random
 import time
@@ -19,7 +20,7 @@ class Command(VerboseCommand):
     help = "CL-specific data dumper for making fixtures from production"
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -33,7 +34,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         n = options["n"]
         fmt = options["format"]
 
@@ -67,7 +68,7 @@ class Command(VerboseCommand):
                 traceback.print_exc()
 
     @staticmethod
-    def _select_pks(sample_size):
+    def _select_pks(sample_size: int):
         """
         Select a random sampling of Opinions from the database.
 

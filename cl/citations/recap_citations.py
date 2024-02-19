@@ -9,8 +9,9 @@ from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
-from cl.lib.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import OpinionsCitedByRECAPDocument, RECAPDocument
+from cl.search.tasks import index_related_cites_fields
 
 
 def store_recap_citations(document: RECAPDocument) -> None:
@@ -57,6 +58,10 @@ def store_recap_citations(document: RECAPDocument) -> None:
             for opinion_object, cits in citation_resolutions.items()
         ]
 
-        OpinionsCitedByRECAPDocument.objects.bulk_create_with_signal(
-            objects_to_create
-        )
+        OpinionsCitedByRECAPDocument.objects.bulk_create(objects_to_create)
+
+    # Update changes in ES.
+    index_related_cites_fields.delay(
+        OpinionsCitedByRECAPDocument.__name__,
+        document.pk,
+    )

@@ -225,9 +225,11 @@ def save_disclosure(extracted_data: dict, disclosure) -> None:
                 redacted=any(v["is_redacted"] for v in debt.values()),
                 creditor_name=debt["Creditor"]["text"],
                 description=debt["Description"]["text"],
-                value_code=debt["Value Code"]["text"]
-                if debt["Value Code"]["text"] != "None"
-                else "",
+                value_code=(
+                    debt["Value Code"]["text"]
+                    if debt["Value Code"]["text"] != "None"
+                    else ""
+                ),
             )
             for debt in extracted_data["sections"]["Liabilities"]["rows"]
         ]
