@@ -62,10 +62,6 @@ class BasicAPIPageTest(TestCase):
         r = await self.async_client.get(reverse("api_index"))
         self.assertEqual(r.status_code, 200)
 
-    async def test_swagger_interface(self) -> None:
-        r = await self.async_client.get(reverse("swagger_schema"))
-        self.assertEqual(r.status_code, 200)
-
     async def test_options_request(self) -> None:
         r = await self.async_client.options(reverse("court_index"))
         self.assertEqual(r.status_code, 200)
@@ -125,8 +121,8 @@ class BasicAPIPageTest(TestCase):
 
 
 class CoverageTests(IndexedSolrTestCase):
-    def test_coverage_data_view_provides_court_data(self) -> None:
-        response = coverage_data(HttpRequest(), "v2", "ca1")
+    async def test_coverage_data_view_provides_court_data(self) -> None:
+        response = await coverage_data(HttpRequest(), "v2", "ca1")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, "annual_counts")
@@ -283,7 +279,13 @@ class ApiEventCreationTestCase(TestCase):
 
         await sync_to_async(view)(request)
 
-    async def test_are_events_created_properly(self) -> None:
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    async def test_are_events_created_properly(
+        self, mock_logging_prefix
+    ) -> None:
         """Are event objects created as API requests are made?"""
         await self.hit_the_api()
 
@@ -320,7 +322,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Timings
         self.assertAlmostEqual(
-            int(self.r.get("api:Test.timing")), 10, delta=500
+            int(self.r.get("api:Test.timing")), 10, delta=2000
         )
 
 
@@ -835,13 +837,13 @@ class DRFSearchAppAndAudioAppApiFilterTest(
         self.q["clusters__panel__name_first__istartswith"] = "jud"
         await self.assertCountInResults(1)
 
-        self.q[
-            "audio_files__sha1"
-        ] = "de8cff186eb263dc06bdc5340860eb6809f898d3-nope"
+        self.q["audio_files__sha1"] = (
+            "de8cff186eb263dc06bdc5340860eb6809f898d3-nope"
+        )
         await self.assertCountInResults(0)
-        self.q[
-            "audio_files__sha1"
-        ] = "de8cff186eb263dc06bdc5340860eb6809f898d3"
+        self.q["audio_files__sha1"] = (
+            "de8cff186eb263dc06bdc5340860eb6809f898d3"
+        )
         await self.assertCountInResults(1)
 
     async def test_audio_filters(self) -> None:

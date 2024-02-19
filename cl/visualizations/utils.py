@@ -32,11 +32,11 @@ async def build_visualization(viz):
             g = await viz.build_nx_digraph(**build_kwargs)
         except TooManyNodes:
             # Still too many hops. Abort.
-            tally_stat("visualization.too_many_nodes_failure")
+            await tally_stat("visualization.too_many_nodes_failure")
             return "too_many_nodes", viz
 
     if len(g.edges()) == 0:
-        tally_stat("visualization.too_few_nodes_failure")
+        await tally_stat("visualization.too_few_nodes_failure")
         return "too_few_nodes", viz
 
     t2 = time.time()

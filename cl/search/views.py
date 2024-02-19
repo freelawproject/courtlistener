@@ -40,7 +40,6 @@ from cl.lib.elasticsearch_utils import (
     limit_inner_hits,
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
-    sanitize_unbalanced_parenthesis,
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
@@ -56,6 +55,10 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     regroup_snippets,
 )
+from cl.lib.utils import (
+    sanitize_unbalanced_parenthesis,
+    sanitize_unbalanced_quotes,
+)
 from cl.search.constants import RELATED_PATTERN
 from cl.search.documents import (
     AudioDocument,
@@ -64,7 +67,11 @@ from cl.search.documents import (
     ParentheticalGroupDocument,
     PersonDocument,
 )
-from cl.search.exception import UnbalancedQuery
+from cl.search.exception import (
+    BadProximityQuery,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
 from cl.search.forms import SearchForm, _clean_form
 from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
@@ -150,7 +157,7 @@ def do_search(
     # Add additional or overridden GET parameters
     if override_params:
         get_params.update(override_params)
-    search_form = SearchForm(get_params)
+    search_form = SearchForm(get_params, courts=courts)
 
     if search_form.is_valid():
         cd = search_form.cleaned_data
@@ -391,7 +398,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
         if len(request.GET) == 0:
             # No parameters --> Homepage.
             if not is_bot(request):
-                tally_stat("search.homepage_loaded")
+                async_to_sync(tally_stat)("search.homepage_loaded")
 
             # Ensure we get nothing from the future.
             mutable_GET = request.GET.copy()  # Makes it mutable
@@ -503,7 +510,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             else:
                 # Just a regular search
                 if not is_bot(request):
-                    tally_stat("search.results")
+                    async_to_sync(tally_stat)("search.results")
 
                 # Create bare-bones alert form.
                 alert_form = CreateAlertForm(
@@ -553,8 +560,11 @@ def advanced(request: HttpRequest) -> HttpResponse:
 
     # I'm not thrilled about how this is repeating URLs in a view.
     if request.path == reverse("advanced_o"):
+        courts = Court.objects.filter(in_use=True)
         obj_type = SEARCH_TYPES.OPINION
-        search_form = SearchForm({"type": obj_type}, request=request)
+        search_form = SearchForm(
+            {"type": obj_type}, request=request, courts=courts
+        )
         render_dict["search_form"] = search_form
         # Needed b/c of facet values.
         if waffle.flag_is_active(request, "o-es-active"):
@@ -562,14 +572,12 @@ def advanced(request: HttpRequest) -> HttpResponse:
             facet_results = get_only_status_facets(
                 search_query, render_dict["search_form"]
             )
-
-            # Merge form with courts.
-            courts = Court.objects.filter(in_use=True)
             search_form.is_valid()
             cd = search_form.cleaned_data
             search_form = _clean_form(
                 {"type": obj_type}, cd, courts, is_es_form=True
             )
+            # Merge form with courts.
             courts, court_count_human, court_count = merge_form_with_courts(
                 courts, search_form
             )
@@ -592,10 +600,10 @@ def advanced(request: HttpRequest) -> HttpResponse:
             render_dict.update(o_results)
         return TemplateResponse(request, "advanced.html", render_dict)
     else:
-        courts = Court.objects.filter(in_use=True)
+        courts = courts_in_use = Court.objects.filter(in_use=True)
         if request.path == reverse("advanced_r"):
             obj_type = SEARCH_TYPES.RECAP
-            courts = courts.filter(
+            courts_in_use = courts.filter(
                 pacer_court_id__isnull=False, end_date__isnull=True
             ).exclude(jurisdiction=Court.FEDERAL_BANKRUPTCY_PANEL)
         elif request.path == reverse("advanced_oa"):
@@ -605,9 +613,11 @@ def advanced(request: HttpRequest) -> HttpResponse:
         else:
             raise NotImplementedError(f"Unknown path: {request.path}")
 
-        search_form = SearchForm({"type": obj_type}, request=request)
+        search_form = SearchForm(
+            {"type": obj_type}, request=request, courts=courts
+        )
         courts, court_count_human, court_count = merge_form_with_courts(
-            courts, search_form
+            courts_in_use, search_form
         )
         render_dict.update(
             {
@@ -630,7 +640,9 @@ def es_search(request: HttpRequest) -> HttpResponse:
     courts = Court.objects.filter(in_use=True)
     render_dict.update({"search_type": "parenthetical"})
     obj_type = SEARCH_TYPES.PARENTHETICAL
-    search_form = SearchForm({"type": obj_type}, request=request)
+    search_form = SearchForm(
+        {"type": obj_type}, request=request, courts=courts
+    )
     if search_form.is_valid():
         search_form = _clean_form(
             request.GET.copy(),
@@ -674,6 +686,7 @@ def do_es_search(
     other location.
     """
     paged_results = None
+    # One court?
     courts = Court.objects.filter(in_use=True)
     query_time = total_query_results = 0
     top_hits_limit = 5
@@ -686,7 +699,7 @@ def do_es_search(
     query_citation = None
     facet_fields = []
 
-    search_form = SearchForm(get_params, is_es_form=True)
+    search_form = SearchForm(get_params, is_es_form=True, courts=courts)
     match get_params.get("type", SEARCH_TYPES.OPINION):
         case SEARCH_TYPES.PARENTHETICAL:
             document_type = ParentheticalGroupDocument
@@ -696,6 +709,8 @@ def do_es_search(
             document_type = PersonDocument
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
+            # Set a different number of results per page for RECAP SEARCH
+            rows = settings.RECAP_SEARCH_PAGE_SIZE
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
 
@@ -706,17 +721,21 @@ def do_es_search(
         try:
             # Create necessary filters to execute ES query
             search_query = document_type.search()
-
             (
                 s,
-                total_query_results,
+                child_docs_count_query,
                 top_hits_limit,
-                total_child_results,
             ) = build_es_main_query(search_query, cd)
-            paged_results, query_time, error = fetch_and_paginate_results(
+            (
+                paged_results,
+                query_time,
+                error,
+                total_query_results,
+                total_child_results,
+            ) = fetch_and_paginate_results(
                 get_params,
                 s,
-                total_query_results,
+                child_docs_count_query,
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
@@ -746,10 +765,24 @@ def do_es_search(
                 related_cluster = OpinionCluster.objects.get(
                     sub_opinions__pk__in=related_pks
                 )
-        except UnbalancedQuery:
+        except UnbalancedParenthesesQuery as e:
             error = True
-            error_message = "has incorrect syntax. Did you forget to close one or more parentheses?"
-            suggested_query = sanitize_unbalanced_parenthesis(cd.get("q", ""))
+            error_message = "unbalanced_parentheses"
+            if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
+                suggested_query = sanitize_unbalanced_parenthesis(
+                    cd.get("q", "")
+                )
+        except UnbalancedQuotesQuery as e:
+            error = True
+            error_message = "unbalanced_quotes"
+            if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
+                suggested_query = sanitize_unbalanced_quotes(cd.get("q", ""))
+        except BadProximityQuery as e:
+            error = True
+            error_message = "bad_proximity_token"
+            suggested_query = "proximity_filter"
+            if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
+                suggested_query = "proximity_query"
     else:
         error = True
 
@@ -787,26 +820,28 @@ def do_es_search(
 def fetch_and_paginate_results(
     get_params: QueryDict,
     search_query: Search,
-    total_query_results: int,
+    child_docs_count_query: Search | None,
     rows_per_page: int = settings.SEARCH_PAGE_SIZE,
     cache_key: str = None,
-) -> tuple[Page | list, int, bool]:
+) -> tuple[Page | list, int, bool, int | None, int | None]:
     """Fetch and paginate elasticsearch results.
 
     :param get_params: The user get params.
     :param search_query: Elasticsearch DSL Search object
-    :param total_query_results: The total number of results for the query.
+    :param child_docs_count_query: The ES DSL Query to perform the count for
+    child documents if required, otherwise None.
     :param rows_per_page: Number of records wanted per page
     :param cache_key: The cache key to use.
-    :return: A three tuple, the paginated results, the ES query time and if
-    there was an error.
+    :return: A five-tuple: the paginated results, the ES query time, whether
+    there was an error, the total number of hits for the main document, and
+    the total number of hits for the child document.
     """
 
     # Run the query and set up pagination
     if cache_key is not None:
         results = cache.get(cache_key)
         if results is not None:
-            return results, 0, False
+            return results, 0, False, None, None
 
     try:
         page = int(get_params.get("page", 1))
@@ -817,13 +852,13 @@ def fetch_and_paginate_results(
     check_pagination_depth(page)
 
     # Fetch results from ES
-    hits, query_time, error = fetch_es_results(
-        get_params, search_query, page, rows_per_page
+    hits, query_time, error, main_total, child_total = fetch_es_results(
+        get_params, search_query, child_docs_count_query, page, rows_per_page
     )
 
     if error:
-        return [], query_time, error
-    paginator = ESPaginator(total_query_results, hits, rows_per_page)
+        return [], query_time, error, main_total, child_total
+    paginator = ESPaginator(main_total, hits, rows_per_page)
     try:
         results = paginator.page(page)
     except PageNotAnInteger:
@@ -841,4 +876,4 @@ def fetch_and_paginate_results(
 
     if cache_key is not None:
         cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
-    return results, query_time, error
+    return results, query_time, error, main_total, child_total

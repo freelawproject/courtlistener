@@ -11,7 +11,7 @@ from cl.favorites.models import DocketTag, UserTag
 
 
 class UserTagViewSet(ModelViewSet):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     serializer_class = UserTagSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = UserTagFilter

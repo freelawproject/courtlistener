@@ -215,7 +215,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "password_change"},
             {"viewname": "delete_account"},
             {"viewname": "take_out"},
-            {"viewname": "profile_donations"},
+            {"viewname": "profile_your_support"},
             {"viewname": "view_api"},
         ]
         for reverse_param in reverse_params:

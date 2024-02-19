@@ -7,7 +7,7 @@ from unittest import mock
 from unittest.mock import ANY
 
 import time_machine
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 from dateutil.tz import tzutc
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -26,7 +26,6 @@ from rest_framework.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
 )
-from rest_framework.test import APIClient
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
@@ -127,7 +126,7 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.tests.utils import MockResponse
+from cl.tests.utils import AsyncAPIClient, MockResponse
 from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
@@ -168,10 +167,10 @@ class RecapUploadsTest(TestCase):
         )
 
     def setUp(self) -> None:
-        self.client = APIClient()
+        self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap")
         token = f"Token {self.user.auth_token.key}"
-        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
         self.f = SimpleUploadedFile("file.txt", b"file content more content")
         self.data = {
@@ -183,9 +182,9 @@ class RecapUploadsTest(TestCase):
             "upload_type": UPLOAD_TYPE.PDF,
         }
 
-    def test_uploading_a_pdf(self, mock):
+    async def test_uploading_a_pdf(self, mock):
         """Can we upload a document and have it be saved correctly?"""
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
@@ -194,15 +193,15 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(j["pacer_case_id"], "asdf")
         mock.assert_called()
 
-    def test_uploading_a_zip(self, mock):
+    async def test_uploading_a_zip(self, mock):
         """Can we upload a zip?"""
         self.data.update({"upload_type": UPLOAD_TYPE.DOCUMENT_ZIP})
         del self.data["pacer_doc_id"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
 
-    def test_uploading_a_docket(self, mock):
+    async def test_uploading_a_docket(self, mock):
         """Can we upload a docket and have it be saved correctly?
 
         Note that this works fine even though we're not actually uploading a
@@ -212,17 +211,17 @@ class RecapUploadsTest(TestCase):
             {"upload_type": UPLOAD_TYPE.DOCKET, "document_number": ""}
         )
         del self.data["pacer_doc_id"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_uploading_a_claims_registry_page(self, mock):
+    async def test_uploading_a_claims_registry_page(self, mock):
         """Can we upload claims registry data?"""
         self.data.update(
             {
@@ -232,11 +231,11 @@ class RecapUploadsTest(TestCase):
                 "court": "canb",
             }
         )
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
 
-    def test_uploading_an_attachment_page(self, mock):
+    async def test_uploading_an_attachment_page(self, mock):
         """Can we upload an attachment page and have it be saved correctly?"""
         self.data.update(
             {
@@ -244,37 +243,37 @@ class RecapUploadsTest(TestCase):
                 "document_number": "",
             }
         )
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_numbers_in_docket_uploads_fail(self, mock):
+    async def test_numbers_in_docket_uploads_fail(self, mock):
         """Are invalid uploads denied?
 
         For example, if you're uploading a Docket, you shouldn't be providing a
         document number.
         """
         self.data["upload_type"] = UPLOAD_TYPE.DOCKET
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_district_court_in_appellate_upload_fails(self, mock):
+    async def test_district_court_in_appellate_upload_fails(self, mock):
         """If you send a district court to an appellate endpoint, does it
         fail?
         """
         self.data.update({"upload_type": UPLOAD_TYPE.APPELLATE_DOCKET})
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_appellate_court_in_district_upload_fails(self, mock):
+    async def test_appellate_court_in_district_upload_fails(self, mock):
         """If you send appellate court info to a distric court, does it
         fail?
         """
@@ -283,57 +282,57 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_string_for_document_number_fails(self, mock):
+    async def test_string_for_document_number_fails(self, mock):
         self.data["document_number"] = "asdf"  # Not an int.
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_no_numbers_in_docket_uploads_work(self, mock):
+    async def test_no_numbers_in_docket_uploads_work(self, mock):
         self.data["upload_type"] = UPLOAD_TYPE.DOCKET
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
-    def test_pdf_without_pacer_case_id_works(self, mock):
+    async def test_pdf_without_pacer_case_id_works(self, mock):
         """Do we allow PDFs lacking a pacer_case_id value?"""
         del self.data["pacer_case_id"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
-    def test_uploading_non_ascii(self, mock):
+    async def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
         self.data["pacer_case_id"] = "☠☠☠"
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
         mock.assert_called()
 
-    def test_disallowed_court(self, mock):
+    async def test_disallowed_court(self, mock):
         """Do posts fail if a bad court is given?"""
         self.data["court"] = "ala"
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_fails_no_document(self, mock):
+    async def test_fails_no_document(self, mock):
         """Do posts fail if the lack an attachment?"""
         del self.data["filepath_local"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
 
-    def test_user_associated_properly(self, mock):
+    async def test_user_associated_properly(self, mock):
         """Does the user get associated after the upload?"""
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         j = json.loads(r.content)
-        processing_request = ProcessingQueue.objects.get(pk=j["id"])
+        processing_request = await ProcessingQueue.objects.aget(pk=j["id"])
         self.assertEqual(self.user.pk, processing_request.uploader_id)
         mock.assert_called()
 
-    def test_ensure_no_users_in_response(self, mock):
+    async def test_ensure_no_users_in_response(self, mock):
         """Is all user information excluded from the processing queue?"""
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         j = json.loads(r.content)
         for bad_key in ["uploader", "user"]:
             with self.assertRaises(KeyError):
@@ -341,7 +340,7 @@ class RecapUploadsTest(TestCase):
                 j[bad_key]
         mock.assert_called()
 
-    def test_uploading_a_case_query_page(self, mock):
+    async def test_uploading_a_case_query_page(self, mock):
         """Can we upload a docket iquery page and have it be saved correctly?
 
         Note that this works fine even though we're not actually uploading a
@@ -351,17 +350,17 @@ class RecapUploadsTest(TestCase):
             {"upload_type": UPLOAD_TYPE.CASE_QUERY_PAGE, "document_number": ""}
         )
         del self.data["pacer_doc_id"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_uploading_an_appellate_case_query_page(self, mock):
+    async def test_uploading_an_appellate_case_query_page(self, mock):
         """Can we upload an appellate case query and have it be saved correctly?
 
         Note that this works fine even though we're not actually uploading a
@@ -375,17 +374,17 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_uploading_an_appellate_attachment_page(self, mock):
+    async def test_uploading_an_appellate_attachment_page(self, mock):
         """Can we upload an appellate attachment page and have it be saved
         correctly?
 
@@ -401,14 +400,14 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
     def test_processing_an_appellate_attachment_page(self, mock_upload):
@@ -539,7 +538,7 @@ class RecapUploadsTest(TestCase):
             self.att_data["attachments"][0]["description"],
         )
 
-    def test_uploading_a_case_query_result_page(self, mock):
+    async def test_uploading_a_case_query_result_page(self, mock):
         """Can we upload a case query result page and have it be saved
         correctly?
 
@@ -555,17 +554,17 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["pacer_case_id"]
         del self.data["document_number"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_uploading_an_appellate_case_query_result_page(self, mock):
+    async def test_uploading_an_appellate_case_query_result_page(self, mock):
         """Can we upload an appellate case query result page and have it be
         saved correctly?
 
@@ -581,17 +580,17 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_case_id"]
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTP_201_CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
-        r = self.client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.status_code, HTTP_200_OK)
 
-    def test_recap_upload_validate_pacer_case_id(self, mock):
+    async def test_recap_upload_validate_pacer_case_id(self, mock):
         """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
         self.data.update(
             {
@@ -601,7 +600,7 @@ class RecapUploadsTest(TestCase):
             }
         )
         del self.data["pacer_doc_id"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
         self.assertIn(
@@ -941,10 +940,10 @@ class RecapAttPageFetchApiTest(TestCase):
 
 class ProcessingQueueApiFilterTest(TestCase):
     def setUp(self) -> None:
-        self.client = APIClient()
+        self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap")
         token = f"Token {self.user.auth_token.key}"
-        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
         # Set up for making PQ objects.
         filename = "file.pdf"
@@ -961,27 +960,31 @@ class ProcessingQueueApiFilterTest(TestCase):
             "upload_type": UPLOAD_TYPE.PDF,
         }
 
-    def test_pq_filters(self) -> None:
+    async def test_pq_filters(self) -> None:
         """Can we filter with the status and upload_type filters?"""
         # Create two PQ objects with different values.
-        ProcessingQueue.objects.create(**self.params)
+        await ProcessingQueue.objects.acreate(**self.params)
         self.params["status"] = PROCESSING_STATUS.FAILED
         self.params["upload_type"] = UPLOAD_TYPE.ATTACHMENT_PAGE
-        ProcessingQueue.objects.create(**self.params)
+        await ProcessingQueue.objects.acreate(**self.params)
 
         # Then try filtering.
         total_number_results = 2
-        r = self.client.get(self.path)
+        r = await self.async_client.get(self.path)
         j = json.loads(r.content)
         self.assertEqual(j["count"], total_number_results)
 
         total_awaiting_processing = 1
-        r = self.client.get(self.path, {"status": PROCESSING_STATUS.ENQUEUED})
+        r = await self.async_client.get(
+            self.path, {"status": PROCESSING_STATUS.ENQUEUED}
+        )
         j = json.loads(r.content)
         self.assertEqual(j["count"], total_awaiting_processing)
 
         total_pdfs = 1
-        r = self.client.get(self.path, {"upload_type": UPLOAD_TYPE.PDF})
+        r = await self.async_client.get(
+            self.path, {"upload_type": UPLOAD_TYPE.PDF}
+        )
         j = json.loads(r.content)
         self.assertEqual(j["count"], total_pdfs)
 
@@ -1017,24 +1020,24 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
             }
 
     def setUp(self) -> None:
-        self.client = APIClient()
+        self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"
-        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
         self.path = "/api/rest/v3/recap-email/"
 
-    def test_non_pacer_court_fails(self):
+    async def test_non_pacer_court_fails(self):
         self.data["court"] = "scotus"
-        r = self.client.post(self.path, self.data, format="json")
+        r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(
             j["non_field_errors"], ["scotus is not a PACER court ID."]
         )
 
-    def test_missing_mail_properties_fails(self):
+    async def test_missing_mail_properties_fails(self):
         del self.data["mail"]["headers"]
-        r = self.client.post(self.path, self.data, format="json")
+        r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(
@@ -1042,9 +1045,9 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
             ["The JSON value at key 'mail' should include 'headers'."],
         )
 
-    def test_missing_receipt_properties_fails(self):
+    async def test_missing_receipt_properties_fails(self):
         del self.data["receipt"]["recipients"]
-        r = self.client.post(self.path, self.data, format="json")
+        r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
         self.assertEqual(
@@ -1060,12 +1063,12 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.get_or_cache_pacer_cookies",
         side_effect=lambda x, y, z: None,
     )
-    def test_email_processing_queue_create(
+    async def test_email_processing_queue_create(
         self, mock_bucket_open, mock_cookies
     ):
-        self.assertEqual(EmailProcessingQueue.objects.count(), 0)
-        self.client.post(self.path, self.data, format="json")
-        self.assertEqual(EmailProcessingQueue.objects.count(), 1)
+        self.assertEqual(await EmailProcessingQueue.objects.acount(), 0)
+        await self.async_client.post(self.path, self.data, format="json")
+        self.assertEqual(await EmailProcessingQueue.objects.acount(), 1)
 
 
 class DebugRecapUploadtest(TestCase):
@@ -2367,25 +2370,27 @@ class RecapAttachmentPageTaskTest(TestCase):
 
 class RecapUploadAuthenticationTest(TestCase):
     def setUp(self) -> None:
-        self.client = APIClient()
+        self.async_client = AsyncAPIClient()
         self.path = reverse("processingqueue-list", kwargs={"version": "v3"})
 
-    def test_authentication(self) -> None:
+    async def test_authentication(self) -> None:
         """Does POSTing and GETting fail when we send the wrong credentials?"""
-        self.client.credentials(HTTP_AUTHORIZATION="Token asdf")  # Junk token.
-        r = self.client.post(self.path)
+        self.async_client.credentials(
+            HTTP_AUTHORIZATION="Token asdf"
+        )  # Junk token.
+        r = await self.async_client.post(self.path)
         self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
 
-        r = self.client.get(self.path)
+        r = await self.async_client.get(self.path)
         self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
 
-    def test_no_credentials(self) -> None:
+    async def test_no_credentials(self) -> None:
         """Does POSTing and GETting fail if we lack credentials?"""
-        self.client.credentials()
-        r = self.client.post(self.path)
+        self.async_client.credentials()
+        r = await self.async_client.post(self.path)
         self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
 
-        r = self.client.get(self.path)
+        r = await self.async_client.get(self.path)
         self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
 
 
@@ -2487,6 +2492,7 @@ class IdbMergeTest(TestCase):
         self.assertEqual(Docket.objects.count(), 3)
 
 
+@mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
 @mock.patch(
     "cl.recap.tasks.RecapEmailSESStorage.open",
     side_effect=mock_bucket_open,
@@ -2642,10 +2648,10 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
     def setUp(self) -> None:
-        self.client = APIClient()
+        self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"
-        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
         self.path = "/api/rest/v3/recap-email/"
 
         recipient_user = self.user_profile
@@ -2674,8 +2680,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_recap_email_case_auto_subscription(
+    async def test_new_recap_email_case_auto_subscription(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -2690,25 +2697,30 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
-        self.client.post(self.path, self.data, format="json")
+        await self.async_client.post(self.path, self.data, format="json")
 
         # Can we get the recap.email recipient properly?
         email_processing = EmailProcessingQueue.objects.all()
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].destination_emails, ["testing_1@recap.email"]
+            email_processing_first.destination_emails,
+            ["testing_1@recap.email"],
         )
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Subscription type, since user has
         # auto-subscribe True.
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.SUBSCRIPTION,
         )
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
 
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
@@ -2718,18 +2730,21 @@ class RecapEmailDocketAlerts(TestCase):
         # Webhook should be triggered
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
+        webhook_triggered_first = await webhook_triggered.afirst()
         self.assertEqual(
-            webhook_triggered[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+            webhook_triggered_first.event_status,
+            WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
-        content = webhook_triggered.first().content
+        content = webhook_triggered_first.content
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
         docket_id = content["payload"]["results"][0]["docket"]
         self.assertEqual(docket.pk, docket_id)
-        self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+        await recap_document_first.arefresh_from_db()
+        self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -2739,8 +2754,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_recap_email_case_auto_subscription_prev_user(
+    async def test_new_recap_email_case_auto_subscription_prev_user(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -2755,43 +2771,50 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new recap.email notification from testing_2@recap.email
         # auto-subscription option enabled
-        self.client.post(self.path, self.data_3, format="json")
+        await self.async_client.post(self.path, self.data_3, format="json")
 
         # Can we get the recap.email recipient properly?
         email_processing = EmailProcessingQueue.objects.all()
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].destination_emails, ["testing_2@recap.email"]
+            email_processing_first.destination_emails,
+            ["testing_2@recap.email"],
         )
 
         # A DocketAlert email for testing_2@recap.email should go out
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(recap_document.count(), 1)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
         message_sent_2 = mail.outbox[0]
         self.assertEqual(message_sent_2.to, [self.recipient_user_2.user.email])
 
         # One webhook should be triggered
         webhook_triggered = WebhookEvent.objects.filter()
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
+        webhook_triggered_first = await webhook_triggered.afirst()
         self.assertEqual(
-            webhook_triggered[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+            webhook_triggered_first.event_status,
+            WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option enabled
-        self.client.post(self.path, self.data, format="json")
+        await self.async_client.post(self.path, self.data, format="json")
 
         # A DocketAlert should be created when receiving the first notification
         # for this case and user (testing_1@recap.email)
-        docket = recap_document[0].docket_entry.docket
-        self.assertEqual(recap_document.count(), 2)
-        self.assertEqual(Docket.objects.all().count(), 1)
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
+        self.assertEqual(await recap_document.acount(), 2)
+        self.assertEqual(await Docket.objects.all().acount(), 1)
         docket_alert_2 = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.SUBSCRIPTION,
         )
-        self.assertEqual(docket_alert_2.count(), 1)
+        self.assertEqual(await docket_alert_2.acount(), 1)
 
         # 2 more emails should go out, one for testing_2@recap.email and one
         # for testing_1@recap.email
@@ -2804,16 +2827,16 @@ class RecapEmailDocketAlerts(TestCase):
         # Two more webhooks should be triggered, one for testing_2@recap.email
         # and one for testing_1@recap.email
         webhooks_triggered = WebhookEvent.objects.filter()
-        self.assertEqual(webhooks_triggered.count(), 3)
+        self.assertEqual(await webhooks_triggered.acount(), 3)
 
-        for webhook_sent in webhooks_triggered:
+        async for webhook_sent in webhooks_triggered:
             self.assertEqual(
                 webhook_sent.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
             )
         webhook_user_2 = WebhookEvent.objects.filter(webhook=self.webhook_2)
-        self.assertEqual(webhook_user_2.count(), 2)
+        self.assertEqual(await webhook_user_2.acount(), 2)
         webhook_user_1 = WebhookEvent.objects.filter(webhook=self.webhook)
-        self.assertEqual(webhook_user_1.count(), 1)
+        self.assertEqual(await webhook_user_1.acount(), 1)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -2823,8 +2846,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_recap_email_case_no_auto_subscription(
+    async def test_new_recap_email_case_no_auto_subscription(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -2840,26 +2864,31 @@ class RecapEmailDocketAlerts(TestCase):
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
-        self.recipient_user.save()
-        self.client.post(self.path, self.data, format="json")
+        await self.recipient_user.asave()
+        await self.async_client.post(self.path, self.data, format="json")
 
         # Can we get the recap.email recipient properly?
         email_processing = EmailProcessingQueue.objects.all()
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].destination_emails, ["testing_1@recap.email"]
+            email_processing_first.destination_emails,
+            ["testing_1@recap.email"],
         )
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Unsubscription type, since user has the
         # auto-subscribe False.
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.UNSUBSCRIPTION,
         )
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
 
         # A first user-case email should go out
         self.assertEqual(len(mail.outbox), 1)
@@ -2869,7 +2898,7 @@ class RecapEmailDocketAlerts(TestCase):
         # No webhook should be triggered
         webhook_triggered = WebhookEvent.objects.all()
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 0)
+        self.assertEqual(await webhook_triggered.acount(), 0)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -2879,8 +2908,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_recap_email_case_no_auto_subscription_prev_user(
+    async def test_new_recap_email_case_no_auto_subscription_prev_user(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -2896,10 +2926,10 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new recap.email notification from testing_2@recap.email
         # auto-subscription option enabled
-        self.client.post(self.path, self.data_3, format="json")
+        await self.async_client.post(self.path, self.data_3, format="json")
 
         # A DocketAlert email for testing_2@recap.email should go out
-        self.assertEqual(DocketAlert.objects.all().count(), 1)
+        self.assertEqual(await DocketAlert.objects.all().acount(), 1)
         message_sent = mail.outbox[0]
         self.assertIn("1 New Docket Entry for", message_sent.subject)
         self.assertEqual(message_sent.to, [self.recipient_user_2.user.email])
@@ -2907,30 +2937,35 @@ class RecapEmailDocketAlerts(TestCase):
         # One webhook should be triggered for testing_2@recap.email
         webhook_triggered = WebhookEvent.objects.filter()
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
+        webhook_triggered_first = await webhook_triggered.afirst()
         self.assertEqual(
-            webhook_triggered[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+            webhook_triggered_first.event_status,
+            WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
-        self.recipient_user.save()
-        self.client.post(self.path, self.data, format="json")
+        await self.recipient_user.asave()
+        await self.async_client.post(self.path, self.data, format="json")
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Unsubscription type, since user has the
         # auto-subscribe False.
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
-        self.assertEqual(recap_document.count(), 2)
-        self.assertEqual(Docket.objects.count(), 1)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
+        self.assertEqual(await recap_document.acount(), 2)
+        self.assertEqual(await Docket.objects.acount(), 1)
         docket_alert_2 = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.UNSUBSCRIPTION,
         )
-        self.assertEqual(docket_alert_2.count(), 1)
+        self.assertEqual(await docket_alert_2.acount(), 1)
 
         # 2 more emails should go out, a first user-case email for
         # testing_1@recap.email and one alert for testing_2@recap.email
@@ -2945,15 +2980,15 @@ class RecapEmailDocketAlerts(TestCase):
         # One more webhook should be triggered, one for testing_2@recap.email
         # none for testing_1@recap.email
         webhooks_triggered = WebhookEvent.objects.filter()
-        self.assertEqual(webhooks_triggered.count(), 2)
-        for webhook_sent in webhooks_triggered:
+        self.assertEqual(await webhooks_triggered.acount(), 2)
+        async for webhook_sent in webhooks_triggered:
             self.assertEqual(
                 webhook_sent.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
             )
         webhook_user_2 = WebhookEvent.objects.filter(webhook=self.webhook_2)
-        self.assertEqual(webhook_user_2.count(), 2)
+        self.assertEqual(await webhook_user_2.acount(), 2)
         webhook_user_1 = WebhookEvent.objects.filter(webhook=self.webhook)
-        self.assertEqual(webhook_user_1.count(), 0)
+        self.assertEqual(await webhook_user_1.acount(), 0)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -2969,8 +3004,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
         side_effect=lambda z, x: "011112443447",
     )
-    def test_no_recap_email_user_found(
+    async def test_no_recap_email_user_found(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -2983,12 +3019,16 @@ class RecapEmailDocketAlerts(TestCase):
         """
 
         # Trigger a new recap.email notification from newuser_2@recap.email
-        self.client.post(self.path, self.data_no_user, format="json")
+        await self.async_client.post(
+            self.path, self.data_no_user, format="json"
+        )
 
         # Can we get the recap.email recipient properly?
         email_processing = EmailProcessingQueue.objects.all()
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].destination_emails, ["newuser_2@recap.email"]
+            email_processing_first.destination_emails,
+            ["newuser_2@recap.email"],
         )
 
         # A @recap.email user not found notification should go out
@@ -3004,8 +3044,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_receive_same_recap_email_notification_different_users(
+    async def test_receive_same_recap_email_notification_different_users(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3020,35 +3061,47 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new recap.email notification from testing_2@recap.email
         # auto-subscription option enabled
-        self.client.post(self.path, self.data_3, format="json")
+        await self.async_client.post(self.path, self.data_3, format="json")
 
         # Can we get the recap.email recipient properly?
         email_processing = EmailProcessingQueue.objects.all().order_by("pk")
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].destination_emails, ["testing_2@recap.email"]
+            email_processing_first.destination_emails,
+            ["testing_2@recap.email"],
         )
 
         # A DocketAlert email for testing_2@recap.email should go out
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
-        self.assertEqual(recap_document.count(), 1)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
+        self.assertEqual(await recap_document.acount(), 1)
         message_sent_2 = mail.outbox[0]
         self.assertEqual(message_sent_2.to, [self.recipient_user_2.user.email])
 
         # Confirm EPQ values.
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
+        await email_processing_first.arefresh_from_db()
         self.assertEqual(
-            email_processing[0].status, PROCESSING_STATUS.SUCCESSFUL
+            email_processing_first.status, PROCESSING_STATUS.SUCCESSFUL
         )
 
         # Confirm RDs are correctly associated to the new EQP.
         self.assertEqual(
-            list(
-                email_processing[0].recap_documents.values_list(
+            [
+                rd
+                async for rd in email_processing_first.recap_documents.values_list(
                     "pk", flat=True
                 )
-            ),
-            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+            ],
+            [
+                rd
+                async for rd in RECAPDocument.objects.all().values_list(
+                    "pk", flat=True
+                )
+            ],
         )
 
         # A DocketAlert should be created when receiving the first notification
@@ -3058,30 +3111,32 @@ class RecapEmailDocketAlerts(TestCase):
             docket=docket,
             alert_type=DocketAlert.SUBSCRIPTION,
         )
-        self.assertEqual(docket_alert_1.count(), 1)
+        self.assertEqual(await docket_alert_1.acount(), 1)
 
         # Webhook should be triggered
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook_2)
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 1)
-        content = webhook_triggered.first().content
+        self.assertEqual(await webhook_triggered.acount(), 1)
+        webhook_triggered_first = await webhook_triggered.afirst()
+        content = webhook_triggered_first.content
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
-        self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+        await recap_document_first.arefresh_from_db()
+        self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
         self.assertEqual(
-            webhook_triggered.first().event_status,
+            webhook_triggered_first.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
         # Trigger a new recap.email notification, same case and same document
         # for testing_1@recap.email, auto-subscription option enabled
-        self.client.post(self.path, self.data_2, format="json")
+        await self.async_client.post(self.path, self.data_2, format="json")
 
         # No new recap document should be created.
-        self.assertEqual(recap_document.count(), 1)
-        self.assertEqual(Docket.objects.all().count(), 1)
+        self.assertEqual(await recap_document.acount(), 1)
+        self.assertEqual(await Docket.objects.all().acount(), 1)
         # A DocketAlert should be created when receiving the first notification
         # for this case for user (testing_1@recap.email)
         docket_alert_2 = DocketAlert.objects.filter(
@@ -3089,43 +3144,52 @@ class RecapEmailDocketAlerts(TestCase):
             docket=docket,
             alert_type=DocketAlert.SUBSCRIPTION,
         )
-        self.assertEqual(docket_alert_2.count(), 1)
+        self.assertEqual(await docket_alert_2.acount(), 1)
 
         # Confirm a new EQP is created.
         email_processing = EmailProcessingQueue.objects.all().order_by("pk")
-        self.assertEqual(len(email_processing), 2)
+        self.assertEqual(await email_processing.acount(), 2)
+        email_processing_last = await email_processing.alast()
         self.assertEqual(
-            email_processing[1].status, PROCESSING_STATUS.SUCCESSFUL
+            email_processing_last.status, PROCESSING_STATUS.SUCCESSFUL
         )
 
         # Confirm RDs are correctly associated to the new EQP.
         self.assertEqual(
-            list(
-                email_processing[1].recap_documents.values_list(
+            [
+                rd
+                async for rd in email_processing_last.recap_documents.values_list(
                     "pk", flat=True
                 )
-            ),
-            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+            ],
+            [
+                rd
+                async for rd in RECAPDocument.objects.all().values_list(
+                    "pk", flat=True
+                )
+            ],
         )
 
         # Webhook for users that were subscribed previously shouldn't be
         # triggered again
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
 
         # Webhook for the new recap email user should be triggered
         webhook_triggered_2 = WebhookEvent.objects.filter(webhook=self.webhook)
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered_2.count(), 1)
+        self.assertEqual(await webhook_triggered_2.acount(), 1)
+        webhook_triggered_2_first = await webhook_triggered_2.afirst()
         self.assertEqual(
-            webhook_triggered_2.first().event_status,
+            webhook_triggered_2_first.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
-        content = webhook_triggered_2.first().content
+        content = webhook_triggered_2_first.content
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
-        self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+        await recap_document_first.arefresh_from_db()
+        self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -3135,8 +3199,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_recap_email_subscribe_by_email_link(
+    async def test_new_recap_email_subscribe_by_email_link(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3151,35 +3216,39 @@ class RecapEmailDocketAlerts(TestCase):
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
-        self.recipient_user.save()
-        self.client.post(self.path, self.data, format="json")
+        await self.recipient_user.asave()
+        await self.async_client.post(self.path, self.data, format="json")
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Unsubscription type, since user has the
         # auto-subscribe False.
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.UNSUBSCRIPTION,
         )
-        self.assertEqual(docket_alert.count(), 1)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(await docket_alert.acount(), 1)
 
         # No webhook should be triggered for testing_1@recap.email
         webhook_triggered = WebhookEvent.objects.filter()
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 0)
+        self.assertEqual(await webhook_triggered.acount(), 0)
 
         # Authenticate user to avoid the subscription confirmation form
-        self.client.login(
+        await self.async_client.alogin(
             username=self.recipient_user.user.username, password="password"
         )
         # Subscribe to the case from first user-case email subscription link
-        self.client.get(
+        await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["subscribe", docket_alert[0].secret_key],
+                args=["subscribe", docket_alert_first.secret_key],
             )
         )
         docket_alert_subscription = DocketAlert.objects.filter(
@@ -3188,8 +3257,8 @@ class RecapEmailDocketAlerts(TestCase):
             alert_type=DocketAlert.SUBSCRIPTION,
         )
         # The DocketAlert should be toggled to Subscription type.
-        self.assertEqual(docket_alert.count(), 0)
-        self.assertEqual(docket_alert_subscription.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 0)
+        self.assertEqual(await docket_alert_subscription.acount(), 1)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -3199,8 +3268,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_recap_email_unsubscribe_by_email_link(
+    async def test_new_recap_email_unsubscribe_by_email_link(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3213,19 +3283,25 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
-        self.client.post(self.path, self.data, format="json")
+        await self.async_client.post(self.path, self.data, format="json")
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Subscription type, since user has
         # auto-subscribe True.
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
         )
-        self.assertEqual(docket_alert.count(), 1)
-        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        self.assertEqual(await docket_alert.acount(), 1)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(
+            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION
+        )
 
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
@@ -3235,26 +3311,29 @@ class RecapEmailDocketAlerts(TestCase):
         # One webhook should be triggered for testing_1@recap.email
         webhook_triggered = WebhookEvent.objects.filter()
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
+        webhook_triggered_first = await webhook_triggered.afirst()
         self.assertEqual(
-            webhook_triggered[0].event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
+            webhook_triggered_first.event_status,
+            WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
         # Authenticate user to avoid the unsubscription confirmation form
-        self.client.login(
+        await self.async_client.alogin(
             username=self.recipient_user.user.username, password="password"
         )
         # Unsubscribe from email link
-        self.client.get(
+        await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["unsubscribe", docket_alert[0].secret_key],
+                args=["unsubscribe", docket_alert_first.secret_key],
             )
         )
 
         # The DocketAlert should be toggled to Unsubscription type.
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
-            docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
+            docket_alert_first.alert_type, DocketAlert.UNSUBSCRIPTION
         )
 
         # The unsubscription confirmation email should go out
@@ -3264,15 +3343,15 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email
-        self.client.post(self.path, self.data_2, format="json")
+        await self.async_client.post(self.path, self.data_2, format="json")
         # No new Subscription should be created.
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
         # No new notification for the same case should go out
         self.assertEqual(len(mail.outbox), 2)
 
         # No more webhooks should be triggered
         webhook_triggered = WebhookEvent.objects.filter()
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -3282,8 +3361,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_recap_email_alerts_integration(
+    async def test_new_recap_email_alerts_integration(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3299,39 +3379,51 @@ class RecapEmailDocketAlerts(TestCase):
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
-        self.recipient_user.save()
-        self.client.post(self.path, self.data, format="json")
+        await self.recipient_user.asave()
+        await self.async_client.post(self.path, self.data, format="json")
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Unsubscription type, since user has the
         # auto-subscribe False.
         email_processing = EmailProcessingQueue.objects.all().order_by("pk")
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
         )
 
+        docket_alert_first = await docket_alert.afirst()
         # Confirm EPQ values.
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].status, PROCESSING_STATUS.SUCCESSFUL
+            email_processing_first.status, PROCESSING_STATUS.SUCCESSFUL
         )
 
         # Confirm RDs are correctly associated to the new EQP.
         self.assertEqual(
-            list(
-                email_processing[0].recap_documents.values_list(
+            [
+                rd
+                async for rd in email_processing_first.recap_documents.values_list(
                     "pk", flat=True
                 )
-            ),
-            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+            ],
+            [
+                rd
+                async for rd in RECAPDocument.objects.all().values_list(
+                    "pk", flat=True
+                )
+            ],
         )
 
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
-            docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
+            docket_alert_first.alert_type, DocketAlert.UNSUBSCRIPTION
         )
 
         # A first user-case email should go out
@@ -3342,26 +3434,29 @@ class RecapEmailDocketAlerts(TestCase):
 
         webhook_triggered = WebhookEvent.objects.all()
         # No webhook should be triggered.
-        self.assertEqual(webhook_triggered.count(), 0)
+        self.assertEqual(await webhook_triggered.acount(), 0)
 
         # Authenticate user to avoid the confirmation form
-        self.client.login(
+        await self.async_client.alogin(
             username=self.recipient_user.user.username, password="password"
         )
         # Subscribe to the case from first user-case email subscription link
-        self.client.get(
+        await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["subscribe", docket_alert[0].secret_key],
+                args=["subscribe", docket_alert_first.secret_key],
             )
         )
-        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        await docket_alert_first.arefresh_from_db()
+        self.assertEqual(
+            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION
+        )
 
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option enabled
-        self.client.post(self.path, self.data_2, format="json")
+        await self.async_client.post(self.path, self.data_2, format="json")
         # No new Subscription should be created.
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
 
         # A second notification for the same case should go out
         self.assertEqual(len(mail.outbox), 2)
@@ -3370,35 +3465,37 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
 
         # Different recap documents created for the same Docket.
-        self.assertEqual(recap_document.count(), 2)
-        self.assertNotEqual(recap_document[0].pk, recap_document[1].pk)
+        self.assertEqual(await recap_document.acount(), 2)
+        recap_document_first = await recap_document.afirst()
+        recap_document_last = await recap_document.alast()
+        self.assertNotEqual(recap_document_first.pk, recap_document_last.pk)
         self.assertNotEqual(
-            recap_document[0].docket_entry.pk,
-            recap_document[1].docket_entry.pk,
+            recap_document_first.docket_entry.pk,
+            recap_document_last.docket_entry.pk,
         )
         self.assertEqual(
-            recap_document[0].docket_entry.docket.pk,
-            recap_document[1].docket_entry.docket.pk,
+            recap_document_first.docket_entry.docket.pk,
+            recap_document_last.docket_entry.docket.pk,
         )
 
         # A webhook event should be triggered since user is now subscribed.
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
+        webhook_triggered_first = await webhook_triggered.afirst()
         self.assertEqual(
-            webhook_triggered.first().event_status,
+            webhook_triggered_first.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
-
-        # Unsubscribe from email link
-        self.client.get(
+        await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["unsubscribe", docket_alert[0].secret_key],
+                args=["unsubscribe", docket_alert_first.secret_key],
             )
         )
 
         # The DocketAlert should be toggled to Unsubscription type.
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
-            docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
+            docket_alert_first.alert_type, DocketAlert.UNSUBSCRIPTION
         )
 
         # The unsubscription confirmation email should go out
@@ -3414,8 +3511,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_docket_alert_toggle_confirmation_fails(
+    async def test_docket_alert_toggle_confirmation_fails(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3428,56 +3526,66 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
-        self.client.post(self.path, self.data, format="json")
+        await self.async_client.post(self.path, self.data, format="json")
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Subscription type, since user has
         # auto-subscribe True.
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
         )
-        self.assertEqual(docket_alert.count(), 1)
-        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        self.assertEqual(await docket_alert.acount(), 1)
+        docket_alert_first = await docket_alert.afirst()
+        self.assertEqual(
+            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION
+        )
 
         # Unauthenticated user tries to unsubscribe via GET and POST
-        self.client.get(
+        await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["unsubscribe", docket_alert[0].secret_key],
+                args=["unsubscribe", docket_alert_first.secret_key],
             )
         )
-        self.client.post(
+        await self.async_client.post(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["unsubscribe", docket_alert[0].secret_key],
+                args=["unsubscribe", docket_alert_first.secret_key],
             ),
             {},
         )
         # The DocketAlert should remain in Subscription type.
-        self.assertEqual(docket_alert[0].alert_type, DocketAlert.SUBSCRIPTION)
+        await docket_alert_first.arefresh_from_db()
+        self.assertEqual(
+            docket_alert_first.alert_type, DocketAlert.SUBSCRIPTION
+        )
 
         # Update the DocketAlert to Unsubscription type
-        docket_alert.update(alert_type=DocketAlert.UNSUBSCRIPTION)
+        await docket_alert.aupdate(alert_type=DocketAlert.UNSUBSCRIPTION)
         # Unauthenticated user tries to subscribe via GET and POST
-        self.client.get(
+        await self.async_client.get(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["subscribe", docket_alert[0].secret_key],
+                args=["subscribe", docket_alert_first.secret_key],
             )
         )
-        self.client.post(
+        await self.async_client.post(
             reverse(
                 "toggle_docket_alert_confirmation",
-                args=["subscribe", docket_alert[0].secret_key],
+                args=["subscribe", docket_alert_first.secret_key],
             ),
             {},
         )
         # The DocketAlert should remain in unsubscription type.
+        await docket_alert_first.arefresh_from_db()
         self.assertEqual(
-            docket_alert[0].alert_type, DocketAlert.UNSUBSCRIPTION
+            docket_alert_first.alert_type, DocketAlert.UNSUBSCRIPTION
         )
 
     @mock.patch(
@@ -3497,8 +3605,9 @@ class RecapEmailDocketAlerts(TestCase):
             200, mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
-    def test_new_recap_email_with_attachments(
+    async def test_new_recap_email_with_attachments(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3514,43 +3623,54 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
-        self.client.post(self.path, self.data_4, format="json")
+        await self.async_client.post(self.path, self.data_4, format="json")
 
         # Can we get the recap.email recipient properly?
         email_processing = EmailProcessingQueue.objects.all().order_by("pk")
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].destination_emails, ["testing_1@recap.email"]
+            email_processing_first.destination_emails,
+            ["testing_1@recap.email"],
         )
 
         # Confirm EPQ values.
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
         self.assertEqual(
-            email_processing[0].status, PROCESSING_STATUS.SUCCESSFUL
+            email_processing_first.status, PROCESSING_STATUS.SUCCESSFUL
         )
 
         # Confirm RDs are correctly associated to the new EQP.
         self.assertEqual(
-            list(
-                email_processing[0].recap_documents.values_list(
+            [
+                rd
+                async for rd in email_processing_first.recap_documents.values_list(
                     "pk", flat=True
                 )
-            ),
-            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+            ],
+            [
+                rd
+                async for rd in RECAPDocument.objects.all().values_list(
+                    "pk", flat=True
+                )
+            ],
         )
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Subscription type, since user has
         # auto-subscribe True.
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 10)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        self.assertEqual(await recap_document.acount(), 10)
 
-        docket = recap_document[0].docket_entry.docket
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.SUBSCRIPTION,
         )
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
 
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
@@ -3560,12 +3680,13 @@ class RecapEmailDocketAlerts(TestCase):
         # Webhook should be triggered
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
+        webhook_triggered_first = await webhook_triggered.afirst()
         self.assertEqual(
-            webhook_triggered.first().event_status,
+            webhook_triggered_first.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
-        content = webhook_triggered.first().content
+        content = webhook_triggered_first.content
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
@@ -3573,9 +3694,10 @@ class RecapEmailDocketAlerts(TestCase):
         recap_documents_webhook = content["payload"]["results"][0][
             "recap_documents"
         ]
-        self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+        await recap_document_first.arefresh_from_db()
+        self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
         # Document available from magic link, not sealed.
-        self.assertEqual(recap_document[0].is_sealed, False)
+        self.assertEqual(recap_document_first.is_sealed, False)
         # We should send 10 recap documents in this webhook example
         self.assertEqual(len(recap_documents_webhook), 10)
         # Compare content for the main document and the first attachment
@@ -3609,14 +3731,14 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger the recap.email notification again for the same user, it
         # should be processed.
-        self.client.post(self.path, self.data_4, format="json")
+        await self.async_client.post(self.path, self.data_4, format="json")
 
         # No new recap documents should be added.
-        self.assertEqual(len(recap_document), 10)
+        self.assertEqual(await recap_document.acount(), 10)
 
         # No new docket alert or webhooks should be triggered.
         self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
@@ -3638,8 +3760,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_extract_pdf_for_recap_email(
+    async def test_extract_pdf_for_recap_email(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_pacer_court_accessible,
         mock_cookies,
@@ -3652,17 +3775,18 @@ class RecapEmailDocketAlerts(TestCase):
         """
 
         # Trigger a new recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data, format="json")
+        await self.async_client.post(self.path, self.data, format="json")
 
         recap_document = RECAPDocument.objects.all()
-        self.assertEqual(recap_document[0].is_available, True)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.is_available, True)
 
         # Plain text is extracted properly.
-        self.assertNotEqual(recap_document[0].plain_text, "")
+        self.assertNotEqual(recap_document_first.plain_text, "")
 
-        self.assertEqual(recap_document[0].needs_extraction, False)
+        self.assertEqual(recap_document_first.needs_extraction, False)
         self.assertEqual(
-            recap_document[0].ocr_status, RECAPDocument.OCR_UNNECESSARY
+            recap_document_first.ocr_status, RECAPDocument.OCR_UNNECESSARY
         )
 
     @mock.patch(
@@ -3680,8 +3804,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_nda_recap_email(
+    async def test_new_nda_recap_email(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3694,17 +3819,20 @@ class RecapEmailDocketAlerts(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_5, format="json")
+        await self.async_client.post(self.path, self.data_5, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
 
         # Compare the NDA docket and recap document metadata
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
-        self.assertEqual(recap_document[0].pacer_doc_id, "009033568259")
-        self.assertEqual(recap_document[0].document_number, "009033568259")
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.pacer_doc_id, "009033568259")
+        self.assertEqual(recap_document_first.document_number, "009033568259")
+        docket = recap_document_first.docket_entry.docket
         self.assertEqual(
             docket.case_name, "Rosemarie Vargas v. Facebook, Inc."
         )
@@ -3726,8 +3854,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
         side_effect=lambda z, x: "009033568259",
     )
-    def test_new_nda_recap_email_case_auto_subscription(
+    async def test_new_nda_recap_email_case_auto_subscription(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3743,22 +3872,25 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
         # auto-subscription option enabled
-        self.client.post(self.path, self.data_5, format="json")
+        await self.async_client.post(self.path, self.data_5, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Subscription type, since user has
         # auto-subscribe True.
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.SUBSCRIPTION,
         )
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
 
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
@@ -3768,17 +3900,19 @@ class RecapEmailDocketAlerts(TestCase):
         # Webhook should be triggered
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 1)
+        self.assertEqual(await webhook_triggered.acount(), 1)
+        webhook_triggered_first = await webhook_triggered.afirst()
         self.assertEqual(
-            webhook_triggered.first().event_status,
+            webhook_triggered_first.event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
-        content = webhook_triggered.first().content
+        content = webhook_triggered_first.content
         # Compare the content of the webhook to the recap document
         pacer_doc_id = content["payload"]["results"][0]["recap_documents"][0][
             "pacer_doc_id"
         ]
-        self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+        await recap_document_first.arefresh_from_db()
+        self.assertEqual(recap_document_first.pacer_doc_id, pacer_doc_id)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -3795,8 +3929,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_new_nda_recap_email_case_no_auto_subscription(
+    async def test_new_nda_recap_email_case_no_auto_subscription(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3813,24 +3948,27 @@ class RecapEmailDocketAlerts(TestCase):
         # Trigger a new recap.email notification from testing_1@recap.email
         # auto-subscription option disabled
         self.recipient_user.auto_subscribe = False
-        self.recipient_user.save()
-        self.client.post(self.path, self.data_5, format="json")
+        await self.recipient_user.asave()
+        await self.async_client.post(self.path, self.data_5, format="json")
 
         # Can we get the recap.email recipient properly?
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
 
         # A DocketAlert should be created when receiving the first notification
         # for this case with Unsubscription type, since user has the
         # auto-subscribe False.
-        recap_document = RECAPDocument.objects.all()
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.UNSUBSCRIPTION,
         )
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
 
         # A first user-case email should go out
         self.assertEqual(len(mail.outbox), 1)
@@ -3840,7 +3978,7 @@ class RecapEmailDocketAlerts(TestCase):
         # No webhook should be triggered
         webhook_triggered = WebhookEvent.objects.all()
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 0)
+        self.assertEqual(await webhook_triggered.acount(), 0)
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
@@ -3863,8 +4001,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_multiple_docket_nef(
+    async def test_multiple_docket_nef(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -3880,41 +4019,50 @@ class RecapEmailDocketAlerts(TestCase):
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
         # Multi Docket NEF.
-        self.client.post(self.path, self.data_multi_jpml, format="json")
+        await self.async_client.post(
+            self.path, self.data_multi_jpml, format="json"
+        )
 
         email_processing = EmailProcessingQueue.objects.all()
         # Confirm EPQ values.
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].status, PROCESSING_STATUS.SUCCESSFUL
+            email_processing_first.status, PROCESSING_STATUS.SUCCESSFUL
         )
 
         # Confirm RDs are correctly associated to the new EQP.
         self.assertEqual(
-            list(
-                email_processing[0].recap_documents.values_list(
+            [
+                rd
+                async for rd in email_processing_first.recap_documents.values_list(
                     "pk", flat=True
                 )
-            ),
-            list(RECAPDocument.objects.all().values_list("pk", flat=True)),
+            ],
+            [
+                rd
+                async for rd in RECAPDocument.objects.all().values_list(
+                    "pk", flat=True
+                )
+            ],
         )
 
         # Compare the docket and recap document metadata
         dockets = Docket.objects.all()
-        self.assertEqual(len(dockets), 3)
+        self.assertEqual(await dockets.acount(), 3)
 
-        case_names = [docket.case_name for docket in dockets]
+        case_names = [docket.case_name async for docket in dockets]
         # Check that all the case names are different between them
         self.assertTrue(len(set(case_names)) == len(case_names))
 
-        docket_numbers = [docket.docket_number for docket in dockets]
+        docket_numbers = [docket.docket_number async for docket in dockets]
         # Check that all the docket_numbers are different between them
         self.assertTrue(len(set(docket_numbers)) == len(docket_numbers))
 
         docket_entries = DocketEntry.objects.all()
-        self.assertEqual(len(docket_entries), 3)
+        self.assertEqual(await docket_entries.acount(), 3)
         docket_entry_numbers = [
-            docket_entry.entry_number for docket_entry in docket_entries
+            docket_entry.entry_number async for docket_entry in docket_entries
         ]
         # Check that all the docket_entry_numbers are different between them
         self.assertTrue(
@@ -3922,9 +4070,9 @@ class RecapEmailDocketAlerts(TestCase):
         )
 
         recap_documents = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_documents), 6)
+        self.assertEqual(await recap_documents.acount(), 6)
 
-        for rd in recap_documents:
+        async for rd in recap_documents:
             # Every RECAPDocument should have a file stored at this point.
             self.assertTrue(rd.filepath_local)
             if not rd.attachment_number:
@@ -3939,22 +4087,22 @@ class RecapEmailDocketAlerts(TestCase):
             user=self.recipient_user.user,
             alert_type=DocketAlert.SUBSCRIPTION,
         )
-        self.assertEqual(docket_alerts.count(), 3)
+        self.assertEqual(await docket_alerts.acount(), 3)
         # 3 DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 3)
 
         # 3 Webhook events should be triggered
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
         # Does the webhook was triggered?
-        self.assertEqual(webhook_triggered.count(), 3)
-        for webhook_event in webhook_triggered:
+        self.assertEqual(await webhook_triggered.acount(), 3)
+        async for webhook_event in webhook_triggered:
             self.assertEqual(
                 webhook_event.event_status, WEBHOOK_EVENT_STATUS.SUCCESSFUL
             )
 
         webhook_entry_numbers = [
             webhook.content["payload"]["results"][0]["entry_number"]
-            for webhook in webhook_triggered
+            async for webhook in webhook_triggered
         ]
         # Check that all the webhook entry numbers are different between them
         self.assertTrue(
@@ -3965,7 +4113,7 @@ class RecapEmailDocketAlerts(TestCase):
             webhook.content["payload"]["results"][0]["recap_documents"][0][
                 "document_number"
             ]
-            for webhook in webhook_triggered
+            async for webhook in webhook_triggered
         ]
         # Check that all the webhook_document_numbers are different between
         # them
@@ -3977,7 +4125,7 @@ class RecapEmailDocketAlerts(TestCase):
             webhook.content["payload"]["results"][0]["recap_documents"][1][
                 "document_number"
             ]
-            for webhook in webhook_triggered
+            async for webhook in webhook_triggered
         ]
         # Check that all the webhook_att_document_numbers are different between
         # them
@@ -3989,20 +4137,22 @@ class RecapEmailDocketAlerts(TestCase):
         # Check that all the PQ objects created are marked as SUCCESSFUL and
         # filepath_local deleted.
         pqs = ProcessingQueue.objects.all()
-        for pq in pqs:
+        async for pq in pqs:
             self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
             self.assertFalse(pq.filepath_local)
 
         # Trigger the recap.email notification again for the same user, it
         # should be processed.
-        self.client.post(self.path, self.data_multi_jpml, format="json")
+        await self.async_client.post(
+            self.path, self.data_multi_jpml, format="json"
+        )
 
         # No new recap documents should be added.
         self.assertEqual(len(recap_documents), 6)
 
         # No new docket alert or webhooks should be triggered.
         self.assertEqual(len(mail.outbox), 3)
-        self.assertEqual(webhook_triggered.count(), 3)
+        self.assertEqual(await webhook_triggered.acount(), 3)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -4020,8 +4170,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.is_pacer_doc_sealed",
         side_effect=lambda z, x: False,
     )
-    def test_recap_email_no_magic_number(
+    async def test_recap_email_no_magic_number(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4040,40 +4191,48 @@ class RecapEmailDocketAlerts(TestCase):
         ):
             # Trigger a new recap.email notification from testing_1@recap.email
             # auto-subscription option enabled
-            self.client.post(self.path, self.data, format="json")
+            await self.async_client.post(self.path, self.data, format="json")
 
         # Can we get the recap.email recipient properly?
         email_processing = EmailProcessingQueue.objects.all()
+        email_processing_first = await email_processing.afirst()
         self.assertEqual(
-            email_processing[0].destination_emails, ["testing_1@recap.email"]
+            email_processing_first.destination_emails,
+            ["testing_1@recap.email"],
         )
 
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
         # A DocketAlert should be created when receiving the first notification
         # for this case with Subscription type, since user has
         # auto-subscribe True.
-        docket = recap_document[0].docket_entry.docket
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         docket_alert = DocketAlert.objects.filter(
             user=self.recipient_user.user,
             docket=docket,
             alert_type=DocketAlert.SUBSCRIPTION,
         )
-        self.assertEqual(docket_alert.count(), 1)
+        self.assertEqual(await docket_alert.acount(), 1)
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
 
         pq = ProcessingQueue.objects.all()
-        self.assertEqual(len(pq), 1)
+        self.assertEqual(await pq.acount(), 1)
+        pq_first = await pq.afirst()
         self.assertEqual(
-            pq[0].error_message,
+            pq_first.error_message,
             "No magic number available to download the document.",
         )
 
         # Mock returns the document is not sealed.
-        self.assertEqual(recap_document[0].is_sealed, False)
+        await recap_document_first.arefresh_from_db()
+        self.assertEqual(recap_document_first.is_sealed, False)
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
-        content = webhook_triggered.first().content
+        webhook_triggered_first = await webhook_triggered.afirst()
+        content = webhook_triggered_first.content
         # Confirm document is not sealed in the webhook payload.
         is_sealed = content["payload"]["results"][0]["recap_documents"][0][
             "is_sealed"
@@ -4095,8 +4254,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_mark_as_sealed_nda_document_not_available_from_magic_link(
+    async def test_mark_as_sealed_nda_document_not_available_from_magic_link(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4109,15 +4269,17 @@ class RecapEmailDocketAlerts(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_5, format="json")
+        await self.async_client.post(self.path, self.data_5, format="json")
 
         recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
+        self.assertEqual(await recap_document.acount(), 1)
 
         # Confirm the document is marked as sealed.
-        self.assertEqual(recap_document[0].is_sealed, True)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.is_sealed, True)
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
-        content = webhook_triggered.first().content
+        webhook_triggered_first = await webhook_triggered.afirst()
+        content = webhook_triggered_first.content
         # Is the document sealed in the webhook payload?
         is_sealed = content["payload"]["results"][0]["recap_documents"][0][
             "is_sealed"
@@ -4138,8 +4300,9 @@ class RecapEmailDocketAlerts(TestCase):
             200, mock_bucket_open("nyed_123019137279.html", "r", True)
         ),
     )
-    def test_mark_as_sealed_nef_documents_not_available_from_magic_link(
+    async def test_mark_as_sealed_nef_documents_not_available_from_magic_link(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4153,15 +4316,17 @@ class RecapEmailDocketAlerts(TestCase):
         """
 
         # Trigger a new recap.email notification
-        self.client.post(self.path, self.data_4, format="json")
+        await self.async_client.post(self.path, self.data_4, format="json")
 
         recap_document = RECAPDocument.objects.all()
         # Main document is marked as sealed.
-        self.assertEqual(recap_document[0].is_sealed, True)
-        self.assertEqual(len(recap_document), 10)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.is_sealed, True)
+        self.assertEqual(await recap_document.acount(), 10)
 
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
-        content = webhook_triggered.first().content
+        webhook_triggered_first = await webhook_triggered.afirst()
+        content = webhook_triggered_first.content
         # Compare the content of the webhook to the recap document
         recap_documents_webhook = content["payload"]["results"][0][
             "recap_documents"
@@ -4184,8 +4349,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.is_pacer_doc_sealed",
         side_effect=lambda z, x: True,
     )
-    def test_recap_email_no_magic_number_sealed_document(
+    async def test_recap_email_no_magic_number_sealed_document(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4203,15 +4369,17 @@ class RecapEmailDocketAlerts(TestCase):
         ):
             # Trigger a new recap.email notification from testing_1@recap.email
             # auto-subscription option enabled
-            self.client.post(self.path, self.data, format="json")
+            await self.async_client.post(self.path, self.data, format="json")
 
         recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
+        self.assertEqual(await recap_document.acount(), 1)
 
         # Document is marked as sealed.
-        self.assertEqual(recap_document[0].is_sealed, True)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.is_sealed, True)
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
-        content = webhook_triggered.first().content
+        webhook_triggered_first = await webhook_triggered.afirst()
+        content = webhook_triggered_first.content
         # Confirm the document is sealed in webhook payload.
         is_sealed = content["payload"]["results"][0]["recap_documents"][0][
             "is_sealed"
@@ -4222,8 +4390,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_recap_email_minute_entry(
+    async def test_recap_email_minute_entry(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4239,23 +4408,27 @@ class RecapEmailDocketAlerts(TestCase):
         ):
             # Trigger a new recap.email notification from testing_1@recap.email
             # auto-subscription option enabled
-            self.client.post(self.path, self.data, format="json")
+            await self.async_client.post(self.path, self.data, format="json")
 
         # Compare docket entry data.
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
-        docket = recap_document[0].docket_entry.docket
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry__docket"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
+        recap_document_first = await recap_document.afirst()
+        docket = recap_document_first.docket_entry.docket
         self.assertEqual(docket.pacer_case_id, "12345")
-        self.assertEqual(recap_document[0].pacer_doc_id, "")
-        self.assertEqual(recap_document[0].docket_entry.entry_number, None)
+        self.assertEqual(recap_document_first.pacer_doc_id, "")
+        self.assertEqual(recap_document_first.docket_entry.entry_number, None)
 
         # A DocketAlert email for the recap.email user should go out
         self.assertEqual(len(mail.outbox), 1)
 
         # We can't set the seal status of a minute entry.
-        self.assertEqual(recap_document[0].is_sealed, None)
+        self.assertEqual(recap_document_first.is_sealed, None)
         webhook_triggered = WebhookEvent.objects.filter(webhook=self.webhook)
-        content = webhook_triggered.first().content
+        webhook_triggered_first = await webhook_triggered.afirst()
+        content = webhook_triggered_first.content
         is_sealed = content["payload"]["results"][0]["recap_documents"][0][
             "is_sealed"
         ]
@@ -4269,8 +4442,9 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.api.webhooks.requests.post",
         side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
     )
-    def test_recap_email_minute_entry_multi_nef(
+    async def test_recap_email_minute_entry_multi_nef(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -4290,17 +4464,19 @@ class RecapEmailDocketAlerts(TestCase):
         ):
             # Trigger a new nda recap.email notification from testing_1@recap.email
             # Multi Docket NEF.
-            self.client.post(self.path, self.data, format="json")
+            await self.async_client.post(self.path, self.data, format="json")
 
         # Compare docket entry data.
         dockets = Docket.objects.all()
-        self.assertEqual(len(dockets), 2)
+        self.assertEqual(await dockets.acount(), 2)
         docket_entries = DocketEntry.objects.all()
-        self.assertEqual(len(docket_entries), 2)
-        recap_documents = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_documents), 2)
+        self.assertEqual(await docket_entries.acount(), 2)
+        recap_documents = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        self.assertEqual(await recap_documents.acount(), 2)
 
-        for rd in recap_documents:
+        async for rd in recap_documents:
             self.assertEqual(rd.pacer_doc_id, "")
             self.assertEqual(rd.is_sealed, None)
             self.assertEqual(rd.document_number, "")
@@ -4649,10 +4825,10 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         }
 
     def setUp(self) -> None:
-        self.client = APIClient()
+        self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"
-        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
         self.path = "/api/rest/v3/recap-email/"
 
     @mock.patch(
@@ -4665,7 +4841,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
             "OK",
         ),
     )
-    def test_nda_get_document_number_from_pdf(
+    async def test_nda_get_document_number_from_pdf(
         self,
         mock_bucket_open,
         mock_pacer_court_accessible,
@@ -4678,17 +4854,20 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_ca9, format="json")
+        await self.async_client.post(self.path, self.data_ca9, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
 
         # Compare the NDA docket and recap document metadata
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
-        self.assertEqual(recap_document[0].is_available, True)
-        self.assertEqual(recap_document[0].document_number, "138")
-        self.assertEqual(recap_document[0].docket_entry.entry_number, 138)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.is_available, True)
+        self.assertEqual(recap_document_first.document_number, "138")
+        self.assertEqual(recap_document_first.docket_entry.entry_number, 138)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -4706,7 +4885,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
         side_effect=lambda z, x: "011112443447",
     )
-    def test_nda_get_document_number_from_confirmation_page(
+    async def test_nda_get_document_number_from_confirmation_page(
         self,
         mock_bucket_open,
         mock_pacer_court_accessible,
@@ -4720,18 +4899,21 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_ca11, format="json")
+        await self.async_client.post(self.path, self.data_ca11, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
 
         # Compare the NDA docket and recap document metadata
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
-        self.assertEqual(recap_document[0].is_available, True)
-        self.assertEqual(recap_document[0].document_number, "011012443447")
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.is_available, True)
+        self.assertEqual(recap_document_first.document_number, "011012443447")
         self.assertEqual(
-            recap_document[0].docket_entry.entry_number, 11012443447
+            recap_document_first.docket_entry.entry_number, 11012443447
         )
 
     @mock.patch(
@@ -4750,7 +4932,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
         side_effect=lambda z, x: "148",
     )
-    def test_nda_get_document_number_fallback(
+    async def test_nda_get_document_number_fallback(
         self,
         mock_bucket_open,
         mock_pacer_court_accessible,
@@ -4765,17 +4947,20 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_ca2, format="json")
+        await self.async_client.post(self.path, self.data_ca2, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
 
         # Compare the NDA docket and recap document metadata
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
-        self.assertEqual(recap_document[0].is_available, True)
-        self.assertEqual(recap_document[0].document_number, "148")
-        self.assertEqual(recap_document[0].docket_entry.entry_number, 148)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.is_available, True)
+        self.assertEqual(recap_document_first.document_number, "148")
+        self.assertEqual(recap_document_first.docket_entry.entry_number, 148)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -4788,7 +4973,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
         side_effect=lambda z, x: "",
     )
-    def test_nda_not_document_number_available(
+    async def test_nda_not_document_number_available(
         self,
         mock_bucket_open,
         mock_pacer_court_accessible,
@@ -4803,15 +4988,18 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_ca8, format="json")
+        await self.async_client.post(self.path, self.data_ca8, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
+        self.assertEqual(await email_processing.acount(), 1)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
         # Document number keeps blank.
-        self.assertEqual(recap_document[0].document_number, "")
-        self.assertEqual(recap_document[0].docket_entry.entry_number, None)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.document_number, "")
+        self.assertEqual(recap_document_first.docket_entry.entry_number, None)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -4824,7 +5012,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
         side_effect=lambda z, x: "011112443447",
     )
-    def test_receive_same_recap_email_nda_notification_different_users(
+    async def test_receive_same_recap_email_nda_notification_different_users(
         self,
         mock_bucket_open,
         mock_pacer_court_accessible,
@@ -4838,26 +5026,30 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_ca11, format="json")
+        await self.async_client.post(self.path, self.data_ca11, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
+        self.assertEqual(await email_processing.acount(), 1)
 
         # Compare the NDA docket and recap document metadata
         recap_document = RECAPDocument.objects.all()
         docket_entry = DocketEntry.objects.all()
-        self.assertEqual(len(recap_document), 1)
-        self.assertEqual(len(docket_entry), 1)
+        self.assertEqual(await recap_document.acount(), 1)
+        self.assertEqual(await docket_entry.acount(), 1)
 
         # Trigger a new nda recap.email notification for the same case/document
-        self.client.post(self.path, self.data_ca11, format="json")
+        await self.async_client.post(self.path, self.data_ca11, format="json")
         recap_document_2 = RECAPDocument.objects.all()
         docket_entry_2 = DocketEntry.objects.all()
         # No duplicated docket entries and recap documents
-        self.assertEqual(len(recap_document_2), 1)
-        self.assertEqual(len(docket_entry_2), 1)
-        self.assertEqual(recap_document[0].pk, recap_document_2[0].pk)
-        self.assertEqual(docket_entry[0].pk, docket_entry_2[0].pk)
+        self.assertEqual(await recap_document_2.acount(), 1)
+        self.assertEqual(await docket_entry_2.acount(), 1)
+        recap_document_first = await recap_document.afirst()
+        recap_document_2_first = await recap_document_2.afirst()
+        self.assertEqual(recap_document_first.pk, recap_document_2_first.pk)
+        docket_entry_first = await docket_entry.afirst()
+        docket_entry_2_first = await docket_entry_2.afirst()
+        self.assertEqual(docket_entry_first.pk, docket_entry_2_first.pk)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -4870,7 +5062,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
         side_effect=lambda z, x: "148",
     )
-    def test_nda_document_not_available_get_from_confirmation_page(
+    async def test_nda_document_not_available_get_from_confirmation_page(
         self,
         mock_bucket_open,
         mock_pacer_court_accessible,
@@ -4884,24 +5076,31 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
         """
 
         # Trigger a new nda recap.email notification from testing_1@recap.email
-        self.client.post(self.path, self.data_ca2, format="json")
+        await self.async_client.post(self.path, self.data_ca2, format="json")
 
         email_processing = EmailProcessingQueue.objects.all()
-        self.assertEqual(len(email_processing), 1)
-        recap_document = RECAPDocument.objects.all()
-        self.assertEqual(len(recap_document), 1)
+        self.assertEqual(await email_processing.acount(), 1)
+        recap_document = RECAPDocument.objects.all().prefetch_related(
+            "docket_entry"
+        )
+        self.assertEqual(await recap_document.acount(), 1)
 
         # Compare the NDA docket and recap document metadata
-        self.assertEqual(recap_document[0].document_number, "148")
-        self.assertEqual(recap_document[0].docket_entry.entry_number, 148)
+        recap_document_first = await recap_document.afirst()
+        self.assertEqual(recap_document_first.document_number, "148")
+        self.assertEqual(recap_document_first.docket_entry.entry_number, 148)
 
 
+@mock.patch("cl.lib.pacer.socket.gethostbyname", return_value="127.0.0.1")
 class CheckCourtConnectivityTest(TestCase):
     """Test the is_pacer_court_accessible method."""
 
     def setUp(self) -> None:
+        self.court_id = "alnb"
         self.r = make_redis_interface("CACHE")
-        self.r.flushdb()
+        key = self.r.keys(f"status:pacer:court.{self.court_id}:ip.127.0.0.1")
+        if key:
+            self.r.delete(*key)
 
     @mock.patch(
         "cl.lib.pacer.check_pacer_court_connectivity",
@@ -4911,8 +5110,10 @@ class CheckCourtConnectivityTest(TestCase):
             "date_time": datetime.now(timezone.utc),
         },
     )
-    def test_is_pacer_court_accessible_pass(self, mock_check_court):
-        court_status = is_pacer_court_accessible("alnb")
+    def test_is_pacer_court_accessible_pass(
+        self, mock_get_ip, mock_check_court
+    ):
+        court_status = is_pacer_court_accessible(self.court_id)
         self.assertEqual(court_status, True)
 
     @mock.patch(
@@ -4923,11 +5124,14 @@ class CheckCourtConnectivityTest(TestCase):
             "date_time": datetime.now(timezone.utc),
         },
     )
-    def test_is_pacer_court_accessible_fails(self, mock_check_court):
-        court_status = is_pacer_court_accessible("alnb")
+    def test_is_pacer_court_accessible_fails(
+        self, mock_get_ip, mock_check_court
+    ):
+        court_status = is_pacer_court_accessible(self.court_id)
         self.assertEqual(court_status, False)
 
 
+@mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
 @mock.patch(
     "cl.recap.tasks.RecapEmailSESStorage.open",
     side_effect=mock_bucket_open,
@@ -4994,10 +5198,10 @@ class WebhooksRetries(TestCase):
         cls.file_stream_error = ContentFile("ERROR")
 
     def setUp(self) -> None:
-        self.client = APIClient()
+        self.async_client = AsyncAPIClient()
         self.user = User.objects.get(username="recap-email")
         token = f"Token {self.user.auth_token.key}"
-        self.client.credentials(HTTP_AUTHORIZATION=token)
+        self.async_client.credentials(HTTP_AUTHORIZATION=token)
         self.path = "/api/rest/v3/recap-email/"
 
         recipient_user = self.user_profile
@@ -5011,8 +5215,16 @@ class WebhooksRetries(TestCase):
 
         self.r = make_redis_interface("CACHE")
 
+    @classmethod
+    def restart_webhook_executed(cls):
+        r = make_redis_interface("CACHE")
+        key = r.keys("daemon:webhooks:executed")
+        if key:
+            r.delete(*key)
+
     def test_get_next_webhook_retry_date(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5048,6 +5260,7 @@ class WebhooksRetries(TestCase):
 
     def test_retry_webhook_disabled(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5080,6 +5293,7 @@ class WebhooksRetries(TestCase):
 
     def test_retry_webhook_events(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5179,6 +5393,7 @@ class WebhooksRetries(TestCase):
 
     def test_webhook_response_status_codes(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5228,8 +5443,9 @@ class WebhooksRetries(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
-    def test_update_webhook_after_http_error(
+    async def test_update_webhook_after_http_error(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5252,46 +5468,55 @@ class WebhooksRetries(TestCase):
             with time_machine.travel(fake_now_0, tick=False):
                 # Trigger a new recap.email notification from testing_1@recap.email
                 # auto-subscription option enabled
-                self.client.post(self.path, self.data_nda, format="json")
+                await self.async_client.post(
+                    self.path, self.data_nda, format="json"
+                )
 
                 # Webhook should be triggered
                 webhook_triggered = WebhookEvent.objects.filter(
                     webhook=self.webhook
-                )
+                ).prefetch_related("webhook")
                 # Does the webhook was triggered?
-                self.assertEqual(webhook_triggered.count(), 1)
-                content = webhook_triggered.first().content
+                self.assertEqual(await webhook_triggered.acount(), 1)
+                webhook_triggered_first = await webhook_triggered.afirst()
+                content = webhook_triggered_first.content
                 # Compare the content of the webhook to the recap document
                 pacer_doc_id = content["payload"]["results"][0][
                     "recap_documents"
                 ][0]["pacer_doc_id"]
                 recap_document = RECAPDocument.objects.all()
-                self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+                recap_document_first = await recap_document.afirst()
+                self.assertEqual(
+                    recap_document_first.pacer_doc_id, pacer_doc_id
+                )
 
                 # Does the Idempotency-Key is generated
-                self.assertNotEqual(webhook_triggered[0].event_id, "")
-                self.assertEqual(webhook_triggered[0].status_code, 500)
-                self.assertEqual(webhook_triggered[0].error_message, "")
+                self.assertNotEqual(webhook_triggered_first.event_id, "")
+                self.assertEqual(webhook_triggered_first.status_code, 500)
+                self.assertEqual(webhook_triggered_first.error_message, "")
 
                 # Is the webhook event updated for retry?
                 first_retry_time = fake_now_0 + timedelta(minutes=3)
                 self.assertEqual(
-                    webhook_triggered[0].next_retry_date, first_retry_time
+                    webhook_triggered_first.next_retry_date, first_retry_time
                 )
                 self.assertEqual(
-                    webhook_triggered[0].event_status,
+                    webhook_triggered_first.event_status,
                     WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
                 )
-                self.assertEqual(webhook_triggered[0].retry_counter, 1)
-                self.assertEqual(webhook_triggered[0].response, "ERROR")
-                self.assertEqual(webhook_triggered[0].webhook.failure_count, 1)
+                self.assertEqual(webhook_triggered_first.retry_counter, 1)
+                self.assertEqual(webhook_triggered_first.response, "ERROR")
+                self.assertEqual(
+                    webhook_triggered_first.webhook.failure_count, 1
+                )
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
-    def test_update_webhook_after_network_error(
+    async def test_update_webhook_after_network_error(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5312,49 +5537,58 @@ class WebhooksRetries(TestCase):
             with time_machine.travel(fake_now_0, tick=False):
                 # Trigger a new recap.email notification from testing_1@recap.email
                 # auto-subscription option enabled
-                self.client.post(self.path, self.data_nda, format="json")
+                await self.async_client.post(
+                    self.path, self.data_nda, format="json"
+                )
 
                 # Webhook should be triggered
                 webhook_triggered = WebhookEvent.objects.filter(
                     webhook=self.webhook
-                )
+                ).prefetch_related("webhook")
                 # Does the webhook was triggered?
-                self.assertEqual(webhook_triggered.count(), 1)
-                content = webhook_triggered.first().content
+                self.assertEqual(await webhook_triggered.acount(), 1)
+                webhook_triggered_first = await webhook_triggered.afirst()
+                content = webhook_triggered_first.content
                 # Compare the content of the webhook to the recap document
                 pacer_doc_id = content["payload"]["results"][0][
                     "recap_documents"
                 ][0]["pacer_doc_id"]
                 recap_document = RECAPDocument.objects.all()
-                self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+                recap_document_first = await recap_document.afirst()
+                self.assertEqual(
+                    recap_document_first.pacer_doc_id, pacer_doc_id
+                )
 
                 # Does the Idempotency-Key is generated
-                self.assertNotEqual(webhook_triggered[0].event_id, "")
-                self.assertEqual(webhook_triggered[0].status_code, None)
+                self.assertNotEqual(webhook_triggered_first.event_id, "")
+                self.assertEqual(webhook_triggered_first.status_code, None)
                 self.assertEqual(
-                    webhook_triggered[0].error_message,
+                    webhook_triggered_first.error_message,
                     "ConnectionError: Connection Error",
                 )
 
                 # Is the webhook event updated for retry?
                 first_retry_time = fake_now_0 + timedelta(minutes=3)
                 self.assertEqual(
-                    webhook_triggered[0].next_retry_date, first_retry_time
+                    webhook_triggered_first.next_retry_date, first_retry_time
                 )
                 self.assertEqual(
-                    webhook_triggered[0].event_status,
+                    webhook_triggered_first.event_status,
                     WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
                 )
-                self.assertEqual(webhook_triggered[0].retry_counter, 1)
-                self.assertEqual(webhook_triggered[0].response, "")
-                self.assertEqual(webhook_triggered[0].webhook.failure_count, 1)
+                self.assertEqual(webhook_triggered_first.retry_counter, 1)
+                self.assertEqual(webhook_triggered_first.response, "")
+                self.assertEqual(
+                    webhook_triggered_first.webhook.failure_count, 1
+                )
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
-    def test_success_webhook_delivery(
+    async def test_success_webhook_delivery(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5375,42 +5609,51 @@ class WebhooksRetries(TestCase):
             with time_machine.travel(fake_now_0, tick=False):
                 # Trigger a new recap.email notification from testing_1@recap.email
                 # auto-subscription option enabled
-                self.client.post(self.path, self.data_nda, format="json")
+                await self.async_client.post(
+                    self.path, self.data_nda, format="json"
+                )
 
                 # Webhook should be triggered
                 webhook_triggered = WebhookEvent.objects.filter(
                     webhook=self.webhook
-                )
+                ).prefetch_related("webhook")
                 # Does the webhook was triggered?
-                self.assertEqual(webhook_triggered.count(), 1)
-                content = webhook_triggered.first().content
+                self.assertEqual(await webhook_triggered.acount(), 1)
+                webhook_triggered_first = await webhook_triggered.afirst()
+                content = webhook_triggered_first.content
                 # Compare the content of the webhook to the recap document
                 pacer_doc_id = content["payload"]["results"][0][
                     "recap_documents"
                 ][0]["pacer_doc_id"]
                 recap_document = RECAPDocument.objects.all()
-                self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
+                recap_document_first = await recap_document.afirst()
+                self.assertEqual(
+                    recap_document_first.pacer_doc_id, pacer_doc_id
+                )
 
                 # Does the Idempotency-Key is generated
-                self.assertNotEqual(webhook_triggered[0].event_id, "")
-                self.assertEqual(webhook_triggered[0].status_code, 200)
-                self.assertEqual(webhook_triggered[0].error_message, "")
+                self.assertNotEqual(webhook_triggered_first.event_id, "")
+                self.assertEqual(webhook_triggered_first.status_code, 200)
+                self.assertEqual(webhook_triggered_first.error_message, "")
 
-                self.assertEqual(webhook_triggered[0].next_retry_date, None)
+                self.assertEqual(webhook_triggered_first.next_retry_date, None)
                 self.assertEqual(
-                    webhook_triggered[0].event_status,
+                    webhook_triggered_first.event_status,
                     WEBHOOK_EVENT_STATUS.SUCCESSFUL,
                 )
-                self.assertEqual(webhook_triggered[0].retry_counter, 0)
-                self.assertEqual(webhook_triggered[0].response, "OK")
-                self.assertEqual(webhook_triggered[0].webhook.failure_count, 0)
+                self.assertEqual(webhook_triggered_first.retry_counter, 0)
+                self.assertEqual(webhook_triggered_first.response, "OK")
+                self.assertEqual(
+                    webhook_triggered_first.webhook.failure_count, 0
+                )
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
-    def test_retry_webhooks_integration(
+    async def test_retry_webhooks_integration(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5432,32 +5675,38 @@ class WebhooksRetries(TestCase):
             with time_machine.travel(fake_now_0, tick=False):
                 # Trigger a new recap.email notification from testing_1@recap.email
                 # auto-subscription option enabled
-                self.client.post(self.path, self.data_nda, format="json")
+                await self.async_client.post(
+                    self.path, self.data_nda, format="json"
+                )
 
                 # Webhook should be triggered
                 webhook_triggered = WebhookEvent.objects.filter(
                     webhook=self.webhook
                 )
                 # Does the webhook was triggered?
-                self.assertEqual(webhook_triggered.count(), 1)
-                content = webhook_triggered.first().content
+                self.assertEqual(await webhook_triggered.acount(), 1)
+                webhook_triggered_first = await webhook_triggered.afirst()
+                content = webhook_triggered_first.content
                 # Compare the content of the webhook to the recap document
                 pacer_doc_id = content["payload"]["results"][0][
                     "recap_documents"
                 ][0]["pacer_doc_id"]
                 recap_document = RECAPDocument.objects.all()
-                self.assertEqual(recap_document[0].pacer_doc_id, pacer_doc_id)
-                self.assertNotEqual(webhook_triggered[0].event_id, "")
-                self.assertEqual(webhook_triggered[0].status_code, 500)
+                recap_document_first = await recap_document.afirst()
+                self.assertEqual(
+                    recap_document_first.pacer_doc_id, pacer_doc_id
+                )
+                self.assertNotEqual(webhook_triggered_first.event_id, "")
+                self.assertEqual(webhook_triggered_first.status_code, 500)
                 first_retry_time = fake_now_0 + timedelta(minutes=3)
                 self.assertEqual(
-                    webhook_triggered[0].next_retry_date, first_retry_time
+                    webhook_triggered_first.next_retry_date, first_retry_time
                 )
                 self.assertEqual(
-                    webhook_triggered[0].event_status,
+                    webhook_triggered_first.event_status,
                     WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY,
                 )
-                self.assertEqual(webhook_triggered[0].retry_counter, 1)
+                self.assertEqual(webhook_triggered_first.retry_counter, 1)
 
             elapsed_times = [
                 (1, 2, 3, WEBHOOK_EVENT_STATUS.ENQUEUED_RETRY),
@@ -5467,23 +5716,25 @@ class WebhooksRetries(TestCase):
                 fake_now = fake_now_0 + timedelta(minutes=delay)
                 next_retry_time = fake_now_0 + timedelta(minutes=elapsed)
                 with time_machine.travel(fake_now, tick=False):
-                    retry_webhook_events()
+                    await sync_to_async(retry_webhook_events)()
 
+                    await webhook_triggered_first.arefresh_from_db()
                     self.assertEqual(
-                        webhook_triggered[0].event_status,
+                        webhook_triggered_first.event_status,
                         status,
                     )
                     self.assertEqual(
-                        webhook_triggered[0].retry_counter, try_count
+                        webhook_triggered_first.retry_counter, try_count
                     )
                     self.assertEqual(
-                        webhook_triggered[0].next_retry_date, next_retry_time
+                        webhook_triggered_first.next_retry_date,
+                        next_retry_time,
                     )
 
             # Update the retry counter and next_retry_date to mock the 6th
             # retry.
             fake_now_4 = fake_now_0 + timedelta(hours=18, minutes=12)
-            webhook_triggered.update(
+            await webhook_triggered.aupdate(
                 retry_counter=6, next_retry_date=fake_now_4
             )
             elapsed_times = [
@@ -5499,10 +5750,11 @@ class WebhooksRetries(TestCase):
             for elapsed, status in elapsed_times:
                 fake_now = fake_now_0 + timedelta(minutes=elapsed)
                 with time_machine.travel(fake_now, tick=False):
-                    retry_webhook_events()
+                    await sync_to_async(retry_webhook_events)()
                     # Triggered
+                    webhook_triggered_first = await webhook_triggered.afirst()
                     self.assertEqual(
-                        webhook_triggered[0].event_status,
+                        webhook_triggered_first.event_status,
                         status,
                     )
 
@@ -5511,19 +5763,25 @@ class WebhooksRetries(TestCase):
                         message = mail.outbox[2]
                         subject_to_compare = "webhook is now disabled"
                         self.assertIn(subject_to_compare, message.subject)
-                        self.assertEqual(webhook_triggered[0].retry_counter, 8)
+                        self.assertEqual(
+                            webhook_triggered_first.retry_counter, 8
+                        )
                     else:
-                        self.assertEqual(webhook_triggered[0].retry_counter, 7)
+                        self.assertEqual(
+                            webhook_triggered_first.retry_counter, 7
+                        )
 
                     seven_retry_time = fake_now_4 + timedelta(
                         hours=36, minutes=27
                     )
                     self.assertEqual(
-                        webhook_triggered[0].next_retry_date, seven_retry_time
+                        webhook_triggered_first.next_retry_date,
+                        seven_retry_time,
                     )
 
     def test_webhook_disabling(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5631,6 +5889,7 @@ class WebhooksRetries(TestCase):
 
     def test_cut_off_time_for_retry_events_and_restore_retry_counter(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5766,6 +6025,7 @@ class WebhooksRetries(TestCase):
 
     def test_webhook_continues_failing_after_an_event_delivery(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5904,6 +6164,7 @@ class WebhooksRetries(TestCase):
 
     def test_delete_old_webhook_events(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -5931,7 +6192,7 @@ class WebhooksRetries(TestCase):
         no_time_to_delete_1 = now().replace(hour=11, minute=59, second=0)
         with time_machine.travel(no_time_to_delete_1, tick=False):
             deleted_count, notifications_send = execute_additional_tasks()
-            self.r.flushdb()
+            self.restart_webhook_executed()
             self.assertEqual(deleted_count, None)
 
         # The delete method should be executed at 12:00 UTC.
@@ -5944,7 +6205,7 @@ class WebhooksRetries(TestCase):
         no_time_to_delete = now().replace(hour=12, minute=5, second=0)
         with time_machine.travel(no_time_to_delete, tick=False):
             deleted_count, notifications_send = execute_additional_tasks()
-            self.r.flushdb()
+            self.restart_webhook_executed()
             self.assertEqual(deleted_count, None)
 
         webhook_events = WebhookEvent.objects.all()
@@ -5953,6 +6214,7 @@ class WebhooksRetries(TestCase):
 
     def test_send_notifications_if_webhook_still_disabled(
         self,
+        mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
@@ -6020,7 +6282,7 @@ class WebhooksRetries(TestCase):
             )
             with time_machine.travel(hours_after, tick=False):
                 execute_additional_tasks()
-                self.r.flushdb()
+                self.restart_webhook_executed()
                 self.assertEqual(len(mail.outbox), email_out)
 
                 subject_to_compare = "webhook is now disabled"

@@ -16,13 +16,14 @@ SOLR_OPINION_HL_FIELDS = [
     "text",
 ]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
-SOLR_PEOPLE_ES_HL_FIELDS = [
+PEOPLE_ES_HL_FIELDS = [
     "name",
-    "name.exact",
     "dob_city",
+    "political_affiliation",
+    "school",
+]
+PEOPLE_ES_HL_KEYWORD_FIELDS = [
     "dob_state_id",
-    "text",
-    "text.exact",
 ]
 
 # ES fields that are used in the search queries
@@ -114,22 +115,15 @@ SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
 ]
 SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "caseName",
-    "caseName.exact",
     "judge",
-    "judge.exact",
     "docketNumber",
-    "docketNumber.exact",
     "court_citation_string",
     "text",
-    "text.exact",
 ]
 SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
     "text",
-    "text.exact",
     "docketNumber",
-    "docketNumber.exact",
     "judge",
-    "judge.exact",
 ]
 SOLR_RECAP_HL_FIELDS = [
     "assignedTo",
@@ -145,32 +139,21 @@ SOLR_RECAP_HL_FIELDS = [
 ]
 SEARCH_RECAP_HL_FIELDS = [
     "assignedTo",
-    "assignedTo.exact",
     "caseName",
-    "caseName.exact",
     "cause",
-    "cause.exact",
     "court_citation_string",
     "docketNumber",
-    "docketNumber.exact",
     "juryDemand",
-    "juryDemand.exact",
     "referredTo",
-    "referredTo.exact",
     "suitNature",
-    "suitNature.exact",
 ]
 
 SEARCH_OPINION_HL_FIELDS = [
     "caseName",
-    "caseName.exact",
     "citation",
-    "citation.exact",
     "court_citation_string",
     "docketNumber",
-    "docketNumber.exact",
     "suitNature",
-    "suitNature.exact",
 ]
 
 
@@ -181,20 +164,13 @@ SEARCH_OPINION_HL_FIELDS = [
 # or provide a different integer to limit the snippet length.
 SEARCH_RECAP_CHILD_HL_FIELDS = {
     "short_description": 0,
-    "short_description.exact": 0,
     "description": 0,
-    "description.exact": 0,
-    "document_type": 0,
-    "document_type.exact": 0,
     "plain_text": 100,
-    "plain_text.exact": 100,
 }
 SEARCH_OPINION_CHILD_HL_FIELDS = {
     "text": 100,
-    "text.exact": 100,
 }
 
-MULTI_VALUE_HL_FIELDS = ["citation"]
 # Search query for related items
 RELATED_PATTERN = re.compile(
     r"""

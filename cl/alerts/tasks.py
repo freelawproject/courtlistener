@@ -4,6 +4,7 @@ from datetime import datetime
 from importlib import import_module
 from typing import Dict, List, Tuple, Union, cast
 
+from asgiref.sync import async_to_sync
 from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -18,7 +19,6 @@ from cl.alerts.utils import (
     alert_hits_limit_reached,
     override_alert_query,
     percolate_document,
-    user_has_donated_enough,
 )
 from cl.api.models import WebhookEventType
 from cl.api.tasks import (
@@ -36,9 +36,9 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.constants import ALERTS_HL_TAG
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
+    ESDocumentNameType,
     PercolatorResponseType,
     SaveDocumentResponseType,
     SearchAlertHitType,
@@ -342,7 +342,7 @@ def send_alert_and_webhook(
     connection.send_messages(messages)
 
     # Work completed. Tally, log, and clean up
-    tally_stat("alerts.docket.alerts.sent", inc=len(messages))
+    async_to_sync(tally_stat)("alerts.docket.alerts.sent", inc=len(messages))
     DocketAlert.objects.filter(docket=d).update(date_last_hit=now())
 
     # Send docket entries to webhook
@@ -532,7 +532,6 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
             merge_highlights_into_result(
                 hit.meta.highlight.to_dict(),
                 document_content_copy,
-                ALERTS_HL_TAG,
             )
 
         # Override order_by to show the latest items when clicking the
@@ -555,10 +554,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
         # Send RT Alerts
         if alert_triggered.rate == Alert.REAL_TIME:
-            user_donated_enough = user_has_donated_enough(
-                alert_user, alerts_count=1
-            )
-            if not user_donated_enough:
+            if not alert_user.profile.is_member:
                 continue
 
             # Append alert RT email to be sent.
@@ -594,7 +590,9 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
             date_last_hit=now()
         )
         alerts_sent = len(rt_alerts_to_send)
-        tally_stat(f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent)
+        async_to_sync(tally_stat)(
+            f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent
+        )
         logger.info(f"Sent {alerts_sent} {Alert.REAL_TIME} email alerts.")
 
 
@@ -663,7 +661,7 @@ def send_or_schedule_alerts(
 def es_save_alert_document(
     self: Task,
     alert_id: int,
-    es_document_name: str,
+    es_document_name: ESDocumentNameType,
 ) -> None:
     """Helper method to prepare and index an Alert object into Elasticsearch.
 

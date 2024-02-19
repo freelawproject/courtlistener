@@ -55,7 +55,6 @@ class Command(VerboseCommand):
                             "type": PAYMENT_TYPES.DONATION,
                         },
                     },
-                    reverse("donate_complete"),
                 )
             except PaymentFailureException:
                 m_donation.failure_count += 1
@@ -90,7 +89,7 @@ class Command(VerboseCommand):
                 # is triggered.
 
         if results["users"]:
-            email: EmailType = emails["admin_donation_report"]
+            email: EmailType = emails["admin_monthly_donation_report"]
             body = email["body"] % (
                 results["amount"],
                 "\n".join(results["users"]),

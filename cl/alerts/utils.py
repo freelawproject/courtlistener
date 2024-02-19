@@ -93,29 +93,6 @@ def percolate_document(
     return s.execute()
 
 
-def user_has_donated_enough(
-    alert_user: UserProfile.user, alerts_count: int
-) -> bool:
-    """Check if a user has donated enough to receive real-time alerts.
-
-    :param alert_user: The user object associated with the alerts.
-    :param alerts_count: The number of real-time alerts triggered for the user.
-    :return: True if the user has donated enough, otherwise False.
-    """
-
-    not_donated_enough = (
-        alert_user.profile.total_donated_last_year
-        < settings.MIN_DONATION["rt_alerts"]
-    )
-    if not_donated_enough:
-        logger.info(
-            "User: %s has not donated enough for their %s "
-            "RT alerts to be sent.\n" % (alert_user, alerts_count)
-        )
-        return False
-    return True
-
-
 def override_alert_query(
     alert: Alert, cut_off_date: date | None = None
 ) -> QueryDict:

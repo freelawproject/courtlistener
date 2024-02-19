@@ -3,6 +3,7 @@ import traceback
 import warnings
 
 import waffle
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
@@ -12,7 +13,7 @@ from django.template import loader
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
-from cl.alerts.utils import InvalidDateError, user_has_donated_enough
+from cl.alerts.utils import InvalidDateError
 from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
@@ -200,10 +201,7 @@ class Command(VerboseCommand):
             logger.info(f"Running alerts for user '{user}': {alerts}")
 
             if rate == Alert.REAL_TIME:
-                user_donated_enough = user_has_donated_enough(
-                    user, alerts.count()
-                )
-                if not user_donated_enough:
+                if not user.profile.is_member:
                     continue
 
             hits = []
@@ -241,7 +239,7 @@ class Command(VerboseCommand):
                 alerts_sent_count += 1
                 send_alert(user.profile, hits)
 
-        tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
+        async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
         logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
     def clean_rt_queue(self):

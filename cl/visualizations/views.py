@@ -12,7 +12,7 @@ from django.http import (
     HttpResponseNotAllowed,
     HttpResponseRedirect,
 )
-from django.shortcuts import aget_object_or_404, render
+from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
@@ -267,9 +267,9 @@ async def privatize_visualization(request: HttpRequest) -> HttpResponse:
         )
 
 
-def mapper_homepage(request: HttpRequest) -> HttpResponse:
+async def mapper_homepage(request: HttpRequest) -> HttpResponse:
     if not is_bot(request):
-        tally_stat("visualization.scotus_homepage_loaded")
+        await tally_stat("visualization.scotus_homepage_loaded")
 
     visualizations = (
         SCOTUSMap.objects.filter(published=True, deleted=False)
@@ -281,7 +281,7 @@ def mapper_homepage(request: HttpRequest) -> HttpResponse:
         .order_by("-date_published", "-date_modified", "-date_created")[:2]
     )
 
-    return render(
+    return TemplateResponse(
         request,
         "visualization_home.html",
         {"visualizations": visualizations, "private": False},

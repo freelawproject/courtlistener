@@ -9,11 +9,7 @@ from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.elasticsearch_utils import (
-    append_query_conjunctions,
-    replace_highlight,
-    select_unique_hl,
-)
+from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
@@ -33,6 +29,13 @@ from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.utils import (
+    check_for_proximity_tokens,
+    check_unbalanced_parenthesis,
+    check_unbalanced_quotes,
+    sanitize_unbalanced_parenthesis,
+    sanitize_unbalanced_quotes,
+)
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
@@ -362,47 +365,6 @@ class TestMimeLookup(SimpleTestCase):
         }
         for test_path in tests.keys():
             self.assertEqual(tests.get(test_path), lookup_mime_type(test_path))
-
-
-@override_settings(MAINTENANCE_MODE_ENABLED=True)
-class TestMaintenanceMiddleware(TestCase):
-    """Test the maintenance middleware"""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        # Do this in two steps to avoid triggering profile creation signal
-        admin = UserProfileWithParentsFactory.create(
-            user__username="admin",
-            user__password=make_password("password"),
-        )
-        admin.user.is_superuser = True
-        admin.user.is_staff = True
-        admin.user.save()
-
-    async def test_middleware_works_when_enabled(self) -> None:
-        """Does the middleware block users when enabled?"""
-        r = await self.async_client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_503_SERVICE_UNAVAILABLE,
-            "Did not get correct status code. Got: %s instead of %s"
-            % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE),
-        )
-
-    async def test_staff_can_get_through(self) -> None:
-        """Can staff get through when the middleware is enabled?"""
-        self.assertTrue(
-            await self.async_client.alogin(
-                username="admin", password="password"
-            )
-        )
-        r = await self.async_client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_200_OK,
-            "Staff did not get through, but should have. Staff got status "
-            "code of: %s instead of %s" % (r.status_code, HTTP_200_OK),
-        )
 
 
 class TestPACERPartyParsing(SimpleTestCase):
@@ -1018,119 +980,123 @@ class TestElasticsearchUtils(SimpleTestCase):
             ouput_str = append_query_conjunctions(test["input"])
             self.assertEqual(ouput_str, test["output"])
 
-    def test_replace_highlight(self) -> None:
-        """Confirm that the replace_highlight helper properly replaces
-        highlighted terms, ensuring it can handle Unicode characters, such as
-        emojis.
+    def test_check_and_sanitize_queries_bad_syntax(self) -> None:
+        """Tests for methods that check and sanitize queries with a bad search
+        syntax.
         """
 
+        # Check for bad proximity tokens.
         tests = [
             {
-                "cleaned_str": "MOTION for Leave to File Amicus Curiae Lorem",
-                "unique_hl_strings": ["Lorem", "Amicus", "Curiae"],
-                "output": "MOTION for Leave to File <mark>Amicus</mark> <mark>Curiae</mark> <mark>Lorem</mark>",
+                "input_str": "This is a range /p query",
+                "output": True,
             },
             {
-                "cleaned_str": "Strickland v. Washington.",
-                "unique_hl_strings": ["Washington", "v.", "Curiae"],
-                "output": "Strickland <mark>v.</mark> <mark>Washington</mark>.",
+                "input_str": "This is a range /s query",
+                "output": True,
             },
             {
-                "cleaned_str": "Strickland v. Washington Washington.",
-                "unique_hl_strings": ["Washington", "v."],
-                "output": "Strickland <mark>v.</mark> <mark>Washington</mark> <mark>Washington</mark>.",
+                "input_str": "This is a range/s query",
+                "output": True,
             },
             {
-                "cleaned_str": "Code, § 1-815",
-                "unique_hl_strings": ["§", "1-815"],
-                "output": "Code, <mark>§</mark> <mark>1-815</mark>",
+                "input_str": "This is a range/p query",
+                "output": True,
             },
             {
-                "cleaned_str": "Dr. Israel also demonstrated a misunderstanding",
-                "unique_hl_strings": ["Dr.", "a"],
-                "output": "<mark>Dr.</mark> Israel also demonstrated <mark>a</mark> misunderstanding",
+                "input_str": "This is a /s range /p query",
+                "output": True,
             },
             {
-                "cleaned_str": "Friedland ⚖️ Deposit",
-                "unique_hl_strings": ["⚖️", "Deposit"],
-                "output": "Friedland <mark>⚖️</mark> <mark>Deposit</mark>",
+                "input_str": "This is not a range query",
+                "output": False,
             },
         ]
-
         for test in tests:
-            output_str = replace_highlight(
-                test["cleaned_str"], test["unique_hl_strings"], "mark"  # type: ignore
+            output = check_for_proximity_tokens(
+                test["input_str"]  # type: ignore
             )
-            self.assertEqual(output_str, test["output"])
+            self.assertEqual(output, test["output"])
 
-    def test_select_unique_hl(self) -> None:
-        """Confirm that select_unique_hl correctly identifies and returns the
-        longest string for highlighting purposes.
-        """
+        # Check for Unbalanced parentheses.
         tests = [
             {
-                "current_list": [
-                    "MOTION for Leave to File Amicus Curiae Lorem"
-                ],
-                "input_str": "MOTION for Leave to File",
-                "output": ["MOTION for Leave to File Amicus Curiae Lorem"],
-                "field": "description",
+                "input_str": "This is (unbalanced",
+                "output": True,
+                "sanitized": "This is unbalanced",
             },
             {
-                "current_list": [
-                    "MOTION for Leave to File Amicus Curiae Lorem"
-                ],
-                "input_str": "for Leave to File Amicus",
-                "output": ["MOTION for Leave to File Amicus Curiae Lorem"],
-                "field": "description",
+                "input_str": "This is unbalanced)",
+                "output": True,
+                "sanitized": "This is unbalanced",
             },
             {
-                "current_list": ["Leave to File Amicus"],
-                "input_str": "Leave to File Amicus Curiae Lorem",
-                "output": ["Leave to File Amicus Curiae Lorem"],
-                "field": "description",
+                "input_str": "This is (unbalanced)(",
+                "output": True,
+                "sanitized": "This is (unbalanced)",
             },
             {
-                "current_list": ["to File Amicus Curiae"],
-                "input_str": "Leave to File Amicus Curiae Lorem",
-                "output": ["Leave to File Amicus Curiae Lorem"],
-                "field": "description",
+                "input_str": "This (is (unbalanced)(",
+                "output": True,
+                "sanitized": "This (is unbalanced)",
             },
             {
-                "current_list": [
-                    "to File Amicus Curiae Lorem pellentesque eu, elementum"
-                ],
-                "input_str": "Leave to File Amicus Curiae Lorem",
-                "output": [
-                    "to File Amicus Curiae Lorem pellentesque eu, elementum"
-                ],
-                "field": "description",
+                "input_str": "This (is (unbalanced)()",
+                "output": True,
+                "sanitized": "This (is (unbalanced))",
             },
             {
-                "current_list": ["22 AL 339"],
-                "input_str": "22 AL 1",
-                "output": ["22 AL 339", "22 AL 1"],
-                "field": "citation",
-            },
-            {
-                "current_list": ["22 AL 1"],
-                "input_str": "22 AL 339",
-                "output": ["22 AL 1", "22 AL 339"],
-                "field": "citation",
-            },
-            {
-                "current_list": ["22 AL 1", "22 AL 2"],
-                "input_str": "22 AL 2",
-                "output": ["22 AL 1", "22 AL 2"],
-                "field": "citation",
+                "input_str": "(This) (is (balanced))",
+                "output": False,
+                "sanitized": "(This) (is (balanced))",
             },
         ]
+        for test in tests:
+            output = check_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
 
         for test in tests:
-            output_str = select_unique_hl(
-                test["current_list"],  # type: ignore
-                test["input_str"],  # type: ignore
-                test["field"],  # type: ignore
+            output = sanitize_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
             )
-            print("Output STR: ", output_str)
-            self.assertEqual(output_str, test["output"])
+            self.assertEqual(output, test["sanitized"])
+
+        # Check for Unbalanced quotes.
+        tests = [
+            {
+                "input_str": 'This is "unbalanced',
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": 'This is "unbalanced""',
+                "output": True,
+                "sanitized": 'This is "unbalanced"',
+            },
+            {
+                "input_str": 'This "is" unbalanced"',
+                "output": True,
+                "sanitized": 'This "is" unbalanced',
+            },
+            {
+                "input_str": 'This "is" unbalanced"""',
+                "output": True,
+                "sanitized": 'This "is" unbalanced""',
+            },
+            {
+                "input_str": '"This is" "balanced"',
+                "output": False,
+                "sanitized": '"This is" "balanced"',
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_quotes(test["input_str"])  # type: ignore
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_quotes(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])

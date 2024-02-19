@@ -3,6 +3,7 @@ Created on Wed Feb 17 12:31:34 2016
 
 @author: elliott
 """
+
 import re
 from collections import Counter
 from datetime import date, datetime
@@ -44,7 +45,8 @@ C = Counter()  # for fixing school names.
 
 
 def get_school(schoolname, testing=False):
-    "Takes the name of a school from judges data and tries to match to a unique School object."
+    """Takes the name of a school from judges data and tries to match to a
+    unique School object."""
 
     if schoolname.isspace():
         return None

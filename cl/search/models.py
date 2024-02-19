@@ -7,10 +7,11 @@ import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Prefetch, Q, QuerySet
-from django.dispatch import Signal
+from django.db.models import Q, QuerySet
+from django.db.models.functions import MD5
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils.encoding import force_str
@@ -39,9 +40,6 @@ from cl.lib.search_index_utils import (
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
-
-# Custom signal for use with bulk_create.
-bulk_create_signal = Signal()
 
 
 class PRECEDENTIAL_STATUS:
@@ -639,7 +637,6 @@ class Docket(AbstractDateTimeModel):
         "the correction field on the Opinion Cluster.",
         blank=True,
         null=True,
-        db_index=True,
     )
     docket_number_core = models.CharField(
         help_text=(
@@ -813,13 +810,21 @@ class Docket(AbstractDateTimeModel):
     )
 
     class Meta:
-        unique_together = ("docket_number", "pacer_case_id", "court")
+        constraints = [
+            models.UniqueConstraint(
+                MD5("docket_number"),
+                "pacer_case_id",
+                "court_id",
+                name="unique_docket_per_court",
+            ),
+        ]
         indexes = [
             models.Index(fields=["court_id", "id"]),
             models.Index(
                 fields=["court_id", "docket_number_core", "pacer_case_id"],
                 name="district_court_docket_lookup_idx",
             ),
+            HashIndex("docket_number", name="hash_docket_number_lookup_idx"),
         ]
 
     def __str__(self) -> str:
@@ -1024,35 +1029,6 @@ class Docket(AbstractDateTimeModel):
     @property
     def pacer_view_doc_url(self):
         return self.pacer_district_url("qryDocument.pl")
-
-    @property
-    def prefetched_parties(self):
-        """Prefetch the attorneys and firms associated with a docket and put
-        those values into the `attys_in_docket` and `firms_in_docket`
-        attributes.
-
-        :return: A parties queryset with the correct values prefetched.
-        """
-        from cl.people_db.models import Attorney, AttorneyOrganization
-
-        return self.parties.prefetch_related(
-            Prefetch(
-                "attorneys",
-                queryset=Attorney.objects.filter(roles__docket=self)
-                .distinct()
-                .only("pk", "name"),
-                to_attr="attys_in_docket",
-            ),
-            Prefetch(
-                "attys_in_docket__organizations",
-                queryset=AttorneyOrganization.objects.filter(
-                    attorney_organization_associations__docket=self
-                )
-                .distinct()
-                .only("pk", "name"),
-                to_attr="firms_in_docket",
-            ),
-        )
 
     def as_search_list(self):
         """Create list of search dicts from a single docket. This should be
@@ -3574,15 +3550,6 @@ class OpinionJoinedBy(Opinion.joined_by.through):
         proxy = True
 
 
-class BulkCreateManager(models.Manager):
-    """Custom manager that will trigger a signal on bulk_create."""
-
-    def bulk_create_with_signal(self, objs, *args, **kwargs):
-        created_objs = super().bulk_create(objs, *args, **kwargs)
-        bulk_create_signal.send(sender=self.model, instances=created_objs)
-        return created_objs
-
-
 class OpinionsCited(models.Model):
     citing_opinion = models.ForeignKey(
         Opinion, related_name="cited_opinions", on_delete=models.CASCADE
@@ -3625,8 +3592,6 @@ class OpinionsCitedByRECAPDocument(models.Model):
         "in the citing document",
         default=1,
     )
-
-    objects = BulkCreateManager()
 
     def __str__(self) -> str:
         return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"
