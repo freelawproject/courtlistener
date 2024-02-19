@@ -13,6 +13,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RunSQL(
             sql="""DROP INDEX CONCURRENTLY IF EXISTS "search_docket_docket_number_4af29e98dca38326_uniq";""",
+            reverse_sql=migrations.RunSQL.noop,
             state_operations=[
                 migrations.AlterField(
                     model_name="docket",
@@ -27,6 +28,7 @@ class Migration(migrations.Migration):
         ),
         migrations.RunSQL(
             sql="""ALTER TABLE "search_docket" DROP CONSTRAINT IF EXISTS "search_docket_docket_number_7642c6c6dbd04704_uniq";""",
+            reverse_sql=migrations.RunSQL.noop,
             state_operations=[
                 migrations.AlterUniqueTogether(
                     name="docket",
