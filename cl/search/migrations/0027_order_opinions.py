@@ -7,7 +7,7 @@ import pgtrigger.migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("search", "0023_add_docket_sources_noop"),
+        ("search", "0026_drop_docket_unique_together_and_more"),
     ]
 
     operations = [
