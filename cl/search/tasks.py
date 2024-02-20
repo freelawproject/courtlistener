@@ -1189,17 +1189,21 @@ def remove_document_from_es_index(
     """
 
     es_document = getattr(es_document_module, es_document_name)
-    get_args: dict[str, int | str] = (
-        {"id": instance_id, "routing": routing}
-        if routing
-        else {"id": instance_id}
-    )
+    delete_args: dict[str, int | str] = {
+        "index": es_document._index._name,
+        "id": instance_id,
+    }
+    if routing:
+        delete_args["routing"] = routing
+    es = connections.get_connection()
     try:
-        doc = es_document.get(**get_args)
-        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+        es.delete(**delete_args)
+        if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+            # Set auto-refresh, used for testing.
+            es_document._index.refresh()
     except NotFoundError:
         model_label = es_document.Django.model.__name__.capitalize()
-        logger.error(
+        logger.warning(
             f"The {model_label} can't be deleted from the ES index, it doesn't "
             f"exists."
         )
