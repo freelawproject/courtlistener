@@ -1,6 +1,6 @@
 A new user signed up for CourtListener and we tried to match their email address
 to Neon. Alas, it didn't work because the email address '{{ user.email }}' appears
-is in Neon more than once.
+in Neon more than once.
 
 Please take the following actions to fix this situation:
 
