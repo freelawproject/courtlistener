@@ -8,7 +8,7 @@
 {% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
-{% block description %}Opinion for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block description %}{{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
 {% block og_description %}{{ cluster|best_case_name }}{% if summaries_count > 0 %} — {{ top_parenthetical_groups.0.representative.text|capfirst }}{% else %} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endif %}
 {% endblock %}
 
@@ -155,38 +155,15 @@
         </div>
 
 
-        {# Show cases this case cites #}
-        {% if authorities_count > 0  %}
-            <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ authorities_count|intcomma }})</span></h3>
-                <p class="bottom">This opinion cites:</p>
-                <ul>
-                    {% for authority in top_authorities %}
-                        <li>
-                            <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ authority.caption|safe|truncatewords:10|v_wrapper }}
-                            </a>
-                            {% if authority.citation_depth %}
-                              <span class="small gray">({{ authority.citation_depth }}&nbsp;time{{ authority.citation_depth|pluralize }})</span>
-                            {% endif %}
-                        </li>
-                    {% endfor %}
-                </ul>
-                <h4>
-                    <a href="{% url "view_authorities" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
-                       class="btn btn-default">
-                        View All Authorities
-                    </a>
-                </h4>
-            </div>
-        {% endif %}
+        {% include "includes/authorities_section.html" with authorities_context=authorities_context%}
+
 
         {# Related opinions #}
         {% if related_clusters %}
             <div id="recommendations" class="sidebar-section">
-                <h3><span>Related Opinions</span></h3>
+                <h3><span>Related Case Law</span></h3>
 
-                <p class="bottom">The following opinions cover similar topics:</p>
+                <p class="bottom">The following case law covers similar topics:</p>
 
                 {% url 'show_results' as show_results_url %}
 
@@ -245,7 +222,7 @@
 {% block content %}
     <article class="col-sm-9">
         {% with opinion_count=cluster.sub_opinions.all.count %}
-            <h2 class="inline">{{ cluster.caption|safe|v_wrapper }}</h2>
+            <h2 class="inline">{{ caption|safe|v_wrapper }}</h2>
             {% include "includes/notes_modal.html" %}
 
             <h3>{{ cluster.docket.court }}</h3>

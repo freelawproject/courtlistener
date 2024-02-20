@@ -1,29 +1,14 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Tuple, TypedDict, Union
+from typing import Any, Callable, Dict, List, NotRequired, TypedDict, Union
 
 from django.http import HttpRequest
-from eyecite.models import (
-    FullCaseCitation,
-    IdCitation,
-    Resource,
-    ShortCaseCitation,
-    SupraCitation,
-)
 
-from cl.search.models import Opinion
 from cl.users.models import User
 
 CleanData = Dict[str, Any]
 TaskData = Dict[str, Any]
-
-SupportedCitationType = Union[
-    FullCaseCitation, ShortCaseCitation, SupraCitation, IdCitation
-]
-MatchedResourceType = Union[Opinion, Resource]
-ResolvedFullCite = Tuple[FullCaseCitation, MatchedResourceType]
-ResolvedFullCites = List[ResolvedFullCite]
 
 
 class AuthenticatedHttpRequest(HttpRequest):
@@ -35,6 +20,12 @@ class EmailType(TypedDict, total=False):
     body: str
     from_email: str
     to: List[str]
+
+
+class ESRangeQueryParams(TypedDict):
+    gte: str | int | float
+    lte: str | int | float
+    relation: NotRequired[str]
 
 
 # fmt: off
@@ -216,9 +207,9 @@ class ApiPositionMapping(BasePositionMapping):
     date_referred_to_judicial_committee_dict: defaultdict[
         int, list[datetime]
     ] = field(default_factory=lambda: defaultdict(list))
-    date_judicial_committee_action_dict: defaultdict[
-        int, list[datetime]
-    ] = field(default_factory=lambda: defaultdict(list))
+    date_judicial_committee_action_dict: defaultdict[int, list[datetime]] = (
+        field(default_factory=lambda: defaultdict(list))
+    )
     date_hearing_dict: defaultdict[int, list[datetime]] = field(
         default_factory=lambda: defaultdict(list)
     )
@@ -237,9 +228,9 @@ class ApiPositionMapping(BasePositionMapping):
     date_termination_dict: defaultdict[int, list[datetime]] = field(
         default_factory=lambda: defaultdict(list)
     )
-    date_granularity_termination_dict: defaultdict[
-        int, list[datetime]
-    ] = field(default_factory=lambda: defaultdict(list))
+    date_granularity_termination_dict: defaultdict[int, list[datetime]] = (
+        field(default_factory=lambda: defaultdict(list))
+    )
 
     judicial_committee_action_dict: defaultdict[int, list[str]] = field(
         default_factory=lambda: defaultdict(list)

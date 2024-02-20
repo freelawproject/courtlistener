@@ -10,17 +10,14 @@ from django.template import loader
 from django.utils.timezone import now
 from juriscraper.lib import importer
 
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 from cl.scrapers.models import ErrorLog
 from cl.search.models import Court, OpinionCluster
 
 
-def _make_query_dict(query_list):
+def _make_query_dict(query_list) -> dict:
     """Reformat the results into dicts."""
-    result_dict = {}
-    for item in query_list:
-        result_dict[item["pk"]] = item["count"]
-    return result_dict
+    return {item["pk"]: item["count"] for item in query_list}
 
 
 def calculate_counts():
@@ -202,7 +199,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         report, subject = generate_report()
         send_report(report, subject, options["debug"])
         truncate_database_logs()

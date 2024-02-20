@@ -1,0 +1,15 @@
+{% load text_filters %}
+
+<ul>
+  {% for authority in authorities %}
+  <li>
+    {{ authority.depth }} reference{{ authority.depth|pluralize }} to
+    <a href="{{ authority.cited_opinion.cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}" {% if authority.blocked %}rel="nofollow" {% endif %}>
+      {{ authority.cited_opinion.cluster.caption|safe|v_wrapper }}
+    </a>
+    <br />
+    <span class="bullet-tail">{{ authority.cited_opinion.cluster.docket.court }}</span>
+    <span class="bullet-tail">{{ authority.cited_opinion.cluster.date_filed }}</span>
+  </li>
+  {% endfor %}
+</ul>

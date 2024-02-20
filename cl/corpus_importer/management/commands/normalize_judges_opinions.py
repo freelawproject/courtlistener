@@ -27,7 +27,7 @@ def normalize_authors_in_opinions():
 
         if not person:
             logger.warning(
-                f"Can't find person with this last name: "
+                "Can't find person with this last name: "
                 f"{opinion.author_str} in opinion id: {opinion.pk}"
             )
         else:

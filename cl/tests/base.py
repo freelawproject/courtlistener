@@ -1,6 +1,7 @@
 """
 Base class(es) for functional testing CourtListener using Selenium and PhantomJS
 """
+
 import os
 import socket
 from contextlib import contextmanager
@@ -69,22 +70,18 @@ class BaseSeleniumTest(
         )
 
         if settings.DOCKER_SELENIUM_HOST:
-            capabilities = options.to_capabilities()
             return webdriver.Remote(
                 settings.DOCKER_SELENIUM_HOST,
-                desired_capabilities=capabilities,
+                options=options,
                 keep_alive=True,
             )
-        return webdriver.Chrome(chrome_options=options, keep_alive=True)
+        return webdriver.Chrome(options=options, keep_alive=True)
 
     @classmethod
     def setUpClass(cls) -> None:
-        super(BaseSeleniumTest, cls).setUpClass()
+        super().setUpClass()
 
-        if "SELENIUM_DEBUG" in os.environ:
-            cls.screenshot = True
-        else:
-            cls.screenshot = False
+        cls.screenshot = "SELENIUM_DEBUG" in os.environ
 
         # Set host to externally accessible web server address
         cls.host = socket.gethostbyname(socket.gethostname())
@@ -109,7 +106,7 @@ class BaseSeleniumTest(
 
     @classmethod
     def tearDownClass(cls) -> None:
-        super(BaseSeleniumTest, cls).tearDownClass()
+        super().tearDownClass()
 
         cls.browser.quit()
 

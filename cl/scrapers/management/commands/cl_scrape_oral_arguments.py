@@ -1,4 +1,3 @@
-import random
 from datetime import date
 from typing import Any, Dict, Tuple, Union
 
@@ -128,7 +127,7 @@ class Command(cl_scrape_opinions.Command):
         for i, item in enumerate(site):
             msg, r = get_binary_content(
                 item["download_urls"],
-                site.cookies,
+                site,
                 headers={"User-Agent": "CourtListener"},
                 method=site.method,
             )

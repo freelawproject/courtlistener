@@ -25,7 +25,7 @@ class Command(VerboseCommand):
     help = "Charges people that have monthly subscriptions."
 
     def handle(self, *args, **options) -> None:
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         m_donations = MonthlyDonation.objects.filter(
             enabled=True,
@@ -55,9 +55,8 @@ class Command(VerboseCommand):
                             "type": PAYMENT_TYPES.DONATION,
                         },
                     },
-                    reverse("donate_complete"),
                 )
-            except PaymentFailureException as e:
+            except PaymentFailureException:
                 m_donation.failure_count += 1
                 m_donation.enabled = False
                 m_donation.save()
@@ -90,7 +89,7 @@ class Command(VerboseCommand):
                 # is triggered.
 
         if results["users"]:
-            email: EmailType = emails["admin_donation_report"]
+            email: EmailType = emails["admin_monthly_donation_report"]
             body = email["body"] % (
                 results["amount"],
                 "\n".join(results["users"]),

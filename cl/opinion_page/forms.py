@@ -107,7 +107,7 @@ class DocketEntryFilterForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop("request", None)
-        super(DocketEntryFilterForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean_order_by(self):
         data = self.cleaned_data["order_by"]
@@ -246,7 +246,7 @@ class CourtUploadForm(forms.Form):
 
     def __init__(self, *args, **kwargs) -> None:
         self.pk = kwargs.pop("pk", None)
-        super(CourtUploadForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
 
@@ -443,7 +443,7 @@ class CourtUploadForm(forms.Form):
         }
 
     def clean(self) -> dict[str, Any]:
-        super(CourtUploadForm, self).clean()
+        super().clean()
         self.validate_neutral_citation()
         self.make_panel()
         self.make_item_dict()

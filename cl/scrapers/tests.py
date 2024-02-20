@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
+from unittest import TestCase, mock
 
 from asgiref.sync import async_to_sync
 from django.conf import settings
@@ -26,7 +27,7 @@ from cl.scrapers.management.commands import (
 from cl.scrapers.models import ErrorLog, UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
-from cl.scrapers.utils import get_extension
+from cl.scrapers.utils import get_binary_content, get_extension
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Court, Docket, Opinion
 from cl.settings import MEDIA_ROOT
@@ -291,7 +292,7 @@ class ReportScrapeStatusTest(TestCase):
     ]
 
     def setUp(self) -> None:
-        super(ReportScrapeStatusTest, self).setUp()
+        super().setUp()
         self.court = Court.objects.get(pk="test")
         # Make some errors that we can tally
         ErrorLog(
@@ -431,7 +432,7 @@ class DupcheckerWithFixturesTest(TestCase):
     ]
 
     def setUp(self) -> None:
-        super(DupcheckerWithFixturesTest, self).setUp()
+        super().setUp()
         self.court = Court.objects.get(pk="test")
 
         # Set the dup_threshold to zero for these tests
@@ -577,3 +578,39 @@ class AudioFileTaskTest(TestCase):
             HTTPStatus.OK,
             msg="Unsuccessful audio conversion",
         )
+
+
+class ScraperContentTypeTest(TestCase):
+    def setUp(self):
+        # Common mock setup for all tests
+        self.mock_response = mock.MagicMock()
+        self.mock_response.content = b"not empty"
+        self.mock_response.headers = {"Content-Type": "application/pdf"}
+        self.site = test_opinion_scraper.Site()
+
+    @mock.patch("requests.Session.get")
+    def test_unexpected_content_type(self, mock_get):
+        """Test when content type doesn't match scraper expectation."""
+        mock_get.return_value = self.mock_response
+        self.site.expected_content_types = ["text/html"]
+
+        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        self.assertIn("UnexpectedContentTypeError:", msg)
+
+    @mock.patch("requests.Session.get")
+    def test_correct_content_type(self, mock_get):
+        """Test when content type matches scraper expectation."""
+        mock_get.return_value = self.mock_response
+        self.site.expected_content_types = ["application/pdf"]
+
+        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        self.assertEqual("", msg)
+
+    @mock.patch("requests.Session.get")
+    def test_no_content_type(self, mock_get):
+        """Test for no content type expected (ie. Montana)"""
+        mock_get.return_value = self.mock_response
+        self.site.expected_content_types = None
+
+        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        self.assertEqual("", msg)

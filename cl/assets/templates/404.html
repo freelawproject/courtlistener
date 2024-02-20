@@ -15,7 +15,7 @@
     <p>You've got a few options:</p>
     <ul>
       <li>
-        <p>Do a new search in the <a href="{% url "advanced_o" %}">Opinions database</a>, <a href="{% url "advanced_r" %}">RECAP Archive</a>, <a href="{% url "advanced_oa" %}">Oral Arguments database</a>, or <a href="{% url "advanced_p" %}">Judge database</a>.
+        <p>Do a new search in the <a href="{% url "advanced_o" %}">Case Law database</a>, <a href="{% url "advanced_r" %}">RECAP Archive</a>, <a href="{% url "advanced_oa" %}">Oral Arguments database</a>, or <a href="{% url "advanced_p" %}">Judge database</a>.
         </p>
       </li>
       <li>
@@ -39,7 +39,7 @@
       {% url "advanced_p" as p_url %}
       {% if o_url in request_path %}
         <a href="{{ o_url }}"
-           class="btn btn-lg btn-primary">Do a New Opinion Search</a>
+           class="btn btn-lg btn-primary">Do a New Case Law Search</a>
       {% elif r_url in request_path %}
         <a href="{{ r_url }}"
            class="btn btn-lg btn-primary">Do a New Search in the RECAP Archive</a>
