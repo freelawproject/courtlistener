@@ -1870,6 +1870,21 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_entry=de_5,
                 document_number="5",
             )
+
+            # Docket entry with a very old date_filed.
+            de_6 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    docket_number="12-0000",
+                    court=self.court_2,
+                    case_name="SUBPOENAS SERVED OLD",
+                ),
+                entry_number=6,
+                date_filed=datetime.date(1732, 2, 23),
+            )
+            RECAPDocumentFactory(
+                docket_entry=de_6,
+                document_number="6",
+            )
             PartyTypeFactory.create(
                 party=PartyFactory(
                     name="Defendant Jane Roe",
@@ -1905,11 +1920,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         # Frontend
         r = async_to_sync(self._test_article_count)(
-            params, 4, "order entry_date_filed desc"
+            params, 5, "order entry_date_filed desc"
         )
+
         self.assertTrue(
             r.content.decode().index("1:21-bk-1234")
             < r.content.decode().index("12-1235")
+            < r.content.decode().index("12-0000")
             < r.content.decode().index("12-1236")
             < r.content.decode().index("12-1237"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed  desc.",
@@ -1924,14 +1941,15 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         # Frontend
         r = async_to_sync(self._test_article_count)(
-            params, 4, "order entry_date_filed asc"
+            params, 5, "order entry_date_filed asc"
         )
         self.assertTrue(
-            r.content.decode().index("12-1235")
+            r.content.decode().index("12-0000")
+            < r.content.decode().index("12-1235")
             < r.content.decode().index("1:21-bk-1234")
             < r.content.decode().index("12-1236")
             < r.content.decode().index("12-1237"),
-            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
+            msg="'12-0000' should come BEFORE '12-1235' when order_by entry_date_filed asc.",
         )
 
         # Order by entry_date_filed desc in match all queries.
@@ -1942,12 +1960,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         # Frontend
         r = async_to_sync(self._test_article_count)(
-            params, 5, "order entry_date_filed desc"
+            params, 6, "order entry_date_filed desc"
         )
         self.assertTrue(
             r.content.decode().index("1:21-bk-1234")
             < r.content.decode().index("12-1235")
             < r.content.decode().index("12-1238")
+            < r.content.decode().index("12-0000")
             < r.content.decode().index("12-1236")
             < r.content.decode().index("12-1237"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed  desc.",
@@ -1961,15 +1980,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         # Frontend
         r = async_to_sync(self._test_article_count)(
-            params, 5, "order entry_date_filed asc"
+            params, 6, "order entry_date_filed asc"
         )
         self.assertTrue(
-            r.content.decode().index("12-1238")
+            r.content.decode().index("12-0000")
+            < r.content.decode().index("12-1238")
             < r.content.decode().index("12-1235")
             < r.content.decode().index("1:21-bk-1234")
             < r.content.decode().index("12-1236")
             < r.content.decode().index("12-1237"),
-            msg="'12-1238' should come BEFORE '12-1235' when order_by entry_date_filed asc.",
+            msg="'12-0000' should come BEFORE '12-1238' when order_by entry_date_filed asc.",
         )
 
         # Order by entry_date_filed desc filtering only parties
@@ -2013,6 +2033,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             de_4.docket.delete()
             de_5.docket.delete()
+            de_6.docket.delete()
             empty_docket.delete()
 
         # Order by dateFiled desc

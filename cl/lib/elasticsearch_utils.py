@@ -638,12 +638,19 @@ def build_has_child_query(
         sort_field, order = order_by
         # Define the function score for sorting, based on the child sort_field.
         # When the order is 'entry_date_filed desc', the 'date_filed_time'
-        # value is used as the score, sorting newer documents first.
-        # In 'asc' order, the score is the difference between  'current_time'
-        # and 'date_filed_time', prioritizing older documents. If a document
-        # does not have a 'date_filed' set, the function returns 1. This
-        # ensures that dockets containing documents without a 'date_filed'
-        # are displayed before dockets without filings, which have a default score of 0.
+        # value, adjusted by washington_bd_offset, is used as the score,
+        # sorting newer documents first. In 'asc' order, the score is the
+        # difference between 'current_time' (also adjusted by the
+        # washington_bd_offset) and 'date_filed_time', prioritizing older
+        # documents. If a document does not have a 'date_filed' set, the
+        # function returns 1. This ensures that dockets containing documents
+        # without a 'date_filed' are displayed before dockets without filings,
+        # which have a default score of 0. washington_bd_offset is based
+        # on George Washington's birthday (February 22, 1732), ensuring all
+        # epoch millisecond values are positive and compatible with ES scoring
+        # system. This approach allows for handling dates in our system both
+        # before and after January 1, 1970 (epoch time), within a positive
+        # scoring range.
 
         query = Q(
             "function_score",
@@ -655,11 +662,14 @@ def build_has_child_query(
                     if (doc['{sort_field}'].size() == 0) {{
                         return 1;  // If not, return 1 as the score
                     }} else {{
-                        // Get the current time in milliseconds
-                        long current_time = new Date().getTime();
+                        // Offset based on the postive epoch time for Washington's birthday to ensure positive scores.
+                        // (February 22, 1732)
+                        long washington_bd_offset = 7506086400000L;
+                        // Get the current time in milliseconds, include the washington_bd_offset to work with positive epoch times.
+                        long current_time = new Date().getTime() + washington_bd_offset;
 
-                        // Convert the 'sort_field' value to epoch milliseconds
-                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli();
+                        // Convert the 'sort_field' value to epoch milliseconds, adjusting by the same offset.
+                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli() + washington_bd_offset;
 
                         // If the order is 'desc', return the 'date_filed_time' as the score
                         if (params.order.equals('desc')) {{
