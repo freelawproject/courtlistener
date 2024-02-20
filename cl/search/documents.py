@@ -1,18 +1,29 @@
 from datetime import datetime
 
 from django.http import QueryDict
-from django.utils.html import escape
+from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
-from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.custom_filters.templatetags.text_filters import (
+    best_case_name,
+    html_decode,
+)
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
+from cl.lib.search_index_utils import null_map
 from cl.lib.utils import deepgetattr
-from cl.people_db.models import Person, Position
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    Person,
+    Position,
+)
+from cl.search.constants import o_type_index_map
 from cl.search.es_indices import (
+    opinion_index,
     oral_arguments_index,
     oral_arguments_percolator_index,
     parenthetical_group_index,
@@ -24,6 +35,8 @@ from cl.search.models import (
     BankruptcyInformation,
     Citation,
     Docket,
+    Opinion,
+    OpinionCluster,
     ParentheticalGroup,
     RECAPDocument,
 )
@@ -87,7 +100,9 @@ class ParentheticalGroupDocument(Document):
         return [str(cite) for cite in instance.opinion.cluster.citations.all()]
 
     def prepare_cites(self, instance):
-        return [o.pk for o in instance.opinion.opinions_cited.all()]
+        return list(
+            instance.opinion.opinions_cited.all().values_list("id", flat=True)
+        )
 
     def prepare_lexisCite(self, instance):
         try:
@@ -110,18 +125,25 @@ class ParentheticalGroupDocument(Document):
             pass
 
     def prepare_panel_ids(self, instance):
-        return [judge.pk for judge in instance.opinion.cluster.panel.all()]
+        return list(
+            instance.opinion.cluster.panel.all().values_list("id", flat=True)
+        )
 
     def prepare_status(self, instance):
-        return instance.opinion.cluster.get_precedential_status_display()
+        return instance.opinion.cluster.precedential_status
 
 
 class AudioDocumentBase(Document):
     absolute_url = fields.KeywordField(index=False)
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -130,7 +152,9 @@ class AudioDocumentBase(Document):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="case_name_full", analyzer="english_exact"
+                attr="case_name_full",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -140,7 +164,9 @@ class AudioDocumentBase(Document):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="docket.court.full_name", analyzer="english_exact"
+                attr="docket.court.full_name",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -156,6 +182,7 @@ class AudioDocumentBase(Document):
         attr="docket.court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        term_vector="with_positions_offsets",
     )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")
@@ -166,30 +193,43 @@ class AudioDocumentBase(Document):
     dateArgued_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     dateReargued_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     dateReargumentDenied_text = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     docketNumber = fields.TextField(
         attr="docket.docket_number",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
-                attr="docket.docket_number", analyzer="english_exact"
+                attr="docket.docket_number",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -202,8 +242,14 @@ class AudioDocumentBase(Document):
     judge = fields.TextField(
         attr="judges",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(attr="judges", analyzer="english_exact"),
+            "exact": fields.TextField(
+                attr="judges",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -216,8 +262,13 @@ class AudioDocumentBase(Document):
     source = fields.KeywordField(attr="source", index=False)
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -237,7 +288,7 @@ class AudioDocument(AudioDocumentBase):
         return best_case_name(instance)
 
     def prepare_panel_ids(self, instance):
-        return [judge.pk for judge in instance.panel.all()]
+        return list(instance.panel.all().values_list("id", flat=True))
 
     def prepare_file_size_mp3(self, instance):
         if instance.local_path_mp3:
@@ -302,7 +353,7 @@ class AudioPercolator(AudioDocumentBase):
         if not search_form.is_valid():
             logger.warning(
                 f"The query {qd} associated with Alert ID {instance.pk} is "
-                f"invalid and was not indexed."
+                "invalid and was not indexed."
             )
             return None
 
@@ -326,6 +377,10 @@ class ES_CHILD_ID:
     def RECAP(self) -> str:
         return f"rd_{self.instance_id}"
 
+    @property
+    def OPINION(self) -> str:
+        return f"o_{self.instance_id}"
+
 
 class PersonBaseDocument(Document):
     id = fields.IntegerField(attr="pk")
@@ -341,8 +396,13 @@ class PersonBaseDocument(Document):
     fjc_id = fields.TextField()
     name = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -352,7 +412,10 @@ class PersonBaseDocument(Document):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -362,15 +425,23 @@ class PersonBaseDocument(Document):
     dod = fields.DateField(attr="date_dod")
     dob_city = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     dob_state = fields.TextField(
         analyzer="text_en_splitting_cl",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -378,8 +449,13 @@ class PersonBaseDocument(Document):
     political_affiliation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -389,7 +465,10 @@ class PersonBaseDocument(Document):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -398,8 +477,13 @@ class PersonBaseDocument(Document):
     school = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -472,7 +556,9 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="court.short_name", analyzer="english_exact"
+                attr="court.short_name",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -482,7 +568,9 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="court.full_name", analyzer="english_exact"
+                attr="court.full_name",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -516,6 +604,7 @@ class PositionDocument(PersonBaseDocument):
             "exact": fields.TextField(
                 attr="appointer.person.name_full_reverse",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -525,7 +614,9 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="supervisor.name_full_reverse", analyzer="english_exact"
+                attr="supervisor.name_full_reverse",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -535,7 +626,9 @@ class PositionDocument(PersonBaseDocument):
         analyzer="text_en_splitting_cl",
         fields={
             "exact": fields.TextField(
-                attr="predecessor.name_full_reverse", analyzer="english_exact"
+                attr="predecessor.name_full_reverse",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -698,8 +791,13 @@ class DocketBaseDocument(Document):
     docket_id = fields.IntegerField(attr="pk")
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -710,6 +808,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="case_name_full",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -717,10 +816,13 @@ class DocketBaseDocument(Document):
     docketNumber = fields.TextField(
         attr="docket_number",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="docket_number",
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -728,10 +830,13 @@ class DocketBaseDocument(Document):
     suitNature = fields.TextField(
         attr="nature_of_suit",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="nature_of_suit",
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -739,18 +844,27 @@ class DocketBaseDocument(Document):
     cause = fields.TextField(
         attr="cause",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(attr="cause", analyzer="english_exact"),
+            "exact": fields.TextField(
+                attr="cause",
+                analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     juryDemand = fields.TextField(
         attr="jury_demand",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="jury_demand",
                 analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -762,6 +876,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="jurisdiction_type",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -771,16 +886,26 @@ class DocketBaseDocument(Document):
     dateTerminated = fields.DateField(attr="date_terminated")
     assignedTo = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
     assigned_to_id = fields.KeywordField(attr="assigned_to.pk")
     referredTo = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -792,6 +917,7 @@ class DocketBaseDocument(Document):
             "exact": fields.TextField(
                 attr="court.full_name",
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -806,6 +932,7 @@ class DocketBaseDocument(Document):
         attr="court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        term_vector="with_positions_offsets",
     )
     chapter = fields.TextField(
         analyzer="text_en_splitting_cl",
@@ -816,6 +943,7 @@ class DocketBaseDocument(Document):
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -836,9 +964,13 @@ class ESRECAPDocument(DocketBaseDocument):
     description = fields.TextField(
         attr="docket_entry.description",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
-                attr="docket_entry.description", analyzer="english_exact"
+                attr="docket_entry.description",
+                term_vector="with_positions_offsets",
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
@@ -848,17 +980,26 @@ class ESRECAPDocument(DocketBaseDocument):
     short_description = fields.TextField(
         attr="description",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
-                attr="description", analyzer="english_exact"
+                attr="description",
+                analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
             ),
         },
         search_analyzer="search_analyzer",
     )
     document_type = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -866,8 +1007,13 @@ class ESRECAPDocument(DocketBaseDocument):
     pacer_doc_id = fields.KeywordField(attr="pacer_doc_id")
     plain_text = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
-            "exact": fields.TextField(analyzer="english_exact"),
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                term_vector="with_positions_offsets",
+                search_analyzer="search_analyzer_exact",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -876,6 +1022,9 @@ class ESRECAPDocument(DocketBaseDocument):
     page_count = fields.IntegerField(attr="page_count")
     filepath_local = fields.KeywordField(index=False)
     absolute_url = fields.KeywordField(index=False)
+    cites = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
 
     class Django:
         model = RECAPDocument
@@ -971,7 +1120,14 @@ class ESRECAPDocument(DocketBaseDocument):
             )
 
     def prepare_plain_text(self, instance):
-        return escape(instance.plain_text)
+        return escape(instance.plain_text.translate(null_map))
+
+    def prepare_cites(self, instance):
+        return list(
+            instance.cited_opinions.all().values_list(
+                "cited_opinion_id", flat=True
+            )
+        )
 
 
 @recap_index.document
@@ -986,7 +1142,10 @@ class DocketDocument(DocketBaseDocument):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -997,7 +1156,10 @@ class DocketDocument(DocketBaseDocument):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -1008,7 +1170,10 @@ class DocketDocument(DocketBaseDocument):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             fields={
-                "exact": fields.TextField(analyzer="english_exact"),
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
             },
             search_analyzer="search_analyzer",
             multi=True,
@@ -1053,15 +1218,35 @@ class DocketDocument(DocketBaseDocument):
             "firm_id": set(),
             "firm": set(),
         }
-        for p in instance.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
+
+        # Extract only required parties values.
+        party_values = instance.parties.values_list("pk", "name")
+        for pk, name in party_values.iterator():
+            out["party_id"].add(pk)
+            out["party"].add(name)
+
+        # Extract only required attorney values.
+        atty_values = (
+            Attorney.objects.filter(roles__docket=instance)
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in atty_values.iterator():
+            out["attorney_id"].add(pk)
+            out["attorney"].add(name)
+
+        # Extract only required firm values.
+        firms_values = (
+            AttorneyOrganization.objects.filter(
+                attorney_organization_associations__docket=instance
+            )
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in firms_values.iterator():
+            out["firm_id"].add(pk)
+            out["firm"].add(name)
+
         return out
 
     def prepare(self, instance):
@@ -1074,3 +1259,563 @@ class DocketDocument(DocketBaseDocument):
         data["firm_id"] = list(parties_prepared["firm_id"])
         data["firm"] = list(parties_prepared["firm"])
         return data
+
+
+# Opinions
+class OpinionBaseDocument(Document):
+    absolute_url = fields.KeywordField(index=False)
+    cluster_id = fields.IntegerField(
+        attr="pk", fields={"raw": fields.KeywordField(attr="pk")}
+    )
+    docket_id = fields.IntegerField(
+        attr="docket.pk", fields={"raw": fields.KeywordField(attr="docket.pk")}
+    )
+    docketNumber = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    caseName = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    caseNameFull = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    dateFiled = fields.DateField()
+    dateArgued = fields.DateField()
+    dateReargued = fields.DateField()
+    dateReargumentDenied = fields.DateField()
+    court_id = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+            "raw": fields.KeywordField(),
+        },
+    )
+    court = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    court_citation_string = fields.TextField(
+        attr="docket.court.citation_string",
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+        term_vector="with_positions_offsets",
+    )
+    judge = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    panel_names = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            search_analyzer="search_analyzer",
+            multi=True,
+        ),
+    )
+    attorney = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    suitNature = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    citation = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
+            fields={
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
+                    multi=True,
+                ),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    status = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+            "raw": fields.KeywordField(),
+        },
+    )
+    procedural_history = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    posture = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    syllabus = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    scdb_id = fields.KeywordField(attr="scdb_id")
+    sibling_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    panel_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    neutralCite = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    lexisCite = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        search_analyzer="search_analyzer",
+    )
+    citeCount = fields.IntegerField(attr="citation_count")
+    cluster_child = JoinField(relations={"opinion_cluster": ["opinion"]})
+    timestamp = fields.DateField()
+
+    class Django:
+        model = OpinionCluster
+        ignore_signals = True
+
+    def prepare_absolute_url(self, instance):
+        return instance.get_absolute_url()
+
+    def prepare_docketNumber(self, instance):
+        return instance.docket.docket_number
+
+    def prepare_caseName(self, instance):
+        return best_case_name(instance)
+
+    def prepare_caseNameFull(self, instance):
+        return instance.case_name_full
+
+    def prepare_court_id(self, instance):
+        return instance.docket.court.pk
+
+    def prepare_court(self, instance):
+        return instance.docket.court.full_name
+
+    def prepare_court_citation_string(self, instance):
+        return instance.docket.court.citation_string
+
+    def prepare_judge(self, instance):
+        return instance.judges
+
+    def prepare_panel_names(self, instance):
+        return [judge.name_full for judge in instance.panel.all()]
+
+    def prepare_citation(self, instance):
+        return [str(cite) for cite in instance.citations.all()]
+
+    def prepare_attorney(self, instance):
+        return instance.attorneys
+
+    def prepare_suitNature(self, instance):
+        return instance.nature_of_suit
+
+    def prepare_status(self, instance):
+        return instance.precedential_status
+
+    def prepare_procedural_history(self, instance):
+        return instance.procedural_history
+
+    def prepare_posture(self, instance):
+        return instance.posture
+
+    def prepare_syllabus(self, instance):
+        return instance.syllabus
+
+    def prepare_sibling_ids(self, instance):
+        return list(instance.sub_opinions.all().values_list("id", flat=True))
+
+    def prepare_panel_ids(self, instance):
+        return list(instance.panel.all().values_list("id", flat=True))
+
+    def prepare_dateFiled(self, instance):
+        if instance.date_filed is None:
+            return
+
+        if isinstance(instance.date_filed, str):
+            datetime_object = datetime.strptime(
+                instance.date_filed, "%Y-%m-%d"
+            )
+            return datetime_object
+
+        return instance.date_filed
+
+    def prepare_dateArgued(self, instance):
+        if instance.docket.date_argued is None:
+            return
+
+        if isinstance(instance.docket.date_argued, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_argued, "%Y-%m-%d"
+            )
+            return datetime_object
+
+        return instance.docket.date_argued
+
+    def prepare_dateReargued(self, instance):
+        if instance.docket.date_reargued is None:
+            return
+
+        if isinstance(instance.docket.date_reargued, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_reargued, "%Y-%m-%d"
+            )
+            return datetime_object
+
+        return instance.docket.date_reargued
+
+    def prepare_dateReargumentDenied(self, instance):
+        if instance.docket.date_reargument_denied is None:
+            return
+
+        if isinstance(instance.docket.date_reargument_denied, str):
+            datetime_object = datetime.strptime(
+                instance.docket.date_reargument_denied, "%Y-%m-%d"
+            )
+            return datetime_object
+
+        return instance.docket.date_reargument_denied
+
+    def prepare_neutralCite(self, instance):
+        neutral_citations = instance.citations.filter(type=Citation.NEUTRAL)
+        if neutral_citations.count():
+            return str(neutral_citations[0])
+        return ""
+
+    def prepare_lexisCite(self, instance):
+        lexis_citations = instance.citations.filter(type=Citation.LEXIS)
+        if lexis_citations.count():
+            return str(lexis_citations[0])
+        return ""
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+
+@opinion_index.document
+class OpinionDocument(OpinionBaseDocument):
+    id = fields.IntegerField(
+        attr="pk",
+        fields={
+            "raw": fields.KeywordField(attr="pk"),
+        },
+    )
+    author_id = fields.IntegerField()
+    type = fields.KeywordField()
+    per_curiam = fields.BooleanField(attr="per_curiam")
+    type_text = fields.TextField(index=False)
+    download_url = fields.KeywordField(attr="download_url", index=False)
+    local_path = fields.KeywordField(index=False)
+    text = fields.TextField(
+        analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+    sha1 = fields.TextField(attr="sha1", index=False)
+    cites = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    joined_by_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+
+    class Django:
+        model = Opinion
+        ignore_signals = True
+
+    def prepare_absolute_url(self, instance):
+        return instance.cluster.get_absolute_url()
+
+    def prepare_author_id(self, instance):
+        return getattr(instance.author, "pk", None)
+
+    def prepare_type_text(self, instance):
+        return instance.get_type_display()
+
+    def prepare_type(self, instance):
+        return o_type_index_map.get(instance.type)
+
+    def prepare_local_path(self, instance):
+        if instance.local_path:
+            return instance.local_path.name
+
+    def prepare_cites(self, instance):
+        return list(
+            instance.cited_opinions.all().values_list(
+                "cited_opinion_id", flat=True
+            )
+        )
+
+    def prepare_joined_by_ids(self, instance):
+        return list(instance.joined_by.all().values_list("id", flat=True))
+
+    def prepare_text(self, instance):
+        if instance.html_columbia:
+            return html_decode(
+                strip_tags(instance.html_columbia.translate(null_map))
+            )
+        elif instance.html_lawbox:
+            return html_decode(
+                strip_tags(instance.html_lawbox.translate(null_map))
+            )
+        elif instance.xml_harvard:
+            return html_decode(
+                strip_tags(instance.xml_harvard.translate(null_map))
+            )
+        elif instance.html_anon_2020:
+            return html_decode(
+                strip_tags(instance.html_anon_2020.translate(null_map))
+            )
+        elif instance.html:
+            return html_decode(strip_tags(instance.html.translate(null_map)))
+        else:
+            return escape(instance.plain_text.translate(null_map))
+
+    def prepare_cluster_id(self, instance):
+        return instance.cluster.pk
+
+    def prepare_docket_id(self, instance):
+        return instance.cluster.docket.pk
+
+    def prepare_scdb_id(self, instance):
+        return instance.cluster.scdb_id
+
+    def prepare_sibling_ids(self, instance):
+        return list(
+            instance.cluster.sub_opinions.all().values_list("id", flat=True)
+        )
+
+    def prepare_panel_ids(self, instance):
+        return list(instance.cluster.panel.all().values_list("id", flat=True))
+
+    def prepare_dateFiled(self, instance):
+        if instance.cluster.date_filed is None:
+            return
+
+        if isinstance(instance.cluster.date_filed, str):
+            datetime_object = datetime.strptime(
+                instance.cluster.date_filed, "%Y-%m-%d"
+            )
+            return datetime_object
+
+        return instance.cluster.date_filed
+
+    def prepare_dateArgued(self, instance):
+        if instance.cluster.docket.date_argued is None:
+            return
+
+        if isinstance(instance.cluster.docket.date_argued, str):
+            datetime_object = datetime.strptime(
+                instance.cluster.docket.date_argued, "%Y-%m-%d"
+            )
+            return datetime_object
+
+        return instance.cluster.docket.date_argued
+
+    def prepare_dateReargued(self, instance):
+        if instance.cluster.docket.date_reargued is None:
+            return
+
+        if isinstance(instance.cluster.docket.date_reargued, str):
+            datetime_object = datetime.strptime(
+                instance.cluster.docket.date_reargued, "%Y-%m-%d"
+            )
+            return datetime_object
+
+        return instance.cluster.docket.date_reargued
+
+    def prepare_dateReargumentDenied(self, instance):
+        if instance.cluster.docket.date_reargument_denied is None:
+            return
+
+        if isinstance(instance.cluster.docket.date_reargument_denied, str):
+            datetime_object = datetime.strptime(
+                instance.cluster.docket.date_reargument_denied, "%Y-%m-%d"
+            )
+            return datetime_object
+
+        return instance.cluster.docket.date_reargument_denied
+
+    def prepare_neutralCite(self, instance):
+        neutral_citations = instance.cluster.citations.filter(
+            type=Citation.NEUTRAL
+        )
+        if neutral_citations.count():
+            return str(neutral_citations[0])
+        return ""
+
+    def prepare_lexisCite(self, instance):
+        lexis_citations = instance.cluster.citations.filter(
+            type=Citation.LEXIS
+        )
+        if lexis_citations.count():
+            return str(lexis_citations[0])
+        return ""
+
+    def prepare_citeCount(self, instance):
+        return instance.cluster.citation_count
+
+    def prepare_docketNumber(self, instance):
+        return instance.cluster.docket.docket_number
+
+    def prepare_caseName(self, instance):
+        return best_case_name(instance.cluster)
+
+    def prepare_caseNameFull(self, instance):
+        return instance.cluster.case_name_full
+
+    def prepare_court_id(self, instance):
+        return instance.cluster.docket.court.pk
+
+    def prepare_court(self, instance):
+        return instance.cluster.docket.court.full_name
+
+    def prepare_court_citation_string(self, instance):
+        return instance.cluster.docket.court.citation_string
+
+    def prepare_judge(self, instance):
+        return instance.cluster.judges
+
+    def prepare_panel_names(self, instance):
+        return [judge.name_full for judge in instance.cluster.panel.all()]
+
+    def prepare_citation(self, instance):
+        return [str(cite) for cite in instance.cluster.citations.all()]
+
+    def prepare_attorney(self, instance):
+        return instance.cluster.attorneys
+
+    def prepare_suitNature(self, instance):
+        return instance.cluster.nature_of_suit
+
+    def prepare_status(self, instance):
+        return instance.cluster.precedential_status
+
+    def prepare_procedural_history(self, instance):
+        return instance.cluster.procedural_history
+
+    def prepare_posture(self, instance):
+        return instance.cluster.posture
+
+    def prepare_syllabus(self, instance):
+        return instance.cluster.syllabus
+
+    def prepare_cluster_child(self, instance):
+        parent_id = getattr(instance.cluster, "pk", None)
+        return {"name": "opinion", "parent": parent_id}
+
+
+@opinion_index.document
+class OpinionClusterDocument(OpinionBaseDocument):
+    court_exact = fields.KeywordField(attr="docket.court_id")
+    non_participating_judge_ids = fields.ListField(
+        fields.IntegerField(multi=True),
+    )
+    source = fields.TextField(
+        attr="source",
+        analyzer="text_en_splitting_cl",
+        fields={
+            "exact": fields.TextField(
+                analyzer="english_exact",
+                search_analyzer="search_analyzer_exact",
+            ),
+        },
+        search_analyzer="search_analyzer",
+    )
+
+    def prepare_non_participating_judge_ids(self, instance):
+        return list(
+            instance.non_participating_judges.all().values_list(
+                "id", flat=True
+            )
+        )
+
+    def prepare_cluster_child(self, instance):
+        return "opinion_cluster"

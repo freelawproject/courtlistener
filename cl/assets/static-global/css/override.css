@@ -45,6 +45,11 @@ header {
   color: #555555;
 }
 
+.navbar-default .navbar-nav > li form button{
+  padding: 13px 20px 10px;
+  color: #555555;
+}
+
 .navbar-default .navbar-nav > li.active a {
   background-color: transparent;
   border-bottom-color: #AE0B0B;
@@ -187,6 +192,11 @@ a.button:active {
 }
 
 @media (max-width: 767px) {
+  .navbar-default .navbar-nav > li form button{
+    padding: 5px 15px 5px 25px;
+    color: #777777;
+  }
+
   #homepage #main-query-box {
     margin-bottom: 2em;
   }
@@ -619,7 +629,7 @@ body {
   /* Adjust to the left and set blur of 1px. This eliminates a tiny line
      between the input box and this box */
   box-shadow: inset -1px 1px 1px rgba(0, 0, 0, 0.075);
-  padding-left: 0;
+  padding: 0.5em 1em 0.5em 0;
 }
 
 #advanced {
@@ -1454,6 +1464,10 @@ emphasis {
 
 .justify-content-end {
   justify-content: flex-end;
+}
+
+.justify-content-center{
+  justify-content: center;
 }
 
 .mr-1 {

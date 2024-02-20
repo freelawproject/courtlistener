@@ -56,7 +56,15 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     async def perform_create(self, serializer):
         pq = await sync_to_async(serializer.save)(uploader=self.request.user)
         recap_upload_task = asyncio.create_task(process_recap_upload(pq))
-        await asyncio.shield(recap_upload_task)
+        # Inhibit upload task cancellation on disconnect by catching and
+        # blocking the asyncio.CancelledError from propagating to the ASGI
+        # request handler.
+        # https://github.com/django/django/blob/5.0.1/django/core/handlers/asgi.py#L218-L223
+        # https://docs.python.org/3/library/asyncio-task.html#shielding-from-cancellation
+        try:
+            await asyncio.shield(recap_upload_task)
+        except asyncio.CancelledError:
+            await recap_upload_task
 
 
 class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
@@ -131,9 +139,7 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
         if not [p.startswith("pacer_doc_id") for p in request.GET.keys()]:
             # Not having this parameter causes bad performance. Abort.
             raise ValidationError("pacer_doc_id is a required filter.")
-        return super(PacerDocIdLookupViewSet, self).list(
-            request, *args, **kwargs
-        )
+        return super().list(request, *args, **kwargs)
 
 
 class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):

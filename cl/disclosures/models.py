@@ -10,7 +10,7 @@ from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.people_db.models import Person
 
 
-class REPORT_TYPES(object):
+class REPORT_TYPES:
     """If extracted, we identify what type of disclosure was reported."""
 
     UNKNOWN = -1
@@ -27,7 +27,7 @@ class REPORT_TYPES(object):
     )
 
 
-class CODES(object):
+class CODES:
     # FORM CODES - these are used in multiple fields in different sections
     # of the disclosures.  For example liabilities/debts uses Gross Value
     # As well as investments.
@@ -286,7 +286,7 @@ class FinancialDisclosure(AbstractDateTimeModel):
         }
 
     def save(self, *args, **kwargs):
-        super(FinancialDisclosure, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
         if self.thumbnail_status == THUMBNAIL_STATUSES.NEEDED:
             from cl.disclosures.tasks import (
                 make_financial_disclosure_thumbnail_from_pdf,

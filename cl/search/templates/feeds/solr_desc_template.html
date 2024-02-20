@@ -1,11 +1,22 @@
 {% load extras %}
+{% load waffle_tags %}
 {% with doc0=obj.doclist.docs.0|default:obj %}
   {% with plain_text=doc0.plain_text %}
     {% if plain_text %}
-      <p>{{ plain_text|safe|truncatewords:"500" }}</p><br>
+      <p>{{ plain_text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
     {% else %}
-      <p>{{ doc0.text|safe|truncatewords:"500" }}</p><br>
+      {% flag "o-es-active" %}
+        {% if doc0.child_docs %}
+          {% with doc=doc0.child_docs.0|get_attrdict:"_source" %}
+            <p>{{ doc.text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
+          {% endwith %}
+        {% else %}
+          <p>{{ doc0.text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
+        {% endif %}
+      {% else %}
+        <p>{{ doc0.text|safe|truncatewords:"500" }}</p><br>
+      {% endflag %}
     {% endif %}
-    <a href="{{doc0.absolute_url}}">Original document ES</a>
+    <a href="{{doc0.absolute_url}}">Original document</a>
   {% endwith %}
 {% endwith %}

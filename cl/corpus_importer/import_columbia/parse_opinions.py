@@ -282,9 +282,11 @@ def get_text(file_path):
                 raw_info.setdefault("opinions", []).append(
                     {
                         "type": opinion_type,
-                        "byline": current_byline["name"]
-                        if current_byline["type"] == opinion_type
-                        else None,
+                        "byline": (
+                            current_byline["name"]
+                            if current_byline["type"] == opinion_type
+                            else None
+                        ),
                         "opinion": get_xml_string(child),
                     }
                 )
@@ -396,7 +398,7 @@ def get_state_court_object(raw_court, file_path):
 
     # this messes up for, e.g. 'St. Louis', and 'U.S. Circuit Court, but works
     # for all others
-    if "." in raw_court and not any([s in raw_court for s in ["St.", "U.S"]]):
+    if "." in raw_court and not any(s in raw_court for s in ["St.", "U.S"]):
         j = raw_court.find(".")
         r = raw_court[:j]
 

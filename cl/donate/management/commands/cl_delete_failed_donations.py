@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils.timezone import now
 
 from cl.donate.models import Donation
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import VerboseCommand
 
 TOO_MANY_DAYS_AGO = now() - timedelta(days=7)
 
@@ -24,13 +24,13 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
-        self.stdout.write(f"{'#'}\n" * 25)
+        super().handle(*args, **options)
+        self.stdout.write("#\n" * 25)
         if options["simulate"]:
             self.stdout.write("# SIMULATE MODE IS ON.  #\n")
         else:
             self.stdout.write("# SIMULATE MODE IS OFF. #\n")
-        self.stdout.write(f"{'#'}\n" * 25)
+        self.stdout.write("#\n" * 25)
 
         # The statuses here are rather conservative and will likely need
         # updating as further failed payments trickle in.

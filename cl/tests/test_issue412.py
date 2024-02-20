@@ -75,7 +75,9 @@ class OpinionBlockedFromSearchEnginesTest(Base412Test):
 
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element(By.ID, "sidebar")
-        self.assertNotIn(BLOCKED_MSG, sidebar.text)
+        self.assertNotIn("Admin", sidebar.text)
+        results = self.browser.find_elements(By.CSS_SELECTOR, "div.btn-danger")
+        self.assertEqual(len(results), 0)
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_admin_viewing_not_blocked_opinion(self) -> None:
@@ -91,7 +93,9 @@ class OpinionBlockedFromSearchEnginesTest(Base412Test):
 
         # She does NOT see a widget telling her the page is blocked
         sidebar = self.browser.find_element(By.ID, "sidebar")
-        self.assertNotIn(BLOCKED_MSG, sidebar.text)
+        self.assertIn("Admin", sidebar.text)
+        results = self.browser.find_elements(By.CSS_SELECTOR, "div.btn-danger")
+        self.assertEqual(len(results), 0)
 
 
 class DocketBlockedFromSearchEnginesTest(Base412Test):

@@ -11,7 +11,7 @@ from django.utils.html import strip_tags
 from nameparser import HumanName
 from unidecode import unidecode
 
-from cl.corpus_importer.utils import wrap_text
+from cl.lib.utils import wrap_text
 from cl.people_db.models import SUFFIX_LOOKUP, Person
 
 # list of words that aren't judge names
@@ -286,15 +286,16 @@ def find_all_judges(judge_text: str) -> [str]:
         cleaned_text,
     )
     query2 = re.findall(
+        # Compile ahead of time
         r",\sand\s(((Van|VAN|De|DE|Da|DA)\s)?\b[A-Z][\w\-'']{2,}\b(\s(IV|I|II|III|V|Jr\.|Sr\.)[\s|\b])?)",
         cleaned_text,
     )
     query = query1 + query2
     if query:
-        matches = [
+        matches = {
             name[0] for name in query if name[0].lower() not in NOT_JUDGE_WORDS
-        ]
-        return sorted(list(set(matches)))
+        }
+        return sorted(matches)
     return []
 
 

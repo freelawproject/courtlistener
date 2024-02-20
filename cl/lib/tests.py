@@ -4,7 +4,6 @@ from typing import Tuple, TypedDict, cast
 from asgiref.sync import async_to_sync
 from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
-from django.db.models import F
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
@@ -30,6 +29,13 @@ from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.utils import (
+    check_for_proximity_tokens,
+    check_unbalanced_parenthesis,
+    check_unbalanced_quotes,
+    sanitize_unbalanced_parenthesis,
+    sanitize_unbalanced_quotes,
+)
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
@@ -359,45 +365,6 @@ class TestMimeLookup(SimpleTestCase):
         }
         for test_path in tests.keys():
             self.assertEqual(tests.get(test_path), lookup_mime_type(test_path))
-
-
-@override_settings(MAINTENANCE_MODE_ENABLED=True)
-class TestMaintenanceMiddleware(TestCase):
-    """Test the maintenance middleware"""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        # Do this in two steps to avoid triggering profile creation signal
-        admin = UserProfileWithParentsFactory.create(
-            user__username="admin",
-            user__password=make_password("password"),
-        )
-        admin.user.is_superuser = True
-        admin.user.is_staff = True
-        admin.user.save()
-
-    def test_middleware_works_when_enabled(self) -> None:
-        """Does the middleware block users when enabled?"""
-        r = self.client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_503_SERVICE_UNAVAILABLE,
-            "Did not get correct status code. Got: %s instead of %s"
-            % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE),
-        )
-
-    def test_staff_can_get_through(self) -> None:
-        """Can staff get through when the middleware is enabled?"""
-        self.assertTrue(
-            self.client.login(username="admin", password="password")
-        )
-        r = self.client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_200_OK,
-            "Staff did not get through, but should have. Staff got status "
-            "code of: %s instead of %s" % (r.status_code, HTTP_200_OK),
-        )
 
 
 class TestPACERPartyParsing(SimpleTestCase):
@@ -965,14 +932,14 @@ class TestDateTimeHelpers(SimpleTestCase):
         self.assertEqual(pdt_utc_offset_hours, -7.0)
 
 
-class TestAppendQueryConjunctions(SimpleTestCase):
+class TestElasticsearchUtils(SimpleTestCase):
     def test_can_add_conjunction(self) -> None:
         tests = [
             {"input": "a", "output": "a"},
             {"input": "a b", "output": "a AND b"},
             {"input": "a b (c d)", "output": "a AND b AND (c d)"},
             {
-                "input": f"caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+                "input": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
                 "output": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
             },
             {
@@ -1012,3 +979,124 @@ class TestAppendQueryConjunctions(SimpleTestCase):
         for test in tests:
             ouput_str = append_query_conjunctions(test["input"])
             self.assertEqual(ouput_str, test["output"])
+
+    def test_check_and_sanitize_queries_bad_syntax(self) -> None:
+        """Tests for methods that check and sanitize queries with a bad search
+        syntax.
+        """
+
+        # Check for bad proximity tokens.
+        tests = [
+            {
+                "input_str": "This is a range /p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range /s query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range/s query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range/p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a /s range /p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is not a range query",
+                "output": False,
+            },
+        ]
+        for test in tests:
+            output = check_for_proximity_tokens(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
+
+        # Check for Unbalanced parentheses.
+        tests = [
+            {
+                "input_str": "This is (unbalanced",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": "This is unbalanced)",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": "This is (unbalanced)(",
+                "output": True,
+                "sanitized": "This is (unbalanced)",
+            },
+            {
+                "input_str": "This (is (unbalanced)(",
+                "output": True,
+                "sanitized": "This (is unbalanced)",
+            },
+            {
+                "input_str": "This (is (unbalanced)()",
+                "output": True,
+                "sanitized": "This (is (unbalanced))",
+            },
+            {
+                "input_str": "(This) (is (balanced))",
+                "output": False,
+                "sanitized": "(This) (is (balanced))",
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])
+
+        # Check for Unbalanced quotes.
+        tests = [
+            {
+                "input_str": 'This is "unbalanced',
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": 'This is "unbalanced""',
+                "output": True,
+                "sanitized": 'This is "unbalanced"',
+            },
+            {
+                "input_str": 'This "is" unbalanced"',
+                "output": True,
+                "sanitized": 'This "is" unbalanced',
+            },
+            {
+                "input_str": 'This "is" unbalanced"""',
+                "output": True,
+                "sanitized": 'This "is" unbalanced""',
+            },
+            {
+                "input_str": '"This is" "balanced"',
+                "output": False,
+                "sanitized": '"This is" "balanced"',
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_quotes(test["input_str"])  # type: ignore
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_quotes(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])
