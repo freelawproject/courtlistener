@@ -29,6 +29,22 @@ FILED_TAGS = [
     "affirmed and opinion filed",
     "dismissed and opinion filed",
     "decided and entered",
+    "memorandum opinion filed",
+    "memorandum opinion delivered and filed",
+    "granted",
+    "affirmed",
+    "submitted and decided",
+    "affirmed and memorandum opinion filed",
+    "memorandum filed",
+    "modified opinion filed",
+    "opinion modified and refiled",
+    "opinion filed on",
+    "opinion on merits filed",
+    "opinion delivered and filed on",
+    "order delivered and filed",
+    "date filed",
+    "opinion filed in",
+    "affirmed opinion filed",
 ]
 DECIDED_TAGS = ["decided", "date decided", "decided on", "decided date"]
 ARGUED_TAGS = [
