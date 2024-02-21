@@ -1,6 +1,6 @@
 A new user signed up for CourtListener and we tried to match their email address
 to Neon. Alas, it didn't work because the email address '{{ user.email }}' appears
-is in Neon more than once.
+in Neon more than once.
 
 Please take the following actions to fix this situation:
 
@@ -13,7 +13,7 @@ In that queue, you should find this user and you should be able to merge their r
 2. Once that's completed, please add the Neon account ID of the merged record to
 CourtListener at the following link:
 
-    https://www.courtlistener.com/admin/user/{{ user.id }}
+    https://www.courtlistener.com/admin/auth/user/{{ user.id }}/change/
 
 Thank you for keeping everything tidy and good!
 
