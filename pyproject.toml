@@ -112,6 +112,7 @@ httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.3.1"
 juriscraper = "*"
 django-permissions-policy = "^4.19.0"
+django-ordered-model = "^3.7.4"
 
 
 [tool.poetry.group.dev.dependencies]

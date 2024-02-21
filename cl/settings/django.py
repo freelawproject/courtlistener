@@ -159,6 +159,7 @@ INSTALLED_APPS = [
     "django_elasticsearch_dsl",
     "pghistory",
     "pgtrigger",
+    "ordered_model",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
