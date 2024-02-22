@@ -7,6 +7,7 @@ from cl.alerts.views import (
     edit_alert_redirect,
     enable_alert,
     new_docket_alert,
+    one_click_disable_alert,
     one_click_docket_alert_unsubscribe,
     toggle_docket_alert,
     toggle_docket_alert_confirmation,
@@ -24,6 +25,11 @@ urlpatterns = [
         "alert/disable/([a-zA-Z0-9]{40})/",
         disable_alert,
         name="disable_alert",
+    ),
+    re_path(
+        "alert/one-click-disable/([a-zA-Z0-9]{40})/",
+        one_click_disable_alert,
+        name="one_click_disable_alert",
     ),
     re_path(
         r"^alert/enable/([a-zA-Z0-9]{40})/$", enable_alert, name="enable_alert"

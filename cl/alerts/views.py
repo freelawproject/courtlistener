@@ -64,6 +64,18 @@ def delete_alert_confirm(request, pk):
     )
 
 
+@csrf_exempt
+@require_http_methods(["POST"])
+@ratelimiter_unsafe_3_per_m
+def one_click_disable_alert(request: HttpRequest, secret_key: str):
+    """Disable an alert based on a secret key."""
+    alert = get_object_or_404(Alert, secret_key=secret_key)
+    alert.rate = Alert.OFF
+    alert.save()
+    # Mail clients send POSTs; an ugly response is OK.
+    return HttpResponse("You have been successfully unsubscribed!")
+
+
 def disable_alert(request: HttpRequest, secret_key: str):
     """Display a confirmation or success page whenever a user
     chooses to disable their search alerts.

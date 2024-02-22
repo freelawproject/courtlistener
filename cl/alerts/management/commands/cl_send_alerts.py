@@ -66,7 +66,9 @@ def send_alert(user_profile, hits):
     context = {"hits": hits}
     if len(hits) == 1:
         alert = hits[0][0]
-        disable_url = reverse("disable_alert", args=[alert.secret_key])
+        disable_url = reverse(
+            "one_click_disable_alert", args=[alert.secret_key]
+        )
         headers = {
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
             "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",

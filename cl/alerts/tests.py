@@ -157,6 +157,19 @@ class AlertTest(SimpleUserDataMixin, TestCase):
         self.assertIn("Your daily opinion alert", response.content.decode())
         self.assertIn("Unsubscribe", response.content.decode())
 
+    async def test_can_we_disable_alert_using_the_one_click_link(
+        self,
+    ) -> None:
+        """can we disable a search alert using the one-click link?"""
+        self.assertEqual(self.alert.rate, self.alert_params["rate"])
+        response = await self.async_client.post(
+            reverse("one_click_disable_alert", args=[self.alert.secret_key])
+        )
+
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        await self.alert.arefresh_from_db()
+        self.assertEqual(self.alert.rate, "off")
+
     async def test_are_alerts_enabled_when_the_link_is_visited(self) -> None:
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
         self.alert.rate = "off"
@@ -694,7 +707,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             f"List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
-            "disable_alert", args=[self.search_alert.secret_key]
+            "one_click_disable_alert", args=[self.search_alert.secret_key]
         )
         self.assertIn(
             unsubscribe_url,
@@ -708,7 +721,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             f"List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
-            "disable_alert", args=[self.search_alert_2.secret_key]
+            "one_click_disable_alert", args=[self.search_alert_2.secret_key]
         )
         self.assertIn(
             unsubscribe_url,
@@ -722,7 +735,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             f"List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
-            "disable_alert", args=[self.search_alert_oa.secret_key]
+            "one_click_disable_alert", args=[self.search_alert_oa.secret_key]
         )
         self.assertIn(
             unsubscribe_url,
