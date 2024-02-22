@@ -495,8 +495,15 @@ def send_search_alert_emails(
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
         }
 
-        alert = hits[0][0]
-        disable_url = reverse("disable_alert", args=[alert.secret_key])
+        if len(hits) == 1:
+            alert = hits[0][0]
+            disable_url = reverse("disable_alert", args=[alert.secret_key])
+            headers = {
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",
+            }
+        else:
+            headers = {}
 
         txt = txt_template.render(context)
         html = html_template.render(context)
@@ -505,10 +512,7 @@ def send_search_alert_emails(
             txt,
             settings.DEFAULT_ALERTS_EMAIL,
             [alert_user.email],
-            headers={
-                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",
-            },
+            headers=headers,
         )
         msg.attach_alternative(html, "text/html")
         messages.append(msg)

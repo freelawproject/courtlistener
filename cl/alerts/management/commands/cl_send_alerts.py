@@ -64,9 +64,15 @@ def send_alert(user_profile, hits):
     txt_template = loader.get_template("alert_email.txt")
     html_template = loader.get_template("alert_email.html")
     context = {"hits": hits}
-
-    alert = hits[0][0]
-    disable_url = reverse("disable_alert", args=[alert.secret_key])
+    if len(hits) == 1:
+        alert = hits[0][0]
+        disable_url = reverse("disable_alert", args=[alert.secret_key])
+        headers = {
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",
+        }
+    else:
+        headers = {}
 
     txt = txt_template.render(context)
     html = html_template.render(context)
@@ -75,10 +81,7 @@ def send_alert(user_profile, hits):
         txt,
         settings.DEFAULT_ALERTS_EMAIL,
         [user_profile.user.email],
-        headers={
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-            "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",
-        },
+        headers=headers,
     )
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=False)
