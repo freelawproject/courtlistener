@@ -132,12 +132,30 @@ class AlertTest(SimpleUserDataMixin, TestCase):
         self.assertTrue(self.alert.secret_key)
 
     async def test_are_alerts_disabled_when_the_link_is_visited(self) -> None:
+        """Do we avoid the confirmation page and disable the search alert when the user is logged in?"""
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
+        await self.async_client.alogin(username="pandora", password="password")
         await self.async_client.get(
             reverse("disable_alert", args=[self.alert.secret_key])
         )
         await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, "off")
+
+    async def test_is_confirmation_page_shown_when_anonymous_user_click_the_link(
+        self,
+    ) -> None:
+        """Do we show the confirmation page when an anonymous user clicks the link?"""
+        self.assertEqual(self.alert.rate, self.alert_params["rate"])
+        response = await self.async_client.get(
+            reverse("disable_alert", args=[self.alert.secret_key])
+        )
+
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertIn(
+            "Please confirm your unsubscription", response.content.decode()
+        )
+        self.assertIn("Your daily opinion alert", response.content.decode())
+        self.assertIn("Unsubscribe", response.content.decode())
 
     async def test_are_alerts_enabled_when_the_link_is_visited(self) -> None:
         self.assertEqual(self.alert.rate, self.alert_params["rate"])

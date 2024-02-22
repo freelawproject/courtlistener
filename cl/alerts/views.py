@@ -64,21 +64,62 @@ def delete_alert_confirm(request, pk):
     )
 
 
-@csrf_exempt
-@require_http_methods(["GET", "POST"])
-def disable_alert(request, secret_key):
-    """Disable an alert based on a secret key."""
+def disable_alert(request: HttpRequest, secret_key: str):
+    """Display a confirmation or success page whenever a user
+    chooses to disable their search alerts.
+
+    :param request: The HttpRequest from the client
+    :param secret_key: The secret key for the search alert
+    :return: The HttpResponse to send to the client
+    """
     alert = get_object_or_404(Alert, secret_key=secret_key)
-    prev_rate = alert.rate
-    alert.rate = Alert.OFF
-    alert.save()
+
+    # Handle confirmation form POST requests
     if request.method == "POST":
-        # Mail clients send POSTs; an ugly response is OK.
-        return HttpResponse("You have been successfully unsubscribed!")
+        form = DocketAlertConfirmForm(request.POST)
+        if form.is_valid():
+            prev_rate = alert.rate
+            alert.rate = Alert.OFF
+            alert.save()
+            return render(
+                request,
+                "disable_alert.html",
+                {"alert": alert, "prev_rate": prev_rate, "private": True},
+            )
+        # If the form is invalid, show the form errors.
+        return render(
+            request,
+            "search_alert_confirmation.html",
+            {
+                "alert": alert,
+                "form": form,
+                "private": True,
+                "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
+            },
+        )
+
+    if request.user.is_authenticated:
+        # If the user is logged in, disable the search alert. No confirmation page
+        # required
+        prev_rate = alert.rate
+        alert.rate = Alert.OFF
+        alert.save()
+        return render(
+            request,
+            "disable_alert.html",
+            {"alert": alert, "prev_rate": prev_rate, "private": True},
+        )
+
+    form = DocketAlertConfirmForm()
     return render(
         request,
-        "disable_alert.html",
-        {"alert": alert, "prev_rate": prev_rate, "private": True},
+        "search_alert_confirmation.html",
+        {
+            "alert": alert,
+            "form": form,
+            "private": True,
+            "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
+        },
     )
 
 
