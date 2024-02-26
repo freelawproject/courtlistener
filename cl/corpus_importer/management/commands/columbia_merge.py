@@ -54,7 +54,7 @@ from cl.corpus_importer.utils import (
     merge_judges,
     merge_long_fields,
     merge_strings,
-    update_cluster_panel,
+    update_cluster_panel, CitationException,
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import extract_judge_last_name, find_just_name
@@ -214,6 +214,8 @@ def map_and_merge_opinions(
     columbia_opinions: list[dict],
 ) -> None:
     """Map and merge opinion data
+
+    # TODO handle combined opinions
 
     :param cluster_id: Cluster id
     :param columbia_opinions: list of columbia opinions from file
@@ -545,6 +547,8 @@ def process_cluster(
         )
     except JudgeException:
         logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
+    except CitationException:
+        logger.warning(msg=f"Invalid citation found in {filepath } while merging cluster id: {cluster_id}")
 
 
 def merge_columbia_into_cl(options) -> None:
