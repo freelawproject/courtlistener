@@ -20,7 +20,12 @@ from elasticsearch.exceptions import (
     NotFoundError,
     RequestError,
 )
-from elasticsearch.helpers import bulk, parallel_bulk, streaming_bulk
+from elasticsearch.helpers import (
+    BulkIndexError,
+    bulk,
+    parallel_bulk,
+    streaming_bulk,
+)
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
@@ -1189,17 +1194,21 @@ def remove_document_from_es_index(
     """
 
     es_document = getattr(es_document_module, es_document_name)
-    get_args: dict[str, int | str] = (
-        {"id": instance_id, "routing": routing}
-        if routing
-        else {"id": instance_id}
-    )
+    delete_args: dict[str, int | str] = {
+        "index": es_document._index._name,
+        "id": instance_id,
+    }
+    if routing:
+        delete_args["routing"] = routing
+    es = connections.get_connection()
     try:
-        doc = es_document.get(**get_args)
-        doc.delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+        es.delete(**delete_args)
+        if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+            # Set auto-refresh, used for testing.
+            es_document._index.refresh()
     except NotFoundError:
         model_label = es_document.Django.model.__name__.capitalize()
-        logger.error(
+        logger.warning(
             f"The {model_label} can't be deleted from the ES index, it doesn't "
             f"exists."
         )
@@ -1317,6 +1326,23 @@ def build_bulk_cites_doc(
         "doc": {"cites": cites_prepared},
     }
     return doc_to_update
+
+
+def check_bulk_indexing_exception(
+    errors: list[dict[str, Any]], exception: str
+) -> bool:
+    """Check for a specific exception type in bulk indexing errors.
+    :param errors: A list of dictionaries representing errors from a bulk
+    indexing operation.
+    :param exception: The exception type string to check for in the error
+    details.
+    :return: True if the specified exception is found in any of the error
+    dictionaries; otherwise, returns False.
+    """
+    for error in errors:
+        if error.get("update", {}).get("error", {}).get("type") == exception:
+            return True
+    return False
 
 
 @app.task(
@@ -1439,7 +1465,23 @@ def index_related_cites_fields(
 
     client = connections.get_connection(alias="no_retry_connection")
     # Execute the bulk update
-    bulk(client, documents_to_update)
+    try:
+        bulk(client, documents_to_update)
+    except BulkIndexError as exc:
+        # Catch any BulkIndexError exceptions to handle specific error message.
+        # If the error is a version conflict, raise a ConflictError for retrying it.
+        if check_bulk_indexing_exception(
+            exc.errors, "version_conflict_engine_exception"
+        ):
+            raise ConflictError(
+                f"ConflictError indexing cites.",
+                "",
+                {"id": child_id},
+            )
+        else:
+            # If the error is of any other type, raises the original
+            # BulkIndexError for debugging.
+            raise exc
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
