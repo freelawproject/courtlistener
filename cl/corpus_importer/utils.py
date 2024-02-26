@@ -150,9 +150,9 @@ def filter_subsets(lists: list[list[int]]) -> Iterator[list[int]]:
 
     for match in lists:
         if not any(
-                is_subset(match, other_matches)
-                for other_matches in lists
-                if match is not other_matches
+            is_subset(match, other_matches)
+            for other_matches in lists
+            if match is not other_matches
         ):
             yield match
 
@@ -221,7 +221,7 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
 
 
 def similarity_scores(
-        texts_to_compare_1: list[str], texts_to_compare_2: list[str]
+    texts_to_compare_1: list[str], texts_to_compare_2: list[str]
 ) -> list[list[float]]:
     """Get similarity scores between two sets of lists
 
@@ -246,13 +246,13 @@ def similarity_scores(
 
     # Calculate cosine similarity between weight of words for each text in list
     scores = cosine_similarity(
-        X[: len(texts_to_compare_1)], X[len(texts_to_compare_1):]
+        X[: len(texts_to_compare_1)], X[len(texts_to_compare_1) :]
     )
     return scores
 
 
 def match_opinion_lists(
-        file_opinions_list: list[Any], cl_opinions_list: list[Any]
+    file_opinions_list: list[Any], cl_opinions_list: list[Any]
 ) -> dict[int, int]:
     """Match opinions on two lists from different sources
 
@@ -329,7 +329,7 @@ def clean_docket_number(docket_number: str) -> str:
 
 
 def merge_docket_numbers(
-        cluster: OpinionCluster, docket_number: str
+    cluster: OpinionCluster, docket_number: str
 ) -> Optional[str]:
     """Merge docket number
 
@@ -345,8 +345,8 @@ def merge_docket_numbers(
         # e.g. CL docket id #3952066 doesn't have
         cl_clean_docket = clean_docket_number(cl_docket.docket_number)
         if (
-                cl_clean_docket in file_cleaned_docket
-                and cl_docket.docket_number != file_cleaned_docket
+            cl_clean_docket in file_cleaned_docket
+            and cl_docket.docket_number != file_cleaned_docket
         ):
             return file_cleaned_docket
         else:
@@ -366,10 +366,10 @@ def merge_docket_numbers(
 
 
 def merge_case_names(
-        cluster: OpinionCluster,
-        file_data: dict[str, Any],
-        case_name_key: str,
-        case_name_full_key: str,
+    cluster: OpinionCluster,
+    file_data: dict[str, Any],
+    case_name_key: str,
+    case_name_full_key: str,
 ) -> dict[str, Any]:
     """Merge case names
 
@@ -425,7 +425,7 @@ def merge_case_names(
 
 
 def merge_strings(
-        field_name: str, overlapping_data: tuple[str, str]
+    field_name: str, overlapping_data: tuple[str, str]
 ) -> dict[str, Any]:
     """Compare two strings and choose the largest
 
@@ -444,9 +444,9 @@ def merge_strings(
 
 
 def merge_long_fields(
-        field_name: str,
-        overlapping_data: Optional[tuple[str, str]],
-        cluster_id: int,
+    field_name: str,
+    overlapping_data: Optional[tuple[str, str]],
+    cluster_id: int,
 ) -> dict[str, Any]:
     """Merge two long text fields
 
@@ -475,10 +475,10 @@ def merge_long_fields(
 
 
 def merge_judges(
-        overlapping_data: Optional[tuple[str, str]],
-        cluster_id: int,
-        is_columbia: bool = False,
-        skip_judge_merger: bool = False,
+    overlapping_data: Optional[tuple[str, str]],
+    cluster_id: int,
+    is_columbia: bool = False,
+    skip_judge_merger: bool = False,
 ) -> dict[str, Any]:
     """Merge overlapping judge values
 
@@ -508,7 +508,7 @@ def merge_judges(
     # Prepare judges string
     judges = titlecase(", ".join(find_all_judges(file_data)))
     if (
-            temp_file_data_clean.issuperset(temp_cl_clean) or cl_data_upper
+        temp_file_data_clean.issuperset(temp_cl_clean) or cl_data_upper
     ) and file_data_cleaned != cl_clean:
         return {"judges": judges}
     elif not temp_file_data_clean.intersection(temp_cl_clean):
@@ -561,11 +561,11 @@ def merge_judges(
 
 
 def merge_overlapping_data(
-        cluster: OpinionCluster,
-        long_fields,
-        changed_values_dictionary: dict,
-        skip_judge_merger: bool = False,
-        is_columbia: bool = False,
+    cluster: OpinionCluster,
+    long_fields,
+    changed_values_dictionary: dict,
+    skip_judge_merger: bool = False,
+    is_columbia: bool = False,
 ) -> dict[str, Any]:
     """Merge overlapping data
 
@@ -625,9 +625,9 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
         clean_cite = re.sub(r"\s+", " ", cite)
         citation = get_citations(clean_cite)
         if (
-                not citation
-                or not isinstance(citation[0], FullCaseCitation)
-                or not citation[0].groups.get("volume", False)
+            not citation
+            or not isinstance(citation[0], FullCaseCitation)
+            or not citation[0].groups.get("volume", False)
         ):
             logger.warning(f"Citation parsing failed for {clean_cite}")
             continue
@@ -639,7 +639,7 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
             reporter_type = map_reporter_db_cite_type(cite_type_str)
 
         if Citation.objects.filter(
-                cluster_id=cluster_id, reporter=citation[0].corrected_reporter()
+            cluster_id=cluster_id, reporter=citation[0].corrected_reporter()
         ).exists():
             # Avoid adding a citation if we already have a citation from the
             # citation's reporter
@@ -667,9 +667,9 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
 
 
 def update_cluster_panel(
-        cluster: OpinionCluster,
-        panel_list: list[str],
-        panel_date: Optional[date] = None,
+    cluster: OpinionCluster,
+    panel_list: list[str],
+    panel_date: Optional[date] = None,
 ) -> None:
     """Update cluster's panel
 
@@ -796,23 +796,21 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
     else:
         opinions = []
         for op in soup.find_all(
-                lambda tag: (
-                                    tag.name == "opinion" and tag.get(
-                                "data-type") is None
-                            )
-                            or tag.get("data-type") == "opinion"
+            lambda tag: (
+                tag.name == "opinion" and tag.get("data-type") is None
+            )
+            or tag.get("data-type") == "opinion"
         ):
             opinions.append(op.text)
         opinion_text = "".join(
             [
                 op.text
                 for op in soup.find_all(
-                lambda tag: (
-                                    tag.name == "opinion" and tag.get(
-                                "data-type") is None
-                            )
-                            or tag.get("data-type") == "opinion"
-            )
+                    lambda tag: (
+                        tag.name == "opinion" and tag.get("data-type") is None
+                    )
+                    or tag.get("data-type") == "opinion"
+                )
             ]
         )
 
@@ -820,7 +818,7 @@ def clean_body_content(case_body: str, harvard_file: bool = False) -> str:
 
 
 def length_too_different(
-        case: OpinionCluster, file_characters: str, cl_characters: str
+    case: OpinionCluster, file_characters: str, cl_characters: str
 ) -> bool:
     """Check if length is too different between texts
 
@@ -841,10 +839,10 @@ def length_too_different(
 
 
 def content_too_different(
-        case: OpinionCluster,
-        file_characters: str,
-        cl_characters: str,
-        docket: str,
+    case: OpinionCluster,
+    file_characters: str,
+    cl_characters: str,
+    docket: str,
 ) -> bool:
     """Is the content too different
 
@@ -893,7 +891,7 @@ def content_too_different(
 
 
 def case_names_dont_overlap(
-        case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
+    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
 ) -> bool:
     """Case names not overlap
 
@@ -916,7 +914,7 @@ def case_names_dont_overlap(
 
 
 def cosine_similarity_too_different(
-        case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
+    case: OpinionCluster, case_name_full: str, case_name_abbreviation: str
 ) -> bool:
     """Cosine similarity comparison between case names
 
@@ -941,7 +939,7 @@ def cosine_similarity_too_different(
 
 
 def has_too_similar_citation(
-        case: OpinionCluster, citation: FullCaseCitation
+    case: OpinionCluster, citation: FullCaseCitation
 ) -> bool:
     """Has a citation associated with cluster in same volume
 
@@ -968,12 +966,12 @@ def has_too_similar_citation(
 
 
 def match_based_text(
-        file_characters: str,
-        docket_number: str,
-        case_name_full: str,
-        possible_cases: QuerySet,
-        case_name_abbreviation: str,
-        citation: FullCaseCitation,
+    file_characters: str,
+    docket_number: str,
+    case_name_full: str,
+    possible_cases: QuerySet,
+    case_name_abbreviation: str,
+    citation: FullCaseCitation,
 ) -> Optional[OpinionCluster]:
     """Compare CL text to file content to establish duplicates
 
@@ -997,11 +995,11 @@ def match_based_text(
         case_and_texts_and_docket = case_and_texts + [docket_number]
         case_and_titles = [case, case_name_full, case_name_abbreviation]
         if (
-                length_too_different(*case_and_texts)
-                or has_too_similar_citation(case, citation)
-                or case_names_dont_overlap(*case_and_titles)
-                or cosine_similarity_too_different(*case_and_titles)
-                or content_too_different(*case_and_texts_and_docket)
+            length_too_different(*case_and_texts)
+            or has_too_similar_citation(case, citation)
+            or case_names_dont_overlap(*case_and_titles)
+            or cosine_similarity_too_different(*case_and_titles)
+            or content_too_different(*case_and_texts_and_docket)
         ):
             continue
         return case

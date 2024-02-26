@@ -43,6 +43,7 @@ from cl.corpus_importer.import_columbia.columbia_utils import (
 )
 from cl.corpus_importer.utils import (
     AuthorException,
+    CitationException,
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
@@ -54,7 +55,7 @@ from cl.corpus_importer.utils import (
     merge_judges,
     merge_long_fields,
     merge_strings,
-    update_cluster_panel, CitationException,
+    update_cluster_panel,
 )
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import extract_judge_last_name, find_just_name
@@ -548,7 +549,9 @@ def process_cluster(
     except JudgeException:
         logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
     except CitationException:
-        logger.warning(msg=f"Invalid citation found in {filepath } while merging cluster id: {cluster_id}")
+        logger.warning(
+            msg=f"Invalid citation found in {filepath } while merging cluster id: {cluster_id}"
+        )
 
 
 def merge_columbia_into_cl(options) -> None:
