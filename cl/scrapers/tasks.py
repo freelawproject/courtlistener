@@ -131,8 +131,16 @@ def extract_doc_content(
         item=opinion,
     )
     if not response.is_success:
-        logging.warning(
-            f"Error from document-extract microservice: {response.status_code}"
+        logger.error(
+            f"Error from document-extract microservice: {response.status_code}",
+            extra=dict(
+                opinion_id=opinion.id,
+                url=opinion.download_url,
+                local_path=opinion.local_path.name,
+                fingerprint=[
+                    f"{opinion.cluster.docket.court_id}-document-extract-failure"
+                ],
+            ),
         )
         return
 
