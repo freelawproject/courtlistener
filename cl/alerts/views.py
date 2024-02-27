@@ -158,9 +158,11 @@ def disable_alert(request: HttpRequest, secret_key: str):
 
 @require_http_methods(["GET"])
 def disable_alert_list(request: HttpRequest):
-    """
+    """Renders a list of search alerts associated with a user's email,
+    allowing them to disable alerts selectively.
 
-    :param request: The HttpRequest from the client
+    :param request: The incoming HTTP request, containing the private
+    keys as query string parameters.
     """
     private_keys = request.GET.getlist("keys")
     alerts = get_list_or_404(Alert, secret_key__in=private_keys)
