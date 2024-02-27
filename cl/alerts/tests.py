@@ -1786,6 +1786,19 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(mail.outbox), 2)
         text_content = mail.outbox[0].body
         self.assertIn(rt_oral_argument.case_name, text_content)
+
+        # Should have the List-Unsubscribe-Post and List-Unsubscribe header
+        # because the email only includes one alert.
+        self.assertIn("List-Unsubscribe", mail.outbox[0].extra_headers)
+        self.assertIn("List-Unsubscribe-Post", mail.outbox[0].extra_headers)
+        unsubscribe_url = reverse(
+            "one_click_disable_alert", args=[self.search_alert.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+
         # Highlighting tags are not set in text version
         self.assertNotIn("<strong>", text_content)
 
@@ -2211,6 +2224,23 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         # Grouped  below two alerts.
         self.assertIn(self.search_alert_3.name, text_content)
         self.assertIn(self.search_alert_4.name, text_content)
+
+        # Should not include the List-Unsubscribe-Post header.
+        self.assertIn("List-Unsubscribe", mail.outbox[0].extra_headers)
+        self.assertNotIn("List-Unsubscribe-Post", mail.outbox[0].extra_headers)
+        alert_list_url = reverse("disable_alert_list")
+        self.assertIn(
+            alert_list_url,
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+        self.assertIn(
+            f"keys={self.search_alert_3.secret_key}",
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+        self.assertIn(
+            f"keys={self.search_alert_4.secret_key}",
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
 
         # Extract HTML version.
         html_content = None

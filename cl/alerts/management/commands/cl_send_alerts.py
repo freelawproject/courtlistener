@@ -1,5 +1,6 @@
 import datetime
 import traceback
+import urllib.parse
 import warnings
 
 import waffle
@@ -64,6 +65,7 @@ def send_alert(user_profile, hits):
     txt_template = loader.get_template("alert_email.txt")
     html_template = loader.get_template("alert_email.html")
     context = {"hits": hits}
+    headers = {}
     if len(hits) == 1:
         alert = hits[0][0]
         disable_url = reverse(
@@ -74,7 +76,12 @@ def send_alert(user_profile, hits):
             "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",
         }
     else:
-        headers = {}
+        params = {"keys": [hit[0].secret_key for hit in hits]}
+        query_string = urllib.parse.urlencode(params, doseq=True)
+        alert_list = reverse("disable_alert_list")
+        headers = {
+            "List-Unsubscribe": f"<https://www.courtlistener.com{alert_list}?{query_string}>",
+        }
 
     txt = txt_template.render(context)
     html = html_template.render(context)

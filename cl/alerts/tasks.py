@@ -1,4 +1,5 @@
 import copy
+import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
@@ -494,7 +495,7 @@ def send_search_alert_emails(
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
         }
-
+        headers = {}
         if len(hits) == 1:
             alert = hits[0][0]
             disable_url = reverse(
@@ -505,7 +506,12 @@ def send_search_alert_emails(
                 "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",
             }
         else:
-            headers = {}
+            params = {"keys": [hit[0].secret_key for hit in hits]}
+            query_string = urllib.parse.urlencode(params, doseq=True)
+            alert_list = reverse("disable_alert_list")
+            headers = {
+                "List-Unsubscribe": f"<https://www.courtlistener.com{alert_list}?{query_string}>",
+            }
 
         txt = txt_template.render(context)
         html = html_template.render(context)
