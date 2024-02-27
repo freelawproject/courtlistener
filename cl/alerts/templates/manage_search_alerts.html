@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %} Manage your Search Alerts – CourtListener.com{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  <script src="{% static "js/loading-states.js" %}" defer></script>
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="col-sm-2"></div>
+<div class="col-sm-8">
+  <div class="text-center">
+    <h1 class="mb-2">Manage your search alerts subscriptions</h1>
+  </div>
+  <p class="lead">
+    Right here on this page, disable any alerts that clutter your inbox and keep only the ones that matter most.
+    Stay informed, stay focused, and enjoy a more personalized experience. Don't worry, disabling is temporary – you can
+    always re-enable them later.
+  </p>
+
+  <div class="col-xs-12">
+    <div class="table-responsive">
+      <table class="table settings-table" hx-ext="loading-states" data-loading-class="hidden">
+        <thead>
+          <tr>
+            <th>Alert&nbsp;Type</th>
+            <th>Name and Query</th>
+            <th>Frequency</th>
+          </tr>
+        </thead>
+        <tbody hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+          {% for alert in alerts %}
+          <tr id='alert-row-{{ alert.id }}'>
+            <td>
+              <p class="bottom">
+                {% if alert.alert_type == "o" %}
+                  Case Law
+                {% else %}
+                  Oral Argument
+                {% endif %}
+              </p>
+            </td>
+            <td>
+              <p class="bottom">
+                {{ alert.name }}
+              </p>
+            </td>
+            <td>{{ alert.get_rate_display }}</td>
+            <td class="right">
+              <div class="flex justify-content-end">
+                <div data-loading-states>
+                  <button
+                    id='btn-remove-{{ alert.id }}'
+                    class="btn {% if alert.rate == "off" %} btn-secondary {% else %} btn-danger {% endif %} btn-xs"
+                    hx-post="{% url "htmx_disable_alert" alert.secret_key %}"
+                    hx-target="this"
+                    data-loading-disable
+                    {% if alert.rate == "off" %} disabled {% endif %}>
+                    &nbsp;Disable
+                    <i data-loading class="fa fa-spinner fa-spin"></i>
+                  </button>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% include "includes/docket_alert_donation.html" %}
+</div>
+{% endblock %}

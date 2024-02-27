@@ -8,7 +8,7 @@ from django.http import (
     HttpResponseNotFound,
     HttpResponseRedirect,
 )
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_list_or_404, get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
@@ -76,6 +76,27 @@ def one_click_disable_alert(request: HttpRequest, secret_key: str):
     return HttpResponse("You have been successfully unsubscribed!")
 
 
+@require_http_methods(["POST"])
+def htmx_disable_alert(request: HttpRequest, secret_key: str):
+    """Disables a specified alert within an HTMX-powered page."""
+    if not request.META.get("HTTP_HX_REQUEST"):
+        return HttpResponseNotFound(
+            "Your attempt to disable the alert was unsuccessful."
+        )
+
+    alert = get_object_or_404(Alert, secret_key=secret_key)
+    alert.rate = Alert.OFF
+    alert.save()
+    # Mail clients send POSTs; an ugly response is OK.
+    return TemplateResponse(
+        request,
+        "includes/manage-alert-table-row.html",
+        {
+            "alert": alert,
+        },
+    )
+
+
 def disable_alert(request: HttpRequest, secret_key: str):
     """Display a confirmation or success page whenever a user
     chooses to disable their search alerts.
@@ -131,6 +152,25 @@ def disable_alert(request: HttpRequest, secret_key: str):
             "form": form,
             "private": True,
             "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
+        },
+    )
+
+
+@require_http_methods(["GET"])
+def disable_alert_list(request: HttpRequest):
+    """
+
+    :param request: The HttpRequest from the client
+    """
+    private_keys = request.GET.getlist("keys")
+    alerts = get_list_or_404(Alert, secret_key__in=private_keys)
+
+    return TemplateResponse(
+        request,
+        "manage_search_alerts.html",
+        {
+            "alerts": alerts,
+            "private": True,
         },
     )
 
