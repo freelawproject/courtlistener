@@ -638,12 +638,19 @@ def build_has_child_query(
         sort_field, order = order_by
         # Define the function score for sorting, based on the child sort_field.
         # When the order is 'entry_date_filed desc', the 'date_filed_time'
-        # value is used as the score, sorting newer documents first.
-        # In 'asc' order, the score is the difference between  'current_time'
-        # and 'date_filed_time', prioritizing older documents. If a document
-        # does not have a 'date_filed' set, the function returns 1. This
-        # ensures that dockets containing documents without a 'date_filed'
-        # are displayed before dockets without filings, which have a default score of 0.
+        # value, adjusted by washington_bd_offset, is used as the score,
+        # sorting newer documents first. In 'asc' order, the score is the
+        # difference between 'current_time' (also adjusted by the
+        # washington_bd_offset) and 'date_filed_time', prioritizing older
+        # documents. If a document does not have a 'date_filed' set, the
+        # function returns 1. This ensures that dockets containing documents
+        # without a 'date_filed' are displayed before dockets without filings,
+        # which have a default score of 0. washington_bd_offset is based
+        # on George Washington's birthday (February 22, 1732), ensuring all
+        # epoch millisecond values are positive and compatible with ES scoring
+        # system. This approach allows for handling dates in our system both
+        # before and after January 1, 1970 (epoch time), within a positive
+        # scoring range.
 
         query = Q(
             "function_score",
@@ -655,11 +662,14 @@ def build_has_child_query(
                     if (doc['{sort_field}'].size() == 0) {{
                         return 1;  // If not, return 1 as the score
                     }} else {{
-                        // Get the current time in milliseconds
-                        long current_time = new Date().getTime();
+                        // Offset based on the postive epoch time for Washington's birthday to ensure positive scores.
+                        // (February 22, 1732)
+                        long washington_bd_offset = 7506086400000L;
+                        // Get the current time in milliseconds, include the washington_bd_offset to work with positive epoch times.
+                        long current_time = new Date().getTime() + washington_bd_offset;
 
-                        // Convert the 'sort_field' value to epoch milliseconds
-                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli();
+                        // Convert the 'sort_field' value to epoch milliseconds, adjusting by the same offset.
+                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli() + washington_bd_offset;
 
                         // If the order is 'desc', return the 'date_filed_time' as the score
                         if (params.order.equals('desc')) {{
@@ -1960,6 +1970,15 @@ def build_full_join_es_queries(
 
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
+        parties_filters = [
+            query
+            for query in parent_filters
+            if isinstance(query, QueryString)
+            and query.fields[0] in ["party", "attorney"]
+        ]
+        has_parent_parties_filter = build_has_parent_parties_query(
+            parties_filters
+        )
         # If parent filters, extend into child_filters.
         if parent_filters:
             # Removes the party and attorney filter if they were provided because
@@ -1972,6 +1991,12 @@ def build_full_join_es_queries(
                     or query.fields[0] not in ["party", "attorney"]
                 ]
             )
+            if parties_filters:
+                # If party filters were provided, append a has_parent query
+                # with the party filters included to match only child documents
+                # whose parents match the party filters.
+                child_filters.append(has_parent_parties_filter)
+
         # Build the child query based on child_filters and child child_text_query
         match child_filters, child_text_query:
             case [], []:
@@ -1996,12 +2021,6 @@ def build_full_join_es_queries(
                 )
 
         _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
-        parties_filters = [
-            query
-            for query in parent_filters
-            if isinstance(query, QueryString)
-            and query.fields[0] in ["party", "attorney"]
-        ]
         has_child_query = None
         if child_text_query or child_filters:
             hl_fields = (
@@ -2016,28 +2035,22 @@ def build_full_join_es_queries(
                 hl_fields,
                 get_child_sorting_key(cd),
             )
-            if not parties_filters:
-                q_should.append(has_child_query)
 
-        if parties_filters:
-            # If party filters were provided append an additional parties
-            # filter to constrain the has_child query matches. This ensures
-            # they only match dockets with child documents where the docket
-            # matches the party filters.
-            if not has_child_query:
-                # If no child query is present, build a match_all query to
-                # match up to 5 RECAPDocuments in dockets with documents that
-                # matched the party filters.
-                has_child_query = build_has_child_query(
-                    "match_all",
-                    "recap_document",
-                    query_hits_limit,
-                    SEARCH_RECAP_CHILD_HL_FIELDS,
-                    get_child_sorting_key(cd),
-                )
-            parties_filters_has_child_query = deepcopy(parties_filters)
-            parties_filters_has_child_query.append(has_child_query)
-            q_should.append(Q("bool", must=parties_filters_has_child_query))
+        if parties_filters and not has_child_query:
+            # If party filters were provided and there is no
+            # has_child_query, build a has_child query including
+            # has_parent_parties_filter to match only child documents whose
+            # parents match the party filters.
+            has_child_query = build_has_child_query(
+                has_parent_parties_filter,
+                "recap_document",
+                query_hits_limit,
+                SEARCH_RECAP_CHILD_HL_FIELDS,
+                get_child_sorting_key(cd),
+            )
+
+        if has_child_query:
+            q_should.append(has_child_query)
 
         # Build the parent filter and text queries.
         string_query = build_fulltext_query(

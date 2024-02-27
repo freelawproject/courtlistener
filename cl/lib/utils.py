@@ -47,7 +47,9 @@ def deepgetattr(obj, name, default=_UNSPECIFIED):
 
 
 def chunks(iterable, chunk_size: int):
-    """Like the chunks function, but the iterable can be a generator.
+    """Warning: If you're considering using this method, you might want to
+    consider using itertools.batched instead.
+    Like the chunks function, but the iterable can be a generator.
 
     Note that the chunks must be *consumed* for it to work properly. Usually
     that means converting them to a list in your loop.
