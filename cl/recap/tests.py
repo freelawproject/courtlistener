@@ -4543,14 +4543,12 @@ class RecapEmailDocketAlerts(TestCase):
         "cl.recap.tasks.download_pdf_by_magic_number",
         return_value=(None, "Failed to get docket entry"),
     )
-    @mock.patch("cl.recap.tasks.process_recap_attachment")
-    @mock.patch("cl.recap.tasks.get_and_copy_recap_attachment_docs")
-    @mock.patch("cl.recap.tasks.get_attachment_page_by_url")
+    @mock.patch("cl.recap.tasks.get_and_merge_rd_attachments")
+    @mock.patch("cl.recap.tasks.add_docket_entries")
     async def test_recap_email_sealed_entry_with_attachments(
         self,
-        mock_get_attachment_page,
-        mock_copy_recap_attachment_docs,
-        mock_process_recap_attachment,
+        mock_add_docket_entries,
+        mock_merge_rd_attachments,
         mock_download_pdf_by_magic_number,
         mock_docket_entry_sealed,
         mock_enqueue_alert,
@@ -4561,13 +4559,7 @@ class RecapEmailDocketAlerts(TestCase):
         """This test checks if a docket entry with attachments that is
         sealed on PACER is ignored.
         """
-        mock_get_attachment_page.return_value = "<!doctype html>"
         mock_docket_entry_sealed.return_value = True
-        mock_process_recap_attachment.return_value = (
-            PROCESSING_STATUS.INVALID_CONTENT,
-            "Not a valid attachment page upload.",
-            [],
-        )
 
         email_data = RECAPEmailNotificationDataFactory(
             contains_attachments=True,
@@ -4605,15 +4597,9 @@ class RecapEmailDocketAlerts(TestCase):
             docket_entry[0]["pacer_doc_id"],
         )
 
-        # call the helper to copy the attachments but pass an empty list of documents
-        mock_copy_recap_attachment_docs.assert_called_once_with(
-            ANY,
-            [],
-            court.pk,
-            docket_entry[0]["pacer_magic_num"],
-            docket_entry[0]["pacer_case_id"],
-            ANY,
-        )
+        # the process_recap_email task returns before trying to add a new entry
+        mock_add_docket_entries.assert_not_called()
+        mock_merge_rd_attachments.assert_not_called()
 
         # check we didn't create a docket entry
         docket_entry_query = DocketEntry.objects.filter(
