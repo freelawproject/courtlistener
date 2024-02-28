@@ -7,6 +7,7 @@ from rest_framework.serializers import ModelSerializer
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.lib.document_serializer import DocumentSerializer
+from cl.people_db.api_serializers import PersonSerializer
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.documents import (
@@ -172,6 +173,26 @@ class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
         fields = "__all__"
 
 
+class OpinionSerializerOffline(
+    DynamicFieldsMixin, serializers.ModelSerializer
+):
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
+    cluster_id = serializers.ReadOnlyField()
+    # Using PrimaryKeyRelatedField for cluster
+    author = PersonSerializer(many=False, read_only=True)
+    # Using PrimaryKeyRelatedField for joined_by with many=True for representing many-to-many relationship
+    opinions_cited = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Opinion.objects.all()
+    )
+    joined_by = PersonSerializer(many=False, read_only=True)
+
+    class Meta:
+        model = Opinion
+        fields = "__all__"
+
+
 class OpinionsCitedSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
@@ -236,6 +257,31 @@ class OpinionClusterSerializer(
         queryset=Opinion.objects.all(),
         style={"base_template": "input.html"},
     )
+    citations = CitationSerializer(many=True)
+
+    class Meta:
+        model = OpinionCluster
+        fields = "__all__"
+
+
+class OpinionClusterSerializerOffline(
+    DynamicFieldsMixin, serializers.ModelSerializer
+):
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
+    panel = PersonSerializer(many=True, read_only=True)
+    non_participating_judges = PersonSerializer(many=True, read_only=True)
+    judges = PersonSerializer(many=True, read_only=True)
+    docket_id = serializers.ReadOnlyField()
+    # To Delete: CONFIRM THIS
+    # docket = serializers.PrimaryKeyRelatedField(
+    #     queryset=Docket.objects.all()
+    # )
+    sub_opinions = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Opinion.objects.all()
+    )
+    # Assuming CitationSerializer is defined elsewhere and is suitable as is
     citations = CitationSerializer(many=True)
 
     class Meta:

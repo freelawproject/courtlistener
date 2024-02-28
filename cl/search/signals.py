@@ -1,7 +1,14 @@
 from django.conf import settings
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
+from cl.api.tasks import (
+    send_opinion_cluster_created_webhook,
+    send_opinion_cluster_updated_webhook,
+    send_opinion_clusters_deleted_webhook,
+    send_opinion_created_webhook,
+    send_opinions_deleted_webhook,
+)
 from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
@@ -563,3 +570,67 @@ def handle_recap_doc_change(
             find_citations_and_parantheticals_for_recap_documents.apply_async(
                 args=([instance.pk],)
             )
+
+
+@receiver(
+    post_save,
+    sender=Opinion,
+    dispatch_uid="handle_opinion_created_or_updated_webhooks",
+)
+def handle_opinion_created_or_updated_webhook(
+    sender, instance: Opinion, created: bool, update_fields=None, **kwargs
+):
+    """
+    Send a webhook to the webapp when an opinion is created.
+    """
+    if created:
+        return send_opinion_created_webhook(instance)
+    raise NotImplementedError("Opinion updates are not yet implemented.")
+
+
+@receiver(
+    post_delete,
+    sender=Opinion,
+    dispatch_uid="handle_opinion_deleted_webhooks",
+)
+def handle_opinion_deleted_webhook(
+    sender, instance: Opinion, created: bool, update_fields=None, **kwargs
+):
+    """
+    Send a webhook to the webapp when an opinion is created.
+    """
+    return send_opinions_deleted_webhook([instance.id])
+
+
+@receiver(
+    post_save,
+    sender=OpinionCluster,
+    dispatch_uid="handle_opinion__cluster_created_or_updated_webhooks",
+)
+def handle_opinion_cluster_created_or_updated_webhook(
+    sender,
+    instance: OpinionCluster,
+    created: bool,
+    update_fields=None,
+    **kwargs
+):
+    """
+    Send a webhook to the webapp when an opinion is created.
+    """
+    if created:
+        return send_opinion_cluster_created_webhook(instance)
+    return send_opinion_cluster_updated_webhook(instance)
+
+
+@receiver(
+    post_delete,
+    sender=Opinion,
+    dispatch_uid="handle_opinion_cluster_deleted_webhooks",
+)
+def handle_opinion_cluster_deleted_webhook(
+    sender, instance: Opinion, created: bool, update_fields=None, **kwargs
+):
+    """
+    Send a webhook to the webapp when an opinion is created.
+    """
+    return send_opinion_clusters_deleted_webhook([instance.id])

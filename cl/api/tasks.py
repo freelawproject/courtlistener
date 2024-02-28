@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Dict, List
 
 from rest_framework.renderers import JSONRenderer
 
@@ -10,9 +10,13 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
-from cl.search.api_serializers import OAESResultSerializer
+from cl.search.api_serializers import (
+    OAESResultSerializer,
+    OpinionClusterSerializerOffline,
+    OpinionSerializerOffline,
+)
 from cl.search.api_utils import ResultObject
-from cl.search.models import DocketEntry
+from cl.search.models import DocketEntry, Opinion, OpinionCluster
 
 
 @app.task()
@@ -33,6 +37,9 @@ def send_test_webhook_event(
         webhook=webhook, content=json_obj, debug=True
     )
     send_webhook_event(webhook_event, content_str.encode("utf-8"))
+
+
+# -- Alert Webhook Events ----
 
 
 @app.task()
@@ -116,3 +123,135 @@ def send_es_search_alert_webhook(
         content=post_content,
     )
     send_webhook_event(webhook_event, json_bytes)
+
+
+# -- CRUD Webhook Events ----
+
+
+@app.task()
+def send_opinion_created_webhook(opinion: Opinion) -> None:
+    """Send a webhook for each new opinion created
+
+    :param opinion: The search opinion object.
+    """
+    for webhook in Webhook.objects.filter(
+        event_type=WebhookEventType.OPINION_CREATE, enabled=True
+    ):
+        post_content = {
+            "webhook": generate_webhook_key_content(webhook),
+            "payload": OpinionSerializerOffline(opinion).data,
+        }
+        renderer = JSONRenderer()
+        json_bytes = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
+        )
+        webhook_event = WebhookEvent.objects.create(
+            webhook=webhook,
+            content=post_content,
+        )
+        send_webhook_event(webhook_event, json_bytes)
+
+
+@app.task()
+def send_opinions_deleted_webhook(ids: List[str]) -> None:
+    """Send a webhook for the deleted opinion cluster
+
+    :param ids: The list of ids deleted.
+    """
+    for webhook in Webhook.objects.filter(
+        event_type=WebhookEventType.OPINION_DELETE, enabled=True
+    ):
+        post_content = {
+            "webhook": generate_webhook_key_content(webhook),
+            "payload": {"ids": ids},
+        }
+        renderer = JSONRenderer()
+        json_bytes = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
+        )
+        webhook_event = WebhookEvent.objects.create(
+            webhook=webhook,
+            content=post_content,
+        )
+        send_webhook_event(webhook_event, json_bytes)
+
+
+@app.task()
+def send_opinion_cluster_created_webhook(
+    opinion_custer: OpinionCluster,
+) -> None:
+    """Send a webhook for the new opinion cluster created.
+
+    :param opinion_custer: The opinion cluster object.
+    """
+    for webhook in Webhook.objects.filter(
+        event_type=WebhookEventType.OPINION_CLUSTER_CREATE, enabled=True
+    ):
+        post_content = {
+            "webhook": generate_webhook_key_content(webhook),
+            "payload": OpinionClusterSerializerOffline(opinion_custer).data,
+        }
+        renderer = JSONRenderer()
+        json_bytes = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
+        )
+        webhook_event = WebhookEvent.objects.create(
+            webhook=webhook,
+            content=post_content,
+        )
+        send_webhook_event(webhook_event, json_bytes)
+
+
+@app.task()
+def send_opinion_clusters_deleted_webhook(ids: List[str]) -> None:
+    """Send a webhook for deleted opinion cluster.
+
+    :param id: The id of the deleted opinion cluster.
+    """
+    for webhook in Webhook.objects.filter(
+        event_type=WebhookEventType.OPINION_CLUSTER_DELETE, enabled=True
+    ):
+        post_content = {
+            "webhook": generate_webhook_key_content(webhook),
+            "payload": {"ids": ids},
+        }
+        renderer = JSONRenderer()
+        json_bytes = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
+        )
+        webhook_event = WebhookEvent.objects.create(
+            webhook=webhook,
+            content=post_content,
+        )
+        send_webhook_event(webhook_event, json_bytes)
+
+
+@app.task()
+def send_opinion_cluster_updated_webhook(
+    id: str, updated_fields: Dict[str, Any]
+) -> None:
+    """Send a webhook for updates to an opinion cluster.
+
+    :param id: The id of the deleted opinion cluster.
+    """
+    for webhook in Webhook.objects.filter(
+        event_type=WebhookEventType.OPINION_CLUSTER_UPDATE, enabled=True
+    ):
+        post_content = {
+            "webhook": generate_webhook_key_content(webhook),
+            "payload": {"id": id, "updated_fields": updated_fields},
+        }
+        renderer = JSONRenderer()
+        json_bytes = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
+        )
+        webhook_event = WebhookEvent.objects.create(
+            webhook=webhook,
+            content=post_content,
+        )
+        send_webhook_event(webhook_event, json_bytes)

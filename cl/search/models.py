@@ -2947,27 +2947,12 @@ class OpinionCluster(AbstractDateTimeModel):
         update_fields=None,
         index=True,
         force_commit=False,
-        send_webhook=True,
         *args,
         **kwargs,
     ):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if update_fields is None:
-            if send_webhook:
-                from cl.api.webhooks import (
-                    send_opinion_cluster_created_webhook,
-                )
-
-                send_opinion_cluster_created_webhook(self)
-        else:
+        if update_fields:
             update_fields = {"slug"}.union(update_fields)
-            if send_webhook:
-                from cl.api.webhooks import (
-                    send_opinion_cluster_updated_webhook,
-                )
-
-                update_data = {k: getattr(self, k) for k in update_fields}
-                send_opinion_cluster_updated_webhook(self.id, update_data)
         super(OpinionCluster, self).save(
             update_fields=update_fields, *args, **kwargs
         )
@@ -2996,7 +2981,7 @@ class OpinionCluster(AbstractDateTimeModel):
             **kwargs,
         )
 
-    def delete(self, send_webhook=True, *args, **kwargs):
+    def delete(self, *args, **kwargs):
         """
         Note that this doesn't get called when an entire queryset
         is deleted, but that should be OK.
@@ -3006,11 +2991,6 @@ class OpinionCluster(AbstractDateTimeModel):
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "search.Opinion")
-
-        if send_webhook:
-            from cl.api.webhooks import send_opinion_clusters_deleted_webhook
-
-            send_opinion_clusters_deleted_webhook(ids=[self.id])
 
     def as_search_list(self):
         # IDs
@@ -3453,7 +3433,6 @@ class Opinion(AbstractDateTimeModel):
         self,
         index: bool = True,
         force_commit: bool = False,
-        send_webhook: bool = True,
         *args: List,
         **kwargs: Dict,
     ) -> None:
@@ -3463,10 +3442,6 @@ class Opinion(AbstractDateTimeModel):
             from cl.search.tasks import add_items_to_solr
 
             add_items_to_solr.delay([self.pk], "search.Opinion", force_commit)
-        if send_webhook:
-            from cl.api.webhooks import send_opinion_created_webhook
-
-            send_opinion_created_webhook(self)
 
     def as_search_dict(self) -> Dict[str, Any]:
         """Create a dict that can be ingested by Solr."""
