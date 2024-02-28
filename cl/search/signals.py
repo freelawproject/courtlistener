@@ -585,7 +585,7 @@ def handle_opinion_created_or_updated_webhook(
     """
     if created:
         return send_opinion_created_webhook(instance)
-    raise NotImplementedError("Opinion updates are not yet implemented.")
+    # raise NotImplementedError("Opinion updates are not yet implemented.")
 
 
 @receiver(
@@ -619,7 +619,8 @@ def handle_opinion_cluster_created_or_updated_webhook(
     """
     if created:
         return send_opinion_cluster_created_webhook(instance)
-    return send_opinion_cluster_updated_webhook(instance)
+    # TODO:
+    # return send_opinion_cluster_updated_webhook(instance)
 
 
 @receiver(
