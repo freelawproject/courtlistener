@@ -90,10 +90,8 @@ def htmx_disable_alert(request: HttpRequest, secret_key: str):
 
     return TemplateResponse(
         request,
-        "includes/manage-alert-table-row.html",
-        {
-            "alert": alert,
-        },
+        "includes/search_alerts/table_row.html",
+        {"alert": alert, "hx_swap": True},
     )
 
 
