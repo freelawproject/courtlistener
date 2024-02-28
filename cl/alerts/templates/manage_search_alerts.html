@@ -29,48 +29,10 @@
   <div class="col-xs-12">
     <div class="table-responsive">
       <table class="table settings-table" hx-ext="loading-states" data-loading-class="hidden">
-        <thead>
-          <tr>
-            <th>Alert&nbsp;Type</th>
-            <th>Name and Query</th>
-            <th>Frequency</th>
-          </tr>
-        </thead>
+        {% include "includes/search_alerts/table_header.html" %}
         <tbody hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
           {% for alert in alerts %}
-          <tr id='alert-row-{{ alert.id }}'>
-            <td>
-              <p class="bottom">
-                {% if alert.alert_type == "o" %}
-                  Case Law
-                {% else %}
-                  Oral Argument
-                {% endif %}
-              </p>
-            </td>
-            <td>
-              <p class="bottom">
-                {{ alert.name }}
-              </p>
-            </td>
-            <td>{{ alert.get_rate_display }}</td>
-            <td class="right">
-              <div class="flex justify-content-end">
-                <div data-loading-states>
-                  <button
-                    id='btn-remove-{{ alert.id }}'
-                    class="btn {% if alert.rate == "off" %} btn-secondary {% else %} btn-danger {% endif %} btn-xs"
-                    hx-post="{% url "htmx_disable_alert" alert.secret_key %}"
-                    hx-target="this"
-                    data-loading-disable
-                    {% if alert.rate == "off" %} disabled {% endif %}>
-                    &nbsp;Disable
-                    <i data-loading class="fa fa-spinner fa-spin"></i>
-                  </button>
-                </div>
-              </div>
-            </td>
-          </tr>
+            {% include "includes/search_alerts/table_row.html" with alert=alert %}
           {% endfor %}
         </tbody>
       </table>
