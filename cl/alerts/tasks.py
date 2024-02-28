@@ -1,9 +1,9 @@
 import copy
-import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
 from typing import Dict, List, Tuple, Union, cast
+from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync
 from celery import Task
@@ -507,7 +507,7 @@ def send_search_alert_emails(
             }
         else:
             params = {"keys": [hit[0].secret_key for hit in hits]}
-            query_string = urllib.parse.urlencode(params, doseq=True)
+            query_string = urlencode(params, doseq=True)
             alert_list = reverse("disable_alert_list")
             headers = {
                 "List-Unsubscribe": f"<https://www.courtlistener.com{alert_list}?{query_string}>",

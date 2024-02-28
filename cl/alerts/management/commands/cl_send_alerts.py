@@ -1,7 +1,7 @@
 import datetime
 import traceback
-import urllib.parse
 import warnings
+from urllib.parse import urlencode
 
 import waffle
 from asgiref.sync import async_to_sync
@@ -77,7 +77,7 @@ def send_alert(user_profile, hits):
         }
     else:
         params = {"keys": [hit[0].secret_key for hit in hits]}
-        query_string = urllib.parse.urlencode(params, doseq=True)
+        query_string = urlencode(params, doseq=True)
         alert_list = reverse("disable_alert_list")
         headers = {
             "List-Unsubscribe": f"<https://www.courtlistener.com{alert_list}?{query_string}>",
