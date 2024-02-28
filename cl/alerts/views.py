@@ -87,7 +87,7 @@ def htmx_disable_alert(request: HttpRequest, secret_key: str):
     alert = get_object_or_404(Alert, secret_key=secret_key)
     alert.rate = Alert.OFF
     alert.save()
-    # Mail clients send POSTs; an ugly response is OK.
+
     return TemplateResponse(
         request,
         "includes/manage-alert-table-row.html",
