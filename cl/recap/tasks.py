@@ -2147,7 +2147,6 @@ def get_and_merge_rd_attachments(
     court_id: str,
     dockets_updated: list[DocketUpdatedData],
     user_pk: int,
-    potentially_sealed_entry: bool = False,
 ) -> list[RECAPDocument]:
     """Get the attachment page and merge the data into the dockets returned
     by the recap.email notification.
@@ -2158,7 +2157,6 @@ def get_and_merge_rd_attachments(
     :param dockets_updated: A list of DocketUpdatedData containing the dockets
     to merge the attachments in.
     :param user_pk: The user to associate with the ProcessingQueue object.
-    :param potentially_sealed_entry: Whether the entry might be sealed or not.
     :return: A list of RECAPDocuments modified or created during the process
     """
 
@@ -2199,17 +2197,6 @@ def get_and_merge_rd_attachments(
         pq_status, msg, rds_affected = async_to_sync(process_recap_attachment)(
             pq_pk, document_number=main_rd_document_number
         )
-
-        # If unable to retrieve the content of the attachment page for an entry
-        # identified as potentially sealed, remove the temporary entry placeholder
-        # record created using the add_docket_entries method to avoid misleading data.
-        if (
-            pq_status == PROCESSING_STATUS.INVALID_CONTENT
-            and potentially_sealed_entry
-        ):
-            docket_entry.des_returned[0].delete()
-            continue
-
         all_attachment_rds += rds_affected
     return all_attachment_rds
 
@@ -2330,10 +2317,7 @@ def process_recap_email(
                 # We only care about the ext w/S3PrivateUUIDStorageTest
                 ContentFile(body.encode()),
             )
-            if (
-                is_potentially_sealed_entry
-                and not data["contains_attachments"]
-            ):
+            if is_potentially_sealed_entry:
                 continue
 
             # Add docket entries for each docket
@@ -2369,13 +2353,15 @@ def process_recap_email(
 
         # Get NEF attachments and merge them.
         all_attachment_rds = []
-        if data["contains_attachments"] is True:
+        if (
+            data["contains_attachments"] is True
+            and not is_potentially_sealed_entry
+        ):
             all_attachment_rds = get_and_merge_rd_attachments(
                 document_url,
                 epq.court_id,
                 dockets_updated,
                 user_pk,
-                is_potentially_sealed_entry,
             )
             get_and_copy_recap_attachment_docs(
                 self,
@@ -2412,7 +2398,7 @@ def process_recap_email(
         all_created_rds += docket_updated.rds_created
         all_updated_rds += docket_updated.rds_updated
 
-    if not is_potentially_sealed_entry or len(all_attachment_rds):
+    if not is_potentially_sealed_entry:
         rds_to_extract_add_to_solr = all_attachment_rds + all_created_rds
         rds_updated_or_created = (
             all_attachment_rds + all_created_rds + all_updated_rds
