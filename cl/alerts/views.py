@@ -77,6 +77,7 @@ def one_click_disable_alert(request: HttpRequest, secret_key: str):
 
 
 @require_http_methods(["POST"])
+@ratelimiter_unsafe_3_per_m
 def htmx_disable_alert(request: HttpRequest, secret_key: str):
     """Disables a specified alert within an HTMX-powered page."""
     if not request.META.get("HTTP_HX_REQUEST"):
@@ -95,6 +96,7 @@ def htmx_disable_alert(request: HttpRequest, secret_key: str):
     )
 
 
+@ratelimiter_unsafe_3_per_m
 def disable_alert(request: HttpRequest, secret_key: str):
     """Display a confirmation or success page whenever a user
     chooses to disable their search alerts.
@@ -303,6 +305,7 @@ def set_docket_alert_state(
         send_unsubscription_confirmation.delay(docket_alert.pk)
 
 
+@ratelimiter_unsafe_3_per_m
 def toggle_docket_alert_confirmation(
     request: HttpRequest,
     route_prefix: str,
