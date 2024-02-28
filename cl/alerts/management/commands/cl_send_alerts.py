@@ -66,22 +66,20 @@ def send_alert(user_profile, hits):
     html_template = loader.get_template("alert_email.html")
     context = {"hits": hits}
     headers = {}
+    query_string = ""
     if len(hits) == 1:
         alert = hits[0][0]
-        disable_url = reverse(
+        unsubscribe_path = reverse(
             "one_click_disable_alert", args=[alert.secret_key]
         )
-        headers = {
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-            "List-Unsubscribe": f"<https://www.courtlistener.com{disable_url}>",
-        }
+        headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     else:
         params = {"keys": [hit[0].secret_key for hit in hits]}
         query_string = urlencode(params, doseq=True)
-        alert_list = reverse("disable_alert_list")
-        headers = {
-            "List-Unsubscribe": f"<https://www.courtlistener.com{alert_list}?{query_string}>",
-        }
+        unsubscribe_path = reverse("disable_alert_list")
+    headers["List-Unsubscribe"] = (
+        f"<https://www.courtlistener.com{unsubscribe_path}?{query_string}>"
+    )
 
     txt = txt_template.render(context)
     html = html_template.render(context)
