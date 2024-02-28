@@ -4530,6 +4530,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn(
             "Failed to get docket entry", processing_queue.error_message
         )
+        # check we don't trigger alerts for sealed docket entries
+        self.assertEqual(len(mail.outbox), 0)
 
         epq_query = EmailProcessingQueue.objects.filter(court_id=court.pk)
         self.assertEqual(await pq_query.acount(), 1)
@@ -4617,6 +4619,8 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertIn(
             "Failed to get docket entry", processing_queue.error_message
         )
+        # check we don't trigger alerts for sealed docket entries
+        self.assertEqual(len(mail.outbox), 0)
 
         epq_query = EmailProcessingQueue.objects.filter(court_id=court.pk)
         self.assertEqual(await pq_query.acount(), 1)
