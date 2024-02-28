@@ -2496,7 +2496,7 @@ class IdbMergeTest(TestCase):
         self.assertEqual(Docket.objects.count(), 3)
 
 
-@mock.patch("cl.recap_rss.tasks.enqueue_docket_alert", return_value=True)
+@mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
 @mock.patch(
     "cl.recap.tasks.RecapEmailSESStorage.open",
     side_effect=mock_bucket_open,
@@ -5324,7 +5324,7 @@ class CheckCourtConnectivityTest(TestCase):
         self.assertEqual(court_status, False)
 
 
-@mock.patch("cl.recap_rss.tasks.enqueue_docket_alert", return_value=True)
+@mock.patch("cl.recap.tasks.enqueue_docket_alert", return_value=True)
 @mock.patch(
     "cl.recap.tasks.RecapEmailSESStorage.open",
     side_effect=mock_bucket_open,

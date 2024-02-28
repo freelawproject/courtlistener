@@ -22,10 +22,10 @@ def create_stub_account(
     This can be helpful when receiving anonymous donations, payments from
     external applications like XERO, etc.
 
-    :param user_data: Generally cleaned data from a cl.donate.forms.UserForm
+    :param user_data: Generally cleaned data from a cl.users.forms.UserForm
     :type user_data: dict
     :param profile_data: Generally cleaned data from a
-    cl.donate.forms.ProfileForm
+    cl.users.forms.ProfileForm
     :type profile_data: dict
     :return: A tuple of a User and UserProfile objects
     """
