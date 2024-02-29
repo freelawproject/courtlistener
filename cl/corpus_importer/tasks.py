@@ -34,6 +34,7 @@ from juriscraper.pacer import (
     PossibleCaseNumberApi,
     ShowCaseDocApi,
 )
+from juriscraper.pacer.reports import BaseReport
 from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
@@ -1756,6 +1757,27 @@ def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
     if data == {}:
         return True
     return False
+
+
+def is_docket_entry_sealed(court_id: str, case_id: str, doc_id: str) -> bool:
+    """Check if a docket entry is sealed, querying the download confirmation
+    page in PACER. If a receipt is returned the docket entry is not sealed,
+    otherwise is sealed.
+
+    :param court_id: A CourtListener court ID to query the confirmation page.
+    :param case_id: The pacer_case_id to use to look up the case:
+    :param doc_id: The pacer_doc_id to query the confirmation page.
+    :return: True if the entry is sealed on PACER, False otherwise.
+    """
+
+    recap_email_user = User.objects.get(username="recap-email")
+    cookies = get_or_cache_pacer_cookies(
+        recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
+    )
+
+    s = PacerSession(cookies=cookies)
+    report = BaseReport(court_id, s)
+    return report.is_entry_sealed(case_id, doc_id)
 
 
 def update_rd_metadata(
