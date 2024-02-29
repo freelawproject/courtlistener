@@ -638,6 +638,15 @@ def handle_ubq_retries(
     :return: None
     """
 
+    # If this is an ApiError exception, confirm the error type is
+    # search_context_missing_exception, so it can be retried. Otherwise, raise
+    # the error.
+    if isinstance(exc, ApiError) and not (
+        exc.info.get("error", {}).get("type", {})
+        == "search_context_missing_exception"
+    ):
+        raise exc
+
     retry_count = self.request.retries
     if retry_count >= self.max_retries:
         raise exc
@@ -652,7 +661,7 @@ def handle_ubq_retries(
         jitter_sec = randint(10, 30)
         countdown_sec = ((retry_count + 1) * min_delay_sec) + jitter_sec
     else:
-        # Default case for ConflictError, NotFoundError or ApiError
+        # Default case for ConflictError, NotFoundError or ApiError search_context_missing_exception
         min_delay_sec = 10  # 10 seconds
         max_delay_sec = 15  # 15 seconds
         countdown_sec = ((retry_count + 1) * min_delay_sec) + randint(
@@ -785,17 +794,9 @@ def update_children_docs_by_query(
         ConflictError,
         ConnectionTimeout,
         NotFoundError,
+        ApiError,
     ) as exc:
         handle_ubq_retries(self, exc, count_query=count_query)
-
-    except ApiError as exc:
-        # Catch any ApiError exceptions to handle specific error message.
-        # If the error is search_context_missing_exception retry it.
-        if (
-            exc.info.get("error", {}).get("type", {})
-            == "search_context_missing_exception"
-        ):
-            handle_ubq_retries(self, exc, count_query=count_query)
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
