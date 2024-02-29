@@ -132,10 +132,41 @@ class AlertTest(SimpleUserDataMixin, TestCase):
         self.assertTrue(self.alert.secret_key)
 
     async def test_are_alerts_disabled_when_the_link_is_visited(self) -> None:
+        """Do we avoid the confirmation page and disable the search alert when the user is logged in?"""
         self.assertEqual(self.alert.rate, self.alert_params["rate"])
+        await self.async_client.alogin(username="pandora", password="password")
         await self.async_client.get(
             reverse("disable_alert", args=[self.alert.secret_key])
         )
+        await self.alert.arefresh_from_db()
+        self.assertEqual(self.alert.rate, "off")
+
+    async def test_is_confirmation_page_shown_when_anonymous_user_click_the_link(
+        self,
+    ) -> None:
+        """Do we show the confirmation page when an anonymous user clicks the link?"""
+        self.assertEqual(self.alert.rate, self.alert_params["rate"])
+        response = await self.async_client.get(
+            reverse("disable_alert", args=[self.alert.secret_key])
+        )
+
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertIn(
+            "Please confirm your unsubscription", response.content.decode()
+        )
+        self.assertIn("Your daily opinion alert", response.content.decode())
+        self.assertIn("Unsubscribe", response.content.decode())
+
+    async def test_can_we_disable_alert_using_the_one_click_link(
+        self,
+    ) -> None:
+        """can we disable a search alert using the one-click link?"""
+        self.assertEqual(self.alert.rate, self.alert_params["rate"])
+        response = await self.async_client.post(
+            reverse("one_click_disable_alert", args=[self.alert.secret_key])
+        )
+
+        self.assertEqual(response.status_code, HTTP_200_OK)
         await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, "off")
 
@@ -177,7 +208,9 @@ class DocketAlertTest(TestCase):
         )
 
         # Add an alert for it
-        DocketAlert.objects.create(docket=self.docket, user=self.user)
+        self.alert = DocketAlert.objects.create(
+            docket=self.docket, user=self.user
+        )
 
         # Add a new docket entry to it
         de = DocketEntry.objects.create(docket=self.docket, entry_number=1)
@@ -201,6 +234,21 @@ class DocketAlertTest(TestCase):
 
         # Does the alert go out? It should.
         self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].extra_headers["X-Entity-Ref-ID"],
+            f"docket.alert:{self.docket.pk}",
+        )
+        self.assertEqual(
+            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
+            f"List-Unsubscribe=One-Click",
+        )
+        unsubscribe_url = reverse(
+            "one_click_docket_alert_unsubscribe", args=[self.alert.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
 
     def test_nothing_happens_for_timers_after_de_creation(self) -> None:
         """Do we avoid sending alerts for timers after the de was created?"""
@@ -654,10 +702,45 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         self.assertEqual(len(mail.outbox), 3)
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
         self.assertIn("daily opinion alert", mail.outbox[0].body)
+        self.assertEqual(
+            mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
+            f"List-Unsubscribe=One-Click",
+        )
+        unsubscribe_url = reverse(
+            "one_click_disable_alert", args=[self.search_alert.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
         self.assertIn("daily opinion alert", mail.outbox[1].body)
+        self.assertEqual(
+            mail.outbox[1].extra_headers["List-Unsubscribe-Post"],
+            f"List-Unsubscribe=One-Click",
+        )
+        unsubscribe_url = reverse(
+            "one_click_disable_alert", args=[self.search_alert_2.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
+            mail.outbox[1].extra_headers["List-Unsubscribe"],
+        )
+
         self.assertEqual(mail.outbox[2].to[0], self.user_profile.user.email)
         self.assertIn("daily oral argument alert ", mail.outbox[2].body)
+        self.assertEqual(
+            mail.outbox[2].extra_headers["List-Unsubscribe-Post"],
+            f"List-Unsubscribe=One-Click",
+        )
+        unsubscribe_url = reverse(
+            "one_click_disable_alert", args=[self.search_alert_oa.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
+            mail.outbox[2].extra_headers["List-Unsubscribe"],
+        )
 
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
@@ -1703,6 +1786,19 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(mail.outbox), 2)
         text_content = mail.outbox[0].body
         self.assertIn(rt_oral_argument.case_name, text_content)
+
+        # Should have the List-Unsubscribe-Post and List-Unsubscribe header
+        # because the email only includes one alert.
+        self.assertIn("List-Unsubscribe", mail.outbox[0].extra_headers)
+        self.assertIn("List-Unsubscribe-Post", mail.outbox[0].extra_headers)
+        unsubscribe_url = reverse(
+            "one_click_disable_alert", args=[self.search_alert.secret_key]
+        )
+        self.assertIn(
+            unsubscribe_url,
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+
         # Highlighting tags are not set in text version
         self.assertNotIn("<strong>", text_content)
 
@@ -2128,6 +2224,23 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         # Grouped  below two alerts.
         self.assertIn(self.search_alert_3.name, text_content)
         self.assertIn(self.search_alert_4.name, text_content)
+
+        # Should not include the List-Unsubscribe-Post header.
+        self.assertIn("List-Unsubscribe", mail.outbox[0].extra_headers)
+        self.assertNotIn("List-Unsubscribe-Post", mail.outbox[0].extra_headers)
+        alert_list_url = reverse("disable_alert_list")
+        self.assertIn(
+            alert_list_url,
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+        self.assertIn(
+            f"keys={self.search_alert_3.secret_key}",
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
+        self.assertIn(
+            f"keys={self.search_alert_4.secret_key}",
+            mail.outbox[0].extra_headers["List-Unsubscribe"],
+        )
 
         # Extract HTML version.
         html_content = None
@@ -2810,3 +2923,33 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
             AudioPercolator.exists(id=valid_alert.pk),
             msg=f"Alert id: {valid_alert.pk} was not indexed.",
         )
+
+
+class OneClickUnsubscribeTests(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.alert = DocketAlertWithParentsFactory(
+            docket__source=Docket.RECAP,
+            user=cls.user_profile.user,
+        )
+
+    def test_can_unsubscribe_docket_alert_with_post_request(self):
+        """Confirm the one click unsubscribe endpoint updates the alert state."""
+        self.assertEqual(self.alert.alert_type, DocketAlert.SUBSCRIPTION)
+
+        response = self.client.post(
+            reverse(
+                "one_click_docket_alert_unsubscribe",
+                args=[self.alert.secret_key],
+            )
+        )
+        self.alert.refresh_from_db()
+
+        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(self.alert.alert_type, DocketAlert.UNSUBSCRIPTION)
+
+        # check unsubscription confirmation email
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("[Unsubscribed]", mail.outbox[0].subject)

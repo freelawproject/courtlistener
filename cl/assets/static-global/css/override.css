@@ -1595,3 +1595,7 @@ rect.series-segment {
   fill: rgb(49, 54, 149) !important;
   fill-opacity: 1.0 !important;
 }
+
+.ml-1 {
+  margin-left: 0.25rem !important;
+}

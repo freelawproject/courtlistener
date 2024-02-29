@@ -1,6 +1,7 @@
 import datetime
 import traceback
 import warnings
+from urllib.parse import urlencode
 
 import waffle
 from asgiref.sync import async_to_sync
@@ -10,6 +11,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
 from django.http import QueryDict
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 
 from cl.alerts.models import Alert, RealTimeQueue
@@ -63,10 +65,30 @@ def send_alert(user_profile, hits):
     txt_template = loader.get_template("alert_email.txt")
     html_template = loader.get_template("alert_email.html")
     context = {"hits": hits}
+    headers = {}
+    query_string = ""
+    if len(hits) == 1:
+        alert = hits[0][0]
+        unsubscribe_path = reverse(
+            "one_click_disable_alert", args=[alert.secret_key]
+        )
+        headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    else:
+        params = {"keys": [hit[0].secret_key for hit in hits]}
+        query_string = urlencode(params, doseq=True)
+        unsubscribe_path = reverse("disable_alert_list")
+    headers["List-Unsubscribe"] = (
+        f"<https://www.courtlistener.com{unsubscribe_path}{'?' if query_string else ''}{query_string}>"
+    )
+
     txt = txt_template.render(context)
     html = html_template.render(context)
     msg = EmailMultiAlternatives(
-        subject, txt, settings.DEFAULT_ALERTS_EMAIL, [user_profile.user.email]
+        subject,
+        txt,
+        settings.DEFAULT_ALERTS_EMAIL,
+        [user_profile.user.email],
+        headers=headers,
     )
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=False)
