@@ -78,7 +78,7 @@ def send_alert(user_profile, hits):
         query_string = urlencode(params, doseq=True)
         unsubscribe_path = reverse("disable_alert_list")
     headers["List-Unsubscribe"] = (
-        f"<https://www.courtlistener.com{unsubscribe_path}?{query_string}>"
+        f"<https://www.courtlistener.com{unsubscribe_path}{'?' if query_string else ''}{query_string}>"
     )
 
     txt = txt_template.render(context)
