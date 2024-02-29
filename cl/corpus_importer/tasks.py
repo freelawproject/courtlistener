@@ -1759,7 +1759,9 @@ def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
     return False
 
 
-def is_docket_entry_sealed(court_id: str, case_id: str, doc_id: str) -> bool:
+def is_docket_entry_sealed(
+    court_id: str, case_id: str, doc_id: str | None
+) -> bool:
     """Check if a docket entry is sealed, querying the download confirmation
     page in PACER. If a receipt is returned the docket entry is not sealed,
     otherwise is sealed.
@@ -1769,6 +1771,10 @@ def is_docket_entry_sealed(court_id: str, case_id: str, doc_id: str) -> bool:
     :param doc_id: The pacer_doc_id to query the confirmation page.
     :return: True if the entry is sealed on PACER, False otherwise.
     """
+
+    # If doc_id is None, it’s probably a minute entry.
+    if not doc_id:
+        return False
 
     recap_email_user = User.objects.get(username="recap-email")
     cookies = get_or_cache_pacer_cookies(
