@@ -8,7 +8,7 @@ def get_redis_interface(
     db_name: str,
     decode_responses: bool = True,
 ) -> Redis:
-    """picks an existing redis connection from the global object.
+    """Pick an existing redis connection from the global object.
 
     :param db_name: The name of the database to use, as defined in our settings
     :param decode_responses: Whether to decode responses with utf-8. If you're
