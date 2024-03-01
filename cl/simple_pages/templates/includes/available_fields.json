@@ -169,9 +169,17 @@
    },
    {
       "field":"dateFiled",
-      "description":"The date that a case or opinion was filed in the court.",
+      "description":"The date the decision was issued by the court.",
       "opinions":true,
       "parentheticals":true,
+      "recap_archive":false,
+      "oral_arguments":false
+   },
+  {
+      "field":"dateFiled",
+      "description":"The date the case was initiated.",
+      "opinions":false,
+      "parentheticals":false,
       "recap_archive":true,
       "oral_arguments":false
    },
