@@ -29,7 +29,10 @@
                     {% else %}
                       {% if item.field == "status" %}
                         <td><code>status_exact</code></td>
-                        <td>The precedential status of a case. Valid entries for this field are <code>"Precedential"</code>, <code>"Non-Precedential"</code>, <code>"Errata"</code>, <code>"Separate Opinion"</code>, <code>"In-chambers"</code>, <code>"Relating-to orders"</code> and <code>"Unknown Status"</code>.</td>
+                        <td>The precedential status of a case. Valid entries for this field are <code>"Precedential"</code>, <code>"Non-Precedential"</code>, <code>"Errata"</code>, <code>"Separate Opinion"</code>, <code>"In-chambers"</code>, <code>"Relating-to orders"</code>, <code>"Unknown Status"</code>.</td>
+                      {% elif item.field == "type" %}
+                        <td><code>type</code></td>
+                        <td>The Opinion type. Valid entries for this field are <code>010combined</code>, <code>015unamimous</code>, <code>020lead</code>, <code>025plurality</code>, <code>030concurrence</code>, <code>035concurrenceinpart</code>, <code>040dissent</code>, <code>050addendum</code>, <code>060remittitur</code>, <code>070rehearing</code>, <code>080onthemerits</code>, <code>090onmotiontostrike</code>.</td>
                       {% elif item.field == "procedural_history" %}
                       {% elif item.field == "posture" %}
                       {% elif item.field == "syllabus" %}
