@@ -165,7 +165,10 @@ def get_cl_opinion_content(
 
 
 def update_matching_opinions(
-    matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
+    matches: dict,
+    cl_cleaned_opinions: list,
+    columbia_opinions: list,
+    filepath: str,
 ) -> None:
     """Store matching opinion content in html_columbia field from Opinion object
 
@@ -223,11 +226,13 @@ def update_matching_opinions(
 def map_and_merge_opinions(
     cluster_id: int,
     columbia_opinions: list[dict],
+    filepath: str,
 ) -> None:
     """Map and merge opinion data
 
     :param cluster_id: Cluster id
     :param columbia_opinions: list of columbia opinions from file
+    :param filepath: xml file from which the opinion was extracted
     :return: None
     """
 
@@ -252,7 +257,7 @@ def map_and_merge_opinions(
         if len(matches) == len(columbia_opinions):
             # We were able to match opinions, add opinions to html_columbia field
             update_matching_opinions(
-                matches, cl_cleaned_opinions, columbia_opinions
+                matches, cl_cleaned_opinions, columbia_opinions, filepath
             )
         else:
             raise OpinionMatchingException("Failed to match opinions")
@@ -279,6 +284,7 @@ def map_and_merge_opinions(
                 per_curiam=op["per_curiam"],
                 cluster_id=cluster_id,
                 type=opinion_type,
+                local_path=filepath,
                 author_str=(
                     titlecase(find_just_name(author.strip(":")))
                     if author
@@ -509,7 +515,9 @@ def process_cluster(
 
     try:
         with transaction.atomic():
-            map_and_merge_opinions(cluster_id, columbia_data["opinions"])
+            map_and_merge_opinions(
+                cluster_id, columbia_data["opinions"], filepath
+            )
 
             merged_data = {}
             for field in ["syllabus", "attorneys", "posture", "judges"]:
