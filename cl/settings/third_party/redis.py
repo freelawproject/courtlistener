@@ -1,7 +1,6 @@
 import environ
 from redis import Redis
 from redis.backoff import ExponentialBackoff
-from redis.exceptions import ConnectionError, TimeoutError
 from redis.retry import Retry
 
 env = environ.FileAwareEnv()
@@ -37,7 +36,7 @@ REDIS_CLIENTS = {
         db=db,  # type: ignore
         decode_responses=decode,
         retry=retry,
-        retry_on_error=[ConnectionError, TimeoutError],
+        retry_on_timeout=True,
         health_check_interval=REDIS_HEALTH_CHECK_INTERVAL,
     )
     for decode in [True, False]
