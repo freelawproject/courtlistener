@@ -14,6 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Prefetch, QuerySet
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
+    ApiError,
     ConflictError,
     ConnectionError,
     ConnectionTimeout,
@@ -618,7 +619,13 @@ def get_doc_from_es(
 
 def handle_ubq_retries(
     self: Task,
-    exc: ConnectionError | ConflictError | ConnectionTimeout | NotFoundError,
+    exc: (
+        ConnectionError
+        | ConflictError
+        | ConnectionTimeout
+        | NotFoundError
+        | ApiError
+    ),
     count_query=QuerySet | None,
 ) -> None:
     """Handles the retry logic for update_children_docs_by_query task based on
@@ -630,6 +637,15 @@ def handle_ubq_retries(
     update.
     :return: None
     """
+
+    # If this is an ApiError exception, confirm the error type is
+    # search_context_missing_exception, so it can be retried. Otherwise, raise
+    # the error.
+    if isinstance(exc, ApiError) and not (
+        exc.info.get("error", {}).get("type", {})
+        == "search_context_missing_exception"
+    ):
+        raise exc
 
     retry_count = self.request.retries
     if retry_count >= self.max_retries:
@@ -645,7 +661,7 @@ def handle_ubq_retries(
         jitter_sec = randint(10, 30)
         countdown_sec = ((retry_count + 1) * min_delay_sec) + jitter_sec
     else:
-        # Default case for ConflictError and NotFoundError
+        # Default case for ConflictError, NotFoundError or ApiError search_context_missing_exception
         min_delay_sec = 10  # 10 seconds
         max_delay_sec = 15  # 15 seconds
         countdown_sec = ((retry_count + 1) * min_delay_sec) + randint(
@@ -778,6 +794,7 @@ def update_children_docs_by_query(
         ConflictError,
         ConnectionTimeout,
         NotFoundError,
+        ApiError,
     ) as exc:
         handle_ubq_retries(self, exc, count_query=count_query)
 
