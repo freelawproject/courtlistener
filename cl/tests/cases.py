@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django_elasticsearch_dsl.registries import registry
 from rest_framework.test import APITestCase
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 
 
 class OutputBlockerTestMixin:
@@ -52,7 +52,7 @@ class RestartRateLimitMixin:
 
     @classmethod
     def restart_rate_limit(cls):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         keys = r.keys(":1:rl:*")
         if keys:
             r.delete(*keys)
@@ -68,7 +68,7 @@ class RestartSentEmailQuotaMixin:
 
     @classmethod
     def restart_sent_email_quota(cls, prefix="email"):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         keys = r.keys(f"{prefix}:*")
 
         if keys:
@@ -169,7 +169,7 @@ class ESIndexTestCase(SimpleTestCase):
 
     @classmethod
     def restart_celery_throttle_key(cls):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         keys = r.keys("celery_throttle:*")
         if keys:
             r.delete(*keys)

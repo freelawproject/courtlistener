@@ -12,7 +12,7 @@ from cl.lib.es_signal_processor import (
     check_fields_that_changed,
     get_fields_to_update,
 )
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import Person
 from cl.search.documents import ESRECAPDocument
 from cl.search.models import (
@@ -61,7 +61,7 @@ def log_last_document_indexed(
     :return: The data logged to redis.
     """
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     pipe = r.pipeline()
     pipe.hgetall(log_key)
     log_info: Mapping[str | bytes, int | str] = {
@@ -86,7 +86,7 @@ def get_last_parent_document_id_processed(
     :return: The last document ID indexed.
     """
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     log_key = compose_redis_key(search_type, event_doc_type)
     stored_values = r.hgetall(log_key)
     last_document_id = int(stored_values.get("last_document_id", 0))

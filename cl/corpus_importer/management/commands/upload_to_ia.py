@@ -10,7 +10,7 @@ from cl.corpus_importer.tasks import upload_pdf_to_ia, upload_recap_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import Docket, RECAPDocument
 
 
@@ -72,7 +72,7 @@ def upload_recap_data(options):
     """Upload RECAP data to Internet Archive."""
     q = options["queue"]
     database = options["database"]
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     redis_key = "recap-docket-last-id"
     last_pk = r.getset(redis_key, 0)
     ds = (

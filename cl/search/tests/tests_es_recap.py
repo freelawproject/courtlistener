@@ -15,7 +15,7 @@ from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 
 from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase, RECAPSearchTestCase
 from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
@@ -2897,7 +2897,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.delete_index("search.Docket")
         self.create_index("search.Docket")
 
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)
@@ -4305,7 +4305,7 @@ class RECAPHistoryTablesIndexingTest(
             pk_offset=0,
             testing_mode=True,
         )
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)
