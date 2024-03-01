@@ -43,7 +43,7 @@ from cl.lib.elasticsearch_utils import (
     set_results_highlights,
 )
 from cl.lib.paginators import ESPaginator
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import (
     add_depth_counts,
     build_main_query,
@@ -270,7 +270,7 @@ def get_homepage_stats():
     """Get any stats that are displayed on the homepage and return them as a
     dict
     """
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     ten_days_ago = make_aware(
         datetime.today() - timedelta(days=10), timezone.utc
     )
