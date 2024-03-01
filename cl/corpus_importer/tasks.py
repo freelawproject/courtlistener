@@ -80,7 +80,7 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
-from cl.lib.redis_utils import delete_redis_semaphore, make_redis_interface
+from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -1190,7 +1190,7 @@ def make_docket_by_iquery(
             return None
         raise self.retry(exc=exc)
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     if not report.data:
         logger.info(
             "No valid data found in iquery page for %s.%s",

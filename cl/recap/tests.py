@@ -44,7 +44,7 @@ from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import get_next_webhook_retry_date
 from cl.lib.pacer import is_pacer_court_accessible
 from cl.lib.recap_utils import needs_ocr
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.people_db.models import (
     Attorney,
@@ -5294,7 +5294,7 @@ class CheckCourtConnectivityTest(TestCase):
 
     def setUp(self) -> None:
         self.court_id = "alnb"
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
         key = self.r.keys(f"status:pacer:court.{self.court_id}:ip.127.0.0.1")
         if key:
             self.r.delete(*key)
@@ -5414,11 +5414,11 @@ class WebhooksRetries(TestCase):
         recipient_user.save()
         self.recipient_user = recipient_user
 
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
 
     @classmethod
     def restart_webhook_executed(cls):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         key = r.keys("daemon:webhooks:executed")
         if key:
             r.delete(*key)

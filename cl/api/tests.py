@@ -24,7 +24,7 @@ from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.factories import AudioFactory
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     AudioTestCase,
     IndexedSolrTestCase,
@@ -252,7 +252,7 @@ class ApiEventCreationTestCase(TestCase):
         cls.user = UserFactory.create()
 
     def setUp(self) -> None:
-        self.r = make_redis_interface("STATS")
+        self.r = get_redis_interface("STATS")
         self.flush_stats()
         self.endpoint_name = "audio-list"
 
@@ -1107,7 +1107,7 @@ class WebhooksMilestoneEventsTest(TestCase):
         )
 
     def setUp(self) -> None:
-        self.r = make_redis_interface("STATS")
+        self.r = get_redis_interface("STATS")
         self.flush_stats()
 
     def tearDown(self) -> None:
