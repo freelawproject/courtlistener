@@ -46,7 +46,7 @@ from cl.favorites.models import (
     UserTagEvent,
 )
 from cl.lib.email_backends import get_email_count
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -2120,7 +2120,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             )
             email.send()
 
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         self.assertEqual(int(r.get("test-email-counter:temp_counter")), 3)
         self.assertEqual(r.zcard("test-email-counter:delivery_attempts"), 4)
         email_counter = get_email_count(r)
@@ -2151,7 +2151,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 5)
 
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         email_counter = get_email_count(r)
         self.assertEqual(email_counter, 5)
 
@@ -2195,7 +2195,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(len(mail.outbox), 5)
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 5)
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         email_counter = get_email_count(r)
         self.assertEqual(email_counter, 5)
 

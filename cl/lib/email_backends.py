@@ -11,7 +11,7 @@ from django.core.mail.backends.base import BaseEmailBackend
 from redis import Redis
 from redis.client import Pipeline
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.users.email_handlers import (
     add_bcc_random,
     enqueue_email,
@@ -170,7 +170,7 @@ class EmailBackend(BaseEmailBackend):
         base_backend = settings.BASE_BACKEND
         connection = get_connection(base_backend)
         connection.open()
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         msg_count = 0
         for email_message in email_messages:
             original_recipients = normalize_addresses(email_message.to)

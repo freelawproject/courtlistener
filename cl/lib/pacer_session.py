@@ -5,7 +5,7 @@ from juriscraper.pacer import PacerSession
 from redis import Redis
 from requests.cookies import RequestsCookieJar
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 
 session_key = "session:pacer:cookies:user.%s"
 
@@ -56,7 +56,7 @@ def get_or_cache_pacer_cookies(
     :param refresh: If True, refresh the cookies even if they're already cached
     :return: Cookies for the PACER user
     """
-    r = make_redis_interface("CACHE", decode_responses=False)
+    r = get_redis_interface("CACHE", decode_responses=False)
     cookies = get_pacer_cookie_from_cache(user_pk, r=r)
     ttl_seconds = r.ttl(session_key % user_pk)
     if cookies and ttl_seconds >= 300 and not refresh:
@@ -83,7 +83,7 @@ def get_pacer_cookie_from_cache(
     :return Either None if no cache cookies or the cookies if they're found.
     """
     if not r:
-        r = make_redis_interface("CACHE", decode_responses=False)
+        r = get_redis_interface("CACHE", decode_responses=False)
     pickled_cookie = r.get(session_key % user_pk)
     if pickled_cookie:
         return pickle.loads(pickled_cookie)

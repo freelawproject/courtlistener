@@ -15,7 +15,7 @@ from factory import RelatedFactory
 from lxml import etree, html
 from rest_framework.status import HTTP_200_OK
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
     EmptySolrTestCase,
@@ -1383,7 +1383,7 @@ class IndexOpinionDocumentsCommandTest(
         cls.create_index("search.OpinionCluster")
 
     def setUp(self) -> None:
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)

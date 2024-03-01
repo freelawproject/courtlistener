@@ -24,7 +24,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import map_pacer_to_cl_id
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import S3PrivateUUIDStorage
 from cl.lib.string_utils import trunc
 from cl.lib.timezone_helpers import localize_date_and_time
@@ -440,7 +440,7 @@ def log_added_items_to_redis(
     :return: The data logged to redis.
     """
 
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
     log_key = "troller_bk:log"
     pipe.hgetall(log_key)

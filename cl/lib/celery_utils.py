@@ -12,7 +12,7 @@ from redis import Redis
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.ratelimiter import parse_rate
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 
 PRIORITY_SEP: str = "\x06\x16"
 DEFAULT_PRIORITY_STEPS: List[int] = [0, 3, 6, 9]
@@ -24,7 +24,7 @@ def clear_queue(queue_name: str):
         make_queue_name_for_pri(queue_name, pri)
         for pri in DEFAULT_PRIORITY_STEPS
     ]
-    r = make_redis_interface("CELERY")
+    r = get_redis_interface("CELERY")
     return sum([r.delete(x) for x in priority_names])
 
 
@@ -67,7 +67,7 @@ def get_queue_length(queue_name: str = "celery") -> int:
         make_queue_name_for_pri(queue_name, pri)
         for pri in DEFAULT_PRIORITY_STEPS
     ]
-    r = make_redis_interface("CELERY")
+    r = get_redis_interface("CELERY")
     return sum(r.llen(x) for x in priority_names)
 
 
@@ -274,7 +274,7 @@ def get_task_wait(
     task_sub_key = f"{task.name}{task_sub_key_suffix}"
     throttle_key = f"celery_throttle:{task_sub_key}"
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
 
     allowed_task_count, duration = parse_rate(rate)
 
