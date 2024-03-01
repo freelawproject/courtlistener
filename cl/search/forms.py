@@ -476,7 +476,7 @@ class SearchForm(forms.Form):
             else:
                 initial = False
             new_field = forms.BooleanField(
-                label=status[1],
+                label=status[status_index],
                 required=False,
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs),

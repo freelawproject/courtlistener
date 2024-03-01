@@ -1,4 +1,5 @@
 {% load extras %}
+{% load waffle_tags %}
 <ul class="nav nav-tabs" role="tablist">
   <li role="presentation" class="active"><a href="#list-fields-opinions" aria-controls="list-fields-opinions" role="tab" data-toggle="tab">Opinions</a></li>
   <li role="presentation"><a href="#list-fields-parentheticals" aria-controls="list-fields-parentheticals" role="tab" data-toggle="tab">Parentheticals</a></li>
@@ -22,8 +23,26 @@
               {% for item in data %}
                   <tr>
                   {% if item|get:type %}
-                    <td><code>{{ item.field }}</code></td>
-                    <td>{{ item.description|safe }}</td>
+                    {% flag "o-es-active" %}
+                      <td><code>{{ item.field }}</code></td>
+                      <td>{{ item.description|safe }}</td>
+                    {% else %}
+                      {% if item.field == "status" %}
+                        <td><code>status_exact</code></td>
+                        <td>The precedential status of a case. Valid entries for this field are <code>"Precedential"</code>, <code>"Non-Precedential"</code>, <code>"Errata"</code>, <code>"Separate Opinion"</code>, <code>"In-chambers"</code>, <code>"Relating-to orders"</code>, <code>"Unknown Status"</code>.</td>
+                      {% elif item.field == "type" %}
+                        <td><code>type</code></td>
+                        <td>The Opinion type. Valid entries for this field are <code>010combined</code>, <code>015unamimous</code>, <code>020lead</code>, <code>025plurality</code>, <code>030concurrence</code>, <code>035concurrenceinpart</code>, <code>040dissent</code>, <code>050addendum</code>, <code>060remittitur</code>, <code>070rehearing</code>, <code>080onthemerits</code>, <code>090onmotiontostrike</code>.</td>
+                      {% elif item.field == "panel_names" %}
+                      {% elif item.field == "procedural_history" %}
+                      {% elif item.field == "posture" %}
+                      {% elif item.field == "syllabus" %}
+                      {% elif item.field == "source" %}
+                      {% else %}
+                        <td><code>{{ item.field }}</code></td>
+                        <td>{{ item.description|safe }}</td>
+                      {% endif %}
+                    {% endflag %}
                   {% endif %}
                   </tr>
               {% endfor %}
