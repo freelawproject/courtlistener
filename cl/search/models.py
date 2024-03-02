@@ -3116,6 +3116,75 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
+class ClusterStub(AbstractDateTimeModel):
+    """A simple class to stub opinion clusters when we dont have the opinion"""
+
+    case_name = models.TextField(
+        help_text="The standard name of the case",
+        blank=True,
+    )
+    case_name_full = models.TextField(
+        help_text="The full unabridged case name",
+        blank=True,
+    )
+    date_filed = models.DateField(
+        help_text="The date the case was filed",
+        null=True,
+        blank=True,
+    )
+    date_decided = models.DateField(
+        help_text="The date the opinion was decided",
+        null=True,
+        blank=True,
+    )
+    date_argued = models.DateField(
+        help_text="The date the opinion was argued",
+        null=True,
+        blank=True,
+    )
+    date_revised = models.DateField(
+        help_text="The date the opinion was revised",
+        null=True,
+        blank=True,
+    )
+    court = models.ForeignKey(
+        "Court",
+        help_text="The court where the opinion cluster was filed",
+        on_delete=models.RESTRICT,
+        null=True,
+        blank=True,
+    )
+    court_str = models.TextField(
+        help_text="Court name as a string",
+        blank=True,
+    )
+    docket_number = models.TextField(
+        help_text="The docket number(s) associated with the opinion or case",
+        blank=True,
+    )
+    raw_citations = models.TextField(
+        help_text="Text value of the citation or citations",
+        blank=True,
+    )
+    citations = models.JSONField(
+        help_text="Citations found by eyecite. Used when we have citation "
+        "values that are not allowed in our citation table",
+        blank=True,
+        null=True,
+    )
+
+    def __str__(self) -> str:
+        if self.case_name:
+            return f"{self.pk}: {self.case_name}"
+        elif self.case_name_full:
+            return f"{self.pk}: {self.case_name_full}"
+        else:
+            return f"{self.pk}"
+
+    class Meta:
+        verbose_name_plural = "OpinionCluster stubs"
+
+
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
 class Citation(models.Model):
     """A simple class to hold citations."""
@@ -3155,6 +3224,16 @@ class Citation(models.Model):
         help_text="The cluster that the citation applies to",
         related_name="citations",
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    cluster_stub = models.ForeignKey(
+        ClusterStub,
+        help_text="The stub that the citation applies to",
+        related_name="stub_citations",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     volume = models.SmallIntegerField(help_text="The volume of the reporter")
     reporter = models.TextField(
@@ -3190,7 +3269,16 @@ class Citation(models.Model):
             # To generate reporter volume lists
             models.Index(fields=["volume", "reporter"]),
         ]
-        unique_together = (("cluster", "volume", "reporter", "page"),)
+        unique_together = (
+            ("cluster", "volume", "reporter", "page"),
+            ("cluster_stub", "volume", "reporter", "page"),
+        )
+        constraints = [
+            models.CheckConstraint(
+                check=Q(cluster__isnull=False) | Q(cluster_stub__isnull=False),
+                name="not_both_null",
+            )
+        ]
 
 
 def sort_cites(c):

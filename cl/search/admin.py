@@ -13,6 +13,7 @@ from cl.search.models import (
     Citation,
     Claim,
     ClaimHistory,
+    ClusterStub,
     Court,
     Courthouse,
     Docket,
@@ -349,4 +350,15 @@ class ParentheticalGroupAdmin(CursorPaginatorAdmin):
     raw_id_fields = (
         "opinion",
         "representative",
+    )
+
+
+@admin.register(ClusterStub)
+class ClusterStubAdmin(CursorPaginatorAdmin):
+    list_display = (
+        "id",
+        "case_name",
+        "case_name_full",
+        "date_filed",
+        "court_str",
     )

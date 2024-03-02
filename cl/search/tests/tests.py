@@ -65,6 +65,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
+    ClusterStub,
     Court,
     Docket,
     DocketEntry,
@@ -1953,3 +1954,43 @@ class ESIndexingTasksUtils(TestCase):
         # Confirm the expected events are returned.
         unique_event_ids = set(unique_events.values_list("pgh_id", flat=True))
         self.assertEqual(unique_event_ids, expected_event_ids)
+
+
+class OpinionClusterStub(TestCase):
+    """Test creation of stub cases"""
+
+    def test_add_stub_case(self):
+        """Can we add a stub case?"""
+
+        # From lexis dataset
+        stub_1 = ClusterStub.objects.create(
+            case_name_full="ANTHONY C. KENNEY, Plaintiff, v. SSA ODAR "
+            "HEARING et al., Defendants.",
+            date_decided=datetime.date(2015, 9, 23),
+            date_filed=datetime.date(2015, 9, 23),
+            court=CourtFactory(id="okwd"),
+            court_str="United States District Court for the Western District "
+            "of Oklahoma",
+            citations={
+                "citation_1": "2015 WL 6160378",
+                "citation_2": "2015 U.S. Dist. LEXIS 142327",
+            },
+        )
+
+        # We have two citations in json field
+        self.assertEqual(len(stub_1.citations), 2)
+
+        # From westlaw dataset
+        stub_2 = ClusterStub.objects.create(
+            case_name="Kordulak v. Prudential Ins. Co. of America",
+            date_filed=datetime.date(1937, 2, 16),
+            docket_number="245687",
+            court_str="District Court of Jersey City, New Jersey.",
+            citations={
+                "citation_1": "15 N.J. Misc. 242",
+                "citation_2": "190 A. 325",
+            },
+        )
+
+        # We have two citations in json field
+        self.assertEqual(len(stub_2.citations), 2)
