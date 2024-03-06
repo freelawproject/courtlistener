@@ -2021,6 +2021,7 @@ class SweepIndexerCommandTest(
             source="C",
             blocked=False,
             sha1="a49ada00977449",
+            processing_complete=True,
         )
         cls.audio_2 = AudioFactory(
             docket_id=cls.de_1.docket_id,
@@ -2029,6 +2030,12 @@ class SweepIndexerCommandTest(
             local_path_mp3="test/audio/2.mp3",
             source="C",
             sha1="a49ada0097744956",
+            processing_complete=True,
+        )
+        # This audio shouldn't be indexed since is not processed.
+        cls.audio_3 = AudioFactory(
+            docket_id=cls.de_1.docket_id,
+            processing_complete=False,
         )
 
         # Opinion Factories

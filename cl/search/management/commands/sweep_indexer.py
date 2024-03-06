@@ -4,6 +4,7 @@ from typing import Iterable, Mapping, cast
 from django.apps import apps
 from django.conf import settings
 
+from cl.audio.models import Audio
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import get_redis_interface
@@ -241,6 +242,16 @@ class Command(VerboseCommand):
                         RECAPDocument.objects.filter(pk__gte=last_document_id)
                         .order_by("pk")
                         .values_list("pk", "docket_entry__docket_id")
+                    )
+                    count = queryset.count()
+                    q = queryset.iterator()
+                case "audio.Audio":
+                    queryset = (
+                        Audio.objects.filter(
+                            pk__gte=last_document_id, processing_complete=True
+                        )
+                        .order_by("pk")
+                        .values_list("pk", flat=True)
                     )
                     count = queryset.count()
                     q = queryset.iterator()
