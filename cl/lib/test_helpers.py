@@ -22,9 +22,10 @@ from cl.people_db.factories import (
     PersonFactory,
     PoliticalAffiliationFactory,
     PositionFactory,
+    RaceFactory,
     SchoolFactory,
 )
-from cl.people_db.models import Person, Race
+from cl.people_db.models import Person
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -73,8 +74,8 @@ class PeopleTestCase(SimpleTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.w_race = Race.objects.get(race="w")
-        cls.b_race = Race.objects.get(race="b")
+        cls.w_race = RaceFactory(race="w")
+        cls.b_race = RaceFactory(race="b")
         cls.person_1 = PersonFactory.create(
             gender="m",
             name_first="Bill",

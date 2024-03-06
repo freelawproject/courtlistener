@@ -1112,6 +1112,10 @@ def index_parent_or_child_docs(
                 )
             elif document_type == "child":
                 child_instances = Opinion.objects.filter(pk__in=instance_ids)
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            parent_es_document = AudioDocument
+            if document_type == "parent":
+                parent_instances = Audio.objects.filter(pk__in=instance_ids)
         case _:
             return
 
