@@ -72,6 +72,10 @@ from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
+from cl.search.management.commands.sweep_indexer import (
+    compose_indexer_redis_key,
+    log_indexer_last_status,
+)
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -2225,40 +2229,92 @@ class SweepIndexerCommandTest(
                 f"\rDocuments Indexed: {expected_dict}"
             )
 
-            # Confirm Dockets are indexed.
-            s = DocketDocument.search()
-            s = s.query(Q("match", docket_child="docket"))
-            self.assertEqual(
-                s.count(), 2, msg="Wrong number of Dockets returned."
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        # Confirm RECAPDocuments are indexed.
+        s = ESRECAPDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+        # Confirm Audios are indexed.
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 2)
+        # Confirm Persons are indexed
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
+        # Confirm Positions are indexed.
+        s = PositionDocument.search()
+        s = s.query(Q("match", person_child="position"))
+        self.assertEqual(s.count(), 3)
+        # Confirm OpinionCluster are indexed
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Opinions returned."
+        )
+
+    def test_restart_from_last_document_logged(self):
+        """Confirm the sweep_indexer command can resume from where it left
+        off after a failure or interruption.
+        """
+
+        # Log last status to simulate a resume from "search.Docket"
+        log_indexer_last_status(
+            "search.Docket",
+            self.de_1.docket.pk,
+            0,
+            compose_indexer_redis_key(),
+        )
+
+        with mock.patch(
+            "cl.search.management.commands.sweep_indexer.logger"
+        ) as mock_logger:
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
             )
-            # Confirm RECAPDocuments are indexed.
-            s = ESRECAPDocument.search()
-            s = s.query(Q("match", docket_child="recap_document"))
-            self.assertEqual(
-                s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+            expected_dict = {
+                "audio.Audio": 0,
+                "people_db.Person": 0,
+                "search.OpinionCluster": 0,
+                "search.Opinion": 0,
+                "search.Docket": 1,
+                "search.RECAPDocument": 3,
+            }
+            # Only Docket and RECAPDocument should be indexed.
+            mock_logger.info.assert_called_with(
+                f"\rDocuments Indexed: {expected_dict}"
             )
-            # Confirm Audios are indexed.
-            s = AudioDocument.search().query("match_all")
-            self.assertEqual(s.count(), 2)
-            # Confirm Persons are indexed
-            s = PersonDocument.search()
-            s = s.query(Q("match", person_child="person"))
-            self.assertEqual(
-                s.count(), 2, msg="Wrong number of judges returned."
-            )
-            # Confirm Positions are indexed.
-            s = PositionDocument.search()
-            s = s.query(Q("match", person_child="position"))
-            self.assertEqual(s.count(), 3)
-            # Confirm OpinionCluster are indexed
-            s = OpinionClusterDocument.search()
-            s = s.query(Q("match", cluster_child="opinion_cluster"))
-            self.assertEqual(
-                s.count(), 2, msg="Wrong number of Clusters returned."
-            )
-            # Confirm Opinions are indexed.
-            s = OpinionDocument.search()
-            s = s.query(Q("match", cluster_child="opinion"))
-            self.assertEqual(
-                s.count(), 3, msg="Wrong number of Opinions returned."
-            )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        # Confirm RECAPDocuments are indexed.
+        s = ESRECAPDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # Confirm no Audios were indexed.
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Confirm that neither Person nor Positions were indexed.
+        s = PersonDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0, msg="Wrong number of judges returned.")
+        # Confirm that neither OpinionCluster nor Opinions were indexed.
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(
+            s.count(), 0, msg="Wrong number of Clusters returned."
+        )

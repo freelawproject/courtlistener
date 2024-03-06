@@ -209,6 +209,10 @@ class Command(VerboseCommand):
         """Processes models names and documents serially for indexing by
         iterating over the stack of model names.
 
+        :param models_stack: A list of model names to be processed for indexing
+        :param last_document_id: An optional integer indicating the last
+        document ID processed, allowing the command to continue from where it
+        left off. Defaults to 0.
         :return:None
         """
         while models_stack:
@@ -252,6 +256,9 @@ class Command(VerboseCommand):
                     q = queryset.iterator()
 
             self.process_queryset(q, count, app_label, task_to_use)
+            #  After finishing each model, restart last_document_id to start
+            # from the ID 0 in the next model.
+            last_document_id = 0
 
     def process_queryset(
         self,
@@ -360,14 +367,15 @@ class Command(VerboseCommand):
                         item_id,
                     )
                 )
-                if not processed_count % 1000 or last_item:
-                    # Log every 1000 parent documents processed.
-                    log_indexer_last_status(
-                        app_label,
-                        item_id,
-                        accumulated_chunk,
-                        compose_indexer_redis_key(),
-                    )
-                    # Restart accumulated_chunk
-                    accumulated_chunk = 0
                 chunk = []
+
+            if not processed_count % 1000 or last_item:
+                # Log every 1000 parent documents processed.
+                log_indexer_last_status(
+                    app_label,
+                    item_id,
+                    accumulated_chunk,
+                    compose_indexer_redis_key(),
+                )
+                # Restart accumulated_chunk
+                accumulated_chunk = 0
