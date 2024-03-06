@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, cast
 
 from django.apps import apps
 from django.conf import settings
@@ -72,7 +72,7 @@ def log_indexer_last_status(
         "date_time": datetime.now().isoformat(),
     }
     data_to_log.update(documents_dict)
-    log_info: Mapping[str | bytes, int | str] = data_to_log
+    log_info = cast(Mapping[str | bytes, int | str], data_to_log)
     pipe.hset(log_key, mapping=log_info)
     pipe.execute()
     return log_info
@@ -113,9 +113,7 @@ def get_documents_processed_count_and_restart() -> dict[str, int]:
     return documents_processed
 
 
-def find_starting_model(
-    models: list_supported_models, target_model: str
-) -> int | None:
+def find_starting_model(models: list[str], target_model: str) -> int | None:
     """Find the index of a model in the list whose name matches the target
     name.
 
@@ -154,6 +152,10 @@ class Command(VerboseCommand):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.options = {}
+        self.sweep_indexer_action = settings.ELASTICSEARCH_SWEEP_INDEXER_ACTION
+        self.queue = settings.ELASTICSEARCH_SWEEP_INDEXER_QUEUE
+        self.chunk_size = settings.ELASTICSEARCH_SWEEP_INDEXER_CHUNK_SIZE
+        self.poll_interval = settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -165,14 +167,14 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super().handle(*args, **options)
         self.options = options
-        sweep_indexer_action = settings.ELASTICSEARCH_SWEEP_INDEXER_ACTION
+
         testing_mode = self.options.get("testing_mode", False)
         while True:
             self.stdout.write(f"Starting a new sweep indexer cycle.")
             self.execute_sweep_indexer_cycle()
             document_counts = get_documents_processed_count_and_restart()
             self.stdout.write(
-                f"\rSweep indexer '{sweep_indexer_action}' cycle finished successfully."
+                f"\rSweep indexer '{self.sweep_indexer_action}' cycle finished successfully."
             )
             logger.info(f"\rDocuments Indexed: {document_counts}")
             if testing_mode:
@@ -271,9 +273,6 @@ class Command(VerboseCommand):
         :return: None
         """
         testing_mode = self.options.get("testing_mode", False)
-        queue = settings.ELASTICSEARCH_SWEEP_INDEXER_QUEUE
-        sweep_indexer_action = settings.ELASTICSEARCH_SWEEP_INDEXER_ACTION
-        chunk_size = settings.ELASTICSEARCH_SWEEP_INDEXER_CHUNK_SIZE
         model_options = {
             "audio.Audio": {
                 "type": "parent",
@@ -313,7 +312,9 @@ class Command(VerboseCommand):
         processed_count = 0
         accumulated_chunk = 0
         throttle = CeleryThrottle(
-            poll_interval=60, min_items=chunk_size, queue_name=queue
+            poll_interval=self.poll_interval,
+            min_items=self.chunk_size,
+            queue_name=self.queue,
         )
         for item in items:
             if isinstance(item, tuple):
@@ -325,7 +326,7 @@ class Command(VerboseCommand):
 
             processed_count += 1
             last_item = count == processed_count
-            if sweep_indexer_action == "missing":
+            if es_document and self.sweep_indexer_action == "missing":
                 doc_id = get_es_doc_id(es_document, item_id)
                 if not es_document.exists(
                     id=doc_id, routing=parent_document_id
@@ -333,13 +334,13 @@ class Command(VerboseCommand):
                     chunk.append(item_id)
             else:
                 chunk.append(item_id)
-            if processed_count % chunk_size == 0 or last_item:
+            if processed_count % self.chunk_size == 0 or last_item:
                 throttle.maybe_wait()
                 match task_to_use:
                     case "index_parent_and_child_docs":
                         index_parent_and_child_docs.si(
                             chunk, search_type, testing_mode=testing_mode
-                        ).set(queue=queue).apply_async()
+                        ).set(queue=self.queue).apply_async()
 
                     case "index_parent_or_child_docs":
                         index_parent_or_child_docs.si(
@@ -347,7 +348,7 @@ class Command(VerboseCommand):
                             search_type,
                             document_type,
                             testing_mode=testing_mode,
-                        ).set(queue=queue).apply_async()
+                        ).set(queue=self.queue).apply_async()
 
                 accumulated_chunk += len(chunk)
                 self.stdout.write(
