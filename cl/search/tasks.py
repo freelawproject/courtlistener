@@ -1098,9 +1098,14 @@ def index_parent_or_child_docs(
                 child_instances = RECAPDocument.objects.filter(
                     pk__in=instance_ids
                 )
-                parent_ids = RECAPDocument.objects.filter(
-                    pk__in=instance_ids
-                ).values_list("docket_entry__docket_id", flat=True)
+                # Get unique parent_ids for RECAPDocuments
+                parent_ids = list(
+                    set(
+                        RECAPDocument.objects.filter(
+                            pk__in=instance_ids
+                        ).values_list("docket_entry__docket_id", flat=True)
+                    )
+                )
         case SEARCH_TYPES.OPINION:
             parent_es_document = OpinionClusterDocument
             child_es_document = OpinionDocument
@@ -1112,6 +1117,14 @@ def index_parent_or_child_docs(
                 )
             elif document_type == "child":
                 child_instances = Opinion.objects.filter(pk__in=instance_ids)
+                # Get unique parent_ids for Opinions
+                parent_ids = list(
+                    set(
+                        Opinion.objects.filter(
+                            pk__in=instance_ids
+                        ).values_list("cluster_id", flat=True)
+                    )
+                )
         case SEARCH_TYPES.ORAL_ARGUMENT:
             parent_es_document = AudioDocument
             if document_type == "parent":
