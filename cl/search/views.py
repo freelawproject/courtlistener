@@ -739,9 +739,6 @@ def do_es_search(
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
-            search_form = _clean_form(
-                get_params, search_form.cleaned_data, courts, is_es_form=True
-            )
             cited_cluster = async_to_sync(add_depth_counts)(
                 # Also returns cited cluster if found
                 search_data=cd,
@@ -754,11 +751,6 @@ def do_es_search(
                 SEARCH_TYPES.DOCKETS,
             ]:
                 query_citation = get_query_citation(cd)
-
-            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
-                facet_fields = get_facet_dict_for_search_query(
-                    search_query, cd, search_form
-                )
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
@@ -783,6 +775,21 @@ def do_es_search(
             suggested_query = "proximity_filter"
             if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
                 suggested_query = "proximity_query"
+        finally:
+            # Make sure to always call the _clean_form method
+            search_form = _clean_form(
+                get_params, search_form.cleaned_data, courts, is_es_form=True
+            )
+            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
+                # If the search query is valid, pass the cleaned data to filter and
+                # retrieve the correct number of opinions per status. Otherwise (if
+                # the query has errors), just provide a dictionary containing the
+                # search type to get the total number of opinions per status
+                facet_fields = get_facet_dict_for_search_query(
+                    search_query,
+                    cd if not error else {"type": cd["type"]},
+                    search_form,
+                )
     else:
         error = True
 
