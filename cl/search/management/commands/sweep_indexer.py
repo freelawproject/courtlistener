@@ -1,8 +1,9 @@
 from datetime import datetime
-from typing import Iterable, Mapping, cast
+from typing import Iterable, Literal, Mapping, cast
 
 from django.apps import apps
 from django.conf import settings
+from django.db.models import QuerySet
 
 from cl.audio.models import Audio
 from cl.lib.celery_utils import CeleryThrottle
@@ -25,7 +26,7 @@ from cl.search.tasks import (
 )
 from cl.search.types import ESDocumentClassType
 
-list_supported_models = [
+supported_models = [
     "audio.Audio",
     "people_db.Person",
     "search.OpinionCluster",
@@ -33,6 +34,7 @@ list_supported_models = [
     "search.Docket",
     "search.RECAPDocument",
 ]
+r = get_redis_interface("CACHE")
 
 
 def compose_indexer_redis_key() -> str:
@@ -43,53 +45,48 @@ def compose_indexer_redis_key() -> str:
 
 
 def log_indexer_last_status(
-    document_name: str, document_pk: int, chunk_size: int, log_key: str
+    model_name: str, document_pk: int, chunk_size: int, log_key: str
 ) -> Mapping[str | bytes, int | str]:
     """Log the sweep indexer last status to Redis.
 
-    :param document_name: The document name being processed.
+    :param model_name: The document name being processed.
     :param document_pk: The last document_id processed.
     :param chunk_size: The last chunk size being processed.
     :param log_key: The log key to use in redis.
     :return: The data logged to redis.
     """
 
-    r = get_redis_interface("CACHE")
-    pipe = r.pipeline()
-    pipe.hgetall(log_key)
-    stored_values = pipe.execute()
-
+    stored_values = r.hgetall(log_key)
     # Build the documents key containing the documents indexed dynamically.
-    documents_dict = {model: 0 for model in list_supported_models}
-    for document in list_supported_models:
-        current_total = int(stored_values[0].get(document, 0))
-        if document_name == document:
+    documents_dict = {model: 0 for model in supported_models}
+    for model in supported_models:
+        current_total = int(stored_values.get(model, 0))
+        if model_name == model:
             current_total = chunk_size + current_total
-        documents_dict[document] = current_total
+        documents_dict[model] = current_total
 
     data_to_log = {
-        "document_name": document_name,
+        "model_name": model_name,
         "last_document_id": document_pk,
         "date_time": datetime.now().isoformat(),
     }
     data_to_log.update(documents_dict)
     log_info = cast(Mapping[str | bytes, int | str], data_to_log)
-    pipe.hset(log_key, mapping=log_info)
-    pipe.execute()
+    r.hset(log_key, mapping=log_info)
     return log_info
 
 
 def get_last_document_processed() -> tuple[str, int]:
-    """Get the last document_name and ID indexed from Redis.
+    """Get the last model_name and ID indexed from Redis.
     :return: The last document name and ID indexed.
     """
-    r = get_redis_interface("CACHE")
+
     log_key = compose_indexer_redis_key()
     stored_values = r.hgetall(log_key)
-    document_name = str(stored_values.get("document_name", ""))
+    model_name = str(stored_values.get("model_name", ""))
     last_document_id = int(stored_values.get("last_document_id", 0))
 
-    return document_name, last_document_id
+    return model_name, last_document_id
 
 
 def get_documents_processed_count_and_restart() -> dict[str, int]:
@@ -99,13 +96,12 @@ def get_documents_processed_count_and_restart() -> dict[str, int]:
     :return: A dict containing the number of documents processed of each type.
     """
 
-    r = get_redis_interface("CACHE")
     log_key = compose_indexer_redis_key()
     stored_values = r.hgetall(log_key)
 
-    # Retrieve the number of documents processed dinamically.
+    # Retrieve the number of documents processed.
     documents_processed = {}
-    for document in list_supported_models:
+    for document in supported_models:
         documents_processed[document] = int(stored_values.get(document, 0))
 
     keys = r.keys(log_key)
@@ -145,6 +141,20 @@ def get_es_doc_id(es_document: ESDocumentClassType, instance_id: int) -> int:
     else:
         doc_id = instance_id
     return doc_id
+
+
+def build_parent_model_queryset(
+    app_label: str, last_document_id: int
+) -> tuple[QuerySet, int]:
+    model = apps.get_model(app_label)
+    queryset = (
+        model.objects.filter(pk__gte=last_document_id)
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+    q = queryset.iterator()
+    count = queryset.count()
+    return q, count
 
 
 class Command(VerboseCommand):
@@ -190,21 +200,19 @@ class Command(VerboseCommand):
         :return: None
         """
 
-        document_name, last_document_id = get_last_document_processed()
-        start_model_index = find_starting_model(
-            list_supported_models, document_name
-        )
+        model_name, last_document_id = get_last_document_processed()
+        start_model_index = find_starting_model(supported_models, model_name)
         if start_model_index is not None and last_document_id:
             # create a sub-list from the start model to the end, then reverse
             # it to process it as a stack.
-            models_stack = list_supported_models[start_model_index:][::-1]
-            self.process_documents(models_stack, last_document_id)
+            models_stack = supported_models[start_model_index:][::-1]
+            self.process_model_stack(models_stack, last_document_id)
         else:
-            # Copy and reverse list_supported_models to process it as a stack.
-            models_stack = list_supported_models[::-1]
-            self.process_documents(models_stack)
+            # Copy and reverse supported_models to process it as a stack.
+            models_stack = supported_models[::-1]
+            self.process_model_stack(models_stack)
 
-    def process_documents(
+    def process_model_stack(
         self, models_stack: list[str], last_document_id: int = 0
     ) -> None:
         """Processes models names and documents serially for indexing by
@@ -229,6 +237,11 @@ class Command(VerboseCommand):
                     q = [item.pk for item in queryset if item.is_judge]
                     count = len(q)
                     task_to_use = "index_parent_and_child_docs"
+                    task_params = (
+                        "parent",
+                        SEARCH_TYPES.PEOPLE,
+                        PersonDocument,
+                    )
                 case "search.Opinion":
                     queryset = (
                         Opinion.objects.filter(pk__gte=last_document_id)
@@ -237,6 +250,11 @@ class Command(VerboseCommand):
                     )
                     count = queryset.count()
                     q = queryset.iterator()
+                    task_params = (
+                        "child",
+                        SEARCH_TYPES.OPINION,
+                        OpinionDocument,
+                    )
                 case "search.RECAPDocument":
                     queryset = (
                         RECAPDocument.objects.filter(pk__gte=last_document_id)
@@ -245,6 +263,11 @@ class Command(VerboseCommand):
                     )
                     count = queryset.count()
                     q = queryset.iterator()
+                    task_params = (
+                        "child",
+                        SEARCH_TYPES.RECAP,
+                        ESRECAPDocument,
+                    )
                 case "audio.Audio":
                     queryset = (
                         Audio.objects.filter(
@@ -255,18 +278,35 @@ class Command(VerboseCommand):
                     )
                     count = queryset.count()
                     q = queryset.iterator()
-                case _:
-                    # Base case for non parent-child documents type.
-                    model = apps.get_model(app_label)
-                    queryset = (
-                        model.objects.filter(pk__gte=last_document_id)
-                        .order_by("pk")
-                        .values_list("pk", flat=True)
+                    task_params = (
+                        "parent",
+                        SEARCH_TYPES.ORAL_ARGUMENT,
+                        AudioDocument,
                     )
-                    count = queryset.count()
-                    q = queryset.iterator()
+                case "search.OpinionCluster":
+                    q, count = build_parent_model_queryset(
+                        app_label, last_document_id
+                    )
+                    task_params = (
+                        "parent",
+                        SEARCH_TYPES.OPINION,
+                        OpinionClusterDocument,
+                    )
+                case "search.Docket":
+                    q, count = build_parent_model_queryset(
+                        app_label, last_document_id
+                    )
+                    task_params = (
+                        "parent",
+                        SEARCH_TYPES.RECAP,
+                        DocketDocument,
+                    )
+                case _:
+                    continue
 
-            self.process_queryset(q, count, app_label, task_to_use)
+            self.process_queryset(
+                q, count, app_label, task_to_use, task_params
+            )
             #  After finishing each model, restart last_document_id to start
             # from the ID 0 in the next model.
             last_document_id = 0
@@ -277,6 +317,9 @@ class Command(VerboseCommand):
         count: int,
         app_label: str,
         task_to_use: str,
+        task_params: tuple[
+            Literal["parent", "child"], str, ESDocumentClassType
+        ],
     ) -> None:
         """Process a queryset and execute tasks based on the specified indexing
         task_to_use.
@@ -288,44 +331,12 @@ class Command(VerboseCommand):
         :param app_label: The app label and model that belongs to the queryset
         being indexed.
         :param task_to_use: The name of the celery task to execute.
+        :param task_params: A three tuple containing the task params, the
+        document_type 'parent' or 'child', the Search type and the ES document
+        class.
         :return: None
         """
         testing_mode = self.options.get("testing_mode", False)
-        model_options = {
-            "audio.Audio": {
-                "type": "parent",
-                "search_type": SEARCH_TYPES.ORAL_ARGUMENT,
-                "es_document": AudioDocument,
-            },
-            "people_db.Person": {
-                "type": "parent",
-                "search_type": SEARCH_TYPES.PEOPLE,
-                "es_document": PersonDocument,
-            },
-            "search.OpinionCluster": {
-                "type": "parent",
-                "search_type": SEARCH_TYPES.OPINION,
-                "es_document": OpinionClusterDocument,
-            },
-            "search.Opinion": {
-                "type": "child",
-                "search_type": SEARCH_TYPES.OPINION,
-                "es_document": OpinionDocument,
-            },
-            "search.Docket": {
-                "type": "parent",
-                "search_type": SEARCH_TYPES.RECAP,
-                "es_document": DocketDocument,
-            },
-            "search.RECAPDocument": {
-                "type": "child",
-                "search_type": SEARCH_TYPES.RECAP,
-                "es_document": ESRECAPDocument,
-            },
-        }
-        document_type = model_options[app_label].get("type")
-        search_type = model_options[app_label].get("search_type")
-        es_document = model_options[app_label].get("es_document")
         chunk = []
         processed_count = 0
         accumulated_chunk = 0
@@ -334,6 +345,7 @@ class Command(VerboseCommand):
             min_items=self.chunk_size,
             queue_name=self.queue,
         )
+        document_type, search_type, es_document = task_params
         for item in items:
             if isinstance(item, tuple):
                 item_id = item[0]
