@@ -1183,7 +1183,7 @@ async def citation_redirector(
     #
     if not volume and not page:
         citations = eyecite.get_citations(reporter)
-        if citations:
+        if citations and citations[0].groups:
             c = citations[0]
             # We slugify reporter so that the test further down will
             # pass.
