@@ -311,6 +311,30 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTP_404_NOT_FOUND)
 
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "Maryland Code, Criminal Law § 11-208",
+                },
+            ),
+            follow=True,
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertIn("Unable to Find Reporter", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "§ 97-29-63",
+                },
+            ),
+            follow=True,
+        )
+        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertIn("Unable to Find Reporter", r.content.decode())
+
     async def test_invalid_page_number_1918(self) -> None:
         """Do we fail gracefully with invalid page numbers?"""
         r = await self.async_client.get(
