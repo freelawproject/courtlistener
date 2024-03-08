@@ -1837,13 +1837,48 @@ def add_highlighting_for_feed_query(s: Search, field: str) -> Search:
     return s
 
 
+def build_search_feed_query(
+    search_query: Search,
+    cd: CleanData,
+    jurisdiction: bool,
+    exclude_docs_for_empty_field: str,
+) -> Search:
+    """Builds a search query for the feed based on cd and jurisdiction flag.
+
+    :param search_query:  Elasticsearch DSL Search object
+    :param cd: The query CleanedData
+    :param jurisdiction: Whether to perform a jurisdiction query with all the
+    child opinions.
+    :param exclude_docs_for_empty_field: Field that should not be empty for a
+    document to be included
+    :return: An Elasticsearch DSL Search object containing the feed query.
+    """
+
+    hl_field = "text"
+    if cd["type"] == SEARCH_TYPES.RECAP:
+        hl_field = "plain_text"
+    s, join_query = build_es_base_query(search_query, cd)
+    if jurisdiction or cd["type"] == SEARCH_TYPES.RECAP:
+        # An Opinion Jurisdiction feed or RECAP Search displays child documents
+        # Eliminate items that lack the ordering field and apply highlighting
+        # to create a snippet for the plain_text or text fields.
+        s = build_child_docs_query(
+            join_query,
+            cd=cd,
+            exclude_docs_for_empty_field=exclude_docs_for_empty_field,
+        )
+        s = search_query.query(s)
+        s = add_highlighting_for_feed_query(s, hl_field)
+    return s
+
+
 def do_es_feed_query(
     search_query: Search,
     cd: CleanData,
     rows: int = 20,
     jurisdiction: bool = False,
     exclude_docs_for_empty_field: str = "",
-) -> Response:
+) -> Response | list:
     """Execute an Elasticsearch query for podcasts.
 
     :param search_query: Elasticsearch DSL Search object
@@ -1855,32 +1890,26 @@ def do_es_feed_query(
     document to be included
     :return: The Elasticsearch DSL response.
     """
-    match cd["type"]:
-        case SEARCH_TYPES.RECAP:
-            _, join_query = build_es_base_query(search_query, cd)
-            # Eliminate items that lack the ordering field.
-            s = build_child_docs_query(
-                join_query,
-                cd,
-                exclude_docs_for_empty_field=exclude_docs_for_empty_field,
-            )
-            s = search_query.query(s)
-            s = add_highlighting_for_feed_query(s, "plain_text")
 
-        case _:
-            s, join_query = build_es_base_query(search_query, cd)
-            if jurisdiction:
-                # Eliminate items that lack the ordering field.
-                s = build_child_docs_query(
-                    join_query,
-                    cd=cd,
-                    exclude_docs_for_empty_field=exclude_docs_for_empty_field,
-                )
-                s = search_query.query(s)
-                s = add_highlighting_for_feed_query(s, "text")
+    try:
+        s = build_search_feed_query(
+            search_query, cd, jurisdiction, exclude_docs_for_empty_field
+        )
+    except (
+        UnbalancedParenthesesQuery,
+        UnbalancedQuotesQuery,
+        BadProximityQuery,
+    ) as e:
+        logger.warning("Couldn't load the feed page. Error was: %s", e)
+        return []
 
     s = s.sort(build_sort_results(cd))
-    response = s.extra(from_=0, size=rows).execute()
+    try:
+        response = s.extra(from_=0, size=rows).execute()
+    except (TransportError, ConnectionError, RequestError, ApiError) as e:
+        logger.warning("Couldn't load the feed page. Error was: %s", e)
+        return []
+
     if cd["type"] == SEARCH_TYPES.OPINION:
         # Merge the text field for Opinions.
         if not jurisdiction:

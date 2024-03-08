@@ -69,7 +69,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             response.status_code,
             msg="Did not get 200 OK status code for podcasts.",
         )
-        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//channel/title", 1),
             ("//channel/link", 1),
@@ -78,14 +78,9 @@ class PodcastTest(ESIndexTestCase, TestCase):
             ("//channel/item/title", 2),
             ("//channel/item/enclosure/@url", 2),
         )
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        xml_tree = self.assert_es_feed_content(
+            node_tests, response, namespaces
+        )
 
         # Confirm items are ordered by dateArgued desc
         pub_date_format = "%a, %d %b %Y %H:%M:%S %z"
@@ -118,7 +113,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             response.status_code,
             msg="Did not get 200 OK status code for podcasts.",
         )
-        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//channel/title", 1),
             ("//channel/link", 1),
@@ -127,14 +122,7 @@ class PodcastTest(ESIndexTestCase, TestCase):
             ("//channel/item/title", 3),
             ("//channel/item/enclosure/@url", 3),
         )
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     def test_do_search_podcasts_have_content(self) -> None:
         """Can we make a search podcast?
@@ -209,6 +197,47 @@ class PodcastTest(ESIndexTestCase, TestCase):
             "count(//item[not(pubDate)]) = count(//item)"
         )
         self.assertTrue(pubdate_not_present)
+
+    def test_catch_es_errors(self) -> None:
+        """Can we catch es errors and just render an empy podcast?"""
+
+        # Bad syntax error.
+        params = {
+            "q": "Leave /:",
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
+        response = self.client.get(
+            reverse("search_podcast", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//channel/title", 1),
+            ("//channel/link", 1),
+            ("//channel/description", 1),
+            ("//channel/item", 0),
+        )
+        self.assert_es_feed_content(node_tests, response, namespaces)
+        # Unbalanced parentheses
+        params = {
+            "q": "(Leave ",
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
+        response = self.client.get(
+            reverse("search_podcast", args=["search"]),
+            params,
+        )
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//channel/title", 1),
+            ("//channel/link", 1),
+            ("//channel/description", 1),
+            ("//channel/item", 0),
+        )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
 
 class AudioSitemapTest(SitemapTest):

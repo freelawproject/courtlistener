@@ -2610,7 +2610,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:title", 1),
@@ -2623,14 +2622,9 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 3),
             ("//atom:entry/atom:summary", 3),
         )
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        xml_tree = self.assert_es_feed_content(
+            node_tests, response, namespaces
+        )
 
         # Confirm items are ordered by entry_date_filed desc
         published_format = "%Y-%m-%dT%H:%M:%S%z"
@@ -2670,7 +2664,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//atom:feed/atom:title", 1),
             ("//atom:feed/atom:link", 2),
@@ -2682,15 +2675,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 2),
             ("//atom:entry/atom:summary", 2),
         )
-
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
         # Match all case.
         params = {
@@ -2703,7 +2688,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//atom:feed/atom:title", 1),
             ("//atom:feed/atom:link", 2),
@@ -2715,17 +2699,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 3),
             ("//atom:entry/atom:summary", 3),
         )
-
-        for test, count in node_tests:
-            node_count = len(
-                xml_tree.xpath(test, namespaces=namespaces)
-            )  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
         # Parent Filter + Child Filter + Query string + Parties
         params = {
@@ -2742,7 +2716,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:title", 1),
@@ -2755,16 +2728,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 1),
             ("//atom:entry/atom:summary", 1),
         )
-        for test, count in node_tests:
-            node_count = len(
-                xml_tree.xpath(test, namespaces=namespaces)
-            )  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
         # Only party filters. Return all the RECAPDocuments where parent dockets
         # match the party filters.
@@ -2779,7 +2743,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:title", 1),
@@ -2792,16 +2755,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 2),
             ("//atom:entry/atom:summary", 2),
         )
-        for test, count in node_tests:
-            node_count = len(
-                xml_tree.xpath(test, namespaces=namespaces)
-            )  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     def test_cleanup_control_characters_for_xml_rendering(self) -> None:
         """Can we remove control characters in the plain_text for a proper XML
@@ -2852,6 +2806,45 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIn(expected_summary, actual_summary)
         with self.captureOnCommitCallbacks(execute=True):
             de_1.delete()
+
+    def test_catch_es_errors(self) -> None:
+        """Can we catch es errors and just render an empy feed?"""
+
+        # Bad syntax error.
+        params = {
+            "q": "Leave /:",
+            "type": SEARCH_TYPES.RECAP,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            200, response.status_code, msg="Did not get a 200 OK status code."
+        )
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 0),
+        )
+        self.assert_es_feed_content(node_tests, response, namespaces)
+        # Unbalanced parentheses
+        params = {
+            "q": "(Leave ",
+            "type": SEARCH_TYPES.RECAP,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
+        node_tests = (
+            ("//atom:feed/atom:title", 1),
+            ("//atom:feed/atom:link", 2),
+            ("//atom:entry", 0),
+        )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
 
 class IndexDocketRECAPDocumentsCommandTest(
