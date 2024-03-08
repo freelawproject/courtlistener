@@ -145,16 +145,21 @@ def get_es_doc_id(es_document: ESDocumentClassType, instance_id: int) -> int:
 
 def build_parent_model_queryset(
     app_label: str, last_document_id: int
-) -> tuple[QuerySet, int]:
+) -> QuerySet:
+    """
+    Build a queryset for the parent model starting from the last document ID.
+
+    :param app_label: The label of the app to which the model belongs.
+    :param last_document_id: The instance ID from which to start the queryset.
+    :return: A QuerySet that retrieves only IDs values.
+    """
     model = apps.get_model(app_label)
     queryset = (
         model.objects.filter(pk__gte=last_document_id)
         .order_by("pk")
         .values_list("pk", flat=True)
     )
-    q = queryset.iterator()
-    count = queryset.count()
-    return q, count
+    return queryset
 
 
 class Command(VerboseCommand):
@@ -224,9 +229,13 @@ class Command(VerboseCommand):
         left off. Defaults to 0.
         :return:None
         """
+
+        parent: Literal["parent", "child"] = "parent"
+        child: Literal["parent", "child"] = "child"
         while models_stack:
             app_label = models_stack.pop()
             task_to_use = "index_parent_or_child_docs"
+
             match app_label:
                 case "people_db.Person":
                     queryset = (
@@ -238,7 +247,7 @@ class Command(VerboseCommand):
                     count = len(q)
                     task_to_use = "index_parent_and_child_docs"
                     task_params = (
-                        "parent",
+                        parent,
                         SEARCH_TYPES.PEOPLE,
                         PersonDocument,
                     )
@@ -251,7 +260,7 @@ class Command(VerboseCommand):
                     count = queryset.count()
                     q = queryset.iterator()
                     task_params = (
-                        "child",
+                        child,
                         SEARCH_TYPES.OPINION,
                         OpinionDocument,
                     )
@@ -264,7 +273,7 @@ class Command(VerboseCommand):
                     count = queryset.count()
                     q = queryset.iterator()
                     task_params = (
-                        "child",
+                        child,
                         SEARCH_TYPES.RECAP,
                         ESRECAPDocument,
                     )
@@ -279,28 +288,33 @@ class Command(VerboseCommand):
                     count = queryset.count()
                     q = queryset.iterator()
                     task_params = (
-                        "parent",
+                        parent,
                         SEARCH_TYPES.ORAL_ARGUMENT,
                         AudioDocument,
                     )
                 case "search.OpinionCluster":
-                    q, count = build_parent_model_queryset(
+                    queryset = build_parent_model_queryset(
                         app_label, last_document_id
                     )
+                    q = queryset.iterator()
+                    count = queryset.count()
                     task_params = (
-                        "parent",
+                        parent,
                         SEARCH_TYPES.OPINION,
                         OpinionClusterDocument,
                     )
                 case "search.Docket":
-                    q, count = build_parent_model_queryset(
+                    queryset = build_parent_model_queryset(
                         app_label, last_document_id
                     )
+                    q = queryset.iterator()
+                    count = queryset.count()
                     task_params = (
-                        "parent",
+                        parent,
                         SEARCH_TYPES.RECAP,
                         DocketDocument,
                     )
+
                 case _:
                     continue
 
