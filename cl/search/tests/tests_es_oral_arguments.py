@@ -1979,6 +1979,7 @@ class OralArgumentIndexingTest(
         self.assertEqual(results[0].caseName, "Lorem Ipsum Dolor vs. USA")
         self.assertEqual(results[0].docketNumber, "1:22-bk-12345")
         self.assertEqual(results[0].panel_ids, [])
+        self.assertEqual(results[0].date_created, audio_6.date_created)
 
         # Update docket number and dateArgued
         docket_5.docket_number = "23-98765"

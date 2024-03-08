@@ -273,6 +273,7 @@ class AudioDocumentBase(Document):
         search_analyzer="search_analyzer",
     )
     timestamp = fields.DateField()
+    date_created = fields.DateField()
 
 
 @oral_arguments_index.document
@@ -332,6 +333,9 @@ class AudioDocument(AudioDocumentBase):
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
+
+    def prepare_date_created(self, instance):
+        return instance.date_created
 
 
 @oral_arguments_percolator_index.document
@@ -491,6 +495,7 @@ class PersonBaseDocument(Document):
     )
     person_child = JoinField(relations={"person": ["position"]})
     timestamp = fields.DateField()
+    date_created = fields.DateField()
 
     class Django:
         model = Person
@@ -547,6 +552,9 @@ class PersonBaseDocument(Document):
             for pa in instance.political_affiliations.all()
             if pa
         ] or None
+
+    def prepare_date_created(self, instance):
+        return instance.date_created
 
 
 @people_db_index.document
@@ -948,6 +956,7 @@ class DocketBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
+    date_created = fields.DateField()
 
     class Django:
         model = Docket
@@ -1128,6 +1137,9 @@ class ESRECAPDocument(DocketBaseDocument):
                 "cited_opinion_id", flat=True
             )
         )
+
+    def prepare_date_created(self, instance):
+        return instance.date_created
 
 
 @recap_index.document
@@ -1449,6 +1461,7 @@ class OpinionBaseDocument(Document):
     citeCount = fields.IntegerField(attr="citation_count")
     cluster_child = JoinField(relations={"opinion_cluster": ["opinion"]})
     timestamp = fields.DateField()
+    date_created = fields.DateField()
 
     class Django:
         model = OpinionCluster
@@ -1570,6 +1583,9 @@ class OpinionBaseDocument(Document):
 
     def prepare_timestamp(self, instance):
         return datetime.utcnow()
+
+    def prepare_date_created(self, instance):
+        return instance.date_created
 
 
 @opinion_index.document

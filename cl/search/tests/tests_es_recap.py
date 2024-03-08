@@ -3362,6 +3362,7 @@ class RECAPIndexingTest(
         self.assertEqual(None, docket_doc.referredTo)
         self.assertEqual(None, docket_doc.assigned_to_id)
         self.assertEqual(None, docket_doc.referred_to_id)
+        self.assertEqual(de_1.docket.date_created, docket_doc.date_created)
 
         # Confirm assigned_to and referred_to are properly updated in Docket.
         judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
@@ -3444,6 +3445,7 @@ class RECAPIndexingTest(
         rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
         self.assertEqual("Notification to File Ipsum", rd_doc.description)
         self.assertEqual(99, rd_doc.entry_number)
+        self.assertEqual(rd_1.date_created, rd_doc.date_created)
 
         # Update RECAPDocument fields.
         f = SimpleUploadedFile("recap_filename", b"file content more content")
