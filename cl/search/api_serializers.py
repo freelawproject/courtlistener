@@ -317,6 +317,7 @@ class OAESResultSerializer(DocumentSerializer):
             "dateReargued_text",
             "dateReargumentDenied_text",
             "court_id_text",
+            "date_created",
         )
 
 
@@ -325,7 +326,7 @@ class PersonESResultSerializer(DocumentSerializer):
 
     class Meta:
         document = PersonDocument
-        exclude = ("text", "person_child")
+        exclude = ("text", "person_child", "date_created")
 
 
 class ExtendedPersonESSerializer(PersonESResultSerializer):
