@@ -211,16 +211,13 @@ class PodcastTest(ESIndexTestCase, TestCase):
             params,
         )
         self.assertEqual(
-            200, response.status_code, msg="Did not get a 200 OK status code."
+            400, response.status_code, msg="Did not get a 400 OK status code."
         )
-        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
-        node_tests = (
-            ("//channel/title", 1),
-            ("//channel/link", 1),
-            ("//channel/description", 1),
-            ("//channel/item", 0),
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
         )
-        self.assert_es_feed_content(node_tests, response, namespaces)
+
         # Unbalanced parentheses
         params = {
             "q": "(Leave ",
@@ -230,14 +227,13 @@ class PodcastTest(ESIndexTestCase, TestCase):
             reverse("search_podcast", args=["search"]),
             params,
         )
-        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
-        node_tests = (
-            ("//channel/title", 1),
-            ("//channel/link", 1),
-            ("//channel/description", 1),
-            ("//channel/item", 0),
+        self.assertEqual(
+            400, response.status_code, msg="Did not get a 400 OK status code."
         )
-        self.assert_es_feed_content(node_tests, response, namespaces)
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
+        )
 
 
 class AudioSitemapTest(SitemapTest):

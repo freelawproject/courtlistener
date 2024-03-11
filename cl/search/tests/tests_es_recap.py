@@ -2820,15 +2820,12 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             params,
         )
         self.assertEqual(
-            200, response.status_code, msg="Did not get a 200 OK status code."
+            400, response.status_code, msg="Did not get a 400 OK status code."
         )
-        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
-        node_tests = (
-            ("//atom:feed/atom:title", 1),
-            ("//atom:feed/atom:link", 2),
-            ("//atom:entry", 0),
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
         )
-        self.assert_es_feed_content(node_tests, response, namespaces)
         # Unbalanced parentheses
         params = {
             "q": "(Leave ",
@@ -2838,13 +2835,13 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             reverse("search_feed", args=["search"]),
             params,
         )
-        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
-        node_tests = (
-            ("//atom:feed/atom:title", 1),
-            ("//atom:feed/atom:link", 2),
-            ("//atom:entry", 0),
+        self.assertEqual(
+            400, response.status_code, msg="Did not get a 400 OK status code."
         )
-        self.assert_es_feed_content(node_tests, response, namespaces)
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
+        )
 
 
 class IndexDocketRECAPDocumentsCommandTest(

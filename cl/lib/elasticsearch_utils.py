@@ -1891,25 +1891,11 @@ def do_es_feed_query(
     :return: The Elasticsearch DSL response.
     """
 
-    try:
-        s = build_search_feed_query(
-            search_query, cd, jurisdiction, exclude_docs_for_empty_field
-        )
-    except (
-        UnbalancedParenthesesQuery,
-        UnbalancedQuotesQuery,
-        BadProximityQuery,
-    ) as e:
-        logger.warning("Couldn't load the feed page. Error was: %s", e)
-        return []
-
+    s = build_search_feed_query(
+        search_query, cd, jurisdiction, exclude_docs_for_empty_field
+    )
     s = s.sort(build_sort_results(cd))
-    try:
-        response = s.extra(from_=0, size=rows).execute()
-    except (TransportError, ConnectionError, RequestError, ApiError) as e:
-        logger.warning("Couldn't load the feed page. Error was: %s", e)
-        return []
-
+    response = s.extra(from_=0, size=rows).execute()
     if cd["type"] == SEARCH_TYPES.OPINION:
         # Merge the text field for Opinions.
         if not jurisdiction:
