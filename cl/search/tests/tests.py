@@ -1982,6 +1982,7 @@ class SweepIndexerCommandTest(
                 date_filed=datetime.date(2015, 8, 16),
                 docket_number="1:21-bk-1234",
                 nature_of_suit="440",
+                source=Docket.RECAP,
             ),
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
@@ -2000,6 +2001,7 @@ class SweepIndexerCommandTest(
                 court=cls.court,
                 date_filed=datetime.date(2016, 8, 16),
                 date_argued=datetime.date(2012, 6, 23),
+                source=Docket.RECAP_AND_IDB,
             ),
             entry_number=None,
             date_filed=datetime.date(2014, 7, 19),
@@ -2064,6 +2066,15 @@ class SweepIndexerCommandTest(
             author=cls.person_3,
             cluster=cls.opinion_cluster_2,
             type="010combined",
+        )
+
+        # No RECAP Docket.
+        DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2019, 8, 16),
+            docket_number="21-bk-2341",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
         )
 
     def tearDown(self) -> None:

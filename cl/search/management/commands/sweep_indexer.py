@@ -19,7 +19,7 @@ from cl.search.documents import (
     OpinionDocument,
     PersonDocument,
 )
-from cl.search.models import SEARCH_TYPES, Opinion, RECAPDocument
+from cl.search.models import SEARCH_TYPES, Docket, Opinion, RECAPDocument
 from cl.search.tasks import (
     index_parent_and_child_docs,
     index_parent_or_child_docs,
@@ -153,8 +153,13 @@ def build_parent_model_queryset(
     :return: A QuerySet that retrieves only IDs values.
     """
     model = apps.get_model(app_label)
+    query_args: dict[str, int] = {"pk__gte": last_document_id}
+    if model == Docket:
+        # If the model is Docket, incorporate a source filter to only match
+        # Dockets that belong to the RECAP collection.
+        query_args["source__in"] = Docket.RECAP_SOURCES
     queryset = (
-        model.objects.filter(pk__gte=last_document_id)
+        model.objects.filter(**query_args)
         .order_by("pk")
         .values_list("pk", flat=True)
     )
