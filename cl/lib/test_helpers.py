@@ -73,8 +73,8 @@ class PeopleTestCase(SimpleTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.w_race = Race.objects.get(race="w")
-        cls.b_race = Race.objects.get(race="b")
+        cls.w_race, _ = Race.objects.get_or_create(race="w")
+        cls.b_race, _ = Race.objects.get_or_create(race="b")
         cls.person_1 = PersonFactory.create(
             gender="m",
             name_first="Bill",
