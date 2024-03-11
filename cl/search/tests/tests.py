@@ -72,10 +72,7 @@ from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
-from cl.search.management.commands.sweep_indexer import (
-    compose_indexer_redis_key,
-    log_indexer_last_status,
-)
+from cl.search.management.commands.sweep_indexer import log_indexer_last_status
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -2280,7 +2277,6 @@ class SweepIndexerCommandTest(
             "search.Docket",
             self.de_1.docket.pk,
             0,
-            compose_indexer_redis_key(),
         )
 
         with mock.patch(

@@ -45,17 +45,17 @@ def compose_indexer_redis_key() -> str:
 
 
 def log_indexer_last_status(
-    model_name: str, document_pk: int, chunk_size: int, log_key: str
-) -> Mapping[str | bytes, int | str]:
+    model_name: str, document_pk: int, chunk_size: int
+) -> Mapping[str, int | str]:
     """Log the sweep indexer last status to Redis.
 
     :param model_name: The document name being processed.
     :param document_pk: The last document_id processed.
     :param chunk_size: The last chunk size being processed.
-    :param log_key: The log key to use in redis.
     :return: The data logged to redis.
     """
 
+    log_key = compose_indexer_redis_key()
     stored_values = r.hgetall(log_key)
     # Build the documents key containing the documents indexed dynamically.
     documents_dict = {model: 0 for model in supported_models}
@@ -71,7 +71,7 @@ def log_indexer_last_status(
         "date_time": datetime.now().isoformat(),
     }
     data_to_log.update(documents_dict)
-    log_info = cast(Mapping[str | bytes, int | str], data_to_log)
+    log_info = cast(Mapping[str, int | str], data_to_log)
     r.hset(log_key, mapping=log_info)
     return log_info
 
@@ -110,19 +110,18 @@ def get_documents_processed_count_and_restart() -> dict[str, int]:
     return documents_processed
 
 
-def find_starting_model(models: list[str], target_model: str) -> int | None:
+def find_starting_model(target_model: str) -> int | None:
     """Find the index of a model in the list whose name matches the target
     name.
 
-    :param models: List of supported models name.
     :param target_model: The name of the model to find.
     :return: The index of the model if found, otherwise None.
     """
 
-    for index, model_name in enumerate(models):
-        if model_name == target_model:
-            return index
-    return None
+    try:
+        return supported_models.index(target_model)
+    except ValueError:
+        return 3
 
 
 def get_es_doc_id(es_document: ESDocumentClassType, instance_id: int) -> int:
@@ -206,7 +205,7 @@ class Command(VerboseCommand):
         """
 
         model_name, last_document_id = get_last_document_processed()
-        start_model_index = find_starting_model(supported_models, model_name)
+        start_model_index = find_starting_model(model_name)
         if start_model_index is not None and last_document_id:
             # create a sub-list from the start model to the end, then reverse
             # it to process it as a stack.
@@ -412,7 +411,6 @@ class Command(VerboseCommand):
                     app_label,
                     item_id,
                     accumulated_chunk,
-                    compose_indexer_redis_key(),
                 )
                 # Restart accumulated_chunk
                 accumulated_chunk = 0

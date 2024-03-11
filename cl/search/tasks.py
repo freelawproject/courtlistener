@@ -1100,11 +1100,10 @@ def index_parent_or_child_docs(
                 )
                 # Get unique parent_ids for RECAPDocuments
                 parent_ids = list(
-                    set(
-                        RECAPDocument.objects.filter(
-                            pk__in=instance_ids
-                        ).values_list("docket_entry__docket_id", flat=True)
-                    )
+                    RECAPDocument.objects.filter(pk__in=instance_ids)
+                    .values_list("docket_entry__docket_id", flat=True)
+                    .order_by("docket_entry__docket_id")
+                    .distinct("docket_entry__docket_id")
                 )
         case SEARCH_TYPES.OPINION:
             parent_es_document = OpinionClusterDocument
@@ -1119,11 +1118,9 @@ def index_parent_or_child_docs(
                 child_instances = Opinion.objects.filter(pk__in=instance_ids)
                 # Get unique parent_ids for Opinions
                 parent_ids = list(
-                    set(
-                        Opinion.objects.filter(
-                            pk__in=instance_ids
-                        ).values_list("cluster_id", flat=True)
-                    )
+                    Opinion.objects.filter(pk__in=instance_ids)
+                    .values_list("cluster_id", flat=True)
+                    .distinct()
                 )
         case SEARCH_TYPES.ORAL_ARGUMENT:
             parent_es_document = AudioDocument
