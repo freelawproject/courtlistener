@@ -14,8 +14,10 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
+from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import html
 from rest_framework.status import HTTP_200_OK
@@ -24,12 +26,15 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
+from cl.audio.factories import AudioFactory
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     AudioTestCase,
+    CourtTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
+    PeopleTestCase,
     SolrTestCase,
 )
 from cl.lib.utils import (
@@ -43,16 +48,22 @@ from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
     OpinionDocument,
+    PersonDocument,
     PositionDocument,
 )
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactory,
     OpinionClusterFactoryWithChildrenAndParents,
+    OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
@@ -61,6 +72,7 @@ from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
 )
+from cl.search.management.commands.sweep_indexer import log_indexer_last_status
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -1953,3 +1965,370 @@ class ESIndexingTasksUtils(TestCase):
         # Confirm the expected events are returned.
         unique_event_ids = set(unique_events.values_list("pgh_id", flat=True))
         self.assertEqual(unique_event_ids, expected_event_ids)
+
+
+class SweepIndexerCommandTest(
+    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+):
+    """sweep_indexer command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2015, 8, 16),
+                docket_number="1:21-bk-1234",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+            ),
+            entry_number=1,
+            date_filed=datetime.date(2015, 8, 19),
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+        )
+        cls.rd_att = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+            attachment_number=2,
+        )
+        cls.de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2016, 8, 16),
+                date_argued=datetime.date(2012, 6, 23),
+                source=Docket.RECAP_AND_IDB,
+            ),
+            entry_number=None,
+            date_filed=datetime.date(2014, 7, 19),
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            docket_entry=cls.de_1,
+            document_number="",
+        )
+
+        # Audio Factories
+        cls.audio_1 = AudioFactory(
+            docket_id=cls.de.docket_id,
+            duration=420,
+            local_path_original_file="test/audio/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="C",
+            blocked=False,
+            sha1="a49ada00977449",
+            processing_complete=True,
+        )
+        cls.audio_2 = AudioFactory(
+            docket_id=cls.de_1.docket_id,
+            duration=837,
+            local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="C",
+            sha1="a49ada0097744956",
+            processing_complete=True,
+        )
+        # This audio shouldn't be indexed since is not processed.
+        cls.audio_3 = AudioFactory(
+            docket_id=cls.de_1.docket_id,
+            processing_complete=False,
+        )
+
+        # Opinion Factories
+        cls.opinion_cluster_1 = OpinionClusterFactory.create(
+            source="C",
+            precedential_status="Errata",
+            docket=cls.de.docket,
+        )
+        cls.opinion_1 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=cls.person_2,
+            cluster=cls.opinion_cluster_1,
+            type="020lead",
+        )
+        cls.opinion_2 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=cls.person_2,
+            cluster=cls.opinion_cluster_1,
+            type="010combined",
+        )
+
+        cls.opinion_cluster_2 = OpinionClusterFactory.create(
+            source="C",
+            precedential_status="Published",
+            docket=cls.de_1.docket,
+        )
+        cls.opinion_3 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=cls.person_3,
+            cluster=cls.opinion_cluster_2,
+            type="010combined",
+        )
+
+        # No RECAP Docket.
+        DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2019, 8, 16),
+            docket_number="21-bk-2341",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
+
+    def tearDown(self) -> None:
+        self.delete_index(
+            [
+                "search.OpinionCluster",
+                "search.Docket",
+                "audio.Audio",
+                "people_db.Person",
+            ]
+        )
+        self.create_index(
+            [
+                "search.OpinionCluster",
+                "search.Docket",
+                "audio.Audio",
+                "people_db.Person",
+            ]
+        )
+
+    def test_sweep_indexer_all(self):
+        """Confirm the sweep_indexer command works properly indexing 'all' the
+        documents serially.
+        """
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        s = PersonDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        # Call sweep_indexer command.
+        with mock.patch(
+            "cl.search.management.commands.sweep_indexer.logger"
+        ) as mock_logger:
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
+            )
+            expected_dict = {
+                "audio.Audio": 2,
+                "people_db.Person": 2,
+                "search.OpinionCluster": 2,
+                "search.Opinion": 3,
+                "search.Docket": 2,
+                "search.RECAPDocument": 3,
+            }
+            # All the instances of each type should be indexed.
+            mock_logger.info.assert_called_with(
+                f"\rDocuments Indexed: {expected_dict}"
+            )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        # Confirm RECAPDocuments are indexed.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # Confirm Audios are indexed.
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 2)
+
+        # Confirm Persons are indexed
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
+
+        # Confirm Positions are indexed.
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_2.pk)
+        self.assertEqual(s.count(), 2)
+
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_3.pk)
+        self.assertEqual(s.count(), 1)
+
+        # Confirm OpinionCluster are indexed
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+
+        # Confirm Opinions are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_1.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Opinions returned."
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_2.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+
+    @override_settings(ELASTICSEARCH_SWEEP_INDEXER_ACTION="missing")
+    def test_sweep_indexer_missing(self):
+        """Confirm the sweep_indexer command works properly indexing 'missing'
+        the documents serially.
+        """
+
+        # Call sweep_indexer command to indexing everything.
+        call_command(
+            "sweep_indexer",
+            testing_mode=True,
+        )
+
+        # Remove one instance of each type from their index.
+        DocketDocument.get(id=self.de_1.docket.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        DocketDocument.get(id=ES_CHILD_ID(self.rd.pk).RECAP).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        AudioDocument.get(id=self.audio_1.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        PersonDocument.get(id=self.person_2.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        PersonDocument.get(id=ES_CHILD_ID(self.position_2.pk).POSITION).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        OpinionClusterDocument.get(id=self.opinion_cluster_1.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        OpinionClusterDocument.get(
+            id=ES_CHILD_ID(self.opinion_3.pk).OPINION
+        ).delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+
+        with mock.patch(
+            "cl.search.management.commands.sweep_indexer.logger"
+        ) as mock_logger:
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
+            )
+            expected_dict = {
+                "audio.Audio": 1,
+                "people_db.Person": 1,
+                "search.OpinionCluster": 1,
+                "search.Opinion": 1,
+                "search.Docket": 1,
+                "search.RECAPDocument": 1,
+            }
+            # Only missing instances of each type should be indexed.
+            mock_logger.info.assert_called_with(
+                f"\rDocuments Indexed: {expected_dict}"
+            )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        # Confirm RECAPDocuments are indexed.
+        s = ESRECAPDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+        # Confirm Audios are indexed.
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 2)
+        # Confirm Persons are indexed
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
+        # Confirm Positions are indexed.
+        s = PositionDocument.search()
+        s = s.query(Q("match", person_child="position"))
+        self.assertEqual(s.count(), 3)
+        # Confirm OpinionCluster are indexed
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Opinions returned."
+        )
+
+    def test_restart_from_last_document_logged(self):
+        """Confirm the sweep_indexer command can resume from where it left
+        off after a failure or interruption.
+        """
+
+        # Log last status to simulate a resume from "search.Docket"
+        log_indexer_last_status(
+            "search.Docket",
+            self.de_1.docket.pk,
+            0,
+        )
+
+        with mock.patch(
+            "cl.search.management.commands.sweep_indexer.logger"
+        ) as mock_logger:
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
+            )
+            expected_dict = {
+                "audio.Audio": 0,
+                "people_db.Person": 0,
+                "search.OpinionCluster": 0,
+                "search.Opinion": 0,
+                "search.Docket": 1,
+                "search.RECAPDocument": 3,
+            }
+            # Only Docket and RECAPDocument should be indexed.
+            mock_logger.info.assert_called_with(
+                f"\rDocuments Indexed: {expected_dict}"
+            )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        # Confirm RECAPDocuments are indexed.
+        s = ESRECAPDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # Confirm no Audios were indexed.
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Confirm that neither Person nor Positions were indexed.
+        s = PersonDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0, msg="Wrong number of judges returned.")
+        # Confirm that neither OpinionCluster nor Opinions were indexed.
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(
+            s.count(), 0, msg="Wrong number of Clusters returned."
+        )

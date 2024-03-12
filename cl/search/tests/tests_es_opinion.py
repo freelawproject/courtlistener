@@ -1388,6 +1388,10 @@ class IndexOpinionDocumentsCommandTest(
         if keys:
             self.r.delete(*keys)
 
+    def tearDown(self) -> None:
+        self.delete_index("search.OpinionCluster")
+        self.create_index("search.OpinionCluster")
+
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their
         RECAPDocuments into the ES."""
@@ -1423,6 +1427,49 @@ class IndexOpinionDocumentsCommandTest(
         ]
         for pk in opinions_pks:
             self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
+
+    def test_index_missing_parent_docs_when_indexing_only_child_docs(self):
+        """Confirm the command can properly index missing clusters when
+        indexing only Opinions.
+        """
+
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            testing_mode=True,
+        )
+
+        # Confirm clusters are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Clusters returned."
+        )
+
+        # Confirm Opinions are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_1.pk)
+        self.assertEqual(
+            s.count(), 4, msg="Wrong number of Opinions returned."
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_2.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_3.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
 
 
 class EsOpinionsIndexingTest(
@@ -2277,7 +2324,6 @@ class OpinionFeedTest(
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:title", 1),
@@ -2290,14 +2336,9 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 2),
             ("//atom:entry/atom:summary", 2),
         )
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        xml_tree = self.assert_es_feed_content(
+            node_tests, response, namespaces
+        )
 
         # Confirm items are ordered by date_filed desc
         published_format = "%Y-%m-%dT%H:%M:%S%z"
@@ -2336,7 +2377,6 @@ class OpinionFeedTest(
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//atom:feed/atom:title", 1),
             ("//atom:feed/atom:link", 2),
@@ -2348,15 +2388,7 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 1),
             ("//atom:entry/atom:summary", 1),
         )
-
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
         # Match all case.
         params = {
@@ -2369,7 +2401,6 @@ class OpinionFeedTest(
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//atom:feed/atom:title", 1),
             ("//atom:feed/atom:link", 2),
@@ -2381,16 +2412,7 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 3),
             ("//atom:entry/atom:summary", 3),
         )
-        for test, count in node_tests:
-            node_count = len(
-                xml_tree.xpath(test, namespaces=namespaces)
-            )  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     async def test_jurisdiction_feed(self) -> None:
         """Can we simply load the jurisdiction feed?"""
@@ -2402,7 +2424,7 @@ class OpinionFeedTest(
             response.status_code,
             msg="Did not get 200 OK status code for jurisdiction feed",
         )
-        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:entry", 5),
             ("//atom:feed/atom:entry/atom:title", 5),
@@ -2412,18 +2434,7 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 5),
             ("//atom:entry/atom:summary", 5),
         )
-        for test, expected_count in node_tests:
-            actual_count = len(
-                xml_tree.xpath(
-                    test, namespaces={"atom": "http://www.w3.org/2005/Atom"}
-                )
-            )
-            self.assertEqual(
-                actual_count,
-                expected_count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (expected_count, test, actual_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     async def test_all_jurisdiction_feed(self) -> None:
         """Can we simply load the jurisdiction feed?"""
@@ -2435,7 +2446,7 @@ class OpinionFeedTest(
             response.status_code,
             msg="Did not get 200 OK status code for jurisdiction feed",
         )
-        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:entry", 7),
             ("//atom:feed/atom:entry/atom:title", 7),
@@ -2445,18 +2456,7 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 7),
             ("//atom:entry/atom:summary", 7),
         )
-        for test, expected_count in node_tests:
-            actual_count = len(
-                xml_tree.xpath(
-                    test, namespaces={"atom": "http://www.w3.org/2005/Atom"}
-                )
-            )
-            self.assertEqual(
-                actual_count,
-                expected_count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (expected_count, test, actual_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     def test_item_enclosure_mime_type(self) -> None:
         """Does the mime type detection work correctly?"""
@@ -2574,3 +2574,39 @@ class OpinionFeedTest(
 
         with self.captureOnCommitCallbacks(execute=True):
             o_c.delete()
+
+    def test_catch_es_errors(self) -> None:
+        """Can we catch es errors and just render an empy feed?"""
+
+        # Bad syntax error.
+        params = {
+            "q": "Leave /:",
+            "type": SEARCH_TYPES.OPINION,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            400, response.status_code, msg="Did not get a 400 OK status code."
+        )
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
+        )
+        # Unbalanced parentheses
+        params = {
+            "q": "(Leave ",
+            "type": SEARCH_TYPES.OPINION,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            400, response.status_code, msg="Did not get a 400 OK status code."
+        )
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
+        )
