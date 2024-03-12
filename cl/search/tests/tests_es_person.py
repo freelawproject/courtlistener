@@ -921,9 +921,10 @@ class PeopleSearchTestElasticSearch(
             "supervisor",
             "termination_reason",
             "timestamp",
+            "date_created",
         ]
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 46)
+        self.assertEqual(keys_count, 47)
         for key in keys_to_check:
             self.assertTrue(
                 key in r.data["results"][0],

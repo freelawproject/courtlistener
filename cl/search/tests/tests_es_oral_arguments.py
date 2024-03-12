@@ -1114,9 +1114,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             "source",
             "sha1",
             "timestamp",
+            "date_created",
         ]
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 23)
+        self.assertEqual(keys_count, 24)
         for key in keys_to_check:
             self.assertTrue(
                 key in r.data["results"][0],
