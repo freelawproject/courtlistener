@@ -206,7 +206,7 @@ def send_opinion_cluster_created_webhook(
 
 
 @app.task()
-def send_opinion_clusters_deleted_webhook(ids: List[str]) -> None:
+def send_opinion_clusters_deleted_webhook(ids: list[int]) -> None:
     """Send a webhook for deleted opinion cluster.
 
     :param id: The id of the deleted opinion cluster.
