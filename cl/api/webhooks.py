@@ -1,5 +1,4 @@
 import json
-from typing import Any, Dict, List
 
 import requests
 from django.conf import settings

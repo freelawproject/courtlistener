@@ -3,10 +3,11 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from cl.api.tasks import (
-    send_opinion_cluster_created_webhook,
     send_opinion_cluster_updated_webhook,
+    send_opinion_clusters_created_webhook,
     send_opinion_clusters_deleted_webhook,
-    send_opinion_created_webhook,
+    send_opinion_updated_webhook,
+    send_opinions_created_webhook,
     send_opinions_deleted_webhook,
 )
 from cl.audio.models import Audio
@@ -584,8 +585,11 @@ def handle_opinion_created_or_updated_webhook(
     Send a webhook to the webapp when an opinion is created.
     """
     if created:
-        return send_opinion_created_webhook(instance)
-    # raise NotImplementedError("Opinion updates are not yet implemented.")
+        return send_opinions_created_webhook.delay([instance.id])
+    changed_fields = instance.webhook_tracked_fields.changed()
+    if changed_fields:
+        fields_that_changed = list(changed_fields.keys())
+        send_opinion_updated_webhook(instance.id, fields_that_changed)
 
 
 @receiver(
@@ -599,7 +603,7 @@ def handle_opinion_deleted_webhook(
     """
     Send a webhook to the webapp when an opinion is created.
     """
-    return send_opinions_deleted_webhook([instance.id])
+    return send_opinions_deleted_webhook.delay([instance.id])
 
 
 @receiver(
@@ -618,9 +622,11 @@ def handle_opinion_cluster_created_or_updated_webhook(
     Send a webhook to the webapp when an opinion is created.
     """
     if created:
-        return send_opinion_cluster_created_webhook(instance)
-    # TODO:
-    # return send_opinion_cluster_updated_webhook(instance)
+        return send_opinion_clusters_created_webhook.delay([instance.id])
+    changed_fields = instance.webhook_tracked_fields.changed()
+    if changed_fields:
+        fields_that_changed = list(changed_fields.keys())
+        send_opinion_cluster_updated_webhook(instance.id, fields_that_changed)
 
 
 @receiver(
@@ -634,4 +640,4 @@ def handle_opinion_cluster_deleted_webhook(
     """
     Send a webhook to the webapp when an opinion is created.
     """
-    return send_opinion_clusters_deleted_webhook([instance.id])
+    return send_opinion_clusters_deleted_webhook.delay([instance.id])

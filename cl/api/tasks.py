@@ -129,17 +129,25 @@ def send_es_search_alert_webhook(
 
 
 @app.task()
-def send_opinion_created_webhook(opinion: Opinion) -> None:
+def send_opinions_created_webhook(ids: List[int]) -> None:
     """Send a webhook for each new opinion created
 
     :param opinion: The search opinion object.
     """
+    opinions = []
+    for i in ids:
+        opinions.append(
+            OpinionSerializerOffline(Opinion.objects.get(pk=i)).data,
+        )
+    opinion = Opinion.objects.get(pk=id)
     for webhook in Webhook.objects.filter(
         event_type=WebhookEventType.OPINION_CREATE, enabled=True
     ):
         post_content = {
             "webhook": generate_webhook_key_content(webhook),
-            "payload": OpinionSerializerOffline(opinion).data,
+            "payload": {
+                "opinions": opinions,
+            },
         }
         renderer = JSONRenderer()
         json_bytes = renderer.render(
@@ -154,7 +162,40 @@ def send_opinion_created_webhook(opinion: Opinion) -> None:
 
 
 @app.task()
-def send_opinions_deleted_webhook(ids: list[int]) -> None:
+def send_opinion_updated_webhook(id: str, updated_fields: List[str]) -> None:
+    """Send a webhook for updates to an opinion.
+
+    :param id: The id of the deleted opinion cluster.
+    :param updated_fields: The updated fields.
+    """
+
+    instance = Opinion.objects.get(pk=id)
+    serializer = OpinionSerializerOffline(instance)
+    for field_name in list(serializer.fields.keys()):
+        if field_name not in updated_fields:
+            serializer.fields.pop(field_name)
+
+    for webhook in Webhook.objects.filter(
+        event_type=WebhookEventType.OPINION_UPDATE, enabled=True
+    ):
+        post_content = {
+            "webhook": generate_webhook_key_content(webhook),
+            "payload": [{"id": id, "updated_fields": serializer.data}],
+        }
+        renderer = JSONRenderer()
+        json_bytes = renderer.render(
+            post_content,
+            accepted_media_type="application/json;",
+        )
+        webhook_event = WebhookEvent.objects.create(
+            webhook=webhook,
+            content=post_content,
+        )
+        send_webhook_event(webhook_event, json_bytes)
+
+
+@app.task()
+def send_opinions_deleted_webhook(ids: List[int]) -> None:
     """Send a webhook for the deleted opinion cluster
 
     :param ids: The list of ids deleted.
@@ -179,19 +220,28 @@ def send_opinions_deleted_webhook(ids: list[int]) -> None:
 
 
 @app.task()
-def send_opinion_cluster_created_webhook(
-    opinion_custer: OpinionCluster,
+def send_opinion_clusters_created_webhook(
+    ids: List[int],
 ) -> None:
     """Send a webhook for the new opinion cluster created.
 
     :param opinion_custer: The opinion cluster object.
     """
+    clusters = []
+    for i in ids:
+        clusters.append(
+            OpinionClusterSerializerOffline(
+                OpinionCluster.objects.get(pk=i)
+            ).data,
+        )
     for webhook in Webhook.objects.filter(
         event_type=WebhookEventType.OPINION_CLUSTER_CREATE, enabled=True
     ):
         post_content = {
             "webhook": generate_webhook_key_content(webhook),
-            "payload": OpinionClusterSerializerOffline(opinion_custer).data,
+            "payload": {
+                "clusters": clusters,
+            },
         }
         renderer = JSONRenderer()
         json_bytes = renderer.render(
@@ -232,18 +282,24 @@ def send_opinion_clusters_deleted_webhook(ids: list[int]) -> None:
 
 @app.task()
 def send_opinion_cluster_updated_webhook(
-    id: str, updated_fields: Dict[str, Any]
+    id: str, updated_fields: List[str]
 ) -> None:
     """Send a webhook for updates to an opinion cluster.
 
     :param id: The id of the deleted opinion cluster.
     """
+    instance = OpinionCluster.objects.get(pk=id)
+    serializer = OpinionClusterSerializerOffline(instance)
+    for field_name in list(serializer.fields.keys()):
+        if field_name not in updated_fields:
+            serializer.fields.pop(field_name)
+
     for webhook in Webhook.objects.filter(
         event_type=WebhookEventType.OPINION_CLUSTER_UPDATE, enabled=True
     ):
         post_content = {
             "webhook": generate_webhook_key_content(webhook),
-            "payload": {"id": id, "updated_fields": updated_fields},
+            "payload": [{"id": id, "updated_fields": serializer.data}],
         }
         renderer = JSONRenderer()
         json_bytes = renderer.render(
