@@ -1523,6 +1523,7 @@ def index_related_cites_fields(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         OpinionClusterDocument._index.refresh()
+        DocketDocument._index.refresh()
 
 
 @app.task(

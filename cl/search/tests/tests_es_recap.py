@@ -1450,7 +1450,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         r = async_to_sync(self._test_article_count)(params, 1, "cites")
         # Count child documents under docket.
-        self._count_child_documents(0, r.content.decode(), 1, '"pacer_doc_id"')
+
+        self._count_child_documents(0, r.content.decode(), 1, '"cites"')
 
         # Add a new OpinionsCitedByRECAPDocument
         with self.captureOnCommitCallbacks(execute=True):
@@ -1475,7 +1476,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         r = async_to_sync(self._test_article_count)(params, 1, "cites")
         # Count child documents under docket.
-        self._count_child_documents(0, r.content.decode(), 2, '"pacer_doc_id"')
+        self._count_child_documents(0, r.content.decode(), 2, '"cites"')
         with self.captureOnCommitCallbacks(execute=True):
             opinion_2.cluster.docket.delete()
 
@@ -3353,7 +3354,7 @@ class RECAPIndexingTest(
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
         )
-        # The Docket is not indexed here yet because it doesn't belong to RECAP
+        # The Docket is not indexed yet here because it doesn't belong to RECAP
         self.assertFalse(DocketDocument.exists(id=de_1.docket.pk))
 
         rd_1 = RECAPDocumentFactory(
