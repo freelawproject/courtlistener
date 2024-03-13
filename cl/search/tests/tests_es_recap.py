@@ -1368,6 +1368,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # at Docket level.
         self._count_child_documents(0, r.content.decode(), 0, "advance firm")
 
+        # Advanced query string, pacer_case_id
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"pacer_case_id:{self.de_1.docket.pacer_case_id}",
+        }
+        # Frontend
+        r = await self._test_article_count(params, 1, "pacer_case_id")
+        # 1 Child document matched.
+        self._count_child_documents(0, r.content.decode(), 1, "pacer_case_id")
+
         # Advanced query string, page_count OR document_type
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -3302,6 +3312,7 @@ class RECAPIndexingTest(
                 assigned_to=None,
                 referred_to=None,
                 nature_of_suit="440",
+                pacer_case_id="973390",
             ),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -3353,6 +3364,7 @@ class RECAPIndexingTest(
         self.assertEqual(None, docket_doc.assigned_to_id)
         self.assertEqual(None, docket_doc.referred_to_id)
         self.assertEqual(de_1.docket.date_created, docket_doc.date_created)
+        self.assertEqual(de_1.docket.pacer_case_id, docket_doc.pacer_case_id)
 
         # Confirm assigned_to and referred_to are properly updated in Docket.
         judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
@@ -3373,6 +3385,7 @@ class RECAPIndexingTest(
         de_1.docket.date_argued = datetime.date(2021, 8, 19)
         de_1.docket.date_filed = datetime.date(2022, 8, 19)
         de_1.docket.date_terminated = datetime.date(2023, 8, 19)
+        de_1.docket.pacer_case_id = "288700"
 
         de_1.docket.save()
 
@@ -3390,6 +3403,7 @@ class RECAPIndexingTest(
         self.assertEqual(
             de_1.docket.date_terminated, docket_doc.dateTerminated.date()
         )
+        self.assertEqual(de_1.docket.pacer_case_id, docket_doc.pacer_case_id)
         self.assertIn(judge.name_full, docket_doc.assignedTo)
         self.assertIn(judge_2.name_full, docket_doc.referredTo)
         self.assertEqual(judge.pk, docket_doc.assigned_to_id)
@@ -3611,6 +3625,7 @@ class RECAPIndexingTest(
         de.docket.date_terminated = datetime.date(2022, 6, 10)
         de.docket.assigned_to = judge_2
         de.docket.referred_to = judge
+        de.docket.pacer_case_id = "3456783"
         de.docket.save()
 
         # Query the parent docket by its updated name.
@@ -3684,6 +3699,10 @@ class RECAPIndexingTest(
             self._compare_response_child_value(
                 response, 0, i, de.docket.assigned_to.pk, "assigned_to_id"
             )
+            self._compare_response_child_value(
+                response, 0, i, de.docket.pacer_case_id, "pacer_case_id"
+            )
+
         # Update judge name.
         judge.name_first = "William"
         judge.name_last = "Anderson"

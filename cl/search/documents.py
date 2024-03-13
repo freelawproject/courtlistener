@@ -950,6 +950,7 @@ class DocketBaseDocument(Document):
         search_analyzer="search_analyzer",
     )
     date_created = fields.DateField(attr="date_created")
+    pacer_case_id = fields.KeywordField(attr="pacer_case_id")
 
     class Django:
         model = Docket
@@ -1130,6 +1131,9 @@ class ESRECAPDocument(DocketBaseDocument):
                 "cited_opinion_id", flat=True
             )
         )
+
+    def prepare_pacer_case_id(self, instance):
+        return instance.docket_entry.docket.pacer_case_id
 
 
 @recap_index.document
