@@ -740,6 +740,14 @@ class ESSignalProcessor:
             # the 'view_count' for dockets and opinions.
             return None
 
+        if (
+            isinstance(instance, Docket)
+            and not instance.source in Docket.RECAP_SOURCES
+        ):
+            # Avoid calling es_save_document if the docket doesn't belong to
+            # RECAP.
+            return
+
         mapping_fields = self.documents_model_mapping["save"][sender]
         if (
             created

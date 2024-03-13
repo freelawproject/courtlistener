@@ -296,6 +296,7 @@ docket_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "slug": ["docket_slug", "docket_absolute_url"],
+                "source": [""],  # Not indexed field.
             },
         },
         Person: {

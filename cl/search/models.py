@@ -805,6 +805,7 @@ class Docket(AbstractDateTimeModel):
             "referred_to_id",
             "referred_to_str",
             "slug",
+            "source",
         ]
     )
     es_o_field_tracker = FieldTracker(

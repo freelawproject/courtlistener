@@ -449,6 +449,8 @@ def document_fields_to_update(
         for field in affected_fields:
             document_fields = fields_map[field]
             for doc_field in document_fields:
+                if not doc_field:
+                    continue
                 if field.startswith("get_") and field.endswith("_display"):
                     fields_to_update[doc_field] = getattr(
                         related_instance, field
@@ -537,6 +539,10 @@ def update_es_document(
         related_instance,
         fields_map,
     )
+    if not fields_values_to_update:
+        # Abort, avoid updating not indexed fields, like "source" in Docket.
+        return
+
     Document.update(
         es_doc,
         **fields_values_to_update,
