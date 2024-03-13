@@ -744,7 +744,9 @@ class ESSignalProcessor:
         if (
             isinstance(instance, Docket)
             and not instance.source in Docket.RECAP_SOURCES
-            and mapping_fields.get("self", None)
+            and mapping_fields.get(
+                "self", None
+            )  # Apply only to signals intended to affect the DocketDocument mapping.
         ):
             # Avoid saving or updating the Docket in ES if it doesn't belong to
             # RECAP.
