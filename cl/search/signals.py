@@ -589,7 +589,7 @@ def handle_opinion_created_or_updated_webhook(
     changed_fields = instance.webhook_tracked_fields.changed()
     if changed_fields:
         fields_that_changed = list(changed_fields.keys())
-        send_opinion_updated_webhook([(instance.id, fields_that_changed)])
+        send_opinion_updated_webhook.delay([(instance.id, fields_that_changed)])
 
 
 @receiver(
@@ -626,7 +626,7 @@ def handle_opinion_cluster_created_or_updated_webhook(
     changed_fields = instance.webhook_tracked_fields.changed()
     if changed_fields:
         fields_that_changed = list(changed_fields.keys())
-        send_opinion_cluster_updated_webhook(
+        send_opinion_cluster_updated_webhook.delay(
             [(instance.id, fields_that_changed)]
         )
 
