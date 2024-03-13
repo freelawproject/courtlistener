@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List
+from typing import Any, List, Tuple
 
 from rest_framework.renderers import JSONRenderer
 
@@ -162,25 +162,28 @@ def send_opinions_created_webhook(ids: List[int]) -> None:
 
 
 @app.task()
-def send_opinion_updated_webhook(id: str, updated_fields: List[str]) -> None:
+def send_opinion_updated_webhook(updates: List[Tuple[int, List[str]]]) -> None:
     """Send a webhook for updates to an opinion.
 
-    :param id: The id of the deleted opinion cluster.
-    :param updated_fields: The updated fields.
+    :param updates: A list containing the id and the list of updated field names for each batched update.
     """
 
-    instance = Opinion.objects.get(pk=id)
-    serializer = OpinionSerializerOffline(instance)
-    for field_name in list(serializer.fields.keys()):
-        if field_name not in updated_fields:
-            serializer.fields.pop(field_name)
+    payload = []
+    for update in updates:
+        id, updated_fields = update[0], update[1]
+        instance = OpinionCluster.objects.get(pk=id)
+        serializer = OpinionClusterSerializerOffline(instance)
+        for field_name in list(serializer.fields.keys()):
+            if field_name not in updated_fields:
+                serializer.fields.pop(field_name)
+        payload.append({"id": id, "updated_fields": serializer.data})
 
     for webhook in Webhook.objects.filter(
         event_type=WebhookEventType.OPINION_UPDATE, enabled=True
     ):
         post_content = {
             "webhook": generate_webhook_key_content(webhook),
-            "payload": [{"id": id, "updated_fields": serializer.data}],
+            "payload": payload,
         }
         renderer = JSONRenderer()
         json_bytes = renderer.render(
@@ -282,24 +285,28 @@ def send_opinion_clusters_deleted_webhook(ids: list[int]) -> None:
 
 @app.task()
 def send_opinion_cluster_updated_webhook(
-    id: str, updated_fields: List[str]
+    updates: List[Tuple[int, List[str]]]
 ) -> None:
     """Send a webhook for updates to an opinion cluster.
 
-    :param id: The id of the deleted opinion cluster.
+    :param updates: A list containing the id and the list of updated field names for each batched update.
     """
-    instance = OpinionCluster.objects.get(pk=id)
-    serializer = OpinionClusterSerializerOffline(instance)
-    for field_name in list(serializer.fields.keys()):
-        if field_name not in updated_fields:
-            serializer.fields.pop(field_name)
+    payload = []
+    for update in updates:
+        id, updated_fields = update[0], update[1]
+        instance = OpinionCluster.objects.get(pk=id)
+        serializer = OpinionClusterSerializerOffline(instance)
+        for field_name in list(serializer.fields.keys()):
+            if field_name not in updated_fields:
+                serializer.fields.pop(field_name)
+        payload.append({"id": id, "updated_fields": serializer.data})
 
     for webhook in Webhook.objects.filter(
         event_type=WebhookEventType.OPINION_CLUSTER_UPDATE, enabled=True
     ):
         post_content = {
             "webhook": generate_webhook_key_content(webhook),
-            "payload": [{"id": id, "updated_fields": serializer.data}],
+            "payload": payload,
         }
         renderer = JSONRenderer()
         json_bytes = renderer.render(
