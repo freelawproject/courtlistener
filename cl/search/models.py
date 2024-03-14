@@ -805,6 +805,7 @@ class Docket(AbstractDateTimeModel):
             "referred_to_id",
             "referred_to_str",
             "slug",
+            "pacer_case_id",
             "source",
         ]
     )

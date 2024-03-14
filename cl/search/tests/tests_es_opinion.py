@@ -1964,6 +1964,10 @@ class EsOpinionsIndexingTest(
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(cluster_doc.docketNumber, "005")
         self.assertEqual(opinion_doc.docketNumber, "005")
+        self.assertEqual(
+            cluster_doc.date_created, opinion_cluster.date_created
+        )
+        self.assertEqual(opinion_doc.date_created, opinion.date_created)
 
         with mock.patch(
             "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
