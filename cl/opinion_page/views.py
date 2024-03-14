@@ -4,7 +4,6 @@ from typing import Dict, Union
 from urllib.parse import urlencode
 
 import eyecite
-import natsort
 import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
@@ -79,6 +78,7 @@ from cl.search.models import (
     Parenthetical,
     RECAPDocument,
 )
+from cl.search.selectors import get_clusters_from_citation_str
 from cl.search.views import do_search
 
 
@@ -983,62 +983,9 @@ async def citation_handler(
     """Load the page when somebody looks up a complete citation"""
 
     citation_str = " ".join([volume, reporter, page])
-    try:
-        clusters = OpinionCluster.objects.filter(citation=citation_str)
-    except ValueError:
-        # Unable to parse the citation.
-        cluster_count = 0
-    else:
-        cluster_count = await clusters.acount()
-
-    if cluster_count == 0:
-        # We didn't get an exact match on the volume/reporter/page. Perhaps
-        # it's a pincite. Try to find the citation immediately *before* this
-        # one in the same book. To do so, get all the opinions from the book,
-        # sort them by page number (in Python, b/c pages can have letters),
-        # then find the citation just before the requested one.
-
-        possible_match = None
-
-        # Create a list of the closest opinion clusters id and page to the
-        # input citation
-        closest_opinion_clusters = [
-            opinion
-            async for opinion in OpinionCluster.objects.filter(
-                citations__reporter=reporter, citations__volume=volume
-            )
-            .annotate(cite_page=(F("citations__page")))
-            .values_list("id", "cite_page")
-        ]
-
-        # Create a temporal item and add it to the values list
-        citation_item = (0, page)
-        closest_opinion_clusters.append((0, page))
-
-        # Natural sort page numbers ascending order
-        sort_possible_matches = natsort.natsorted(
-            closest_opinion_clusters, key=lambda item: item[1]
-        )
-
-        # Find the position of the item that we added
-        citation_item_position = sort_possible_matches.index(citation_item)
-
-        if citation_item_position > 0:
-            # if the position is greater than 0, then the previous item in
-            # the list is the closest citation, we get the id of the
-            # previous item, and we get the object
-            possible_match = await OpinionCluster.objects.aget(
-                id=sort_possible_matches[citation_item_position - 1][0]
-            )
-
-        if possible_match:
-            # There may be different page cite formats that aren't yet
-            # accounted for by this code.
-            clusters = OpinionCluster.objects.filter(
-                id=possible_match.id,
-                sub_opinions__html_with_citations__contains=f"*{page}",
-            )
-            cluster_count = 1 if await clusters.aexists() else 0
+    clusters, cluster_count = await get_clusters_from_citation_str(
+        reporter, volume, page
+    )
 
     # Show the correct page....
     if cluster_count == 0:
@@ -1060,11 +1007,6 @@ async def citation_handler(
         return HttpResponseRedirect(clusters_first.get_absolute_url())
 
     if cluster_count > 1:
-        clusters_list = []
-        async for cluster in clusters:
-            docket = await Docket.objects.aget(pk=cluster.docket_id)
-            cluster.court = await Court.objects.aget(pk=docket.court_id)
-            clusters_list.append(cluster)
         # Multiple results. Show them.
         return TemplateResponse(
             request,
@@ -1072,7 +1014,7 @@ async def citation_handler(
             {
                 "too_many": True,
                 "citation_str": citation_str,
-                "clusters": clusters_list,
+                "clusters": clusters,
                 "private": await clusters.filter(blocked=True).aexists(),
             },
             status=HTTP_300_MULTIPLE_CHOICES,
