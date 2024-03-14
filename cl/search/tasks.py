@@ -3,7 +3,7 @@ import socket
 from datetime import timedelta
 from importlib import import_module
 from random import randint
-from typing import Any, Generator
+from typing import Any, Generator, Literal
 
 import scorched
 import waffle
@@ -1251,20 +1251,15 @@ def remove_document_from_es_index(
         )
 
 
-@app.task(
-    bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=5,
-    interval_start=5,
-    ignore_result=True,
-)
-def index_dockets_in_bulk(
-    self: Task, instance_ids: list[int], testing_mode: bool = False
+def index_or_remove_dockets_in_bulk(
+    instance_ids: list[int],
+    action: Literal["index", "delete"],
+    testing_mode: bool = False,
 ) -> None:
-    """Index dockets in bulk in Elasticsearch.
+    """Index or Remove dockets in bulk to/from Elasticsearch.
 
-    :param self: The Celery task instance
     :param instance_ids: The Docket IDs to index.
+    :param action: The action to perform. Valid values are "index", "delete".
     :param testing_mode: Set to True to enable streaming bulk, which is used in
      TestCase-based tests because parallel_bulk is incompatible with them.
     https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
@@ -1276,7 +1271,7 @@ def index_dockets_in_bulk(
     # Index dockets in bulk.
     client = connections.get_connection()
     base_doc = {
-        "_op_type": "index",
+        "_op_type": action,
         "_index": DocketDocument._index._name,
     }
     failed_docs = []
@@ -1309,12 +1304,44 @@ def index_dockets_in_bulk(
             if not success:
                 failed_docs.append(info["index"]["_id"])
 
+    action_description = "indexing"
+    if action == "delete":
+        action_description = "removing"
+
     if failed_docs:
-        logger.error(f"Error indexing Dockets in bulk IDs are: {failed_docs}")
+        logger.error(
+            f"Error {action_description} Dockets in bulk IDs are: {failed_docs}"
+        )
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         DocketDocument._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=5,
+    interval_start=5,
+    ignore_result=True,
+)
+def index_dockets_in_bulk(
+    self: Task, instance_ids: list[int], testing_mode: bool = False
+) -> None:
+    """Task wrapper for indexing dockets in bulk in Elasticsearch.
+
+    :param self: The Celery task instance
+    :param instance_ids: The Docket IDs to index.
+    :param testing_mode: Set to True to enable streaming bulk, which is used in
+     TestCase-based tests because parallel_bulk is incompatible with them.
+    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+    Default is False.
+    :return: None
+    """
+
+    index_or_remove_dockets_in_bulk(
+        instance_ids, action="index", testing_mode=testing_mode
+    )
 
 
 def build_bulk_cites_doc(
@@ -1602,3 +1629,29 @@ def remove_parent_and_child_docs_by_query(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         es_document._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=5,
+    interval_start=5,
+    ignore_result=True,
+)
+def remove_dockets_in_bulk(
+    self: Task, instance_ids: list[int], testing_mode: bool = False
+) -> None:
+    """Task wrapper for removing dockets in bulk from Elasticsearch.
+
+    :param self: The Celery task instance
+    :param instance_ids: The Docket IDs to index.
+    :param testing_mode: Set to True to enable streaming bulk, which is used in
+     TestCase-based tests because parallel_bulk is incompatible with them.
+    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
+    Default is False.
+    :return: None
+    """
+
+    index_or_remove_dockets_in_bulk(
+        instance_ids, action="delete", testing_mode=testing_mode
+    )
