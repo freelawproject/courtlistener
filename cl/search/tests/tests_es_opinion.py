@@ -46,6 +46,7 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    Docket,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -77,7 +78,11 @@ class OpinionAPISolrSearchTest(IndexedSolrTestCase):
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
-            docket=DocketFactory(court=court, docket_number="1:21-cv-1234"),
+            docket=DocketFactory(
+                court=court,
+                docket_number="1:21-cv-1234",
+                source=Docket.HARVARD,
+            ),
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
@@ -99,7 +104,9 @@ class OpinionAPISolrSearchTest(IndexedSolrTestCase):
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
-            docket=DocketFactory(court=court, docket_number="123456"),
+            docket=DocketFactory(
+                court=court, docket_number="123456", source=Docket.HARVARD
+            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             syllabus="some rando syllabus",
             procedural_history="some rando history",
@@ -418,7 +425,11 @@ class OpinionsESSearchTest(
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
-            docket=DocketFactory(court=court, docket_number="1:21-cv-1234"),
+            docket=DocketFactory(
+                court=court,
+                docket_number="1:21-cv-1234",
+                source=Docket.HARVARD,
+            ),
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
@@ -441,7 +452,9 @@ class OpinionsESSearchTest(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
-            docket=DocketFactory(court=court, docket_number="123456"),
+            docket=DocketFactory(
+                court=court, docket_number="123456", source=Docket.HARVARD
+            ),
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
@@ -1294,7 +1307,7 @@ class GroupedSearchTest(EmptySolrTestCase):
             slug="case-name",
             pacer_case_id="666666",
             blocked=False,
-            source=0,
+            source=Docket.HARVARD,
             date_blocked=None,
         )
 
@@ -1506,7 +1519,7 @@ class EsOpinionsIndexingTest(
             slug="case-name",
             pacer_case_id="666666",
             blocked=False,
-            source=0,
+            source=Docket.HARVARD,
         )
         self.person = PersonFactory.create(
             gender="f",
@@ -1826,9 +1839,7 @@ class EsOpinionsIndexingTest(
 
     def test_parent_document_update_fields_properly(self) -> None:
         """Confirm that parent fields are properly update when changing DB records"""
-        docket = DocketFactory(
-            court_id=self.court_2.pk,
-        )
+        docket = DocketFactory(court_id=self.court_2.pk, source=Docket.HARVARD)
         opinion_cluster = OpinionClusterFactory.create(
             case_name_full="Paul test v. Franklin",
             case_name_short="Debbas",
@@ -1910,9 +1921,7 @@ class EsOpinionsIndexingTest(
 
     def test_update_shared_fields_related_documents(self) -> None:
         """Confirm that related document are properly update using bulk approach"""
-        docket = DocketFactory(
-            court_id=self.court_2.pk,
-        )
+        docket = DocketFactory(court_id=self.court_2.pk, source=Docket.HARVARD)
         opinion_cluster = OpinionClusterFactory.create(
             case_name_full="Paul test v. Franklin",
             case_name_short="Debbas",
@@ -1947,9 +1956,10 @@ class EsOpinionsIndexingTest(
             docket.docket_number = "005"
             docket.save()
 
-        # 2 update_es_document task should be called on tracked field update, one
-        # for DocketDocument and one for OpinionClusterDocument.
-        self.reset_and_assert_task_count(expected=2)
+        # 1 update_es_document task should be called on tracked field update,
+        # exclusively for updating the OpinionClusterDocument. Since the docket
+        # is not from RECAP, it should not be updated in ES.
+        self.reset_and_assert_task_count(expected=1)
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(cluster_doc.docketNumber, "005")
@@ -2290,7 +2300,9 @@ class OpinionFeedTest(
         )
         OpinionClusterFactoryWithChildrenAndParents(
             date_filed=datetime.date(2020, 8, 15),
-            docket=DocketFactory(court=court, docket_number="123456"),
+            docket=DocketFactory(
+                court=court, docket_number="123456", source=Docket.HARVARD
+            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             syllabus="some rando syllabus",
             procedural_history="some rando history",
@@ -2519,7 +2531,9 @@ class OpinionFeedTest(
             )
             o_c = OpinionClusterFactoryWithChildrenAndParents(
                 date_filed=datetime.date(2020, 8, 15),
-                docket=DocketFactory(court=court, docket_number="123456"),
+                docket=DocketFactory(
+                    court=court, docket_number="123456", source=Docket.HARVARD
+                ),
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 syllabus="some rando syllabus",
                 sub_opinions=RelatedFactory(

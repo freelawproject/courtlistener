@@ -37,6 +37,7 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     Court,
+    Docket,
     Opinion,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
@@ -439,6 +440,7 @@ class RECAPSearchTestCase(SimpleTestCase):
                 assigned_to=cls.judge,
                 referred_to=cls.judge_2,
                 nature_of_suit="440",
+                source=Docket.RECAP,
             ),
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
@@ -507,6 +509,7 @@ class RECAPSearchTestCase(SimpleTestCase):
                 date_argued=datetime.date(2012, 6, 23),
                 assigned_to=cls.judge_3,
                 referred_to=cls.judge_4,
+                source=Docket.COLUMBIA_AND_RECAP,
             ),
             entry_number=3,
             date_filed=datetime.date(2014, 7, 19),

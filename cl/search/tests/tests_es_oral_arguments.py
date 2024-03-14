@@ -20,7 +20,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.test_helpers import AudioESTestCase
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.tasks import es_save_document, update_es_document
 from cl.tests.cases import (
     CountESTasksTestCase,
@@ -1940,10 +1940,10 @@ class OralArgumentIndexingTest(
             citation_string="Bankr. C.D. Cal.",
         )
         self.docket = DocketFactory.create(
-            court_id=self.court_1.pk,
+            court_id=self.court_1.pk, source=Docket.SCRAPER
         )
         self.docket_2 = DocketFactory.create(
-            court_id=self.court_1.pk,
+            court_id=self.court_1.pk, source=Docket.SCRAPER
         )
 
         super().setUp()
@@ -1959,6 +1959,7 @@ class OralArgumentIndexingTest(
             docket_number="1:22-bk-12345",
             court_id=self.court_1.pk,
             date_argued=datetime.date(2015, 8, 16),
+            source=Docket.SCRAPER,
         )
         audio_6 = AudioFactory.create(
             case_name="Lorem Ipsum Dolor vs. USA",
