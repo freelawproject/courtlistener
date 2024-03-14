@@ -1196,14 +1196,6 @@ async def citation_redirector(
     if reporter != reporter_slug:
         # Reporter provided in non-slugified form. Redirect to slugified
         # version.
-        r = reverse(
-            "citation_redirector",
-            kwargs=make_citation_url_dict(
-                reporter_slug,
-                volume,
-                page,
-            ),
-        )
         return HttpResponseRedirect(
             reverse(
                 "citation_redirector",
