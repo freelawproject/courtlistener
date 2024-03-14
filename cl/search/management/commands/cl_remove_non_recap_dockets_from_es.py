@@ -5,11 +5,12 @@ from django.conf import settings
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import get_redis_interface
+from cl.search.documents import DocketDocument
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     log_last_document_indexed,
 )
 from cl.search.models import Docket
-from cl.search.tasks import remove_dockets_in_bulk
+from cl.search.tasks import remove_documents_by_query
 
 
 def compose_redis_key_non_recap() -> str:
@@ -59,11 +60,6 @@ class Command(VerboseCommand):
             action="store_true",
             help="Auto resume the command using the last document_id logged in Redis.",
         )
-        parser.add_argument(
-            "--testing-mode",
-            action="store_true",
-            help="Use this flag only when running the command in tests based on TestCase",
-        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -103,9 +99,7 @@ class Command(VerboseCommand):
         :param chunk_size: The number of items to process in a single chunk.
         :return: None
         """
-
         queue = self.options["queue"]
-        testing_mode = self.options.get("testing_mode", False)
 
         chunk = []
         processed_count = 0
@@ -116,9 +110,9 @@ class Command(VerboseCommand):
             chunk.append(item_id)
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-                remove_dockets_in_bulk.si(chunk, testing_mode).set(
-                    queue=queue
-                ).apply_async()
+                remove_documents_by_query.si(
+                    DocketDocument.__name__, chunk
+                ).set(queue=queue).apply_async()
                 chunk = []
                 self.stdout.write(
                     "\rProcessed {}/{}, ({:.0%}), last PK {}".format(

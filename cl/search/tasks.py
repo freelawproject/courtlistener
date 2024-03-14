@@ -1251,15 +1251,20 @@ def remove_document_from_es_index(
         )
 
 
-def index_or_remove_dockets_in_bulk(
-    instance_ids: list[int],
-    action: Literal["index", "delete"],
-    testing_mode: bool = False,
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=5,
+    interval_start=5,
+    ignore_result=True,
+)
+def index_dockets_in_bulk(
+    self: Task, instance_ids: list[int], testing_mode: bool = False
 ) -> None:
-    """Index or Remove dockets in bulk to/from Elasticsearch.
+    """Index dockets in bulk in Elasticsearch.
 
+    :param self: The Celery task instance
     :param instance_ids: The Docket IDs to index.
-    :param action: The action to perform. Valid values are "index", "delete".
     :param testing_mode: Set to True to enable streaming bulk, which is used in
      TestCase-based tests because parallel_bulk is incompatible with them.
     https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
@@ -1271,7 +1276,7 @@ def index_or_remove_dockets_in_bulk(
     # Index dockets in bulk.
     client = connections.get_connection()
     base_doc = {
-        "_op_type": action,
+        "_op_type": "index",
         "_index": DocketDocument._index._name,
     }
     failed_docs = []
@@ -1304,44 +1309,12 @@ def index_or_remove_dockets_in_bulk(
             if not success:
                 failed_docs.append(info["index"]["_id"])
 
-    action_description = "indexing"
-    if action == "delete":
-        action_description = "removing"
-
     if failed_docs:
-        logger.error(
-            f"Error {action_description} Dockets in bulk IDs are: {failed_docs}"
-        )
+        logger.error(f"Error indexing Dockets in bulk IDs are: {failed_docs}")
 
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         DocketDocument._index.refresh()
-
-
-@app.task(
-    bind=True,
-    autoretry_for=(ConnectionError,),
-    max_retries=5,
-    interval_start=5,
-    ignore_result=True,
-)
-def index_dockets_in_bulk(
-    self: Task, instance_ids: list[int], testing_mode: bool = False
-) -> None:
-    """Task wrapper for indexing dockets in bulk in Elasticsearch.
-
-    :param self: The Celery task instance
-    :param instance_ids: The Docket IDs to index.
-    :param testing_mode: Set to True to enable streaming bulk, which is used in
-     TestCase-based tests because parallel_bulk is incompatible with them.
-    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
-    Default is False.
-    :return: None
-    """
-
-    index_or_remove_dockets_in_bulk(
-        instance_ids, action="index", testing_mode=testing_mode
-    )
 
 
 def build_bulk_cites_doc(
@@ -1638,20 +1611,32 @@ def remove_parent_and_child_docs_by_query(
     interval_start=5,
     ignore_result=True,
 )
-def remove_dockets_in_bulk(
-    self: Task, instance_ids: list[int], testing_mode: bool = False
+def remove_documents_by_query(
+    self: Task, es_document_name: ESDocumentNameType, instance_ids: list[int]
 ) -> None:
-    """Task wrapper for removing dockets in bulk from Elasticsearch.
+    """Remove documents from ES by query.
 
     :param self: The Celery task instance
-    :param instance_ids: The Docket IDs to index.
-    :param testing_mode: Set to True to enable streaming bulk, which is used in
-     TestCase-based tests because parallel_bulk is incompatible with them.
-    https://github.com/freelawproject/courtlistener/pull/3324#issue-1970675619
-    Default is False.
+    :param es_document_name: The Elasticsearch Document type name to delete.
+    :param instance_ids: The document IDs to delete.
     :return: None
     """
 
-    index_or_remove_dockets_in_bulk(
-        instance_ids, action="delete", testing_mode=testing_mode
+    es_document = getattr(es_document_module, es_document_name)
+    s = es_document.search()
+    match es_document_name:
+        case "DocketDocument":
+            remove_query = Q("terms", _id=instance_ids)
+            s = s.query(remove_query)
+            query = s.to_dict()["query"]
+        case _:
+            # Abort DeleteByQuery request for a not supported document type.
+            return
+
+    client = connections.get_connection(alias="no_retry_connection")
+    client.delete_by_query(
+        index=es_document._index._name, body={"query": query}
     )
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        es_document._index.refresh()

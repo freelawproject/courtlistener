@@ -1827,7 +1827,7 @@ class ESIndexingTasksUtils(TestCase):
                 court=cls.court,
                 docket_number="12-09876",
                 case_name="People v. Lorem",
-                source=Docket.RECAP
+                source=Docket.RECAP,
             ),
             entry_number=1,
         )
@@ -1898,7 +1898,7 @@ class ESIndexingTasksUtils(TestCase):
             court=self.court,
             docket_number="21-55555",
             case_name="Enterprises, Inc v. Lorem",
-            source=Docket.RECAP
+            source=Docket.RECAP,
         )
         docket_1 = self.de.docket
         expected_event_ids = set()

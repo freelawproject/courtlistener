@@ -4813,7 +4813,6 @@ class RemoveNonRECAPDocketsCommandTest(ESIndexTestCase, TestCase):
         ) as mock_logger:
             call_command(
                 "cl_remove_non_recap_dockets_from_es",
-                testing_mode=True,
             )
             mock_logger.info.assert_called_with(
                 f"Successfully removed 2 non-recap dockets."
@@ -4854,7 +4853,6 @@ class RemoveNonRECAPDocketsCommandTest(ESIndexTestCase, TestCase):
         ) as mock_logger:
             call_command(
                 "cl_remove_non_recap_dockets_from_es",
-                testing_mode=True,
                 auto_resume=True,
             )
             mock_logger.info.assert_called_with(
