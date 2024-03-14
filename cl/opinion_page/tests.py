@@ -297,6 +297,20 @@ class CitationRedirectorTest(TestCase):
         self.assertStatus(r, HTTP_300_MULTIPLE_CHOICES)
         await f2_cite.adelete()
 
+    async def test_handle_ambiguous_reporter_variations(self) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "bailey",
+                },
+            ),
+        )
+        self.assertStatus(r, HTTP_300_MULTIPLE_CHOICES)
+        self.assertIn(
+            "Found More Than One Possible Reporter", r.content.decode()
+        )
+
     async def test_unknown_citation(self) -> None:
         """Do we get a 404 message if we don't know the citation?"""
         r = await self.async_client.get(

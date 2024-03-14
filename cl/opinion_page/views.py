@@ -1146,17 +1146,15 @@ async def attempt_reporter_variation(
     elif len(possible_canonicals) > 1:
         # The reporter variation is ambiguous b/c it can refer to more than
         # one reporter. Abort with a 300 status.
-        return HttpResponse(
-            content=loader.render_to_string(
-                "citation_redirect_info_page.html",
-                {
-                    "too_many_reporter_variations": True,
-                    "reporter": reporter,
-                    "possible_canonicals": possible_canonicals,
-                    "private": True,
-                },
-                request=request,
-            ),
+        return TemplateResponse(
+            request,
+            "citation_redirect_info_page.html",
+            {
+                "too_many_reporter_variations": True,
+                "reporter": reporter,
+                "possible_canonicals": possible_canonicals,
+                "private": True,
+            },
             status=HTTP_300_MULTIPLE_CHOICES,
         )
     else:
