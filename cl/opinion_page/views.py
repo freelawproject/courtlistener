@@ -35,6 +35,7 @@ from reporters_db import (
 from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
+from cl.citations.utils import get_canonicals_from_reporter
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -1059,16 +1060,7 @@ async def attempt_reporter_variation(
     :param volume: The volume requested, if provided
     :param page: The page requested, if provided
     """
-    # Make a slugified variations dict
-    slugified_variations = {}
-    for variant, canonicals in VARIATIONS_ONLY.items():
-        slugged_canonicals = []
-        for canonical in canonicals:
-            slugged_canonicals.append(slugify(canonical))
-        slugified_variations[str(slugify(variant))] = slugged_canonicals
-
-    # Look up the user's request in the variations dict
-    possible_canonicals = slugified_variations.get(reporter, [])
+    possible_canonicals = get_canonicals_from_reporter(reporter)
     if len(possible_canonicals) == 0:
         # Couldn't find it as a variation. Give up.
         return await throw_404(
