@@ -50,6 +50,12 @@ class Command(VerboseCommand):
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
+            "--queue-size",
+            type=int,
+            default="10",
+            help="The min_items queue size used for celery throttling.",
+        )
+        parser.add_argument(
             "--chunk-size",
             type=int,
             default="100",
@@ -100,10 +106,10 @@ class Command(VerboseCommand):
         :return: None
         """
         queue = self.options["queue"]
-
+        queue_size = self.options["queue_size"]
         chunk = []
         processed_count = 0
-        throttle = CeleryThrottle(queue_name=queue)
+        throttle = CeleryThrottle(min_items=queue_size, queue_name=queue)
         for item_id in items:
             processed_count += 1
             last_item = count == processed_count
