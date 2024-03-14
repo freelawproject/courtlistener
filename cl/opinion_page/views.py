@@ -921,20 +921,23 @@ async def reporter_or_volume_handler(
         reporter, volume
     )
 
-    paginator = Paginator(cases_in_volume, 100, orphans=5)
     page = request.GET.get("page", 1)
-    try:
-        cases = await sync_to_async(paginator.page)(page)
-    except PageNotAnInteger:
-        cases = await sync_to_async(paginator.page)(1)
-    except EmptyPage:
-        cases = await sync_to_async(paginator.page)(paginator.num_pages)
+
+    @sync_to_async
+    def paginate_volumes(volumes, volume_page):
+        paginator = Paginator(volumes, 100, orphans=10)
+        try:
+            return paginator.page(volume_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
 
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         {
-            "cases": cases,
+            "cases": await paginate_volumes(cases_in_volume, page),
             "reporter": reporter,
             "variation_names": variation_names,
             "volume": volume,

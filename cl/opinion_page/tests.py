@@ -388,6 +388,27 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTP_200_OK)
 
+    async def test_handle_volume_pagination_properly(self) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56"},
+            ),
+            {"page": 0},
+        )
+        self.assertStatus(r, HTTP_200_OK)
+        self.assertEqual(r.context["cases"].number, 1)
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56"},
+            ),
+            {"page": "a"},
+        )
+        self.assertStatus(r, HTTP_200_OK)
+        self.assertEqual(r.context["cases"].number, 1)
+
     async def test_link_to_page_in_citation(self) -> None:
         """Test link to page with star pagination"""
         # Here opinion cluster 2 has the citation 56 F.2d 9, but the
