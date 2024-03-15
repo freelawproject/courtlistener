@@ -296,6 +296,8 @@ docket_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "slug": ["docket_slug", "docket_absolute_url"],
+                "pacer_case_id": ["pacer_case_id"],
+                "source": [""],  # Not indexed field.
             },
         },
         Person: {
@@ -361,6 +363,7 @@ recap_document_field_mapping = {
                 "referred_to_id": ["referred_to_id", "referredTo"],
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
+                "pacer_case_id": ["pacer_case_id"],
             }
         },
         Person: {
