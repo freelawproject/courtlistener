@@ -31,6 +31,9 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
     get_cut_off_date,
 )
+from cl.alerts.management.commands.clean_up_search_alerts import (
+    clean_up_alerts,
+)
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
 )
@@ -56,8 +59,7 @@ from cl.api.models import (
 )
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
-from cl.donate.factories import DonationFactory
-from cl.donate.models import Donation, NeonMembership
+from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
 from cl.search.documents import AudioDocument, AudioPercolator
@@ -2953,3 +2955,106 @@ class OneClickUnsubscribeTests(TestCase):
         # check unsubscription confirmation email
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("[Unsubscribed]", mail.outbox[0].subject)
+
+
+class CleanUpSearchAlertsCommandTests(TestCase):
+    """Test the clean_up_search_alerts command"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.search_alert_0 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_Precedential=on",
+        )
+        cls.search_alert_1 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert 1",
+            query="q=test&type=o&order_by=score%20desc&stat_Non-Precedential=on",
+        )
+        cls.search_alert_2 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_Errata=on",
+        )
+        cls.search_alert_3 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_Separate%20Opinion=on",
+        )
+        cls.search_alert_4 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_In-chambers=on",
+        )
+        cls.search_alert_5 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&stat_Relating-to%20orders=on&order_by=score%20desc",
+        )
+        cls.search_alert_6 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=caseName%3A&type=o&stat_Unknown%20Status=on&order_by=score%20desc",
+        )
+        cls.search_alert_7 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on",
+        )
+
+    def test_clean_up_alerts(self):
+        """Confirm clean_up_alerts properly replaces the stat_ filters on
+        Opinions Search Alerts queries.
+        """
+        with mock.patch(
+            "cl.alerts.management.commands.clean_up_search_alerts.logger"
+        ) as mock_logger:
+            call_command("clean_up_search_alerts", action="clean-up")
+            mock_logger.info.assert_called_with(
+                f"\r Successfully fixed 6 opinions search alerts."
+            )
+
+        expected_query = {
+            self.search_alert_0.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.PUBLISHED}=on",
+            self.search_alert_1.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}=on",
+            self.search_alert_2.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.ERRATA}=on",
+            self.search_alert_3.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.SEPARATE}=on",
+            self.search_alert_4.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.IN_CHAMBERS}=on",
+            self.search_alert_5.pk: f"q=test&type=o&stat_{PRECEDENTIAL_STATUS.RELATING_TO}=on&order_by=score%20desc",
+            self.search_alert_6.pk: f"q=caseName%3A&type=o&stat_{PRECEDENTIAL_STATUS.UNKNOWN}=on&order_by=score%20desc",
+            self.search_alert_7.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.PUBLISHED}=on&stat_{PRECEDENTIAL_STATUS.ERRATA}=on&stat_{PRECEDENTIAL_STATUS.SEPARATE}=on",
+        }
+
+        alerts = Alert.objects.all().values_list("pk", "query")
+        for alert in alerts:
+            with self.subTest("Alert query", alert=alert):
+                self.assertEqual(expected_query[alert[0]], alert[1])
+
+    def test_validate_queries_syntax(self):
+        """Confirm that the command can correctly report alerts for Opinions
+        search with incorrect syntax.
+        """
+        with mock.patch(
+            "cl.alerts.management.commands.clean_up_search_alerts.logger"
+        ) as mock_logger:
+            call_command(
+                "clean_up_search_alerts",
+                action="validate-queries",
+                validation_wait=0,
+            )
+            mock_logger.info.assert_called_with(
+                f"\r Checked 8 opinions search alerts."
+            )
+            self.assertIn(
+                "Failed to parse query: %s", mock_logger.error.call_args[0][0]
+            )
