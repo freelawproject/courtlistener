@@ -3,7 +3,7 @@ import socket
 from datetime import timedelta
 from importlib import import_module
 from random import randint
-from typing import Any, Generator
+from typing import Any, Generator, Literal
 
 import scorched
 import waffle
@@ -1599,6 +1599,44 @@ def remove_parent_and_child_docs_by_query(
     except (ConnectionError, NotFoundError) as exc:
         handle_ubq_retries(self, exc, count_query=count_query)
 
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        es_document._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError,),
+    max_retries=5,
+    interval_start=5,
+    ignore_result=True,
+)
+def remove_documents_by_query(
+    self: Task, es_document_name: ESDocumentNameType, instance_ids: list[int]
+) -> None:
+    """Remove documents from ES by query.
+
+    :param self: The Celery task instance
+    :param es_document_name: The Elasticsearch Document type name to delete.
+    :param instance_ids: The document IDs to delete.
+    :return: None
+    """
+
+    es_document = getattr(es_document_module, es_document_name)
+    s = es_document.search()
+    match es_document_name:
+        case "DocketDocument":
+            remove_query = Q("terms", _id=instance_ids)
+            s = s.query(remove_query)
+            query = s.to_dict()["query"]
+        case _:
+            # Abort DeleteByQuery request for a not supported document type.
+            return
+
+    client = connections.get_connection(alias="no_retry_connection")
+    client.delete_by_query(
+        index=es_document._index._name, body={"query": query}
+    )
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         es_document._index.refresh()
