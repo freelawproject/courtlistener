@@ -9,11 +9,12 @@ from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Q, QuerySet
 from django.db.models.functions import MD5
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
@@ -866,7 +867,19 @@ class Docket(AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"slug", "docket_number_core"}.union(update_fields)
 
-        super(Docket, self).save(update_fields=update_fields, *args, **kwargs)
+        try:
+            # Without a transaction wrapper, a failure will invalidate outer transactions
+            with transaction.atomic():
+                super(Docket, self).save(
+                    update_fields=update_fields, *args, **kwargs
+                )
+        except IntegrityError:
+            # Temporary patch while we solve #3359
+            # If the error is not related to `date_modified` it will raise again
+            self.date_modified = timezone.now()
+            super(Docket, self).save(
+                update_fields=update_fields, *args, **kwargs
+            )
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
