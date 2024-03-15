@@ -290,21 +290,56 @@ def update_or_create_docket(
     date_blocked: date | None = None,
     date_argued: date | None = None,
     ia_needs_upload: bool | None = None,
+    appeal_from_str: str = "",
+    appeal_from_id: str | None = None,
+    assigned_to_str: str = "",
+    referred_to_str: str = "",
+    panel_str: str = "",
+    cause: str = "",
+    nature_of_suit: str = "",
+    jury_demand: str = "",
+    appellate_fee_status: str = "",
+    date_cert_granted: date | None = None,
+    date_cert_denied: date | None = None,
+    date_reargued: date | None = None,
+    date_reargument_denied: date | None = None,
+    date_filed: date | None = None,
+    date_terminated: date | None = None,
+    date_last_filing: date | None = None,
 ) -> Docket:
     """Look for an existing Docket and update it or create a new one if it's
     not found.
 
+    Required arguments:
     :param case_name: The docket case_name.
     :param case_name_short: The docket case_name_short
     :param court_id: The court id the docket belongs to.
     :param docket_number: The docket number.
     :param source: The docket source.
     :param blocked: If the docket should be blocked, default False.
+
+    Optional args:
     :param case_name_full: The docket case_name_full.
     :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
-    :return: The docket docket.
+    :param appeal_from_str:
+    :param assigned_to_str:
+    :param referred_to_str:
+    :param panel_str:
+    :param cause:
+    :param nature_of_suit:
+    :param jury_demand:
+    :param appellate_fee_status:
+    :param date_cert_granted:
+    :param date_cert_denied:
+    :param date_reargued:
+    :param date_reargument_denied:
+    :param date_filed:
+    :param date_terminated:
+    :param date_last_filing:
+
+    :return: The docket
     """
     docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
     if docket.pk:
@@ -316,6 +351,22 @@ def update_or_create_docket(
         docket.date_blocked = date_blocked
         docket.date_argued = date_argued
         docket.ia_needs_upload = ia_needs_upload
+        docket.appeal_from_str = appeal_from_str
+        docket.appeal_from_id = appeal_from_id
+        docket.assigned_to_str = assigned_to_str
+        docket.referred_to_str = referred_to_str
+        docket.panel_str = panel_str
+        docket.cause = cause
+        docket.nature_of_suit = nature_of_suit
+        docket.jury_demand = jury_demand
+        docket.appellate_fee_status = appellate_fee_status
+        docket.date_cert_granted = date_cert_granted
+        docket.date_cert_denied = date_cert_denied
+        docket.date_reargued = date_reargued
+        docket.date_reargument_denied = date_reargument_denied
+        docket.date_filed = date_filed
+        docket.date_terminated = date_terminated
+        docket.date_last_filing = date_last_filing
     else:
         docket = Docket(
             case_name=case_name,
@@ -328,5 +379,21 @@ def update_or_create_docket(
             date_blocked=date_blocked,
             date_argued=date_argued,
             ia_needs_upload=ia_needs_upload,
+            appeal_from_str=appeal_from_str,
+            appeal_from_id=appeal_from_id,
+            assigned_to_str=assigned_to_str,
+            referred_to_str=referred_to_str,
+            panel_str=panel_str,
+            cause=cause,
+            nature_of_suit=nature_of_suit,
+            jury_demand=jury_demand,
+            appellate_fee_status=appellate_fee_status,
+            date_cert_granted=date_cert_granted,
+            date_cert_denied=date_cert_denied,
+            date_reargued=date_reargued,
+            date_reargument_denied=date_reargument_denied,
+            date_filed=date_filed,
+            date_terminated=date_terminated,
+            date_last_filing=date_last_filing,
         )
     return docket
