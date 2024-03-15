@@ -2954,7 +2954,7 @@ class OneClickUnsubscribeTests(TestCase):
         self.assertIn("[Unsubscribed]", mail.outbox[0].subject)
 
 
-class CleanUpSearchAlertsCommandTests(TestCase):
+class CleanUpSearchAlertsCommandTests(ESIndexTestCase, TestCase):
     """Test the clean_up_search_alerts command"""
 
     @classmethod

@@ -87,7 +87,6 @@ def validate_queries_syntax(options: OptionsType) -> None:
                 BadProximityQuery,
                 ApiError,
             ) as e:
-                print("Error was: ", e)
                 logger.error(
                     "Invalid Search Alert syntax. ID: %s, error: %s",
                     alert.pk,
