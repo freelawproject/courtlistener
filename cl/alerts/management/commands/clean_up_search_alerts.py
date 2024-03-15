@@ -28,9 +28,7 @@ def clean_up_alerts(options: OptionsType) -> None:
     filter_replacements = {
         "stat_Precedential": f"stat_{PRECEDENTIAL_STATUS.PUBLISHED}",
         "stat_Non-Precedential": f"stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}",
-        "stat_Errata": f"stat_{PRECEDENTIAL_STATUS.ERRATA}",
         "stat_Separate%20Opinion": f"stat_{PRECEDENTIAL_STATUS.SEPARATE}",
-        "stat_In-chambers": f"stat_{PRECEDENTIAL_STATUS.IN_CHAMBERS}",
         "stat_Relating-to%20orders": f"stat_{PRECEDENTIAL_STATUS.RELATING_TO}",
         "stat_Unknown%20Status": f"stat_{PRECEDENTIAL_STATUS.UNKNOWN}",
     }
