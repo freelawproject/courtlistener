@@ -297,6 +297,20 @@ class CitationRedirectorTest(TestCase):
         self.assertStatus(r, HTTP_300_MULTIPLE_CHOICES)
         await f2_cite.adelete()
 
+    async def test_handle_ambiguous_reporter_variations(self) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "bailey",
+                },
+            ),
+        )
+        self.assertStatus(r, HTTP_300_MULTIPLE_CHOICES)
+        self.assertIn(
+            "Found More Than One Possible Reporter", r.content.decode()
+        )
+
     async def test_unknown_citation(self) -> None:
         """Do we get a 404 message if we don't know the citation?"""
         r = await self.async_client.get(
@@ -373,6 +387,27 @@ class CitationRedirectorTest(TestCase):
             )
         )
         self.assertStatus(r, HTTP_200_OK)
+
+    async def test_handle_volume_pagination_properly(self) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56"},
+            ),
+            {"page": 0},
+        )
+        self.assertStatus(r, HTTP_200_OK)
+        self.assertEqual(r.context["cases"].number, 1)
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56"},
+            ),
+            {"page": "a"},
+        )
+        self.assertStatus(r, HTTP_200_OK)
+        self.assertEqual(r.context["cases"].number, 1)
 
     async def test_link_to_page_in_citation(self) -> None:
         """Test link to page with star pagination"""

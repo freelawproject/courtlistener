@@ -121,7 +121,7 @@ def find_starting_model(target_model: str) -> int | None:
     try:
         return supported_models.index(target_model)
     except ValueError:
-        return 3
+        return None
 
 
 def get_es_doc_id(es_document: ESDocumentClassType, instance_id: int) -> int:
