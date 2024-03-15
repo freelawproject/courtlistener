@@ -1606,7 +1606,7 @@ def remove_parent_and_child_docs_by_query(
 
 @app.task(
     bind=True,
-    autoretry_for=(ConnectionError,),
+    autoretry_for=(ConnectionError, NotFoundError),
     max_retries=5,
     interval_start=5,
     ignore_result=True,
