@@ -3044,6 +3044,9 @@ class CleanUpSearchAlertsCommandTests(TestCase):
         with mock.patch(
             "cl.alerts.management.commands.clean_up_search_alerts.logger"
         ) as mock_logger:
+            # Clean up the alerts first to avoid syntax errors due to the old
+            # filter values.
+            call_command("clean_up_search_alerts", action="clean-up")
             call_command(
                 "clean_up_search_alerts",
                 action="validate-queries",
