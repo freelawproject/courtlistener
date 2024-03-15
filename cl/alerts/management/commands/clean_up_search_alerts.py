@@ -10,6 +10,11 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.types import OptionsType
 from cl.search.documents import OpinionClusterDocument
+from cl.search.exception import (
+    BadProximityQuery,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
 from cl.search.forms import SearchForm
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
 
@@ -58,29 +63,43 @@ def validate_queries_syntax(options: OptionsType) -> None:
 
     :return: None
     """
-    waiting_time = int(options["validation_wait"])
+    waiting_time = cast(int, options["validation_wait"])
     alerts = Alert.objects.filter(alert_type=SEARCH_TYPES.OPINION).only(
-        "query"
+        "pk", "query"
     )
 
     search_query = OpinionClusterDocument.search()
     queries_count = 0
+    invalid_queries = 0
     for alert in alerts.iterator():
         qd = QueryDict(alert.query.encode(), mutable=True)
         search_form = SearchForm(qd)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            s, _ = build_es_base_query(search_query, cd)
-            s = s.extra(size=0)
             try:
+                s, _ = build_es_base_query(search_query, cd)
+                s = s.extra(size=0)
                 s.execute().to_dict()
                 # Waiting between requests to avoid hammering ES too quickly.
                 time.sleep(waiting_time)
-            except (RequestError, ApiError) as e:
-                logger.error("Failed to parse query: %s", e)
+            except (
+                RequestError,
+                UnbalancedParenthesesQuery,
+                UnbalancedQuotesQuery,
+                BadProximityQuery,
+                ApiError,
+            ) as e:
+                logger.error(
+                    "Invalid Search Alert syntax. ID: %s, error: %s",
+                    alert.pk,
+                    e,
+                )
+                invalid_queries += 1
 
         queries_count += 1
-    logger.info(f"\r Checked {queries_count} opinions search alerts.")
+    logger.info(
+        f"\r Checked {queries_count} opinions search alerts. There were {invalid_queries} invalid queries."
+    )
 
 
 class Command(VerboseCommand):
@@ -112,7 +131,11 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        action = cast(Callable, self.VALID_ACTIONS[options["action"]])
+        if isinstance(options["action"], str):
+            action_function = self.VALID_ACTIONS[options["action"]]
+        else:
+            action_function = options["action"]
+        action = cast(Callable, action_function)
         action(options)
 
     VALID_ACTIONS = {

@@ -31,9 +31,6 @@ from cl.alerts.management.commands.cl_send_scheduled_alerts import (
     DAYS_TO_DELETE,
     get_cut_off_date,
 )
-from cl.alerts.management.commands.clean_up_search_alerts import (
-    clean_up_alerts,
-)
 from cl.alerts.management.commands.handle_old_docket_alerts import (
     build_user_report,
 )
@@ -3053,8 +3050,9 @@ class CleanUpSearchAlertsCommandTests(TestCase):
                 validation_wait=0,
             )
             mock_logger.info.assert_called_with(
-                f"\r Checked 8 opinions search alerts."
+                f"\r Checked 8 opinions search alerts. There were 1 invalid queries."
             )
             self.assertIn(
-                "Failed to parse query: %s", mock_logger.error.call_args[0][0]
+                "Invalid Search Alert syntax.",
+                mock_logger.error.call_args[0][0],
             )
