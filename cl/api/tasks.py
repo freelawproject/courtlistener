@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Any, List, Tuple
 
 from rest_framework.renderers import JSONRenderer
@@ -10,6 +11,7 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
+from cl.lib.redis_utils import make_redis_interface
 from cl.search.api_serializers import (
     OAESResultSerializer,
     OpinionClusterSerializerOffline,
@@ -37,6 +39,48 @@ def send_test_webhook_event(
         webhook=webhook, content=json_obj, debug=True
     )
     send_webhook_event(webhook_event, content_str.encode("utf-8"))
+
+
+def add_webhook_event_to_queue(queue_name: str, payload: Any) -> None:
+    """Adds a webhook event to the queue.
+
+    :param queue_name: The name of the queue to add the event to.
+    :param content_str: The str content to add to the queue.
+    :return: None
+    """
+    redis = make_redis_interface()
+    redis.rpush(queue_name, payload)
+
+
+@app.task()
+def consume_webhook_event_batch(
+    queue_name, on_finished, batch_size=10, timeout=30
+):
+    """A recursive celery task to consume a batch of webhook events from a queue.
+
+    Args:
+        queue_name (_type_): The name of the queue to consume from.
+        on_finished (_type_): A callback function to call process the batch when finished.
+        batch_size (int, optional): _description_. Defaults to 10.
+        timeout (int, optional): _description_. Defaults to 30.
+    """
+    batch = []
+    redis = make_redis_interface()
+    if redis.get(f"{queue_name}:status") is None:
+        redis.set(f"{queue_name}:status", "running")
+        return
+    start = time.time()
+    while len(batch) < batch_size or time.time() - start < timeout:
+        message = redis.blpop(queue_name, timeout=timeout)
+        if message:
+            _, value = message
+            batch.append(value)
+    on_finished(batch)
+    redis.set(f"{queue_name}:status", None)
+    # recursion here to keep consuming until the queue or on timeout
+    consume_webhook_event_batch.apply_async(
+        args=[queue_name, on_finished, batch_size], countdown=1
+    )
 
 
 # -- Alert Webhook Events ----
@@ -139,7 +183,6 @@ def send_opinions_created_webhook(ids: List[int]) -> None:
         opinions.append(
             OpinionSerializerOffline(Opinion.objects.get(pk=i)).data,
         )
-    opinion = Opinion.objects.get(pk=id)
     for webhook in Webhook.objects.filter(
         event_type=WebhookEventType.OPINION_CREATE, enabled=True
     ):
@@ -162,7 +205,9 @@ def send_opinions_created_webhook(ids: List[int]) -> None:
 
 
 @app.task()
-def send_opinion_updated_webhook(updates: List[Tuple[int, List[str]]]) -> None:
+def send_opinions_updated_webhook(
+    updates: List[Tuple[int, List[str]]]
+) -> None:
     """Send a webhook for updates to an opinion.
 
     :param updates: A list containing the id and the list of updated field names for each batched update.
@@ -284,7 +329,7 @@ def send_opinion_clusters_deleted_webhook(ids: list[int]) -> None:
 
 
 @app.task()
-def send_opinion_cluster_updated_webhook(
+def send_opinion_clusters_updated_webhook(
     updates: List[Tuple[int, List[str]]]
 ) -> None:
     """Send a webhook for updates to an opinion cluster.

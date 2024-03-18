@@ -2,14 +2,8 @@ from django.conf import settings
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from cl.api.tasks import (
-    send_opinion_cluster_updated_webhook,
-    send_opinion_clusters_created_webhook,
-    send_opinion_clusters_deleted_webhook,
-    send_opinion_updated_webhook,
-    send_opinions_created_webhook,
-    send_opinions_deleted_webhook,
-)
+from cl.api.models import WebhookEventType
+from cl.api.tasks import add_webhook_event_to_queue
 from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
@@ -585,11 +579,15 @@ def handle_opinion_created_or_updated_webhook(
     Send a webhook to the webapp when an opinion is created.
     """
     if created:
-        return send_opinions_created_webhook.delay([instance.id])
+        return add_webhook_event_to_queue(
+            WebhookEventType.OPINION_CREATE, instance.id
+        )
     changed_fields = instance.webhook_tracked_fields.changed()
     if changed_fields:
         fields_that_changed = list(changed_fields.keys())
-        send_opinion_updated_webhook.delay([(instance.id, fields_that_changed)])
+        return add_webhook_event_to_queue(
+            WebhookEventType.OPINION_UPDATE, (instance.id, fields_that_changed)
+        )
 
 
 @receiver(
@@ -603,7 +601,9 @@ def handle_opinion_deleted_webhook(
     """
     Send a webhook to the webapp when an opinion is created.
     """
-    return send_opinions_deleted_webhook.delay([instance.id])
+    return add_webhook_event_to_queue(
+        WebhookEventType.OPINION_DELETE, instance.id
+    )
 
 
 @receiver(
@@ -622,12 +622,15 @@ def handle_opinion_cluster_created_or_updated_webhook(
     Send a webhook to the webapp when an opinion is created.
     """
     if created:
-        return send_opinion_clusters_created_webhook.delay([instance.id])
+        return add_webhook_event_to_queue(
+            WebhookEventType.OPINION_CLUSTER_CREATE, instance.id
+        )
     changed_fields = instance.webhook_tracked_fields.changed()
     if changed_fields:
         fields_that_changed = list(changed_fields.keys())
-        send_opinion_cluster_updated_webhook.delay(
-            [(instance.id, fields_that_changed)]
+        return add_webhook_event_to_queue(
+            WebhookEventType.OPINION_CLUSTER_UPDATE,
+            (instance.id, fields_that_changed),
         )
 
 
@@ -642,4 +645,6 @@ def handle_opinion_cluster_deleted_webhook(
     """
     Send a webhook to the webapp when an opinion is created.
     """
-    return send_opinion_clusters_deleted_webhook.delay([instance.id])
+    return add_webhook_event_to_queue(
+        WebhookEventType.OPINION_CLUSTER_DELETE, instance.id
+    )
