@@ -2146,12 +2146,20 @@ class SweepIndexerCommandTest(
         self.assertEqual(
             s.count(), 2, msg="Wrong number of RECAPDocuments returned."
         )
+        # Confirm routing_ids are properly set.
+        response = s.execute()
+        self.assertEqual(int(response[0].meta.routing), self.de.docket.pk)
+        self.assertEqual(int(response[1].meta.routing), self.de.docket.pk)
 
+        # Confirm RECAPDocuments are indexed.
         s = DocketDocument.search()
         s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
         self.assertEqual(
             s.count(), 1, msg="Wrong number of RECAPDocuments returned."
         )
+        # Confirm routing_ids are properly set.
+        response = s.execute()
+        self.assertEqual(int(response[0].meta.routing), self.de_1.docket.pk)
 
         # Confirm Audios are indexed.
         s = AudioDocument.search().query("match_all")
@@ -2184,11 +2192,24 @@ class SweepIndexerCommandTest(
         self.assertEqual(
             s.count(), 2, msg="Wrong number of Opinions returned."
         )
+        # Confirm routing_ids are properly set.
+        response = s.execute()
+        self.assertEqual(
+            int(response[0].meta.routing), self.opinion_cluster_1.pk
+        )
+        self.assertEqual(
+            int(response[1].meta.routing), self.opinion_cluster_1.pk
+        )
 
         s = OpinionClusterDocument.search()
         s = s.query("parent_id", type="opinion", id=self.opinion_cluster_2.pk)
         self.assertEqual(
             s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+        # Confirm routing_ids are properly set.
+        response = s.execute()
+        self.assertEqual(
+            int(response[0].meta.routing), self.opinion_cluster_2.pk
         )
 
     @override_settings(ELASTICSEARCH_SWEEP_INDEXER_ACTION="missing")
