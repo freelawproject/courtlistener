@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Iterable
 
 from django.conf import settings
@@ -121,6 +121,10 @@ class Command(VerboseCommand):
                 q = queryset.iterator()
                 count = queryset.count()
             case "opinions-removal" if start_date and end_date:
+                if isinstance(start_date, datetime):
+                    start_date = start_date.date()
+                if isinstance(end_date, datetime):
+                    end_date = end_date.date()
                 response = remove_documents_by_query(
                     OpinionDocument.__name__,
                     start_date=start_date,
