@@ -1,9 +1,9 @@
 import logging
 import socket
-from datetime import timedelta
+from datetime import date, timedelta
 from importlib import import_module
 from random import randint
-from typing import Any, Generator, Literal
+from typing import Any, Generator
 
 import scorched
 import waffle
@@ -33,7 +33,7 @@ from scorched.exc import SolrError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
-from cl.lib.elasticsearch_utils import es_index_exists
+from cl.lib.elasticsearch_utils import build_daterange_query, es_index_exists
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
@@ -1612,31 +1612,63 @@ def remove_parent_and_child_docs_by_query(
     ignore_result=True,
 )
 def remove_documents_by_query(
-    self: Task, es_document_name: ESDocumentNameType, instance_ids: list[int]
-) -> None:
+    self: Task,
+    es_document_name: ESDocumentNameType,
+    instance_ids: list[int] | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    testing_mode: bool = False,
+) -> None | dict[str, str]:
     """Remove documents from ES by query.
 
-    :param self: The Celery task instance
+    This method deletes documents from a specified ES document type based on a
+    combination of criteria such as document IDs, and a date range.
+
+    :param self: The Celery task instance.
     :param es_document_name: The Elasticsearch Document type name to delete.
-    :param instance_ids: The document IDs to delete.
-    :return: None
+    :param instance_ids: Optional, a list of document IDs to delete. If None,
+    deletion is based on the date range.
+    :param start_date: Optional, the start date of the date range for document deletion.
+    :param end_date: Optional, the end date of the date range for document deletion.
+    :param testing_mode: Optional, if True, performs the removal synchronously.
+    :return: The ES request response, or None for unsupported removal actions.
     """
 
+    optional_params = {}
     es_document = getattr(es_document_module, es_document_name)
     s = es_document.search()
     match es_document_name:
-        case "DocketDocument":
+        case "DocketDocument" if instance_ids:
+            # Remove non-recap dockets.
             remove_query = Q("terms", _id=instance_ids)
             s = s.query(remove_query)
             query = s.to_dict()["query"]
+        case "OpinionDocument" if start_date and end_date:
+            # Remove OpinionDocument by a timestamp range date query.
+            date_range_query = build_daterange_query(
+                "timestamp", end_date, start_date
+            )
+            child_query_opinion = Q("match", cluster_child="opinion")
+            remove_query = Q(
+                "bool", must=[date_range_query[0], child_query_opinion]
+            )
+            s = s.query(remove_query)
+            query = s.to_dict()["query"]
+            if not testing_mode:
+                # Execute the task asynchronously.
+                optional_params.update({"wait_for_completion": "false"})
         case _:
             # Abort DeleteByQuery request for a not supported document type.
-            return
+            return None
 
     client = connections.get_connection(alias="no_retry_connection")
-    client.delete_by_query(
-        index=es_document._index._name, body={"query": query}
+    response = client.delete_by_query(
+        index=es_document._index._name,
+        body={"query": query},
+        params=optional_params,
     )
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         es_document._index.refresh()
+
+    return response

@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytz
+import time_machine
 from asgiref.sync import async_to_sync
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
@@ -71,6 +72,10 @@ from cl.search.factories import (
 from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
+    log_last_document_indexed,
+)
+from cl.search.management.commands.cl_remove_content_from_es import (
+    compose_redis_key_non_recap,
 )
 from cl.search.management.commands.sweep_indexer import log_indexer_last_status
 from cl.search.models import (
@@ -89,6 +94,7 @@ from cl.search.models import (
 from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     get_es_doc_id_and_parent_id,
+    index_dockets_in_bulk,
 )
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -2333,4 +2339,234 @@ class SweepIndexerCommandTest(
         s = OpinionClusterDocument.search().query("match_all")
         self.assertEqual(
             s.count(), 0, msg="Wrong number of Clusters returned."
+        )
+
+
+class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
+    """cl_remove_content_from_es command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+
+        cls.recap_docket = DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2015, 8, 16),
+            docket_number="1:21-bk-1234",
+            nature_of_suit="440",
+            source=Docket.RECAP,
+        )
+        cls.non_recap_docket = DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2019, 8, 16),
+            docket_number="21-bk-2341",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
+        cls.non_recap_docket_2 = DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2010, 8, 16),
+            docket_number="21-bk-2632",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
+
+    def tearDown(self) -> None:
+        self.delete_index(["search.Docket", "search.OpinionCluster"])
+        self.create_index(["search.Docket", "search.OpinionCluster"])
+
+    def test_remove_non_recap_dockets(self):
+        """Confirm the cl_remove_content_from_es command works
+        properly removing non-recap dockets from ES.
+        """
+
+        # Index all the dockets regardless of their source.
+        index_dockets_in_bulk.delay(
+            [
+                self.recap_docket.pk,
+                self.non_recap_docket.pk,
+                self.non_recap_docket_2.pk,
+            ],
+            testing_mode=True,
+        )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 3, msg="Wrong number of Dockets returned.")
+
+        # Call sweep_indexer command.
+        with mock.patch(
+            "cl.search.management.commands.cl_remove_content_from_es.logger"
+        ) as mock_logger:
+            call_command(
+                "cl_remove_content_from_es",
+                action="non-recap-dockets",
+            )
+            mock_logger.info.assert_called_with(
+                f"Successfully removed 2 non-recap dockets."
+            )
+
+        # Confirm non-recap Dockets are removed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 1, msg="Wrong number of Dockets returned.")
+        self.assertTrue(DocketDocument.exists(self.recap_docket.pk))
+
+    def test_restart_from_last_document_logged(self):
+        """Confirm the cl_remove_content_from_es is able to resume
+        from the last logged docket.
+        """
+
+        # Index all the dockets regardless of their source.
+        index_dockets_in_bulk.delay(
+            [
+                self.recap_docket.pk,
+                self.non_recap_docket.pk,
+                self.non_recap_docket_2.pk,
+            ],
+            testing_mode=True,
+        )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 3, msg="Wrong number of Dockets returned.")
+
+        log_last_document_indexed(
+            self.non_recap_docket_2.pk, compose_redis_key_non_recap()
+        )
+        # Call sweep_indexer command.
+        with mock.patch(
+            "cl.search.management.commands.cl_remove_content_from_es.logger"
+        ) as mock_logger:
+            call_command(
+                "cl_remove_content_from_es",
+                action="non-recap-dockets",
+                auto_resume=True,
+            )
+            mock_logger.info.assert_called_with(
+                f"Successfully removed 1 non-recap dockets."
+            )
+
+        # Confirm the last non-recap Docket is removed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        self.assertFalse(DocketDocument.exists(self.non_recap_docket_2.pk))
+
+    def test_remove_opinions_by_timestamp(self):
+        """Confirm the cl_remove_content_from_es command works
+        properly removing opinions by a timestamp range query.
+        """
+
+        # Opinion Factories
+        opinion_cluster_1 = OpinionClusterFactory.create(
+            source="C",
+            precedential_status="Errata",
+            docket=self.recap_docket,
+        )
+        opinion_1 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            cluster=opinion_cluster_1,
+            type="020lead",
+        )
+
+        opinion_cluster_2 = OpinionClusterFactory.create(
+            source="C",
+            precedential_status="Published",
+            docket=self.non_recap_docket,
+        )
+        opinion_2 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            cluster=opinion_cluster_2,
+            type="010combined",
+        )
+
+        five_days_ago = now() - datetime.timedelta(days=5)
+        with time_machine.travel(five_days_ago, tick=False):
+            # Index all the opinion documents with a timestamp from 5 days ago.
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.OPINION,
+                pk_offset=0,
+                testing_mode=True,
+            )
+
+        # Confirm OpinionClusters are indexed
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Opinions returned."
+        )
+
+        three_days_ago = now() - datetime.timedelta(days=3)
+        with time_machine.travel(three_days_ago, tick=False):
+            # Run the sweep indexer to update the timestamp in opinion_2
+            log_indexer_last_status(
+                "search.Opinion",
+                opinion_2.pk,
+                0,
+            )
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
+            )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            # Trigger a change in opinion_1 to confirm the timestamp is not
+            # updated.
+            opinion_1.type = Opinion.UNANIMOUS
+            opinion_1.save()
+
+        # The timestamp in opinion_1 remains the same as it was from 5 days ago
+        opinion_1_doc = OpinionClusterDocument.get(
+            ES_CHILD_ID(opinion_1.pk).OPINION
+        )
+        self.assertEqual(opinion_1_doc.type, "unanimous-opinion")
+        self.assertEqual(opinion_1_doc.timestamp.date(), five_days_ago.date())
+
+        # The timestamp in opinion_2 is updated to 2 days ago.
+        opinion_2_doc = OpinionClusterDocument.get(
+            ES_CHILD_ID(opinion_2.pk).OPINION
+        )
+        self.assertEqual(opinion_2_doc.timestamp.date(), three_days_ago.date())
+
+        # Call cl_remove_content_from_es command.
+        with mock.patch(
+            "cl.search.management.commands.cl_remove_content_from_es.logger"
+        ) as mock_logger:
+            call_command(
+                "cl_remove_content_from_es",
+                action="opinions-removal",
+                start_date=three_days_ago.date(),
+                end_date=now().date(),
+                testing_mode=True,
+            )
+            self.assertIn(
+                "Removal task successfully scheduled. Task ID:",
+                mock_logger.info.call_args[0][0],
+            )
+
+        # Confirm OpinionCluster remains indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm only opinion_2 was removed.
+        s = OpinionDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+        self.assertFalse(
+            OpinionClusterDocument.exists(ES_CHILD_ID(opinion_2.pk).OPINION)
         )

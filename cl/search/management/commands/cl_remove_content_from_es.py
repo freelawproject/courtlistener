@@ -1,11 +1,13 @@
 from typing import Iterable
+from datetime import date
 
 from django.conf import settings
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import get_redis_interface
-from cl.search.documents import DocketDocument
+from cl.lib.argparse_types import valid_date_time
+from cl.search.documents import DocketDocument, OpinionDocument
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     log_last_document_indexed,
 )
@@ -36,7 +38,7 @@ def get_last_parent_document_id_processed() -> int:
 
 
 class Command(VerboseCommand):
-    help = "Remove non-recap dockets from RECAP index in ES."
+    help = "Remove content from an ES index."
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -66,10 +68,38 @@ class Command(VerboseCommand):
             action="store_true",
             help="Auto resume the command using the last document_id logged in Redis.",
         )
+        parser.add_argument(
+            "--action",
+            type=str,
+            required=False,
+            choices=["non-recap-dockets", "opinions-removal"],
+            help="The action removal to perform.",
+        )
+        parser.add_argument(
+            "--start-date",
+            type=valid_date_time,
+            help="Start date in ISO-8601 format for a range of documents to "
+                 "update.",
+        )
+        parser.add_argument(
+            "--end-date",
+            type=valid_date_time,
+            help="Start date in ISO-8601 format for a range of documents to "
+                 "update.",
+        )
+        parser.add_argument(
+            "--testing-mode",
+            action="store_true",
+            help="Use this flag only when running the command in tests based on TestCase",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
         self.options = options
+        start_date: date | None = options.get("start_date", None)
+        end_date: date | None = options.get("end_date", None)
+        action = options.get("action")
+        testing_mode = self.options.get("testing_mode", False)
 
         chunk_size = self.options["chunk_size"]
         auto_resume = options.get("auto_resume", False)
@@ -80,15 +110,26 @@ class Command(VerboseCommand):
             self.stdout.write(
                 f"Auto-resume enabled starting indexing from ID: {pk_offset}."
             )
-        # Dockets that don't belong to RECAP_SOURCES.
-        queryset = (
-            Docket.objects.filter(pk__gte=pk_offset)
-            .exclude(source__in=Docket.RECAP_SOURCES)
-            .order_by("pk")
-            .values_list("pk", flat=True)
-        )
-        q = queryset.iterator()
-        count = queryset.count()
+
+        match action:
+            case "non-recap-dockets":
+                # Dockets that don't belong to RECAP_SOURCES.
+                queryset = (
+                    Docket.objects.filter(pk__gte=pk_offset)
+                    .exclude(source__in=Docket.RECAP_SOURCES)
+                    .order_by("pk")
+                    .values_list("pk", flat=True)
+                )
+                q = queryset.iterator()
+                count = queryset.count()
+            case "opinions-removal" if start_date and end_date:
+                response = remove_documents_by_query(OpinionDocument.__name__, start_date=start_date, end_date=end_date, testing_mode = testing_mode)
+                logger.info(
+                    f"Removal task successfully scheduled. Task ID: {response}"
+                )
+                return
+            case _:
+                return
 
         self.process_queryset(q, count, chunk_size)
 

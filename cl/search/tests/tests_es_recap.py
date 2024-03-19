@@ -39,9 +39,6 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_last_parent_document_id_processed,
     log_last_document_indexed,
 )
-from cl.search.management.commands.cl_remove_non_recap_dockets_from_es import (
-    compose_redis_key_non_recap,
-)
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
@@ -52,7 +49,6 @@ from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     es_save_document,
     index_docket_parties_in_es,
-    index_dockets_in_bulk,
     index_related_cites_fields,
     update_es_document,
 )
@@ -4772,116 +4768,3 @@ class RECAPHistoryTablesIndexingTest(
         )
         if keys:
             self.r.delete(*keys)
-
-
-class RemoveNonRECAPDocketsCommandTest(ESIndexTestCase, TestCase):
-    """cl_remove_non_recap_dockets_from_es command tests for Elasticsearch"""
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
-
-        cls.recap_docket = DocketFactory(
-            court=cls.court,
-            date_filed=datetime.date(2015, 8, 16),
-            docket_number="1:21-bk-1234",
-            nature_of_suit="440",
-            source=Docket.RECAP,
-        )
-        cls.non_recap_docket = DocketFactory(
-            court=cls.court,
-            date_filed=datetime.date(2019, 8, 16),
-            docket_number="21-bk-2341",
-            nature_of_suit="440",
-            source=Docket.HARVARD,
-        )
-        cls.non_recap_docket_2 = DocketFactory(
-            court=cls.court,
-            date_filed=datetime.date(2010, 8, 16),
-            docket_number="21-bk-2632",
-            nature_of_suit="440",
-            source=Docket.HARVARD,
-        )
-
-    def tearDown(self) -> None:
-        self.delete_index("search.Docket")
-        self.create_index("search.Docket")
-
-    def test_remove_non_recap_dockets(self):
-        """Confirm the cl_remove_non_recap_dockets_from_es command works
-        properly removing non-recap dockets from ES.
-        """
-
-        # Index all the dockets regardless of their source.
-        index_dockets_in_bulk.delay(
-            [
-                self.recap_docket.pk,
-                self.non_recap_docket.pk,
-                self.non_recap_docket_2.pk,
-            ],
-            testing_mode=True,
-        )
-
-        # Confirm Dockets are indexed.
-        s = DocketDocument.search()
-        s = s.query(Q("match", docket_child="docket"))
-        self.assertEqual(s.count(), 3, msg="Wrong number of Dockets returned.")
-
-        # Call sweep_indexer command.
-        with mock.patch(
-            "cl.search.management.commands.cl_remove_non_recap_dockets_from_es.logger"
-        ) as mock_logger:
-            call_command(
-                "cl_remove_non_recap_dockets_from_es",
-            )
-            mock_logger.info.assert_called_with(
-                f"Successfully removed 2 non-recap dockets."
-            )
-
-        # Confirm non-recap Dockets are removed.
-        s = DocketDocument.search()
-        s = s.query(Q("match", docket_child="docket"))
-        self.assertEqual(s.count(), 1, msg="Wrong number of Dockets returned.")
-        self.assertTrue(DocketDocument.exists(self.recap_docket.pk))
-
-    def test_restart_from_last_document_logged(self):
-        """Confirm the cl_remove_non_recap_dockets_from_es is able to resume
-        from the last logged docket.
-        """
-
-        # Index all the dockets regardless of their source.
-        index_dockets_in_bulk.delay(
-            [
-                self.recap_docket.pk,
-                self.non_recap_docket.pk,
-                self.non_recap_docket_2.pk,
-            ],
-            testing_mode=True,
-        )
-
-        # Confirm Dockets are indexed.
-        s = DocketDocument.search()
-        s = s.query(Q("match", docket_child="docket"))
-        self.assertEqual(s.count(), 3, msg="Wrong number of Dockets returned.")
-
-        log_last_document_indexed(
-            self.non_recap_docket_2.pk, compose_redis_key_non_recap()
-        )
-        # Call sweep_indexer command.
-        with mock.patch(
-            "cl.search.management.commands.cl_remove_non_recap_dockets_from_es.logger"
-        ) as mock_logger:
-            call_command(
-                "cl_remove_non_recap_dockets_from_es",
-                auto_resume=True,
-            )
-            mock_logger.info.assert_called_with(
-                f"Successfully removed 1 non-recap dockets."
-            )
-
-        # Confirm the last non-recap Docket is removed.
-        s = DocketDocument.search()
-        s = s.query(Q("match", docket_child="docket"))
-        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
-        self.assertFalse(DocketDocument.exists(self.non_recap_docket_2.pk))
