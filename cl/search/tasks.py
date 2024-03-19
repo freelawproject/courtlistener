@@ -864,6 +864,8 @@ def bulk_indexing_generator(
     :param child_id_property: Optional, the property to be used for generating
      ES child document ID.
     :param parent_id: Optional, the parent instance ID used for routing in ES.
+    This parameter must only be provided when indexing documents that belong to
+    the same parent document.
     :param base_doc: The base ES document fields.
     :return: Yields ES child documents for bulk indexing.
     """
@@ -876,13 +878,18 @@ def bulk_indexing_generator(
         es_doc = es_document().prepare(doc)
         if child_id_property:
             if not parent_id:
-                parent_id_lambda = parent_id_mappings.get(child_id_property)
-                if not parent_id_lambda:
+                routing_id_lambda = parent_id_mappings.get(child_id_property)
+                if not routing_id_lambda:
                     continue
-                parent_id = parent_id_lambda(doc)
+                # Get the routing_id from the parent document's ID.
+                routing_id = routing_id_lambda(doc)
+            else:
+                # The parent_id was provided when indexing documents that
+                # belong to the same parent.
+                routing_id = parent_id
             doc_params = {
                 "_id": getattr(ES_CHILD_ID(doc.pk), child_id_property),
-                "_routing": f"{parent_id}",
+                "_routing": f"{routing_id}",
             }
         else:
             doc_params = {
