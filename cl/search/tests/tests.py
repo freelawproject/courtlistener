@@ -75,7 +75,7 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
     log_last_document_indexed,
 )
 from cl.search.management.commands.cl_remove_content_from_es import (
-    compose_redis_key_non_recap,
+    compose_redis_key_remove_content,
 )
 from cl.search.management.commands.sweep_indexer import log_indexer_last_status
 from cl.search.models import (
@@ -2456,7 +2456,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.assertEqual(s.count(), 3, msg="Wrong number of Dockets returned.")
 
         log_last_document_indexed(
-            self.non_recap_docket_2.pk, compose_redis_key_non_recap()
+            self.non_recap_docket_2.pk, compose_redis_key_remove_content()
         )
         # Call sweep_indexer command.
         with mock.patch(

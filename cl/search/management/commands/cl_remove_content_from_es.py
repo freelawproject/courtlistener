@@ -15,13 +15,11 @@ from cl.search.models import Docket
 from cl.search.tasks import remove_documents_by_query
 
 
-def compose_redis_key_non_recap() -> str:
-    """Compose a Redis key based on the search type for indexing log.
-
-    document type being processed.
+def compose_redis_key_remove_content() -> str:
+    """Compose a Redis key for storing the removal action status.
     :return: A Redis key as a string.
     """
-    return f"es_remove_non_recap_docket:log"
+    return f"es_remove_content_from_es:log"
 
 
 def get_last_parent_document_id_processed() -> int:
@@ -30,7 +28,7 @@ def get_last_parent_document_id_processed() -> int:
     """
 
     r = get_redis_interface("CACHE")
-    log_key = compose_redis_key_non_recap()
+    log_key = compose_redis_key_remove_content()
     stored_values = r.hgetall(log_key)
     last_document_id = int(stored_values.get("last_document_id", 0))
 
@@ -73,19 +71,19 @@ class Command(VerboseCommand):
             type=str,
             required=False,
             choices=["non-recap-dockets", "opinions-removal"],
-            help="The action removal to perform.",
+            help="The removal action to perform.",
         )
         parser.add_argument(
             "--start-date",
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
-            "update.",
+            "delete.",
         )
         parser.add_argument(
             "--end-date",
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
-            "update.",
+            "delete.",
         )
         parser.add_argument(
             "--testing-mode",
@@ -177,7 +175,7 @@ class Command(VerboseCommand):
                 if not processed_count % 1000:
                     # Log every 1000 parent documents processed.
                     log_last_document_indexed(
-                        item_id, compose_redis_key_non_recap()
+                        item_id, compose_redis_key_remove_content()
                     )
 
         logger.info(
