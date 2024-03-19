@@ -28,6 +28,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.audio.factories import AudioFactory
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
@@ -77,7 +78,10 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 from cl.search.management.commands.cl_remove_content_from_es import (
     compose_redis_key_remove_content,
 )
-from cl.search.management.commands.sweep_indexer import log_indexer_last_status
+from cl.search.management.commands.sweep_indexer import (
+    compose_indexer_redis_key,
+    log_indexer_last_status,
+)
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -2084,6 +2088,10 @@ class SweepIndexerCommandTest(
             nature_of_suit="440",
             source=Docket.HARVARD,
         )
+        r = get_redis_interface("CACHE")
+        keys_indexer = r.keys(compose_indexer_redis_key())
+        if keys_indexer:
+            r.delete(*keys_indexer)
 
     def tearDown(self) -> None:
         self.delete_index(
@@ -2392,6 +2400,14 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
             nature_of_suit="440",
             source=Docket.HARVARD,
         )
+        r = get_redis_interface("CACHE")
+        keys_indexer = r.keys(compose_indexer_redis_key())
+        if keys_indexer:
+            r.delete(*keys_indexer)
+
+        keys_remove = r.keys(compose_redis_key_remove_content())
+        if keys_remove:
+            r.delete(*keys_remove)
 
     def tearDown(self) -> None:
         self.delete_index(["search.Docket", "search.OpinionCluster"])
