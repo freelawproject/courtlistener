@@ -1,12 +1,12 @@
-from typing import Iterable
 from datetime import date
+from typing import Iterable
 
 from django.conf import settings
 
+from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.argparse_types import valid_date_time
 from cl.search.documents import DocketDocument, OpinionDocument
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     log_last_document_indexed,
@@ -79,13 +79,13 @@ class Command(VerboseCommand):
             "--start-date",
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
-                 "update.",
+            "update.",
         )
         parser.add_argument(
             "--end-date",
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
-                 "update.",
+            "update.",
         )
         parser.add_argument(
             "--testing-mode",
@@ -123,7 +123,12 @@ class Command(VerboseCommand):
                 q = queryset.iterator()
                 count = queryset.count()
             case "opinions-removal" if start_date and end_date:
-                response = remove_documents_by_query(OpinionDocument.__name__, start_date=start_date, end_date=end_date, testing_mode = testing_mode)
+                response = remove_documents_by_query(
+                    OpinionDocument.__name__,
+                    start_date=start_date,
+                    end_date=end_date,
+                    testing_mode=testing_mode,
+                )
                 logger.info(
                     f"Removal task successfully scheduled. Task ID: {response}"
                 )
