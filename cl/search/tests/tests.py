@@ -78,10 +78,7 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 from cl.search.management.commands.cl_remove_content_from_es import (
     compose_redis_key_remove_content,
 )
-from cl.search.management.commands.sweep_indexer import (
-    compose_indexer_redis_key,
-    log_indexer_last_status,
-)
+from cl.search.management.commands.sweep_indexer import log_indexer_last_status
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -1979,6 +1976,10 @@ class ESIndexingTasksUtils(TestCase):
         self.assertEqual(unique_event_ids, expected_event_ids)
 
 
+@mock.patch(
+    "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
+    return_value="es_sweep_indexer:log_test",
+)
 class SweepIndexerCommandTest(
     CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
 ):
@@ -2088,10 +2089,6 @@ class SweepIndexerCommandTest(
             nature_of_suit="440",
             source=Docket.HARVARD,
         )
-        r = get_redis_interface("CACHE")
-        keys_indexer = r.keys(compose_indexer_redis_key())
-        if keys_indexer:
-            r.delete(*keys_indexer)
 
     def tearDown(self) -> None:
         self.delete_index(
@@ -2111,7 +2108,7 @@ class SweepIndexerCommandTest(
             ]
         )
 
-    def test_sweep_indexer_all(self):
+    def test_sweep_indexer_all(self, mock_logging_prefix):
         """Confirm the sweep_indexer command works properly indexing 'all' the
         documents serially.
         """
@@ -2227,7 +2224,7 @@ class SweepIndexerCommandTest(
         )
 
     @override_settings(ELASTICSEARCH_SWEEP_INDEXER_ACTION="missing")
-    def test_sweep_indexer_missing(self):
+    def test_sweep_indexer_missing(self, mock_logging_prefix):
         """Confirm the sweep_indexer command works properly indexing 'missing'
         the documents serially.
         """
@@ -2315,7 +2312,7 @@ class SweepIndexerCommandTest(
             s.count(), 3, msg="Wrong number of Opinions returned."
         )
 
-    def test_restart_from_last_document_logged(self):
+    def test_restart_from_last_document_logged(self, mock_logging_prefix):
         """Confirm the sweep_indexer command can resume from where it left
         off after a failure or interruption.
         """
@@ -2371,6 +2368,10 @@ class SweepIndexerCommandTest(
         )
 
 
+@mock.patch(
+    "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
+    return_value="es_sweep_indexer:log_remove",
+)
 class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
     """cl_remove_content_from_es command tests for Elasticsearch"""
 
@@ -2401,10 +2402,6 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
             source=Docket.HARVARD,
         )
         r = get_redis_interface("CACHE")
-        keys_indexer = r.keys(compose_indexer_redis_key())
-        if keys_indexer:
-            r.delete(*keys_indexer)
-
         keys_remove = r.keys(compose_redis_key_remove_content())
         if keys_remove:
             r.delete(*keys_remove)
@@ -2413,7 +2410,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.delete_index(["search.Docket", "search.OpinionCluster"])
         self.create_index(["search.Docket", "search.OpinionCluster"])
 
-    def test_remove_non_recap_dockets(self):
+    def test_remove_non_recap_dockets(self, mock_logging_prefix):
         """Confirm the cl_remove_content_from_es command works
         properly removing non-recap dockets from ES.
         """
@@ -2451,7 +2448,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.assertEqual(s.count(), 1, msg="Wrong number of Dockets returned.")
         self.assertTrue(DocketDocument.exists(self.recap_docket.pk))
 
-    def test_restart_from_last_document_logged(self):
+    def test_restart_from_last_document_logged(self, mock_logging_prefix):
         """Confirm the cl_remove_content_from_es is able to resume
         from the last logged docket.
         """
@@ -2493,7 +2490,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
         self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
         self.assertFalse(DocketDocument.exists(self.non_recap_docket_2.pk))
 
-    def test_remove_opinions_by_timestamp(self):
+    def test_remove_opinions_by_timestamp(self, mock_logging_prefix):
         """Confirm the cl_remove_content_from_es command works
         properly removing opinions by a timestamp range query.
         """
