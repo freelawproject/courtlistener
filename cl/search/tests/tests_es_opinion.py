@@ -1484,6 +1484,65 @@ class IndexOpinionDocumentsCommandTest(
             s.count(), 1, msg="Wrong number of Opinions returned."
         )
 
+    def test_opinions_indexing_missing_flag(self):
+        """Confirm the command can properly index missing Opinions."""
+
+        # Call cl_index_parent_and_child_docs command for Opinions.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            testing_mode=True,
+        )
+
+        # Remove an opinion and opinion cluster manually.
+        OpinionClusterDocument.get(id=self.opinion_cluster_2.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        OpinionClusterDocument.get(
+            id=ES_CHILD_ID(self.opinion_2.pk).OPINION
+        ).delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+
+        # Confirm clusters are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 5, msg="Wrong number of Opinions returned."
+        )
+
+        # Call cl_index_parent_and_child_docs command for Opinions passing the
+        # missing flag.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            missing=True,
+            testing_mode=True,
+        )
+
+        # Confirm clusters are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 6, msg="Wrong number of Opinions returned."
+        )
+
 
 class EsOpinionsIndexingTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
