@@ -2,6 +2,8 @@ from http import HTTPStatus
 
 import eyecite
 from asgiref.sync import async_to_sync
+from django.db.models import QuerySet
+from django.http import HttpResponse
 from django.template.defaultfilters import slugify
 from reporters_db import EDITIONS
 from rest_framework.exceptions import NotFound
@@ -17,7 +19,9 @@ from cl.search.api_serializers import OpinionClusterSerializer
 from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
 
-SLUGIFIED_EDITIONS = {str(slugify(item)): item for item in EDITIONS.keys()}
+SLUGIFIED_EDITIONS: dict[str, str] = {
+    str(slugify(item)): item for item in EDITIONS.keys()
+}
 
 
 class CitationLookupView(GenericAPIView):
@@ -25,7 +29,7 @@ class CitationLookupView(GenericAPIView):
     pagination_class = MediumAdjustablePagination
     serializer = OpinionClusterSerializer
 
-    def get(self, request: Request, *args, **kwargs):
+    def get(self, request: Request, *args, **kwargs) -> HttpResponse:
         query = request.query_params
 
         # Uses the serializer to perform object level validations
@@ -66,9 +70,19 @@ class CitationLookupView(GenericAPIView):
         if proper_reporter and self.volume and self.page:
             return self._citation_handler(request, proper_reporter)
         else:
-            return self._reporter_or_volume_handler(request, proper_reporter)
+            return self._reporter_volume_handler(request, proper_reporter)
 
     def _attempt_reporter_variation(self) -> str:
+        """Try to disambiguate an unknown reporter using the variations dict.
+
+        Raises:
+            NotFound: If the unknown reporter string doesn't match a canonical.
+            MultipleChoices: If the reporter variation maps to more than one
+                            canonical reporter.
+
+        Returns:
+            str: canonical name for the reporter.
+        """
         potential_canonicals = get_canonicals_from_reporter(self.reporter_slug)
 
         if len(potential_canonicals) == 0:
@@ -85,10 +99,27 @@ class CitationLookupView(GenericAPIView):
             )
 
         else:
-            # Unambiguous reporter variation. Great. Use the canonical reporter
-            return SLUGIFIED_EDITIONS.get(potential_canonicals[0])
+            # Unambiguous reporter variation. Use the canonical reporter
+            return SLUGIFIED_EDITIONS.get(potential_canonicals[0], "")
 
-    def _citation_handler(self, request, reporter: str):
+    def _citation_handler(
+        self, request: Request, reporter: str
+    ) -> HttpResponse:
+        """
+        This method retrieves opinion clusters that match a citation string.
+
+        Args:
+            request (Request): The HTTP object containing information
+                about the request.
+            reporter (str): The name of the reporter.
+
+        Raises:
+            NotFound: If the citation string doesn't match any opinion clusters
+
+        Returns:
+            HttpResponse: An HTTP response object containing a list of matching
+                opinion clusters.
+        """
         citation_str = " ".join([str(self.volume), reporter, self.page])
         clusters, cluster_count = async_to_sync(
             get_clusters_from_citation_str
@@ -99,7 +130,26 @@ class CitationLookupView(GenericAPIView):
 
         return self._show_paginated_response(request, clusters)
 
-    def _reporter_or_volume_handler(self, request, reporter: str):
+    def _reporter_volume_handler(
+        self, request: Request, reporter: str
+    ) -> HttpResponse:
+        """
+        Handles requests to retrieve opinions based on a reporter-volume
+        combination.
+
+        Args:
+            request (Request): The HTTP object containing information
+                about the request.
+            reporter (str): The name of the reporter.
+
+        Returns:
+            A response object containing the list of opinions for the
+            reporter-volume dyad.
+
+        Raises:
+            NotFound: If the reporter name is invalid or the reporter-volume
+                combination doesn't match any opinion clusters.
+        """
         root_reporter = EDITIONS.get(reporter)
         if not root_reporter:
             raise NotFound(
@@ -117,7 +167,25 @@ class CitationLookupView(GenericAPIView):
 
         return self._show_paginated_response(request, cases_in_volume)
 
-    def _show_paginated_response(self, request, clusters):
+    def _show_paginated_response(
+        self, request: Request, clusters: QuerySet[OpinionCluster]
+    ) -> HttpResponse:
+        """
+        Generates a paginated HTTP response containing opinion clusters.
+
+        This method takes a queryset of opinion clusters and an HTTP request
+        object.It then paginates the queryset based on the request parameters
+        and returns an appropriate HTTP response containing the paginated data.
+
+        Args:
+            request (Request): The HTTP request object.
+            clusters (QuerySet[OpinionCluster]): The queryset containing opinion
+            clusters.
+
+        Returns:
+            HttpResponse: An HTTP response containing the paginated opinion
+                        clusters and pagination information.
+        """
         clusters = clusters.prefetch_related(
             "sub_opinions", "panel", "non_participating_judges", "citations"
         ).order_by("-id")
