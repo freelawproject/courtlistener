@@ -144,6 +144,13 @@ router.register(
     basename="membership-webhooks",
 )
 
+# Citation lookups
+router.register(
+    r"citation-lookup",
+    citations_views.CitationLookupViewSet,
+    basename="citation-lookup",
+)
+
 API_TITLE = "CourtListener Legal Data API"
 
 
@@ -153,11 +160,6 @@ urlpatterns = [
         include("rest_framework.urls", namespace="rest_framework"),
     ),
     re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
-    re_path(
-        r"^api/rest/(?P<version>[v3]+)/citation-lookup/",
-        citations_views.CitationLookupView.as_view(),
-        name="citation_lookup",
-    ),
     # Documentation
     path("help/api/", views.api_index, name="api_index"),
     path("help/api/jurisdictions/", views.court_index, name="court_index"),

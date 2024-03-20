@@ -30,7 +30,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
     pagination_class = MediumAdjustablePagination
     serializer = OpinionClusterSerializer
 
-    def list(self, request: Request, *args, **kwargs) -> HttpResponse:
+    def list(self, request: Request, *args, **kwargs):
         query = request.query_params
 
         # Uses the serializer to perform object level validations

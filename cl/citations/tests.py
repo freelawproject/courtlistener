@@ -1746,7 +1746,7 @@ class CitationLookUpApiTest(
 
     async def test_can_handle_requests_with_no_citation_or_reporter(self):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"})
+            reverse("citation-lookup-list", kwargs={"version": "v3"})
         )
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
@@ -1757,7 +1757,7 @@ class CitationLookUpApiTest(
 
     async def test_can_handle_requests_with_only_reporter(self):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "ark"},
         )
         j = json.loads(r.content)
@@ -1769,7 +1769,7 @@ class CitationLookUpApiTest(
 
     async def test_can_handle_random_text_as_a_text_citation(self):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text_citation": "this is a text"},
         )
         j = json.loads(r.content)
@@ -1781,7 +1781,7 @@ class CitationLookUpApiTest(
 
     async def test_can_handle_invalid_text_citations(self):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text_citation": "Maryland Code, Criminal Law § 11-208"},
         )
         j = json.loads(r.content)
@@ -1792,7 +1792,7 @@ class CitationLookUpApiTest(
         )
 
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text_citation": "§ 97-29-63"},
         )
         j = json.loads(r.content)
@@ -1804,7 +1804,7 @@ class CitationLookUpApiTest(
 
     async def test_can_handle_invalid_reporter(self):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {
                 "reporter": "bad-reporter",
                 "volume": "1",
@@ -1820,7 +1820,7 @@ class CitationLookUpApiTest(
 
     async def test_can_handle_ambiguous_reporter_variations(self) -> None:
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {
                 "reporter": "bailey",
                 "volume": "1",
@@ -1837,7 +1837,7 @@ class CitationLookUpApiTest(
     async def test_can_handle_invalid_page_number(self) -> None:
         """Do we fail gracefully with invalid page numbers?"""
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {
                 "reporter": "f2d",
                 "volume": "1",
@@ -1853,7 +1853,7 @@ class CitationLookUpApiTest(
 
     async def test_returns_all_clusters_that_match_reporter_and_volume(self):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f2d", "volume": "56"},
         )
 
@@ -1868,7 +1868,7 @@ class CitationLookUpApiTest(
     )
     async def test_return_paginated_body(self, pagination_mock):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f2d", "volume": "56"},
         )
 
@@ -1879,7 +1879,7 @@ class CitationLookUpApiTest(
 
     async def test_can_match_citation_with_reporter_volume_page(self):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f2d", "volume": "56", "citation_page": "9"},
         )
 
@@ -1896,7 +1896,7 @@ class CitationLookUpApiTest(
         # HTML with citations contains star pagination for pages 9 and 10.
         # This tests if we can find opinion cluster 2 with page 9 and 10
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f2d", "volume": "56", "citation_page": "10"},
         )
 
@@ -1911,7 +1911,7 @@ class CitationLookUpApiTest(
 
     async def test_can_handle_reporter_variations(self):
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "F2d", "volume": "56", "citation_page": "9"},
         )
         data = json.loads(r.content)
@@ -1920,7 +1920,7 @@ class CitationLookUpApiTest(
 
         # Introduce a space into the reporter
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f 2d", "volume": "56"},
         )
         data = json.loads(r.content)
@@ -1928,7 +1928,7 @@ class CitationLookUpApiTest(
         self.assertEqual(data["count"], 2)
 
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f 2d", "volume": "56", "citation_page": "9"},
         )
         data = json.loads(r.content)
@@ -1940,7 +1940,7 @@ class CitationLookUpApiTest(
         citation?"""
 
         r = await self.async_client.get(
-            reverse("citation_lookup", kwargs={"version": "v3"}),
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {
                 "text_citation": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)"
             },
