@@ -19,7 +19,7 @@ class CitationRequestSerializer(serializers.Serializer):
             raise ValidationError(
                 {
                     "non_field_errors": [
-                        "You must either provide a 'text citation' or 'reporter'."
+                        "Either 'text_citation' or 'reporter' is required."
                     ]
                 }
             )

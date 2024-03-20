@@ -1751,7 +1751,7 @@ class CitationLookUpApiTest(
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
         self.assertIn(
-            "You must either provide a 'text citation' or 'reporter'",
+            "Either 'text_citation' or 'reporter' is required",
             j["non_field_errors"][0],
         )
 
