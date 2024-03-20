@@ -1779,7 +1779,7 @@ class CitationLookUpApiTest(
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
         self.assertIn(
-            "Unable to find a citation withing the provided text",
+            "No citations found in 'text_citation'",
             j["detail"],
         )
 
@@ -1789,22 +1789,16 @@ class CitationLookUpApiTest(
             {"text_citation": "Maryland Code, Criminal Law § 11-208"},
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
-        self.assertIn(
-            "The provided text is not a valid citation. Please review it and try again",
-            j["detail"],
-        )
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertIn("Invalid citation", j["text_citation"][0])
 
         r = await self.async_client.get(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text_citation": "§ 97-29-63"},
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
-        self.assertIn(
-            "The provided text is not a valid citation. Please review it and try again",
-            j["detail"],
-        )
+        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertIn("Invalid citation", j["text_citation"][0])
 
     async def test_can_handle_invalid_reporter(self):
         r = await self.async_client.get(
@@ -1818,7 +1812,7 @@ class CitationLookUpApiTest(
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
         self.assertIn(
-            "Unable to find Reporter with abbreviation of 'bad-reporter'",
+            "Unable to find reporter with abbreviation of 'bad-reporter'",
             j["detail"],
         )
 
@@ -1851,7 +1845,7 @@ class CitationLookUpApiTest(
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
         self.assertIn(
-            "Unable to Find Citation",
+            "Citation not found:",
             j["detail"],
         )
 

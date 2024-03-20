@@ -5,7 +5,7 @@ from asgiref.sync import async_to_sync
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.template.defaultfilters import slugify
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.mixins import ListModelMixin
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -42,9 +42,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
         if self.full_text_citation:
             citations = eyecite.get_citations(self.full_text_citation)
             if not citations:
-                raise NotFound(
-                    f"Unable to find a citation withing the provided text"
-                )
+                raise NotFound(f"No citations found in 'text_citation'.")
 
             if citations[0].groups:
                 c = citations[0]
@@ -52,9 +50,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
                 self.volume = c.groups["volume"]
                 self.page = c.groups["page"]
             else:
-                raise NotFound(
-                    f"The provided text is not a valid citation. Please review it and try again"
-                )
+                raise ValidationError({"text_citation": ["Invalid citation."]})
 
         self.reporter_slug = slugify(self.reporter)
 
@@ -81,7 +77,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
         if len(potential_canonicals) == 0:
             # Couldn't find it as a variation. Give up.
             raise NotFound(
-                f"Unable to find Reporter with abbreviation of '{self.reporter}'"
+                f"Unable to find reporter with abbreviation of '{self.reporter}'"
             )
 
         elif len(potential_canonicals) > 1:
@@ -119,7 +115,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
         )(reporter, str(self.volume), self.page)
 
         if cluster_count == 0:
-            raise NotFound(f"Unable to Find Citation '{ citation_str }'")
+            raise NotFound(f"Citation not found: '{ citation_str }'")
 
         return self._show_paginated_response(request, clusters)
 
@@ -130,7 +126,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
         Generates a paginated HTTP response containing opinion clusters.
 
         This method takes a queryset of opinion clusters and an HTTP request
-        object.It then paginates the queryset based on the request parameters
+        object. It then paginates the queryset based on the request parameters
         and returns an appropriate HTTP response containing the paginated data.
 
         Args:
