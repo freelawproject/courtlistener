@@ -44,13 +44,13 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
             if not citations:
                 raise NotFound(f"No citations found in 'text_citation'.")
 
-            if citations[0].groups:
-                c = citations[0]
-                self.reporter = slugify(c.groups["reporter"])
-                self.volume = c.groups["volume"]
-                self.page = c.groups["page"]
-            else:
+            if not citations[0].groups:
                 raise ValidationError({"text_citation": ["Invalid citation."]})
+
+            c = citations[0]
+            self.reporter = c.groups["reporter"]
+            self.volume = c.groups["volume"]
+            self.page = c.groups["page"]
 
         self.reporter_slug = slugify(self.reporter)
 
