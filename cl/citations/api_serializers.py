@@ -12,6 +12,7 @@ class CitationRequestSerializer(serializers.Serializer):
         reporter = data.get("reporter")
         text_citation = data.get("text_citation")
         volume = data.get("volume")
+        page = data.get("citation_page")
         citation_or_reporter_provided = any([reporter, text_citation])
 
         # make sure users provide either a reporter or a text citation.
@@ -34,9 +35,14 @@ class CitationRequestSerializer(serializers.Serializer):
                 }
             )
 
-        # Make sure users provide a volume when they use the reporter
-        # field to lookup citations.
-        if reporter and not volume:
-            raise ValidationError({"volume": ["This field is required."]})
+        # Make sure users provide a volume and a page when they use the
+        # reporter field to look up citations.
+        if reporter and not all([volume, page]):
+            errors = {}
+            if not volume:
+                errors["volume"] = ["This field is required."]
+            if not page:
+                errors["citation_page"] = ["This field is required."]
+            raise ValidationError(errors)
 
         return data
