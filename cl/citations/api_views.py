@@ -5,7 +5,6 @@ from asgiref.sync import async_to_sync
 from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.template.defaultfilters import slugify
-from reporters_db import EDITIONS
 from rest_framework.exceptions import NotFound
 from rest_framework.mixins import ListModelMixin
 from rest_framework.request import Request
@@ -15,14 +14,10 @@ from rest_framework.viewsets import GenericViewSet
 from cl.api.pagination import MediumAdjustablePagination
 from cl.citations.api_serializers import CitationRequestSerializer
 from cl.citations.exceptions import MultipleChoices
-from cl.citations.utils import get_canonicals_from_reporter
+from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
 from cl.search.api_serializers import OpinionClusterSerializer
 from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
-
-SLUGIFIED_EDITIONS: dict[str, str] = {
-    str(slugify(item)): item for item in EDITIONS.keys()
-}
 
 
 class CitationLookupViewSet(ListModelMixin, GenericViewSet):
