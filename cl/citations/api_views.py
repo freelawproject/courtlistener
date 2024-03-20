@@ -68,10 +68,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
         if not proper_reporter:
             proper_reporter = self._attempt_reporter_variation()
 
-        if proper_reporter and self.volume and self.page:
-            return self._citation_handler(request, proper_reporter)
-        else:
-            return self._reporter_volume_handler(request, proper_reporter)
+        return self._citation_handler(request, proper_reporter)
 
     def _attempt_reporter_variation(self) -> str:
         """Try to disambiguate an unknown reporter using the variations dict.
@@ -130,43 +127,6 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
             raise NotFound(f"Unable to Find Citation '{ citation_str }'")
 
         return self._show_paginated_response(request, clusters)
-
-    def _reporter_volume_handler(
-        self, request: Request, reporter: str
-    ) -> HttpResponse:
-        """
-        Handles requests to retrieve opinions based on a reporter-volume
-        combination.
-
-        Args:
-            request (Request): The HTTP object containing information
-                about the request.
-            reporter (str): The name of the reporter.
-
-        Returns:
-            A response object containing the list of opinions for the
-            reporter-volume dyad.
-
-        Raises:
-            NotFound: If the reporter name is invalid or the reporter-volume
-                combination doesn't match any opinion clusters.
-        """
-        root_reporter = EDITIONS.get(reporter)
-        if not root_reporter:
-            raise NotFound(
-                f"Unable to find Reporter with abbreviation of '{reporter}'"
-            )
-
-        cases_in_volume = OpinionCluster.objects.filter(
-            citations__reporter=reporter, citations__volume=self.volume
-        ).order_by("date_filed")
-
-        if not cases_in_volume.exists():
-            raise NotFound(
-                f"Unable to Find any Citations for { self.volume } ( {reporter} )"
-            )
-
-        return self._show_paginated_response(request, cases_in_volume)
 
     def _show_paginated_response(
         self, request: Request, clusters: QuerySet[OpinionCluster]

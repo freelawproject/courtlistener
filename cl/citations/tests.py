@@ -1766,6 +1766,10 @@ class CitationLookUpApiTest(
             "This field is required",
             j["volume"][0],
         )
+        self.assertIn(
+            "This field is required",
+            j["citation_page"][0],
+        )
 
     async def test_can_handle_random_text_as_a_text_citation(self):
         r = await self.async_client.get(
@@ -1808,7 +1812,7 @@ class CitationLookUpApiTest(
             {
                 "reporter": "bad-reporter",
                 "volume": "1",
-                "page": "1",
+                "citation_page": "1",
             },
         )
         j = json.loads(r.content)
@@ -1824,7 +1828,7 @@ class CitationLookUpApiTest(
             {
                 "reporter": "bailey",
                 "volume": "1",
-                "page": "1",
+                "citation_page": "1",
             },
         )
         j = json.loads(r.content)
@@ -1841,41 +1845,15 @@ class CitationLookUpApiTest(
             {
                 "reporter": "f2d",
                 "volume": "1",
-                "page": "asdf",
+                "citation_page": "asdf",
             },
         )
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
         self.assertIn(
-            "Unable to Find any Citations",
+            "Unable to Find Citation",
             j["detail"],
         )
-
-    async def test_returns_all_clusters_that_match_reporter_and_volume(self):
-        r = await self.async_client.get(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"reporter": "f2d", "volume": "56"},
-        )
-
-        j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_300_MULTIPLE_CHOICES)
-        self.assertEqual(j["count"], 2)
-
-    @patch(
-        "cl.citations.api_views.MediumAdjustablePagination.page_size",
-        new_callable=PropertyMock,
-        return_value=1,
-    )
-    async def test_return_paginated_body(self, pagination_mock):
-        r = await self.async_client.get(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"reporter": "f2d", "volume": "56"},
-        )
-
-        j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_300_MULTIPLE_CHOICES)
-        self.assertEqual(j["count"], 2)
-        self.assertIsNotNone(j["next"])
 
     async def test_can_match_citation_with_reporter_volume_page(self):
         r = await self.async_client.get(
@@ -1919,14 +1897,6 @@ class CitationLookUpApiTest(
         self.assertEqual(data["count"], 1)
 
         # Introduce a space into the reporter
-        r = await self.async_client.get(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"reporter": "f 2d", "volume": "56"},
-        )
-        data = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_300_MULTIPLE_CHOICES)
-        self.assertEqual(data["count"], 2)
-
         r = await self.async_client.get(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f 2d", "volume": "56", "citation_page": "9"},
