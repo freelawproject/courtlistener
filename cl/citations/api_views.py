@@ -7,9 +7,10 @@ from django.http import HttpResponse
 from django.template.defaultfilters import slugify
 from reporters_db import EDITIONS
 from rest_framework.exceptions import NotFound
-from rest_framework.generics import GenericAPIView
+from rest_framework.mixins import ListModelMixin
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
 
 from cl.api.pagination import MediumAdjustablePagination
 from cl.citations.api_serializers import CitationRequestSerializer
@@ -24,12 +25,12 @@ SLUGIFIED_EDITIONS: dict[str, str] = {
 }
 
 
-class CitationLookupView(GenericAPIView):
+class CitationLookupViewSet(ListModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
     pagination_class = MediumAdjustablePagination
     serializer = OpinionClusterSerializer
 
-    def get(self, request: Request, *args, **kwargs) -> HttpResponse:
+    def list(self, request: Request, *args, **kwargs) -> HttpResponse:
         query = request.query_params
 
         # Uses the serializer to perform object level validations
