@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from datetime import timedelta
+from http import HTTPStatus
 from typing import Any
 
 from asgiref.sync import sync_to_async
@@ -15,7 +16,6 @@ from django.template import loader
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
-from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
 from cl.disclosures.models import (
@@ -441,5 +441,5 @@ async def ratelimited(
         request,
         "429.html",
         {"private": True},
-        status=HTTP_429_TOO_MANY_REQUESTS,
+        status=HTTPStatus.TOO_MANY_REQUESTS,
     )

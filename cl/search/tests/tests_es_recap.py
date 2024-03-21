@@ -2,6 +2,7 @@ import datetime
 import math
 import re
 import unittest
+from http import HTTPStatus
 from unittest import mock
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -12,7 +13,6 @@ from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from lxml import etree, html
-from rest_framework.status import HTTP_200_OK
 
 from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
 from cl.lib.redis_utils import get_redis_interface
@@ -439,12 +439,12 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             reverse("show_results"),
             {"type": SEARCH_TYPES.RECAP, "document_number": "1"},
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         r = await self.async_client.get(
             reverse("show_results"),
             {"type": SEARCH_TYPES.RECAP, "attachment_number": "1"},
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_case_name_filter(self) -> None:
         """Confirm case_name filter works properly"""

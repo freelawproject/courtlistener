@@ -4,6 +4,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from http import HTTPStatus
 from multiprocessing import process
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
@@ -38,10 +39,6 @@ from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.cookies import RequestsCookieJar
 from requests.packages.urllib3.exceptions import ReadTimeoutError
-from rest_framework.status import (
-    HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_504_GATEWAY_TIMEOUT,
-)
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.api.webhooks import send_recap_fetch_webhooks
@@ -1548,8 +1545,8 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
     except HTTPError as exc:
         msg = "Failed to get attachment page from network."
         if exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
             if self.request.retries == self.max_retries:
                 mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)

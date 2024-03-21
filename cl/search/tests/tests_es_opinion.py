@@ -1,4 +1,5 @@
 import datetime
+from http import HTTPStatus
 from unittest import mock
 
 from asgiref.sync import sync_to_async
@@ -13,7 +14,6 @@ from django.urls import reverse
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
-from rest_framework.status import HTTP_200_OK
 
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -879,7 +879,7 @@ class OpinionsESSearchTest(
             r = await self.async_client.get(reverse("show_results"), param)
             self.assertEqual(
                 r.status_code,
-                HTTP_200_OK,
+                HTTPStatus.OK,
                 msg=f"Didn't get good status code with params: {param}",
             )
 
@@ -1192,7 +1192,7 @@ class RelatedSearchTest(
         )
 
         r = self.client.get(reverse("show_results"), params)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
         self.assertEqual(expected_article_count, self.get_article_count(r))
         self.assertTrue(
