@@ -2,8 +2,9 @@ import itertools
 import json
 from dataclasses import dataclass
 from datetime import date, timedelta
+from http import HTTPStatus
 from typing import List, Tuple
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import Mock
 
 from django.core.management import call_command
 from django.test import AsyncClient
@@ -19,12 +20,6 @@ from eyecite.test_factories import (
 )
 from factory import RelatedFactory
 from lxml import etree
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_300_MULTIPLE_CHOICES,
-    HTTP_400_BAD_REQUEST,
-    HTTP_404_NOT_FOUND,
-)
 
 from cl.citations.annotate_citations import (
     create_cited_html,
@@ -1749,7 +1744,7 @@ class CitationLookUpApiTest(
             reverse("citation-lookup-list", kwargs={"version": "v3"})
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIn(
             "Either 'text_citation' or 'reporter' is required",
             j["non_field_errors"][0],
@@ -1761,7 +1756,7 @@ class CitationLookUpApiTest(
             {"reporter": "ark"},
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIn(
             "This field is required",
             j["volume"][0],
@@ -1777,7 +1772,7 @@ class CitationLookUpApiTest(
             {"text_citation": "this is a text"},
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
         self.assertIn(
             "No citations found in 'text_citation'",
             j["detail"],
@@ -1789,7 +1784,7 @@ class CitationLookUpApiTest(
             {"text_citation": "Maryland Code, Criminal Law § 11-208"},
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIn("Invalid citation", j["text_citation"][0])
 
         r = await self.async_client.get(
@@ -1797,7 +1792,7 @@ class CitationLookUpApiTest(
             {"text_citation": "§ 97-29-63"},
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIn("Invalid citation", j["text_citation"][0])
 
     async def test_can_handle_invalid_reporter(self):
@@ -1810,7 +1805,7 @@ class CitationLookUpApiTest(
             },
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
         self.assertIn(
             "Unable to find reporter with abbreviation of 'bad-reporter'",
             j["detail"],
@@ -1826,7 +1821,7 @@ class CitationLookUpApiTest(
             },
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_300_MULTIPLE_CHOICES)
+        self.assertEqual(r.status_code, HTTPStatus.MULTIPLE_CHOICES)
         self.assertIn(
             "Found more than one possible reporter for 'bailey'",
             j["detail"],
@@ -1843,7 +1838,7 @@ class CitationLookUpApiTest(
             },
         )
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
         self.assertIn(
             "Citation not found:",
             j["detail"],
@@ -1855,7 +1850,7 @@ class CitationLookUpApiTest(
             {"reporter": "f2d", "volume": "56", "citation_page": "9"},
         )
 
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
         cluster_data = data["results"][0]
         self.assertEqual(data["count"], 1)
@@ -1872,7 +1867,7 @@ class CitationLookUpApiTest(
             {"reporter": "f2d", "volume": "56", "citation_page": "10"},
         )
 
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
         cluster_data = data["results"][0]
         self.assertEqual(data["count"], 1)
@@ -1887,7 +1882,7 @@ class CitationLookUpApiTest(
             {"reporter": "F2d", "volume": "56", "citation_page": "9"},
         )
         data = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(data["count"], 1)
 
         # Introduce a space into the reporter
@@ -1896,7 +1891,7 @@ class CitationLookUpApiTest(
             {"reporter": "f 2d", "volume": "56", "citation_page": "9"},
         )
         data = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(data["count"], 1)
 
     async def test_can_handle_full_citation_within_text(self) -> None:
@@ -1910,7 +1905,7 @@ class CitationLookUpApiTest(
             },
         )
 
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
         cluster_data = data["results"][0]
         self.assertEqual(data["count"], 1)
