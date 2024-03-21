@@ -1,5 +1,6 @@
 import json
 from datetime import date, timedelta
+from http import HTTPStatus
 from typing import Any, Dict
 from unittest import mock
 
@@ -14,7 +15,6 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
-from rest_framework.status import HTTP_200_OK, HTTP_403_FORBIDDEN
 from rest_framework.test import APIRequestFactory
 
 from cl.api.factories import WebhookEventFactory, WebhookFactory
@@ -239,9 +239,9 @@ class ApiQueryCountTests(TransactionTestCase):
     def test_recap_api_required_filter(self) -> None:
         path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
         r = self.client.get(path, {"pacer_doc_id": "17711118263"})
-        self.assertEqual(HTTP_200_OK, r.status_code)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         r = self.client.get(path, {"pacer_doc_id__in": "17711118263,asdf"})
-        self.assertEqual(HTTP_200_OK, r.status_code)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
 class ApiEventCreationTestCase(TestCase):
@@ -985,7 +985,7 @@ class DRFRecapPermissionTest(TestCase):
         for path in self.paths:
             print(f"Access allowed to recap user at: {path}... ", end="")
             r = await self.async_client.get(path)
-            self.assertEqual(r.status_code, HTTP_200_OK)
+            self.assertEqual(r.status_code, HTTPStatus.OK)
             print("✓")
 
     async def test_lacks_access(self) -> None:
@@ -998,7 +998,7 @@ class DRFRecapPermissionTest(TestCase):
         for path in self.paths:
             print(f"Access denied to non-recap user at: {path}... ", end="")
             r = await self.async_client.get(path)
-            self.assertEqual(r.status_code, HTTP_403_FORBIDDEN)
+            self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
             print("✓")
 
 
@@ -1046,7 +1046,7 @@ class WebhooksProxySecurityTest(TestCase):
         self.assertIn("IP 127.0.0.1 is blocked", webhook_event.response)
         self.assertEqual(
             webhook_event.status_code,
-            HTTP_403_FORBIDDEN,
+            HTTPStatus.FORBIDDEN,
         )
 
         webhook_event_2 = WebhookEventFactory(
@@ -1064,7 +1064,7 @@ class WebhooksProxySecurityTest(TestCase):
         self.assertIn("IP 127.0.0.1 is blocked", webhook_event_2.response)
         self.assertEqual(
             webhook_event_2.status_code,
-            HTTP_403_FORBIDDEN,
+            HTTPStatus.FORBIDDEN,
         )
 
         webhook_event_3 = WebhookEventFactory(
@@ -1082,7 +1082,7 @@ class WebhooksProxySecurityTest(TestCase):
         self.assertIn("IP 0.0.0.0 is blocked", webhook_event_3.response)
         self.assertEqual(
             webhook_event_3.status_code,
-            HTTP_403_FORBIDDEN,
+            HTTPStatus.FORBIDDEN,
         )
 
 

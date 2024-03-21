@@ -2,6 +2,7 @@
 Unit tests for Visualizations
 """
 
+from http import HTTPStatus
 from typing import Any, Callable, Dict
 
 from asgiref.sync import sync_to_async
@@ -11,13 +12,6 @@ from django.core.handlers.asgi import ASGIRequest
 from django.test import AsyncRequestFactory
 from django.urls import reverse
 from httplib2 import Response
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,
-    HTTP_403_FORBIDDEN,
-    HTTP_404_NOT_FOUND,
-)
 
 from cl.search.models import OpinionCluster
 from cl.tests.cases import APITestCase, TestCase
@@ -217,8 +211,8 @@ class TestViews(TestCase):
         response = await self.async_client.get(url)
         self.assertEqual(
             response.status_code,
-            HTTP_200_OK,
-            msg=f"Didn't get {HTTP_200_OK}, got {response.status_code}, with HTML:\n{response.content.decode()}",
+            HTTPStatus.OK,
+            msg=f"Didn't get {HTTPStatus.OK}, got {response.status_code}, with HTML:\n{response.content.decode()}",
         )
         self.assertIn("My Private Visualization", response.content.decode())
 
@@ -230,7 +224,7 @@ class TestViews(TestCase):
             )
         )
         response = await self.async_client.get(url)
-        self.assertNotEqual(response.status_code, HTTP_200_OK)
+        self.assertNotEqual(response.status_code, HTTPStatus.OK)
         self.assertNotIn("My Private Visualization", response.content.decode())
 
     async def test_view_counts_increment_by_one(self) -> None:
@@ -442,7 +436,7 @@ class APIVisualizationTestCase(APITestCase):
         }
         response = await self.client.post(self.path, data, format="json")
         res = response.json()
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(res["title"][0], "This field may not be blank.")
 
     async def test_no_cluster_start_visualization_post(self) -> None:
@@ -455,7 +449,7 @@ class APIVisualizationTestCase(APITestCase):
         }
         response = await self.client.post(self.path, data, format="json")
         res = response.json()
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(
             res["cluster_start"][0], "This field may not be null."
         )
@@ -470,7 +464,7 @@ class APIVisualizationTestCase(APITestCase):
         }
         response = await self.client.post(self.path, data, format="json")
         res = response.json()
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(res["cluster_end"][0], "This field may not be null.")
 
     async def test_invalid_cluster_start_visualization_post(self) -> None:
@@ -487,8 +481,8 @@ class APIVisualizationTestCase(APITestCase):
         res = response.json()
         self.assertEqual(
             response.status_code,
-            HTTP_400_BAD_REQUEST,
-            msg=f"Got {response.status_code} instead of {HTTP_400_BAD_REQUEST}. JSON was:\n{res}",
+            HTTPStatus.BAD_REQUEST,
+            msg=f"Got {response.status_code} instead of {HTTPStatus.BAD_REQUEST}. JSON was:\n{res}",
         )
         self.assertEqual(
             res["cluster_start"][0],
@@ -498,7 +492,7 @@ class APIVisualizationTestCase(APITestCase):
     async def test_valid_visualization_post(self) -> None:
         title = "My Valid Visualization"
         response = await self.make_good_visualization(title)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
         res = response.json()
         self.assertEqual(res["title"], title)
 
@@ -528,13 +522,13 @@ class APIVisualizationTestCase(APITestCase):
         response = await self.client.patch(
             path, {"published": True}, format="json"
         )
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
         # Try to edit it as a different user; should fail
         response = await self.rando_client.patch(
             path, {"published": True}, format="json"
         )
-        self.assertEqual(response.status_code, HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
 
     async def test_json_data_permissions(self) -> None:
         """Are non-owners rejected from editing JSON data?"""
@@ -547,23 +541,23 @@ class APIVisualizationTestCase(APITestCase):
         response = await self.client.patch(
             json_path, {"json_data": "immaterial"}, format="json"
         )
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
         # Try to edit the JSON as different user, while private; should fail;
         # user shouldn't know it exists.
         response = await self.rando_client.patch(
             json_path, {"json_data": "immaterial"}, format="json"
         )
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
         # Try to edit the JSON as different user, while public; should fail
         # Make it public
         response = await self.client.patch(
             vis_path, {"published": True}, format="json"
         )
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         # Try to patch it as a random user
         response = await self.rando_client.patch(
             json_path, {"json_data": "immaterial"}, format="json"
         )
-        self.assertEqual(response.status_code, HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
