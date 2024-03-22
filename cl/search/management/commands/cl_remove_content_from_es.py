@@ -90,6 +90,19 @@ class Command(VerboseCommand):
             action="store_true",
             help="Use this flag only when running the command in tests based on TestCase",
         )
+        parser.add_argument(
+            "--max-docs",
+            type=int,
+            default="0",
+            help="The max number of documents to process. Default to 0 means no limit.",
+        )
+        parser.add_argument(
+            "--requests-per-second",
+            type=int,
+            default="8",
+            help="The max number of sub-requests per second for a removal operation. "
+            "Defaults to 8",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -101,6 +114,8 @@ class Command(VerboseCommand):
 
         chunk_size = self.options["chunk_size"]
         auto_resume = options.get("auto_resume", False)
+        max_docs = options.get("max_docs", 0)
+        requests_per_second = options.get("requests_per_second")
 
         pk_offset = 0
         if auto_resume:
@@ -130,6 +145,8 @@ class Command(VerboseCommand):
                     start_date=start_date,
                     end_date=end_date,
                     testing_mode=testing_mode,
+                    requests_per_second=requests_per_second,
+                    max_docs=max_docs,
                 )
                 logger.info(
                     f"Removal task successfully scheduled. Task ID: {response}"

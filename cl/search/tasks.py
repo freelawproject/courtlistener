@@ -1625,6 +1625,8 @@ def remove_documents_by_query(
     start_date: date | None = None,
     end_date: date | None = None,
     testing_mode: bool = False,
+    requests_per_second: int | None = None,
+    max_docs: int = 0,
 ) -> None | dict[str, str]:
     """Remove documents from ES by query.
 
@@ -1638,6 +1640,9 @@ def remove_documents_by_query(
     :param start_date: Optional, the start date of the date range for document deletion.
     :param end_date: Optional, the end date of the date range for document deletion.
     :param testing_mode: Optional, if True, performs the removal synchronously.
+    :param requests_per_second: Optional, the target number of sub-requests per
+    second for a delete by query operation.
+    :param max_docs: Optional, maximum number of documents to process.
     :return: The ES request response, or None for unsupported removal actions.
     """
 
@@ -1664,9 +1669,19 @@ def remove_documents_by_query(
             if not testing_mode:
                 # Execute the task asynchronously.
                 optional_params.update({"wait_for_completion": "false"})
+            if max_docs:
+                optional_params.update({"max_docs": max_docs})
+            if requests_per_second:
+                optional_params.update(
+                    {"requests_per_second": requests_per_second}
+                )
         case _:
             # Abort DeleteByQuery request for a not supported document type.
             return None
+
+    if not testing_mode:
+        # Ignore ConflictErrors, by proceeding with the deletion.
+        optional_params.update({"conflicts": "proceed"})
 
     client = connections.get_connection(alias="no_retry_connection")
     response = client.delete_by_query(
