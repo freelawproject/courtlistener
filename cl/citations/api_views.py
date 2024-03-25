@@ -6,8 +6,9 @@ from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound
 from rest_framework.mixins import CreateModelMixin
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -22,6 +23,7 @@ from cl.search.selectors import get_clusters_from_citation_str
 class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
     serializer = OpinionClusterSerializer
+    permission_classes = (AllowAny,)
 
     def create(self, request: Request, *args, **kwargs):
         # Uses the serializer to perform object level validations
