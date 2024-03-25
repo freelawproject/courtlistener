@@ -6,6 +6,7 @@ from http import HTTPStatus
 from typing import List, Tuple
 from unittest.mock import Mock
 
+from asgiref.sync import sync_to_async
 from django.core.management import call_command
 from django.test import AsyncClient
 from django.urls import reverse
@@ -1740,7 +1741,7 @@ class CitationLookUpApiTest(
         self.async_client = AsyncClient()
 
     async def test_can_handle_requests_with_no_citation_or_reporter(self):
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"})
         )
         j = json.loads(r.content)
@@ -1751,7 +1752,7 @@ class CitationLookUpApiTest(
         )
 
     async def test_can_handle_requests_with_only_reporter(self):
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "ark"},
         )
@@ -1763,11 +1764,11 @@ class CitationLookUpApiTest(
         )
         self.assertIn(
             "This field is required",
-            j["citation_page"][0],
+            j["page"][0],
         )
 
     async def test_can_handle_random_text_as_a_text_citation(self):
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text_citation": "this is a text"},
         )
@@ -1779,137 +1780,267 @@ class CitationLookUpApiTest(
         )
 
     async def test_can_handle_invalid_text_citations(self):
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text_citation": "Maryland Code, Criminal Law § 11-208"},
-        )
-        j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
-        self.assertIn("Invalid citation", j["text_citation"][0])
-
-        r = await self.async_client.get(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"text_citation": "§ 97-29-63"},
-        )
-        j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
-        self.assertIn("Invalid citation", j["text_citation"][0])
-
-    async def test_can_handle_invalid_reporter(self):
-        r = await self.async_client.get(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {
-                "reporter": "bad-reporter",
-                "volume": "1",
-                "citation_page": "1",
-            },
-        )
-        j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
-        self.assertIn(
-            "Unable to find reporter with abbreviation of 'bad-reporter'",
-            j["detail"],
-        )
-
-    async def test_can_handle_ambiguous_reporter_variations(self) -> None:
-        r = await self.async_client.get(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {
-                "reporter": "bailey",
-                "volume": "1",
-                "citation_page": "1",
-            },
-        )
-        j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTPStatus.MULTIPLE_CHOICES)
-        self.assertIn(
-            "Found more than one possible reporter for 'bailey'",
-            j["detail"],
-        )
-
-    async def test_can_handle_invalid_page_number(self) -> None:
-        """Do we fail gracefully with invalid page numbers?"""
-        r = await self.async_client.get(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {
-                "reporter": "f2d",
-                "volume": "1",
-                "citation_page": "asdf",
-            },
-        )
-        j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
-        self.assertIn(
-            "Citation not found:",
-            j["detail"],
-        )
-
-    async def test_can_match_citation_with_reporter_volume_page(self):
-        r = await self.async_client.get(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"reporter": "f2d", "volume": "56", "citation_page": "9"},
         )
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
-        cluster_data = data["results"][0]
-        self.assertEqual(data["count"], 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["status"], HTTPStatus.BAD_REQUEST)
+        self.assertIn("Invalid citation", first_citation["error_message"])
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text_citation": "§ 97-29-63"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["status"], HTTPStatus.BAD_REQUEST)
+        self.assertIn("Invalid citation", first_citation["error_message"])
+
+    async def test_can_handle_invalid_reporter(self):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {
+                "reporter": "bad-reporter",
+                "volume": "1",
+                "page": "1",
+            },
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
         self.assertEqual(
-            cluster_data["absolute_url"],
+            first_citation["citation"],
+            "1 bad-reporter 1",
+        )
+        self.assertEqual(first_citation["status"], HTTPStatus.NOT_FOUND)
+        self.assertEqual(
+            first_citation["error_message"],
+            "Unable to find reporter with abbreviation of 'bad-reporter'",
+        )
+
+    async def test_can_handle_ambiguous_reporter_variations(self) -> None:
+
+        handy_citation = await sync_to_async(
+            CitationWithParentsFactory.create
+        )(volume=1, reporter="Handy", page="150", type=1)
+        haw_citation = await sync_to_async(CitationWithParentsFactory.create)(
+            volume=1, reporter="Haw.", page="150", type=1
+        )
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {
+                "reporter": "H.",
+                "volume": "1",
+                "page": "150",
+            },
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "1 H. 150")
+        self.assertEqual(first_citation["status"], HTTPStatus.MULTIPLE_CHOICES)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 2)
+        for cluster in clusters:
+            self.assertIn(
+                cluster["absolute_url"],
+                [
+                    handy_citation.cluster.get_absolute_url(),
+                    haw_citation.cluster.get_absolute_url(),
+                ],
+            )
+
+    async def test_can_handle_invalid_page_number(self) -> None:
+        """Do we fail gracefully with invalid page numbers?"""
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {
+                "reporter": "f2d",
+                "volume": "1",
+                "page": "asdf",
+            },
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "1 f2d asdf")
+        self.assertEqual(first_citation["status"], HTTPStatus.NOT_FOUND)
+        self.assertIn("Citation not found:", first_citation["error_message"])
+
+    async def test_can_match_citation_with_reporter_volume_page(self):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"reporter": "f2d", "volume": "56", "page": "9"},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 f2d 9")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
             self.opinion_cluster_2.get_absolute_url(),
         )
 
         # Here opinion cluster 2 has the citation 56 F.2d 9, but the
         # HTML with citations contains star pagination for pages 9 and 10.
         # This tests if we can find opinion cluster 2 with page 9 and 10
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"reporter": "f2d", "volume": "56", "citation_page": "10"},
+            {"reporter": "f2d", "volume": "56", "page": "10"},
         )
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
-        cluster_data = data["results"][0]
-        self.assertEqual(data["count"], 1)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 f2d 10")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
         self.assertEqual(
-            cluster_data["absolute_url"],
+            clusters[0]["absolute_url"],
             self.opinion_cluster_2.get_absolute_url(),
         )
 
-    async def test_can_handle_reporter_variations(self):
-        r = await self.async_client.get(
+    async def test_can_handle_reporter_typos(self):
+        r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"reporter": "F2d", "volume": "56", "citation_page": "9"},
+            {"reporter": "F2d", "volume": "56", "page": "9"},
         )
-        data = json.loads(r.content)
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertEqual(data["count"], 1)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 F2d 9")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
+            self.opinion_cluster_2.get_absolute_url(),
+        )
 
         # Introduce a space into the reporter
-        r = await self.async_client.get(
+        r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"reporter": "f 2d", "volume": "56", "citation_page": "9"},
+            {"reporter": "f 2d", "volume": "56", "page": "9"},
         )
-        data = json.loads(r.content)
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertEqual(data["count"], 1)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 f 2d 9")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
+            self.opinion_cluster_2.get_absolute_url(),
+        )
 
     async def test_can_handle_full_citation_within_text(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
-
-        r = await self.async_client.get(
+        text_citation = (
+            "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)"
+        )
+        r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {
-                "text_citation": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)"
-            },
+            {"text_citation": text_citation},
         )
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
-        cluster_data = data["results"][0]
-        self.assertEqual(data["count"], 1)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
         self.assertEqual(
-            cluster_data["absolute_url"],
+            first_citation["citation"],
+            "56 F.2d 9",
+        )
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+        self.assertEqual(first_citation["start_index"], 30)
+        self.assertEqual(first_citation["end_index"], 39)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
             self.opinion_cluster_2.get_absolute_url(),
         )
+
+    async def test_can_extract_all_citations_within_text(self) -> None:
+        la_rue_citation = await sync_to_async(
+            CitationWithParentsFactory.create
+        )(volume=139, reporter="U.S.", page="601", type=1)
+
+        text_citation = (
+            "the majority of the court was of opinion that the transfer of the "
+            "Martin device to windmills for the purpose named in the patent "
+            "involved invention within the cases of the Western Electric Co. v. "
+            "La Rue, 139 U.S. 601; Crane v. Price, Webster's Pat. Cases, 393, "
+            "and Potts v. Creager, 155 U.S. 597."
+        )
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text_citation": text_citation},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        # the response should include two citations ("139 U.S. 601"
+        # and "155 U.S. 597")
+        self.assertEqual(len(data), 2)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "139 U.S. 601")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+        self.assertEqual(first_citation["start_index"], 204)
+        self.assertEqual(first_citation["end_index"], 216)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"], la_rue_citation.get_absolute_url()
+        )
+
+        second_citation = data[1]
+        self.assertEqual(second_citation["citation"], "155 U.S. 597")
+        self.assertEqual(second_citation["status"], HTTPStatus.NOT_FOUND)
+        self.assertEqual(second_citation["start_index"], 283)
+        self.assertEqual(second_citation["end_index"], 295)
+
+        clusters = second_citation["clusters"]
+        self.assertEqual(len(clusters), 0)
