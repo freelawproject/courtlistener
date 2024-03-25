@@ -94,7 +94,6 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         if not proper_reporter:
             proper_reporter = self._attempt_reporter_variation()
 
-        clusters, cluster_count = None, 9
         if isinstance(proper_reporter, str):
             # We retrieved the proper_reporter directly from the
             # SLUGIFIED_EDITIONS dictionary.
@@ -102,25 +101,60 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                 get_clusters_from_citation_str
             )(proper_reporter, str(self.volume), self.page)
         else:
-            for canonical in proper_reporter:
-                _reporter = SLUGIFIED_EDITIONS.get(canonical, None)
-                if not _reporter:
-                    continue
-
-                opinions, _count = async_to_sync(
-                    get_clusters_from_citation_str
-                )(_reporter, str(self.volume), self.page)
-
-                if not _count:
-                    continue
-
-                clusters = clusters | opinions if clusters else opinions
-                cluster_count += _count
+            clusters, cluster_count = self._get_clusters_for_canonical_list(
+                proper_reporter
+            )
 
         if cluster_count == 0:
             raise NotFound(f"Citation not found: '{ citation_str }'")
 
         return self._show_response(request, clusters)
+
+    def _get_clusters_for_canonical_list(
+        self, reporters: list[SafeString]
+    ) -> tuple[QuerySet[OpinionCluster] | None, int]:
+        """
+        Retrieves opinion clusters associated with a list of reporter slugs.
+
+        This method takes a list of reporter variations (as slugs) and attempts
+        to find all associated opinion clusters.
+
+        Args:
+            reporters (list[str]): A list of strings representing the reporter
+            slugs.
+
+        Returns:
+            A tuple containing two elements:
+                - A list of the matching opinion clusters.
+                - An integer representing the total number of matching opinion
+                clusters found for the given reporters.
+        """
+        clusters, cluster_count = None, 0
+        for canonical in reporters:
+            reporter = SLUGIFIED_EDITIONS.get(canonical, None)
+            if not reporter:
+                continue
+
+            opinions, _count = async_to_sync(get_clusters_from_citation_str)(
+                reporter, str(self.volume), self.page
+            )
+
+            if not _count:
+                continue
+
+            clusters = clusters | opinions if clusters else opinions
+            cluster_count += _count
+
+            opinions, _count = async_to_sync(get_clusters_from_citation_str)(
+                reporter, str(self.volume), self.page
+            )
+
+            if not _count:
+                continue
+
+            clusters = clusters | opinions if clusters else opinions
+            cluster_count += _count
+        return clusters, cluster_count
 
     def _show_response(
         self, request: Request, clusters: QuerySet[OpinionCluster]
