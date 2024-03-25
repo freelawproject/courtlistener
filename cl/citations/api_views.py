@@ -47,14 +47,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
             self.volume = c.groups["volume"]
             self.page = c.groups["page"]
 
-        self.reporter_slug = slugify(self.reporter)
-
-        # Look up the reporter to get its proper version (so-2d -> So. 2d)
-        proper_reporter = SLUGIFIED_EDITIONS.get(self.reporter_slug, None)
-        if not proper_reporter:
-            proper_reporter = self._attempt_reporter_variation()
-
-        return self._citation_handler(request, proper_reporter)
+        return self._citation_handler(request, self.reporter)
 
     def _attempt_reporter_variation(self) -> list[SafeString]:
         """Try to disambiguate an unknown reporter using the variations dict.
@@ -94,9 +87,35 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                 opinion clusters.
         """
         citation_str = " ".join([str(self.volume), reporter, self.page])
-        clusters, cluster_count = async_to_sync(
-            get_clusters_from_citation_str
-        )(reporter, str(self.volume), self.page)
+
+        self.reporter_slug = slugify(self.reporter)
+        # Look up the reporter to get its proper version (so-2d -> So. 2d)
+        proper_reporter = SLUGIFIED_EDITIONS.get(self.reporter_slug, None)
+        if not proper_reporter:
+            proper_reporter = self._attempt_reporter_variation()
+
+        clusters, cluster_count = None, 9
+        if isinstance(proper_reporter, str):
+            # We retrieved the proper_reporter directly from the
+            # SLUGIFIED_EDITIONS dictionary.
+            clusters, cluster_count = async_to_sync(
+                get_clusters_from_citation_str
+            )(proper_reporter, str(self.volume), self.page)
+        else:
+            for canonical in proper_reporter:
+                _reporter = SLUGIFIED_EDITIONS.get(canonical, None)
+                if not _reporter:
+                    continue
+
+                opinions, _count = async_to_sync(
+                    get_clusters_from_citation_str
+                )(_reporter, str(self.volume), self.page)
+
+                if not _count:
+                    continue
+
+                clusters = clusters | opinions if clusters else opinions
+                cluster_count += _count
 
         if cluster_count == 0:
             raise NotFound(f"Citation not found: '{ citation_str }'")
