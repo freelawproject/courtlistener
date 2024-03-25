@@ -6,7 +6,7 @@ from django.db.models import QuerySet
 from django.http import HttpResponse
 from django.template.defaultfilters import slugify
 from rest_framework.exceptions import NotFound, ValidationError
-from rest_framework.mixins import ListModelMixin
+from rest_framework.mixins import CreateModelMixin
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -18,15 +18,13 @@ from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
 from django.utils.safestring import SafeString
 
-class CitationLookupViewSet(ListModelMixin, GenericViewSet):
+class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
     serializer = OpinionClusterSerializer
 
-    def list(self, request: Request, *args, **kwargs):
-        query = request.query_params
-
+    def create(self, request: Request, *args, **kwargs):
         # Uses the serializer to perform object level validations
-        citation_serializer = CitationRequestSerializer(data=query)
+        citation_serializer = CitationRequestSerializer(data=request.data)
         citation_serializer.is_valid(raise_exception=True)
 
         # Get query parameters from the validated data
