@@ -11,7 +11,6 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from cl.api.pagination import MediumAdjustablePagination
 from cl.citations.api_serializers import CitationRequestSerializer
 from cl.citations.exceptions import MultipleChoices
 from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
@@ -22,7 +21,6 @@ from cl.search.selectors import get_clusters_from_citation_str
 
 class CitationLookupViewSet(ListModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
-    pagination_class = MediumAdjustablePagination
     serializer = OpinionClusterSerializer
 
     def list(self, request: Request, *args, **kwargs):
@@ -117,9 +115,9 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
         if cluster_count == 0:
             raise NotFound(f"Citation not found: '{ citation_str }'")
 
-        return self._show_paginated_response(request, clusters)
+        return self._show_response(request, clusters)
 
-    def _show_paginated_response(
+    def _show_response(
         self, request: Request, clusters: QuerySet[OpinionCluster]
     ) -> HttpResponse:
         """
@@ -141,18 +139,11 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
         clusters = clusters.prefetch_related(
             "sub_opinions", "panel", "non_participating_judges", "citations"
         ).order_by("-id")
-        paginator = self.pagination_class()
-        result_page = paginator.paginate_queryset(clusters, request)
         serializer = self.serializer(
-            result_page, many=True, context={"request": request}
+            clusters, many=True, context={"request": request}
         )
         return Response(
-            {
-                "count": paginator.page.paginator.count,
-                "next": paginator.get_next_link(),
-                "previous": paginator.get_previous_link(),
-                "results": serializer.data,
-            },
+            serializer.data,
             status=(
                 HTTPStatus.MULTIPLE_CHOICES
                 if clusters.count() > 1
