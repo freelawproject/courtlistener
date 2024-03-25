@@ -6,13 +6,13 @@ class CitationRequestSerializer(serializers.Serializer):
     text_citation = serializers.CharField(required=False)
     reporter = serializers.CharField(max_length=100, required=False)
     volume = serializers.IntegerField(required=False)
-    citation_page = serializers.CharField(required=False)
+    page = serializers.CharField(required=False)
 
     def validate(self, data):
         reporter = data.get("reporter")
         text_citation = data.get("text_citation")
         volume = data.get("volume")
-        page = data.get("citation_page")
+        page = data.get("page")
         citation_or_reporter_provided = any([reporter, text_citation])
 
         # make sure users provide either a reporter or a text citation.
@@ -42,7 +42,7 @@ class CitationRequestSerializer(serializers.Serializer):
             if not volume:
                 errors["volume"] = ["This field is required."]
             if not page:
-                errors["citation_page"] = ["This field is required."]
+                errors["page"] = ["This field is required."]
             raise ValidationError(errors)
 
         return data

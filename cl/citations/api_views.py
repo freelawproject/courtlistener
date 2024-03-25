@@ -34,7 +34,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
         self.full_text_citation = data.get("text_citation", None)
         self.reporter = data.get("reporter", None)
         self.volume = data.get("volume", None)
-        self.page = data.get("citation_page", None)
+        self.page = data.get("page", None)
 
         if self.full_text_citation:
             citations = eyecite.get_citations(self.full_text_citation)
