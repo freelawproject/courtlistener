@@ -12,12 +12,11 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from cl.citations.api_serializers import CitationRequestSerializer
-from cl.citations.exceptions import MultipleChoices
 from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
 from cl.search.api_serializers import OpinionClusterSerializer
 from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
-
+from django.utils.safestring import SafeString
 
 class CitationLookupViewSet(ListModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
@@ -59,13 +58,11 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
 
         return self._citation_handler(request, proper_reporter)
 
-    def _attempt_reporter_variation(self) -> str:
+    def _attempt_reporter_variation(self) -> list[SafeString]:
         """Try to disambiguate an unknown reporter using the variations dict.
 
         Raises:
             NotFound: If the unknown reporter string doesn't match a canonical.
-            MultipleChoices: If the reporter variation maps to more than one
-                            canonical reporter.
 
         Returns:
             str: canonical name for the reporter.
@@ -78,16 +75,7 @@ class CitationLookupViewSet(ListModelMixin, GenericViewSet):
                 f"Unable to find reporter with abbreviation of '{self.reporter}'"
             )
 
-        elif len(potential_canonicals) > 1:
-            # The reporter variation is ambiguous b/c it can refer to more than
-            # one reporter. Abort with a 300 status.
-            raise MultipleChoices(
-                f"Found more than one possible reporter for '{self.reporter}'"
-            )
-
-        else:
-            # Unambiguous reporter variation. Use the canonical reporter
-            return SLUGIFIED_EDITIONS.get(potential_canonicals[0], "")
+        return potential_canonicals
 
     def _citation_handler(
         self, request: Request, reporter: str
