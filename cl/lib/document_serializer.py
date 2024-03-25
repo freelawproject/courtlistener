@@ -23,6 +23,20 @@ class DateOrDateTimeField(serializers.Field):
             )
 
 
+class NullableListField(serializers.ListField):
+    """A custom ListField that returns None when serialized if the list is
+    empty. For API V3 compatibility.
+    """
+
+    def to_representation(self, data):
+        """
+        Return "None" if the list is empty, otherwise return the list.
+        """
+        if not data:
+            return None
+        return super().to_representation(data)
+
+
 class DocumentSerializer(serializers.Serializer):
     """A dynamic DocumentSerializer class."""
 

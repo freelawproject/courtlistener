@@ -558,10 +558,10 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         alert_user: UserProfile.user = alert_triggered.user
         # Set highlight if available in response.
         if hasattr(hit.meta, "highlight"):
-            merge_highlights_into_result(
-                hit.meta.highlight.to_dict(),
-                document_content_copy,
-            )
+            document_content_copy["meta"] = {}
+            document_content_copy["meta"][
+                "highlight"
+            ] = hit.meta.highlight.to_dict()
 
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.

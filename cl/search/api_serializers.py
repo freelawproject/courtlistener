@@ -6,14 +6,10 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
-from cl.lib.document_serializer import DocumentSerializer
+from cl.lib.document_serializer import DocumentSerializer, NullableListField
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
-from cl.search.documents import (
-    AudioDocument,
-    OpinionClusterDocument,
-    PersonDocument,
-)
+from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
 from cl.search.models import (
     Citation,
     Court,
@@ -370,13 +366,15 @@ class OpinionESResultSerializer(DocumentSerializer):
     type = serializers.CharField(read_only=True)
     download_url = serializers.CharField(read_only=True)
     local_path = serializers.CharField(read_only=True)
-    cites = serializers.ListField(read_only=True)
-    joined_by_ids = serializers.ListField(read_only=True)
-
+    cites = NullableListField(read_only=True)
+    joined_by_ids = NullableListField(read_only=True)
+    panel_ids = NullableListField(read_only=True)
+    sibling_ids = NullableListField(read_only=True)
+    citation = NullableListField(read_only=True)
     per_curiam = serializers.BooleanField(read_only=True)
 
     class Meta:
-        document = OpinionClusterDocument
+        document = OpinionDocument
         exclude = (
             "text",
             "caseNameFull",

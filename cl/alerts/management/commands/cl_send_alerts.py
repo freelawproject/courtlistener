@@ -20,15 +20,31 @@ from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.elasticsearch_utils import (
+    build_child_docs_query,
+    build_es_base_query,
+    build_highlights_dict,
+)
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
+from cl.search.constants import (
+    ALERTS_HL_TAG,
+    SEARCH_ALERTS_OPINION_HL_FIELDS,
+    o_type_index_map,
+)
+from cl.search.documents import OpinionDocument
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
 from cl.stats.utils import tally_stat
 
 # Only do this number of RT items at a time. If there are more, they will be
 # handled in the next run of this script.
 MAX_RT_ITEM_QUERY = 1000
+
+
+inverted_o_type_index_map = {
+    value: key for key, value in o_type_index_map.items()
+}
 
 
 def get_cut_off_date(rate, d=datetime.date.today()):
@@ -64,6 +80,10 @@ def send_alert(user_profile, hits):
 
     txt_template = loader.get_template("alert_email.txt")
     html_template = loader.get_template("alert_email.html")
+    if waffle.switch_is_active("o-es-alerts-active"):
+        txt_template = loader.get_template("alert_email_es.txt")
+        html_template = loader.get_template("alert_email_es.html")
+
     context = {"hits": hits}
     headers = {}
     query_string = ""
@@ -115,6 +135,9 @@ class Command(VerboseCommand):
         }
         self.options = {}
         self.valid_ids = {}
+        self.o_es_alerts = False
+        if waffle.switch_is_active("o-es-alerts-active"):
+            self.o_es_alerts = True
 
     def __del__(self):
         for si in self.sis.values():
@@ -142,6 +165,7 @@ class Command(VerboseCommand):
     def run_query(self, alert, rate):
         results = []
         cd = {}
+        main_params = {}
         logger.info(f"Now running the query: {alert.query}\n")
 
         # Make a dict from the query string.
@@ -164,7 +188,7 @@ class Command(VerboseCommand):
                 return query_type, results
 
         logger.info(f"Data sent to SearchForm is: {qd}\n")
-        search_form = SearchForm(qd)
+        search_form = SearchForm(qd, is_es_form=self.o_es_alerts)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 
@@ -175,38 +199,78 @@ class Command(VerboseCommand):
                 # Bail out. No results will be found if no valid_ids.
                 return query_type, results
 
-            main_params = search_utils.build_main_query(
-                cd,
-                highlight="text",  # Required to show all field as in Search API
-                facet=False,
-            )
-            main_params.update(
-                {
-                    "rows": "20",
-                    "start": "0",
-                    "hl.tag.pre": "<em><strong>",
-                    "hl.tag.post": "</strong></em>",
-                    "caller": f"cl_send_alerts:{query_type}",
-                }
-            )
+            if self.o_es_alerts:
+                search_query = OpinionDocument.search()
+                s, join_query = build_es_base_query(search_query, cd)
+                s = build_child_docs_query(
+                    join_query,
+                    cd=cd,
+                )
+                s = search_query.query(s)
+            else:
+                main_params = search_utils.build_main_query(
+                    cd,
+                    highlight="text",
+                    # Required to show all field as in Search API
+                    facet=False,
+                )
+                main_params.update(
+                    {
+                        "rows": "20",
+                        "start": "0",
+                        "hl.tag.pre": "<em><strong>",
+                        "hl.tag.post": "</strong></em>",
+                        "caller": f"cl_send_alerts:{query_type}",
+                    }
+                )
 
             if rate == Alert.REAL_TIME:
-                main_params["fq"].append(
-                    f"id:({' OR '.join([str(i) for i in self.valid_ids[query_type]])})"
-                )
+                if self.o_es_alerts:
+                    pass
+                else:
+                    main_params["fq"].append(
+                        f"id:({' OR '.join([str(i) for i in self.valid_ids[query_type]])})"
+                    )
 
-            # Ignore warnings from this bit of code. Otherwise, it complains
-            # about the query URL being too long and having to POST it instead
-            # of being able to GET it.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                results = (
-                    self.sis[query_type]
-                    .query()
-                    .add_extra(**main_params)
-                    .execute()
+            if self.o_es_alerts:
+                highlight_options, fields_to_exclude = build_highlights_dict(
+                    SEARCH_ALERTS_OPINION_HL_FIELDS, ALERTS_HL_TAG
                 )
-            regroup_snippets(results)
+                s = s.source(excludes=fields_to_exclude)
+                s = s.extra(
+                    from_=0,
+                    size=20,
+                    highlight=highlight_options,
+                    collapse={
+                        "field": "cluster_id",
+                    },
+                )
+                results = s.execute()
+                for result in results:
+                    # Map "type" and "status" fields to V3 values to ensure
+                    # backward compatibility.
+                    result["type"] = inverted_o_type_index_map.get(
+                        result["type"]
+                    )
+                    result["status"] = (
+                        PRECEDENTIAL_STATUS.get_status_value_reverse(
+                            result["status"]
+                        )
+                    )
+
+            else:
+                # Ignore warnings from this bit of code. Otherwise, it complains
+                # about the query URL being too long and having to POST it instead
+                # of being able to GET it.
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    results = (
+                        self.sis[query_type]
+                        .query()
+                        .add_extra(**main_params)
+                        .execute()
+                    )
+                regroup_snippets(results)
 
         logger.info(f"There were {len(results)} results.")
         return qd, results
@@ -242,7 +306,12 @@ class Command(VerboseCommand):
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 if len(results) > 0:
                     search_type = qd.get("type", SEARCH_TYPES.OPINION)
-                    hits.append([alert, search_type, results])
+                    if self.o_es_alerts:
+                        hits.append(
+                            [alert, search_type, results, len(results)]
+                        )
+                    else:
+                        hits.append([alert, search_type, results])
                     alert.query_run = qd.urlencode()
                     alert.date_last_hit = now()
                     alert.save()

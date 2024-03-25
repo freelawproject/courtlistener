@@ -58,11 +58,15 @@ from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
+from cl.lib.date_time import midnight_pt
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
+    CitationWithParentsFactory,
     CourtFactory,
     DocketFactory,
+    OpinionFactory,
+    OpinionsCitedWithParentsFactory,
     OpinionWithParentsFactory,
 )
 from cl.search.models import (
@@ -561,12 +565,16 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
 
 
-class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
+@override_switch("o-es-alerts-active", active=True)
+class SearchAlertsWebhooksTest(
+    ESIndexTestCase, EmptySolrTestCase
+):  # TestCase ):
     """Test Search Alerts Webhooks"""
 
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("alerts.Alert")
+        cls.rebuild_index("search.OpinionCluster")
         cls.user_profile = UserProfileWithParentsFactory()
         cls.user_profile_1 = UserProfileWithParentsFactory()
         NeonMembership.objects.create(
@@ -584,23 +592,25 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             url="https://example.com/",
             enabled=True,
         )
+        unpublished_status = PRECEDENTIAL_STATUS.UNPUBLISHED
+        # unpublished_status = "Non-Precedential"
         cls.search_alert = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert O",
-            query="type=o&stat_Non-Precedential=on",
+            query=f"q=California&type=o&stat_{unpublished_status}=on",
         )
         cls.search_alert_rt = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert O rt",
-            query="type=o&stat_Non-Precedential=on",
+            query=f"type=o&stat_{unpublished_status}=on",
         )
         cls.search_alert_rt_1 = AlertFactory(
             user=cls.user_profile_1.user,
             rate=Alert.REAL_TIME,
             name="Test Alert O rt",
-            query="type=o&stat_Non-Precedential=on",
+            query=f"type=o&stat_{unpublished_status}=on",
         )
         cls.search_alert_oa = AlertFactory(
             user=cls.user_profile.user,
@@ -612,13 +622,13 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             user=cls.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert O wly",
-            query="type=o&stat_Non-Precedential=on",
+            query=f"type=o&stat_{unpublished_status}=on",
         )
         cls.search_alert_o_mly = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert O mly",
-            query="type=o&stat_Non-Precedential=on",
+            query=f"type=o&stat_{unpublished_status}=on",
         )
 
         cls.user_profile_2 = UserProfileWithParentsFactory()
@@ -632,16 +642,62 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             user=cls.user_profile_2.user,
             rate=Alert.DAILY,
             name="Test Alert O Disabled",
-            query="type=o&stat_Non-Precedential=on",
+            query=f"type=o&stat_{unpublished_status}=on",
+        )
+        cls.user_profile_3 = UserProfileWithParentsFactory(
+            user__email="test_3@email.com"
+        )
+        cls.webhook_user_3 = WebhookFactory(
+            user=cls.user_profile_3.user,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        cls.search_alert_3 = AlertFactory(
+            user=cls.user_profile_3.user,
+            rate=Alert.DAILY,
+            name="Test Alert O Enabled",
+            query=f"q=California hearing&type=o&stat_{unpublished_status}=on",
+        )
+        cls.c1 = CourtFactory(
+            id="canb", jurisdiction="I", citation_string="Bankr. C.D. Cal."
         )
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(
             cls.mock_date, tick=False
         ), cls.captureOnCommitCallbacks(execute=True):
             cls.dly_opinion = OpinionWithParentsFactory.create(
+                cluster__case_name="California vs Lorem",
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                cluster__date_filed=now() - timedelta(hours=5),
+                cluster__date_filed=(now() - timedelta(hours=5)).date(),
+                cluster__attorneys="Attorney General of North Carolina",
+                cluster__judges="Lorem Judge",
+                cluster__citation_count=1,
+                cluster__docket=DocketFactory(
+                    court=cls.c1,
+                ),
+                plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
+                type=Opinion.LEAD,
             )
+            cls.citation_1 = CitationWithParentsFactory.create(
+                volume=33,
+                reporter="state",
+                page="1",
+                type=1,
+                cluster=cls.dly_opinion.cluster,
+            )
+            cls.dly_opinion_2 = OpinionFactory(
+                cluster=cls.dly_opinion.cluster,
+                type=Opinion.COMBINED,
+                plain_text="Lorem dolor california sit amet, consectetur adipiscing elit.",
+                download_url="https://ca.flcourts.gov/",
+                local_path="test/search/opinion_html.html",
+            )
+            cls.opinion_cited_1 = OpinionsCitedWithParentsFactory.create(
+                cited_opinion=cls.dly_opinion,
+                citing_opinion=cls.dly_opinion_2,
+            )
+
             with mock.patch(
                 "cl.scrapers.tasks.microservice",
                 side_effect=lambda *args, **kwargs: MockResponse(200, b"10"),
@@ -679,9 +735,9 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         """
 
         webhooks_enabled = Webhook.objects.filter(enabled=True)
-        self.assertEqual(len(webhooks_enabled), 2)
+        self.assertEqual(len(webhooks_enabled), 3)
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 7)
+        self.assertEqual(len(search_alerts), 8)
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -698,9 +754,45 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         # Three search alerts should be sent:
         # Two opinion alerts to user_profile and one to user_profile_2 (Solr)
         # One oral argument alert to user_profile (ES)
-        self.assertEqual(len(mail.outbox), 3)
+        self.assertEqual(len(mail.outbox), 4)
+
+        # Opinion email alert assertions
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
-        self.assertIn("daily opinion alert", mail.outbox[0].body)
+        # Plain text assertions
+        opinion_alert_content = mail.outbox[0].body
+        self.assertIn("daily opinion alert", opinion_alert_content)
+
+        self.assertIn("had 1 hit", opinion_alert_content)
+        self.assertIn(
+            self.dly_opinion_2.cluster.docket.court.citation_string,
+            opinion_alert_content,
+        )
+        self.assertIn("California vs Lorem", opinion_alert_content)
+        self.assertIn("california sit amet", opinion_alert_content)
+        self.assertIn(self.dly_opinion_2.download_url, opinion_alert_content)
+        self.assertIn(
+            str(self.dly_opinion_2.local_path), opinion_alert_content
+        )
+
+        html_content = None
+        for content, content_type in mail.outbox[0].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+        # HTML assertions
+        self.assertIn("had 1 hit", html_content)
+        self.assertIn(
+            self.dly_opinion_2.cluster.docket.court.citation_string.replace(
+                " ", "&nbsp;"
+            ),
+            html_content,
+        )
+        self.assertIn(self.dly_opinion_2.download_url, html_content)
+        self.assertIn(str(self.dly_opinion_2.local_path), html_content)
+        self.assertIn("<strong>California</strong> vs Lorem", html_content)
+        self.assertIn("<strong>california</strong> sit amet", html_content)
+
+        # Unsubscribe headers assertions.
         self.assertEqual(
             mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
             f"List-Unsubscribe=One-Click",
@@ -713,6 +805,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             mail.outbox[0].extra_headers["List-Unsubscribe"],
         )
 
+        # Second Opinion alert
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
         self.assertIn("daily opinion alert", mail.outbox[1].body)
         self.assertEqual(
@@ -727,10 +820,11 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             mail.outbox[1].extra_headers["List-Unsubscribe"],
         )
 
-        self.assertEqual(mail.outbox[2].to[0], self.user_profile.user.email)
-        self.assertIn("daily oral argument alert ", mail.outbox[2].body)
+        # Oral Argument Alert
+        self.assertEqual(mail.outbox[3].to[0], self.user_profile.user.email)
+        self.assertIn("daily oral argument alert ", mail.outbox[3].body)
         self.assertEqual(
-            mail.outbox[2].extra_headers["List-Unsubscribe-Post"],
+            mail.outbox[3].extra_headers["List-Unsubscribe-Post"],
             f"List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
@@ -738,21 +832,28 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
         )
         self.assertIn(
             unsubscribe_url,
-            mail.outbox[2].extra_headers["List-Unsubscribe"],
+            mail.outbox[3].extra_headers["List-Unsubscribe"],
         )
 
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 2)
+        self.assertEqual(len(webhook_events), 3)
 
         alert_data = {
             self.search_alert.pk: {
                 "alert": self.search_alert,
-                "result": self.dly_opinion.cluster,
+                "result": self.dly_opinion_2,
+                "snippet": "Lorem dolor <strong>california</strong> sit amet, consectetur adipiscing elit.",
             },
             self.search_alert_oa.pk: {
                 "alert": self.search_alert_oa,
                 "result": self.dly_oral_argument,
+                "snippet": "",
+            },
+            self.search_alert_3.pk: {
+                "alert": self.search_alert_3,
+                "result": self.dly_opinion,
+                "snippet": "Lorem dolor sit amet, consectetur adipiscing elit <strong>hearing</strong>.",
             },
         }
 
@@ -761,18 +862,18 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
                 webhook_sent.event_status,
                 WEBHOOK_EVENT_STATUS.SUCCESSFUL,
             )
+            content = webhook_sent.content
+            alert_data_compare = alert_data[content["payload"]["alert"]["id"]]
             self.assertEqual(
                 webhook_sent.webhook.user,
-                self.user_profile.user,
+                alert_data_compare["alert"].user,
             )
-            content = webhook_sent.content
+
             # Check if the webhook event payload is correct.
             self.assertEqual(
                 content["webhook"]["event_type"],
                 WebhookEventType.SEARCH_ALERT,
             )
-
-            alert_data_compare = alert_data[content["payload"]["alert"]["id"]]
             self.assertEqual(
                 content["payload"]["alert"]["name"],
                 alert_data_compare["alert"].name,
@@ -785,10 +886,79 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
                 content["payload"]["alert"]["rate"],
                 alert_data_compare["alert"].rate,
             )
-            self.assertEqual(
-                content["payload"]["results"][0]["caseName"],
-                alert_data_compare["result"].case_name,
-            )
+            if (
+                content["payload"]["alert"]["alert_type"]
+                == SEARCH_TYPES.OPINION
+            ):
+                self.assertEqual(
+                    content["payload"]["results"][0]["caseName"],
+                    alert_data_compare["result"].cluster.case_name,
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["dateReargued"],
+                    alert_data_compare["result"].cluster.docket.date_reargued,
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["dateFiled"],
+                    midnight_pt(
+                        alert_data_compare["result"].cluster.date_filed
+                    ).isoformat(),
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["panel_ids"],
+                    None,
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["download_url"],
+                    alert_data_compare["result"].download_url,
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["download_url"],
+                    alert_data_compare["result"].download_url,
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["type"],
+                    alert_data_compare["result"].type,
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["status"],
+                    alert_data_compare[
+                        "result"
+                    ].cluster.get_precedential_status_display(),
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["snippet"],
+                    alert_data_compare["snippet"],
+                )
+                local_path_to_compare = (
+                    alert_data_compare["result"].local_path
+                    if alert_data_compare["result"].local_path
+                    else None
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["local_path"],
+                    local_path_to_compare,
+                )
+                cites_to_compare = (
+                    list(
+                        alert_data_compare["result"]
+                        .cited_opinions.all()
+                        .values_list("cited_opinion_id", flat=True)
+                    )
+                    if alert_data_compare["result"]
+                    .cited_opinions.all()
+                    .values_list("cited_opinion_id", flat=True)
+                    else None
+                )
+                self.assertEqual(
+                    content["payload"]["results"][0]["cites"],
+                    cites_to_compare,
+                )
+            else:
+                self.assertEqual(
+                    content["payload"]["results"][0]["caseName"],
+                    alert_data_compare["result"].case_name,
+                )
 
     def test_send_search_alert_webhooks_rates(self):
         """Can we send search alert webhooks for different alert rates?"""
@@ -812,9 +982,9 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, EmptySolrTestCase):
             )
 
         webhooks_enabled = Webhook.objects.filter(enabled=True)
-        self.assertEqual(len(webhooks_enabled), 2)
+        self.assertEqual(len(webhooks_enabled), 3)
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 7)
+        self.assertEqual(len(search_alerts), 8)
 
         # (rate, events expected, number of search results expected per event)
         # The number of expected results increases with every iteration since

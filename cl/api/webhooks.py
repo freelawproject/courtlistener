@@ -2,6 +2,7 @@ import json
 
 import requests
 from django.conf import settings
+from elasticsearch_dsl.response import Response
 from rest_framework.renderers import JSONRenderer
 from scorched.response import SolrResponse
 
@@ -16,11 +17,15 @@ from cl.api.utils import (
     generate_webhook_key_content,
     update_webhook_event_after_request,
 )
+from cl.custom_filters.templatetags.extras import get_highlight
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
-from cl.search.api_serializers import SearchResultSerializer
+from cl.search.api_serializers import (
+    OpinionESResultSerializer,
+    SearchResultSerializer,
+)
 from cl.search.api_utils import ResultObject
 
 
@@ -153,7 +158,7 @@ def send_recap_fetch_webhooks(fq: PacerFetchQueue) -> None:
 
 def send_search_alert_webhook(
     solr_interface: ExtraSolrInterface,
-    results: SolrResponse,
+    results: SolrResponse | Response,
     webhook: Webhook,
     alert: Alert,
 ) -> None:
@@ -168,18 +173,31 @@ def send_search_alert_webhook(
 
     serialized_alert = SearchAlertSerializerModel(alert).data
     solr_results = []
-    for result in results.result.docs:
-        # Pull the text snippet up a level
-        result["snippet"] = "&hellip;".join(result["solr_highlights"]["text"])
-        # This transformation is required before serialization so that null
-        # fields are shown in the results, as in Search API.
-        solr_results.append(ResultObject(initial=result))
 
-    serialized_results = SearchResultSerializer(
-        solr_results,
-        many=True,
-        context={"schema": solr_interface.schema},
-    ).data
+    if isinstance(results, SolrResponse):
+        # Solr results serialization
+        for result in results.result.docs:
+            # Pull the text snippet up a level
+            result["snippet"] = "&hellip;".join(
+                result["solr_highlights"]["text"]
+            )
+            # This transformation is required before serialization so that null
+            # fields are shown in the results, as in Search API.
+            solr_results.append(ResultObject(initial=result))
+
+        serialized_results = SearchResultSerializer(
+            solr_results,
+            many=True,
+            context={"schema": solr_interface.schema},
+        ).data
+    else:
+        # ES results serialization
+        for result in results:
+            result["snippet"] = get_highlight(result, "text")
+        serialized_results = OpinionESResultSerializer(
+            results,
+            many=True,
+        ).data
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),
