@@ -149,7 +149,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                 "error_message": f"Citation not found: '{ citation_str }'",
             }
 
-        return self._show_response(request, clusters, cluster_count)
+        return self._format_cluster_response(request, clusters, cluster_count)
 
     def _get_clusters_for_canonical_list(
         self, reporters: list[SafeString], volume: int, page: str
@@ -189,7 +189,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
             cluster_count += _count
         return clusters, cluster_count
 
-    def _show_response(
+    def _format_cluster_response(
         self,
         request: Request,
         clusters: QuerySet[OpinionCluster],
