@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from cl.citations.api_serializers import CitationRequestSerializer
+from cl.citations.types import CitationAPIResponse
 from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
 from cl.search.api_serializers import OpinionClusterSerializer
 from cl.search.models import OpinionCluster
@@ -103,7 +104,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
 
     def _citation_handler(
         self, request: Request, reporter: str, volume: int, page: str
-    ) -> HttpResponse:
+    ) -> CitationAPIResponse:
         """
         This method retrieves opinion clusters that match a citation string.
 
@@ -117,9 +118,6 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         Raises:
             NotFound: If the citation string doesn't match any opinion clusters
 
-        Returns:
-            HttpResponse: An HTTP response object containing a list of matching
-                opinion clusters.
         """
         # Look up the reporter to get its proper version (so-2d -> So. 2d)
         proper_reporter: None | str | list[SafeString]
@@ -151,7 +149,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                 "error_message": f"Citation not found: '{ citation_str }'",
             }
 
-        return self._show_response(request, clusters)
+        return self._show_response(request, clusters, cluster_count)
 
     def _get_clusters_for_canonical_list(
         self, reporters: list[SafeString], volume: int, page: str
@@ -192,23 +190,26 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         return clusters, cluster_count
 
     def _show_response(
-        self, request: Request, clusters: QuerySet[OpinionCluster]
-    ) -> HttpResponse:
+        self,
+        request: Request,
+        clusters: QuerySet[OpinionCluster],
+        cluster_count: int,
+    ) -> CitationAPIResponse:
         """
-        Generates a paginated HTTP response containing opinion clusters.
-
-        This method takes a queryset of opinion clusters and an HTTP request
-        object. It then paginates the queryset based on the request parameters
-        and returns an appropriate HTTP response containing the paginated data.
+        Enhances the provided cluster queryset and formats the data
+        for the response.
 
         Args:
             request (Request): The HTTP request object.
-            clusters (QuerySet[OpinionCluster]): The queryset containing opinion
-            clusters.
+            clusters (QuerySet[OpinionCluster]): The queryset containing
+            opinion clusters.
+            cluster_count (int): The expected number of clusters.
 
         Returns:
-            HttpResponse: An HTTP response containing the paginated opinion
-                        clusters and pagination information.
+            A dictionary containing the following keys:
+                - status (int): An integer indicating the status of the operation.
+                - clusters (list): list of dictionaries. Each dictionary represents
+                a cluster and contains relevant data from the cluster model and its associated models.
         """
         clusters = clusters.prefetch_related(
             "sub_opinions", "panel", "non_participating_judges", "citations"
@@ -216,11 +217,11 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         serializer = self.serializer(
             clusters, many=True, context={"request": request}
         )
-        return Response(
-            serializer.data,
-            status=(
+        return {
+            "status": (
                 HTTPStatus.MULTIPLE_CHOICES
-                if clusters.count() > 1
+                if cluster_count > 1
                 else HTTPStatus.OK
             ),
-        )
+            "clusters": serializer.data,
+        }

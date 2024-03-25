@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Any, NotRequired, TypedDict, Union
 
 from eyecite.models import (
     FullCaseCitation,
@@ -16,3 +16,9 @@ SupportedCitationType = Union[
 MatchedResourceType = Union[Opinion, Resource]
 ResolvedFullCite = tuple[FullCaseCitation, MatchedResourceType]
 ResolvedFullCites = list[ResolvedFullCite]
+
+
+class CitationAPIResponse(TypedDict):
+    status: int
+    error_message: NotRequired[str]
+    clusters: NotRequired[list[dict[str, Any]]]
