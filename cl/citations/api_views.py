@@ -121,13 +121,17 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
             HttpResponse: An HTTP response object containing a list of matching
                 opinion clusters.
         """
-        citation_str = " ".join([str(volume), reporter, page])
-
         # Look up the reporter to get its proper version (so-2d -> So. 2d)
         proper_reporter: None | str | list[SafeString]
         proper_reporter = SLUGIFIED_EDITIONS.get(slugify(reporter), None)
         if not proper_reporter:
-            proper_reporter = self._attempt_reporter_variation()
+            try:
+                proper_reporter = self._attempt_reporter_variation(reporter)
+            except NotFound as e:
+                return {
+                    "status": HTTPStatus.NOT_FOUND,
+                    "error_message": str(e.detail),
+                }
 
         if isinstance(proper_reporter, str):
             # We retrieved the proper_reporter directly from the
@@ -140,8 +144,12 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                 proper_reporter, volume, page
             )
 
-        if cluster_count == 0:
-            raise NotFound(f"Citation not found: '{ citation_str }'")
+        if not cluster_count:
+            citation_str = " ".join([str(volume), reporter, page])
+            return {
+                "status": HTTPStatus.NOT_FOUND,
+                "error_message": f"Citation not found: '{ citation_str }'",
+            }
 
         return self._show_response(request, clusters)
 
