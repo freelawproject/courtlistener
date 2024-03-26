@@ -1,4 +1,5 @@
 from datetime import timedelta
+from http import HTTPStatus
 from unittest.mock import patch
 
 from django.core import mail
@@ -6,7 +7,6 @@ from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
-from rest_framework.status import HTTP_201_CREATED
 
 from cl.donate.api_views import MembershipWebhookViewSet
 from cl.donate.factories import DonationFactory, NeonWebhookEventFactory
@@ -72,7 +72,7 @@ class MembershipWebhookTest(TestCase):
             data=self.data,
             content_type="application/json",
         )
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         self.assertEqual(NeonWebhookEvent.objects.all().count(), 1)
 
         # Make sure to save the webhook payload even if an error occurs.
@@ -103,7 +103,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         self.assertEqual(NeonWebhookEvent.objects.all().count(), 10)
 
     @patch.object(
@@ -117,7 +117,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         query = NeonMembership.objects.filter(neon_id="12345")
         self.assertEqual(await query.acount(), 1)
@@ -140,7 +140,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         query = NeonMembership.objects.filter(neon_id="12345")
         self.assertEqual(await query.acount(), 0)
@@ -158,7 +158,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         self.data["eventTrigger"] = "updateMembership"
         self.data["data"]["membership"]["membershipId"] = "12344"
@@ -171,7 +171,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         # checks the neon_id was not updated
         query = NeonMembership.objects.filter(neon_id="12345")
@@ -203,7 +203,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         membership = await NeonMembership.objects.aget(neon_id="12345")
 
         self.assertEqual(membership.neon_id, "12345")
@@ -230,7 +230,7 @@ class MembershipWebhookTest(TestCase):
         )
 
         query = NeonMembership.objects.filter(neon_id="9876")
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         self.assertEqual(await query.acount(), 0)
 
     @patch(
@@ -262,7 +262,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         query = NeonMembership.objects.filter(neon_id="12345")
         self.assertEqual(await query.acount(), 1)
@@ -317,7 +317,7 @@ class MembershipWebhookTest(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         query = NeonMembership.objects.select_related(
             "user", "user__profile"

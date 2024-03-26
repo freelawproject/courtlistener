@@ -2,6 +2,7 @@ import json
 import os
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
+from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY
@@ -20,12 +21,6 @@ from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 from requests import ConnectionError
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,
-    HTTP_401_UNAUTHORIZED,
-)
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
@@ -185,7 +180,7 @@ class RecapUploadsTest(TestCase):
     async def test_uploading_a_pdf(self, mock):
         """Can we upload a document and have it be saved correctly?"""
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         self.assertEqual(j["court"], self.court.id)
@@ -198,7 +193,7 @@ class RecapUploadsTest(TestCase):
         self.data.update({"upload_type": UPLOAD_TYPE.DOCUMENT_ZIP})
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         mock.assert_called()
 
     async def test_uploading_a_docket(self, mock):
@@ -212,14 +207,14 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_a_claims_registry_page(self, mock):
         """Can we upload claims registry data?"""
@@ -232,7 +227,7 @@ class RecapUploadsTest(TestCase):
             }
         )
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         mock.assert_called()
 
     async def test_uploading_an_attachment_page(self, mock):
@@ -244,14 +239,14 @@ class RecapUploadsTest(TestCase):
             }
         )
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_numbers_in_docket_uploads_fail(self, mock):
         """Are invalid uploads denied?
@@ -261,7 +256,7 @@ class RecapUploadsTest(TestCase):
         """
         self.data["upload_type"] = UPLOAD_TYPE.DOCKET
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_district_court_in_appellate_upload_fails(self, mock):
         """If you send a district court to an appellate endpoint, does it
@@ -271,7 +266,7 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_appellate_court_in_district_upload_fails(self, mock):
         """If you send appellate court info to a distric court, does it
@@ -283,44 +278,44 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_string_for_document_number_fails(self, mock):
         self.data["document_number"] = "asdf"  # Not an int.
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_no_numbers_in_docket_uploads_work(self, mock):
         self.data["upload_type"] = UPLOAD_TYPE.DOCKET
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
     async def test_pdf_without_pacer_case_id_works(self, mock):
         """Do we allow PDFs lacking a pacer_case_id value?"""
         del self.data["pacer_case_id"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
     async def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
         self.data["pacer_case_id"] = "☠☠☠"
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         mock.assert_called()
 
     async def test_disallowed_court(self, mock):
         """Do posts fail if a bad court is given?"""
         self.data["court"] = "ala"
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_fails_no_document(self, mock):
         """Do posts fail if the lack an attachment?"""
         del self.data["filepath_local"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_user_associated_properly(self, mock):
         """Does the user get associated after the upload?"""
@@ -351,14 +346,14 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_an_appellate_case_query_page(self, mock):
         """Can we upload an appellate case query and have it be saved correctly?
@@ -375,14 +370,14 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_an_appellate_attachment_page(self, mock):
         """Can we upload an appellate attachment page and have it be saved
@@ -401,14 +396,14 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     def test_processing_an_appellate_attachment_page(self, mock_upload):
         """Can we process an appellate attachment and transform the main recap
@@ -555,14 +550,14 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_case_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_an_appellate_case_query_result_page(self, mock):
         """Can we upload an appellate case query result page and have it be
@@ -581,14 +576,14 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_recap_upload_validate_pacer_case_id(self, mock):
         """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
@@ -602,7 +597,7 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIn(
             "PACER case ID can not contains dashes -", j["non_field_errors"][0]
         )
@@ -1030,7 +1025,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         self.data["court"] = "scotus"
         r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(
             j["non_field_errors"], ["scotus is not a PACER court ID."]
         )
@@ -1039,7 +1034,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         del self.data["mail"]["headers"]
         r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(
             j["non_field_errors"],
             ["The JSON value at key 'mail' should include 'headers'."],
@@ -1049,7 +1044,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         del self.data["receipt"]["recipients"]
         r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(
             j["non_field_errors"],
             ["The JSON value at key 'receipt' should include 'recipients'."],
@@ -2383,19 +2378,19 @@ class RecapUploadAuthenticationTest(TestCase):
             HTTP_AUTHORIZATION="Token asdf"
         )  # Junk token.
         r = await self.async_client.post(self.path)
-        self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
         r = await self.async_client.get(self.path)
-        self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_no_credentials(self) -> None:
         """Does POSTing and GETting fail if we lack credentials?"""
         self.async_client.credentials()
         r = await self.async_client.post(self.path)
-        self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
         r = await self.async_client.get(self.path)
-        self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
 
 class IdbImportTest(SimpleTestCase):

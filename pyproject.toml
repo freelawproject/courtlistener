@@ -27,7 +27,6 @@ cl-manage = "manage:main"
 
 [tool.poetry.dependencies]
 argparse = "*"
-asgiref = {git = "https://github.com/django/asgiref.git", rev = "8108512196b0831962eb923b7c3f5c5935b1fde1"}
 beautifulsoup4 = "==4.12.*"
 boto3 = "^1.34.17"
 celery = "^5.3.6"

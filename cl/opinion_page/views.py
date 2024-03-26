@@ -1,5 +1,6 @@
 import datetime
 from collections import OrderedDict, defaultdict
+from http import HTTPStatus
 from typing import Dict, Union
 from urllib.parse import urlencode
 
@@ -32,7 +33,6 @@ from reporters_db import (
     REPORTERS,
     VARIATIONS_ONLY,
 )
-from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.citations.utils import get_canonicals_from_reporter
@@ -816,7 +816,7 @@ async def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
         request,
         "volumes_for_reporter.html",
         context,
-        status=HTTP_404_NOT_FOUND,
+        status=HTTPStatus.NOT_FOUND,
     )
 
 
@@ -999,7 +999,7 @@ async def citation_handler(
                 "citation_str": citation_str,
                 "private": False,
             },
-            status=HTTP_404_NOT_FOUND,
+            status=HTTPStatus.NOT_FOUND,
         )
 
     if cluster_count == 1:
@@ -1018,7 +1018,7 @@ async def citation_handler(
                 "clusters": clusters,
                 "private": await clusters.filter(blocked=True).aexists(),
             },
-            status=HTTP_300_MULTIPLE_CHOICES,
+            status=HTTPStatus.MULTIPLE_CHOICES,
         )
     return HttpResponse(status=500)
 
@@ -1092,7 +1092,7 @@ async def attempt_reporter_variation(
                 "possible_canonicals": possible_canonicals,
                 "private": True,
             },
-            status=HTTP_300_MULTIPLE_CHOICES,
+            status=HTTPStatus.MULTIPLE_CHOICES,
         )
     else:
         return HttpResponse(status=500)

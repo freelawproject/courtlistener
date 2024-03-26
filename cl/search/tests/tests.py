@@ -21,7 +21,6 @@ from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import html
-from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait

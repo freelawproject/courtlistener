@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
@@ -16,12 +17,6 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
 from lxml import html
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_204_NO_CONTENT,
-    HTTP_404_NOT_FOUND,
-)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
@@ -153,7 +148,7 @@ class AlertTest(SimpleUserDataMixin, TestCase):
             reverse("disable_alert", args=[self.alert.secret_key])
         )
 
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIn(
             "Please confirm your unsubscription", response.content.decode()
         )
@@ -169,7 +164,7 @@ class AlertTest(SimpleUserDataMixin, TestCase):
             reverse("one_click_disable_alert", args=[self.alert.secret_key])
         )
 
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, "off")
 
@@ -463,7 +458,7 @@ class AlertAPITests(APITestCase):
         search_alert = Alert.objects.all()
         response = await self.make_an_alert(self.client)
         self.assertEqual(await search_alert.acount(), 1)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
     async def test_list_users_alerts(self) -> None:
         """Can we list user's own alerts?"""
@@ -477,12 +472,12 @@ class AlertAPITests(APITestCase):
 
         # Get the alerts for user_1, should be 2
         response = await self.client.get(self.alert_path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
         # Get the alerts for user_2, should be 1
         response_2 = await self.client_2.get(self.alert_path)
-        self.assertEqual(response_2.status_code, HTTP_200_OK)
+        self.assertEqual(response_2.status_code, HTTPStatus.OK)
         self.assertEqual(response_2.json()["count"], 1)
 
     async def test_delete_alert(self) -> None:
@@ -504,7 +499,7 @@ class AlertAPITests(APITestCase):
 
         # Delete the alert for user_1
         response = await self.client.delete(alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
         self.assertEqual(await search_alert.acount(), 1)
 
         alert_2_path_detail = reverse(
@@ -514,7 +509,7 @@ class AlertAPITests(APITestCase):
 
         # user_2 tries to delete a user_1 alert, it should fail
         response = await self.client_2.delete(alert_2_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         self.assertEqual(await search_alert.acount(), 1)
 
     async def test_alert_detail(self) -> None:
@@ -533,11 +528,11 @@ class AlertAPITests(APITestCase):
 
         # Get the alert detail for user_1
         response = await self.client.get(alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
         # user_2 tries to get user_1 alert, it should fail
         response = await self.client_2.get(alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_alert_update(self) -> None:
         """Can we update an alert?"""
@@ -560,7 +555,7 @@ class AlertAPITests(APITestCase):
         response = await self.client.put(alert_1_path_detail, data_updated)
 
         # Check that the alert was updated
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["name"], "alert_1_updated")
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
 
@@ -1119,7 +1114,7 @@ class DocketAlertAPITests(APITestCase):
         docket_alert_first = await docket_alert.afirst()
         self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
         self.assertEqual(await docket_alert.acount(), 1)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
     async def test_list_users_docket_alerts(self) -> None:
         """Can we list user's own alerts?"""
@@ -1133,12 +1128,12 @@ class DocketAlertAPITests(APITestCase):
 
         # Get the docket alerts for user_1, should be 2
         response = await self.client.get(self.docket_alert_path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
         # Get the docket alerts for user_2, should be 1
         response_2 = await self.client_2.get(self.docket_alert_path)
-        self.assertEqual(response_2.status_code, HTTP_200_OK)
+        self.assertEqual(response_2.status_code, HTTPStatus.OK)
         self.assertEqual(response_2.json()["count"], 1)
 
     async def test_delete_docket_alert(self) -> None:
@@ -1162,7 +1157,7 @@ class DocketAlertAPITests(APITestCase):
 
         # Delete the docket_alert for user_1
         response = await self.client.delete(docket_alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
         self.assertEqual(await docket_alert.acount(), 1)
 
         docket_alert_2_path_detail = reverse(
@@ -1172,7 +1167,7 @@ class DocketAlertAPITests(APITestCase):
 
         # user_2 tries to delete a user_1 docket alert, it should fail
         response = await self.client_2.delete(docket_alert_2_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         self.assertEqual(await docket_alert.acount(), 1)
 
     async def test_docket_alert_detail(self) -> None:
@@ -1191,11 +1186,11 @@ class DocketAlertAPITests(APITestCase):
 
         # Get the docket alert detail for user_1
         response = await self.client.get(docket_alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
         # user_2 tries to get user_1 docket alert, it should fail
         response = await self.client_2.get(docket_alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_docket_alert_update(self) -> None:
         """Can we update a docket alert?"""
@@ -1230,7 +1225,7 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
 
         # Check that the alert was updated
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(
             response.json()["alert_type"], DocketAlert.UNSUBSCRIPTION
         )
@@ -1268,7 +1263,7 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
 
         # Check that the alert was updated
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(
             response.json()["alert_type"], DocketAlert.UNSUBSCRIPTION
         )
@@ -3114,7 +3109,7 @@ class OneClickUnsubscribeTests(TestCase):
         )
         self.alert.refresh_from_db()
 
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(self.alert.alert_type, DocketAlert.UNSUBSCRIPTION)
 
         # check unsubscription confirmation email
