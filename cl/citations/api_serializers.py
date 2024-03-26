@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from rest_framework.serializers import ValidationError
 
+from cl.search.api_serializers import OpinionClusterSerializer
+
 
 class CitationAPIRequestSerializer(serializers.Serializer):
     text_citation = serializers.CharField(required=False)
@@ -46,3 +48,22 @@ class CitationAPIRequestSerializer(serializers.Serializer):
             raise ValidationError(errors)
 
         return data
+
+
+class CitationAPIResponseSerializer(serializers.Serializer):
+    citation = serializers.CharField()
+    start_index = serializers.IntegerField()
+    end_index = serializers.IntegerField()
+    status = serializers.IntegerField()
+    error_message = serializers.CharField(required=False)
+    clusters = serializers.SerializerMethodField(required=False)
+
+    def get_clusters(self, obj):
+        if "clusters" not in obj:
+            return []
+
+        return OpinionClusterSerializer(
+            obj["clusters"],
+            many=True,
+            context={"request": self.context["request"]},
+        ).data

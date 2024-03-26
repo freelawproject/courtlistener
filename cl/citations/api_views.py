@@ -3,7 +3,6 @@ from http import HTTPStatus
 import eyecite
 from asgiref.sync import async_to_sync
 from django.db.models import QuerySet
-from django.http import HttpResponse
 from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
 from rest_framework.exceptions import NotFound
@@ -13,7 +12,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from cl.citations.api_serializers import CitationAPIRequestSerializer
+from cl.citations.api_serializers import (
+    CitationAPIRequestSerializer,
+    CitationAPIResponseSerializer,
+)
 from cl.citations.types import CitationAPIResponse
 from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
 from cl.search.api_serializers import OpinionClusterSerializer
@@ -71,14 +73,24 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
             volume = data.get("volume")
             page = data.get("page")
 
+            citation_str = " ".join([str(volume), reporter, page])
+            citation_data = {
+                "citation": citation_str,
+                "start_index": 0,
+                "end_index": len(citation_str),
+            }
             citations.append(
                 {
-                    "citation": " ".join([str(volume), reporter, page]),
+                    **citation_data,
                     **self._citation_handler(request, reporter, volume, page),
                 }
             )
 
-        return Response(citations)
+        return Response(
+            CitationAPIResponseSerializer(
+                citations, many=True, context={"request": request}
+            ).data
+        )
 
     def _attempt_reporter_variation(self, reporter) -> list[SafeString]:
         """Try to disambiguate an unknown reporter using the variations dict.
@@ -149,7 +161,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                 "error_message": f"Citation not found: '{ citation_str }'",
             }
 
-        return self._format_cluster_response(request, clusters, cluster_count)
+        return self._format_cluster_response(clusters, cluster_count)
 
     def _get_clusters_for_canonical_list(
         self, reporters: list[SafeString], volume: int, page: str
@@ -191,7 +203,6 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
 
     def _format_cluster_response(
         self,
-        request: Request,
         clusters: QuerySet[OpinionCluster],
         cluster_count: int,
     ) -> CitationAPIResponse:
@@ -208,20 +219,17 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         Returns:
             A dictionary containing the following keys:
                 - status (int): An integer indicating the status of the operation.
-                - clusters (list): list of dictionaries. Each dictionary represents
-                a cluster and contains relevant data from the cluster model and its associated models.
+                - clusters (Queryset): queryset of cluster that contains relevant
+                    data from the cluster model and its associated models.
         """
         clusters = clusters.prefetch_related(
             "sub_opinions", "panel", "non_participating_judges", "citations"
         ).order_by("-id")
-        serializer = self.serializer(
-            clusters, many=True, context={"request": request}
-        )
         return {
             "status": (
                 HTTPStatus.MULTIPLE_CHOICES
                 if cluster_count > 1
                 else HTTPStatus.OK
             ),
-            "clusters": serializer.data,
+            "clusters": clusters,
         }

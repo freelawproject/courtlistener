@@ -1,5 +1,6 @@
-from typing import Any, NotRequired, TypedDict, Union
+from typing import NotRequired, TypedDict, Union
 
+from django.db.models import QuerySet
 from eyecite.models import (
     FullCaseCitation,
     IdCitation,
@@ -8,7 +9,7 @@ from eyecite.models import (
     SupraCitation,
 )
 
-from cl.search.models import Opinion
+from cl.search.models import Opinion, OpinionCluster
 
 SupportedCitationType = Union[
     FullCaseCitation, ShortCaseCitation, SupraCitation, IdCitation
@@ -21,4 +22,4 @@ ResolvedFullCites = list[ResolvedFullCite]
 class CitationAPIResponse(TypedDict):
     status: int
     error_message: NotRequired[str]
-    clusters: NotRequired[list[dict[str, Any]]]
+    clusters: NotRequired[QuerySet[OpinionCluster]]
