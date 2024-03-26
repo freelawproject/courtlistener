@@ -1,4 +1,5 @@
 import datetime
+from http import HTTPStatus
 from unittest import mock
 
 from asgiref.sync import sync_to_async
@@ -13,9 +14,8 @@ from django.urls import reverse
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
-from rest_framework.status import HTTP_200_OK
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
     EmptySolrTestCase,
@@ -46,6 +46,7 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    Docket,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -77,7 +78,11 @@ class OpinionAPISolrSearchTest(IndexedSolrTestCase):
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
-            docket=DocketFactory(court=court, docket_number="1:21-cv-1234"),
+            docket=DocketFactory(
+                court=court,
+                docket_number="1:21-cv-1234",
+                source=Docket.HARVARD,
+            ),
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
@@ -99,7 +104,9 @@ class OpinionAPISolrSearchTest(IndexedSolrTestCase):
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
-            docket=DocketFactory(court=court, docket_number="123456"),
+            docket=DocketFactory(
+                court=court, docket_number="123456", source=Docket.HARVARD
+            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             syllabus="some rando syllabus",
             procedural_history="some rando history",
@@ -418,7 +425,11 @@ class OpinionsESSearchTest(
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
-            docket=DocketFactory(court=court, docket_number="1:21-cv-1234"),
+            docket=DocketFactory(
+                court=court,
+                docket_number="1:21-cv-1234",
+                source=Docket.HARVARD,
+            ),
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
@@ -441,7 +452,9 @@ class OpinionsESSearchTest(
             case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
-            docket=DocketFactory(court=court, docket_number="123456"),
+            docket=DocketFactory(
+                court=court, docket_number="123456", source=Docket.HARVARD
+            ),
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
@@ -866,7 +879,7 @@ class OpinionsESSearchTest(
             r = await self.async_client.get(reverse("show_results"), param)
             self.assertEqual(
                 r.status_code,
-                HTTP_200_OK,
+                HTTPStatus.OK,
                 msg=f"Didn't get good status code with params: {param}",
             )
 
@@ -1179,7 +1192,7 @@ class RelatedSearchTest(
         )
 
         r = self.client.get(reverse("show_results"), params)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
         self.assertEqual(expected_article_count, self.get_article_count(r))
         self.assertTrue(
@@ -1294,7 +1307,7 @@ class GroupedSearchTest(EmptySolrTestCase):
             slug="case-name",
             pacer_case_id="666666",
             blocked=False,
-            source=0,
+            source=Docket.HARVARD,
             date_blocked=None,
         )
 
@@ -1383,10 +1396,14 @@ class IndexOpinionDocumentsCommandTest(
         cls.create_index("search.OpinionCluster")
 
     def setUp(self) -> None:
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)
+
+    def tearDown(self) -> None:
+        self.delete_index("search.OpinionCluster")
+        self.create_index("search.OpinionCluster")
 
     def test_cl_index_parent_and_child_docs_command(self):
         """Confirm the command can properly index Dockets and their
@@ -1424,6 +1441,108 @@ class IndexOpinionDocumentsCommandTest(
         for pk in opinions_pks:
             self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
 
+    def test_index_missing_parent_docs_when_indexing_only_child_docs(self):
+        """Confirm the command can properly index missing clusters when
+        indexing only Opinions.
+        """
+
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            testing_mode=True,
+        )
+
+        # Confirm clusters are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Clusters returned."
+        )
+
+        # Confirm Opinions are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_1.pk)
+        self.assertEqual(
+            s.count(), 4, msg="Wrong number of Opinions returned."
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_2.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_3.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+
+    def test_opinions_indexing_missing_flag(self):
+        """Confirm the command can properly index missing Opinions."""
+
+        # Call cl_index_parent_and_child_docs command for Opinions.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            testing_mode=True,
+        )
+
+        # Remove an opinion and opinion cluster manually.
+        OpinionClusterDocument.get(id=self.opinion_cluster_2.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        OpinionClusterDocument.get(
+            id=ES_CHILD_ID(self.opinion_2.pk).OPINION
+        ).delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+
+        # Confirm clusters are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 5, msg="Wrong number of Opinions returned."
+        )
+
+        # Call cl_index_parent_and_child_docs command for Opinions passing the
+        # missing flag.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="child",
+            missing=True,
+            testing_mode=True,
+        )
+
+        # Confirm clusters are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 6, msg="Wrong number of Opinions returned."
+        )
+
 
 class EsOpinionsIndexingTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
@@ -1459,7 +1578,7 @@ class EsOpinionsIndexingTest(
             slug="case-name",
             pacer_case_id="666666",
             blocked=False,
-            source=0,
+            source=Docket.HARVARD,
         )
         self.person = PersonFactory.create(
             gender="f",
@@ -1779,9 +1898,7 @@ class EsOpinionsIndexingTest(
 
     def test_parent_document_update_fields_properly(self) -> None:
         """Confirm that parent fields are properly update when changing DB records"""
-        docket = DocketFactory(
-            court_id=self.court_2.pk,
-        )
+        docket = DocketFactory(court_id=self.court_2.pk, source=Docket.HARVARD)
         opinion_cluster = OpinionClusterFactory.create(
             case_name_full="Paul test v. Franklin",
             case_name_short="Debbas",
@@ -1863,9 +1980,7 @@ class EsOpinionsIndexingTest(
 
     def test_update_shared_fields_related_documents(self) -> None:
         """Confirm that related document are properly update using bulk approach"""
-        docket = DocketFactory(
-            court_id=self.court_2.pk,
-        )
+        docket = DocketFactory(court_id=self.court_2.pk, source=Docket.HARVARD)
         opinion_cluster = OpinionClusterFactory.create(
             case_name_full="Paul test v. Franklin",
             case_name_short="Debbas",
@@ -1900,13 +2015,18 @@ class EsOpinionsIndexingTest(
             docket.docket_number = "005"
             docket.save()
 
-        # 2 update_es_document task should be called on tracked field update, one
-        # for DocketDocument and one for OpinionClusterDocument.
-        self.reset_and_assert_task_count(expected=2)
+        # 1 update_es_document task should be called on tracked field update,
+        # exclusively for updating the OpinionClusterDocument. Since the docket
+        # is not from RECAP, it should not be updated in ES.
+        self.reset_and_assert_task_count(expected=1)
         cluster_doc = OpinionClusterDocument.get(opinion_cluster.pk)
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(cluster_doc.docketNumber, "005")
         self.assertEqual(opinion_doc.docketNumber, "005")
+        self.assertEqual(
+            cluster_doc.date_created, opinion_cluster.date_created
+        )
+        self.assertEqual(opinion_doc.date_created, opinion.date_created)
 
         with mock.patch(
             "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
@@ -2239,7 +2359,9 @@ class OpinionFeedTest(
         )
         OpinionClusterFactoryWithChildrenAndParents(
             date_filed=datetime.date(2020, 8, 15),
-            docket=DocketFactory(court=court, docket_number="123456"),
+            docket=DocketFactory(
+                court=court, docket_number="123456", source=Docket.HARVARD
+            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             syllabus="some rando syllabus",
             procedural_history="some rando history",
@@ -2273,7 +2395,6 @@ class OpinionFeedTest(
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:title", 1),
@@ -2286,14 +2407,9 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 2),
             ("//atom:entry/atom:summary", 2),
         )
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        xml_tree = self.assert_es_feed_content(
+            node_tests, response, namespaces
+        )
 
         # Confirm items are ordered by date_filed desc
         published_format = "%Y-%m-%dT%H:%M:%S%z"
@@ -2332,7 +2448,6 @@ class OpinionFeedTest(
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//atom:feed/atom:title", 1),
             ("//atom:feed/atom:link", 2),
@@ -2344,15 +2459,7 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 1),
             ("//atom:entry/atom:summary", 1),
         )
-
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
         # Match all case.
         params = {
@@ -2365,7 +2472,6 @@ class OpinionFeedTest(
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//atom:feed/atom:title", 1),
             ("//atom:feed/atom:link", 2),
@@ -2377,16 +2483,7 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 3),
             ("//atom:entry/atom:summary", 3),
         )
-        for test, count in node_tests:
-            node_count = len(
-                xml_tree.xpath(test, namespaces=namespaces)
-            )  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     async def test_jurisdiction_feed(self) -> None:
         """Can we simply load the jurisdiction feed?"""
@@ -2398,7 +2495,7 @@ class OpinionFeedTest(
             response.status_code,
             msg="Did not get 200 OK status code for jurisdiction feed",
         )
-        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:entry", 5),
             ("//atom:feed/atom:entry/atom:title", 5),
@@ -2408,18 +2505,7 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 5),
             ("//atom:entry/atom:summary", 5),
         )
-        for test, expected_count in node_tests:
-            actual_count = len(
-                xml_tree.xpath(
-                    test, namespaces={"atom": "http://www.w3.org/2005/Atom"}
-                )
-            )
-            self.assertEqual(
-                actual_count,
-                expected_count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (expected_count, test, actual_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     async def test_all_jurisdiction_feed(self) -> None:
         """Can we simply load the jurisdiction feed?"""
@@ -2431,7 +2517,7 @@ class OpinionFeedTest(
             response.status_code,
             msg="Did not get 200 OK status code for jurisdiction feed",
         )
-        xml_tree = etree.fromstring(response.content)
+        namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:entry", 7),
             ("//atom:feed/atom:entry/atom:title", 7),
@@ -2441,18 +2527,7 @@ class OpinionFeedTest(
             ("//atom:entry/atom:id", 7),
             ("//atom:entry/atom:summary", 7),
         )
-        for test, expected_count in node_tests:
-            actual_count = len(
-                xml_tree.xpath(
-                    test, namespaces={"atom": "http://www.w3.org/2005/Atom"}
-                )
-            )
-            self.assertEqual(
-                actual_count,
-                expected_count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (expected_count, test, actual_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     def test_item_enclosure_mime_type(self) -> None:
         """Does the mime type detection work correctly?"""
@@ -2515,7 +2590,9 @@ class OpinionFeedTest(
             )
             o_c = OpinionClusterFactoryWithChildrenAndParents(
                 date_filed=datetime.date(2020, 8, 15),
-                docket=DocketFactory(court=court, docket_number="123456"),
+                docket=DocketFactory(
+                    court=court, docket_number="123456", source=Docket.HARVARD
+                ),
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 syllabus="some rando syllabus",
                 sub_opinions=RelatedFactory(
@@ -2570,3 +2647,39 @@ class OpinionFeedTest(
 
         with self.captureOnCommitCallbacks(execute=True):
             o_c.delete()
+
+    def test_catch_es_errors(self) -> None:
+        """Can we catch es errors and just render an empy feed?"""
+
+        # Bad syntax error.
+        params = {
+            "q": "Leave /:",
+            "type": SEARCH_TYPES.OPINION,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            400, response.status_code, msg="Did not get a 400 OK status code."
+        )
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
+        )
+        # Unbalanced parentheses
+        params = {
+            "q": "(Leave ",
+            "type": SEARCH_TYPES.OPINION,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            400, response.status_code, msg="Did not get a 400 OK status code."
+        )
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
+        )

@@ -26,7 +26,7 @@ from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.api.models import WEBHOOK_EVENT_STATUS, Webhook, WebhookEvent
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 from cl.users.tasks import notify_failing_webhook
@@ -250,7 +250,7 @@ class LoggingMixin(object):
         endpoint = resolve(request.path_info).url_name
         response_ms = self._get_response_ms()
 
-        r = make_redis_interface("STATS")
+        r = get_redis_interface("STATS")
         pipe = r.pipeline()
         api_prefix = get_logging_prefix()
 
@@ -441,7 +441,7 @@ def invert_user_logs(
     add an alias in the returned dictionary that contains the username as well.
     :return The inverted dictionary
     """
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
 
     dates = make_date_str_list(start, end)
@@ -498,7 +498,7 @@ def get_user_ids_for_date_range(
     :return Set of user IDs during a time period. Will not contain anonymous
     users.
     """
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
 
     date_strs = make_date_str_list(start, end)
@@ -519,7 +519,7 @@ def get_count_for_endpoint(endpoint: str, start: str, end: str) -> int:
     :param end: The end date (inclusive) you want the results for.
     :return int: The count for that endpoint
     """
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
 
     dates = make_date_str_list(start, end)
@@ -539,7 +539,7 @@ def get_avg_ms_for_endpoint(endpoint: str, d: datetime) -> float:
     that day.
     """
     d_str = d.isoformat()
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
     pipe.zscore(f"api:v3.endpoint.d:{d_str}.timings", endpoint)
     pipe.zscore(f"api:v3.endpoint.d:{d_str}.counts", endpoint)
@@ -746,7 +746,7 @@ def log_webhook_event(webhook_user_id: int) -> list[int | float]:
     webhook count.
     """
 
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
     webhook_prefix = get_webhook_logging_prefix()
 

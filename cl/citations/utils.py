@@ -4,8 +4,11 @@ from django.apps import (  # Must use apps.get_model() to avoid circular import 
     apps,
 )
 from django.db.models import Sum
+from django.template.defaultfilters import slugify
+from django.utils.safestring import SafeString
 from eyecite.models import FullCaseCitation
 from eyecite.utils import strip_punct
+from reporters_db import VARIATIONS_ONLY
 
 QUERY_LENGTH = 10
 
@@ -80,3 +83,26 @@ def make_name_param(
     # Strip out punctuation, which Solr doesn't like
     query_words = [strip_punct(t) for t in token_list]
     return " ".join(query_words), len(query_words)
+
+
+def get_canonicals_from_reporter(reporter_slug: str) -> list[SafeString]:
+    """
+    Disambiguates a reporter slug using a list of variations.
+
+    The list of variations is a dictionary that maps each variation
+    to a list of reporters that it could be possibly referring to.
+
+    Args:
+        reporter_slug (str): The reporter's name in slug format
+
+    Returns:
+        list[str]: A list of potential canonical names for the reporter
+    """
+    slugified_variations = {}
+    for variant, canonicals in VARIATIONS_ONLY.items():
+        slugged_canonicals = []
+        for canonical in canonicals:
+            slugged_canonicals.append(slugify(canonical))
+        slugified_variations[str(slugify(variant))] = slugged_canonicals
+
+    return slugified_variations.get(reporter_slug, [])

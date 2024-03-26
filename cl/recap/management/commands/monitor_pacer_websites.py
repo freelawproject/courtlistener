@@ -1,7 +1,8 @@
+from http import HTTPStatus
+
 import requests
 from django.conf import settings
 from django.utils.timezone import now
-from rest_framework.status import HTTP_200_OK
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.decorators import retry
@@ -40,7 +41,7 @@ def check_if_global_outage(session, url, timeout=5):
         # from the proxy, not from here.
         timeout=timeout + 1,
     )
-    if response.status_code != HTTP_200_OK:
+    if response.status_code != HTTPStatus.OK:
         # Something went wrong with our request
         print(response.json())
         raise requests.RequestException("Didn't use proxy API correctly.")

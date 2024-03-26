@@ -921,9 +921,10 @@ class PeopleSearchTestElasticSearch(
             "supervisor",
             "termination_reason",
             "timestamp",
+            "date_created",
         ]
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 46)
+        self.assertEqual(keys_count, 47)
         for key in keys_to_check:
             self.assertTrue(
                 key in r.data["results"][0],
@@ -1575,6 +1576,7 @@ class PeopleIndexingTest(
         self.assertEqual(
             self.position_1.person.name_full_reverse, pos_doc.appointer
         )
+        self.assertEqual(position_6.date_created, pos_doc.date_created)
 
         # Check for races, political_affiliation_idk, dod and dob, initial values.
         person_doc = PersonDocument.get(id=person.pk)
@@ -1585,6 +1587,7 @@ class PeopleIndexingTest(
         self.assertEqual(person.date_dob, person_doc.dob.date())
         self.assertEqual(person.date_dod, person_doc.dod.date())
         self.assertEqual(["i"], person_doc.political_affiliation_id)
+        self.assertEqual(person.date_created, person_doc.date_created)
 
         pos_5_doc = PositionDocument.get(
             id=ES_CHILD_ID(position_5.pk).POSITION

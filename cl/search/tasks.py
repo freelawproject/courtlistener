@@ -1,6 +1,6 @@
 import logging
 import socket
-from datetime import timedelta
+from datetime import date, timedelta
 from importlib import import_module
 from random import randint
 from typing import Any, Generator
@@ -14,6 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Prefetch, QuerySet
 from django.utils.timezone import now
 from elasticsearch.exceptions import (
+    ApiError,
     ConflictError,
     ConnectionError,
     ConnectionTimeout,
@@ -32,7 +33,7 @@ from scorched.exc import SolrError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
-from cl.lib.elasticsearch_utils import es_index_exists
+from cl.lib.elasticsearch_utils import build_daterange_query, es_index_exists
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
@@ -448,6 +449,8 @@ def document_fields_to_update(
         for field in affected_fields:
             document_fields = fields_map[field]
             for doc_field in document_fields:
+                if not doc_field:
+                    continue
                 if field.startswith("get_") and field.endswith("_display"):
                     fields_to_update[doc_field] = getattr(
                         related_instance, field
@@ -536,6 +539,10 @@ def update_es_document(
         related_instance,
         fields_map,
     )
+    if not fields_values_to_update:
+        # Abort, avoid updating not indexed fields, like "source" in Docket.
+        return
+
     Document.update(
         es_doc,
         **fields_values_to_update,
@@ -618,7 +625,13 @@ def get_doc_from_es(
 
 def handle_ubq_retries(
     self: Task,
-    exc: ConnectionError | ConflictError | ConnectionTimeout | NotFoundError,
+    exc: (
+        ConnectionError
+        | ConflictError
+        | ConnectionTimeout
+        | NotFoundError
+        | ApiError
+    ),
     count_query=QuerySet | None,
 ) -> None:
     """Handles the retry logic for update_children_docs_by_query task based on
@@ -630,6 +643,15 @@ def handle_ubq_retries(
     update.
     :return: None
     """
+
+    # If this is an ApiError exception, confirm the error type is
+    # search_context_missing_exception, so it can be retried. Otherwise, raise
+    # the error.
+    if isinstance(exc, ApiError) and not (
+        exc.info.get("error", {}).get("type", {})
+        == "search_context_missing_exception"
+    ):
+        raise exc
 
     retry_count = self.request.retries
     if retry_count >= self.max_retries:
@@ -645,7 +667,7 @@ def handle_ubq_retries(
         jitter_sec = randint(10, 30)
         countdown_sec = ((retry_count + 1) * min_delay_sec) + jitter_sec
     else:
-        # Default case for ConflictError and NotFoundError
+        # Default case for ConflictError, NotFoundError or ApiError search_context_missing_exception
         min_delay_sec = 10  # 10 seconds
         max_delay_sec = 15  # 15 seconds
         countdown_sec = ((retry_count + 1) * min_delay_sec) + randint(
@@ -778,6 +800,7 @@ def update_children_docs_by_query(
         ConflictError,
         ConnectionTimeout,
         NotFoundError,
+        ApiError,
     ) as exc:
         handle_ubq_retries(self, exc, count_query=count_query)
 
@@ -841,6 +864,8 @@ def bulk_indexing_generator(
     :param child_id_property: Optional, the property to be used for generating
      ES child document ID.
     :param parent_id: Optional, the parent instance ID used for routing in ES.
+    This parameter must only be provided when indexing documents that belong to
+    the same parent document.
     :param base_doc: The base ES document fields.
     :return: Yields ES child documents for bulk indexing.
     """
@@ -853,13 +878,18 @@ def bulk_indexing_generator(
         es_doc = es_document().prepare(doc)
         if child_id_property:
             if not parent_id:
-                parent_id_lambda = parent_id_mappings.get(child_id_property)
-                if not parent_id_lambda:
+                routing_id_lambda = parent_id_mappings.get(child_id_property)
+                if not routing_id_lambda:
                     continue
-                parent_id = parent_id_lambda(doc)
+                # Get the routing_id from the parent document's ID.
+                routing_id = routing_id_lambda(doc)
+            else:
+                # The parent_id was provided when indexing documents that
+                # belong to the same parent.
+                routing_id = parent_id
             doc_params = {
                 "_id": getattr(ES_CHILD_ID(doc.pk), child_id_property),
-                "_routing": f"{parent_id}",
+                "_routing": f"{routing_id}",
             }
         else:
             doc_params = {
@@ -1081,9 +1111,13 @@ def index_parent_or_child_docs(
                 child_instances = RECAPDocument.objects.filter(
                     pk__in=instance_ids
                 )
-                parent_ids = RECAPDocument.objects.filter(
-                    pk__in=instance_ids
-                ).values_list("docket_entry__docket_id", flat=True)
+                # Get unique parent_ids for RECAPDocuments
+                parent_ids = list(
+                    RECAPDocument.objects.filter(pk__in=instance_ids)
+                    .values_list("docket_entry__docket_id", flat=True)
+                    .order_by("docket_entry__docket_id")
+                    .distinct("docket_entry__docket_id")
+                )
         case SEARCH_TYPES.OPINION:
             parent_es_document = OpinionClusterDocument
             child_es_document = OpinionDocument
@@ -1095,6 +1129,16 @@ def index_parent_or_child_docs(
                 )
             elif document_type == "child":
                 child_instances = Opinion.objects.filter(pk__in=instance_ids)
+                # Get unique parent_ids for Opinions
+                parent_ids = list(
+                    Opinion.objects.filter(pk__in=instance_ids)
+                    .values_list("cluster_id", flat=True)
+                    .distinct()
+                )
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            parent_es_document = AudioDocument
+            if document_type == "parent":
+                parent_instances = Audio.objects.filter(pk__in=instance_ids)
         case _:
             return
 
@@ -1486,6 +1530,7 @@ def index_related_cites_fields(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         OpinionClusterDocument._index.refresh()
+        DocketDocument._index.refresh()
 
 
 @app.task(
@@ -1564,3 +1609,88 @@ def remove_parent_and_child_docs_by_query(
     if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
         # Set auto-refresh, used for testing.
         es_document._index.refresh()
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(ConnectionError, NotFoundError),
+    max_retries=5,
+    interval_start=5,
+    ignore_result=True,
+)
+def remove_documents_by_query(
+    self: Task,
+    es_document_name: ESDocumentNameType,
+    instance_ids: list[int] | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    testing_mode: bool = False,
+    requests_per_second: int | None = None,
+    max_docs: int = 0,
+) -> None | dict[str, str]:
+    """Remove documents from ES by query.
+
+    This method deletes documents from a specified ES document type based on a
+    combination of criteria such as document IDs, and a date range.
+
+    :param self: The Celery task instance.
+    :param es_document_name: The Elasticsearch Document type name to delete.
+    :param instance_ids: Optional, a list of document IDs to delete. If None,
+    deletion is based on the date range.
+    :param start_date: Optional, the start date of the date range for document deletion.
+    :param end_date: Optional, the end date of the date range for document deletion.
+    :param testing_mode: Optional, if True, performs the removal synchronously.
+    :param requests_per_second: Optional, the target number of sub-requests per
+    second for a delete by query operation.
+    :param max_docs: Optional, maximum number of documents to process.
+    :return: The ES request response, or None for unsupported removal actions.
+    """
+
+    optional_params = {}
+    es_document = getattr(es_document_module, es_document_name)
+    s = es_document.search()
+    match es_document_name:
+        case "DocketDocument" if instance_ids:
+            # Remove non-recap dockets.
+            remove_query = Q("terms", _id=instance_ids)
+            s = s.query(remove_query)
+            query = s.to_dict()["query"]
+        case "OpinionDocument" if start_date and end_date:
+            # Remove OpinionDocument by a timestamp range date query.
+            date_range_query = build_daterange_query(
+                "timestamp", end_date, start_date
+            )
+            child_query_opinion = Q("match", cluster_child="opinion")
+            remove_query = Q(
+                "bool", must=[date_range_query[0], child_query_opinion]
+            )
+            s = s.query(remove_query)
+            query = s.to_dict()["query"]
+            if not testing_mode:
+                # Execute the task asynchronously.
+                optional_params.update({"wait_for_completion": "false"})
+            if max_docs:
+                optional_params.update({"max_docs": max_docs})
+            if requests_per_second:
+                optional_params.update(
+                    {"requests_per_second": requests_per_second}
+                )
+        case _:
+            # Abort DeleteByQuery request for a not supported document type.
+            return None
+
+    if not testing_mode:
+        # Ignore ConflictErrors, by proceeding with the deletion.
+        optional_params.update({"conflicts": "proceed"})
+
+    client = connections.get_connection(alias="no_retry_connection")
+    response = client.delete_by_query(
+        index=es_document._index._name,
+        body={"query": query},
+        params=optional_params,
+    )
+    if settings.ELASTICSEARCH_DSL_AUTO_REFRESH:
+        # Set auto-refresh, used for testing.
+        es_document._index.refresh()
+
+    return response

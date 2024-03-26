@@ -4,6 +4,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from http import HTTPStatus
 from multiprocessing import process
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
@@ -38,10 +39,6 @@ from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.cookies import RequestsCookieJar
 from requests.packages.urllib3.exceptions import ReadTimeoutError
-from rest_framework.status import (
-    HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_504_GATEWAY_TIMEOUT,
-)
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.api.webhooks import send_recap_fetch_webhooks
@@ -51,6 +48,7 @@ from cl.corpus_importer.tasks import (
     download_pdf_by_magic_number,
     get_att_report_by_rd,
     get_document_number_for_appellate,
+    is_docket_entry_sealed,
     is_pacer_doc_sealed,
     make_attachment_pq_object,
     update_rd_metadata,
@@ -1547,8 +1545,8 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
     except HTTPError as exc:
         msg = "Failed to get attachment page from network."
         if exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
             if self.request.retries == self.max_retries:
                 mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
@@ -2274,6 +2272,11 @@ def process_recap_email(
         user_pk,
         appellate,
     )
+    is_potentially_sealed_entry = (
+        is_docket_entry_sealed(epq.court_id, pacer_case_id, pacer_doc_id)
+        if pq.status == PROCESSING_STATUS.FAILED and not appellate
+        else False
+    )
     if appellate:
         # Get the document number for appellate documents.
         appellate_doc_num = get_document_number_for_appellate(
@@ -2311,6 +2314,9 @@ def process_recap_email(
                 # We only care about the ext w/S3PrivateUUIDStorageTest
                 ContentFile(body.encode()),
             )
+            if is_potentially_sealed_entry:
+                continue
+
             # Add docket entries for each docket
             (
                 (des_returned, rds_updated),
@@ -2344,9 +2350,15 @@ def process_recap_email(
 
         # Get NEF attachments and merge them.
         all_attachment_rds = []
-        if data["contains_attachments"] is True:
+        if (
+            data["contains_attachments"] is True
+            and not is_potentially_sealed_entry
+        ):
             all_attachment_rds = get_and_merge_rd_attachments(
-                document_url, epq.court_id, dockets_updated, user_pk
+                document_url,
+                epq.court_id,
+                dockets_updated,
+                user_pk,
             )
             get_and_copy_recap_attachment_docs(
                 self,
@@ -2383,20 +2395,26 @@ def process_recap_email(
         all_created_rds += docket_updated.rds_created
         all_updated_rds += docket_updated.rds_updated
 
-    rds_to_extract_add_to_solr = all_attachment_rds + all_created_rds
-    rds_updated_or_created = (
-        all_attachment_rds + all_created_rds + all_updated_rds
-    )
-    async_to_sync(associate_related_instances)(
-        epq,
-        d_id=None,
-        de_id=None,
-        rd_id=[rd.pk for rd in rds_updated_or_created],
-    )
-    msg = "Successful upload! Nice work."
-    async_to_sync(mark_pq_status)(
-        epq, msg, PROCESSING_STATUS.SUCCESSFUL, "status_message"
-    )
+    if not is_potentially_sealed_entry:
+        rds_to_extract_add_to_solr = all_attachment_rds + all_created_rds
+        rds_updated_or_created = (
+            all_attachment_rds + all_created_rds + all_updated_rds
+        )
+        async_to_sync(associate_related_instances)(
+            epq,
+            d_id=None,
+            de_id=None,
+            rd_id=[rd.pk for rd in rds_updated_or_created],
+        )
+        msg = "Successful upload! Nice work."
+        status = PROCESSING_STATUS.SUCCESSFUL
+    else:
+        rds_to_extract_add_to_solr = []
+        self.request.chain = None
+        msg = "Could not retrieve Docket Entry"
+        status = PROCESSING_STATUS.FAILED
+
+    async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
     return [rd.pk for rd in rds_to_extract_add_to_solr]
 
 
