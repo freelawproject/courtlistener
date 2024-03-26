@@ -7,7 +7,11 @@ from rest_framework.serializers import ModelSerializer
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.extras import get_highlight
-from cl.lib.document_serializer import DocumentSerializer, NullableListField
+from cl.lib.document_serializer import (
+    DocumentSerializer,
+    NullableListField,
+    TimeStampField,
+)
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.constants import o_type_index_map
@@ -379,6 +383,7 @@ class OpinionESResultSerializer(DocumentSerializer):
     citation = NullableListField(read_only=True)
     per_curiam = serializers.BooleanField(read_only=True)
     court_exact = serializers.CharField(read_only=True)
+    timestamp = TimeStampField(read_only=True)
 
     def to_representation(self, instance):
         """Transforms fields and adds missing ones to the serialized
@@ -409,4 +414,5 @@ class OpinionESResultSerializer(DocumentSerializer):
             "syllabus",
             "procedural_history",
             "panel_names",
+            "sha1",
         )

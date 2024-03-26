@@ -1,21 +1,37 @@
 import copy
+import datetime
 from collections import OrderedDict
-from datetime import date, datetime
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 from django_elasticsearch_dsl import Document, fields
 from rest_framework import serializers
 from rest_framework.fields import empty
 from rest_framework.utils.field_mapping import get_field_kwargs
 
 
+class TimeStampField(serializers.Field):
+    """Handles a naive timestamp field."""
+
+    def to_representation(self, value):
+        if isinstance(value, datetime.datetime) and timezone.is_naive(value):
+            date_time_aware = timezone.make_aware(value, datetime.timezone.utc)
+            return serializers.DateTimeField().to_representation(
+                timezone.localtime(date_time_aware)
+            )
+        else:
+            raise serializers.ValidationError(
+                "Date or DateTime object expected."
+            )
+
+
 class DateOrDateTimeField(serializers.Field):
     """Handles both datetime and date objects."""
 
     def to_representation(self, value):
-        if isinstance(value, datetime):
+        if isinstance(value, datetime.datetime):
             return serializers.DateTimeField().to_representation(value)
-        elif isinstance(value, date):
+        elif isinstance(value, datetime.date):
             return serializers.DateField().to_representation(value)
         else:
             raise serializers.ValidationError(

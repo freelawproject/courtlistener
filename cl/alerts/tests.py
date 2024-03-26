@@ -54,7 +54,7 @@ from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.date_time import midnight_pt
-from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
+from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -66,6 +66,7 @@ from cl.search.factories import (
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
+    Citation,
     Court,
     Docket,
     DocketEntry,
@@ -822,6 +823,103 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             mail.outbox[3].extra_headers["List-Unsubscribe"],
         )
 
+        opinion_alert_webhook_keys = {
+            "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
+            "attorney": lambda x: x["result"].cluster.attorneys,
+            "author_id": lambda x: x["result"].author_id,
+            "caseName": lambda x: x["result"].cluster.case_name,
+            "citation": lambda x: [
+                str(cite) for cite in x["result"].cluster.citations.all()
+            ],
+            "citeCount": lambda x: x["result"].cluster.citation_count,
+            "cites": lambda x: (
+                list(
+                    x["result"]
+                    .cited_opinions.all()
+                    .values_list("cited_opinion_id", flat=True)
+                )
+                if x["result"]
+                .cited_opinions.all()
+                .values_list("cited_opinion_id", flat=True)
+                else None
+            ),
+            "court": lambda x: x["result"].cluster.docket.court.full_name,
+            "court_citation_string": lambda x: x[
+                "result"
+            ].cluster.docket.court.citation_string,
+            "court_exact": lambda x: x["result"].cluster.docket.court_id,
+            "court_id": lambda x: x["result"].cluster.docket.court_id,
+            "cluster_id": lambda x: x["result"].cluster_id,
+            "dateArgued": lambda x: midnight_pt(
+                x["result"].cluster.docket.date_argued
+            ).isoformat(),
+            "dateFiled": lambda x: midnight_pt(
+                x["result"].cluster.date_filed
+            ).isoformat(),
+            "dateReargued": lambda x: x["result"].cluster.docket.date_reargued,
+            "dateReargumentDenied": lambda x: x[
+                "result"
+            ].cluster.docket.date_reargument_denied,
+            "docketNumber": lambda x: x["result"].cluster.docket.docket_number,
+            "docket_id": lambda x: x["result"].cluster.docket_id,
+            "download_url": lambda x: x["result"].download_url,
+            "id": lambda x: x["result"].pk,
+            "joined_by_ids": lambda x: (
+                list(x["result"].joined_by.all().values_list("id", flat=True))
+                if x["result"].joined_by.all()
+                else None
+            ),
+            "panel_ids": lambda x: (
+                list(
+                    x["result"]
+                    .cluster.panel.all()
+                    .values_list("id", flat=True)
+                )
+                if x["result"].cluster.panel.all()
+                else None
+            ),
+            "type": lambda x: x["result"].type,
+            "judge": lambda x: x["result"].cluster.judges,
+            "lexisCite": lambda x: (
+                str(
+                    x["result"].cluster.citations.filter(type=Citation.LEXIS)[
+                        0
+                    ]
+                )
+                if x["result"].cluster.citations.filter(type=Citation.LEXIS)
+                else ""
+            ),
+            "neutralCite": lambda x: (
+                str(
+                    x["result"].cluster.citations.filter(
+                        type=Citation.NEUTRAL
+                    )[0]
+                )
+                if x["result"].cluster.citations.filter(type=Citation.NEUTRAL)
+                else ""
+            ),
+            "local_path": lambda x: (
+                x["result"].local_path if x["result"].local_path else None
+            ),
+            "per_curiam": lambda x: x["result"].per_curiam,
+            "scdb_id": lambda x: x["result"].cluster.scdb_id,
+            "sibling_ids": lambda x: list(
+                x["result"]
+                .cluster.sub_opinions.all()
+                .values_list("id", flat=True)
+            ),
+            "status": lambda x: x[
+                "result"
+            ].cluster.get_precedential_status_display(),
+            "snippet": lambda x: x["snippet"],
+            "suitNature": lambda x: x["result"].cluster.nature_of_suit,
+            "date_created": lambda x: timezone.localtime(
+                x["result"].cluster.date_created
+            ).isoformat(),
+            "timestamp": lambda x: timezone.localtime(
+                x["result"].cluster.date_created
+            ).isoformat(),
+        }
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(len(webhook_events), 3)
@@ -845,112 +943,71 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
         }
 
         for webhook_sent in webhook_events:
-            self.assertEqual(
-                webhook_sent.event_status,
-                WEBHOOK_EVENT_STATUS.SUCCESSFUL,
-            )
-            content = webhook_sent.content
-            alert_data_compare = alert_data[content["payload"]["alert"]["id"]]
-            self.assertEqual(
-                webhook_sent.webhook.user,
-                alert_data_compare["alert"].user,
-            )
+            with self.subTest(webhook_sent=webhook_sent):
+                self.assertEqual(
+                    webhook_sent.event_status,
+                    WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                )
+                content = webhook_sent.content
+                alert_data_compare = alert_data[
+                    content["payload"]["alert"]["id"]
+                ]
+                self.assertEqual(
+                    webhook_sent.webhook.user,
+                    alert_data_compare["alert"].user,
+                )
 
-            # Check if the webhook event payload is correct.
-            self.assertEqual(
-                content["webhook"]["event_type"],
-                WebhookEventType.SEARCH_ALERT,
-            )
-            self.assertEqual(
-                content["payload"]["alert"]["name"],
-                alert_data_compare["alert"].name,
-            )
-            self.assertEqual(
-                content["payload"]["alert"]["query"],
-                alert_data_compare["alert"].query,
-            )
-            self.assertEqual(
-                content["payload"]["alert"]["rate"],
-                alert_data_compare["alert"].rate,
-            )
-            if (
-                content["payload"]["alert"]["alert_type"]
-                == SEARCH_TYPES.OPINION
-            ):
+                # Check if the webhook event payload is correct.
                 self.assertEqual(
-                    content["payload"]["results"][0]["caseName"],
-                    alert_data_compare["result"].cluster.case_name,
+                    content["webhook"]["event_type"],
+                    WebhookEventType.SEARCH_ALERT,
                 )
                 self.assertEqual(
-                    content["payload"]["results"][0]["dateReargued"],
-                    alert_data_compare["result"].cluster.docket.date_reargued,
+                    content["payload"]["alert"]["name"],
+                    alert_data_compare["alert"].name,
                 )
                 self.assertEqual(
-                    content["payload"]["results"][0]["dateFiled"],
-                    midnight_pt(
-                        alert_data_compare["result"].cluster.date_filed
-                    ).isoformat(),
+                    content["payload"]["alert"]["query"],
+                    alert_data_compare["alert"].query,
                 )
                 self.assertEqual(
-                    content["payload"]["results"][0]["panel_ids"],
-                    None,
+                    content["payload"]["alert"]["rate"],
+                    alert_data_compare["alert"].rate,
                 )
-                self.assertEqual(
-                    content["payload"]["results"][0]["download_url"],
-                    alert_data_compare["result"].download_url,
-                )
-                self.assertEqual(
-                    content["payload"]["results"][0]["download_url"],
-                    alert_data_compare["result"].download_url,
-                )
-                self.assertEqual(
-                    content["payload"]["results"][0]["type"],
-                    alert_data_compare["result"].type,
-                )
-                self.assertEqual(
-                    content["payload"]["results"][0]["status"],
-                    alert_data_compare[
-                        "result"
-                    ].cluster.get_precedential_status_display(),
-                )
-                self.assertEqual(
-                    content["payload"]["results"][0]["snippet"],
-                    alert_data_compare["snippet"],
-                )
-                local_path_to_compare = (
-                    alert_data_compare["result"].local_path
-                    if alert_data_compare["result"].local_path
-                    else None
-                )
-                self.assertEqual(
-                    content["payload"]["results"][0]["local_path"],
-                    local_path_to_compare,
-                )
-                cites_to_compare = (
-                    list(
-                        alert_data_compare["result"]
-                        .cited_opinions.all()
-                        .values_list("cited_opinion_id", flat=True)
+                if (
+                    content["payload"]["alert"]["alert_type"]
+                    == SEARCH_TYPES.OPINION
+                ):
+                    # Assert the number of keys in the Opinions Search Webhook
+                    # payload
+                    keys_count = len(content["payload"]["results"][0])
+                    self.assertEqual(
+                        keys_count, len(opinion_alert_webhook_keys)
                     )
-                    if alert_data_compare["result"]
-                    .cited_opinions.all()
-                    .values_list("cited_opinion_id", flat=True)
-                    else None
-                )
-                self.assertEqual(
-                    content["payload"]["results"][0]["cites"],
-                    cites_to_compare,
-                )
-                self.assertEqual(
-                    content["payload"]["results"][0]["court_exact"],
-                    alert_data_compare["result"].cluster.docket.court_id,
-                )
 
-            else:
-                self.assertEqual(
-                    content["payload"]["results"][0]["caseName"],
-                    alert_data_compare["result"].case_name,
-                )
+                    # Iterate through all the opinion fields and compare them.
+                    for (
+                        field,
+                        get_expected_value,
+                    ) in opinion_alert_webhook_keys.items():
+                        with self.subTest(field=field):
+                            expected_value = get_expected_value(
+                                alert_data_compare
+                            )
+                            actual_value = content["payload"]["results"][
+                                0
+                            ].get(field)
+                            self.assertEqual(
+                                actual_value,
+                                expected_value,
+                                f"Field '{field}' does not match.",
+                            )
+                else:
+                    # Assertions for OA webhook payload.
+                    self.assertEqual(
+                        content["payload"]["results"][0]["caseName"],
+                        alert_data_compare["result"].case_name,
+                    )
 
     def test_send_search_alert_webhooks_rates(self):
         """Can we send search alert webhooks for different alert rates?"""
