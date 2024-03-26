@@ -13,6 +13,7 @@ from django.http import QueryDict
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
+from elasticsearch_dsl import Q as ES_Q
 
 from cl.alerts.models import Alert, RealTimeQueue
 from cl.alerts.utils import InvalidDateError
@@ -199,40 +200,46 @@ class Command(VerboseCommand):
                 # Bail out. No results will be found if no valid_ids.
                 return query_type, results
 
-            if self.o_es_alerts:
-                search_query = OpinionDocument.search()
-                s, join_query = build_es_base_query(search_query, cd)
-                s = build_child_docs_query(
-                    join_query,
-                    cd=cd,
-                )
-                s = search_query.query(s)
-            else:
-                main_params = search_utils.build_main_query(
-                    cd,
-                    highlight="text",
-                    # Required to show all field as in Search API
-                    facet=False,
-                )
-                main_params.update(
-                    {
-                        "rows": "20",
-                        "start": "0",
-                        "hl.tag.pre": "<em><strong>",
-                        "hl.tag.post": "</strong></em>",
-                        "caller": f"cl_send_alerts:{query_type}",
-                    }
-                )
+            main_params = search_utils.build_main_query(
+                cd,
+                highlight="text",
+                # Required to show all field as in Search API
+                facet=False,
+            )
+            main_params.update(
+                {
+                    "rows": "20",
+                    "start": "0",
+                    "hl.tag.pre": "<em><strong>",
+                    "hl.tag.post": "</strong></em>",
+                    "caller": f"cl_send_alerts:{query_type}",
+                }
+            )
 
             if rate == Alert.REAL_TIME:
                 if self.o_es_alerts:
-                    pass
+                    cd.update(
+                        {
+                            "id": " ".join(
+                                [str(i) for i in self.valid_ids[query_type]]
+                            )
+                        }
+                    )
                 else:
                     main_params["fq"].append(
                         f"id:({' OR '.join([str(i) for i in self.valid_ids[query_type]])})"
                     )
 
             if self.o_es_alerts:
+
+                search_query = OpinionDocument.search()
+                s, join_query = build_es_base_query(search_query, cd)
+                s = build_child_docs_query(
+                    join_query,
+                    cd=cd,
+                )
+
+                s = search_query.query(s)
                 highlight_options, fields_to_exclude = build_highlights_dict(
                     SEARCH_ALERTS_OPINION_HL_FIELDS, ALERTS_HL_TAG
                 )
@@ -356,9 +363,9 @@ class Command(VerboseCommand):
 
     def get_new_ids(self):
         """Get an intersection of the items that are new in the DB and those
-        that have made it into Solr.
+        that have made it into Solr or ES.
 
-        For every item that's in the RealTimeQueue, query Solr and see which
+        For every item that's in the RealTimeQueue, query ES/Solr and see which
         have made it to the index. We'll use these to run the alerts.
 
         Returns a dict like so:
@@ -370,7 +377,22 @@ class Command(VerboseCommand):
         valid_ids = {}
         for item_type in SEARCH_TYPES.ALL_TYPES:
             ids = RealTimeQueue.objects.filter(item_type=item_type)
-            if ids:
+            if not ids:
+                valid_ids[item_type] = []
+            if self.o_es_alerts:
+                # Get valid RT IDs from ES.
+                search_query = OpinionDocument.search()
+                ids_query = ES_Q("terms", id=[str(i.item_pk) for i in ids])
+                s = search_query.query(ids_query)
+                s = s.source(includes=["id"])
+                s = s.extra(
+                    from_=0,
+                    size=MAX_RT_ITEM_QUERY,
+                )
+                results = s.execute()
+                valid_ids[item_type] = [int(r["id"]) for r in results]
+            else:
+                # Get valid RT IDs from SOLR.
                 main_params = {
                     "q": "*",  # Vital!
                     "caller": f"cl_send_alerts:{item_type}",
@@ -389,6 +411,4 @@ class Command(VerboseCommand):
                 valid_ids[item_type] = [
                     int(r["id"]) for r in results.result.docs
                 ]
-            else:
-                valid_ids[item_type] = []
         return valid_ids

@@ -566,9 +566,7 @@ class AlertAPITests(APITestCase):
 
 
 @override_switch("o-es-alerts-active", active=True)
-class SearchAlertsWebhooksTest(
-    ESIndexTestCase, EmptySolrTestCase
-):  # TestCase ):
+class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
     """Test Search Alerts Webhooks"""
 
     @classmethod
@@ -593,7 +591,6 @@ class SearchAlertsWebhooksTest(
             enabled=True,
         )
         unpublished_status = PRECEDENTIAL_STATUS.UNPUBLISHED
-        # unpublished_status = "Non-Precedential"
         cls.search_alert = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.DAILY,
@@ -656,7 +653,7 @@ class SearchAlertsWebhooksTest(
         cls.search_alert_3 = AlertFactory(
             user=cls.user_profile_3.user,
             rate=Alert.DAILY,
-            name="Test Alert O Enabled",
+            name="Test Alert 2 O Enabled",
             query=f"q=California hearing&type=o&stat_{unpublished_status}=on",
         )
         cls.c1 = CourtFactory(
@@ -712,22 +709,16 @@ class SearchAlertsWebhooksTest(
 
             cls.wly_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__case_name="California vs Week",
                 cluster__date_filed=now() - timedelta(days=2),
+                plain_text="Lorem dolor Ipsum",
             )
             cls.mly_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__case_name="California vs Month",
                 cluster__date_filed=now() - timedelta(days=25),
+                plain_text="Lorem dolor Ipsum",
             )
-
-    def setUp(self) -> None:
-        super().setUp()
-        obj_types = {
-            "audio.Audio": Audio,
-            "search.Opinion": Opinion,
-        }
-        for obj_name, obj_type in obj_types.items():
-            ids = obj_type.objects.all().values_list("pk", flat=True)
-            add_items_to_solr(ids, obj_name, force_commit=True)
 
     def test_send_search_alert_webhooks(self):
         """Can we send search alert webhooks for Opinions and Oral Arguments
@@ -751,8 +742,9 @@ class SearchAlertsWebhooksTest(
                 # Send ES Alerts (Only OA for now)
                 call_command("cl_send_scheduled_alerts", rate="dly")
 
-        # Three search alerts should be sent:
-        # Two opinion alerts to user_profile and one to user_profile_2 (Solr)
+        # 4 search alerts should be sent:
+        # Two opinion alerts to user_profile, one to user_profile_2, and one to
+        # user_profile_3
         # One oral argument alert to user_profile (ES)
         self.assertEqual(len(mail.outbox), 4)
 
@@ -968,7 +960,9 @@ class SearchAlertsWebhooksTest(
             # Get ready the RT opinion for the test.
             rt_opinion = OpinionWithParentsFactory.create(
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                cluster__case_name="California vs RT",
                 cluster__date_filed=now(),
+                plain_text="Lorem dolor hearing Ipsum",
             )
             RealTimeQueue.objects.create(
                 item_type=SEARCH_TYPES.OPINION, item_pk=rt_opinion.pk
@@ -993,7 +987,7 @@ class SearchAlertsWebhooksTest(
         rates = [
             (Alert.REAL_TIME, 2, 1),  # 2 expected webhook events, 1 Opinion RT
             # Alert (search_alert_rt) + 1 OA Daily Alert, triggered by ES.
-            (Alert.DAILY, 1, 2),
+            (Alert.DAILY, 2, 2),
             (Alert.WEEKLY, 1, 3),
             (Alert.MONTHLY, 1, 4),
         ]
@@ -1012,16 +1006,19 @@ class SearchAlertsWebhooksTest(
                     call_command("cl_send_scheduled_alerts", rate=rate)
 
             webhook_events = WebhookEvent.objects.all()
-            self.assertEqual(len(webhook_events), events)
+            self.assertEqual(
+                len(webhook_events), events, msg="Wrong number of Events"
+            )
 
             for webhook_sent in webhook_events:
                 self.assertEqual(
                     webhook_sent.event_status,
                     WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                    msg="Wrong number of webhooks sent.",
                 )
-                self.assertEqual(
+                self.assertIn(
                     webhook_sent.webhook.user,
-                    self.user_profile.user,
+                    [self.user_profile.user, self.user_profile_3.user],
                 )
                 content = webhook_sent.content
                 # Check if the webhook event payload is correct.
@@ -1056,6 +1053,7 @@ class SearchAlertsWebhooksTest(
                     self.assertEqual(
                         len(content["payload"]["results"]),
                         results,
+                        msg="Wrong number of results.",
                     )
                     self.assertEqual(
                         content["payload"]["alert"]["rate"],

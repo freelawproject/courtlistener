@@ -1824,6 +1824,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                     "judge",
                     cd.get("judge", ""),
                 ),
+                *build_term_query("id", cd.get("id", "").split()),
             ]
         )
 
