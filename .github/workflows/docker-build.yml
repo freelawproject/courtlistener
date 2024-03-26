@@ -101,6 +101,11 @@ jobs:
       - name: Watch cl-celery-prefork-bulk rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk
 
+      - name: Rollout cl-celery-prefork-es-sweep
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep cl-celery-prefork-es-sweep=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-celery-prefork-es-sweep rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep
+
       - name: Rollout cl-scrape-rss
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss scrape-rss=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-scrape-rss rollout status
@@ -110,6 +115,12 @@ jobs:
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks retry-webhooks=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-retry-webhooks rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks
+
+      - name: Rollout cl-es-sweep-indexer
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer sweep-indexer=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-es-sweep-indexer rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer
+
 
       # Watch "cronjobs" in k9s
       - name: Update cronjobs

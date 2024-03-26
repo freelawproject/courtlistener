@@ -273,6 +273,7 @@ class AudioDocumentBase(Document):
         search_analyzer="search_analyzer",
     )
     timestamp = fields.DateField()
+    date_created = fields.DateField(attr="date_created")
 
 
 @oral_arguments_index.document
@@ -337,7 +338,6 @@ class AudioDocument(AudioDocumentBase):
 @oral_arguments_percolator_index.document
 class AudioPercolator(AudioDocumentBase):
     rate = fields.KeywordField(attr="rate")
-    date_created = fields.DateField(attr="date_created")
     percolator_query = PercolatorField()
 
     class Django:
@@ -491,6 +491,7 @@ class PersonBaseDocument(Document):
     )
     person_child = JoinField(relations={"person": ["position"]})
     timestamp = fields.DateField()
+    date_created = fields.DateField(attr="date_created")
 
     class Django:
         model = Person
@@ -948,6 +949,8 @@ class DocketBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
+    date_created = fields.DateField(attr="date_created")
+    pacer_case_id = fields.KeywordField(attr="pacer_case_id")
 
     class Django:
         model = Docket
@@ -1128,6 +1131,9 @@ class ESRECAPDocument(DocketBaseDocument):
                 "cited_opinion_id", flat=True
             )
         )
+
+    def prepare_pacer_case_id(self, instance):
+        return instance.docket_entry.docket.pacer_case_id
 
 
 @recap_index.document
@@ -1449,6 +1455,7 @@ class OpinionBaseDocument(Document):
     citeCount = fields.IntegerField(attr="citation_count")
     cluster_child = JoinField(relations={"opinion_cluster": ["opinion"]})
     timestamp = fields.DateField()
+    date_created = fields.DateField(attr="date_created")
 
     class Django:
         model = OpinionCluster

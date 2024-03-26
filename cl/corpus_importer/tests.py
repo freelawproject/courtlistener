@@ -71,7 +71,7 @@ from cl.corpus_importer.utils import (
     winnow_case_name,
 )
 from cl.lib.pacer import process_docket_data
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
 from cl.people_db.lookup_utils import (
@@ -1146,7 +1146,7 @@ class TrollerBKTests(TestCase):
 
     @classmethod
     def restart_troller_log(cls):
-        r = make_redis_interface("STATS")
+        r = get_redis_interface("STATS")
         key = r.keys("troller_bk:log")
         if key:
             r.delete(*key)

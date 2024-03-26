@@ -1,4 +1,5 @@
 import datetime
+from http import HTTPStatus
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
@@ -18,7 +19,6 @@ from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import status as statuses
 
 from cl.lib.bot_detector import is_bot
 from cl.lib.http import is_ajax
@@ -44,13 +44,13 @@ async def render_visualization_page(
 
     status = None
     if viz.deleted:
-        status = statuses.HTTP_410_GONE
+        status = HTTPStatus.GONE
         title = "Visualization Deleted by Creator"
     else:
         user = await User.objects.aget(pk=viz.user_id)
         if viz.published is False and user != await request.auser():
             # Not deleted, private and not the owner
-            status = statuses.HTTP_401_UNAUTHORIZED
+            status = HTTPStatus.UNAUTHORIZED
             title = "Private Visualization"
         else:
             title = f"Network Graph of {viz.title}"

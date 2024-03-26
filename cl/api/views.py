@@ -1,5 +1,6 @@
 import logging
 from datetime import date, timedelta
+from http import HTTPStatus
 from typing import Optional
 
 import waffle
@@ -10,8 +11,6 @@ from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from requests import Session
-from rest_framework import status
-from rest_framework.status import HTTP_400_BAD_REQUEST
 
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -230,7 +229,7 @@ async def get_result_count(request, version, day_count):
         return JsonResponse(
             {"error": "Invalid SearchForm"},
             safe=True,
-            status=HTTP_400_BAD_REQUEST,
+            status=HTTPStatus.BAD_REQUEST,
         )
     cd = search_form.cleaned_data
     search_type = cd["type"]
@@ -280,7 +279,7 @@ async def deprecated_api(request, v):
             "objects": [],
         },
         safe=False,
-        status=status.HTTP_410_GONE,
+        status=HTTPStatus.GONE,
     )
 
 
