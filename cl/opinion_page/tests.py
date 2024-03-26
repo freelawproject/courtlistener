@@ -640,6 +640,28 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
+    async def test_can_handle_text_with_slashes(self):
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "ARB/11/20/"},
+            follow=True,
+        )
+        self.assertTemplateUsed(r, "volumes_for_reporter.html")
+        self.assertIn("arb-11-20", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_can_handle_urls_as_inputs(self):
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "https://dockets.justia.com/docket/circuit-courts/ca5/20-10820"
+            },
+            follow=True,
+        )
+        self.assertTemplateUsed(r, "citation_redirect_info_page.html")
+        self.assertIn("Validation Error", r.content.decode())
+        self.assertIn("URLs are not allowed in this field", r.content.decode())
+
 
 class ViewRecapDocketTest(TestCase):
     @classmethod
