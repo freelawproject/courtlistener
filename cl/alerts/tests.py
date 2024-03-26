@@ -941,6 +941,11 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                     content["payload"]["results"][0]["cites"],
                     cites_to_compare,
                 )
+                self.assertEqual(
+                    content["payload"]["results"][0]["court_exact"],
+                    alert_data_compare["result"].cluster.docket.court_id,
+                )
+
             else:
                 self.assertEqual(
                     content["payload"]["results"][0]["caseName"],

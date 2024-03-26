@@ -28,24 +28,15 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
-from cl.search.constants import (
-    ALERTS_HL_TAG,
-    SEARCH_ALERTS_OPINION_HL_FIELDS,
-    o_type_index_map,
-)
+from cl.search.constants import ALERTS_HL_TAG, SEARCH_ALERTS_OPINION_HL_FIELDS
 from cl.search.documents import OpinionDocument
 from cl.search.forms import SearchForm
-from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 
 # Only do this number of RT items at a time. If there are more, they will be
 # handled in the next run of this script.
 MAX_RT_ITEM_QUERY = 1000
-
-
-inverted_o_type_index_map = {
-    value: key for key, value in o_type_index_map.items()
-}
 
 
 def get_cut_off_date(rate, d=datetime.date.today()):
@@ -231,14 +222,12 @@ class Command(VerboseCommand):
                     )
 
             if self.o_es_alerts:
-
                 search_query = OpinionDocument.search()
                 s, join_query = build_es_base_query(search_query, cd)
                 s = build_child_docs_query(
                     join_query,
                     cd=cd,
                 )
-
                 s = search_query.query(s)
                 highlight_options, fields_to_exclude = build_highlights_dict(
                     SEARCH_ALERTS_OPINION_HL_FIELDS, ALERTS_HL_TAG
@@ -253,17 +242,6 @@ class Command(VerboseCommand):
                     },
                 )
                 results = s.execute()
-                for result in results:
-                    # Map "type" and "status" fields to V3 values to ensure
-                    # backward compatibility.
-                    result["type"] = inverted_o_type_index_map.get(
-                        result["type"]
-                    )
-                    result["status"] = (
-                        PRECEDENTIAL_STATUS.get_status_value_reverse(
-                            result["status"]
-                        )
-                    )
 
             else:
                 # Ignore warnings from this bit of code. Otherwise, it complains

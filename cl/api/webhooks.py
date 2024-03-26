@@ -17,7 +17,6 @@ from cl.api.utils import (
     generate_webhook_key_content,
     update_webhook_event_after_request,
 )
-from cl.custom_filters.templatetags.extras import get_highlight
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
@@ -192,8 +191,6 @@ def send_search_alert_webhook(
         ).data
     else:
         # ES results serialization
-        for result in results:
-            result["snippet"] = get_highlight(result, "text")
         serialized_results = OpinionESResultSerializer(
             results,
             many=True,
