@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 from typing import Any, MutableMapping
 
@@ -52,6 +53,11 @@ class CitationRedirectorForm(forms.Form):
         ),
         required=False,
     )
+
+    def clean_reporter(self):
+        data = self.cleaned_data["reporter"]
+        # Sanitize reporter text: remove slashes
+        return data.replace("/", " ")
 
 
 class DocketEntryFilterForm(forms.Form):
