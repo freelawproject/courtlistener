@@ -64,12 +64,11 @@ def process_csv_data(
         if end_row is not None and (end_row == index):
             end = True
 
-        logger.info(f"Processing row: {index}")
         cluster_id = int(row.get("cluster_id"))
         citation_to_add = row.get("citation")
 
         if not OpinionCluster.objects.filter(id=cluster_id).exists():
-            logger.info(f"Opinion cluster doesn't exist: {cluster_id}")
+            logger.info(f"Row: {index} - Opinion cluster doesn't exist: {cluster_id}")
             continue
 
         if cluster_id and citation_to_add:
