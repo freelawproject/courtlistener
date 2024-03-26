@@ -56,6 +56,14 @@ class CitationRedirectorForm(forms.Form):
 
     def clean_reporter(self):
         data = self.cleaned_data["reporter"]
+        # Flag reporter text for potential URLs
+        if bool(re.search(r"http[s]?://\S+", data)):
+            raise ValidationError(
+                (
+                    "URLs are not allowed in this field. "
+                    "Please remove the URL and try again."
+                )
+            )
         # Sanitize reporter text: remove slashes
         return data.replace("/", " ")
 
