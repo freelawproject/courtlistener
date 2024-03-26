@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.serializers import ValidationError
 
 
-class CitationRequestSerializer(serializers.Serializer):
+class CitationAPIRequestSerializer(serializers.Serializer):
     text_citation = serializers.CharField(required=False)
     reporter = serializers.CharField(max_length=100, required=False)
     volume = serializers.IntegerField(required=False)

@@ -13,7 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from cl.citations.api_serializers import CitationRequestSerializer
+from cl.citations.api_serializers import CitationAPIRequestSerializer
 from cl.citations.types import CitationAPIResponse
 from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
 from cl.search.api_serializers import OpinionClusterSerializer
@@ -28,7 +28,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
 
     def create(self, request: Request, *args, **kwargs):
         # Uses the serializer to perform object level validations
-        citation_serializer = CitationRequestSerializer(data=request.data)
+        citation_serializer = CitationAPIRequestSerializer(data=request.data)
         citation_serializer.is_valid(raise_exception=True)
 
         # Get query parameters from the validated data
