@@ -1,3 +1,5 @@
+import re
+
 from juriscraper.lib.exceptions import PacerLoginException
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -145,6 +147,12 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     "Uploaded PDFs must have the pacer_doc_id and "
                     "document_number fields completed."
+                )
+
+            if not re.match("^[0-9]*$", attrs.get("document_number")):
+                raise ValidationError(
+                    "Uploaded PDFs document_number field can only contain "
+                    "numbers."
                 )
 
         if attrs["upload_type"] not in [
