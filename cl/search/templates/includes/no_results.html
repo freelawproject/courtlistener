@@ -47,7 +47,7 @@
       <p>Proximity queries do not work in filters. Consider using the main search box. For more details, visit our <a href="{% url "advanced_search" %}#proximity">advance search documentation</a>.</p>
     {% elif suggested_query %}
       <div class="flex">
-        <h4 class="text-danger" >Did you mean:&nbsp;<a href="{% url 'show_results' %}?q={{suggested_query}}&type={{request.GET.type}}">{{suggested_query}}</a></h4>
+        <h4 class="text-danger" >Did you mean:&nbsp;<a href="{% url 'show_results' %}?q={{suggested_query}}{% if request.GET.type %}&type={{request.GET.type}}{% endif %}">{{suggested_query}}</a></h4>
       </div>
     {% endif %}
 

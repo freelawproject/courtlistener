@@ -1,5 +1,7 @@
+from http import HTTPStatus
+
 import waffle
-from rest_framework import pagination, permissions, response, status, viewsets
+from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.pagination import PageNumberPagination
 
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
@@ -201,5 +203,5 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(
-            search_form.errors, status=status.HTTP_400_BAD_REQUEST
+            search_form.errors, status=HTTPStatus.BAD_REQUEST
         )

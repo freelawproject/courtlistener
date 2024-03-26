@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 from datetime import date
+from http import HTTPStatus
 from io import BytesIO
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
@@ -46,12 +47,6 @@ from requests.exceptions import (
     RequestException,
 )
 from rest_framework.renderers import JSONRenderer
-from rest_framework.status import (
-    HTTP_400_BAD_REQUEST,
-    HTTP_403_FORBIDDEN,
-    HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_504_GATEWAY_TIMEOUT,
-)
 from urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
@@ -80,7 +75,7 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
-from cl.lib.redis_utils import delete_redis_semaphore, make_redis_interface
+from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -599,8 +594,8 @@ def get_and_process_free_pdf(
         )
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
             msg = (
                 "Ran into HTTPError while getting PDF: "
@@ -816,8 +811,8 @@ def upload_to_ia(
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
-            HTTP_403_FORBIDDEN,  # Can't access bucket, typically.
-            HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
+            HTTPStatus.FORBIDDEN,  # Can't access bucket, typically.
+            HTTPStatus.BAD_REQUEST,  # Corrupt PDF, typically.
         ]:
             return [exc.response]
         if self.request.retries == self.max_retries:
@@ -1190,7 +1185,7 @@ def make_docket_by_iquery(
             return None
         raise self.retry(exc=exc)
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     if not report.data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
@@ -1457,8 +1452,8 @@ def get_attachment_page_by_rd(
         att_report = get_att_report_by_rd(rd, cookies)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
             logger.warning(
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
@@ -2082,8 +2077,8 @@ def get_pacer_doc_id_with_show_case_doc_url(
         raise self.retry(exc=exc)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
             status_code = exc.response.status_code
             msg = "Got HTTPError with status code %s."

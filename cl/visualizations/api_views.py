@@ -1,8 +1,9 @@
+from http import HTTPStatus
+
 from asgiref.sync import async_to_sync
 from django.db.models import Q
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
@@ -46,11 +47,13 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         if status != "success":
             return Response(
-                {"error": status}, status=HTTP_400_BAD_REQUEST, headers=headers
+                {"error": status},
+                status=HTTPStatus.BAD_REQUEST,
+                headers=headers,
             )
         else:
             return Response(
-                serializer.data, status=HTTP_201_CREATED, headers=headers
+                serializer.data, status=HTTPStatus.CREATED, headers=headers
             )
 
     def perform_create(self, serializer):

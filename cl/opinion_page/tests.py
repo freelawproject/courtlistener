@@ -3,6 +3,7 @@ import datetime
 import os
 import shutil
 from datetime import date
+from http import HTTPStatus
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
@@ -16,13 +17,6 @@ from django.test import override_settings
 from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_300_MULTIPLE_CHOICES,
-    HTTP_302_FOUND,
-    HTTP_400_BAD_REQUEST,
-    HTTP_404_NOT_FOUND,
-)
 from waffle.testutils import override_flag
 
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -93,7 +87,7 @@ class SimpleLoadTest(TestCase):
             kwargs={"docket_id": 1, "doc_num": "1", "slug": "asdf"},
         )
         response = await self.async_client.get(path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
 class OpinionPageLoadTest(
@@ -172,7 +166,7 @@ class OpinionPageLoadTest(
             "view_case", kwargs={"pk": self.opinion_cluster_1.pk, "_": "asdf"}
         )
         response = await self.async_client.get(path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIn("33 state 1", response.content.decode())
 
     async def test_es_get_citing_clusters_with_cache(self) -> None:
@@ -248,8 +242,8 @@ class DocumentPageRedirection(TestCase):
             },
         )
         r = await self.async_client.get(path, follow=True)
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
 class CitationRedirectorTest(TestCase):
@@ -267,7 +261,7 @@ class CitationRedirectorTest(TestCase):
 
     async def test_citation_homepage(self) -> None:
         r = await self.async_client.get(reverse("citation_homepage"))
-        self.assertStatus(r, HTTP_200_OK)
+        self.assertStatus(r, HTTPStatus.OK)
 
     @override_flag("o-es-active", False)
     def test_with_a_citation(self) -> None:
@@ -276,12 +270,12 @@ class CitationRedirectorTest(TestCase):
         r = self.client.get(
             reverse("citation_redirector", kwargs=self.citation), follow=True
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
         r = self.client.post(
             reverse("citation_redirector"), self.citation, follow=True
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
     async def test_multiple_results(self) -> None:
         """Do we return a 300 status code when there are multiple results?"""
@@ -294,8 +288,22 @@ class CitationRedirectorTest(TestCase):
         r = await self.async_client.get(
             reverse("citation_redirector", kwargs=self.citation)
         )
-        self.assertStatus(r, HTTP_300_MULTIPLE_CHOICES)
+        self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
         await f2_cite.adelete()
+
+    async def test_handle_ambiguous_reporter_variations(self) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "bailey",
+                },
+            ),
+        )
+        self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+        self.assertIn(
+            "Found More Than One Possible Reporter", r.content.decode()
+        )
 
     async def test_unknown_citation(self) -> None:
         """Do we get a 404 message if we don't know the citation?"""
@@ -309,7 +317,31 @@ class CitationRedirectorTest(TestCase):
                 },
             ),
         )
-        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "Maryland Code, Criminal Law § 11-208",
+                },
+            ),
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
+        self.assertIn("Unable to Find Reporter", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "§ 97-29-63",
+                },
+            ),
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
+        self.assertIn("Unable to Find Reporter", r.content.decode())
 
     async def test_invalid_page_number_1918(self) -> None:
         """Do we fail gracefully with invalid page numbers?"""
@@ -323,7 +355,7 @@ class CitationRedirectorTest(TestCase):
                 },
             ),
         )
-        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
     async def test_long_numbers(self) -> None:
         """Do really long WL citations work?"""
@@ -333,13 +365,13 @@ class CitationRedirectorTest(TestCase):
                 kwargs={"reporter": "wl", "volume": "2012", "page": "2995064"},
             ),
         )
-        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
     async def test_volume_page(self) -> None:
         r = await self.async_client.get(
             reverse("citation_redirector", kwargs={"reporter": "f2d"})
         )
-        self.assertStatus(r, HTTP_200_OK)
+        self.assertStatus(r, HTTPStatus.OK)
 
     async def test_case_page(self) -> None:
         r = await self.async_client.get(
@@ -348,7 +380,28 @@ class CitationRedirectorTest(TestCase):
                 kwargs={"reporter": "f2d", "volume": "56"},
             )
         )
-        self.assertStatus(r, HTTP_200_OK)
+        self.assertStatus(r, HTTPStatus.OK)
+
+    async def test_handle_volume_pagination_properly(self) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56"},
+            ),
+            {"page": 0},
+        )
+        self.assertStatus(r, HTTPStatus.OK)
+        self.assertEqual(r.context["cases"].number, 1)
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56"},
+            ),
+            {"page": "a"},
+        )
+        self.assertStatus(r, HTTPStatus.OK)
+        self.assertEqual(r.context["cases"].number, 1)
 
     async def test_link_to_page_in_citation(self) -> None:
         """Test link to page with star pagination"""
@@ -392,7 +445,7 @@ class CitationRedirectorTest(TestCase):
                 },
             )
         )
-        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
         self.assertEqual(r.url, "/c/f2d/")
 
     async def test_reporter_variation_just_reporter_and_volume(self) -> None:
@@ -407,7 +460,7 @@ class CitationRedirectorTest(TestCase):
                 },
             )
         )
-        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
         self.assertEqual(r.url, "/c/f2d/56/")
 
     async def test_reporter_variation_full_citation(self) -> None:
@@ -423,7 +476,7 @@ class CitationRedirectorTest(TestCase):
                 },
             )
         )
-        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
     async def test_volume_pagination(self) -> None:
@@ -544,8 +597,8 @@ class CitationRedirectorTest(TestCase):
             ),
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(
             r.redirect_chain[0][0], "/opinion/2/case-name-cluster/"
         )
@@ -585,7 +638,7 @@ class CitationRedirectorTest(TestCase):
                 },
             ),
         )
-        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
 
 class ViewRecapDocketTest(TestCase):
@@ -607,7 +660,7 @@ class ViewRecapDocketTest(TestCase):
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_recap_docket_url(self) -> None:
         """Can we redirect to a regular docket URL from a recap/uscourts.*
@@ -623,7 +676,7 @@ class ViewRecapDocketTest(TestCase):
             ),
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
     async def test_docket_view_counts_increment_by_one(self) -> None:
         """Test the view count for a Docket increments on page view"""
@@ -632,7 +685,7 @@ class ViewRecapDocketTest(TestCase):
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         await self.docket.arefresh_from_db(fields=["view_count"])
         self.assertEqual(old_view_count + 1, self.docket.view_count)
 
@@ -654,7 +707,7 @@ class ViewRecapDocketTest(TestCase):
                 args=[self.docket_appellate.pk, self.docket_appellate.slug],
             )
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         await self.docket_appellate.arefresh_from_db(fields=["view_count"])
         self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
 
@@ -688,12 +741,12 @@ class OgRedirectLookupViewTest(TestCase):
     async def test_do_we_404_no_param(self) -> None:
         """Does the view return 404 when no parameters given?"""
         r = await self.async_client.get(self.url)
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_unknown_doc(self) -> None:
         """Do we redirect to S3 when unknown file path?"""
         r = await self.async_client.get(self.url, {"file_path": "xxx"})
-        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
 
     @mock.patch("cl.opinion_page.views.make_png_thumbnail_for_instance")
     async def test_success_goes_to_view(self, mock: MagicMock) -> None:
@@ -703,7 +756,7 @@ class OgRedirectLookupViewTest(TestCase):
         r = await self.async_client.get(
             self.url, {"file_path": path}, USER_AGENT="facebookexternalhit"
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         mock.assert_called_once()
 
     @mock.patch("cl.lib.thumbnails.microservice")
@@ -724,7 +777,7 @@ class OgRedirectLookupViewTest(TestCase):
         r = await self.async_client.get(
             self.url, {"file_path": path}, USER_AGENT="facebookexternalhit"
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         microservice_mock.assert_called_once()
 
         recap_doc = await RECAPDocument.objects.aget(pk=1)
@@ -751,7 +804,7 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
     async def test_bad_parameters(self) -> None:
         """If we omit the pacer_case_id and court_id params, do things fail?"""
         r = await self.async_client.get(reverse("new_docket_alert"))
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_unknown_docket(self) -> None:
         """What happens if no docket?"""
@@ -759,7 +812,7 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
             reverse("new_docket_alert"),
             data={"pacer_case_id": "blah", "court_id": "blah"},
         )
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
         self.assertIn("Refresh this Page", r.content.decode())
 
     async def test_all_systems_go(self) -> None:
@@ -768,7 +821,7 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
             reverse("new_docket_alert"),
             data={"pacer_case_id": "666666", "court_id": "test"},
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertInHTML("Get Docket Alerts", r.content.decode())
 
 

@@ -1,6 +1,7 @@
 import json
 from collections import defaultdict
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
@@ -16,12 +17,6 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
 from lxml import html
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_204_NO_CONTENT,
-    HTTP_404_NOT_FOUND,
-)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 from waffle.testutils import override_switch
@@ -56,8 +51,7 @@ from cl.api.models import (
 )
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
-from cl.donate.factories import DonationFactory
-from cl.donate.models import Donation, NeonMembership
+from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.test_helpers import EmptySolrTestCase, SimpleUserDataMixin
 from cl.search.documents import AudioDocument, AudioPercolator
@@ -150,7 +144,7 @@ class AlertTest(SimpleUserDataMixin, TestCase):
             reverse("disable_alert", args=[self.alert.secret_key])
         )
 
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIn(
             "Please confirm your unsubscription", response.content.decode()
         )
@@ -166,7 +160,7 @@ class AlertTest(SimpleUserDataMixin, TestCase):
             reverse("one_click_disable_alert", args=[self.alert.secret_key])
         )
 
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         await self.alert.arefresh_from_db()
         self.assertEqual(self.alert.rate, "off")
 
@@ -460,7 +454,7 @@ class AlertAPITests(APITestCase):
         search_alert = Alert.objects.all()
         response = await self.make_an_alert(self.client)
         self.assertEqual(await search_alert.acount(), 1)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
     async def test_list_users_alerts(self) -> None:
         """Can we list user's own alerts?"""
@@ -474,12 +468,12 @@ class AlertAPITests(APITestCase):
 
         # Get the alerts for user_1, should be 2
         response = await self.client.get(self.alert_path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
         # Get the alerts for user_2, should be 1
         response_2 = await self.client_2.get(self.alert_path)
-        self.assertEqual(response_2.status_code, HTTP_200_OK)
+        self.assertEqual(response_2.status_code, HTTPStatus.OK)
         self.assertEqual(response_2.json()["count"], 1)
 
     async def test_delete_alert(self) -> None:
@@ -501,7 +495,7 @@ class AlertAPITests(APITestCase):
 
         # Delete the alert for user_1
         response = await self.client.delete(alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
         self.assertEqual(await search_alert.acount(), 1)
 
         alert_2_path_detail = reverse(
@@ -511,7 +505,7 @@ class AlertAPITests(APITestCase):
 
         # user_2 tries to delete a user_1 alert, it should fail
         response = await self.client_2.delete(alert_2_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         self.assertEqual(await search_alert.acount(), 1)
 
     async def test_alert_detail(self) -> None:
@@ -530,11 +524,11 @@ class AlertAPITests(APITestCase):
 
         # Get the alert detail for user_1
         response = await self.client.get(alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
         # user_2 tries to get user_1 alert, it should fail
         response = await self.client_2.get(alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_alert_update(self) -> None:
         """Can we update an alert?"""
@@ -557,7 +551,7 @@ class AlertAPITests(APITestCase):
         response = await self.client.put(alert_1_path_detail, data_updated)
 
         # Check that the alert was updated
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["name"], "alert_1_updated")
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
 
@@ -952,7 +946,7 @@ class DocketAlertAPITests(APITestCase):
         docket_alert_first = await docket_alert.afirst()
         self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
         self.assertEqual(await docket_alert.acount(), 1)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
     async def test_list_users_docket_alerts(self) -> None:
         """Can we list user's own alerts?"""
@@ -966,12 +960,12 @@ class DocketAlertAPITests(APITestCase):
 
         # Get the docket alerts for user_1, should be 2
         response = await self.client.get(self.docket_alert_path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
         # Get the docket alerts for user_2, should be 1
         response_2 = await self.client_2.get(self.docket_alert_path)
-        self.assertEqual(response_2.status_code, HTTP_200_OK)
+        self.assertEqual(response_2.status_code, HTTPStatus.OK)
         self.assertEqual(response_2.json()["count"], 1)
 
     async def test_delete_docket_alert(self) -> None:
@@ -995,7 +989,7 @@ class DocketAlertAPITests(APITestCase):
 
         # Delete the docket_alert for user_1
         response = await self.client.delete(docket_alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
         self.assertEqual(await docket_alert.acount(), 1)
 
         docket_alert_2_path_detail = reverse(
@@ -1005,7 +999,7 @@ class DocketAlertAPITests(APITestCase):
 
         # user_2 tries to delete a user_1 docket alert, it should fail
         response = await self.client_2.delete(docket_alert_2_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         self.assertEqual(await docket_alert.acount(), 1)
 
     async def test_docket_alert_detail(self) -> None:
@@ -1024,11 +1018,11 @@ class DocketAlertAPITests(APITestCase):
 
         # Get the docket alert detail for user_1
         response = await self.client.get(docket_alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
         # user_2 tries to get user_1 docket alert, it should fail
         response = await self.client_2.get(docket_alert_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_docket_alert_update(self) -> None:
         """Can we update a docket alert?"""
@@ -1063,7 +1057,7 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
 
         # Check that the alert was updated
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(
             response.json()["alert_type"], DocketAlert.UNSUBSCRIPTION
         )
@@ -1101,7 +1095,7 @@ class DocketAlertAPITests(APITestCase):
         self.assertEqual(docket_alert_first.date_modified, ten_days_ahead)  # type: ignore[union-attr]
 
         # Check that the alert was updated
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(
             response.json()["alert_type"], DocketAlert.UNSUBSCRIPTION
         )
@@ -2947,9 +2941,116 @@ class OneClickUnsubscribeTests(TestCase):
         )
         self.alert.refresh_from_db()
 
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(self.alert.alert_type, DocketAlert.UNSUBSCRIPTION)
 
         # check unsubscription confirmation email
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("[Unsubscribed]", mail.outbox[0].subject)
+
+
+class CleanUpSearchAlertsCommandTests(ESIndexTestCase, TestCase):
+    """Test the clean_up_search_alerts command"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.search_alert_0 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_Precedential=on",
+        )
+        cls.search_alert_1 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert 1",
+            query="q=test&type=o&order_by=score%20desc&stat_Non-Precedential=on",
+        )
+        cls.search_alert_2 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_Errata=on",
+        )
+        cls.search_alert_3 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_Separate%20Opinion=on",
+        )
+        cls.search_alert_4 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_In-chambers=on",
+        )
+        cls.search_alert_5 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&stat_Relating-to%20orders=on&order_by=score%20desc",
+        )
+        cls.search_alert_6 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=caseName%3A&type=o&stat_Unknown%20Status=on&order_by=score%20desc",
+        )
+        cls.search_alert_7 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert O",
+            query="q=test&type=o&order_by=score%20desc&stat_Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on",
+        )
+
+    def test_clean_up_alerts(self):
+        """Confirm clean_up_alerts properly replaces the stat_ filters on
+        Opinions Search Alerts queries.
+        """
+        with mock.patch(
+            "cl.alerts.management.commands.clean_up_search_alerts.logger"
+        ) as mock_logger:
+            call_command("clean_up_search_alerts", action="clean-up")
+            mock_logger.info.assert_called_with(
+                f"\r Successfully fixed 6 opinions search alerts."
+            )
+
+        expected_query = {
+            self.search_alert_0.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.PUBLISHED}=on",
+            self.search_alert_1.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}=on",
+            self.search_alert_2.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.ERRATA}=on",
+            self.search_alert_3.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.SEPARATE}=on",
+            self.search_alert_4.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.IN_CHAMBERS}=on",
+            self.search_alert_5.pk: f"q=test&type=o&stat_{PRECEDENTIAL_STATUS.RELATING_TO}=on&order_by=score%20desc",
+            self.search_alert_6.pk: f"q=caseName%3A&type=o&stat_{PRECEDENTIAL_STATUS.UNKNOWN}=on&order_by=score%20desc",
+            self.search_alert_7.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.PUBLISHED}=on&stat_{PRECEDENTIAL_STATUS.ERRATA}=on&stat_{PRECEDENTIAL_STATUS.SEPARATE}=on",
+        }
+
+        alerts = Alert.objects.all().values_list("pk", "query")
+        for alert in alerts:
+            with self.subTest("Alert query", alert=alert):
+                self.assertEqual(expected_query[alert[0]], alert[1])
+
+    def test_validate_queries_syntax(self):
+        """Confirm that the command can correctly report alerts for Opinions
+        search with incorrect syntax.
+        """
+        with mock.patch(
+            "cl.alerts.management.commands.clean_up_search_alerts.logger"
+        ) as mock_logger:
+            # Clean up the alerts first to avoid syntax errors due to the old
+            # filter values.
+            call_command("clean_up_search_alerts", action="clean-up")
+            call_command(
+                "clean_up_search_alerts",
+                action="validate-queries",
+                validation_wait=0,
+            )
+            mock_logger.info.assert_called_with(
+                f"\r Checked 8 opinions search alerts. There were 1 invalid queries."
+            )
+            self.assertIn(
+                "Invalid Search Alert syntax.",
+                mock_logger.error.call_args[0][0],
+            )

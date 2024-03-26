@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -13,7 +15,6 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from cl.alerts.forms import DocketAlertConfirmForm
 from cl.alerts.models import Alert, DocketAlert
@@ -250,7 +251,7 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
                 "title": "400: Invalid request creating docket alert",
                 "private": True,
             },
-            status=HTTP_400_BAD_REQUEST,
+            status=HTTPStatus.BAD_REQUEST,
         )
     try:
         docket = await Docket.objects.aget(
@@ -265,7 +266,7 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
                 "title": "New Docket Alert for Unknown Case",
                 "private": True,
             },
-            status=HTTP_404_NOT_FOUND,
+            status=HTTPStatus.NOT_FOUND,
         )
     except Docket.MultipleObjectsReturned:
         docket = await Docket.objects.filter(
@@ -333,7 +334,7 @@ def toggle_docket_alert_confirmation(
                 "private": True,
                 "target_state": target_state,
             },
-            status=HTTP_404_NOT_FOUND,
+            status=HTTPStatus.NOT_FOUND,
         )
     # Handle confirmation form POST requests
     if request.method == "POST":
