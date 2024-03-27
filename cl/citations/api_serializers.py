@@ -52,6 +52,7 @@ class CitationAPIRequestSerializer(serializers.Serializer):
 
 class CitationAPIResponseSerializer(serializers.Serializer):
     citation = serializers.CharField()
+    normalized_citations = serializers.ListField(child=serializers.CharField())
     start_index = serializers.IntegerField()
     end_index = serializers.IntegerField()
     status = serializers.IntegerField()

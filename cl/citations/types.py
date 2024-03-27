@@ -21,5 +21,6 @@ ResolvedFullCites = list[ResolvedFullCite]
 
 class CitationAPIResponse(TypedDict):
     status: int
+    normalized_citations: NotRequired[list[str]]
     error_message: NotRequired[str]
     clusters: NotRequired[QuerySet[OpinionCluster]]
