@@ -8,9 +8,12 @@ from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
 from eyecite.models import FullCaseCitation
 from eyecite.utils import strip_punct
-from reporters_db import VARIATIONS_ONLY
+from reporters_db import EDITIONS, VARIATIONS_ONLY
 
 QUERY_LENGTH = 10
+SLUGIFIED_EDITIONS: dict[str, str] = {
+    str(slugify(item)): item for item in EDITIONS.keys()
+}
 
 
 def map_reporter_db_cite_type(citation_type: str) -> int:
