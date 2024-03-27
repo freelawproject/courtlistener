@@ -49,10 +49,12 @@
                     </a>
                     &nbsp;&nbsp;|&nbsp;&nbsp;
                   {% endif %}
-                  {# Provide link to S3 for OA for now, for everything later. #}
+                {% if result.local_path %}
+                  {# Provide link to S3. #}
                   <a href="https://storage.courtlistener.com/{{result.local_path}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
                       Our backup
                   </a>
+                {% endif %}
                 </p>
                 {% if type == 'oa' %}
                   <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 0; padding: 0;">
