@@ -1772,12 +1772,10 @@ class CitationLookUpApiTest(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "this is a text"},
         )
-        j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
-        self.assertIn(
-            "No citations found in 'text'",
-            j["detail"],
-        )
+        data = json.loads(r.content)
+        # The response should be an empty json object and a success HTTP code.
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
 
     async def test_can_handle_invalid_text_citations(self):
         r = await self.async_client.post(

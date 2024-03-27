@@ -40,7 +40,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         if text:
             citation_objs = eyecite.get_citations(text)
             if not citation_objs:
-                raise NotFound(f"No citations found in 'text'.")
+                return Response({})
 
             for citation in citation_objs:
                 start_index, end_index = citation.span()
