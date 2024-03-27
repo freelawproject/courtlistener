@@ -19,14 +19,13 @@ from cl.citations.api_serializers import (
 )
 from cl.citations.types import CitationAPIResponse
 from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
-from cl.search.api_serializers import OpinionClusterSerializer
 from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
 
 
 class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
-    serializer = OpinionClusterSerializer
+    serializer_class = CitationAPIRequestSerializer
     permission_classes = (AllowAny,)
 
     def create(self, request: Request, *args, **kwargs):
