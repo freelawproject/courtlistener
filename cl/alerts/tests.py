@@ -55,6 +55,7 @@ from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
 from cl.lib.date_time import midnight_pt
 from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.people_db.factories import PersonFactory
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
     CitationWithParentsFactory,
@@ -655,10 +656,20 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
         cls.c1 = CourtFactory(
             id="canb", jurisdiction="I", citation_string="Bankr. C.D. Cal."
         )
+        cls.person_1 = PersonFactory.create(
+            gender="m",
+        )
         cls.mock_date = now().replace(day=15, hour=0)
-        with time_machine.travel(
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(
             cls.mock_date, tick=False
-        ), cls.captureOnCommitCallbacks(execute=True):
+        ), cls.captureOnCommitCallbacks(
+            execute=True
+        ):
             cls.dly_opinion = OpinionWithParentsFactory.create(
                 cluster__case_name="California vs Lorem",
                 cluster__precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
@@ -668,15 +679,33 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                 cluster__citation_count=1,
                 cluster__docket=DocketFactory(
                     court=cls.c1,
+                    date_reargued=(now() - timedelta(hours=6)).date(),
+                    date_reargument_denied=(now() - timedelta(hours=4)).date(),
                 ),
                 plain_text="Lorem dolor sit amet, consectetur adipiscing elit hearing.",
                 type=Opinion.LEAD,
+            )
+            cls.dly_opinion.joined_by.add(cls.person_1)
+            cls.dly_opinion.cluster.panel.add(cls.person_1)
+            cls.lexis_citation = CitationWithParentsFactory.create(
+                volume=10,
+                reporter="Yeates",
+                page="4",
+                type=Citation.LEXIS,
+                cluster=cls.dly_opinion.cluster,
+            )
+            cls.neutra_citation = CitationWithParentsFactory.create(
+                volume=10,
+                reporter="Neutral",
+                page="4",
+                type=Citation.NEUTRAL,
+                cluster=cls.dly_opinion.cluster,
             )
             cls.citation_1 = CitationWithParentsFactory.create(
                 volume=33,
                 reporter="state",
                 page="1",
-                type=1,
+                type=Citation.FEDERAL,
                 cluster=cls.dly_opinion.cluster,
             )
             cls.dly_opinion_2 = OpinionFactory(
@@ -722,27 +751,30 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
         """
 
         webhooks_enabled = Webhook.objects.filter(enabled=True)
-        self.assertEqual(len(webhooks_enabled), 3)
+        self.assertEqual(
+            len(webhooks_enabled), 3, msg="Webhooks enabled doesn't match."
+        )
         search_alerts = Alert.objects.all()
-        self.assertEqual(len(search_alerts), 8)
+        self.assertEqual(len(search_alerts), 8, msg="Alerts doesn't match.")
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
-            with time_machine.travel(self.mock_date, tick=False):
-                # Send Solr Alerts (Except OA)
-                call_command("cl_send_alerts", rate="dly")
-                # Send ES Alerts (Only OA for now)
-                call_command("cl_send_scheduled_alerts", rate="dly")
+        ), time_machine.travel(self.mock_date, tick=False):
+            # Send Opinion Alerts
+            call_command("cl_send_alerts", rate="dly")
+            # Send ES Alerts (Only OA for now)
+            call_command("cl_send_scheduled_alerts", rate="dly")
 
         # 4 search alerts should be sent:
         # Two opinion alerts to user_profile, one to user_profile_2, and one to
         # user_profile_3
         # One oral argument alert to user_profile (ES)
-        self.assertEqual(len(mail.outbox), 4)
+        self.assertEqual(
+            len(mail.outbox), 4, msg="Outgoing emails don't match."
+        )
 
         # Opinion email alert assertions
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
@@ -856,10 +888,12 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             "dateFiled": lambda x: midnight_pt(
                 x["result"].cluster.date_filed
             ).isoformat(),
-            "dateReargued": lambda x: x["result"].cluster.docket.date_reargued,
-            "dateReargumentDenied": lambda x: x[
-                "result"
-            ].cluster.docket.date_reargument_denied,
+            "dateReargued": lambda x: midnight_pt(
+                x["result"].cluster.docket.date_reargued
+            ).isoformat(),
+            "dateReargumentDenied": lambda x: midnight_pt(
+                x["result"].cluster.docket.date_reargument_denied
+            ).isoformat(),
             "docketNumber": lambda x: x["result"].cluster.docket.docket_number,
             "docket_id": lambda x: x["result"].cluster.docket_id,
             "download_url": lambda x: x["result"].download_url,
@@ -922,7 +956,9 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
         }
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 3)
+        self.assertEqual(
+            len(webhook_events), 3, msg="Webhook events don't match."
+        )
 
         alert_data = {
             self.search_alert.pk: {
@@ -947,6 +983,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                 self.assertEqual(
                     webhook_sent.event_status,
                     WEBHOOK_EVENT_STATUS.SUCCESSFUL,
+                    msg="The event status doesn't match.",
                 )
                 content = webhook_sent.content
                 alert_data_compare = alert_data[
@@ -955,24 +992,29 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                 self.assertEqual(
                     webhook_sent.webhook.user,
                     alert_data_compare["alert"].user,
+                    msg="The user doesn't match.",
                 )
 
                 # Check if the webhook event payload is correct.
                 self.assertEqual(
                     content["webhook"]["event_type"],
                     WebhookEventType.SEARCH_ALERT,
+                    msg="The event type doesn't match.",
                 )
                 self.assertEqual(
                     content["payload"]["alert"]["name"],
                     alert_data_compare["alert"].name,
+                    msg="The alert name doesn't match.",
                 )
                 self.assertEqual(
                     content["payload"]["alert"]["query"],
                     alert_data_compare["alert"].query,
+                    msg="The alert query doesn't match.",
                 )
                 self.assertEqual(
                     content["payload"]["alert"]["rate"],
                     alert_data_compare["alert"].rate,
+                    msg="The alert rate doesn't match.",
                 )
                 if (
                     content["payload"]["alert"]["alert_type"]
