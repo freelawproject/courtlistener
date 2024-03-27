@@ -355,8 +355,9 @@ class Command(VerboseCommand):
         valid_ids = {}
         for item_type in SEARCH_TYPES.ALL_TYPES:
             ids = RealTimeQueue.objects.filter(item_type=item_type)
-            if not ids:
+            if not ids.exists():
                 valid_ids[item_type] = []
+                continue
             if self.o_es_alerts:
                 # Get valid RT IDs from ES.
                 search_query = OpinionDocument.search()
