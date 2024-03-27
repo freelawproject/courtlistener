@@ -261,7 +261,9 @@ class Command(VerboseCommand):
                         .order_by("pk")
                         .values_list("pk", "cluster_id")
                     )
-                    count = queryset.count()
+                    count = Opinion.objects.filter(
+                        pk__gte=last_document_id
+                    ).count()
                     q = queryset.iterator()
                     task_params = (
                         child,
@@ -274,7 +276,9 @@ class Command(VerboseCommand):
                         .order_by("pk")
                         .values_list("pk", "docket_entry__docket_id")
                     )
-                    count = queryset.count()
+                    count = RECAPDocument.objects.filter(
+                        pk__gte=last_document_id
+                    ).count()
                     q = queryset.iterator()
                     task_params = (
                         child,
