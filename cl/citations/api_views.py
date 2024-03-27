@@ -140,7 +140,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
             except NotFound as e:
                 return {
                     "normalized_citations": [],
-                    "status": HTTPStatus.NOT_FOUND,
+                    "status": HTTPStatus.BAD_REQUEST,
                     "error_message": str(e.detail),
                 }
 

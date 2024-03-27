@@ -1851,7 +1851,7 @@ class CitationLookUpApiTest(
 
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "1 bad-reporter 1")
-        self.assertEqual(first_citation["status"], HTTPStatus.NOT_FOUND)
+        self.assertEqual(first_citation["status"], HTTPStatus.BAD_REQUEST)
         self.assertEqual(
             first_citation["error_message"],
             "Unable to find reporter with abbreviation of 'bad-reporter'",
