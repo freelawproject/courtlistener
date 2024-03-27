@@ -1802,8 +1802,8 @@ class CitationLookUpApiTest(
             # Journal Citation
             {
                 "text": (
-                    "The Structural Constitution: Unitary Executive, Plural "
-                    "Judiciary, 105 Harv. L. Rev. 1155, 1158 (1992)."
+                    "The Structural Constitution: Unitary Executive, Plural"
+                    " Judiciary, 105 Harv. L. Rev. 1155, 1158 (1992)."
                 )
             },
         )
@@ -1831,6 +1831,9 @@ class CitationLookUpApiTest(
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(len(data), 1)
 
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "671 P.2d 1085")
+
     async def test_can_handle_invalid_reporter(self):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -1847,15 +1850,14 @@ class CitationLookUpApiTest(
         self.assertEqual(len(data), 1)
 
         first_citation = data[0]
-        self.assertEqual(
-            first_citation["citation"],
-            "1 bad-reporter 1",
-        )
+        self.assertEqual(first_citation["citation"], "1 bad-reporter 1")
         self.assertEqual(first_citation["status"], HTTPStatus.NOT_FOUND)
         self.assertEqual(
             first_citation["error_message"],
             "Unable to find reporter with abbreviation of 'bad-reporter'",
         )
+        # The normalized citations list is empty because the reporter is invalid
+        self.assertEqual(len(first_citation["normalized_citations"]), 0)
 
     async def test_can_handle_ambiguous_reporter_variations(self) -> None:
 
@@ -1881,6 +1883,14 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "1 H. 150")
         self.assertEqual(first_citation["status"], HTTPStatus.MULTIPLE_CHOICES)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 3)
+        for citation in normalized_citations:
+            self.assertIn(
+                citation,
+                [str(handy_citation), str(haw_citation), "1 Hill 150"],
+            )
 
         clusters = first_citation["clusters"]
         self.assertEqual(len(clusters), 2)
@@ -1911,6 +1921,10 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "1 f2d asdf")
         self.assertEqual(first_citation["status"], HTTPStatus.NOT_FOUND)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+        self.assertEqual(normalized_citations[0], "1 F.2d asdf")
         self.assertIn("Citation not found:", first_citation["error_message"])
 
     async def test_can_match_citation_with_reporter_volume_page(self):
@@ -1926,6 +1940,9 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "56 f2d 9")
         self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
 
         clusters = first_citation["clusters"]
         self.assertEqual(len(clusters), 1)
@@ -1970,6 +1987,10 @@ class CitationLookUpApiTest(
         self.assertEqual(first_citation["citation"], "56 F2d 9")
         self.assertEqual(first_citation["status"], HTTPStatus.OK)
 
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+        self.assertEqual(normalized_citations[0], "56 F.2d 9")
+
         clusters = first_citation["clusters"]
         self.assertEqual(len(clusters), 1)
         self.assertEqual(
@@ -1989,6 +2010,10 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "56 f 2d 9")
         self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+        self.assertEqual(normalized_citations[0], "56 F.2d 9")
 
         clusters = first_citation["clusters"]
         self.assertEqual(len(clusters), 1)
