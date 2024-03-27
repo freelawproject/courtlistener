@@ -36,11 +36,11 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         # Get query parameters from the validated data
         citations = []
         data = citation_serializer.validated_data
-        full_text_citation = data.get("text_citation", None)
-        if full_text_citation:
-            citation_objs = eyecite.get_citations(full_text_citation)
+        text = data.get("text", None)
+        if text:
+            citation_objs = eyecite.get_citations(text)
             if not citation_objs:
-                raise NotFound(f"No citations found in 'text_citation'.")
+                raise NotFound(f"No citations found in 'text'.")
 
             for citation in citation_objs:
                 start_index, end_index = citation.span()

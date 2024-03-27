@@ -5,34 +5,34 @@ from cl.search.api_serializers import OpinionClusterSerializer
 
 
 class CitationAPIRequestSerializer(serializers.Serializer):
-    text_citation = serializers.CharField(required=False)
+    text = serializers.CharField(required=False)
     reporter = serializers.CharField(max_length=100, required=False)
     volume = serializers.IntegerField(required=False)
     page = serializers.CharField(required=False)
 
     def validate(self, data):
         reporter = data.get("reporter")
-        text_citation = data.get("text_citation")
+        text = data.get("text")
         volume = data.get("volume")
         page = data.get("page")
-        citation_or_reporter_provided = any([reporter, text_citation])
+        citation_or_reporter_provided = any([reporter, text])
 
         # make sure users provide either a reporter or a text citation.
         if not all([len(data), citation_or_reporter_provided]):
             raise ValidationError(
                 {
                     "non_field_errors": [
-                        "Either 'text_citation' or 'reporter' is required."
+                        "Either 'text' or 'reporter' is required."
                     ]
                 }
             )
 
-        # Enforces mutually exclusive fields: reporter and text_citation.
-        if all([reporter, text_citation]):
+        # Enforces mutually exclusive fields: reporter and text.
+        if all([reporter, text]):
             raise ValidationError(
                 {
                     "non_field_errors": [
-                        "Invalid request. Provide either a 'text citation' or 'reporter', not both."
+                        "Invalid request. Provide either a 'text' or 'reporter', not both."
                     ]
                 }
             )

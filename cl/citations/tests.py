@@ -1747,7 +1747,7 @@ class CitationLookUpApiTest(
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIn(
-            "Either 'text_citation' or 'reporter' is required",
+            "Either 'text' or 'reporter' is required",
             j["non_field_errors"][0],
         )
 
@@ -1767,22 +1767,22 @@ class CitationLookUpApiTest(
             j["page"][0],
         )
 
-    async def test_can_handle_random_text_as_a_text_citation(self):
+    async def test_can_handle_random_text_as_a_citation(self):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"text_citation": "this is a text"},
+            {"text": "this is a text"},
         )
         j = json.loads(r.content)
         self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
         self.assertIn(
-            "No citations found in 'text_citation'",
+            "No citations found in 'text'",
             j["detail"],
         )
 
     async def test_can_handle_invalid_text_citations(self):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"text_citation": "Maryland Code, Criminal Law § 11-208"},
+            {"text": "Maryland Code, Criminal Law § 11-208"},
         )
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
@@ -1794,7 +1794,7 @@ class CitationLookUpApiTest(
 
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"text_citation": "§ 97-29-63"},
+            {"text": "§ 97-29-63"},
         )
         self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
@@ -1977,7 +1977,7 @@ class CitationLookUpApiTest(
         )
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"text_citation": text_citation},
+            {"text": text_citation},
         )
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
@@ -2015,7 +2015,7 @@ class CitationLookUpApiTest(
 
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"text_citation": text_citation},
+            {"text": text_citation},
         )
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
