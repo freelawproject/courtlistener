@@ -82,6 +82,13 @@ class EmptyOpinionException(Exception):
         self.message = message
 
 
+class CitationException(Exception):
+    """Error found in cite."""
+
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+
 async def mark_ia_upload_needed(d: Docket, save_docket: bool) -> None:
     """Mark the docket as needing upload if it's not already marked.
 
@@ -654,6 +661,9 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
             logger.warning(
                 f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
             )
+        except ValueError:
+            # Handle: ValueError: Field ‘volume’ expected a number but got ‘1986-2’
+            raise CitationException(f"Invalid citation found: {cite}")
 
 
 def update_cluster_panel(

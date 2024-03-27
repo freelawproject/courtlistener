@@ -43,6 +43,7 @@ from cl.corpus_importer.import_columbia.columbia_utils import (
 )
 from cl.corpus_importer.utils import (
     AuthorException,
+    CitationException,
     JudgeException,
     OpinionMatchingException,
     OpinionTypeException,
@@ -79,7 +80,6 @@ VALID_UPDATED_DOCKET_SOURCES = [
     Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
 ]
 
-
 VALID_MERGED_SOURCES = [
     key
     for key in dict(SOURCES.NAMES).keys()
@@ -113,14 +113,26 @@ def clean_opinion_content(content: str, is_harvard: bool) -> str:
     return prep_text
 
 
-def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
+def get_cl_opinion_content(
+    cluster_id: int, columbia_single_opinion: bool = False
+) -> list[dict[Any, Any]]:
     """Get the opinions content for a cluster object
 
     :param cluster_id: Cluster ID for a set of opinions
+    :param columbia_single_opinion: True if xml file only has one opinion else False
     :return: list with opinion content from cl
     """
     cl_cleaned_opinions = []
+
+    # Get all opinions from cluster
     opinions_from_cluster = Opinion.objects.filter(cluster_id=cluster_id)
+
+    if not columbia_single_opinion:
+        # File has multiple opinions, then we can exclude combined opinions
+        opinions_from_cluster = opinions_from_cluster.exclude(
+            type="010combined"
+        )
+
     is_harvard = False
 
     for i, op in enumerate(opinions_from_cluster):
@@ -153,7 +165,10 @@ def get_cl_opinion_content(cluster_id: int) -> list[dict[Any, Any]]:
 
 
 def update_matching_opinions(
-    matches: dict, cl_cleaned_opinions: list, columbia_opinions: list
+    matches: dict,
+    cl_cleaned_opinions: list,
+    columbia_opinions: list,
+    filepath: str,
 ) -> None:
     """Store matching opinion content in html_columbia field from Opinion object
 
@@ -211,15 +226,23 @@ def update_matching_opinions(
 def map_and_merge_opinions(
     cluster_id: int,
     columbia_opinions: list[dict],
+    filepath: str,
 ) -> None:
     """Map and merge opinion data
 
     :param cluster_id: Cluster id
     :param columbia_opinions: list of columbia opinions from file
+    :param filepath: xml file from which the opinion was extracted
     :return: None
     """
 
-    cl_cleaned_opinions = get_cl_opinion_content(cluster_id)
+    # Check if columbia source only has one opinion
+    columbia_single_opinion = True if len(columbia_opinions) == 1 else False
+
+    # We exclude combined opinions only if we have more than one opinion in the xml
+    cl_cleaned_opinions = get_cl_opinion_content(
+        cluster_id, columbia_single_opinion
+    )
 
     if len(columbia_opinions) == len(cl_cleaned_opinions):
         # We need that both list to be cleaned, so we can have a more
@@ -232,13 +255,19 @@ def map_and_merge_opinions(
             [op.get("opinion") for op in cl_cleaned_opinions],
         )
         if len(matches) == len(columbia_opinions):
+            # We were able to match opinions, add opinions to html_columbia field
             update_matching_opinions(
-                matches, cl_cleaned_opinions, columbia_opinions
+                matches, cl_cleaned_opinions, columbia_opinions, filepath
             )
         else:
             raise OpinionMatchingException("Failed to match opinions")
 
-    elif len(columbia_opinions) > len(cl_cleaned_opinions) == 1:
+    elif (len(columbia_opinions) > len(cl_cleaned_opinions)) and len(
+        cl_cleaned_opinions
+    ) == 0:
+        # We have more opinions in file than in CL and if cl_cleaned_opinions == 0 it
+        # means that we probably excluded the combined opinion, we create each
+        # opinion from file
         for op in columbia_opinions:
             opinion_type = op.get("type")
             file = op.get("file")
@@ -255,6 +284,7 @@ def map_and_merge_opinions(
                 per_curiam=op["per_curiam"],
                 cluster_id=cluster_id,
                 type=opinion_type,
+                local_path=filepath,
                 author_str=(
                     titlecase(find_just_name(author.strip(":")))
                     if author
@@ -485,7 +515,9 @@ def process_cluster(
 
     try:
         with transaction.atomic():
-            map_and_merge_opinions(cluster_id, columbia_data["opinions"])
+            map_and_merge_opinions(
+                cluster_id, columbia_data["opinions"], filepath
+            )
 
             merged_data = {}
             for field in ["syllabus", "attorneys", "posture", "judges"]:
@@ -544,6 +576,10 @@ def process_cluster(
         )
     except JudgeException:
         logger.warning(msg=f"Judge exception for cluster id: {cluster_id}")
+    except CitationException:
+        logger.warning(
+            msg=f"Invalid citation found in {filepath} while merging cluster id: {cluster_id}"
+        )
 
 
 def merge_columbia_into_cl(options) -> None:
