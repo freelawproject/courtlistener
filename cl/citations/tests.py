@@ -1783,23 +1783,53 @@ class CitationLookUpApiTest(
             {"text": "Maryland Code, Criminal Law § 11-208"},
         )
 
-        self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
-
-        first_citation = data[0]
-        self.assertEqual(first_citation["status"], HTTPStatus.BAD_REQUEST)
-        self.assertIn("Invalid citation", first_citation["error_message"])
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
 
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "§ 97-29-63"},
         )
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        data = json.loads(r.content)
 
-        first_citation = data[0]
-        self.assertEqual(first_citation["status"], HTTPStatus.BAD_REQUEST)
-        self.assertIn("Invalid citation", first_citation["error_message"])
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+    async def test_can_filter_non_case_law_citations(self):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # Journal Citation
+            {
+                "text": (
+                    "The Structural Constitution: Unitary Executive, Plural "
+                    "Judiciary, 105 Harv. L. Rev. 1155, 1158 (1992)."
+                )
+            },
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # two Journal Citations and one opinion citation
+            {
+                "text": (
+                    "Frank H. Easterbrook, Substance and Due Process, 1982 Sup."
+                    " Ct. Rev. 85, 114. Kootenai Env't All., Inc. v. Panhandle"
+                    " Yacht Club, Inc., 671 P.2d 1085 (Idaho 1983). Naomi R."
+                    " Cahn, Civil Images of Battered Women: The Impact of"
+                    " Domestic Violence on Child Custody Decisions, 44 Vand."
+                    " L. Rev. 1041 (1991)."
+                )
+            },
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
 
     async def test_can_handle_invalid_reporter(self):
         r = await self.async_client.post(

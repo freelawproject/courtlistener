@@ -5,6 +5,7 @@ from asgiref.sync import async_to_sync
 from django.db.models import QuerySet
 from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
+from eyecite.models import FullCaseCitation, ShortCaseCitation
 from rest_framework.exceptions import NotFound
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import AllowAny
@@ -39,6 +40,11 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         text = data.get("text", None)
         if text:
             citation_objs = eyecite.get_citations(text)
+            citation_objs = [
+                c
+                for c in citation_objs
+                if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+            ]
             if not citation_objs:
                 return Response({})
 
@@ -49,13 +55,6 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                     "start_index": start_index,
                     "end_index": end_index,
                 }
-                if not citation.groups:
-                    error_data = {
-                        "status": HTTPStatus.BAD_REQUEST,
-                        "error_message": "Invalid citation.",
-                    }
-                    citations.append({**citation_data, **error_data})
-                    continue
 
                 reporter = citation.groups["reporter"]
                 volume = citation.groups["volume"]
