@@ -662,6 +662,16 @@ class CitationRedirectorTest(TestCase):
         self.assertIn("Validation Error", r.content.decode())
         self.assertIn("URLs are not allowed in this field", r.content.decode())
 
+    async def test_show_error_for_non_opinion_citations(self):
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "44 Vand. L. Rev. 1041"},
+            follow=True,
+        )
+        print(r.content.decode())
+        self.assertIn("Citation Type Mismatch", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
 
 class ViewRecapDocketTest(TestCase):
     @classmethod

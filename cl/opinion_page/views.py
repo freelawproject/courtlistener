@@ -27,6 +27,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from eyecite.models import FullCaseCitation, ShortCaseCitation
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
@@ -1119,12 +1120,21 @@ async def citation_redirector(
     if not volume and not page:
         citations = eyecite.get_citations(reporter)
         if citations and citations[0].groups:
-            c = citations[0]
+            # check whether the parsed object is an opinion citation
+            if not isinstance(
+                citations[0], (FullCaseCitation, ShortCaseCitation)
+            ):
+                return await throw_404(
+                    request,
+                    {"not_opinion_citation": True, "private": False},
+                )
+
+            groups = citations[0].groups
             # We slugify reporter so that the test further down will
             # pass.
-            reporter = slugify(c.groups["reporter"])
-            volume = c.groups["volume"]
-            page = c.groups["page"]
+            reporter = slugify(groups["reporter"])
+            volume = groups.get("volume", None)
+            page = groups.get("page", None)
 
     reporter_slug = slugify(reporter)
 
