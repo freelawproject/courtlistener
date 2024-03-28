@@ -15,6 +15,8 @@
     No Cases Found for {{ volume_names.0 }} (404) – CourtListener.com
   {% elif volumes %}
     {{ reporter }}, {{ volume_names.0 }} – CourtListener.com
+  {% elif not_opinion_citation %}
+    Not an opinion citation - CourtListener.com
   {% elif cases.paginator.count %}
     Vol. {{ volume }} of {{ volume_names.0 }} ({{ reporter }}) – CourtListener.com
   {% endif %}
@@ -61,6 +63,15 @@
           </div>
         {% endfor %}
       </div>
+    </div>
+  {% elif not_opinion_citation %}
+    <div class="col-xs-12 col-md-10 col-lg-8">
+      <h1>Citation Type Mismatch</h1>
+      <p>We identified a potential citation within the text you provided, it's not formatted in the typical style used for judicial opinions.</p>
+      <p>Please try looking up a different piece of text.</p>
+      <p class="v-offset-above-2">
+        <a href="{% url "citation_homepage" %}"
+          class="btn btn-primary btn-lg">Look Up Another Citation</a></p>
     </div>
   {% elif cases.paginator.count %}
     {# This lists the cases in a given reporter & volume #}
