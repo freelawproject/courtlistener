@@ -2460,7 +2460,7 @@ def do_es_api_query(
         highlighting_fields, hl_tag
     )
     s = s.source(excludes=fields_to_exclude)
-    extra_options = {"highlight": highlight_options}
+    extra_options: dict[str, dict[str, Any]] = {"highlight": highlight_options}
     if cd["type"] == SEARCH_TYPES.OPINION:
         extra_options.update(
             {
@@ -2474,15 +2474,17 @@ def do_es_api_query(
     return main_query
 
 
-def do_collapse_count_query(search_query: Search) -> int | None:
+def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
     """Execute an Elasticsearch count query for queries that uses collapse.
     Uses a query with aggregation to determine the number of unique opinions
     based on the 'cluster_id' field.
 
-    :param search_query: Elasticsearch DSL Search object.
+    :param main_query: The Elasticsearch DSL Search object.
+    :param query: The ES Query object to perform the count query.
     :return: The results count.
     """
 
+    search_query = main_query.query(query)
     search_query.aggs.bucket(
         "unique_opinions", "cardinality", field="cluster_id"
     )

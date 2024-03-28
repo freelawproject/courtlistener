@@ -1,5 +1,6 @@
 import waffle
 from django.conf import settings
+from elasticsearch_dsl import Q
 from rest_framework.exceptions import ParseError
 
 from cl.lib import search_utils
@@ -106,7 +107,8 @@ class ESList:
     def __len__(self):
         if self._length is None:
             if self.type == SEARCH_TYPES.OPINION:
-                self._length = do_collapse_count_query(self.main_query)
+                query = Q(self.main_query.to_dict(count=True)["query"])
+                self._length = do_collapse_count_query(self.main_query, query)
             else:
                 self._length = do_count_query(self.main_query)
         return self._length

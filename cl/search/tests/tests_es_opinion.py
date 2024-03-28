@@ -385,7 +385,7 @@ class OpinionAPISearchTest(
             f"stat_{PRECEDENTIAL_STATUS.UNKNOWN}": "on",
         }
         r = await self._test_api_results_count(
-            search_params, 5, "docket number box"
+            search_params, 5, "API results count"
         )
         self.assertEqual(r.data["count"], 5, msg="Wrong number of results.")
 
