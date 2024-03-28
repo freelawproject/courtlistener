@@ -6,11 +6,9 @@ import os
 import socket
 from contextlib import contextmanager
 
-import scorched
 from django.conf import settings
 from django.core.management import call_command
 from django.test.utils import override_settings, tag
-from requests import Session
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
@@ -20,11 +18,8 @@ from selenium.webdriver.support.expected_conditions import staleness_of
 from selenium.webdriver.support.ui import WebDriverWait
 from timeout_decorator import TimeoutError
 
-from cl.audio.models import Audio
 from cl.lib.decorators import retry
-from cl.lib.test_helpers import SerializeSolrTestMixin
-from cl.search.models import Opinion
-from cl.search.tasks import add_items_to_solr
+from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, StaticLiveServerTestCase
 
 SELENIUM_TIMEOUT = 120
@@ -37,14 +32,9 @@ if "SELENIUM_TIMEOUT" in os.environ:
 
 @tag("selenium")
 @override_settings(
-    SOLR_OPINION_URL=settings.SOLR_OPINION_TEST_URL,
-    SOLR_AUDIO_URL=settings.SOLR_AUDIO_TEST_URL,
-    SOLR_URLS=settings.SOLR_TEST_URLS,
     ALLOWED_HOSTS=["*"],
 )
-class BaseSeleniumTest(
-    SerializeSolrTestMixin, StaticLiveServerTestCase, ESIndexTestCase
-):
+class BaseSeleniumTest(StaticLiveServerTestCase, ESIndexTestCase):
     """Base class for Selenium Tests. Sets up a few attributes:
       * browser - instance of Selenium WebDriver
       * screenshot - boolean for if the test should save a final screenshot
@@ -102,12 +92,10 @@ class BaseSeleniumTest(
             filename = f"{type(self).__name__}-selenium.png"
             print(f"\nSaving screenshot in docker image at: /tmp/{filename}")
             self.browser.save_screenshot(f"/tmp/{filename}")
-        self._teardown_test_solr()
 
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
-
         cls.browser.quit()
 
     @retry(AssertionError, tries=3, delay=0.25, backoff=1)
@@ -201,22 +189,11 @@ class BaseSeleniumTest(
 
     @staticmethod
     def _update_index() -> None:
-        # For now, until some model/api issues are worked out for Audio
-        # objects, we'll avoid using the cl_update_index command and do
-        # this the hard way using tasks
-        opinion_keys = Opinion.objects.values_list("pk", flat=True)
-        add_items_to_solr(opinion_keys, "search.Opinion", force_commit=True)
-        audio_keys = Audio.objects.values_list("pk", flat=True)
-        add_items_to_solr(audio_keys, "audio.Audio", force_commit=True)
-
-    @staticmethod
-    def _teardown_test_solr() -> None:
-        """Empty out the test cores that we use"""
-        conns = [settings.SOLR_OPINION_TEST_URL, settings.SOLR_AUDIO_TEST_URL]
-        for conn in conns:
-            with Session() as session:
-                si = scorched.SolrInterface(
-                    conn, http_connection=session, mode="rw"
-                )
-                si.delete_all()
-                si.commit()
+        # Index Opinions into ES.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
