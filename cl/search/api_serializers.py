@@ -6,15 +6,18 @@ from rest_framework.serializers import ModelSerializer
 
 from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
-from cl.lib.document_serializer import DocumentSerializer
+from cl.custom_filters.templatetags.extras import get_highlight
+from cl.lib.document_serializer import (
+    DocumentSerializer,
+    NullableListField,
+    TimeStampField,
+)
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
-from cl.search.documents import (
-    AudioDocument,
-    OpinionClusterDocument,
-    PersonDocument,
-)
+from cl.search.constants import o_type_index_map
+from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
 from cl.search.models import (
+    PRECEDENTIAL_STATUS,
     Citation,
     Court,
     Docket,
@@ -26,6 +29,10 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
+
+inverted_o_type_index_map = {
+    value: key for key, value in o_type_index_map.items()
+}
 
 
 class PartyTypeSerializer(
@@ -361,7 +368,6 @@ class OpinionESResultSerializer(DocumentSerializer):
     """The serializer for Opinion results."""
 
     cluster_id = serializers.IntegerField(read_only=True)
-    status_exact = serializers.CharField(read_only=True)
 
     # Fields from the opinion child
     id = serializers.IntegerField(read_only=True)
@@ -370,22 +376,43 @@ class OpinionESResultSerializer(DocumentSerializer):
     type = serializers.CharField(read_only=True)
     download_url = serializers.CharField(read_only=True)
     local_path = serializers.CharField(read_only=True)
-    cites = serializers.ListField(read_only=True)
-    joined_by_ids = serializers.ListField(read_only=True)
-
+    cites = NullableListField(read_only=True)
+    joined_by_ids = NullableListField(read_only=True)
+    panel_ids = NullableListField(read_only=True)
+    sibling_ids = NullableListField(read_only=True)
+    citation = NullableListField(read_only=True)
     per_curiam = serializers.BooleanField(read_only=True)
+    court_exact = serializers.CharField(read_only=True)
+    timestamp = TimeStampField(read_only=True)
+
+    def to_representation(self, instance):
+        """Transforms fields and adds missing ones to the serialized
+        representation to ensure compatibility with the V3 API version when
+        using ES as the search engine.
+        """
+        ret = super().to_representation(instance)
+        ret["type"] = inverted_o_type_index_map.get(ret["type"])
+        ret["status"] = PRECEDENTIAL_STATUS.get_status_value_reverse(
+            ret["status"]
+        )
+        ret["court_exact"] = ret["court_id"]
+        ret["snippet"] = get_highlight(instance, "text")
+
+        return ret
 
     class Meta:
-        document = OpinionClusterDocument
+        document = OpinionDocument
         exclude = (
             "text",
             "caseNameFull",
             "dateFiled_text",
             "dateArgued_text",
             "dateReargued_text",
+            "type_text",
             "dateReargumentDenied_text",
             "posture",
             "syllabus",
             "procedural_history",
             "panel_names",
+            "sha1",
         )
