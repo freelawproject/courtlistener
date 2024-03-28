@@ -2734,6 +2734,28 @@ class OpinionCluster(AbstractDateTimeModel):
         ]
     )
 
+    webhook_tracked_fields = FieldTracker(
+        fields=[
+            "docket_id",
+            "case_name",
+            "case_name_short",
+            "case_name_full",
+            "date_filed",
+            "judges",
+            "attorneys",
+            "nature_of_suit",
+            "attorneys",
+            "precedential_status",
+            "procedural_history",
+            "posture",
+            "syllabus",
+            "scdb_id",
+            "citation_count",
+            "slug",
+            "source",
+        ]
+    )
+
     async def acaption(self):
         """Make a proper caption
 
@@ -2974,7 +2996,7 @@ class OpinionCluster(AbstractDateTimeModel):
         **kwargs,
     ):
         self.slug = slugify(trunc(best_case_name(self), 75))
-        if update_fields is not None:
+        if update_fields:
             update_fields = {"slug"}.union(update_fields)
         super(OpinionCluster, self).save(
             update_fields=update_fields, *args, **kwargs
@@ -3432,6 +3454,24 @@ class Opinion(AbstractDateTimeModel):
         ]
     )
 
+    webhook_field_tracker = FieldTracker(
+        fields=[
+            "cluster_id",
+            "author_id",
+            "type",
+            "per_curiam",
+            "download_url",
+            "local_path",
+            "html_columbia",
+            "html_lawbox",
+            "xml_harvard",
+            "html_anon_2020",
+            "html",
+            "plain_text",
+            "sha1",
+        ]
+    )
+
     @property
     def siblings(self) -> QuerySet:
         # These are other sub-opinions of the current cluster.
@@ -3458,6 +3498,7 @@ class Opinion(AbstractDateTimeModel):
         **kwargs: Dict,
     ) -> None:
         super(Opinion, self).save(*args, **kwargs)
+
         if index:
             from cl.search.tasks import add_items_to_solr
 

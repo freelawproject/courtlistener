@@ -15,6 +15,12 @@ class WebhookEventType(models.IntegerChoices):
     SEARCH_ALERT = 2, "Search Alert"
     RECAP_FETCH = 3, "Recap Fetch"
     OLD_DOCKET_ALERTS_REPORT = 4, "Old Docket Alerts Report"
+    OPINION_CREATE = 5, "Opinion Create"
+    OPINION_UPDATE = 6, "Opinion Update"
+    OPINION_DELETE = 7, "Opinion Delete"
+    OPINION_CLUSTER_CREATE = 8, "Opinion Cluster Create"
+    OPINION_CLUSTER_UPDATE = 9, "Opinion Cluster Update"
+    OPINION_CLUSTER_DELETE = 10, "Opinion Cluster Delete"
 
 
 HttpStatusCodes = models.IntegerChoices(  # type: ignore

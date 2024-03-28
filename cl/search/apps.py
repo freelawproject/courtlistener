@@ -5,6 +5,16 @@ from django.db.models.signals import post_migrate
 from elasticsearch.exceptions import ConnectionError, ConnectionTimeout
 from elasticsearch_dsl import connections
 
+from cl.api.models import WebhookEventType
+from cl.api.tasks import (
+    consume_webhook_event_batch,
+    send_opinion_clusters_created_webhook,
+    send_opinion_clusters_deleted_webhook,
+    send_opinion_clusters_updated_webhook,
+    send_opinions_created_webhook,
+    send_opinions_deleted_webhook,
+    send_opinions_updated_webhook,
+)
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 
@@ -21,6 +31,44 @@ class SearchConfig(AppConfig):
             # Execute create_search_indices after the post_migrate signal
             # is triggered in the search app.
             post_migrate.connect(create_search_indices, sender=self)
+
+        # Start the batch consumer for the webhook event queue
+        consume_webhook_event_batch.apply_async(
+            args=[
+                WebhookEventType.OPINION_CLUSTER_CREATE,
+                send_opinion_clusters_created_webhook,
+            ]
+        )
+        consume_webhook_event_batch.apply_async(
+            args=[
+                WebhookEventType.OPINION_CLUSTER_UPDATE,
+                send_opinion_clusters_updated_webhook,
+            ]
+        )
+        consume_webhook_event_batch.apply_async(
+            args=[
+                WebhookEventType.OPINION_CLUSTER_DELETE,
+                send_opinion_clusters_deleted_webhook,
+            ]
+        )
+        consume_webhook_event_batch.apply_async(
+            args=[
+                WebhookEventType.OPINION_CREATE,
+                send_opinions_created_webhook,
+            ]
+        )
+        consume_webhook_event_batch.apply_async(
+            args=[
+                WebhookEventType.OPINION_UPDATE,
+                send_opinions_updated_webhook,
+            ]
+        )
+        consume_webhook_event_batch.apply_async(
+            args=[
+                WebhookEventType.OPINION_DELETE,
+                send_opinions_deleted_webhook,
+            ]
+        )
 
 
 @retry((ConnectionError, ConnectionTimeout), tries=5, delay=5)
