@@ -53,8 +53,7 @@ from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
-from cl.lib.date_time import midnight_pt
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import SimpleUserDataMixin, opinion_search_api_keys
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
@@ -855,105 +854,6 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             mail.outbox[3].extra_headers["List-Unsubscribe"],
         )
 
-        opinion_alert_webhook_keys = {
-            "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
-            "attorney": lambda x: x["result"].cluster.attorneys,
-            "author_id": lambda x: x["result"].author_id,
-            "caseName": lambda x: x["result"].cluster.case_name,
-            "citation": lambda x: [
-                str(cite) for cite in x["result"].cluster.citations.all()
-            ],
-            "citeCount": lambda x: x["result"].cluster.citation_count,
-            "cites": lambda x: (
-                list(
-                    x["result"]
-                    .cited_opinions.all()
-                    .values_list("cited_opinion_id", flat=True)
-                )
-                if x["result"]
-                .cited_opinions.all()
-                .values_list("cited_opinion_id", flat=True)
-                else None
-            ),
-            "court": lambda x: x["result"].cluster.docket.court.full_name,
-            "court_citation_string": lambda x: x[
-                "result"
-            ].cluster.docket.court.citation_string,
-            "court_exact": lambda x: x["result"].cluster.docket.court_id,
-            "court_id": lambda x: x["result"].cluster.docket.court_id,
-            "cluster_id": lambda x: x["result"].cluster_id,
-            "dateArgued": lambda x: midnight_pt(
-                x["result"].cluster.docket.date_argued
-            ).isoformat(),
-            "dateFiled": lambda x: midnight_pt(
-                x["result"].cluster.date_filed
-            ).isoformat(),
-            "dateReargued": lambda x: midnight_pt(
-                x["result"].cluster.docket.date_reargued
-            ).isoformat(),
-            "dateReargumentDenied": lambda x: midnight_pt(
-                x["result"].cluster.docket.date_reargument_denied
-            ).isoformat(),
-            "docketNumber": lambda x: x["result"].cluster.docket.docket_number,
-            "docket_id": lambda x: x["result"].cluster.docket_id,
-            "download_url": lambda x: x["result"].download_url,
-            "id": lambda x: x["result"].pk,
-            "joined_by_ids": lambda x: (
-                list(x["result"].joined_by.all().values_list("id", flat=True))
-                if x["result"].joined_by.all()
-                else None
-            ),
-            "panel_ids": lambda x: (
-                list(
-                    x["result"]
-                    .cluster.panel.all()
-                    .values_list("id", flat=True)
-                )
-                if x["result"].cluster.panel.all()
-                else None
-            ),
-            "type": lambda x: x["result"].type,
-            "judge": lambda x: x["result"].cluster.judges,
-            "lexisCite": lambda x: (
-                str(
-                    x["result"].cluster.citations.filter(type=Citation.LEXIS)[
-                        0
-                    ]
-                )
-                if x["result"].cluster.citations.filter(type=Citation.LEXIS)
-                else ""
-            ),
-            "neutralCite": lambda x: (
-                str(
-                    x["result"].cluster.citations.filter(
-                        type=Citation.NEUTRAL
-                    )[0]
-                )
-                if x["result"].cluster.citations.filter(type=Citation.NEUTRAL)
-                else ""
-            ),
-            "local_path": lambda x: (
-                x["result"].local_path if x["result"].local_path else None
-            ),
-            "per_curiam": lambda x: x["result"].per_curiam,
-            "scdb_id": lambda x: x["result"].cluster.scdb_id,
-            "sibling_ids": lambda x: list(
-                x["result"]
-                .cluster.sub_opinions.all()
-                .values_list("id", flat=True)
-            ),
-            "status": lambda x: x[
-                "result"
-            ].cluster.get_precedential_status_display(),
-            "snippet": lambda x: x["snippet"],
-            "suitNature": lambda x: x["result"].cluster.nature_of_suit,
-            "date_created": lambda x: timezone.localtime(
-                x["result"].cluster.date_created
-            ).isoformat(),
-            "timestamp": lambda x: timezone.localtime(
-                x["result"].cluster.date_created
-            ).isoformat(),
-        }
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
         self.assertEqual(
@@ -1023,15 +923,13 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                     # Assert the number of keys in the Opinions Search Webhook
                     # payload
                     keys_count = len(content["payload"]["results"][0])
-                    self.assertEqual(
-                        keys_count, len(opinion_alert_webhook_keys)
-                    )
+                    self.assertEqual(keys_count, len(opinion_search_api_keys))
 
                     # Iterate through all the opinion fields and compare them.
                     for (
                         field,
                         get_expected_value,
-                    ) in opinion_alert_webhook_keys.items():
+                    ) in opinion_search_api_keys.items():
                         with self.subTest(field=field):
                             expected_value = get_expected_value(
                                 alert_data_compare

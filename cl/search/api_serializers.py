@@ -396,8 +396,9 @@ class OpinionESResultSerializer(DocumentSerializer):
             ret["status"]
         )
         ret["court_exact"] = ret["court_id"]
-        ret["snippet"] = get_highlight(instance, "text")
-
+        if not ret.get("snippet"):
+            # If the snippet has not yet been set upstream, set it here.
+            ret["snippet"] = get_highlight(instance, "text")
         return ret
 
     class Meta:

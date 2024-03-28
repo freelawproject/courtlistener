@@ -2,6 +2,7 @@ import datetime
 from http import HTTPStatus
 from unittest import mock
 
+import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -11,17 +12,19 @@ from django.db.models import F
 from django.http import HttpRequest
 from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
+from waffle.testutils import override_flag
 
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
     EmptySolrTestCase,
-    IndexedSolrTestCase,
     PeopleTestCase,
     SearchTestCase,
+    opinion_search_api_keys,
 )
 from cl.people_db.factories import PersonFactory
 from cl.search.constants import o_type_index_map
@@ -67,58 +70,71 @@ from cl.tests.cases import (
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-class OpinionAPISolrSearchTest(IndexedSolrTestCase):
+@override_flag("o-es-search-api-active", active=True)
+class OpinionAPISearchTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
     @classmethod
     def setUpTestData(cls):
-        court = CourtFactory(
-            id="canb",
-            jurisdiction="FB",
-            full_name="court of the Medical Worries",
-        )
-        OpinionClusterFactoryWithChildrenAndParents(
-            case_name="Strickland v. Washington.",
-            case_name_full="Strickland v. Washington.",
-            docket=DocketFactory(
-                court=court,
-                docket_number="1:21-cv-1234",
-                source=Docket.HARVARD,
-            ),
-            sub_opinions=RelatedFactory(
-                OpinionWithChildrenFactory,
-                factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815</p>",
-            ),
-            date_filed=datetime.date(2020, 8, 15),
-            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            syllabus="some rando syllabus",
-            procedural_history="some rando history",
-            source="C",
-            judges="",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            citation_count=1,
-            scdb_votes_minority=3,
-            scdb_votes_majority=6,
-        )
-        OpinionClusterFactoryWithChildrenAndParents(
-            case_name="Strickland v. Lorem.",
-            case_name_full="Strickland v. Lorem.",
-            date_filed=datetime.date(2020, 8, 15),
-            docket=DocketFactory(
-                court=court, docket_number="123456", source=Docket.HARVARD
-            ),
-            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            syllabus="some rando syllabus",
-            procedural_history="some rando history",
-            source="C",
-            judges="",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            citation_count=1,
-            scdb_votes_minority=3,
-            scdb_votes_majority=6,
-        )
-        super().setUpTestData()
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            cls.rebuild_index("search.OpinionCluster")
+            court = CourtFactory(
+                id="canb",
+                jurisdiction="FB",
+                full_name="court of the Medical Worries",
+            )
+            OpinionClusterFactoryWithChildrenAndParents(
+                case_name="Strickland v. Washington.",
+                case_name_full="Strickland v. Washington.",
+                docket=DocketFactory(
+                    court=court,
+                    docket_number="1:21-cv-1234",
+                    source=Docket.HARVARD,
+                ),
+                sub_opinions=RelatedFactory(
+                    OpinionWithChildrenFactory,
+                    factory_related_name="cluster",
+                    html_columbia="<p>Code, &#167; 1-815</p>",
+                ),
+                date_filed=datetime.date(2020, 8, 15),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                syllabus="some rando syllabus",
+                procedural_history="some rando history",
+                source="C",
+                judges="",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                citation_count=1,
+                scdb_votes_minority=3,
+                scdb_votes_majority=6,
+            )
+            OpinionClusterFactoryWithChildrenAndParents(
+                case_name="Strickland v. Lorem.",
+                case_name_full="Strickland v. Lorem.",
+                date_filed=datetime.date(2020, 8, 15),
+                docket=DocketFactory(
+                    court=court, docket_number="123456", source=Docket.HARVARD
+                ),
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                syllabus="some rando syllabus",
+                procedural_history="some rando history",
+                source="C",
+                judges="",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                citation_count=1,
+                scdb_votes_minority=3,
+                scdb_votes_majority=6,
+            )
+            super().setUpTestData()
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.OPINION,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -356,59 +372,48 @@ class OpinionAPISolrSearchTest(IndexedSolrTestCase):
         )
         self.assertIn("Lorem", r.content.decode())
 
+    async def test_api_results_count(self) -> None:
+        """Test the results count returned by the API"""
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            f"stat_{PRECEDENTIAL_STATUS.PUBLISHED}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.ERRATA}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.SEPARATE}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.IN_CHAMBERS}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.RELATING_TO}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.UNKNOWN}": "on",
+        }
+        r = await self._test_api_results_count(
+            search_params, 5, "docket number box"
+        )
+        self.assertEqual(r.data["count"], 5, msg="Wrong number of results.")
+
     async def test_results_api_fields(self) -> None:
-        """Confirm fields in RECAP Search API results."""
-        search_params = {"q": "Honda"}
+        """Confirm fields in Opinion Search API results."""
+        search_params = {"q": f"id:{self.opinion_2.pk} AND secret"}
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
-        keys_to_check = [
-            "absolute_url",
-            "attorney",
-            "author_id",
-            "caseName",
-            "caseNameShort",
-            "citation",
-            "citeCount",
-            "cites",
-            "cluster_id",
-            "court",
-            "court_citation_string",
-            "court_exact",
-            "court_id",
-            "dateArgued",
-            "dateFiled",
-            "dateReargued",
-            "dateReargumentDenied",
-            "docketNumber",
-            "docket_id",
-            "download_url",
-            "id",
-            "joined_by_ids",
-            "judge",
-            "lexisCite",
-            "local_path",
-            "neutralCite",
-            "non_participating_judge_ids",
-            "pagerank",
-            "panel_ids",
-            "per_curiam",
-            "scdb_id",
-            "sibling_ids",
-            "snippet",
-            "source",
-            "status",
-            "status_exact",
-            "suitNature",
-            "timestamp",
-            "type",
-        ]
+
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(keys_to_check))
-        for key in keys_to_check:
-            self.assertTrue(
-                key in r.data["results"][0],
-                msg=f"Key {key} not found in the result object.",
-            )
+        self.assertEqual(keys_count, len(opinion_search_api_keys))
+        for (
+            field,
+            get_expected_value,
+        ) in opinion_search_api_keys.items():
+            with self.subTest(field=field):
+                expected_value = await sync_to_async(get_expected_value)(
+                    {
+                        "result": self.opinion_2,
+                        "snippet": "my plain text <mark>secret</mark> word for queries",
+                    }
+                )
+                actual_value = r.data["results"][0].get(field)
+                self.assertEqual(
+                    actual_value,
+                    expected_value,
+                    f"Field '{field}' does not match.",
+                )
 
 
 class OpinionsESSearchTest(
