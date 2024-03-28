@@ -36,7 +36,7 @@ from reporters_db import (
 )
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
-from cl.citations.utils import get_canonicals_from_reporter
+from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -1153,8 +1153,7 @@ async def citation_redirector(
         )
 
     # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
-    slugified_editions = {str(slugify(item)): item for item in EDITIONS.keys()}
-    proper_reporter = slugified_editions.get(reporter, None)
+    proper_reporter = SLUGIFIED_EDITIONS.get(reporter, None)
     if not proper_reporter:
         return await attempt_reporter_variation(
             request, reporter, volume, page
