@@ -2486,7 +2486,10 @@ def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
 
     search_query = main_query.query(query)
     search_query.aggs.bucket(
-        "unique_opinions", "cardinality", field="cluster_id"
+        "unique_opinions",
+        "cardinality",
+        field="cluster_id",
+        precision_threshold=40_000,
     )
     search_query = search_query.extra(size=0, track_total_hits=True)
     try:
