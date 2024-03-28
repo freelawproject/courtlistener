@@ -13,6 +13,7 @@ from cl.search.api_serializers import (
     ExtendedPersonESSerializer,
     OAESResultSerializer,
     OpinionClusterSerializer,
+    OpinionESResultSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
@@ -177,7 +178,11 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
     permission_classes = (permissions.AllowAny,)
 
     def list(self, request, *args, **kwargs):
-        search_form = SearchForm(request.GET)
+
+        is_opinion_es_active = waffle.flag_is_active(
+            request, "o-es-search-api-active"
+        )
+        search_form = SearchForm(request.GET, is_es_form=is_opinion_es_active)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 
@@ -194,6 +199,8 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 request, "p-es-active"
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
+            elif search_type == SEARCH_TYPES.OPINION and is_opinion_es_active:
+                serializer = OpinionESResultSerializer(result_page, many=True)
             else:
                 if cd["q"] == "":
                     cd["q"] = "*"  # Get everything
