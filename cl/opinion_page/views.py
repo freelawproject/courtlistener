@@ -1111,31 +1111,6 @@ async def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-    # "reporter" can be a reporter or a full citation.  If it is a full
-    # citation then we will get the reporter, volume, and page from
-    # eyecite.
-    #
-    # By adding this extra test we can keep the rest of the logic untouched
-    #
-    if not volume and not page:
-        citations = eyecite.get_citations(reporter)
-        if citations and citations[0].groups:
-            # check whether the parsed object is an opinion citation
-            if not isinstance(
-                citations[0], (FullCaseCitation, ShortCaseCitation)
-            ):
-                return await throw_404(
-                    request,
-                    {"not_opinion_citation": True, "private": False},
-                )
-
-            groups = citations[0].groups
-            # We slugify reporter so that the test further down will
-            # pass.
-            reporter = slugify(groups["reporter"])
-            volume = groups.get("volume", None)
-            page = groups.get("page", None)
-
     reporter_slug = slugify(reporter)
 
     if reporter != reporter_slug:
