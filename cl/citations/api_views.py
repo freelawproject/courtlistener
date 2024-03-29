@@ -18,7 +18,11 @@ from cl.citations.api_serializers import (
     CitationAPIResponseSerializer,
 )
 from cl.citations.types import CitationAPIResponse
-from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
+from cl.citations.utils import (
+    SLUGIFIED_EDITIONS,
+    filter_out_non_case_law_citations,
+    get_canonicals_from_reporter,
+)
 from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
 
@@ -39,11 +43,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         text = data.get("text", None)
         if text:
             citation_objs = eyecite.get_citations(text)
-            citation_objs = [
-                c
-                for c in citation_objs
-                if isinstance(c, (FullCaseCitation, ShortCaseCitation))
-            ]
+            citation_objs = filter_out_non_case_law_citations(citation_objs)
             if not citation_objs:
                 return Response({})
 

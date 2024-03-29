@@ -6,7 +6,7 @@ from django.apps import (  # Must use apps.get_model() to avoid circular import 
 from django.db.models import Sum
 from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
-from eyecite.models import FullCaseCitation
+from eyecite.models import CitationBase, FullCaseCitation, ShortCaseCitation
 from eyecite.utils import strip_punct
 from reporters_db import EDITIONS, VARIATIONS_ONLY
 
@@ -109,3 +109,22 @@ def get_canonicals_from_reporter(reporter_slug: str) -> list[SafeString]:
         slugified_variations[str(slugify(variant))] = slugged_canonicals
 
     return slugified_variations.get(reporter_slug, [])
+
+
+def filter_out_non_case_law_citations(
+    citations: list[CitationBase],
+) -> list[FullCaseCitation | ShortCaseCitation]:
+    """
+    Filters out all non-case-law citations from a list of citations.
+
+    Args:
+        citations (list[CitationBase]): List of citation
+
+    Returns:
+        list[FullCaseCitation | ShortCaseCitation]: List of case law citations.
+    """
+    return [
+        c
+        for c in citations
+        if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+    ]
