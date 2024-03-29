@@ -130,7 +130,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         )
 
     def test_opinion_dockets_source_assigment(self) -> None:
-        """ Test that the opinion dockets source gets properly assigned. """
+        """Test that the opinion dockets source gets properly assigned."""
         docket = DocketFactory.create(
             case_name="Lorem Ipsum",
             docket_number="11-8890",
@@ -139,6 +139,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             pacer_case_id="01111",
         )
         non_columbia_sources_tests = {
+            Docket.DEFAULT: Docket.COLUMBIA,
             Docket.RECAP: Docket.COLUMBIA_AND_RECAP,
             Docket.SCRAPER: Docket.COLUMBIA_AND_SCRAPER,
             Docket.RECAP_AND_SCRAPER: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
@@ -156,6 +157,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
         }
         non_harvard_sources_tests = {
+            Docket.DEFAULT: Docket.HARVARD,
             Docket.RECAP: Docket.HARVARD_AND_RECAP,
             Docket.SCRAPER: Docket.SCRAPER_AND_HARVARD,
             Docket.RECAP_AND_SCRAPER: Docket.RECAP_AND_SCRAPER_AND_HARVARD,
@@ -173,6 +175,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
         }
         non_scraper_sources_tests = {
+            Docket.DEFAULT: Docket.SCRAPER,
             Docket.RECAP: Docket.RECAP_AND_SCRAPER,
             Docket.COLUMBIA: Docket.COLUMBIA_AND_SCRAPER,
             Docket.COLUMBIA_AND_RECAP: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,

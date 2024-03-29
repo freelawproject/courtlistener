@@ -477,6 +477,7 @@ class Docket(AbstractDateTimeModel):
         COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
     ]
     NON_SCRAPER_SOURCES = [
+        DEFAULT,
         RECAP,
         COLUMBIA,
         COLUMBIA_AND_RECAP,
@@ -494,6 +495,7 @@ class Docket(AbstractDateTimeModel):
         COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
     ]
     NON_COLUMBIA_SOURCES = [
+        DEFAULT,
         RECAP,
         SCRAPER,
         RECAP_AND_SCRAPER,
@@ -511,6 +513,7 @@ class Docket(AbstractDateTimeModel):
         RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
     ]
     NON_HARVARD_SOURCES = [
+        DEFAULT,
         RECAP,
         SCRAPER,
         RECAP_AND_SCRAPER,
@@ -959,7 +962,7 @@ class Docket(AbstractDateTimeModel):
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
 
-    def add_opinions_source(self, scraper_source):
+    def add_opinions_source(self, scraper_source:int):
         match scraper_source:
             case self.COLUMBIA:
                 non_source_list = self.NON_COLUMBIA_SOURCES

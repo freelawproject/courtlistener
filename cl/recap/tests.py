@@ -37,7 +37,7 @@ from cl.api.management.commands.cl_retry_webhooks import (
 )
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import get_next_webhook_retry_date
-from cl.lib.pacer import is_pacer_court_accessible
+from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -105,6 +105,7 @@ from cl.recap.tasks import (
     process_recap_zip,
 )
 from cl.recap_rss.tasks import merge_rss_feed_contents
+from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
@@ -2007,6 +2008,11 @@ class DescriptionCleanupTest(SimpleTestCase):
 
 
 class RecapDocketTaskTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "cand.html"
@@ -2054,8 +2060,8 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(self.pq.docket_id, existing_d.pk)
 
     def test_add_recap_source(self) -> None:
-        """Is the RECAP source properly added to a docket originally added by
-        a harvard source?
+        """Is the RECAP source properly added to a docket originally added from
+        a different source?
         """
 
         non_recap_sources = {
@@ -2080,23 +2086,42 @@ class RecapDocketTaskTest(TestCase):
             len(Docket.NON_RECAP_SOURCES),
             msg="Was a new non-recap source added?",
         )
-        for source, expected_source in non_recap_sources.items():
-            with self.subTest(
-                f"Testing RECAP source {source} assigment.",
-                source=source,
-                expected_source=expected_source,
-            ):
-                harvard_docket = DocketFactory.create(
-                    source=source, pacer_case_id="asdf", court_id="scotus"
-                )
-                harvard_docket.add_recap_source()
-                harvard_docket.save()
-                harvard_docket.refresh_from_db()
-                self.assertEqual(
-                    harvard_docket.source,
-                    expected_source,
-                    msg="The source does not match.",
-                )
+        non_recap_sources.update({Docket.DEFAULT: Docket.RECAP_AND_SCRAPER})
+        docket = DocketFactory.create(
+            source=Docket.DEFAULT, pacer_case_id="asdf", court_id=self.court.pk
+        )
+
+        def add_recap_source_and_save(docket_instance):
+            docket_instance.add_recap_source()
+            docket_instance.save()
+
+        pacer_free_doc_row = PACERFreeDocumentRowFactory(
+            court_id=self.court.pk, pacer_case_id=docket.pacer_case_id
+        )
+        pacer_free_doc_row.court = self.court
+        delattr(pacer_free_doc_row, "id")
+        tests = {
+            "add_recap_source_test": lambda x: add_recap_source_and_save(x),
+            "lookup_and_save_test": lambda x: lookup_and_save(
+                pacer_free_doc_row
+            ),
+        }
+        for test, method in tests.items():
+            for source, expected_source in non_recap_sources.items():
+                with self.subTest(
+                    f"Testing {test} source {source} assigment.",
+                    source=source,
+                    expected_source=expected_source,
+                ):
+                    Docket.objects.filter(pk=docket.pk).update(source=source)
+                    docket.refresh_from_db()
+                    method(docket)
+                    docket.refresh_from_db()
+                    self.assertEqual(
+                        docket.source,
+                        expected_source,
+                        msg="The source does not match.",
+                    )
 
     def test_docket_and_de_already_exist(self) -> None:
         """Can we parse if the docket and the docket entry already exist?"""
