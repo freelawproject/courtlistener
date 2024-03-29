@@ -962,7 +962,7 @@ class Docket(AbstractDateTimeModel):
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
 
-    def add_opinions_source(self, scraper_source:int):
+    def add_opinions_source(self, scraper_source: int):
         match scraper_source:
             case self.COLUMBIA:
                 non_source_list = self.NON_COLUMBIA_SOURCES
