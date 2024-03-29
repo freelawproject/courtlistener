@@ -1034,7 +1034,7 @@ def make_citation_url_dict(
     d = {"reporter": reporter}
     if volume:
         d["volume"] = volume
-    if page:
+    if volume and page:
         d["page"] = page
     return d
 
@@ -1159,31 +1159,16 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
             # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
             citations = eyecite.get_citations(cd["reporter"])
-            kwargs = {}
-            if not citations:
-                # Eyecite didn't identify a citation, the user might be
-                # entering a reporter name.
-                kwargs.update(make_citation_url_dict(**cd))
-                return HttpResponseRedirect(
-                    reverse("citation_redirector", kwargs=kwargs)
-                )
-
-            # Eyecite found citations in the input. Let's keep only case
-            # law citations and try to find a clusters that match the first
-            # one.
             case_law_citations = filter_out_non_case_law_citations(citations)
-
             if not case_law_citations:
                 return TemplateResponse(
                     request,
                     "volumes_for_reporter.html",
-                    {"not_opinion_citation": True, "private": False},
+                    {"no_citation_found": True, "private": False},
                     status=HTTPStatus.BAD_REQUEST,
                 )
 
-            kwargs.update(
-                make_citation_url_dict(**case_law_citations[0].groups)
-            )
+            kwargs = make_citation_url_dict(**case_law_citations[0].groups)
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=kwargs)
             )

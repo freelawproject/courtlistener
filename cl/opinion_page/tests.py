@@ -272,11 +272,6 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
-        r = self.client.post(
-            reverse("citation_redirector"), self.citation, follow=True
-        )
-        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
-
     async def test_multiple_results(self) -> None:
         """Do we return a 300 status code when there are multiple results?"""
         # Duplicate the citation and add it to another cluster instead.
@@ -289,6 +284,15 @@ class CitationRedirectorTest(TestCase):
             reverse("citation_redirector", kwargs=self.citation)
         )
         self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "56 F.2d 9 (1st Cir. 2015)"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+
         await f2_cite.adelete()
 
     async def test_handle_ambiguous_reporter_variations(self) -> None:
@@ -319,6 +323,15 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "1 bad-reporter 1"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
+
         r = await self.async_client.get(
             reverse(
                 "citation_redirector",
@@ -331,6 +344,15 @@ class CitationRedirectorTest(TestCase):
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
         self.assertIn("Unable to Find Reporter", r.content.decode())
 
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "Maryland Code, Criminal Law § 11-208"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
+
         r = await self.async_client.get(
             reverse(
                 "citation_redirector",
@@ -342,6 +364,15 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
         self.assertIn("Unable to Find Reporter", r.content.decode())
+
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "§ 97-29-63"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
 
     async def test_invalid_page_number_1918(self) -> None:
         """Do we fail gracefully with invalid page numbers?"""
@@ -645,8 +676,8 @@ class CitationRedirectorTest(TestCase):
             follow=True,
         )
         self.assertTemplateUsed(r, "volumes_for_reporter.html")
-        self.assertIn("arb-11-20", r.content.decode())
-        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+        self.assertIn("No Citations Detected", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
         r = await self.async_client.post(
             reverse("citation_homepage"),
@@ -656,8 +687,8 @@ class CitationRedirectorTest(TestCase):
             follow=True,
         )
         self.assertTemplateUsed(r, "volumes_for_reporter.html")
-        self.assertIn("Unable to Find Reporter", r.content.decode())
-        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+        self.assertIn("No Citations Detected", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_can_filter_out_non_case_law_citation(self):
         chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
@@ -682,7 +713,7 @@ class CitationRedirectorTest(TestCase):
             follow=True,
         )
 
-        self.assertIn("Citation Type Mismatch", r.content.decode())
+        self.assertIn("No Citations Detected", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
 
