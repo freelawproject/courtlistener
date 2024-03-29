@@ -115,7 +115,7 @@ def filter_out_non_case_law_citations(
     citations: list[CitationBase],
 ) -> list[FullCaseCitation | ShortCaseCitation]:
     """
-    Filters out all non-case-law citations from a list of citations.
+    Filters out all non-case law citations from a list of citations.
 
     Args:
         citations (list[CitationBase]): List of citation

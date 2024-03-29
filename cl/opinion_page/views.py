@@ -27,7 +27,6 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
-from eyecite.models import FullCaseCitation, ShortCaseCitation
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
@@ -36,7 +35,11 @@ from reporters_db import (
 )
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
-from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
+from cl.citations.utils import (
+    SLUGIFIED_EDITIONS,
+    filter_out_non_case_law_citations,
+    get_canonicals_from_reporter,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -1155,11 +1158,32 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
         if await sync_to_async(form.is_valid)():
             # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
-            kwargs = {"reporter": cd["reporter"]}
-            if cd["volume"]:
-                kwargs["volume"] = cd["volume"]
-            if cd["page"]:
-                kwargs["page"] = cd["page"]
+            citations = eyecite.get_citations(cd["reporter"])
+            kwargs = {}
+            if not citations:
+                # Eyecite didn't identify a citation, the user might be
+                # entering a reporter name.
+                kwargs.update(make_citation_url_dict(**cd))
+                return HttpResponseRedirect(
+                    reverse("citation_redirector", kwargs=kwargs)
+                )
+
+            # Eyecite found citations in the input. Let's keep only case
+            # law citations and try to find a clusters that match the first
+            # one.
+            case_law_citations = filter_out_non_case_law_citations(citations)
+
+            if not case_law_citations:
+                return TemplateResponse(
+                    request,
+                    "volumes_for_reporter.html",
+                    {"not_opinion_citation": True, "private": False},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+
+            kwargs.update(
+                make_citation_url_dict(**case_law_citations[0].groups)
+            )
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=kwargs)
             )
