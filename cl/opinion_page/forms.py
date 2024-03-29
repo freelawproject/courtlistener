@@ -54,11 +54,6 @@ class CitationRedirectorForm(forms.Form):
         required=False,
     )
 
-    def clean_reporter(self):
-        data = self.cleaned_data["reporter"]
-        # Sanitize reporter text: remove slashes
-        return data.replace("/", " ")
-
 
 class DocketEntryFilterForm(forms.Form):
     ASCENDING = "asc"
