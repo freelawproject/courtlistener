@@ -476,6 +476,57 @@ class Docket(AbstractDateTimeModel):
         COLUMBIA_AND_IDB_AND_HARVARD,
         COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
     ]
+    NON_SCRAPER_SOURCES = [
+        RECAP,
+        COLUMBIA,
+        COLUMBIA_AND_RECAP,
+        IDB,
+        RECAP_AND_IDB,
+        COLUMBIA_AND_IDB,
+        COLUMBIA_AND_RECAP_AND_IDB,
+        HARVARD,
+        HARVARD_AND_RECAP,
+        HARVARD_AND_COLUMBIA,
+        COLUMBIA_AND_RECAP_AND_HARVARD,
+        IDB_AND_HARVARD,
+        RECAP_AND_IDB_AND_HARVARD,
+        COLUMBIA_AND_IDB_AND_HARVARD,
+        COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
+    ]
+    NON_COLUMBIA_SOURCES = [
+        RECAP,
+        SCRAPER,
+        RECAP_AND_SCRAPER,
+        IDB,
+        RECAP_AND_IDB,
+        SCRAPER_AND_IDB,
+        RECAP_AND_SCRAPER_AND_IDB,
+        HARVARD,
+        HARVARD_AND_RECAP,
+        SCRAPER_AND_HARVARD,
+        RECAP_AND_SCRAPER_AND_HARVARD,
+        IDB_AND_HARVARD,
+        RECAP_AND_IDB_AND_HARVARD,
+        SCRAPER_AND_IDB_AND_HARVARD,
+        RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+    ]
+    NON_HARVARD_SOURCES = [
+        RECAP,
+        SCRAPER,
+        RECAP_AND_SCRAPER,
+        COLUMBIA,
+        COLUMBIA_AND_RECAP,
+        COLUMBIA_AND_SCRAPER,
+        COLUMBIA_AND_RECAP_AND_SCRAPER,
+        IDB,
+        RECAP_AND_IDB,
+        SCRAPER_AND_IDB,
+        RECAP_AND_SCRAPER_AND_IDB,
+        COLUMBIA_AND_IDB,
+        COLUMBIA_AND_RECAP_AND_IDB,
+        COLUMBIA_AND_SCRAPER_AND_IDB,
+        COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
+    ]
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.", choices=SOURCE_CHOICES
@@ -907,6 +958,21 @@ class Docket(AbstractDateTimeModel):
         elif self.source in self.NON_RECAP_SOURCES:
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
+
+    def add_opinions_source(self, scraper_source):
+        match scraper_source:
+            case self.COLUMBIA:
+                non_source_list = self.NON_COLUMBIA_SOURCES
+            case self.SCRAPER:
+                non_source_list = self.NON_SCRAPER_SOURCES
+            case self.HARVARD:
+                non_source_list = self.NON_HARVARD_SOURCES
+            case _:
+                return
+
+        if self.source in non_source_list:
+            # Simply add the new source value to the other value.
+            self.source = self.source + scraper_source
 
     @property
     def authorities(self):

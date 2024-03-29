@@ -304,29 +304,32 @@ def update_or_create_docket(
     :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
-    :return: The docket docket.
+    :return: The docket.
     """
+
+    docket_fields = {
+        "case_name": case_name,
+        "case_name_short": case_name_short,
+        "case_name_full": case_name_full,
+        "blocked": blocked,
+        "date_blocked": date_blocked,
+        "date_argued": date_argued,
+        "ia_needs_upload": ia_needs_upload,
+    }
+
     docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
     if docket.pk:
-        docket.case_name = case_name
-        docket.case_name_short = case_name_short
-        docket.case_name_full = case_name_full
-        docket.source = source
-        docket.blocked = blocked
-        docket.date_blocked = date_blocked
-        docket.date_argued = date_argued
-        docket.ia_needs_upload = ia_needs_upload
+        # Update the existing docket with the new values
+        docket.add_opinions_source(source)
+        for field, value in docket_fields.items():
+            setattr(docket, field, value)
     else:
+        # Create a new docket with docket_fields and additional fields
         docket = Docket(
-            case_name=case_name,
-            case_name_short=case_name_short,
-            case_name_full=case_name_full,
+            **docket_fields,
+            source=source,
             docket_number=docket_number,
             court_id=court_id,
-            source=source,
-            blocked=blocked,
-            date_blocked=date_blocked,
-            date_argued=date_argued,
-            ia_needs_upload=ia_needs_upload,
         )
+
     return docket
