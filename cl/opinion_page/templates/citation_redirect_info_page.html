@@ -51,11 +51,6 @@
 
           <p class="text-center">If you have a citation you want to look up,
             put it in here, and we'll look it up.</p>
-          {% if form.errors %}
-            <div class="alert alert-danger">
-              <p class="text-center bottom">Error: Citation field is required.</p>
-            </div>
-          {% endif %}
         </div>
         <div id="main-query-box" class="row" >
           <form action="" method="post" class="form-inline" role="form">
@@ -65,10 +60,11 @@
               <div class="input-group" >
                 <input id="id_full_citation"
                        class="form-control input-lg"
-                       value=""
+                       value="{{ form.reporter.value|default:'' }}"
                        name="reporter"
                        autocomplete="off"
                        placeholder="{{ form.reporter.field.widget.attrs.placeholder }}"
+                       required
                        type="text" >
                 <span class="input-group-btn" >
                   <button type="submit"
