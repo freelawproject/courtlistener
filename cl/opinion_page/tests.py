@@ -587,20 +587,18 @@ class CitationRedirectorTest(TestCase):
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
-
-        r = self.client.get(
-            reverse(
-                "citation_redirector",
-                kwargs={
-                    "reporter": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)",
-                },
-            ),
+        r = self.client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)",
+            },
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
         self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "opinion.html")
         self.assertEqual(
-            r.redirect_chain[0][0], "/opinion/2/case-name-cluster/"
+            r.context["cluster"].get_absolute_url(),
+            "/opinion/2/case-name-cluster/",
         )
 
     async def test_avoid_exception_possible_matches_page_with_letter(
@@ -650,7 +648,6 @@ class CitationRedirectorTest(TestCase):
         self.assertIn("arb-11-20", r.content.decode())
         self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
-    async def test_can_handle_urls_as_inputs(self):
         r = await self.async_client.post(
             reverse("citation_homepage"),
             {
@@ -658,9 +655,25 @@ class CitationRedirectorTest(TestCase):
             },
             follow=True,
         )
-        self.assertTemplateUsed(r, "citation_redirect_info_page.html")
-        self.assertIn("Validation Error", r.content.decode())
-        self.assertIn("URLs are not allowed in this field", r.content.decode())
+        self.assertTemplateUsed(r, "volumes_for_reporter.html")
+        self.assertIn("Unable to Find Reporter", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+
+    async def test_can_filter_out_non_case_law_citation(self):
+        chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
+            volume=22, reporter="U.S.", page="444", type=1
+        )
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "§102 USC 222 is the statute that was discussed in 22 U.S. 444"
+            },
+            follow=True,
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "opinion.html")
+        self.assertIn(str(chests_of_tea), r.content.decode())
 
     async def test_show_error_for_non_opinion_citations(self):
         r = await self.async_client.post(
@@ -668,9 +681,9 @@ class CitationRedirectorTest(TestCase):
             {"reporter": "44 Vand. L. Rev. 1041"},
             follow=True,
         )
-        print(r.content.decode())
+
         self.assertIn("Citation Type Mismatch", r.content.decode())
-        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
 
 class ViewRecapDocketTest(TestCase):
