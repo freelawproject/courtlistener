@@ -2053,16 +2053,50 @@ class RecapDocketTaskTest(TestCase):
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.docket_id, existing_d.pk)
 
-    def test_adding_harvard_and_recap_source(self) -> None:
-        """Is the HARVARD_AND_RECAP source properly added when updating a
-        docket by RECAP, originally added by Harvard?
+    def test_add_recap_source(self) -> None:
+        """Is the RECAP source properly added to a docket originally added by
+        a harvard source?
         """
-        Docket.objects.create(
-            source=Docket.HARVARD, pacer_case_id="asdf", court_id="scotus"
+
+        non_recap_sources = {
+            Docket.SCRAPER: Docket.RECAP_AND_SCRAPER,
+            Docket.COLUMBIA: Docket.COLUMBIA_AND_RECAP,
+            Docket.COLUMBIA_AND_SCRAPER: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
+            Docket.IDB: Docket.RECAP_AND_IDB,
+            Docket.SCRAPER_AND_IDB: Docket.RECAP_AND_SCRAPER_AND_IDB,
+            Docket.COLUMBIA_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_IDB,
+            Docket.COLUMBIA_AND_SCRAPER_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
+            Docket.HARVARD: Docket.HARVARD_AND_RECAP,
+            Docket.SCRAPER_AND_HARVARD: Docket.RECAP_AND_SCRAPER_AND_HARVARD,
+            Docket.HARVARD_AND_COLUMBIA: Docket.COLUMBIA_AND_RECAP_AND_HARVARD,
+            Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
+            Docket.IDB_AND_HARVARD: Docket.RECAP_AND_IDB_AND_HARVARD,
+            Docket.SCRAPER_AND_IDB_AND_HARVARD: Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+            Docket.COLUMBIA_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
+            Docket.COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+        }
+        self.assertEqual(
+            len(non_recap_sources),
+            len(Docket.NON_RECAP_SOURCES),
+            msg="Was a new non-recap source added?",
         )
-        returned_data = async_to_sync(process_recap_docket)(self.pq.pk)
-        d = Docket.objects.get(pk=returned_data["docket_pk"])
-        self.assertEqual(d.source, Docket.HARVARD_AND_RECAP)
+        for source, expected_source in non_recap_sources.items():
+            with self.subTest(
+                f"Testing RECAP source {source} assigment.",
+                source=source,
+                expected_source=expected_source,
+            ):
+                harvard_docket = DocketFactory.create(
+                    source=source, pacer_case_id="asdf", court_id="scotus"
+                )
+                harvard_docket.add_recap_source()
+                harvard_docket.save()
+                harvard_docket.refresh_from_db()
+                self.assertEqual(
+                    harvard_docket.source,
+                    expected_source,
+                    msg="The source does not match.",
+                )
 
     def test_docket_and_de_already_exist(self) -> None:
         """Can we parse if the docket and the docket entry already exist?"""

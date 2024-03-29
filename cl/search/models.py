@@ -459,6 +459,23 @@ class Docket(AbstractDateTimeModel):
         COLUMBIA_AND_SCRAPER_AND_IDB,
         COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
     ]
+    NON_RECAP_SOURCES = [
+        SCRAPER,
+        COLUMBIA,
+        COLUMBIA_AND_SCRAPER,
+        IDB,
+        SCRAPER_AND_IDB,
+        COLUMBIA_AND_IDB,
+        COLUMBIA_AND_SCRAPER_AND_IDB,
+        HARVARD,
+        SCRAPER_AND_HARVARD,
+        HARVARD_AND_COLUMBIA,
+        COLUMBIA_AND_SCRAPER_AND_HARVARD,
+        IDB_AND_HARVARD,
+        SCRAPER_AND_IDB_AND_HARVARD,
+        COLUMBIA_AND_IDB_AND_HARVARD,
+        COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
+    ]
 
     source = models.SmallIntegerField(
         help_text="contains the source of the Docket.", choices=SOURCE_CHOICES
@@ -887,16 +904,7 @@ class Docket(AbstractDateTimeModel):
     def add_recap_source(self):
         if self.source == self.DEFAULT:
             self.source = self.RECAP_AND_SCRAPER
-        elif self.source in [
-            self.SCRAPER,
-            self.COLUMBIA,
-            self.COLUMBIA_AND_SCRAPER,
-            self.IDB,
-            self.SCRAPER_AND_IDB,
-            self.COLUMBIA_AND_IDB,
-            self.COLUMBIA_AND_SCRAPER_AND_IDB,
-            self.HARVARD,
-        ]:
+        elif self.source in self.NON_RECAP_SOURCES:
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
 
