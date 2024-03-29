@@ -33,7 +33,7 @@ from scorched.exc import SolrError
 
 from cl.audio.models import Audio
 from cl.celery_init import app
-from cl.lib.elasticsearch_utils import build_daterange_query, es_index_exists
+from cl.lib.elasticsearch_utils import build_daterange_query
 from cl.lib.search_index_utils import InvalidDocumentError
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
@@ -323,7 +323,6 @@ def es_save_document(
             parent_id = getattr(instance.person, "pk", None)
             if not all(
                 [
-                    es_index_exists(es_document._index._name),
                     parent_id,
                     # avoid indexing position records if the parent is not a judge
                     instance.person.is_judge,
@@ -344,12 +343,7 @@ def es_save_document(
             doc_id = instance.pk
         case "search.RECAPDocument":
             parent_id = getattr(instance.docket_entry.docket, "pk", None)
-            if not all(
-                [
-                    es_index_exists(es_document._index._name),
-                    parent_id,
-                ]
-            ):
+            if not parent_id:
                 self.request.chain = None
                 return None
 
@@ -364,12 +358,7 @@ def es_save_document(
             es_args["_routing"] = parent_id
         case "search.Opinion":
             parent_id = getattr(instance.cluster, "pk", None)
-            if not all(
-                [
-                    es_index_exists(es_document._index._name),
-                    parent_id,
-                ]
-            ):
+            if not parent_id:
                 self.request.chain = None
                 return None
 
