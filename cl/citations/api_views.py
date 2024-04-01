@@ -48,6 +48,9 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                 return Response({})
 
             for citation in citation_objs:
+                if citation.groups["volume"] is None:
+                    continue
+
                 start_index, end_index = citation.span()
                 citation_data = {
                     "citation": citation.matched_text(),
