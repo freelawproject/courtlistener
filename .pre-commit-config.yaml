@@ -33,7 +33,7 @@ repos:
        args: [--line-length=79, --transform-concats]
 
   - repo: https://github.com/psf/black
-    rev: 24.1.0
+    rev: 24.3.0
     hooks:
      - id: black
 
