@@ -1834,6 +1834,34 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "671 P.2d 1085")
 
+    async def test_can_filter_out_citation_with_no_volume(self):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "Thomp. Cas., 21"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # two Journal Citations and one opinion citation
+            {
+                "text": (
+                    "Perlman v. Swiss Bank Corp. Comprehensive Disability Prot."
+                    " Plan, 979 F. Supp. 726 (N.D. Ill. 1997). Thomp. Cas., 21"
+                )
+            },
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "979 F. Supp. 726")
+
     async def test_can_handle_invalid_reporter(self):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
