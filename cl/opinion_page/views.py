@@ -35,7 +35,11 @@ from reporters_db import (
 )
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
-from cl.citations.utils import get_canonicals_from_reporter
+from cl.citations.utils import (
+    SLUGIFIED_EDITIONS,
+    filter_out_non_case_law_citations,
+    get_canonicals_from_reporter,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -1030,7 +1034,7 @@ def make_citation_url_dict(
     d = {"reporter": reporter}
     if volume:
         d["volume"] = volume
-    if page:
+    if volume and page:
         d["page"] = page
     return d
 
@@ -1110,22 +1114,6 @@ async def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-    # "reporter" can be a reporter or a full citation.  If it is a full
-    # citation then we will get the reporter, volume, and page from
-    # eyecite.
-    #
-    # By adding this extra test we can keep the rest of the logic untouched
-    #
-    if not volume and not page:
-        citations = eyecite.get_citations(reporter)
-        if citations and citations[0].groups:
-            c = citations[0]
-            # We slugify reporter so that the test further down will
-            # pass.
-            reporter = slugify(c.groups["reporter"])
-            volume = c.groups["volume"]
-            page = c.groups["page"]
-
     reporter_slug = slugify(reporter)
 
     if reporter != reporter_slug:
@@ -1143,8 +1131,7 @@ async def citation_redirector(
         )
 
     # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
-    slugified_editions = {str(slugify(item)): item for item in EDITIONS.keys()}
-    proper_reporter = slugified_editions.get(reporter, None)
+    proper_reporter = SLUGIFIED_EDITIONS.get(reporter, None)
     if not proper_reporter:
         return await attempt_reporter_variation(
             request, reporter, volume, page
@@ -1171,11 +1158,17 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
         if await sync_to_async(form.is_valid)():
             # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
-            kwargs = {"reporter": cd["reporter"]}
-            if cd["volume"]:
-                kwargs["volume"] = cd["volume"]
-            if cd["page"]:
-                kwargs["page"] = cd["page"]
+            citations = eyecite.get_citations(cd["reporter"])
+            case_law_citations = filter_out_non_case_law_citations(citations)
+            if not case_law_citations:
+                return TemplateResponse(
+                    request,
+                    "volumes_for_reporter.html",
+                    {"no_citation_found": True, "private": False},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+
+            kwargs = make_citation_url_dict(**case_law_citations[0].groups)
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=kwargs)
             )
