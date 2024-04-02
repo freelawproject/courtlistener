@@ -1862,6 +1862,29 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "979 F. Supp. 726")
 
+    async def test_can_filter_out_citation_with_no_page(self):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "592 U.S. _"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # two Journal Citations and one opinion citation
+            {"text": "592 U.S. __, 141 S. Ct. 1017"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "141 S. Ct. 1017")
+
     async def test_can_handle_invalid_reporter(self):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
