@@ -5,10 +5,9 @@ from asgiref.sync import async_to_sync
 from django.db.models import QuerySet
 from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
-from eyecite.models import FullCaseCitation, ShortCaseCitation
 from rest_framework.exceptions import NotFound
 from rest_framework.mixins import CreateModelMixin
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -30,7 +29,7 @@ from cl.search.selectors import get_clusters_from_citation_str
 class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
     serializer_class = CitationAPIRequestSerializer
-    permission_classes = (AllowAny,)
+    permission_classes = [IsAuthenticated]
 
     def create(self, request: Request, *args, **kwargs):
         # Uses the serializer to perform object level validations
@@ -45,7 +44,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
             citation_objs = eyecite.get_citations(text)
             citation_objs = filter_out_non_case_law_citations(citation_objs)
             if not citation_objs:
-                return Response({})
+                return Response([])
 
             for citation in citation_objs:
                 if not all(
