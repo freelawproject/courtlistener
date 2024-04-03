@@ -108,8 +108,8 @@ daphne = "^4.1.0"
 psycopg = {extras = ["binary"], version = "^3.1.17"}
 httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.3.1"
-juriscraper = "*"
 django-permissions-policy = "^4.19.0"
+juriscraper = {git = "https://github.com/freelawproject/juriscraper.git", rev = "953-free-opinion-report-normalize-docket-number-and-case-name"}
 
 
 [tool.poetry.group.dev.dependencies]
