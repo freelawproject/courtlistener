@@ -132,8 +132,8 @@ class Command(cl_scrape_opinions.Command):
                 method=site.method,
             )
             if msg:
-                fp = [f"{court_str}-oral-arg-unexpected-content-type"]
-                logger.error(msg, extra={"fingerprint": fp})
+                fingerprint = [f"{court_str}-unexpected-content-type"]
+                logger.error(msg, extra={"fingerprint": fingerprint})
                 ErrorLog(log_level="WARNING", court=court, message=msg).save()
                 continue
 
