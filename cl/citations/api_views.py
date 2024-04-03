@@ -44,7 +44,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
             citation_objs = eyecite.get_citations(text)
             citation_objs = filter_out_non_case_law_citations(citation_objs)
             if not citation_objs:
-                return Response({})
+                return Response([])
 
             for citation in citation_objs:
                 if not all(
