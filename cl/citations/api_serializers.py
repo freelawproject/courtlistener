@@ -56,7 +56,7 @@ class CitationAPIResponseSerializer(serializers.Serializer):
     start_index = serializers.IntegerField()
     end_index = serializers.IntegerField()
     status = serializers.IntegerField()
-    error_message = serializers.CharField(required=False)
+    error_message = serializers.CharField(required=False, default="")
     clusters = serializers.SerializerMethodField(required=False)
 
     def get_clusters(self, obj):
