@@ -109,6 +109,11 @@ def lookup_and_save(new, debug=False):
     elif d.source == Docket.COLUMBIA_AND_SCRAPER:
         d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
 
+    if d.nature_of_suit:
+        # Avoid updating the nature_of_suit if the docket already has a
+        # nature_of_suit set, since this value doesn't change. See issue #3878.
+        delattr(new, "nature_of_suit")
+
     for attr, v in new.__dict__.items():
         setattr(d, attr, v)
 

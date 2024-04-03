@@ -48,7 +48,9 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                 return Response({})
 
             for citation in citation_objs:
-                if citation.groups["volume"] is None:
+                if not all(
+                    [citation.groups["volume"], citation.groups["page"]]
+                ):
                     continue
 
                 start_index, end_index = citation.span()
