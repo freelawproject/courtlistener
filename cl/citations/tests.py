@@ -1780,6 +1780,18 @@ class CitationLookUpApiTest(
             j["page"][0],
         )
 
+    async def test_can_handle_requests_with_big_pieces_of_text(self):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "test" * 17_000},
+        )
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "Ensure this field has no more than 64000 characters.",
+            j["text"][0],
+        )
+
     async def test_can_handle_random_text_as_a_citation(self):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
