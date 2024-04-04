@@ -2138,12 +2138,14 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.5.95"
+version = "2.6.0"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
-files = []
-develop = false
+files = [
+    {file = "juriscraper-2.6.0-py27-none-any.whl", hash = "sha256:c1d51c3b7200a767ed0b25558b1c1bad4b5308ead463a4596b69534572896134"},
+    {file = "juriscraper-2.6.0.tar.gz", hash = "sha256:be6547530f2ca8efc7f1609a66f277732ba8a0a3ec9db090aa753615c0c7b446"},
+]
 
 [package.dependencies]
 argparse = "*"
@@ -2161,12 +2163,6 @@ python-dateutil = ">=2.8.2"
 requests = ">=2.20.0"
 selenium = ">=4.9.1"
 tldextract = "*"
-
-[package.source]
-type = "git"
-url = "https://github.com/freelawproject/juriscraper.git"
-reference = "953-free-opinion-report-normalize-docket-number-and-case-name"
-resolved_reference = "10d0e66b66ab5f3f0896071f50ef64bd9f643a80"
 
 [[package]]
 name = "kdtree"
@@ -5170,4 +5166,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "02b3441cd081f7aafb5a1087d4c8c84447ecc492fd20406fec6c79f79a50f5b3"
+content-hash = "c25aa180f1ba97eea8ae592abffffa1695ef0fcbdb9f21a3ecded5446544e196"
