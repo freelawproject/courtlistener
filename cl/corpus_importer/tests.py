@@ -13,7 +13,7 @@ from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, now
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 
@@ -58,7 +58,10 @@ from cl.corpus_importer.management.commands.troller_bk import (
     log_added_items_to_redis,
     merge_rss_data,
 )
-from cl.corpus_importer.tasks import generate_ia_json
+from cl.corpus_importer.tasks import (
+    generate_ia_json,
+    get_and_save_free_document_report,
+)
 from cl.corpus_importer.utils import (
     ClusterSourceException,
     DocketSourceException,
@@ -82,6 +85,7 @@ from cl.people_db.lookup_utils import (
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
 from cl.recap_rss.models import RssItemCache
+from cl.scrapers.models import PACERFreeDocumentRow
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -105,6 +109,7 @@ from cl.search.models import (
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.fakes import FakeFreeOpinionReport
 
 
 class JudgeExtractionTest(SimpleTestCase):
@@ -477,6 +482,33 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.address2, "Suite 3800")
         self.assertEqual(godfrey_llp.city, "Seattle")
         self.assertEqual(godfrey_llp.state, "WA")
+
+    @patch(
+        "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
+        return_value=None,
+    )
+    def test_get_and_save_free_document_report(self, mock_cookies) -> None:
+        """Test the retrieval and storage of free document report data."""
+
+        with patch(
+            "cl.corpus_importer.tasks.FreeOpinionReport",
+            new=FakeFreeOpinionReport,
+        ):
+            get_and_save_free_document_report(
+                "cand", now().date(), now().date()
+            )
+
+        row = PACERFreeDocumentRow.objects.all()
+        self.assertEqual(row.count(), 1)
+        self.assertEqual(row[0].court_id, "cand")
+        self.assertEqual(row[0].docket_number, "5:18-ap-07075")
+        self.assertTrue(row[0].description)
+        self.assertTrue(row[0].date_filed)
+        self.assertTrue(row[0].document_number)
+        self.assertTrue(row[0].nature_of_suit)
+        self.assertTrue(row[0].pacer_case_id)
+        self.assertTrue(row[0].pacer_doc_id)
+        self.assertTrue(row[0].pacer_seq_no)
 
 
 class GetQuarterTest(SimpleTestCase):
