@@ -307,7 +307,11 @@ async def update_docket_metadata(
     )
     d.date_terminated = docket_data.get("date_terminated") or d.date_terminated
     d.cause = docket_data.get("cause") or d.cause
-    d.nature_of_suit = docket_data.get("nature_of_suit") or d.nature_of_suit
+    # Avoid updating the nature_of_suit if the docket already has a
+    # nature_of_suit set, since this value doesn't change. See issue #3878.
+    d.nature_of_suit = d.nature_of_suit or docket_data.get(
+        "nature_of_suit", ""
+    )
     d.jury_demand = docket_data.get("jury_demand") or d.jury_demand
     d.jurisdiction_type = (
         docket_data.get("jurisdiction") or d.jurisdiction_type

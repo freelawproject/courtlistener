@@ -103,6 +103,12 @@ def lookup_and_save(new, debug=False):
 
     # Add RECAP as a source if it's not already.
     d.add_recap_source()
+
+    if d.nature_of_suit:
+        # Avoid updating the nature_of_suit if the docket already has a
+        # nature_of_suit set, since this value doesn't change. See issue #3878.
+        delattr(new, "nature_of_suit")
+
     for attr, v in new.__dict__.items():
         setattr(d, attr, v)
 

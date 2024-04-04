@@ -6,7 +6,8 @@ from http import HTTPStatus
 from typing import List, Tuple
 from unittest.mock import Mock
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
+from django.contrib.auth.hashers import make_password
 from django.core.management import call_command
 from django.test import AsyncClient
 from django.urls import reverse
@@ -76,6 +77,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.users.factories import UserProfileWithParentsFactory
 
 
 class CitationTextTest(SimpleTestCase):
@@ -1737,8 +1739,19 @@ class CitationLookUpApiTest(
     CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
 
-    def setUp(self) -> None:
-        self.async_client = AsyncClient()
+    @classmethod
+    def setUpTestData(cls) -> None:
+        UserProfileWithParentsFactory.create(
+            user__username="citation-user",
+            user__password=make_password("password"),
+        )
+        super().setUpTestData()
+
+    @async_to_sync
+    async def setUp(self) -> None:
+        await self.async_client.alogin(
+            username="citation-user", password="password"
+        )
 
     async def test_can_handle_requests_with_no_citation_or_reporter(self):
         r = await self.async_client.post(
@@ -1861,6 +1874,29 @@ class CitationLookUpApiTest(
 
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "979 F. Supp. 726")
+
+    async def test_can_filter_out_citation_with_no_page(self):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "592 U.S. _"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # two Journal Citations and one opinion citation
+            {"text": "592 U.S. __, 141 S. Ct. 1017"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "141 S. Ct. 1017")
 
     async def test_can_handle_invalid_reporter(self):
         r = await self.async_client.post(
