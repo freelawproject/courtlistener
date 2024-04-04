@@ -371,9 +371,9 @@ class OpinionESResultSerializer(DocumentSerializer):
 
     # Fields from the opinion child
     id = serializers.IntegerField(read_only=True)
-    snippet = serializers.CharField(read_only=True)
+    snippet = serializers.SerializerMethodField(read_only=True)
     author_id = serializers.IntegerField(read_only=True)
-    type = serializers.CharField(read_only=True)
+    type = serializers.SerializerMethodField(read_only=True)
     download_url = serializers.CharField(read_only=True)
     local_path = serializers.CharField(read_only=True)
     cites = NullableListField(read_only=True)
@@ -382,23 +382,18 @@ class OpinionESResultSerializer(DocumentSerializer):
     sibling_ids = NullableListField(read_only=True)
     citation = NullableListField(read_only=True)
     per_curiam = serializers.BooleanField(read_only=True)
-    court_exact = serializers.CharField(read_only=True)
+    court_exact = serializers.CharField(read_only=True, source="court_id")
     timestamp = TimeStampField(read_only=True)
+    status = serializers.SerializerMethodField(read_only=True)
 
-    def to_representation(self, instance):
-        """Transforms fields and adds missing ones to the serialized
-        representation to ensure compatibility with the V3 API version when
-        using ES as the search engine.
-        """
-        ret = super().to_representation(instance)
-        ret["type"] = inverted_o_type_index_map.get(ret["type"])
-        ret["status"] = PRECEDENTIAL_STATUS.get_status_value_reverse(
-            ret["status"]
-        )
-        ret["court_exact"] = ret["court_id"]
-        ret["snippet"] = get_highlight(instance, "text")
+    def get_type(self, obj):
+        return inverted_o_type_index_map.get(obj.type)
 
-        return ret
+    def get_status(self, obj):
+        return PRECEDENTIAL_STATUS.get_status_value_reverse(obj.status)
+
+    def get_snippet(self, obj):
+        return get_highlight(obj, "text")
 
     class Meta:
         document = OpinionDocument

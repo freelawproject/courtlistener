@@ -31,10 +31,7 @@ from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import (
-    fetch_all_search_results,
-    merge_highlights_into_result,
-)
+from cl.lib.elasticsearch_utils import fetch_all_search_results
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
