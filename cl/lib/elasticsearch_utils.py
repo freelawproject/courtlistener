@@ -599,6 +599,49 @@ def build_es_filters(cd: CleanData) -> List:
     return queries_list
 
 
+def build_highlights_dict(
+    highlighting_fields: dict[str, int] | None, hl_tag: str
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Builds a dictionary for ES highlighting options and a list of fields to
+    exclude from the _source.
+
+    :param highlighting_fields: A dictionary of fields to highlight in child docs.
+    :param hl_tag: The HTML tag to use for highlighting matched fragments.
+    :return: A tuple containing, a dictionary with the configuration for
+    highlighting each field and aa list of field names to exclude from the
+    _source results to avoid data redundancy.
+    """
+
+    if highlighting_fields is None:
+        highlighting_fields = {}
+    highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
+
+    fields_to_exclude = []
+    for field, fragment_size in highlighting_fields.items():
+        number_of_fragments = 1 if fragment_size else 0
+        # In fields that have a defined fragment size in their HL mapping
+        # e.g., SEARCH_RECAP_CHILD_HL_FIELDS, a 'no_match_size' parameter
+        # is also set. If there are no matching fragments to highlight,
+        # this setting will return a specified amount of text from the
+        # beginning of the field.
+        no_match_size = settings.NO_MATCH_HL_SIZE if fragment_size else 0
+        if fragment_size and not field.endswith("exact"):
+            # The original field is excluded from the response to avoid
+            # returning the entire field from the index.
+            fields_to_exclude.append(field)
+        highlight_options["fields"][field] = {
+            "type": settings.ES_HIGHLIGHTER,
+            "matched_fields": [field, f"{field}.exact"],
+            "fragment_size": fragment_size,
+            "no_match_size": no_match_size,
+            "number_of_fragments": number_of_fragments,
+            "pre_tags": [f"<{hl_tag}>"],
+            "post_tags": [f"</{hl_tag}>"],
+        }
+
+    return highlight_options, fields_to_exclude
+
+
 def build_has_child_query(
     query: QueryString | str,
     child_type: str,
@@ -675,32 +718,9 @@ def build_has_child_query(
             boost_mode="replace",
         )
 
-    if highlighting_fields is None:
-        highlighting_fields = {}
-    highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
-
-    fields_to_exclude = []
-    for field, fragment_size in highlighting_fields.items():
-        number_of_fragments = 1 if fragment_size else 0
-        # In fields that have a defined fragment size in their HL mapping
-        # e.g., SEARCH_RECAP_CHILD_HL_FIELDS, a 'no_match_size' parameter
-        # is also set. If there are no matching fragments to highlight,
-        # this setting will return a specified amount of text from the
-        # beginning of the field.
-        no_match_size = settings.NO_MATCH_HL_SIZE if fragment_size else 0
-        if fragment_size and not field.endswith("exact"):
-            # The original field is excluded from the response to avoid
-            # returning the entire field from the index.
-            fields_to_exclude.append(field)
-        highlight_options["fields"][field] = {
-            "type": settings.ES_HIGHLIGHTER,
-            "matched_fields": [field, f"{field}.exact"],
-            "fragment_size": fragment_size,
-            "no_match_size": no_match_size,
-            "number_of_fragments": number_of_fragments,
-            "pre_tags": ["<mark>"],
-            "post_tags": ["</mark>"],
-        }
+    highlight_options, fields_to_exclude = build_highlights_dict(
+        highlighting_fields, SEARCH_HL_TAG
+    )
 
     inner_hits = {
         "name": f"filter_query_inner_{child_type}",
@@ -1787,6 +1807,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                     "judge",
                     cd.get("judge", ""),
                 ),
+                *build_term_query("id", cd.get("id", "").split()),
             ]
         )
 
