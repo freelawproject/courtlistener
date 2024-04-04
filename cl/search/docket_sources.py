@@ -1,7 +1,5 @@
-
-
 class DocketSources:
-    
+
     # The source values are additive. That is, if you get content from a new
     # source, you can add it to the previous one, and have a combined value.
     # For example, if you start with a RECAP docket (1), then add scraped
@@ -41,11 +39,107 @@ class DocketSources:
     COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD = 30
     COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 31
     DIRECT_INPUT = 32
+    RECAP_AND_DIRECT_INPUT = 33
+    SCRAPER_AND_DIRECT_INPUT = 34
+    RECAP_AND_SCRAPER_AND_DIRECT_INPUT = 35
+    COLUMBIA_AND_DIRECT_INPUT = 36
+    RECAP_AND_COLUMBIA_AND_DIRECT_INPUT = 37
+    SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT = 38
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT = 39
+    IDB_AND_DIRECT_INPUT = 40
+    RECAP_AND_IDB_AND_DIRECT_INPUT = 41
+    SCRAPER_AND_IDB_AND_DIRECT_INPUT = 42
+    RECAP_AND_SCRAPER_AND_IDB_AND_DIRECT_INPUT = 43
+    COLUMBIA_AND_IDB_AND_DIRECT_INPUT = 44
+    RECAP_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT = 45
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT = 46
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT = 47
     DIRECT_INPUT_AND_HARVARD = 48
+    RECAP_AND_HARVARD_AND_DIRECT_INPUT = 49
+    SCRAPER_AND_HARVARD_AND_DIRECT_INPUT = 50
+    RECAP_AND_SCRAPER_AND_HARVARD_AND_DIRECT_INPUT = 51
+    COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT = 52
+    RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT = 53
+    SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT = 54
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT = 55
+    IDB_AND_HARVARD_AND_DIRECT_INPUT = 56
+    RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT = 57
+    SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT = 58
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT = 59
+    COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT = 60
+    RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT = 61
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT = 62
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT = 63
     ANON_2020 = 64
+    RECAP_AND_ANON_2020 = 65
     ANON_2020_AND_SCRAPER = 66
+    RECAP_AND_SCRAPER_AND_ANON_2020 = 67
+    COLUMBIA_AND_ANON_2020 = 68
+    RECAP_AND_COLUMBIA_AND_ANON_2020 = 69
+    SCRAPER_AND_COLUMBIA_AND_ANON_2020 = 70
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_ANON_2020 = 71
+    IDB_AND_ANON_2020 = 72
+    RECAP_AND_IDB_AND_ANON_2020 = 73
+    SCRAPER_AND_IDB_AND_ANON_2020 = 74
+    RECAP_AND_SCRAPER_AND_IDB_AND_ANON_2020 = 75
+    COLUMBIA_AND_IDB_AND_ANON_2020 = 76
+    RECAP_AND_COLUMBIA_AND_IDB_AND_ANON_2020 = 77
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_ANON_2020 = 78
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_ANON_2020 = 79
     ANON_2020_AND_HARVARD = 80
+    RECAP_AND_HARVARD_AND_ANON_2020 = 81
     ANON_2020_AND_SCRAPER_AND_HARVARD = 82
+    RECAP_AND_SCRAPER_AND_HARVARD_AND_ANON_2020 = 83
+    COLUMBIA_AND_HARVARD_AND_ANON_2020 = 84
+    RECAP_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020 = 85
+    SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020 = 86
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020 = 87
+    IDB_AND_HARVARD_AND_ANON_2020 = 88
+    RECAP_AND_IDB_AND_HARVARD_AND_ANON_2020 = 89
+    SCRAPER_AND_IDB_AND_HARVARD_AND_ANON_2020 = 90
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_ANON_2020 = 91
+    COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020 = 92
+    RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020 = 93
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020 = 94
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020 = 95
+    DIRECT_INPUT_AND_ANON_2020 = 96
+    RECAP_AND_DIRECT_INPUT_AND_ANON_2020 = 97
+    SCRAPER_AND_DIRECT_INPUT_AND_ANON_2020 = 98
+    RECAP_AND_SCRAPER_AND_DIRECT_INPUT_AND_ANON_2020 = 99
+    COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020 = 100
+    RECAP_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020 = 101
+    SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020 = 102
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020 = 103
+    IDB_AND_DIRECT_INPUT_AND_ANON_2020 = 104
+    RECAP_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020 = 105
+    SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020 = 106
+    RECAP_AND_SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020 = 107
+    COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020 = 108
+    RECAP_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020 = 109
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020 = 110
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020 = 111
+    HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 112
+    RECAP_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 113
+    SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 114
+    RECAP_AND_SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 115
+    COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 116
+    RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 117
+    SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 118
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = (
+        119
+    )
+    IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 120
+    RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 121
+    SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 122
+    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 123
+    COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 124
+    RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = 125
+    SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = (
+        126
+    )
+    RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020 = (
+        127
+    )
     SOURCE_CHOICES = (
         (DEFAULT, "Default"),
         (RECAP, "RECAP"),
@@ -98,13 +192,352 @@ class DocketSources:
             "Columbia, Recap, Scraper, IDB, and Harvard",
         ),
         (DIRECT_INPUT, "Direct court input"),
+        (RECAP_AND_DIRECT_INPUT, "RECAP and Direct court input"),
+        (SCRAPER_AND_DIRECT_INPUT, "Scraper and Direct court input"),
+        (
+            RECAP_AND_SCRAPER_AND_DIRECT_INPUT,
+            "RECAP, Scraper, and Direct court input",
+        ),
+        (COLUMBIA_AND_DIRECT_INPUT, "Columbia and Direct court input"),
+        (
+            RECAP_AND_COLUMBIA_AND_DIRECT_INPUT,
+            "RECAP, Columbia, and Direct court input",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT,
+            "Scraper, Columbia, and Direct court input",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT,
+            "RECAP, Scraper, Columbia, and Direct court input",
+        ),
+        (IDB_AND_DIRECT_INPUT, "IDB and Direct court input"),
+        (
+            RECAP_AND_IDB_AND_DIRECT_INPUT,
+            "RECAP, IDB, and Direct court input",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_DIRECT_INPUT,
+            "Scraper, IDB, and Direct court input",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_DIRECT_INPUT,
+            "RECAP, Scraper, IDB, and Direct court input",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_DIRECT_INPUT,
+            "Columbia, IDB, and Direct court input",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT,
+            "RECAP, Columbia, IDB, and Direct court input",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT,
+            "Scraper, Columbia, IDB, and Direct court input",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT,
+            "RECAP, Scraper, Columbia, IDB, and Direct court input",
+        ),
         (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
+        (
+            RECAP_AND_HARVARD_AND_DIRECT_INPUT,
+            "RECAP, Harvard, and Direct court input",
+        ),
+        (
+            SCRAPER_AND_HARVARD_AND_DIRECT_INPUT,
+            "Scraper, Harvard, and Direct court input",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_HARVARD_AND_DIRECT_INPUT,
+            "RECAP, Scraper, Harvard, and Direct court input",
+        ),
+        (
+            COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT,
+            "Columbia, Harvard, and Direct court input",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT,
+            "RECAP, Columbia, Harvard, and Direct court input",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT,
+            "Scraper, Columbia, Harvard, and Direct court input",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT,
+            "RECAP, Scraper, Columbia, Harvard, and Direct court input",
+        ),
+        (
+            IDB_AND_HARVARD_AND_DIRECT_INPUT,
+            "IDB, Harvard, and Direct court input",
+        ),
+        (
+            RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT,
+            "RECAP, IDB, Harvard, and Direct court input",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT,
+            "Scraper, IDB, Harvard, and Direct court input",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT,
+            "RECAP, Scraper, IDB, Harvard, and Direct court input",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT,
+            "Columbia, IDB, Harvard, and Direct court input",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT,
+            "RECAP, Columbia, IDB, Harvard, and Direct court input",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT,
+            "Scraper, Columbia, IDB, Harvard, and Direct court input",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT,
+            "RECAP, Scraper, Columbia, IDB, Harvard, and Direct court input",
+        ),
         (ANON_2020, "2020 anonymous database"),
+        (IDB_AND_ANON_2020, "IDB and 2020 anonymous database"),
         (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
+        (
+            RECAP_AND_SCRAPER_AND_ANON_2020,
+            "RECAP, Scraper, and 2020 anonymous database",
+        ),
+        (COLUMBIA_AND_ANON_2020, "Columbia and 2020 anonymous database"),
+        (
+            RECAP_AND_COLUMBIA_AND_ANON_2020,
+            "RECAP, Columbia, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_ANON_2020,
+            "Scraper, Columbia, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_ANON_2020,
+            "RECAP, Scraper, Columbia, and 2020 anonymous database",
+        ),
+        (IDB_AND_ANON_2020, "IDB and 2020 anonymous database"),
+        (
+            RECAP_AND_IDB_AND_ANON_2020,
+            "RECAP, IDB, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_ANON_2020,
+            "Scraper, IDB, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_ANON_2020,
+            "RECAP, Scraper, IDB, and 2020 anonymous database",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_ANON_2020,
+            "Columbia, IDB, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_ANON_2020,
+            "RECAP, Columbia, IDB, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_ANON_2020,
+            "Scraper, Columbia, IDB, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_ANON_2020,
+            "RECAP, Scraper, Columbia, IDB, and 2020 anonymous database",
+        ),
         (ANON_2020_AND_HARVARD, "2020 anonymous database and Harvard"),
         (
             ANON_2020_AND_SCRAPER_AND_HARVARD,
             "2020 anonymous database, Scraper, and Harvard",
+        ),
+        (
+            RECAP_AND_HARVARD_AND_ANON_2020,
+            "RECAP, Harvard, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_HARVARD_AND_ANON_2020,
+            "RECAP, Scraper, Harvard, and 2020 anonymous database",
+        ),
+        (
+            COLUMBIA_AND_HARVARD_AND_ANON_2020,
+            "Columbia, Harvard, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020,
+            "RECAP, Columbia, Harvard, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020,
+            "Scraper, Columbia, Harvard, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_ANON_2020,
+            "RECAP, Scraper, Columbia, Harvard, and 2020 anonymous database",
+        ),
+        (
+            IDB_AND_HARVARD_AND_ANON_2020,
+            "IDB, Harvard, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_IDB_AND_HARVARD_AND_ANON_2020,
+            "RECAP, IDB, Harvard, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_HARVARD_AND_ANON_2020,
+            "Scraper, IDB, Harvard, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_ANON_2020,
+            "RECAP, Scraper, IDB, Harvard, and 2020 anonymous database",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020,
+            "Columbia, IDB, Harvard, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020,
+            "RECAP, Columbia, IDB, Harvard, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020,
+            "Scraper, Columbia, IDB, Harvard, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_ANON_2020,
+            "RECAP, Scraper, Columbia, IDB, Harvard, and 2020 anonymous database",
+        ),
+        (
+            DIRECT_INPUT_AND_ANON_2020,
+            "Direct court input and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Scraper, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Scraper, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Columbia, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Columbia, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Scraper, Columbia, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Scraper, Columbia, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            IDB_AND_DIRECT_INPUT_AND_ANON_2020,
+            "IDB, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, IDB, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Scraper, IDB, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Scraper, IDB, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Columbia, IDB, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Columbia, IDB, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Scraper, Columbia, IDB, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Scraper, Columbia, IDB, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Scraper, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Scraper, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Columbia, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Columbia, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Scraper, Columbia, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Scraper, Columbia, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "IDB, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, IDB, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Scraper, IDB, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Scraper, IDB, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Columbia, IDB, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Columbia, IDB, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "Scraper, Columbia, IDB, Harvard, Direct court input, and 2020 anonymous database",
+        ),
+        (
+            RECAP_AND_SCRAPER_AND_COLUMBIA_AND_IDB_AND_HARVARD_AND_DIRECT_INPUT_AND_ANON_2020,
+            "RECAP, Scraper, Columbia, IDB, Harvard, Direct court input, and 2020 anonymous database",
         ),
     )
     RECAP_SOURCES = [
