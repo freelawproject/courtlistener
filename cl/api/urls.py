@@ -169,6 +169,11 @@ urlpatterns = [
         name="rest_docs",
     ),
     path(
+        "help/api/rest/v3/citation-lookup/",
+        views.citation_lookup_api,
+        name="citation_lookup_api"
+    ),
+    path(
         "help/api/rest/changes/",
         views.rest_change_log,
         name="rest_change_log",
