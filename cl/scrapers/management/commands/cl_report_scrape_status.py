@@ -125,7 +125,6 @@ def generate_report():
     context = {
         "most_recent_opinions": most_recent_opinions,
         "recently_dying_courts": recently_dying_courts,
-        "errors": {"court": 0},
         "js_version": js_version,
     }
     report = html_template.render(context)
