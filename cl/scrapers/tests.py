@@ -20,7 +20,6 @@ from cl.donate.models import Donation
 from cl.lib.microservice_utils import microservice
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
-    cl_report_scrape_status,
     cl_scrape_opinions,
     cl_scrape_oral_arguments,
 )
