@@ -2111,6 +2111,78 @@ class RecapDocketTaskTest(TestCase):
                         msg="The source does not match.",
                     )
 
+    def test_add_idb_anon_2020_source(self) -> None:
+        """Is the IDB and ANON_2020 source properly added to a docket
+        originally added from a different source?
+        """
+
+        non_idb_sources = generate_docket_target_sources(
+            Docket.NON_IDB_SOURCES, Docket.IDB
+        )
+
+        non_anon_2020_sources = generate_docket_target_sources(
+            Docket.NON_ANON_2020_SOURCES, Docket.ANON_2020
+        )
+
+        self.assertEqual(
+            len(non_idb_sources),
+            len(Docket.NON_IDB_SOURCES),
+            msg="Was a new non-recap source added?",
+        )
+
+        self.assertEqual(
+            len(non_anon_2020_sources),
+            len(Docket.NON_ANON_2020_SOURCES),
+            msg="Was a new non-recap source added?",
+        )
+
+        docket = DocketFactory.create(
+            source=Docket.DEFAULT, pacer_case_id="asdf", court_id=self.court.pk
+        )
+
+        def add_idb_source_and_save(docket_instance):
+            docket_instance.add_idb_source()
+            docket_instance.save()
+
+        def add_anon_2020_source_and_save(docket_instance):
+            docket_instance.add_anon_2020_source()
+            docket_instance.save()
+
+        pacer_free_doc_row = PACERFreeDocumentRowFactory(
+            court_id=self.court.pk, pacer_case_id=docket.pacer_case_id
+        )
+        pacer_free_doc_row.court = self.court
+        delattr(pacer_free_doc_row, "id")
+        tests = {
+            "add_idb_source_test": (
+                non_idb_sources,
+                lambda x: add_idb_source_and_save(x),
+            ),
+            "add_anon_2020_source_test": (
+                non_anon_2020_sources,
+                lambda x: add_anon_2020_source_and_save(x),
+            ),
+        }
+        for test, test_assets in tests.items():
+            for source, expected_source in test_assets[0].items():
+                with self.subTest(
+                    f"Testing {test} source {source} assigment.",
+                    source=source,
+                    expected_source=expected_source,
+                ):
+                    assign_source_method = test_assets[1]
+                    Docket.objects.filter(pk=docket.pk).update(
+                        source=getattr(Docket, source)
+                    )
+                    docket.refresh_from_db()
+                    assign_source_method(docket)
+                    docket.refresh_from_db()
+                    self.assertEqual(
+                        docket.source,
+                        getattr(Docket, expected_source),
+                        msg="The source does not match.",
+                    )
+
     def test_docket_and_de_already_exist(self) -> None:
         """Can we parse if the docket and the docket entry already exist?"""
         existing_d = Docket.objects.create(

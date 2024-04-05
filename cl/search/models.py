@@ -805,26 +805,11 @@ class Docket(AbstractDateTimeModel, DocketSources):
         return build_authorities_query(self.authorities)
 
     def add_idb_source(self):
-        if self.source == self.DEFAULT:
-            self.source = self.IDB
-        elif self.source in [
-            self.RECAP,
-            self.SCRAPER,
-            self.RECAP_AND_SCRAPER,
-            self.COLUMBIA,
-            self.COLUMBIA_AND_RECAP,
-            self.COLUMBIA_AND_SCRAPER,
-            self.COLUMBIA_AND_RECAP_AND_SCRAPER,
-        ]:
+        if self.source in self.NON_IDB_SOURCES:
             self.source = self.source + self.IDB
 
     def add_anon_2020_source(self) -> None:
-        if self.source not in [
-            self.ANON_2020,
-            self.ANON_2020_AND_HARVARD,
-            self.ANON_2020_AND_SCRAPER,
-            self.ANON_2020_AND_SCRAPER_AND_HARVARD,
-        ]:
+        if self.source in self.NON_ANON_2020_SOURCES:
             self.source = self.source + self.ANON_2020
 
     @property
