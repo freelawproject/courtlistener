@@ -2054,6 +2054,14 @@ class EsOpinionsIndexingTest(
         opinion_doc = OpinionDocument.get(ES_CHILD_ID(opinion.pk).OPINION)
         self.assertEqual(cluster_doc.caseName, "Debbas v. Franklin2")
         self.assertEqual(opinion_doc.caseName, "Debbas v. Franklin2")
+        self.assertEqual(
+            cluster_doc.absolute_url,
+            opinion_cluster.get_absolute_url(),
+        )
+        self.assertEqual(
+            opinion_doc.absolute_url,
+            opinion_cluster.get_absolute_url(),
+        )
 
         opinion_cluster.case_name = ""
         opinion_cluster.case_name_full = "Franklin v. Debbas"

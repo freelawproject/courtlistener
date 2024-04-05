@@ -378,17 +378,17 @@ def get_and_save_free_document_report(
     document_rows_to_create = []
     for row in results:
         document_row = PACERFreeDocumentRow(
-            court_id=row.court_id,
-            pacer_case_id=row.pacer_case_id,
-            docket_number=row.docket_number,
-            case_name=row.case_name,
-            date_filed=row.date_filed,
-            pacer_doc_id=row.pacer_doc_id,
-            pacer_seq_no=row.pacer_seq_no,
-            document_number=row.document_number,
-            description=row.description,
-            nature_of_suit=row.nature_of_suit,
-            cause=row.cause,
+            court_id=row["court_id"],
+            pacer_case_id=row["pacer_case_id"],
+            docket_number=row["docket_number"],
+            case_name=row["case_name"],
+            date_filed=row["date_filed"],
+            pacer_doc_id=row["pacer_doc_id"],
+            pacer_seq_no=row["pacer_seq_no"],
+            document_number=row["document_number"],
+            description=row["description"],
+            nature_of_suit=row["nature_of_suit"],
+            cause=row["cause"],
         )
         document_rows_to_create.append(document_row)
 
