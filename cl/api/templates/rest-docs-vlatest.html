@@ -611,7 +611,15 @@
     </p>
     <p>The citation graph is also provided as <a href="{% url "bulk_data_index" %}#citation-data">a single CSV file</a> listing every citation between <code>Opinions</code>. Please don't attempt to crawl this endpoint &mdash; It has more than 10 million records.
     </p>
-
+  
+    
+    <h3 id="citation-lookup">Citation Lookup and Verification API</h3>
+    <p>Use this API to look up citations in CourtListener's database of millions of citations.</p>
+    <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
+    </p>
+    <p>
+      <a href="{% url "citation_lookup_api" %}" class="btn btn-primary btn-lg">Learn More</a>
+    </p>
 
     <h3 id="jurisdiction-endpoint">{% url "court-list" version="v3" %}</h3>
     <p>This endpoint provides basic information about the <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
