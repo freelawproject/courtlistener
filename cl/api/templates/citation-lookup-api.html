@@ -174,9 +174,31 @@
     <li><p>The <code>error_message</code> field provides details of the error.</p></li>
   </ol>
   <h3 id="throttled">Throttled Citations</h3>
-  <p>If your request contains more than 250 citations, the 251st and subsequent citation will be returned with 429 <code>status</code> fields as follows:
+  <p>If your request contains more than 250 citations, the 251<sup>st</sup> and subsequent citations will be returned with 429 <code>status</code> fields:
   </p>
-  <pre>XXX</pre>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'text=Imagine a very long blob here, with 251 citations.'
+[
+  ...250 citations would appear here, then the 251st and subsequent citations would be...
+  {
+    "citation": "576 U.S. 644",
+    "normalized_citations": [
+      "576 U.S. 644"
+    ],
+    "start_index": 10002,
+    "end_index": 10013,
+    "status": 429,
+    "error_message": "Too many citations requested.",
+    "clusters": []
+  }
+]</pre>
+  <p>Note that:</p>
+  <ol>
+    <li><p>All citations will be parsed and will provide normalized versions and index locations.</p></li>
+    <li><p>Citations after the 250<sup>th</sup> will return a <code>status</code> of 429, indicating "Too Many Requests."</p></li>
+    <li><p>A follow-up query that begins on the 251<sup>st</sup> <code>start_index</code> (in this case number 10002) will look up the next 250 items.</p></li>
+  </ol>
 
   <h3 id="typoed">Typoed/Non-Canonical Reporter Abbreviation</h3>
   <p>If you query the non-canonical reporter abbreviation or if your reporter contains a known typo, we will provide the corrected citation in the <code>normalized_citations</code> key. The following example looks up a citation using "US" instead of the correct "U.S.":
