@@ -22,7 +22,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import Citation, SEARCH_TYPES, Court, OpinionCluster
+from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
 from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 
@@ -110,9 +110,14 @@ async def bulk_data_index(request: HttpRequest) -> HttpResponse:
         disclosure_coverage,
     )
 
+
 async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
     cite_count = await Citation.objects.acount()
-    return TemplateResponse(request, "citation-lookup-api.html", {"cite_count": cite_count, "private": False})
+    return TemplateResponse(
+        request,
+        "citation-lookup-api.html",
+        {"cite_count": cite_count, "private": False},
+    )
 
 
 def strip_zero_years(data):
