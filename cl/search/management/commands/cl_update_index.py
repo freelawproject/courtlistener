@@ -370,7 +370,7 @@ class Command(VerboseCommand):
             count = len(q)
         elif model == Docket:
             q = Docket.objects.filter(
-                source__in=Docket.RECAP_SOURCES
+                source__in=Docket.RECAP_SOURCES()
             ).values_list("pk", flat=True)
             count = q.count()
             q = q.iterator()

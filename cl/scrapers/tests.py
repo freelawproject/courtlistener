@@ -140,29 +140,29 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             pacer_case_id="01111",
         )
         non_columbia_sources_tests = generate_docket_target_sources(
-            Docket.NON_COLUMBIA_SOURCES, Docket.COLUMBIA
+            Docket.NON_COLUMBIA_SOURCES(), Docket.COLUMBIA
         )
         non_harvard_sources_tests = generate_docket_target_sources(
-            Docket.NON_HARVARD_SOURCES, Docket.HARVARD
+            Docket.NON_HARVARD_SOURCES(), Docket.HARVARD
         )
         non_scraper_sources_tests = generate_docket_target_sources(
-            Docket.NON_SCRAPER_SOURCES, Docket.SCRAPER
+            Docket.NON_SCRAPER_SOURCES(), Docket.SCRAPER
         )
 
         source_assigment_tests = [
             (
                 non_columbia_sources_tests,
-                Docket.NON_COLUMBIA_SOURCES,
+                Docket.NON_COLUMBIA_SOURCES(),
                 Docket.COLUMBIA,
             ),
             (
                 non_harvard_sources_tests,
-                Docket.NON_HARVARD_SOURCES,
+                Docket.NON_HARVARD_SOURCES(),
                 Docket.HARVARD,
             ),
             (
                 non_scraper_sources_tests,
-                Docket.NON_SCRAPER_SOURCES,
+                Docket.NON_SCRAPER_SOURCES(),
                 Docket.SCRAPER,
             ),
         ]

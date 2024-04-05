@@ -2066,11 +2066,11 @@ class RecapDocketTaskTest(TestCase):
         """
 
         non_recap_sources = generate_docket_target_sources(
-            Docket.NON_RECAP_SOURCES, Docket.RECAP
+            Docket.NON_RECAP_SOURCES(), Docket.RECAP
         )
         self.assertEqual(
             len(non_recap_sources),
-            len(Docket.NON_RECAP_SOURCES),
+            len(Docket.NON_RECAP_SOURCES()),
             msg="Was a new non-recap source added?",
         )
         docket = DocketFactory.create(
@@ -2117,22 +2117,22 @@ class RecapDocketTaskTest(TestCase):
         """
 
         non_idb_sources = generate_docket_target_sources(
-            Docket.NON_IDB_SOURCES, Docket.IDB
+            Docket.NON_IDB_SOURCES(), Docket.IDB
         )
 
         non_anon_2020_sources = generate_docket_target_sources(
-            Docket.NON_ANON_2020_SOURCES, Docket.ANON_2020
+            Docket.NON_ANON_2020_SOURCES(), Docket.ANON_2020
         )
 
         self.assertEqual(
             len(non_idb_sources),
-            len(Docket.NON_IDB_SOURCES),
+            len(Docket.NON_IDB_SOURCES()),
             msg="Was a new non-recap source added?",
         )
 
         self.assertEqual(
             len(non_anon_2020_sources),
-            len(Docket.NON_ANON_2020_SOURCES),
+            len(Docket.NON_ANON_2020_SOURCES()),
             msg="Was a new non-recap source added?",
         )
 

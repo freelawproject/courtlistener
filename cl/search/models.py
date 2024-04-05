@@ -724,7 +724,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
                 self.docket_number
             )
 
-        if self.source in self.RECAP_SOURCES:
+        if self.source in self.RECAP_SOURCES():
             for field in ["pacer_case_id", "docket_number"]:
                 if (
                     field == "pacer_case_id"
@@ -760,18 +760,18 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def add_recap_source(self):
         if self.source == self.DEFAULT:
             self.source = self.RECAP_AND_SCRAPER
-        elif self.source in self.NON_RECAP_SOURCES:
+        elif self.source in self.NON_RECAP_SOURCES():
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
 
     def add_opinions_source(self, scraper_source: int):
         match scraper_source:
             case self.COLUMBIA:
-                non_source_list = self.NON_COLUMBIA_SOURCES
+                non_source_list = self.NON_COLUMBIA_SOURCES()
             case self.SCRAPER:
-                non_source_list = self.NON_SCRAPER_SOURCES
+                non_source_list = self.NON_SCRAPER_SOURCES()
             case self.HARVARD:
-                non_source_list = self.NON_HARVARD_SOURCES
+                non_source_list = self.NON_HARVARD_SOURCES()
             case _:
                 return
 
@@ -805,11 +805,11 @@ class Docket(AbstractDateTimeModel, DocketSources):
         return build_authorities_query(self.authorities)
 
     def add_idb_source(self):
-        if self.source in self.NON_IDB_SOURCES:
+        if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
 
     def add_anon_2020_source(self) -> None:
-        if self.source in self.NON_ANON_2020_SOURCES:
+        if self.source in self.NON_ANON_2020_SOURCES():
             self.source = self.source + self.ANON_2020
 
     @property
@@ -1037,7 +1037,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
         :param do_original_xml: Whether to do the original XML file as received
         from Internet Archive.
         """
-        if self.source not in self.RECAP_SOURCES:
+        if self.source not in self.RECAP_SOURCES():
             return
 
         from cl.lib.pacer import process_docket_data

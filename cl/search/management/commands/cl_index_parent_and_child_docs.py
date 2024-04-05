@@ -127,7 +127,7 @@ def get_unique_oldest_history_rows(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
                     pgh_created_at__lte=end_date,
-                    source__in=Docket.RECAP_SOURCES,
+                    source__in=Docket.RECAP_SOURCES(),
                 )
                 .order_by("id", "pgh_created_at")
                 .distinct("id")
@@ -399,7 +399,8 @@ class Command(VerboseCommand):
                 else:
                     queryset = (
                         Docket.objects.filter(
-                            pk__gte=pk_offset, source__in=Docket.RECAP_SOURCES
+                            pk__gte=pk_offset,
+                            source__in=Docket.RECAP_SOURCES(),
                         )
                         .order_by("pk")
                         .values_list("pk", flat=True)

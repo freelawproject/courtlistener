@@ -2961,7 +2961,11 @@ class HarvardMergerTests(TestCase):
         self.assertEqual(docket_1.source, Docket.HARVARD_AND_RECAP)
 
         with self.assertRaises(DocketSourceException):
-            docket_2 = DocketFactory(source=Docket.COLUMBIA_AND_RECAP)
+            # Raise DocketSourceException if the initial source already contains
+            # Harvard.
+            docket_2 = DocketFactory(
+                source=Docket.RECAP_AND_SCRAPER_AND_HARVARD
+            )
             cluster_2 = OpinionClusterWithParentsFactory(docket=docket_2)
             update_docket_source(cluster_2)
             docket_2.refresh_from_db()
@@ -3309,3 +3313,14 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
 <blockquote>Footnote sample
 </blockquote></footnote_body></p>""",
         )
+
+        # Ensure the cluster is not merged again if it has already been merged
+        # and the COLUMBIA source was assigned.
+        with patch(
+            "cl.corpus_importer.management.commands.columbia_merge.logger"
+        ) as mock_logger:
+            # Merge cluster
+            process_cluster(cluster.id, "/columbia/fake_filepath.xml")
+            mock_logger.info.assert_called_with(
+                f"Cluster id: {cluster.id} already merged"
+            )

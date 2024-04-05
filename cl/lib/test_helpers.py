@@ -1,6 +1,5 @@
 import datetime
 import json
-from collections.abc import Hashable
 from typing import Sized, cast
 
 import scorched
@@ -843,7 +842,7 @@ def generate_docket_target_sources(
     inverse_sources = {
         value: key
         for key, value in DocketSources.__dict__.items()
-        if not key.startswith("__") and isinstance(value, Hashable)
+        if not key.startswith("__") and isinstance(value, int)
     }
 
     target_sources = {}

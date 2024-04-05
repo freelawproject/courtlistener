@@ -129,7 +129,7 @@ class Command(VerboseCommand):
                 # Dockets that don't belong to RECAP_SOURCES.
                 queryset = (
                     Docket.objects.filter(pk__gte=pk_offset)
-                    .exclude(source__in=Docket.RECAP_SOURCES)
+                    .exclude(source__in=Docket.RECAP_SOURCES())
                     .order_by("pk")
                     .values_list("pk", flat=True)
                 )
