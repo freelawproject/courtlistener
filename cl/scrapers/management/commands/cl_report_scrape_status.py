@@ -11,7 +11,6 @@ from django.utils.timezone import now
 from juriscraper.lib import importer
 
 from cl.lib.command_utils import VerboseCommand
-from cl.scrapers.models import ErrorLog
 from cl.search.models import Court, OpinionCluster
 
 
@@ -117,56 +116,16 @@ def send_report(report, subject, debug=True):
     connection.close()
 
 
-def tally_errors():
-    """Look at the error db and gather the latest errors from it"""
-    yesterday = now() - timedelta(days=1)
-    cts_critical = (
-        Court.objects.filter(
-            errorlog__log_time__gt=yesterday, errorlog__log_level="CRITICAL"
-        )
-        .annotate(count=Count("errorlog__pk"))
-        .values("pk", "count")
-    )
-    cts_warnings = (
-        Court.objects.filter(
-            errorlog__log_time__gt=yesterday, errorlog__log_level="WARNING"
-        )
-        .annotate(count=Count("errorlog__pk"))
-        .values("pk", "count")
-    )
-
-    all_active_courts = (
-        Court.objects.filter(in_use=True).values("pk").order_by("position")
-    )
-
-    # Reformat as dicts...
-    cts_critical = _make_query_dict(cts_critical)
-    cts_warnings = _make_query_dict(cts_warnings)
-
-    # Make a union of the dicts
-    errors = {}
-    for court in all_active_courts:
-        critical_count = cts_critical.get(court["pk"], 0)
-        warning_count = cts_warnings.get(court["pk"], 0)
-        if critical_count + warning_count == 0:
-            # No issues, move along.
-            continue
-        errors[court["pk"]] = [critical_count, warning_count]
-
-    return errors
-
-
 def generate_report():
     """Look at the counts and errors, generate and return a report."""
     most_recent_opinions, recently_dying_courts = calculate_counts()
-    errors = tally_errors()
     js_version = pkg_resources.get_distribution("juriscraper").version
 
     html_template = loader.get_template("report.html")
     context = {
         "most_recent_opinions": most_recent_opinions,
         "recently_dying_courts": recently_dying_courts,
-        "errors": errors,
+        "errors": {"court": 0},
         "js_version": js_version,
     }
     report = html_template.render(context)
@@ -177,12 +136,6 @@ def generate_report():
     )
 
     return report, subject
-
-
-def truncate_database_logs():
-    """Truncate the database so that it doesn't grow forever."""
-    thirty_days_ago = now() - timedelta(days=30)
-    ErrorLog.objects.filter(log_time__lt=thirty_days_ago).delete()
 
 
 class Command(VerboseCommand):
@@ -202,4 +155,3 @@ class Command(VerboseCommand):
         super().handle(*args, **options)
         report, subject = generate_report()
         send_report(report, subject, options["debug"])
-        truncate_database_logs()
