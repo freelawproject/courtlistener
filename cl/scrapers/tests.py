@@ -18,6 +18,7 @@ from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.lib.microservice_utils import microservice
+from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
     cl_report_scrape_status,
@@ -138,60 +139,15 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             source=Docket.RECAP,
             pacer_case_id="01111",
         )
-        non_columbia_sources_tests = {
-            Docket.DEFAULT: Docket.COLUMBIA,
-            Docket.RECAP: Docket.COLUMBIA_AND_RECAP,
-            Docket.SCRAPER: Docket.COLUMBIA_AND_SCRAPER,
-            Docket.RECAP_AND_SCRAPER: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
-            Docket.IDB: Docket.COLUMBIA_AND_IDB,
-            Docket.RECAP_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_IDB,
-            Docket.SCRAPER_AND_IDB: Docket.COLUMBIA_AND_SCRAPER_AND_IDB,
-            Docket.RECAP_AND_SCRAPER_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-            Docket.HARVARD: Docket.HARVARD_AND_COLUMBIA,
-            Docket.HARVARD_AND_RECAP: Docket.COLUMBIA_AND_RECAP_AND_HARVARD,
-            Docket.SCRAPER_AND_HARVARD: Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
-            Docket.RECAP_AND_SCRAPER_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
-            Docket.IDB_AND_HARVARD: Docket.COLUMBIA_AND_IDB_AND_HARVARD,
-            Docket.RECAP_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
-            Docket.SCRAPER_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-        }
-        non_harvard_sources_tests = {
-            Docket.DEFAULT: Docket.HARVARD,
-            Docket.RECAP: Docket.HARVARD_AND_RECAP,
-            Docket.SCRAPER: Docket.SCRAPER_AND_HARVARD,
-            Docket.RECAP_AND_SCRAPER: Docket.RECAP_AND_SCRAPER_AND_HARVARD,
-            Docket.COLUMBIA: Docket.HARVARD_AND_COLUMBIA,
-            Docket.COLUMBIA_AND_RECAP: Docket.COLUMBIA_AND_RECAP_AND_HARVARD,
-            Docket.COLUMBIA_AND_SCRAPER: Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
-            Docket.COLUMBIA_AND_RECAP_AND_SCRAPER: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
-            Docket.IDB: Docket.IDB_AND_HARVARD,
-            Docket.RECAP_AND_IDB: Docket.RECAP_AND_IDB_AND_HARVARD,
-            Docket.SCRAPER_AND_IDB: Docket.SCRAPER_AND_IDB_AND_HARVARD,
-            Docket.RECAP_AND_SCRAPER_AND_IDB: Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            Docket.COLUMBIA_AND_IDB: Docket.COLUMBIA_AND_IDB_AND_HARVARD,
-            Docket.COLUMBIA_AND_RECAP_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
-            Docket.COLUMBIA_AND_SCRAPER_AND_IDB: Docket.COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-        }
-        non_scraper_sources_tests = {
-            Docket.DEFAULT: Docket.SCRAPER,
-            Docket.RECAP: Docket.RECAP_AND_SCRAPER,
-            Docket.COLUMBIA: Docket.COLUMBIA_AND_SCRAPER,
-            Docket.COLUMBIA_AND_RECAP: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
-            Docket.IDB: Docket.SCRAPER_AND_IDB,
-            Docket.RECAP_AND_IDB: Docket.RECAP_AND_SCRAPER_AND_IDB,
-            Docket.COLUMBIA_AND_IDB: Docket.COLUMBIA_AND_SCRAPER_AND_IDB,
-            Docket.COLUMBIA_AND_RECAP_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-            Docket.HARVARD: Docket.SCRAPER_AND_HARVARD,
-            Docket.HARVARD_AND_RECAP: Docket.RECAP_AND_SCRAPER_AND_HARVARD,
-            Docket.HARVARD_AND_COLUMBIA: Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
-            Docket.COLUMBIA_AND_RECAP_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
-            Docket.IDB_AND_HARVARD: Docket.SCRAPER_AND_IDB_AND_HARVARD,
-            Docket.RECAP_AND_IDB_AND_HARVARD: Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            Docket.COLUMBIA_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            Docket.COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-        }
+        non_columbia_sources_tests = generate_docket_target_sources(
+            Docket.NON_COLUMBIA_SOURCES, Docket.COLUMBIA
+        )
+        non_harvard_sources_tests = generate_docket_target_sources(
+            Docket.NON_HARVARD_SOURCES, Docket.HARVARD
+        )
+        non_scraper_sources_tests = generate_docket_target_sources(
+            Docket.NON_SCRAPER_SOURCES, Docket.SCRAPER
+        )
 
         source_assigment_tests = [
             (
@@ -234,7 +190,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                         expected_source=expected_source,
                     ):
                         Docket.objects.filter(pk=docket.pk).update(
-                            source=source
+                            source=getattr(Docket, source)
                         )
                         docket.refresh_from_db()
                         docket.add_opinions_source(source_to_assign)
@@ -242,7 +198,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                         docket.refresh_from_db()
                         self.assertEqual(
                             docket.source,
-                            expected_source,
+                            getattr(Docket, expected_source),
                             msg="The source does not match.",
                         )
 

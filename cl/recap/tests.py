@@ -41,6 +41,7 @@ from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
+from cl.lib.test_helpers import generate_docket_target_sources
 from cl.people_db.models import (
     Attorney,
     AttorneyOrganizationAssociation,
@@ -2064,29 +2065,14 @@ class RecapDocketTaskTest(TestCase):
         a different source?
         """
 
-        non_recap_sources = {
-            Docket.SCRAPER: Docket.RECAP_AND_SCRAPER,
-            Docket.COLUMBIA: Docket.COLUMBIA_AND_RECAP,
-            Docket.COLUMBIA_AND_SCRAPER: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
-            Docket.IDB: Docket.RECAP_AND_IDB,
-            Docket.SCRAPER_AND_IDB: Docket.RECAP_AND_SCRAPER_AND_IDB,
-            Docket.COLUMBIA_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_IDB,
-            Docket.COLUMBIA_AND_SCRAPER_AND_IDB: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-            Docket.HARVARD: Docket.HARVARD_AND_RECAP,
-            Docket.SCRAPER_AND_HARVARD: Docket.RECAP_AND_SCRAPER_AND_HARVARD,
-            Docket.HARVARD_AND_COLUMBIA: Docket.COLUMBIA_AND_RECAP_AND_HARVARD,
-            Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
-            Docket.IDB_AND_HARVARD: Docket.RECAP_AND_IDB_AND_HARVARD,
-            Docket.SCRAPER_AND_IDB_AND_HARVARD: Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            Docket.COLUMBIA_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
-            Docket.COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD: Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-        }
+        non_recap_sources = generate_docket_target_sources(
+            Docket.NON_RECAP_SOURCES, Docket.RECAP
+        )
         self.assertEqual(
             len(non_recap_sources),
             len(Docket.NON_RECAP_SOURCES),
             msg="Was a new non-recap source added?",
         )
-        non_recap_sources.update({Docket.DEFAULT: Docket.RECAP_AND_SCRAPER})
         docket = DocketFactory.create(
             source=Docket.DEFAULT, pacer_case_id="asdf", court_id=self.court.pk
         )
@@ -2113,13 +2099,15 @@ class RecapDocketTaskTest(TestCase):
                     source=source,
                     expected_source=expected_source,
                 ):
-                    Docket.objects.filter(pk=docket.pk).update(source=source)
+                    Docket.objects.filter(pk=docket.pk).update(
+                        source=getattr(Docket, source)
+                    )
                     docket.refresh_from_db()
                     method(docket)
                     docket.refresh_from_db()
                     self.assertEqual(
                         docket.source,
-                        expected_source,
+                        getattr(Docket, expected_source),
                         msg="The source does not match.",
                     )
 
