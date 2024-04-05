@@ -684,6 +684,13 @@ class ScraperContentTypeTest(TestCase):
         msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
         self.assertEqual("", msg)
 
+        self.mock_response.headers = {
+            "Content-Type": "application/pdf;charset=utf-8"
+        }
+        mock_get.return_value = self.mock_response
+        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        self.assertEqual("", msg)
+
     @mock.patch("requests.Session.get")
     def test_no_content_type(self, mock_get):
         """Test for no content type expected (ie. Montana)"""

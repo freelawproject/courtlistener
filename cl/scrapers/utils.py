@@ -204,14 +204,19 @@ def get_binary_content(
 
         # test for expected content type (thanks mont for nil)
         if site.expected_content_types:
-            content_type = r.headers.get("Content-Type").lower()
+            # Clean up content types like "application/pdf;charset=utf-8"
+            # and 'application/octet-stream; charset=UTF-8'
+            content_type = (
+                r.headers.get("Content-Type").lower().split(";")[0].strip()
+            )
             m = any(
-                content_type in mime for mime in site.expected_content_types
+                content_type in mime.lower()
+                for mime in site.expected_content_types
             )
             if not m:
                 msg = (
                     f"UnexpectedContentTypeError: {download_url}\n"
-                    f"'\"{r.headers.get('Content-Type').lower()}\" not in {site.expected_content_types}"
+                    f'\'"{content_type}" not in {site.expected_content_types}'
                 )
                 return msg, None
 
