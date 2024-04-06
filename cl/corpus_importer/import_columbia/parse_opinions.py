@@ -312,7 +312,7 @@ def get_xml_string(e):
     :param e: An XML element.
     """
     inner_string = re.sub(
-        r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag), "", ET.tostring(e)
+        rf"(^<{e.tag}\b.*?>|</{e.tag}\b.*?>$)", "", ET.tostring(e)
     )
     return inner_string.decode().strip()
 

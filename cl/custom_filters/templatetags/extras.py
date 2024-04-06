@@ -217,7 +217,7 @@ def render_string_or_list(value: any) -> any:
     :param value: The value to be rendered.
     :return: The original value or comma-separated values.
     """
-    if isinstance(value, list) or isinstance(value, AttrList):
+    if isinstance(value, (list, AttrList)):
         return ", ".join(str(item) for item in value)
     return value
 

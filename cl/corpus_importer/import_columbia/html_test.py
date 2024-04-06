@@ -127,7 +127,7 @@ def clean_string(s):
 # For use in harmonize function
 # More details: http://www.law.cornell.edu/citation/4-300.htm
 US = r"USA|U\.S\.A\.|U\.S\.?|U\. S\.?|(The )?United States of America|The United States"
-UNITED_STATES = re.compile(r"^(%s)(,|\.)?$" % US, re.I)
+UNITED_STATES = re.compile(rf"^({US})(,|\.)?$", re.I)
 THE_STATE = re.compile(r"the state", re.I)
 ET_AL = re.compile(r",?\set\.?\sal\.?", re.I)
 BW = (
@@ -137,7 +137,7 @@ BW = (
     + r"|respond(e|a)nts?(--?|/)appell(ee|ant)s?|cross(--?|/)respondents?|crosss?(--?|/)petitioners?"
     + r"|cross(--?|/)appell(ees|ant)s?|deceased"
 )
-BAD_WORDS = re.compile(r"^(%s)(,|\.)?$" % BW, re.I)
+BAD_WORDS = re.compile(rf"^({BW})(,|\.)?$", re.I)
 BIG = (
     "3D|AFL|AKA|A/K/A|BMG|CBS|CDC|CDT|CEO|CIO|CNMI|D/B/A|DOJ|DVA|EFF|FCC|"
     "FTC|HSBC|IBM|II|III|IV|JJ|LLC|LLP|MCI|MJL|MSPB|ND|NLRB|PTO|SD|UPS|RSS|SEC|UMG|US|USA|USC|"
@@ -147,7 +147,7 @@ SMALL = r"a|an|and|as|at|but|by|en|for|if|in|is|of|on|or|the|to|v\.?|via|vs\.?"
 NUMS = "0123456789"
 PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
 WEIRD_CHARS = r"¼½¾§ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜßàáâãäåæçèéêëìíîïñòóôœõöøùúûüÿ"
-BIG_WORDS = re.compile(r"^(%s)[%s]?$" % (BIG, PUNCT), re.I)
+BIG_WORDS = re.compile(rf"^({BIG})[{PUNCT}]?$", re.I)
 SMALL_WORDS = re.compile(rf"^({SMALL})$", re.I)
 SMALL_WORD_INLINE = re.compile(rf"(^|\s)({SMALL})(\s|$)", re.I)
 INLINE_PERIOD = re.compile(r"[a-z][.][a-z]", re.I)

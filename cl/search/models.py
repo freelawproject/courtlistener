@@ -965,11 +965,7 @@ class Docket(AbstractDateTimeModel):
             self.court.jurisdiction == Court.FEDERAL_APPELLATE
         ):
             return None
-        return "https://ecf.%s.uscourts.gov/cgi-bin/%s?%s" % (
-            self.pacer_court_id,
-            path,
-            self.pacer_case_id,
-        )
+        return f"https://ecf.{self.pacer_court_id}.uscourts.gov/cgi-bin/{path}?{self.pacer_case_id}"
 
     def pacer_appellate_url_with_caseId(self, path):
         return (
