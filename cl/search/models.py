@@ -875,16 +875,12 @@ class Docket(AbstractDateTimeModel):
         try:
             # Without a transaction wrapper, a failure will invalidate outer transactions
             with transaction.atomic():
-                super().save(
-                    update_fields=update_fields, *args, **kwargs
-                )
+                super().save(update_fields=update_fields, *args, **kwargs)
         except IntegrityError:
             # Temporary patch while we solve #3359
             # If the error is not related to `date_modified` it will raise again
             self.date_modified = timezone.now()
-            super().save(
-                update_fields=update_fields, *args, **kwargs
-            )
+            super().save(update_fields=update_fields, *args, **kwargs)
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
@@ -1646,9 +1642,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"pacer_doc_id"}.union(update_fields)
 
-        super().save(
-            update_fields=update_fields, *args, **kwargs
-        )
+        super().save(update_fields=update_fields, *args, **kwargs)
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
@@ -2981,9 +2975,7 @@ class OpinionCluster(AbstractDateTimeModel):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if update_fields is not None:
             update_fields = {"slug"}.union(update_fields)
-        super().save(
-            update_fields=update_fields, *args, **kwargs
-        )
+        super().save(update_fields=update_fields, *args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
 

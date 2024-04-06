@@ -107,8 +107,8 @@ def clean_string(s):
     # We split on the v., and handle fixes at either end of plaintiff or
     # appellant.
     bad_punctuation = r"(-|–|_|/|;|,|\s)*"
-    bad_endings = re.compile(fr"{bad_punctuation}$")
-    bad_beginnings = re.compile(fr"^{bad_punctuation}")
+    bad_endings = re.compile(rf"{bad_punctuation}$")
+    bad_beginnings = re.compile(rf"^{bad_punctuation}")
 
     s = s.split(" v. ")
     cleaned_string = []
@@ -148,18 +148,18 @@ NUMS = "0123456789"
 PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
 WEIRD_CHARS = r"¼½¾§ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜßàáâãäåæçèéêëìíîïñòóôœõöøùúûüÿ"
 BIG_WORDS = re.compile(r"^(%s)[%s]?$" % (BIG, PUNCT), re.I)
-SMALL_WORDS = re.compile(fr"^({SMALL})$", re.I)
-SMALL_WORD_INLINE = re.compile(fr"(^|\s)({SMALL})(\s|$)", re.I)
+SMALL_WORDS = re.compile(rf"^({SMALL})$", re.I)
+SMALL_WORD_INLINE = re.compile(rf"(^|\s)({SMALL})(\s|$)", re.I)
 INLINE_PERIOD = re.compile(r"[a-z][.][a-z]", re.I)
 INLINE_SLASH = re.compile(r"[a-z][/][a-z]", re.I)
 INLINE_AMPERSAND = re.compile(r"([a-z][&][a-z])(.*)", re.I)
-UC_ELSEWHERE = re.compile(fr"[{PUNCT}]*?[a-zA-Z]+[A-Z]+?")
-CAPFIRST = re.compile(fr"^[{PUNCT}]*?([A-Za-z])")
-SMALL_FIRST = re.compile(fr"^([{PUNCT}]*)({SMALL})\b", re.I)
-SMALL_LAST = re.compile(fr"\b({SMALL})[{PUNCT}]?$", re.I)
-SUBPHRASE = re.compile(fr"([:;?!][ ])({SMALL})")
+UC_ELSEWHERE = re.compile(rf"[{PUNCT}]*?[a-zA-Z]+[A-Z]+?")
+CAPFIRST = re.compile(rf"^[{PUNCT}]*?([A-Za-z])")
+SMALL_FIRST = re.compile(rf"^([{PUNCT}]*)({SMALL})\b", re.I)
+SMALL_LAST = re.compile(rf"\b({SMALL})[{PUNCT}]?$", re.I)
+SUBPHRASE = re.compile(rf"([:;?!][ ])({SMALL})")
 APOS_SECOND = re.compile(r"^[dol]{1}['‘]{1}[a-z]+$", re.I)
-ALL_CAPS = re.compile(fr"^[A-Z\s{PUNCT}{WEIRD_CHARS}{NUMS}]+$")
+ALL_CAPS = re.compile(rf"^[A-Z\s{PUNCT}{WEIRD_CHARS}{NUMS}]+$")
 UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+,?$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+.*)")
 
@@ -671,7 +671,7 @@ def get_xml_string(e):
     """
 
     inner_string = re.sub(
-        fr"(^<{e.tag}\b.*?>|</{e.tag}\b.*?>$)",
+        rf"(^<{e.tag}\b.*?>|</{e.tag}\b.*?>$)",
         "",
         ET.tostring(e).decode(),
     )
