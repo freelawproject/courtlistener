@@ -107,8 +107,8 @@ def clean_string(s):
     # We split on the v., and handle fixes at either end of plaintiff or
     # appellant.
     bad_punctuation = r"(-|–|_|/|;|,|\s)*"
-    bad_endings = re.compile(r"%s$" % bad_punctuation)
-    bad_beginnings = re.compile(r"^%s" % bad_punctuation)
+    bad_endings = re.compile(fr"{bad_punctuation}$")
+    bad_beginnings = re.compile(fr"^{bad_punctuation}")
 
     s = s.split(" v. ")
     cleaned_string = []
@@ -148,18 +148,18 @@ NUMS = "0123456789"
 PUNCT = r"""!"#$¢%&'‘()*+,\-./:;?@[\\\]_—`{|}~"""
 WEIRD_CHARS = r"¼½¾§ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖØÙÚÛÜßàáâãäåæçèéêëìíîïñòóôœõöøùúûüÿ"
 BIG_WORDS = re.compile(r"^(%s)[%s]?$" % (BIG, PUNCT), re.I)
-SMALL_WORDS = re.compile(r"^(%s)$" % SMALL, re.I)
-SMALL_WORD_INLINE = re.compile(r"(^|\s)(%s)(\s|$)" % SMALL, re.I)
+SMALL_WORDS = re.compile(fr"^({SMALL})$", re.I)
+SMALL_WORD_INLINE = re.compile(fr"(^|\s)({SMALL})(\s|$)", re.I)
 INLINE_PERIOD = re.compile(r"[a-z][.][a-z]", re.I)
 INLINE_SLASH = re.compile(r"[a-z][/][a-z]", re.I)
 INLINE_AMPERSAND = re.compile(r"([a-z][&][a-z])(.*)", re.I)
-UC_ELSEWHERE = re.compile(r"[%s]*?[a-zA-Z]+[A-Z]+?" % PUNCT)
-CAPFIRST = re.compile(r"^[%s]*?([A-Za-z])" % PUNCT)
-SMALL_FIRST = re.compile(r"^([%s]*)(%s)\b" % (PUNCT, SMALL), re.I)
-SMALL_LAST = re.compile(r"\b(%s)[%s]?$" % (SMALL, PUNCT), re.I)
-SUBPHRASE = re.compile(r"([:;?!][ ])(%s)" % SMALL)
+UC_ELSEWHERE = re.compile(fr"[{PUNCT}]*?[a-zA-Z]+[A-Z]+?")
+CAPFIRST = re.compile(fr"^[{PUNCT}]*?([A-Za-z])")
+SMALL_FIRST = re.compile(fr"^([{PUNCT}]*)({SMALL})\b", re.I)
+SMALL_LAST = re.compile(fr"\b({SMALL})[{PUNCT}]?$", re.I)
+SUBPHRASE = re.compile(fr"([:;?!][ ])({SMALL})")
 APOS_SECOND = re.compile(r"^[dol]{1}['‘]{1}[a-z]+$", re.I)
-ALL_CAPS = re.compile(r"^[A-Z\s%s%s%s]+$" % (PUNCT, WEIRD_CHARS, NUMS))
+ALL_CAPS = re.compile(fr"^[A-Z\s{PUNCT}{WEIRD_CHARS}{NUMS}]+$")
 UC_INITIALS = re.compile(r"^(?:[A-Z]{1}\.{1}|[A-Z]{1}\.{1}[A-Z]{1})+,?$")
 MAC_MC = re.compile(r"^([Mm]a?c)(\w+.*)")
 
@@ -642,10 +642,6 @@ def parse_dates(raw_dates, caseyear):
                 date = dparser.parse(raw_part, fuzzy=True).date()
             except:
                 continue
-            #            if caseyear is not None:
-            #                if date.year > caseyear + 1 or date.year < caseyear - 2:
-            #                    print(('Year problem:',date.year,raw_date,caseyear))
-            #                    date = datetime(caseyear, date.month, date.day)
 
             if date.year < 1600 or date.year > 2020:
                 continue
@@ -675,7 +671,7 @@ def get_xml_string(e):
     """
 
     inner_string = re.sub(
-        r"(^<%s\b.*?>|</%s\b.*?>$)" % (e.tag, e.tag),
+        fr"(^<{e.tag}\b.*?>|</{e.tag}\b.*?>$)",
         "",
         ET.tostring(e).decode(),
     )
@@ -698,16 +694,9 @@ for folder in folders:
         continue
     print(folder)
     for path in file_generator(folder):
-        # f = open(path).read()
-        # x = f.count('<date>')
-        # if x > 1:
-        #    print(path)
-        # break
-
         parsed = parse_file(path)
         if parsed is None:
             continue
-        # print(parsed['dates'])
         newname = path.replace("/", "_")
         if len(parsed["dates"]) == 0:
             print(path)
@@ -716,17 +705,3 @@ for folder in folders:
 
         if len(parsed["dates"][0]) == 0:
             print(path)
-#
-#            print(open(path).read(), file=open('_failparse/'+newname,'wt'))
-#
-
-#        numops = len(parsed['opinions'])
-#        if numops > 0:
-#            for op in parsed['opinions']:
-#                optext = op['opinion']
-#                tags = re.findall('<.*?>',optext)
-#                html_tab.update(tags)
-#                #if '<block_quote>' in tags:
-#                #    print(optext)
-#                #    exit()
-#

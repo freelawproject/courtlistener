@@ -875,14 +875,14 @@ class Docket(AbstractDateTimeModel):
         try:
             # Without a transaction wrapper, a failure will invalidate outer transactions
             with transaction.atomic():
-                super(Docket, self).save(
+                super().save(
                     update_fields=update_fields, *args, **kwargs
                 )
         except IntegrityError:
             # Temporary patch while we solve #3359
             # If the error is not related to `date_modified` it will raise again
             self.date_modified = timezone.now()
-            super(Docket, self).save(
+            super().save(
                 update_fields=update_fields, *args, **kwargs
             )
 
@@ -1646,7 +1646,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"pacer_doc_id"}.union(update_fields)
 
-        super(RECAPDocument, self).save(
+        super().save(
             update_fields=update_fields, *args, **kwargs
         )
         tasks = []
@@ -1686,7 +1686,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         is deleted, but that should be OK.
         """
         id_cache = self.pk
-        super(RECAPDocument, self).delete(*args, **kwargs)
+        super().delete(*args, **kwargs)
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "search.RECAPDocument")
@@ -2308,7 +2308,7 @@ class Court(models.Model):
     )
     jurisdiction = models.CharField(
         help_text="the jurisdiction of the court, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in JURISDICTIONS]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS),
         max_length=3,
         choices=JURISDICTIONS,
     )
@@ -2545,7 +2545,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,
@@ -2981,7 +2981,7 @@ class OpinionCluster(AbstractDateTimeModel):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if update_fields is not None:
             update_fields = {"slug"}.union(update_fields)
-        super(OpinionCluster, self).save(
+        super().save(
             update_fields=update_fields, *args, **kwargs
         )
         if index:
@@ -3013,7 +3013,7 @@ class OpinionCluster(AbstractDateTimeModel):
         is deleted, but that should be OK.
         """
         id_cache = self.pk
-        super(OpinionCluster, self).delete(*args, **kwargs)
+        super().delete(*args, **kwargs)
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "search.Opinion")
@@ -3462,7 +3462,7 @@ class Opinion(AbstractDateTimeModel):
         *args: List,
         **kwargs: Dict,
     ) -> None:
-        super(Opinion, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
 

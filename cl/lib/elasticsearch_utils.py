@@ -788,7 +788,7 @@ def get_search_query(
                         score_mode="max",
                         query=Q("match_all"),
                         inner_hits={
-                            "name": f"text_query_inner_opinion",
+                            "name": "text_query_inner_opinion",
                             "size": 10,
                         },
                     ),
@@ -1934,7 +1934,7 @@ def nullify_parent_score_on_child_sorting(
             query=query,
             script_score={
                 "script": {
-                    "source": f""" return 0; """,
+                    "source": """ return 0; """,
                 },
             },
             # Replace the original score with the one computed by the script

@@ -99,7 +99,7 @@ class NoEmptyFilterSet(FilterSet):
 
 class SimpleMetadataWithFilters(SimpleMetadata):
     def determine_metadata(self, request, view):
-        metadata = super(SimpleMetadataWithFilters, self).determine_metadata(
+        metadata = super().determine_metadata(
             request, view
         )
         filters = OrderedDict()
@@ -190,7 +190,7 @@ def get_logging_prefix() -> str:
     return "api:v3"
 
 
-class LoggingMixin(object):
+class LoggingMixin:
     """Log requests to Redis
 
     This draws inspiration from the code that can be found at:
@@ -209,13 +209,13 @@ class LoggingMixin(object):
     milestones = get_milestone_range("SM", "XXXL")
 
     def initial(self, request, *args, **kwargs):
-        super(LoggingMixin, self).initial(request, *args, **kwargs)
+        super().initial(request, *args, **kwargs)
 
         # For logging the timing in self.finalize_response
         self.requested_at = now()
 
     def finalize_response(self, request, response, *args, **kwargs):
-        response = super(LoggingMixin, self).finalize_response(
+        response = super().finalize_response(
             request, response, *args, **kwargs
         )
 
@@ -305,14 +305,14 @@ class LoggingMixin(object):
                 )
 
 
-class CacheListMixin(object):
+class CacheListMixin:
     """Cache listed results"""
 
     @method_decorator(cache_page(60))
     # Ensure that permissions are maintained and not cached!
     @method_decorator(vary_on_headers("Cookie", "Authorization"))
     def list(self, *args, **kwargs):
-        return super(CacheListMixin, self).list(*args, **kwargs)
+        return super().list(*args, **kwargs)
 
 
 class ExceptionalUserRateThrottle(UserRateThrottle):
