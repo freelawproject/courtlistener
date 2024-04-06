@@ -559,7 +559,7 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
                 r"<footnote_body>(.[\s\S]*?)</footnote_body>", fn
             )
             if content:
-                rep = r'<div class="footnote">%s</div>' % content.group(1)
+                rep = rf'<div class="footnote">{content.group(1)}</div>'
                 text = text.replace(fn, rep)
 
         # Replace footnote numbers

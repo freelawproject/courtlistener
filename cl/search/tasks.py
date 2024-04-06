@@ -1242,8 +1242,7 @@ def remove_document_from_es_index(
     except NotFoundError:
         model_label = es_document.Django.model.__name__.capitalize()
         logger.warning(
-            f"The {model_label} can't be deleted from the ES index, it doesn't "
-            f"exists."
+            f"The {model_label} can't be deleted from the ES index, it doesn't exist."
         )
 
 
@@ -1507,7 +1506,7 @@ def index_related_cites_fields(
             exc.errors, "version_conflict_engine_exception"
         ):
             raise ConflictError(
-                f"ConflictError indexing cites.",
+                "ConflictError indexing cites.",
                 "",
                 {"id": child_id},
             )
