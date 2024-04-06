@@ -1204,7 +1204,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
 
         if obj_type not in ["docket", "cluster"]:
             return HttpResponseBadRequest(
-                f"This view can not handle the provided type"
+                "This view can not handle the provided type"
             )
 
         cluster = None

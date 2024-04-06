@@ -120,8 +120,7 @@ def lookup_and_save(new, debug=False):
     if not debug:
         d.save()
         logger.info(
-            "Saved as Docket %s: https://www.courtlistener.com%s"
-            % (d.pk, d.get_absolute_url())
+            f"Saved as Docket {d.pk}: https://www.courtlistener.com{d.get_absolute_url()}"
         )
     return d
 
