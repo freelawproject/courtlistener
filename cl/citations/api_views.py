@@ -19,7 +19,7 @@ from cl.citations.api_serializers import (
 from cl.citations.types import CitationAPIResponse
 from cl.citations.utils import (
     SLUGIFIED_EDITIONS,
-    filter_out_non_case_law_citations,
+    filter_out_non_case_law_and_non_valid_citations,
     get_canonicals_from_reporter,
 )
 from cl.search.models import OpinionCluster
@@ -42,15 +42,13 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         text = data.get("text", None)
         if text:
             citation_objs = eyecite.get_citations(text)
-            citation_objs = filter_out_non_case_law_citations(citation_objs)
+            citation_objs = filter_out_non_case_law_and_non_valid_citations(
+                citation_objs
+            )
             if not citation_objs:
                 return Response([])
 
             for citation in citation_objs:
-                if not all(
-                    [citation.groups["volume"], citation.groups["page"]]
-                ):
-                    continue
 
                 start_index, end_index = citation.span()
                 citation_data = {
