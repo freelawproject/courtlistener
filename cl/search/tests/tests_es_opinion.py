@@ -353,7 +353,7 @@ class OpinionAPISearchTest(
         # Indexed: 1:21-cv-1234 -> Search: 1:21-cv-1234-ABC
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "q": f"1:21-cv-1234-ABC",
+            "q": "1:21-cv-1234-ABC",
         }
 
         r = await self._test_api_results_count(
@@ -934,7 +934,7 @@ class OpinionsESSearchTest(
         # Frontend
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "q": f"1:21-cv-1234-ABC",
+            "q": "1:21-cv-1234-ABC",
         }
         # Frontend
         r = await self._test_article_count(
@@ -1012,13 +1012,13 @@ class OpinionsESSearchTest(
 
     async def test_query_fielded(self) -> None:
         """Does fielded queries work"""
-        search_params = {"q": f'status:"published"'}
+        search_params = {"q": 'status:"published"'}
         r = await self._test_article_count(search_params, 4, "status")
         self.assertIn("docket number 2", r.content.decode())
         self.assertIn("docket number 3", r.content.decode())
         self.assertIn("4 Opinions", r.content.decode())
 
-        search_params = {"q": f'status:"errata"', "stat_Errata": "on"}
+        search_params = {"q": 'status:"errata"', "stat_Errata": "on"}
         r = await self._test_article_count(search_params, 1, "status")
         self.assertIn("docket number 1 005", r.content.decode())
 
@@ -1165,7 +1165,7 @@ class RelatedSearchTest(
         admin.user.is_staff = True
         admin.user.save()
 
-        super(RelatedSearchTest, self).setUp()
+        super().setUp()
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -1358,7 +1358,7 @@ class GroupedSearchTest(EmptySolrTestCase):
 
     def setUp(self) -> None:
         # Set up some handy variables
-        super(GroupedSearchTest, self).setUp()
+        super().setUp()
         args = [
             "--type",
             "search.Opinion",
@@ -2359,7 +2359,7 @@ class OpinionFeedTest(
         self.null_item = self.good_item.copy()
         self.null_item.update({"local_path": None})
         self.feed = JurisdictionFeed()
-        super(OpinionFeedTest, self).setUp()
+        super().setUp()
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -2398,7 +2398,7 @@ class OpinionFeedTest(
 
         # Text query case.
         params = {
-            "q": f"docket number",
+            "q": "docket number",
             "type": SEARCH_TYPES.OPINION,
         }
         response = self.client.get(

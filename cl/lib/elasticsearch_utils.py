@@ -95,23 +95,6 @@ def elasticsearch_enabled(func: Callable) -> Callable:
     return wrapper_func
 
 
-def es_index_exists(index_name: str) -> bool:
-    """Confirm if the Elasticsearch index exists in the default instance.
-    :param index_name: The index name to check.
-    :return: True if the index exists, otherwise False.
-    """
-    try:
-        es = connections.get_connection()
-        index_exists = es.indices.exists(index=index_name)
-    except (TransportError, ConnectionError) as e:
-        logger.warning(
-            f"Error in ES connection when checking index existence: {index_name}"
-        )
-        logger.warning(f"Error was: {e}")
-        index_exists = False
-    return index_exists
-
-
 def build_numeric_range_query(
     field: str,
     lower_bound: int | float,
@@ -805,7 +788,7 @@ def get_search_query(
                         score_mode="max",
                         query=Q("match_all"),
                         inner_hits={
-                            "name": f"text_query_inner_opinion",
+                            "name": "text_query_inner_opinion",
                             "size": 10,
                         },
                     ),
@@ -1951,7 +1934,7 @@ def nullify_parent_score_on_child_sorting(
             query=query,
             script_score={
                 "script": {
-                    "source": f""" return 0; """,
+                    "source": """ return 0; """,
                 },
             },
             # Replace the original score with the one computed by the script

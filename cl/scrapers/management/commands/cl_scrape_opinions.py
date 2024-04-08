@@ -258,7 +258,8 @@ class Command(VerboseCommand):
                 method=site.method,
             )
             if msg:
-                logger.warning(msg)
+                fingerprint = [f"{court_str}-unexpected-content-type"]
+                logger.error(msg, extra={"fingerprint": fingerprint})
                 ErrorLog(log_level="WARNING", court=court, message=msg).save()
                 continue
 

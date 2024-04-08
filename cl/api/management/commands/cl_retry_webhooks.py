@@ -134,7 +134,7 @@ class Command(VerboseCommand):
     DELAY_BETWEEN_ITERATIONS = 1 * 60  # One minute
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         # Execute it continuously with a delay of one minute between iterations
         while True:

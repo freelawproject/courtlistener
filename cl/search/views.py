@@ -33,7 +33,6 @@ from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     convert_str_date_fields_to_date_objects,
-    es_index_exists,
     fetch_es_results,
     get_facet_dict_for_search_query,
     get_only_status_facets,
@@ -714,9 +713,7 @@ def do_es_search(
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
 
-    if search_form.is_valid() and es_index_exists(
-        index_name=document_type._index._name
-    ):
+    if search_form.is_valid():
         cd = search_form.cleaned_data
         try:
             # Create necessary filters to execute ES query

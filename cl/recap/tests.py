@@ -37,7 +37,7 @@ from cl.api.management.commands.cl_retry_webhooks import (
 )
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import get_next_webhook_retry_date
-from cl.lib.pacer import is_pacer_court_accessible
+from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
@@ -105,6 +105,7 @@ from cl.recap.tasks import (
     process_recap_zip,
 )
 from cl.recap_rss.tasks import merge_rss_feed_contents
+from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
@@ -2007,6 +2008,11 @@ class DescriptionCleanupTest(SimpleTestCase):
 
 
 class RecapDocketTaskTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "cand.html"
@@ -2112,6 +2118,99 @@ class RecapDocketTaskTest(TestCase):
         async_to_sync(process_recap_docket)(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    def test_avoid_overwriting_nature_of_suit_in_free_opinions(self) -> None:
+        """Test avoid updating the nature_of_suit from FreeOpinionReport if
+        the docket already has a nature_of_suit set, since this value doesn't
+        change. See issue #3878.
+        """
+
+        test_cases = [
+            ("810 copyright", "copyright"),
+            ("", "social welfare"),
+            ("", ""),
+        ]
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+        )
+        for initial_nature_of_suit, nature_of_suit_from_row in test_cases:
+            with self.subTest(
+                initial_nature_of_suit=initial_nature_of_suit,
+                nature_of_suit_from_row=nature_of_suit_from_row,
+            ):
+                # Update Docket with or without nature_of_suit
+                Docket.objects.filter(pk=d.pk).update(
+                    nature_of_suit=initial_nature_of_suit
+                )
+                d.refresh_from_db()
+                pacer_free_doc_row = PACERFreeDocumentRowFactory(
+                    court_id=self.court.pk,
+                    pacer_case_id=d.pacer_case_id,
+                    nature_of_suit=nature_of_suit_from_row,
+                )
+                pacer_free_doc_row.court = self.court
+                delattr(pacer_free_doc_row, "id")
+                lookup_and_save(pacer_free_doc_row)
+                d.refresh_from_db()
+                self.assertEqual(
+                    d.nature_of_suit,
+                    (
+                        nature_of_suit_from_row
+                        if not initial_nature_of_suit
+                        else initial_nature_of_suit
+                    ),
+                    msg="The nature_of_suit does not match.",
+                )
+        d.delete()
+
+    def test_avoid_overwriting_nature_of_suit_in_update_docket_metadata(
+        self,
+    ) -> None:
+        """Test avoid updating the nature_of_suit from update_docket_metadata
+         if the docket already has a nature_of_suit set, since this value doesn't
+        change. See issue #3878.
+        """
+
+        test_cases = [
+            ("810 copyright", "copyright"),
+            ("", "social welfare"),
+            ("", ""),
+        ]
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+        )
+        for initial_nature_of_suit, incoming_nature_of_suit in test_cases:
+            with self.subTest(
+                initial_nature_of_suit=initial_nature_of_suit,
+                incoming_nature_of_suit=incoming_nature_of_suit,
+            ):
+                # Update Docket with or without nature_of_suit
+                Docket.objects.filter(pk=d.pk).update(
+                    nature_of_suit=initial_nature_of_suit
+                )
+                docket_data = {
+                    "case_name": d.case_name,
+                    "docket_number": d.docket_number,
+                    "nature_of_suit": incoming_nature_of_suit,
+                }
+                d.refresh_from_db()
+                async_to_sync(update_docket_metadata)(d, docket_data)
+                d.save()
+                d.refresh_from_db()
+                self.assertEqual(
+                    d.nature_of_suit,
+                    (
+                        incoming_nature_of_suit
+                        if not initial_nature_of_suit
+                        else initial_nature_of_suit
+                    ),
+                    msg="The nature_of_suit does not match.",
+                )
+        d.delete()
 
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")

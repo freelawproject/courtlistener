@@ -511,9 +511,8 @@ def add_new_case(
                     % trunc(docket_string, length=5000, ellipsis="...")
                 )
                 docket.save()
-                long_data["correction"] = "%s <br> %s" % (
-                    data["docket_number"],
-                    long_data["correction"],
+                long_data["correction"] = (
+                    f"{data['docket_number']} <br> {long_data['correction']}"
                 )
 
         cluster = OpinionCluster(

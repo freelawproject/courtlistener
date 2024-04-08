@@ -2438,7 +2438,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
                 action="non-recap-dockets",
             )
             mock_logger.info.assert_called_with(
-                f"Successfully removed 2 non-recap dockets."
+                "Successfully removed 2 non-recap dockets."
             )
 
         # Confirm non-recap Dockets are removed.
@@ -2480,7 +2480,7 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
                 auto_resume=True,
             )
             mock_logger.info.assert_called_with(
-                f"Successfully removed 1 non-recap dockets."
+                "Successfully removed 1 non-recap dockets."
             )
 
         # Confirm the last non-recap Docket is removed.

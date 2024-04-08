@@ -239,7 +239,7 @@ class DocketAlertTest(TestCase):
         )
         self.assertEqual(
             mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
-            f"List-Unsubscribe=One-Click",
+            "List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
             "one_click_docket_alert_unsubscribe", args=[self.alert.secret_key]
@@ -814,7 +814,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
         # Unsubscribe headers assertions.
         self.assertEqual(
             mail.outbox[0].extra_headers["List-Unsubscribe-Post"],
-            f"List-Unsubscribe=One-Click",
+            "List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
             "one_click_disable_alert", args=[self.search_alert.secret_key]
@@ -829,7 +829,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
         self.assertIn("daily opinion alert", mail.outbox[1].body)
         self.assertEqual(
             mail.outbox[1].extra_headers["List-Unsubscribe-Post"],
-            f"List-Unsubscribe=One-Click",
+            "List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
             "one_click_disable_alert", args=[self.search_alert_2.secret_key]
@@ -844,7 +844,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
         self.assertIn("daily oral argument alert ", mail.outbox[3].body)
         self.assertEqual(
             mail.outbox[3].extra_headers["List-Unsubscribe-Post"],
-            f"List-Unsubscribe=One-Click",
+            "List-Unsubscribe=One-Click",
         )
         unsubscribe_url = reverse(
             "one_click_disable_alert", args=[self.search_alert_oa.secret_key]
@@ -3183,7 +3183,7 @@ class CleanUpSearchAlertsCommandTests(ESIndexTestCase, TestCase):
         ) as mock_logger:
             call_command("clean_up_search_alerts", action="clean-up")
             mock_logger.info.assert_called_with(
-                f"\r Successfully fixed 6 opinions search alerts."
+                "\r Successfully fixed 6 opinions search alerts."
             )
 
         expected_query = {
@@ -3218,7 +3218,7 @@ class CleanUpSearchAlertsCommandTests(ESIndexTestCase, TestCase):
                 validation_wait=0,
             )
             mock_logger.info.assert_called_with(
-                f"\r Checked 8 opinions search alerts. There were 1 invalid queries."
+                "\r Checked 8 opinions search alerts. There were 1 invalid queries."
             )
             self.assertIn(
                 "Invalid Search Alert syntax.",

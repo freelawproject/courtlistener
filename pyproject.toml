@@ -108,12 +108,12 @@ daphne = "^4.1.0"
 psycopg = {extras = ["binary"], version = "^3.1.17"}
 httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.3.1"
-juriscraper = "*"
 django-permissions-policy = "^4.19.0"
+juriscraper = "^2.6.0"
 
 
 [tool.poetry.group.dev.dependencies]
-pre-commit = "^3.6.0"
+pre-commit = "^3.7.0"
 types-redis = "^4.6.0.20240106"
 pylint = "^3.0.3"
 pytest = "^8.0.0"

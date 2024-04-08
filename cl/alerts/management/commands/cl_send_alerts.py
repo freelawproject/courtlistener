@@ -123,9 +123,7 @@ class Command(VerboseCommand):
         }
         self.options = {}
         self.valid_ids = {}
-        self.o_es_alerts = False
-        if waffle.switch_is_active("o-es-alerts-active"):
-            self.o_es_alerts = True
+        self.o_es_alerts = bool(waffle.switch_is_active("o-es-alerts-active"))
 
     def __del__(self):
         for si in self.sis.values():
