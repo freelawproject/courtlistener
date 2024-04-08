@@ -9,7 +9,7 @@ from unittest.mock import Mock
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.core.management import call_command
-from django.test import AsyncClient
+from django.test import override_settings
 from django.urls import reverse
 from eyecite import get_citations
 from eyecite.test_factories import (
@@ -2173,3 +2173,21 @@ class CitationLookUpApiTest(
 
         clusters = second_citation["clusters"]
         self.assertEqual(len(clusters), 0)
+
+    @override_settings(MAX_CITATIONS_PER_REQUEST=10)
+    async def test_can_limit_max_citations_per_request(self) -> None:
+        ten_citations = "56 F.2d 9, " * 10
+        text_citation = f"{ten_citations} 139 U.S. 601, 155 U.S. 597"
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": text_citation},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 11)
+
+        last_citation = data[-1]
+        self.assertEqual(last_citation["citation"], "139 U.S. 601")
+        self.assertEqual(last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS)
+        self.assertEqual(last_citation["error_message"], "Too many requests.")

@@ -2,6 +2,7 @@ from http import HTTPStatus
 
 import eyecite
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.db.models import QuerySet
 from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
@@ -48,7 +49,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
             if not citation_objs:
                 return Response([])
 
-            for citation in citation_objs:
+            for idx, citation in enumerate(citation_objs):
 
                 start_index, end_index = citation.span()
                 citation_data = {
@@ -57,6 +58,16 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                     "start_index": start_index,
                     "end_index": end_index,
                 }
+
+                if idx == settings.MAX_CITATIONS_PER_REQUEST:
+                    citations.append(
+                        {
+                            **citation_data,
+                            "status": HTTPStatus.TOO_MANY_REQUESTS,
+                            "error_message": "Too many requests.",
+                        }
+                    )
+                    break
 
                 reporter = citation.groups["reporter"]
                 volume = citation.groups["volume"]
