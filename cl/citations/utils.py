@@ -128,3 +128,25 @@ def filter_out_non_case_law_citations(
         for c in citations
         if isinstance(c, (FullCaseCitation, ShortCaseCitation))
     ]
+
+
+def filter_out_non_case_law_and_non_valid_citations(
+    citations: list[CitationBase],
+) -> list[FullCaseCitation | ShortCaseCitation]:
+    """
+    Filters out all non-case law citations and citations with no volume or page
+    from a list of citations.
+
+    Args:
+        citations (list[CitationBase]): List of citation
+
+    Returns:
+        list[FullCaseCitation | ShortCaseCitation]: List of case law citations.
+    """
+    return [
+        c
+        for c in citations
+        if isinstance(c, (FullCaseCitation, ShortCaseCitation))
+        and c.groups.get("volume", None)
+        and c.groups.get("page", None)
+    ]
