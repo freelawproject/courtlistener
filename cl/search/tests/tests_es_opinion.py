@@ -18,6 +18,7 @@ from factory import RelatedFactory
 from lxml import etree, html
 from waffle.testutils import override_flag
 
+from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -27,7 +28,8 @@ from cl.lib.test_helpers import (
     opinion_search_api_keys,
 )
 from cl.people_db.factories import PersonFactory
-from cl.search.constants import o_type_index_map
+from cl.search.api_utils import ESList
+from cl.search.constants import SEARCH_HL_TAG, o_type_index_map
 from cl.search.documents import (
     ES_CHILD_ID,
     OpinionClusterDocument,
@@ -41,6 +43,7 @@ from cl.search.factories import (
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionFactory,
     OpinionWithChildrenFactory,
+    OpinionWithParentsFactory,
 )
 from cl.search.feeds import JurisdictionFeed
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
@@ -71,7 +74,7 @@ from cl.users.factories import UserProfileWithParentsFactory
 
 
 @override_flag("o-es-search-api-active", active=True)
-class OpinionAPISearchTest(
+class OpinionV3APISearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
     @classmethod
@@ -414,6 +417,75 @@ class OpinionAPISearchTest(
                     expected_value,
                     f"Field '{field}' does not match.",
                 )
+
+    def test_o_results_api_pagination(self) -> None:
+        """Test pagination for V3 Opinion Search API."""
+
+        created_opinions = []
+        opinions_to_create = 20
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            for _ in range(opinions_to_create):
+                opinion = OpinionWithParentsFactory()
+                created_opinions.append(opinion)
+
+        page_size = 20
+        total_opinions = Opinion.objects.all().distinct("cluster_id").count()
+        total_pages = int(total_opinions / page_size) + 1
+        ids_in_results = set()
+        cd = {
+            "type": SEARCH_TYPES.OPINION,
+            "order_by": "score desc",
+        }
+        for page in range(1, total_pages + 1):
+            search_query = OpinionClusterDocument.search()
+            offset = max(0, (page - 1) * page_size)
+            main_query = do_es_api_query(
+                search_query, cd, {"text": 500}, SEARCH_HL_TAG
+            )
+            hits = ESList(
+                main_query=main_query,
+                offset=offset,
+                page_size=page_size,
+                type=cd["type"],
+            )
+            for result in hits:
+                ids_in_results.add(result.id)
+        self.assertEqual(
+            len(ids_in_results),
+            total_opinions,
+            msg="Wrong number of opinions.",
+        )
+
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            f"stat_{PRECEDENTIAL_STATUS.PUBLISHED}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.ERRATA}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.SEPARATE}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.IN_CHAMBERS}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.RELATING_TO}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.UNKNOWN}": "on",
+        }
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        self.assertEqual(len(r.data["results"]), 20)
+        self.assertEqual(25, r.data["count"])
+        self.assertIn("page=2", r.data["next"])
+
+        # Test next page.
+        search_params.update({"page": 2})
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), search_params
+        )
+        self.assertEqual(len(r.data["results"]), 5)
+        self.assertEqual(25, r.data["count"])
+        self.assertEqual(None, r.data["next"])
+
+        # Remove Opinion objects to avoid affecting other tests.
+        for created_opinion in created_opinions:
+            created_opinion.delete()
 
 
 class OpinionsESSearchTest(
