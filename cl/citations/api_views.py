@@ -13,6 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from cl.api.utils import CitationCountRateThrottle
 from cl.citations.api_serializers import (
     CitationAPIRequestSerializer,
     CitationAPIResponseSerializer,
@@ -31,15 +32,18 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
     serializer_class = CitationAPIRequestSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [CitationCountRateThrottle]
 
-    def create(self, request: Request, *args, **kwargs):
-        # Uses the serializer to perform object level validations
+    def validate_request_data(self, request: Request):
+        # Perform object level validations before extracting citations
         citation_serializer = CitationAPIRequestSerializer(data=request.data)
         citation_serializer.is_valid(raise_exception=True)
 
-        # Get query parameters from the validated data
+        return citation_serializer.validated_data
+
+    def create(self, request: Request, *args, **kwargs):
         citations = []
-        data = citation_serializer.validated_data
+        data = self.request.data
         text = data.get("text", None)
         if text:
             citation_objs = eyecite.get_citations(text)
