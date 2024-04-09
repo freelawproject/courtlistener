@@ -1302,7 +1302,7 @@ class DocketEntry(AbstractDateTimeModel):
         indexes = [
             models.Index(
                 fields=["docket_id", "entry_number"],
-                name='entry_number_idx',
+                name="entry_number_idx",
                 condition=Q(entry_number=1),
             ),
             models.Index(fields=["recap_sequence_number", "entry_number"]),
