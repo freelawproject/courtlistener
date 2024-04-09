@@ -33,6 +33,7 @@ from cl.stats.utils import tally_stat
 # Only do this number of RT items at a time. If there are more, they will be
 # handled in the next run of this script.
 MAX_RT_ITEM_QUERY = 1000
+HITS_LIMIT = 20
 
 
 def get_cut_off_date(rate, d=datetime.date.today()):
@@ -68,11 +69,12 @@ def send_alert(user_profile, hits):
 
     txt_template = loader.get_template("alert_email.txt")
     html_template = loader.get_template("alert_email.html")
+    context = {"hits": hits}
     if waffle.switch_is_active("o-es-alerts-active"):
         txt_template = loader.get_template("alert_email_es.txt")
         html_template = loader.get_template("alert_email_es.html")
+        context = {"hits": hits, "hits_limit": HITS_LIMIT}
 
-    context = {"hits": hits}
     headers = {}
     query_string = ""
     if len(hits) == 1:
@@ -225,7 +227,7 @@ class Command(VerboseCommand):
                 )
                 s = s.extra(
                     from_=0,
-                    size=20,
+                    size=HITS_LIMIT,
                 )
                 results = s.execute()
             else:
