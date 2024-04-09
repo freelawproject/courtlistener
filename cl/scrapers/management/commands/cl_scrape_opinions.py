@@ -21,7 +21,6 @@ from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     get_binary_content,
@@ -260,7 +259,6 @@ class Command(VerboseCommand):
             if msg:
                 fingerprint = [f"{court_str}-unexpected-content-type"]
                 logger.error(msg, extra={"fingerprint": fingerprint})
-                ErrorLog(log_level="WARNING", court=court, message=msg).save()
                 continue
 
             content = site.cleanup_content(r.content)
