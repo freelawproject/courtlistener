@@ -1300,7 +1300,12 @@ class DocketEntry(AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Docket Entries"
         indexes = [
-            models.Index(fields=["recap_sequence_number", "entry_number"])
+            models.Index(
+                fields=["docket_id", "entry_number"],
+                name="entry_number_idx",
+                condition=Q(entry_number=1),
+            ),
+            models.Index(fields=["recap_sequence_number", "entry_number"]),
         ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
