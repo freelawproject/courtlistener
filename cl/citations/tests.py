@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from http import HTTPStatus
 from typing import List, Tuple
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
@@ -1735,6 +1735,10 @@ class GroupParentheticalsTest(SimpleTestCase):
                 )
 
 
+@patch(
+    "cl.api.utils.CitationCountRateThrottle.get_cache_key_for_citations",
+    return_value="citations_tests",
+)
 class CitationLookUpApiTest(
     CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
@@ -1753,7 +1757,9 @@ class CitationLookUpApiTest(
             username="citation-user", password="password"
         )
 
-    async def test_can_handle_requests_with_no_citation_or_reporter(self):
+    async def test_can_handle_requests_with_no_citation_or_reporter(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"})
         )
@@ -1764,7 +1770,9 @@ class CitationLookUpApiTest(
             j["non_field_errors"][0],
         )
 
-    async def test_can_handle_requests_with_only_reporter(self):
+    async def test_can_handle_requests_with_only_reporter(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "ark"},
@@ -1780,7 +1788,9 @@ class CitationLookUpApiTest(
             j["page"][0],
         )
 
-    async def test_can_handle_requests_with_big_pieces_of_text(self):
+    async def test_can_handle_requests_with_big_pieces_of_text(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "test" * 17_000},
@@ -1792,7 +1802,7 @@ class CitationLookUpApiTest(
             j["text"][0],
         )
 
-    async def test_can_handle_random_text_as_a_citation(self):
+    async def test_can_handle_random_text_as_a_citation(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "this is a text"},
@@ -1802,7 +1812,7 @@ class CitationLookUpApiTest(
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(len(data), 0)
 
-    async def test_can_handle_invalid_text_citations(self):
+    async def test_can_handle_invalid_text_citations(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "Maryland Code, Criminal Law § 11-208"},
@@ -1821,7 +1831,7 @@ class CitationLookUpApiTest(
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(len(data), 0)
 
-    async def test_can_filter_non_case_law_citations(self):
+    async def test_can_filter_non_case_law_citations(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             # Journal Citation
@@ -1859,7 +1869,9 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "671 P.2d 1085")
 
-    async def test_can_filter_out_citation_with_no_volume(self):
+    async def test_can_filter_out_citation_with_no_volume(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "Thomp. Cas., 21"},
@@ -1887,7 +1899,7 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "979 F. Supp. 726")
 
-    async def test_can_filter_out_citation_with_no_page(self):
+    async def test_can_filter_out_citation_with_no_page(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "592 U.S. _"},
@@ -1910,7 +1922,7 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "141 S. Ct. 1017")
 
-    async def test_can_handle_invalid_reporter(self):
+    async def test_can_handle_invalid_reporter(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {
@@ -1935,7 +1947,9 @@ class CitationLookUpApiTest(
         # The normalized citations list is empty because the reporter is invalid
         self.assertEqual(len(first_citation["normalized_citations"]), 0)
 
-    async def test_can_handle_ambiguous_reporter_variations(self) -> None:
+    async def test_can_handle_ambiguous_reporter_variations(
+        self, cache_key_mock
+    ) -> None:
 
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
@@ -1979,7 +1993,9 @@ class CitationLookUpApiTest(
                 ],
             )
 
-    async def test_can_handle_invalid_page_number(self) -> None:
+    async def test_can_handle_invalid_page_number(
+        self, cache_key_mock
+    ) -> None:
         """Do we fail gracefully with invalid page numbers?"""
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2003,7 +2019,9 @@ class CitationLookUpApiTest(
         self.assertEqual(normalized_citations[0], "1 F.2d asdf")
         self.assertIn("Citation not found:", first_citation["error_message"])
 
-    async def test_can_match_citation_with_reporter_volume_page(self):
+    async def test_can_match_citation_with_reporter_volume_page(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f2d", "volume": "56", "page": "9"},
@@ -2050,7 +2068,7 @@ class CitationLookUpApiTest(
             self.opinion_cluster_2.get_absolute_url(),
         )
 
-    async def test_can_handle_reporter_typos(self):
+    async def test_can_handle_reporter_typos(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "F2d", "volume": "56", "page": "9"},
@@ -2098,7 +2116,9 @@ class CitationLookUpApiTest(
             self.opinion_cluster_2.get_absolute_url(),
         )
 
-    async def test_can_handle_full_citation_within_text(self) -> None:
+    async def test_can_handle_full_citation_within_text(
+        self, cache_key_mock
+    ) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
         text_citation = (
@@ -2129,7 +2149,9 @@ class CitationLookUpApiTest(
             self.opinion_cluster_2.get_absolute_url(),
         )
 
-    async def test_can_extract_all_citations_within_text(self) -> None:
+    async def test_can_extract_all_citations_within_text(
+        self, cache_key_mock
+    ) -> None:
         la_rue_citation = await sync_to_async(
             CitationWithParentsFactory.create
         )(volume=139, reporter="U.S.", page="601", type=1)
@@ -2175,7 +2197,9 @@ class CitationLookUpApiTest(
         self.assertEqual(len(clusters), 0)
 
     @override_settings(MAX_CITATIONS_PER_REQUEST=10)
-    async def test_can_limit_max_citations_per_request(self) -> None:
+    async def test_can_limit_max_citations_per_request(
+        self, cache_key_mock
+    ) -> None:
         ten_citations = "56 F.2d 9, " * 10
         text_citation = f"{ten_citations} 139 U.S. 601, 155 U.S. 597"
         r = await self.async_client.post(
@@ -2191,3 +2215,34 @@ class CitationLookUpApiTest(
         self.assertEqual(last_citation["citation"], "139 U.S. 601")
         self.assertEqual(last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS)
         self.assertEqual(last_citation["error_message"], "Too many requests.")
+
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value=(20, 60),
+    )
+    async def test_can_rate_limit_user_based_on_citation_count(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
+        sixty_citations = "56 F.2d 9, " * 60
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": sixty_citations},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 60)
+
+        # This test only allows 20 citations per minute, but the last request
+        # had 60. This request should be rate limited.
+        ten_citations = "56 F.2d 9, " * 10
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": ten_citations},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+        data = json.loads(r.content)
+        self.assertEqual(data["error_message"], "Request was throttled.")
+        self.assertIn("wait_until", data)
