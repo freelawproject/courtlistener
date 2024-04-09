@@ -70,7 +70,7 @@ REST_FRAMEWORK = {
         "WarrenLex": "20000/hour",  # For big litigation days (wow)
         "quevon24": "500000/hour",  # Perform tests, clone cases in local env
     },
-    "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": [],
+    "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {},
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.BasicAuthentication",
