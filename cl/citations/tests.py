@@ -1,11 +1,12 @@
 import itertools
 import json
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import List, Tuple
 from unittest.mock import Mock, patch
 
+import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.core.management import call_command
@@ -2240,27 +2241,150 @@ class CitationLookUpApiTest(
         self, get_rate_mock, throttle_logic_mock
     ) -> None:
         throttle_logic_mock.return_value = "citation_throttle_test"
-        sixty_citations = "56 F.2d 9, " * 60
-        r = await self.async_client.post(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"text": sixty_citations},
-        )
+        # Throttle users for 1 minute if they query for the exact number of
+        # citations allowed by the rate limit.
+        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False):
+            ten_citations = "56 F.2d 9, " * 10
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 10)
 
-        self.assertEqual(r.status_code, HTTPStatus.OK)
-        data = json.loads(r.content)
-        self.assertEqual(len(data), 60)
+            # Ten more citations, This request should be allowed
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 10)
 
-        # This test only allows 20 citations per minute, but the last request
-        # had 60. This request should be rate limited.
-        ten_citations = "56 F.2d 9, " * 10
-        r = await self.async_client.post(
-            reverse("citation-lookup-list", kwargs={"version": "v3"}),
-            {"text": ten_citations},
-        )
+            # This request must not be allowed.
+            # User has reached the maximum number of citations allowed by the
+            # rate limit. Access will be restored one minute after the first
+            # request.
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
 
-        self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
-        data = json.loads(r.content)
-        self.assertEqual(
-            data["error_message"], "Too many requests (allowed rate: 20/m)."
-        )
-        self.assertIn("wait_until", data)
+            expected_time = test_date + timedelta(minutes=1)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+        # Throttle users exceeding the citation limit by a small number.
+        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False):
+            fifteen_citations = "56 F.2d 9, " * 15
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # fifteen more citations, This request should be allowed but the user
+            # will be throttle after making this request.
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # This request must be rate limited. User has exceeded the lookup
+            # limit of 20 citations per minute with 30 citations. They must
+            # wait for previous requests to expire to free up citations in
+            # history. The first request(oldest one) added 15 citations to
+            # the cache, once this request is expire the user should be allowed
+            # to use the API again.
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            expected_time = test_date + timedelta(minutes=1)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False) as traveller:
+            fifteen_citations = "56 F.2d 9, " * 15
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # twenty more citations, ten seconds after the first one. This
+            # request should be allowed but the user will be throttle after
+            # making this request.
+            traveller.shift(timedelta(seconds=10))
+            twenty_citations = "56 F.2d 9, " * 20
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": twenty_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 20)
+
+            # This request must be rate limited. User has exceeded the lookup
+            # limit of 20 citations per minute with 35 citations. They must
+            # wait for previous requests to expire to free up citations in
+            # history. The first request(oldest one) added 15 citations to the
+            # cache. However, even if this request expires, it will leave 20
+            # citations in history. This means the user need to wait for the
+            # second request to expire before making further requests.
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            expected_time = (
+                test_date + timedelta(minutes=1) + timedelta(seconds=10)
+            )
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+        # throttle users that exceeds the max number of citations by a
+        # significant margin.
+        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False):
+            sixty_citations = "56 F.2d 9, " * 60
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": sixty_citations},
+            )
+
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 60)
+
+            # This test only allows 20 citations per minute, but the last request
+            # had 60. This request must be rate limited.
+            ten_citations = "56 F.2d 9, " * 10
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            self.assertEqual(
+                data["error_message"],
+                "Too many requests (allowed rate: 20/m).",
+            )
+            # User throttled for 3 minutes because the request contained 3
+            # times the allowed number of citations.
+            expected_time = test_date + timedelta(minutes=3)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
