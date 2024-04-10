@@ -440,7 +440,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
             self.get_citations_rate(request)
         )
         expiration = (
-            citation_count * (max_num_citations / duration)
+            citation_count * (duration / max_num_citations)
             if citation_count > max_num_citations
             else duration
         )
