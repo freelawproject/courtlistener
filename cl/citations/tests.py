@@ -2197,7 +2197,7 @@ class CitationLookUpApiTest(
         self.assertEqual(len(clusters), 0)
 
     @override_settings(MAX_CITATIONS_PER_REQUEST=10)
-    async def test_can_limit_max_citations_per_request(
+    async def test_can_look_up_max_citations_per_request(
         self, cache_key_mock
     ) -> None:
         ten_citations = "56 F.2d 9, " * 10
@@ -2209,10 +2209,24 @@ class CitationLookUpApiTest(
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
         data = json.loads(r.content)
-        self.assertEqual(len(data), 11)
+        self.assertEqual(len(data), 12)
+
+        # This test limits citations to a maximum of 10 per request.
+        # Citations exceeding this limit will still be included in the response
+        # but will be marked with an error message and a status code of 429
+        # (Too Many Requests).
+        second_to_last_citation = data[-2]
+        self.assertEqual(second_to_last_citation["citation"], "139 U.S. 601")
+        self.assertEqual(
+            second_to_last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS
+        )
+        self.assertEqual(
+            second_to_last_citation["error_message"],
+            "Too many citations requested.",
+        )
 
         last_citation = data[-1]
-        self.assertEqual(last_citation["citation"], "139 U.S. 601")
+        self.assertEqual(last_citation["citation"], "155 U.S. 597")
         self.assertEqual(last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS)
         self.assertEqual(
             last_citation["error_message"], "Too many citations requested."

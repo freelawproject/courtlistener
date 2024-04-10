@@ -63,7 +63,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                     "end_index": end_index,
                 }
 
-                if idx == settings.MAX_CITATIONS_PER_REQUEST:
+                if idx >= settings.MAX_CITATIONS_PER_REQUEST:
                     citations.append(
                         {
                             **citation_data,
@@ -71,7 +71,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                             "error_message": "Too many citations requested.",
                         }
                     )
-                    break
+                    continue
 
                 reporter = citation.groups["reporter"]
                 volume = citation.groups["volume"]
