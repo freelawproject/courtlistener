@@ -2220,7 +2220,7 @@ class CitationLookUpApiTest(
 
     @patch(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
-        return_value=(20, 60),
+        return_value="20/m",
     )
     async def test_can_rate_limit_user_based_on_citation_count(
         self, get_rate_mock, throttle_logic_mock
@@ -2246,5 +2246,7 @@ class CitationLookUpApiTest(
 
         self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
         data = json.loads(r.content)
-        self.assertEqual(data["error_message"], "Request was throttled.")
+        self.assertEqual(
+            data["error_message"], "Too many requests (allowed rate: 20/m)."
+        )
         self.assertIn("wait_until", data)

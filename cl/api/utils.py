@@ -490,7 +490,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
 
         raise Throttled(
             detail={
-                "error_message": "Request was throttled.",
+                "error_message": f"Too many requests (allowed rate: {rate}).",
                 "wait_until": soonest_time,
             }
         )
