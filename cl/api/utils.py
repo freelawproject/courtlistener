@@ -372,8 +372,8 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         if not text:
             # Since the 'text' key is missing from the request, the user is
             # likely trying to retrieve opinions using a reporter, volume,
-            # and page combination. This approach allows looking one citation
-            # at a time.
+            # and page combination. This approach allows looking up one
+            # citation at a time.
             return 1
 
         citation_objs = filter_out_non_case_law_and_non_valid_citations(
