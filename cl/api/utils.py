@@ -351,7 +351,7 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
 
 class CitationCountRateThrottle(ExceptionalUserRateThrottle):
     """
-    Limits the rate of API calls that may be made by a users based on the
+    Limits the rate of API calls that may be made by users based on the
     number of citations they try to look up.
     """
 
