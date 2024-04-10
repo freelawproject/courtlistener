@@ -1,11 +1,11 @@
 from http import HTTPStatus
 
-import eyecite
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db.models import QuerySet
 from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
+from eyecite.models import FullCaseCitation, ShortCaseCitation
 from rest_framework.exceptions import NotFound
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
@@ -19,11 +19,7 @@ from cl.citations.api_serializers import (
     CitationAPIResponseSerializer,
 )
 from cl.citations.types import CitationAPIResponse
-from cl.citations.utils import (
-    SLUGIFIED_EDITIONS,
-    filter_out_non_case_law_and_non_valid_citations,
-    get_canonicals_from_reporter,
-)
+from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
 from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
 
@@ -33,6 +29,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
     serializer_class = CitationAPIRequestSerializer
     permission_classes = [IsAuthenticated]
     throttle_classes = [CitationCountRateThrottle]
+    citation_list: list[FullCaseCitation | ShortCaseCitation] = []
 
     def validate_request_data(self, request: Request):
         # Perform object level validations before extracting citations
@@ -46,14 +43,13 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
         data = self.request.data
         text = data.get("text", None)
         if text:
-            citation_objs = eyecite.get_citations(text)
-            citation_objs = filter_out_non_case_law_and_non_valid_citations(
-                citation_objs
-            )
-            if not citation_objs:
+            # self.citations is set by the throttle class. This is a performance
+            # enhancement to avoid parsing the citations twice, first in the
+            # throttle and then again here.
+            if not self.citation_list:
                 return Response([])
 
-            for idx, citation in enumerate(citation_objs):
+            for idx, citation in enumerate(self.citation_list):
 
                 start_index, end_index = citation.span()
                 citation_data = {

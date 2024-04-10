@@ -361,8 +361,8 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
 
         This helper method retrieves the number of citations from a request
         object. It first validates the data using the `validate_request_data`
-        method. If valid, it extracts the citations list and it returns the
-        number of citations in the list.
+        method. If valid, it extracts the citations list, stores it in the
+        view instance and it returns the number of citations in the list.
 
         Returns:
             int: The number of citations as an integer.
@@ -379,6 +379,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         citation_objs = filter_out_non_case_law_and_non_valid_citations(
             eyecite.get_citations(text)
         )
+        view.citation_list = citation_objs
         return len(citation_objs)
 
     def get_cache_key_for_citations(self, request, view):
