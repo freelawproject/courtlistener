@@ -392,7 +392,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         Checks the settings for a custom citations API rate limit.
 
         If the authenticated user has a custom rate limit set in the settings,
-        it parses that value. Otherwise, it parses the default rate limit.
+        it returns that value. Otherwise, it returns the default rate limit.
 
         Args:
             request: The request object with the user's data.
@@ -401,10 +401,12 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         custom_rate = settings.REST_FRAMEWORK[
             "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
         ].get(request.user.username, None)
-        return self.parse_rate(custom_rate or default_rate)
+        return custom_rate or default_rate
 
     def throttle_request_by_citation_count(self, request, view):
-        max_num_citations, _ = self.get_citations_rate(request)
+        max_num_citations, _ = self.parse_rate(
+            self.get_citations_rate(request)
+        )
 
         self.key = self.get_cache_key_for_citations(request, view)
         self.history = self.cache.get(self.key, [])
@@ -433,7 +435,9 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         if not citation_count:
             return
 
-        max_num_citations, duration = self.get_citations_rate(request)
+        max_num_citations, duration = self.parse_rate(
+            self.get_citations_rate(request)
+        )
         expiration = (
             citation_count * (max_num_citations / duration)
             if citation_count > max_num_citations
@@ -471,7 +475,8 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
         Raises:
             Throttled: The exception includes details about the throttling.
         """
-        max_num_citations, _ = self.get_citations_rate(request)
+        rate = self.get_citations_rate(request)
+        max_num_citations, _ = self.parse_rate(rate)
         soonest_time = None
         for idx in reversed(range(len(self.history))):
             remaining_citation = sum(
