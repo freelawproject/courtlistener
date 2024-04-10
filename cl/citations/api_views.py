@@ -68,7 +68,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                         {
                             **citation_data,
                             "status": HTTPStatus.TOO_MANY_REQUESTS,
-                            "error_message": "Too many requests.",
+                            "error_message": "Too many citations requested.",
                         }
                     )
                     break

@@ -2214,7 +2214,9 @@ class CitationLookUpApiTest(
         last_citation = data[-1]
         self.assertEqual(last_citation["citation"], "139 U.S. 601")
         self.assertEqual(last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS)
-        self.assertEqual(last_citation["error_message"], "Too many requests.")
+        self.assertEqual(
+            last_citation["error_message"], "Too many citations requested."
+        )
 
     @patch(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
