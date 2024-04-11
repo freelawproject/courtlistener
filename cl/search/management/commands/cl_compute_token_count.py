@@ -4,7 +4,7 @@ import tiktoken
 from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand
-from cl.search.models import RECAPDocument
+from cl.search.models import Opinion, RECAPDocument
 
 
 def get_recap_random_dataset(
@@ -27,6 +27,25 @@ def get_recap_random_dataset(
     """
     return RECAPDocument.objects.raw(
         f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
+    )
+
+
+def get_opinions_random_dataset(
+    percentage: float = 0.1,
+) -> QuerySet[Opinion]:
+    """
+    Creates a queryset that retrieves a random sample of Opinions from the
+    database.
+
+    Args:
+        percentage (float): A floating-point value between 0 and 100(inclusive)
+         representing the percentage of documents to sample. Defaults to 0.1.
+
+    Returns:
+        A Django QuerySet containing a random sample of Opinion objects.
+    """
+    return Opinion.objects.raw(
+        f"SELECT * FROM search_opinion TABLESAMPLE SYSTEM ({percentage}) "
     )
 
 
@@ -92,7 +111,7 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         percentage = options["percentage"]
-        rd_queryset = get_recap_random_data(percentage)
+        rd_queryset = get_recap_random_dataset(percentage)
 
         token_count = []
         tokens_per_page = []
