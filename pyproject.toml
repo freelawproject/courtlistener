@@ -110,6 +110,7 @@ httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.3.1"
 django-permissions-policy = "^4.19.0"
 juriscraper = "^2.6.0"
+tiktoken = "^0.6.0"
 
 
 [tool.poetry.group.dev.dependencies]
