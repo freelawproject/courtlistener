@@ -32,7 +32,7 @@
   <div class="col-xs-12 col-md-8 col-lg-6">
     <h1>Data Coverage &mdash; What's in CourtListener?</h1>
     <p class="lead">CourtListener is a vast searchable collection of legal information.</p>
-    <p>We have millions of case law records including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, we have tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and we have <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
+    <p>We have millions of case law records including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
     </p>
     <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), case law, oral argument recordings, or financial disclosures.
     </p>
@@ -40,62 +40,13 @@
 
     <hr>
     <h2 id="recap-archive">PACER Data (The RECAP Archive)</h2>
-    <p>Broadly speaking, the <a href="{% url "advanced_r" %}">RECAP Archive</a> consists of dockets, docket entries, documents, parties, and attorneys. Our goal with the RECAP Archive is to collect any PACER data that we can so that we can share it as widely as possible.
+    <p>The RECAP Archive is the biggest open collection of federal court data on the Internet. It contains hundreds of millions of docket entries, nearly every federal case, and millions of documents. It grows by thousands of documents each day. See our page on this topic for more details.
     </p>
-    <p>This content is sourced in a variety of ways:</p>
-    <ol>
-      <li>
-        <p><strong>RECAP Extensions:</strong> One of the most important sources of PACER data are the <a href="https://free.law/recap/">RECAP Extensions</a>. The RECAP Extensions are simple tools for Firefox, Chrome and Safari that send us copies of documents and dockets that you purchase on PACER, as you use PACER. Since 2009, users of the RECAP extensions have contributed millions of documents from PACER to the RECAP Archive.
-        </p>
-        <p>RECAP is used by many journalists, and as a result, these documents tend to be some of the most newsworthy in the country. If you use PACER, <a href="https://free.law/recap/">install the RECAP Extension</a> to save money and contribute to the RECAP Archive.
-        </p>
-      </li>
-      <li>
-        <p><strong>@recap.email system:</strong> People that receive notification emails from PACER can use the <a href="{% url "recap_email_help" %}">@recap.email system</a> to add documents to the RECAP Archive. Each time they get a notification from PACER, we get it too, and we use it to add content to the RECAP Archive.
-        </p>
-      </li>
-      <li><p><strong>Special Case Scrapers:</strong> Special cases get additional monitoring via a system of scrapers that regularly gathers data from PACER. Examples of "special" cases are those that have active <a href="{% url "alert_help" %}#recap-alerts">RECAP Alerts for PACER</a>, are saved in <a href="{% url "tag_notes_help" %}#notes">notes</a>, or are otherwise popular or important.
-      </p></li>
-      <li><p><strong>Our PACER Scraping Tools:</strong> We host <a href="https://free.law/2019/11/05/pacer-fetch-api/">free APIs that many organizations use to gather cases and documents from PACER</a>. Every day, many organizations rely on these automated tools to add innumerable cases and documents to our system.</p></li>
-      <li>
-        <p><strong>Client Work:</strong> One way <a href="https://free.law">Free Law Project</a>, the non-profit sponsoring CourtListener and RECAP, remains sustainable is by doing bulk PACER downloads for organizations. In these arrangements, <a href="https://free.law/data-consulting/">we work with clients</a> to purchase thousands of dollars worth of PACER content, all of which we add to the RECAP Archive.
-        </p>
-        <p>Aside from the client engagements noted below, we cannot share the details of client engagements:</p>
-        <p>
-          <ol>
-            <li><strong>Broad Data</strong> — In early 2023, we added short descriptions and basic metadata for about 150M documents in the PACER system. This data was drawn from over three million PACER RSS feeds gathered and contributed by <a href="https://www.trollerbk.com/">Troller BK</a> in support of our mission.</li>
-            <li><strong>Broad Data</strong> — In early 2021, we scraped basic metadata from every unsealed bankruptcy, civil, and criminal case in the PACER system. This data, gathered on behalf of a major media organization, spans about 60M cases, and includes the case name, date filed, date terminated, and judge.</li>
-            <li><strong>Broad Data</strong> — In May 2019, we downloaded nearly all civil district court dockets filed in from January 1, 2016 to November 9, 2018. Dockets with natures of suit related to civil rights, prisoner petitions or patent law were excluded.
-            </li>
-            <li><strong>Bankruptcy Data</strong> — In 2020, we worked with a researcher to gather $1.9M worth of content from the Southern District of Illinois Bankruptcy Court. For every case from 2007 to 2017, we downloaded the docket sheet, initial petition, and docket entries containing the word "final."
-            </li>
-            <li><strong>Fair Labor Standards Act Data (FLSA)</strong> — We worked with a start-up to create an extensive collection of labor-related dockets and initial complaints. The date range for this collection is from 2009 to 2017.</li>
-            <li><strong>Export Control</strong> — We have a large, random sample of dockets related to export-controlled technology collected on behalf of a major DoD policy oragnization.</li>
-            <li><strong>Invoices</strong> — We have a large collection of documents described by the word "invoice" that can be used for machine learning.</li>
-          </ol>
-        </p>
-        <p>Finally, we have some data sources that we have not yet merged into CourtListener. These can be treasure troves of data and are detailed on <a href="https://github.com/orgs/freelawproject/projects/16">our project board dedicated to the topic</a>.
-        </p>
-      </li>
-      <li><p><strong>PACER Judicial Opinion Scraper:</strong> When clerks upload documents to PACER, they must consider <a href="https://free.law/pacer-facts/#written-opinions-are-free-on-pacer-but-h">whether
-        those documents are official opinions or orders of the court</a>. If they are, the clerks are supposed to mark them as such, and those documents become free to download from PACER. Each night <a href="https://free.law/2017/08/15/we-have-all-free-pacer/">we download all documents that clerks mark in this way</a> from district and bankruptcy courts across the country.
-      </p></li>
-      <li><p><strong>PACER RSS Feeds:</strong> Most of federal district courts  provide RSS feeds listing their latest docket entries. We crawl these feeds on an ongoing basis to get the latest docket entries. This amounts to around 100,000 docket entries per day that we add to the RECAP Archive. Unfortunately, this only adds docket entries, not documents, party, or attorney information. For details on which courts are supported by RSS <a href="{% url "alert_help" %}#coverage-gaps">see the documentation on alerts</a>.
-      </p></li>
-      <li><p><strong>Social Media Bots:</strong> We host <a href="https://bots.law">a fleet of social media bots</a> that download important documents from PACER so they can be shared with the public. The bots use <a href="{% url "api_index" %}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.
-      </p></li>
-    </ol>
-    <p>The above sources account for a vast quantity and an ongoing supply of PACER information. There's no quick answer to "What's in RECAP?", but we hope that the above provides a working framework. Of course, if something is not in RECAP and you wish it were, you can always add it by using the RECAP Extensions. We hope you will.
-    </p>
-    <hr>
-
-    <h2 id="adding-updating">Adding or Updating PACER Data in Our System</h2>
-    <p>It is cost-prohibitive for us to have every court document or case. If you wish to add something to our collection, the best way is to install the RECAP extension and purchase the item yourself on PACER.
-    </p>
+    <p><a href="{% url "coverage_recap" %}" class="btn btn-default btn-lg">RECAP Archive Coverage</a></p>
     <hr>
 
     <h2 id="opinions">Case Law</h2>
-    <p id="opinion-chart">Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet. We have over nine million decisions from over 2000 courts. See our page on this topic for more details.</p>
+    <p>Courtlistener has one of the most comprehensive collections of American Legal Jurisprudence on the internet. We have over nine million decisions from over 2000 courts. See our page on this topic for more details.</p>
     <p><a href="{% url "coverage_opinions" %}" class="btn btn-default btn-lg">Case Law Coverage</a></p>
     <hr>
 
