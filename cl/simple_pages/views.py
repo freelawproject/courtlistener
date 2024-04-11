@@ -300,6 +300,7 @@ async def coverage_opinions(request: HttpRequest) -> HttpResponse:
         request, "help/coverage_opinions.html", coverage_data_op
     )
 
+
 async def coverage_recap(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
