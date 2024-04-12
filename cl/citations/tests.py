@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
+from django.core.cache import cache as default_cache
 from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
@@ -1756,6 +1757,9 @@ class CitationLookUpApiTest(
     async def setUp(self) -> None:
         await self.async_client.alogin(
             username="citation-user", password="password"
+        )
+        await default_cache.adelete_many(
+            ["citations_tests", "citation_throttle_test"]
         )
 
     async def test_can_handle_requests_with_no_citation_or_reporter(
