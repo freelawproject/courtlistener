@@ -181,6 +181,7 @@ class Command(VerboseCommand):
 
         opinion_queryset = get_opinions_random_dataset(percentage)
         self.stdout.write("Starting to retrieve the random Opinion dataset.")
+        token_count = []
         for opinion in opinion_queryset.iterator():
             text = get_clean_opinion_text(opinion)
             count = get_token_count_from_string(text)
