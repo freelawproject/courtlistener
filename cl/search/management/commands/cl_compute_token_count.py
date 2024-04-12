@@ -1,6 +1,8 @@
 from math import ceil
 
+import nh3
 import tiktoken
+from django.contrib.humanize.templatetags.humanize import intword
 from django.db.models import QuerySet
 
 from cl.lib.command_utils import VerboseCommand
@@ -125,11 +127,28 @@ class Command(VerboseCommand):
             words_per_page.append(ceil(word_count / document.page_count))
 
         self.stdout.write("Computing averages.")
+        sample_size = len(token_count)
         avg_tokens_per_doc = compute_avg_from_list(token_count)
         avg_words_per_page = compute_avg_from_list(words_per_page)
         avg_tokens_per_page = compute_avg_from_list(tokens_per_page)
 
-        self.stdout.write(f"Size of the dataset: {len(token_count)}")
+        self.stdout.write(
+            "Counting the total number of document in the Archive."
+        )
+        total_recap_documents = RECAPDocument.objects.all().count()
+        total_token_in_recap = avg_tokens_per_doc * total_recap_documents
+
+        self.stdout.write(f"Size of the dataset: {sample_size}")
         self.stdout.write(f"Average tokens per document: {avg_tokens_per_doc}")
         self.stdout.write(f"Average words per page: {avg_words_per_page}")
         self.stdout.write(f"Average tokens per page: {avg_tokens_per_page}")
+        self.stdout.write("-" * 20)
+        self.stdout.write(
+            f"Total number of recap documents: {total_recap_documents}"
+        )
+        self.stdout.write(
+            f"The sample represents {sample_size/total_recap_documents:.3%} of the Archive"
+        )
+        self.stdout.write(
+            f"Total number of tokens in the recap archive: {intword(total_token_in_recap)}"
+        )
