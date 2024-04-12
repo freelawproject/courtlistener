@@ -86,6 +86,52 @@ def get_token_count_from_string(string: str) -> int:
     return num_tokens
 
 
+def get_clean_opinion_text(opinion: Opinion) -> str:
+    """
+    Extracts and cleans the opinion text from a provided Opinion object.
+
+    This function attempts to retrieve the opinion text from various source
+    fields within the Opinion object, prioritizing HTML formats with citations
+    over plain text. The supported source fields are:
+
+        - html_with_citations (preferred)
+        - html_columbia
+        - html_lawbox
+        - xml_harvard
+        - html_anon_2020
+        - html
+
+    If no HTML text is found, the function falls back to the plain_text field.
+
+    The retrieved text is then cleaned using the `nh3.clean`. This cleaning
+    process removes all HTML tags while preserving the content.
+
+    Args:
+        opinion (Opinion): An object containing the opinion data.
+
+    Returns:
+        str: The cleaned opinion text without any HTML tags.
+    """
+    text = None
+    if opinion.html_with_citations:
+        text = opinion.html_with_citations
+    elif opinion.html_columbia:
+        text = opinion.html_columbia
+    elif opinion.html_lawbox:
+        text = opinion.html_lawbox
+    elif opinion.xml_harvard:
+        text = opinion.xml_harvard
+    elif opinion.html_anon_2020:
+        text = opinion.html_anon_2020
+    elif opinion.html:
+        text = opinion.html
+
+    if not text:
+        return opinion.plain_text
+
+    return nh3.clean(text, tags=set())
+
+
 def compute_avg_from_list(array: list[float]) -> float:
     """
     Computes the average of a list of numbers.
