@@ -2,7 +2,7 @@ import logging
 import re
 
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Q
 from eyecite.find import get_citations
 
 from cl.lib.command_utils import VerboseCommand
@@ -20,8 +20,8 @@ from cl.search.models import (
 def fetch_start_date(court: Court) -> str:
     """Fetch start date
 
-    :param court:
-    :return:
+    :param court: Court object
+    :return: the most recent date for this court
     """
     return (
         OpinionCluster.objects.filter(docket__court=court)
@@ -39,7 +39,7 @@ def identify_judge_string(description: str) -> str:
     pattern = r"(by) (Chief|Magistrate|District)? ?(Honorable|Judge)(.*?) on "
     n = re.search(pattern, description, re.IGNORECASE)
     if not n:
-        # No judge evident in description
+        # No judge found easily in description
         return ""
     first_pass = n.group(4)
     delimiters = [
@@ -66,6 +66,9 @@ def merge_recap_into_caselaw(
 ) -> None:
     """Merge Recap documents into Case Law DB
 
+    :param first_docket_id: A docket id to begin with if requestsed
+    :param min_date_str: Minimum date string to ingest opinions
+    :param max_date_str: Maximum date string to ingest opinions
     :return: None
     """
     if first_docket_id != None:
@@ -75,7 +78,7 @@ def merge_recap_into_caselaw(
     else:
         start = True
 
-    for court in Court.objects.filter(jurisdiction="FD"):
+    for court in Court.objects.filter(Q(jurisdiction="FD") & ~Q(id="dcd")):
         if start == False:
             if court.id != starting_court.id:
                 continue
@@ -107,15 +110,13 @@ def merge_recap_into_caselaw(
             for rd in rds:
                 if rd.docket_entry.date_filed <= latest_date_filed:
                     # Exclude documents entered before our date
-                    # Its not ideal but the queries were killing my system and this
-                    # works relatively well enough
                     continue
                 if Opinion.objects.filter(sha1=rd.sha1).exists():
                     logging.warning(
                         f"Skipping document: {rd} as previously processed"
                     )
                     continue
-                # Lets test our document for citations - now that we know its an opinion
+                # Check for citations - now that we know its an opinion
                 citations = get_citations(rd.plain_text)
                 if len(citations) == 0:
                     # if no citations are found simply skip it.
@@ -157,7 +158,7 @@ def merge_recap_into_caselaw(
                             f"New op {opinion.id}, cluster: {cluster.id} for docket {docket.id}"
                         )
                 except ValueError as e:
-                    logging.warning(f"Error saving transaction {str(e)}")
+                    logging.warning(f"Error saving new opinion {str(e)}")
 
 
 class Command(VerboseCommand):
