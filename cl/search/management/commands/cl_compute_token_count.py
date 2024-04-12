@@ -198,3 +198,33 @@ class Command(VerboseCommand):
         self.stdout.write(
             f"Total number of tokens in the recap archive: {intword(total_token_in_recap)}"
         )
+
+        opinion_queryset = get_opinions_random_dataset(percentage)
+        self.stdout.write("Starting to retrieve the random Opinion dataset.")
+        for opinion in opinion_queryset.iterator():
+            text = get_clean_opinion_text(opinion)
+            count = get_token_count_from_string(text)
+            token_count.append(count)
+
+        self.stdout.write("Computing averages.")
+        sample_size = len(token_count)
+        avg_tokens_per_opinion = compute_avg_from_list(token_count)
+
+        self.stdout.write(
+            "Counting the total number of Opinions in the Archive."
+        )
+        total_opinions = Opinion.objects.all().count()
+        total_token_in_caselaw = avg_tokens_per_opinion * total_opinions
+
+        self.stdout.write(f"Size of the dataset: {len(token_count)}")
+        self.stdout.write(
+            f"Average tokens per opinion: {avg_tokens_per_opinion}"
+        )
+        self.stdout.write("-" * 20)
+        self.stdout.write(f"Total number of opinions: {total_opinions}")
+        self.stdout.write(
+            f"The sample represents {sample_size/total_opinions:.3%} of the Caselaw"
+        )
+        self.stdout.write(
+            f"Total number of tokens in caselaw: {intword(total_token_in_caselaw)}"
+        )
