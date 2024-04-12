@@ -28,7 +28,10 @@ def get_recap_random_dataset(
         A Django QuerySet containing a random sample of RECAPDocument objects.
     """
     return RECAPDocument.objects.raw(
-        f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
+        (
+            f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
+            "where is_available= True and plain_text <> '' and page_count is not null"
+        )
     )
 
 
@@ -49,34 +52,6 @@ def get_opinions_random_dataset(
     return Opinion.objects.raw(
         f"SELECT * FROM search_opinion TABLESAMPLE SYSTEM ({percentage}) "
     )
-
-
-def clean_recap_random_set(data: QuerySet[RECAPDocument]):
-    """
-    Filters a queryset of RECAPDocuments and yields only documents that meet
-    specific criteria.
-
-    This function iterates through the provided queryset and checks each
-    document for the presence of the required fields. If all conditions are
-    met, the document is yielded, making it available for further processing.
-    Documents missing any of the criteria are excluded.
-
-    Args:
-        data: A Django QuerySet containing RECAPDocuments.
-
-    Yields:
-        RECAPDocument objects that meet the following criteria:
-            - is_available: The document is marked as available.
-            - plain_text: The document contains plain text content.
-            - page_count: The document has a valid page count.
-    """
-    for document in data.iterator():
-        if (
-            document.is_available
-            and document.plain_text
-            and document.page_count
-        ):
-            yield document
 
 
 def get_token_count_from_string(string: str) -> int:
@@ -165,7 +140,7 @@ class Command(VerboseCommand):
         tokens_per_page = []
         words_per_page = []
         self.stdout.write("Starting to retrieve the random RECAP dataset.")
-        for document in clean_recap_random_set(rd_queryset):
+        for document in rd_queryset.iterator():
             count = get_token_count_from_string(document.plain_text)
             token_count.append(count)
             tokens_per_page.append(count / document.page_count)
