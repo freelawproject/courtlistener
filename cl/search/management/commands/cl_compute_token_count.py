@@ -182,14 +182,17 @@ class Command(VerboseCommand):
         opinion_queryset = get_opinions_random_dataset(percentage)
         self.stdout.write("Starting to retrieve the random Opinion dataset.")
         token_count = []
+        words_per_opinion = []
         for opinion in opinion_queryset.iterator():
             text = get_clean_opinion_text(opinion)
             count = get_token_count_from_string(text)
+            words_per_opinion.append(len(text.split()))
             token_count.append(count)
 
         self.stdout.write("Computing averages.")
         sample_size = len(token_count)
         avg_tokens_per_opinion = compute_avg_from_list(token_count)
+        avg_words_per_opinion = compute_avg_from_list(words_per_opinion)
 
         self.stdout.write(
             "Counting the total number of Opinions in the Archive."
@@ -200,6 +203,9 @@ class Command(VerboseCommand):
         self.stdout.write(f"Size of the dataset: {len(token_count)}")
         self.stdout.write(
             f"Average tokens per opinion: {avg_tokens_per_opinion}"
+        )
+        self.stdout.write(
+            f"Average words per opinion: {avg_words_per_opinion}"
         )
         self.stdout.write("-" * 20)
         self.stdout.write(f"Total number of opinions: {total_opinions}")
