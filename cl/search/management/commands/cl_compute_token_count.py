@@ -154,9 +154,14 @@ class Command(VerboseCommand):
         avg_tokens_per_page = compute_avg_from_list(tokens_per_page)
 
         self.stdout.write(
-            "Counting the total number of document in the Archive."
+            "Counting the total number of documents in the Archive."
         )
-        total_recap_documents = RECAPDocument.objects.all().count()
+        total_recap_documents = (
+            RECAPDocument.objects.filter(is_available=True)
+            .exclude(plain_text__exact="")
+            .all()
+            .count()
+        )
         total_token_in_recap = avg_tokens_per_doc * total_recap_documents
 
         self.stdout.write(f"Size of the dataset: {sample_size}")
