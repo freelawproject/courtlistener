@@ -1126,13 +1126,13 @@ files = [
 
 [[package]]
 name = "django-ses"
-version = "3.5.2"
+version = "3.6.0"
 description = "A Django email backend for Amazon's Simple Email Service (SES)"
 optional = false
-python-versions = ">=3.8,<4.0"
+python-versions = "<4.0,>=3.8"
 files = [
-    {file = "django_ses-3.5.2-py3-none-any.whl", hash = "sha256:90c68cc6ca3467893faa8499981c81ba8ff2bd3f3acb08c06423a4142d6a0fc6"},
-    {file = "django_ses-3.5.2.tar.gz", hash = "sha256:b6d94689bc15de02a11e84f05a5bf4a7895688e570c6f07c21698094debc6ced"},
+    {file = "django_ses-3.6.0-py3-none-any.whl", hash = "sha256:f3f69b97444fdbda41946c7349c63e1a0ea8284d9e9acd6f4b5cb3dba5030829"},
+    {file = "django_ses-3.6.0.tar.gz", hash = "sha256:ea08bea9e1aab71f9fbf43b30733a27eff76cea3797b7ebeab9f6bc5d3df6b37"},
 ]
 
 [package.dependencies]
