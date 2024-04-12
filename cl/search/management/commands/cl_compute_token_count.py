@@ -30,7 +30,7 @@ def get_recap_random_dataset(
     return RECAPDocument.objects.raw(
         (
             f"SELECT * FROM search_recapdocument TABLESAMPLE SYSTEM ({percentage}) "
-            "where is_available= True and plain_text <> '' and page_count is not null"
+            "where is_available= True and plain_text <> '' and page_count > 0"
         )
     )
 
