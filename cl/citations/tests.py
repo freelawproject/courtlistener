@@ -2241,14 +2241,14 @@ class CitationLookUpApiTest(
         "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
         return_value="20/m",
     )
-    async def test_can_rate_limit_user_based_on_citation_count(
+    async def test_can_throttle_user_when_querying_exact_rate_limit(
         self, get_rate_mock, throttle_logic_mock
     ) -> None:
         throttle_logic_mock.return_value = "citation_throttle_test"
         # Throttle users for 1 minute if they query for the exact number of
         # citations allowed by the rate limit.
         test_date = datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc)
-        with time_machine.travel(test_date, tick=False):
+        with time_machine.travel(test_date, tick=False) as traveler:
             ten_citations = "56 F.2d 9, " * 10
             r = await self.async_client.post(
                 reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2259,6 +2259,7 @@ class CitationLookUpApiTest(
             self.assertEqual(len(data), 10)
 
             # Ten more citations, This request should be allowed
+            traveler.shift(timedelta(seconds=5))
             r = await self.async_client.post(
                 reverse("citation-lookup-list", kwargs={"version": "v3"}),
                 {"text": ten_citations},
@@ -2271,6 +2272,7 @@ class CitationLookUpApiTest(
             # User has reached the maximum number of citations allowed by the
             # rate limit. Access will be restored one minute after the first
             # request.
+            traveler.shift(timedelta(seconds=10))
             r = await self.async_client.post(
                 reverse("citation-lookup-list", kwargs={"version": "v3"}),
                 {"text": ten_citations},
@@ -2281,9 +2283,16 @@ class CitationLookUpApiTest(
             expected_time = test_date + timedelta(minutes=1)
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
-        # Throttle users exceeding the citation limit by a small number.
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value="20/m",
+    )
+    async def test_can_throttle_user_exceeding_citation_limit_by_small_number(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
         test_date = datetime(1970, 1, 1, 0, 1, tzinfo=timezone.utc)
-        with time_machine.travel(test_date, tick=False):
+        with time_machine.travel(test_date, tick=False) as traveler:
             fifteen_citations = "56 F.2d 9, " * 15
             r = await self.async_client.post(
                 reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2295,6 +2304,7 @@ class CitationLookUpApiTest(
 
             # fifteen more citations, This request should be allowed but the user
             # will be throttle after making this request.
+            traveler.shift(timedelta(seconds=5))
             r = await self.async_client.post(
                 reverse("citation-lookup-list", kwargs={"version": "v3"}),
                 {"text": fifteen_citations},
@@ -2309,6 +2319,7 @@ class CitationLookUpApiTest(
             # history. The first request(oldest one) added 15 citations to
             # the cache, once this request is expire the user should be allowed
             # to use the API again.
+            traveler.shift(timedelta(seconds=5))
             r = await self.async_client.post(
                 reverse("citation-lookup-list", kwargs={"version": "v3"}),
                 {"text": fifteen_citations},
@@ -2319,7 +2330,7 @@ class CitationLookUpApiTest(
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
         test_date = datetime(1970, 1, 1, 0, 2, tzinfo=timezone.utc)
-        with time_machine.travel(test_date, tick=False) as traveller:
+        with time_machine.travel(test_date, tick=False) as traveler:
             fifteen_citations = "56 F.2d 9, " * 15
             r = await self.async_client.post(
                 reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2332,7 +2343,7 @@ class CitationLookUpApiTest(
             # twenty more citations, ten seconds after the first one. This
             # request should be allowed but the user will be throttle after
             # making this request.
-            traveller.shift(timedelta(seconds=10))
+            traveler.shift(timedelta(seconds=15))
             twenty_citations = "56 F.2d 9, " * 20
             r = await self.async_client.post(
                 reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -2356,10 +2367,18 @@ class CitationLookUpApiTest(
             self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
             data = json.loads(r.content)
             expected_time = (
-                test_date + timedelta(minutes=1) + timedelta(seconds=10)
+                test_date + timedelta(minutes=1) + timedelta(seconds=15)
             )
             self.assertEqual(data["wait_until"], expected_time.isoformat())
 
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value="20/m",
+    )
+    async def test_can_throttle_user_exceeding_citation_limit_by_big_margin(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
         # throttle users that exceeds the max number of citations by a
         # significant margin.
         test_date = datetime(1970, 1, 1, 4, 0, tzinfo=timezone.utc)
