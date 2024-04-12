@@ -488,6 +488,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
                     self.history[idx][-1], timezone.utc
                 )
                 soonest_time = datetime_obj.isoformat()
+                break
 
         raise Throttled(
             detail={
