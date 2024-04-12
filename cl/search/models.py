@@ -119,6 +119,7 @@ class SOURCES:
     COLUMBIA_M_MANUAL_INPUT_M_HARVARD = "ZMU"
     COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
+    RECAP = "P"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -218,6 +219,10 @@ class SOURCES:
         (
             COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             "columbia archive merged with lawbox, court website and Harvard",
+        ),
+        (
+            RECAP,
+            "recap",
         ),
     )
 
@@ -3272,6 +3277,7 @@ class Opinion(AbstractDateTimeModel):
     REHEARING = "070rehearing"
     ON_THE_MERITS = "080onthemerits"
     ON_MOTION_TO_STRIKE = "090onmotiontostrike"
+    TRIAL_COURT = "100trialcourt"
     OPINION_TYPES = (
         (COMBINED, "Combined Opinion"),
         (UNANIMOUS, "Unanimous Opinion"),
@@ -3285,6 +3291,7 @@ class Opinion(AbstractDateTimeModel):
         (REHEARING, "Rehearing"),
         (ON_THE_MERITS, "On the Merits"),
         (ON_MOTION_TO_STRIKE, "On Motion to Strike Cost Bill"),
+        (TRIAL_COURT, "Trial Court"),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
