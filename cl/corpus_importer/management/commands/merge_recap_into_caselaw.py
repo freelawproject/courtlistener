@@ -92,6 +92,10 @@ def merge_recap_into_caselaw(
         logging.warning(f"Starting court: {court.id}")
         # lets iterate over every docket from recap
         for docket in Docket.objects.filter(court=court, source=9).iterator():
+            if "cr" in docket.docket_number:
+                # Exclude criminal cases
+                # Need to reprocess criminal cases
+                continue
             if start == False:
                 if docket.id != first_docket_id:
                     continue
