@@ -124,10 +124,10 @@ class ProcessingQueue(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
-    document_number = models.BigIntegerField(
+    document_number = models.CharField(
         help_text="The docket entry number for the document.",
+        max_length=32,
         blank=True,
-        null=True,
     )
     attachment_number = models.SmallIntegerField(
         help_text="If the file is an attachment, the number is the attachment "
