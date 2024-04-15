@@ -168,7 +168,7 @@ def merge_recap_into_caselaw(skip_until: int) -> None:
                 citations = get_citations(rd.plain_text)
                 if len(citations) == 0:
                     logging.warning(
-                        f"Skipping opinion: {opinion.id}, for cluster: {cluster.id} on docket: {docket.id} without citations"
+                        f"Skip rd: {rd.id} on docket: {docket.id} without cite"
                     )
                     continue
 
