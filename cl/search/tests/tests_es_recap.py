@@ -5,18 +5,24 @@ import unittest
 from http import HTTPStatus
 from unittest import mock
 
+import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 
 from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import IndexedSolrTestCase, RECAPSearchTestCase
+from cl.lib.test_helpers import (
+    IndexedSolrTestCase,
+    RECAPSearchTestCase,
+    recap_search_v4_api_keys,
+)
 from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
     AttorneyFactory,
@@ -89,24 +95,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             got,
             expected_count,
             msg="Did not get the right number of search results in Frontend with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
-        )
-        return r
-
-    async def _test_api_results_count(
-        self, params, expected_count, field_name
-    ):
-        r = await self.async_client.get(
-            reverse("search-list", kwargs={"version": "v3"}), params
-        )
-        got = len(r.data["results"])
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of search results in API with %s "
             "filter applied.\n"
             "Expected: %s\n"
             "     Got: %s\n\n"
@@ -2131,23 +2119,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             await docket.adelete()
 
 
-class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
-    """
-    RECAP Search API V3 Tests
-    """
+class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
-    tests_running_over_solr = True
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-    def setUp(self) -> None:
-        add_docket_to_solr_by_rds(
-            [self.rd.pk, self.rd_att.pk], force_commit=True
-        )
-        add_docket_to_solr_by_rds([self.rd_2.pk], force_commit=True)
-        super().setUp()
+    version_api = "v3"
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -2181,8 +2155,9 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         """Confirm court filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "court": "canb"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "court")
+        # Double the results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(params, expected_results, "court")
 
     async def test_document_description_filter(self) -> None:
         """Confirm description filter works properly"""
@@ -2190,29 +2165,37 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
             "type": SEARCH_TYPES.RECAP,
             "description": "MOTION for Leave to File Amicus Curiae Lorem",
         }
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "description")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "description"
+        )
 
     async def test_docket_number_filter(self) -> None:
         """Confirm docket_number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "docket_number")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "docket_number"
+        )
 
     async def test_attachment_number_filter(self) -> None:
         """Confirm attachment number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "attachment_number": 2}
 
-        # API
         await self._test_api_results_count(params, 1, "attachment_number")
 
     async def test_assigned_to_judge_filter(self) -> None:
         """Confirm assigned_to filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "assigned_to": "Thalassa Miller"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "assigned_to")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "assigned_to"
+        )
 
     async def test_referred_to_judge_filter(self) -> None:
         """Confirm referred_to_judge filter works properly"""
@@ -2221,35 +2204,42 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
             "referred_to": "Persephone Sinclair",
         }
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "referred_to")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "referred_to"
+        )
 
     async def test_nature_of_suit_filter(self) -> None:
         """Confirm nature_of_suit filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "nature_of_suit": "440"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "nature_of_suit")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "nature_of_suit"
+        )
 
     async def test_filed_after_filter(self) -> None:
         """Confirm filed_after filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "filed_after": "2016-08-16"}
 
-        # API
         await self._test_api_results_count(params, 1, "filed_after")
 
     async def test_filed_before_filter(self) -> None:
         """Confirm filed_before filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "filed_before": "2015-08-17"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "filed_before")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "filed_before"
+        )
 
     async def test_document_number_filter(self) -> None:
         """Confirm document number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "document_number": "3"}
 
-        # API
         await self._test_api_results_count(params, 1, "document_number")
 
     async def test_available_only_field(self) -> None:
@@ -2259,38 +2249,16 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         # API
         await self._test_api_results_count(params, 1, "available_only")
 
-    @unittest.skipIf(
-        tests_running_over_solr,
-        "Skip in SOlR due to we stopped indexing parties",
-    )
-    async def test_party_name_filter(self) -> None:
-        """Confirm party_name filter works properly"""
-        params = {
-            "type": SEARCH_TYPES.RECAP,
-            "party_name": "Defendant Jane Roe",
-        }
-
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "party_name")
-
-    @unittest.skipIf(
-        tests_running_over_solr,
-        "Skip in SOlR due to we stopped indexing parties",
-    )
-    async def test_atty_name_filter(self) -> None:
-        """Confirm atty_name filter works properly"""
-        params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
-
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "atty_name")
-
     async def test_combine_filters(self) -> None:
         """Confirm that combining filters works properly"""
         # Get results for a broad filter
         params = {"type": SEARCH_TYPES.RECAP, "case_name": "SUBPOENAS SERVED"}
 
-        # API, 3 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 3, "case_name")
+        # More results expected in v3 since the results are not grouped.
+        expected_results = 3 if self.version_api == "v3" else 2
+        await self._test_api_results_count(
+            params, expected_results, "case_name"
+        )
 
         # Constraint results by adding document number filter.
         params["docket_number"] = "12-1235"
@@ -2318,6 +2286,81 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         }
         # API
         await self._test_api_results_count(params, 1, "filter + text query")
+
+    async def test_text_queries(self) -> None:
+        """Confirm text queries works properly"""
+        # Text query case name.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "SUBPOENAS SERVED OFF"}
+        # API
+        await self._test_api_results_count(params, 1, "text query case name")
+
+        # Text query description.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Amicus Curiae Lorem"}
+
+        # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "text query description"
+        )
+
+        # Text query text.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "PACER Document Franklin"}
+
+        # API
+        await self._test_api_results_count(params, 1, "text query text")
+
+        # Text query text judge.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
+
+        # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "text query judge"
+        )
+
+
+class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
+    """
+    RECAP Search API V3 Tests
+    """
+
+    tests_running_over_solr = True
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+    def setUp(self) -> None:
+        add_docket_to_solr_by_rds(
+            [self.rd.pk, self.rd_att.pk], force_commit=True
+        )
+        add_docket_to_solr_by_rds([self.rd_2.pk], force_commit=True)
+        super().setUp()
+
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
+    async def test_party_name_filter(self) -> None:
+        """Confirm party_name filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Defendant Jane Roe",
+        }
+
+        # API, 2 result expected since RECAPDocuments are not grouped.
+        await self._test_api_results_count(params, 2, "party_name")
+
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
+    async def test_atty_name_filter(self) -> None:
+        """Confirm atty_name filter works properly"""
+        params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
+
+        # API, 2 result expected since RECAPDocuments are not grouped.
+        await self._test_api_results_count(params, 2, "atty_name")
 
     async def test_docket_child_documents(self) -> None:
         """Confirm results contain the right number of child documents"""
@@ -2410,31 +2453,6 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         await self._test_api_results_count(
             params, 2, '"SUBPOENAS SERVED" NOT "OFF"'
         )
-
-    async def test_text_queries(self) -> None:
-        """Confirm text queries works properly"""
-        # Text query case name.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "SUBPOENAS SERVED OFF"}
-        # API
-        await self._test_api_results_count(params, 1, "text query case name")
-
-        # Text query description.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "Amicus Curiae Lorem"}
-
-        # API
-        await self._test_api_results_count(params, 2, "text query description")
-
-        # Text query text.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "PACER Document Franklin"}
-
-        # API
-        await self._test_api_results_count(params, 1, "text query text")
-
-        # Text query text judge.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
-
-        # API
-        await self._test_api_results_count(params, 2, "text query judge")
 
     async def test_results_api_fields(self) -> None:
         """Confirm fields in RECAP Search API results."""
@@ -2582,6 +2600,267 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by asc.",
         )
+
+
+class RECAPSearchAPIV4Test(
+    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase
+):
+    """
+    RECAP Search API V4 Tests
+    """
+
+    version_api = "v4"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        cls.rebuild_index("search.Docket")
+        super().setUpTestData()
+
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            cls.judge_api = PersonFactory.create(
+                name_first="George", name_last="Doe", name_suffix="2"
+            )
+            cls.court_api = CourtFactory(
+                id="ca9", jurisdiction="F", citation_string="Appeals. CA9."
+            )
+            cls.de_api = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=cls.court_api,
+                    case_name="America vs API Lorem",
+                    case_name_full="America vs API Lorem vs. Bank",
+                    date_filed=datetime.date(2016, 4, 16),
+                    date_argued=datetime.date(2022, 5, 20),
+                    date_reargued=datetime.date(2023, 5, 21),
+                    date_terminated=datetime.date(2023, 7, 21),
+                    docket_number="1:24-bk-0000",
+                    assigned_to=cls.judge_api,
+                    referred_to=cls.judge_api,
+                    nature_of_suit="569",
+                    source=Docket.RECAP,
+                    cause="401 Civil",
+                    jury_demand="Plaintiff",
+                    jurisdiction_type="U.S. Government Defendant",
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2020, 8, 19),
+                description="MOTION for Leave Lorem vs America",
+            )
+            cls.firm_api = AttorneyOrganizationFactory(
+                name="Associates America", lookup_key="firm_api"
+            )
+            cls.attorney_api = AttorneyFactory(
+                name="John Doe",
+                organizations=[cls.firm_api],
+                docket=cls.de_api.docket,
+            )
+            cls.party_type = PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Defendant John Doe",
+                    docket=cls.de_api.docket,
+                    attorneys=[cls.attorney_api],
+                ),
+                docket=cls.de_api.docket,
+            )
+            cls.rd_api = RECAPDocumentFactory(
+                docket_entry=cls.de_api,
+                description="Order Letter",
+                document_number="2",
+                is_available=False,
+                page_count=100,
+                pacer_doc_id="019036000435",
+                plain_text="This a plain text to be shown in the API",
+            )
+            OpinionsCitedByRECAPDocument.objects.create(
+                citing_document=cls.rd_api,
+                cited_opinion=cls.opinion,
+                depth=1,
+            )
+            BankruptcyInformationFactory(docket=cls.de_api.docket)
+
+            cls.de_empty_fields_api = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=cls.court_api,
+                    date_reargued=None,
+                    source=Docket.RECAP,
+                ),
+                description="",
+            )
+            cls.rd_empty_fields_api = RECAPDocumentFactory(
+                docket_entry=cls.de_empty_fields_api,
+                description="",
+                pacer_doc_id="",
+            )
+
+            cls.empty_docket_api = DocketFactory(
+                court=cls.court_api,
+                date_argued=None,
+                source=Docket.RECAP,
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
+            # Index parties in ES.
+            index_docket_parties_in_es.delay(cls.de_api.docket.pk)
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in API with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    async def _test_api_fields_content(self, api_response, content_to_compare):
+        for (
+            field,
+            get_expected_value,
+        ) in recap_search_v4_api_keys.items():
+            with self.subTest(field=field):
+                actual_value = api_response.data["results"][0].get(field)
+                if field == "recap_documents":
+                    for child_field, child_value in actual_value[0].items():
+                        with self.subTest(child_field=child_field):
+                            get_child_expected_value = (
+                                recap_search_v4_api_keys.get(field)[0].get(
+                                    child_field
+                                )
+                            )
+                            child_expected_value = await sync_to_async(
+                                get_child_expected_value
+                            )(content_to_compare)
+                            self.assertEqual(
+                                child_value,
+                                child_expected_value,
+                                f"Child field '{field}' does not match.",
+                            )
+                else:
+                    expected_value = await sync_to_async(get_expected_value)(
+                        content_to_compare
+                    )
+                    self.assertEqual(
+                        actual_value,
+                        expected_value,
+                        f"Parent field '{field}' does not match.",
+                    )
+
+    async def test_case_name_filter(self) -> None:
+        """Confirm case_name filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "SUBPOENAS SERVED OFF",
+        }
+        # API, 2 result expected since RECAPDocuments are not grouped.
+        await self._test_api_results_count(params, 1, "case_name")
+
+    async def test_results_api_fields(self) -> None:
+        """Confirm fields in V4 RECAP Search API results."""
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_api.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(recap_search_v4_api_keys))
+        rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
+        self.assertEqual(
+            rd_keys_count, len(recap_search_v4_api_keys["recap_documents"][0])
+        )
+        content_to_compare = {"result": self.rd_api}
+        await self._test_api_fields_content(r, content_to_compare)
+
+    async def test_results_api_empty_fields(self) -> None:
+        """Confirm empty fields values in V4 RECAP Search API results."""
+
+        # Confirm expected values for empty fields.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_empty_fields_api.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(recap_search_v4_api_keys))
+        rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
+        self.assertEqual(
+            rd_keys_count, len(recap_search_v4_api_keys["recap_documents"][0])
+        )
+        content_to_compare = {"result": self.rd_empty_fields_api}
+        await self._test_api_fields_content(r, content_to_compare)
+
+        # Query a docket with no filings.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"docket_id:{self.empty_docket_api.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(recap_search_v4_api_keys))
+        recap_documents = r.data["results"][0].get("recap_documents")
+        self.assertEqual(recap_documents, [])
+
+    async def test_results_api_highlighted_fields(self) -> None:
+        """Confirm highlighted fields in V4 RECAP Search API results."""
+        # API HL disabled.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_api.pk} cause:(401 Civil) court_citation_string:Appeals juryDemand:Plaintiff short_description:(Order Letter) plain_text:(shown in the API)",
+            "assigned_to": "George",
+            "referred_to": "George",
+            "case_name": "America vs API",
+            "docket_number": "1:24-bk-0000",
+            "nature_of_suit": "569",
+            "description": "MOTION for Leave",
+        }
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(recap_search_v4_api_keys))
+        rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
+        self.assertEqual(
+            rd_keys_count, len(recap_search_v4_api_keys["recap_documents"][0])
+        )
+        content_to_compare = {
+            "result": self.rd_api,
+        }
+        await self._test_api_fields_content(r, content_to_compare)
+
+        # API HL enabled:
+        search_params["highlight"] = True
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        content_to_compare = {
+            "result": self.rd_api,
+            "assignedTo": "<mark>George</mark> Doe II",
+            "caseName": "<mark>America</mark> <mark>vs</mark> <mark>API</mark> Lorem",
+            "cause": "<mark>401</mark> <mark>Civil</mark>",
+            "court_citation_string": "<mark>Appeals</mark>. CA9.",
+            "docketNumber": "<mark>1:24-bk-0000</mark>",
+            "juryDemand": "<mark>Plaintiff</mark>",
+            "referredTo": "<mark>George</mark> Doe II",
+            "suitNature": "<mark>569</mark>",
+            "description": "<mark>MOTION</mark> <mark>for</mark> <mark>Leave</mark> Lorem vs America",
+            "short_description": "<mark>Order Letter</mark>",
+            "snippet": "This a plain text to be <mark>shown in the API</mark>",
+        }
+        await self._test_api_fields_content(r, content_to_compare)
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

@@ -26,6 +26,7 @@ from cl.people_db.factories import (
     SchoolFactory,
 )
 from cl.people_db.models import Person, Race
+from cl.search.documents import DocketDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -151,6 +152,188 @@ opinion_search_api_keys = {
     "timestamp": lambda x: timezone.localtime(
         x["result"].cluster.date_created
     ).isoformat(),
+}
+
+
+recap_search_v4_api_keys = {
+    "assignedTo": lambda x: (
+        x["assignedTo"]
+        if x.get("assignedTo")
+        else (
+            x["result"].docket_entry.docket.assigned_to.name_full
+            if x["result"].docket_entry.docket.assigned_to
+            else None
+        )
+    ),
+    "assigned_to_id": lambda x: (
+        x["result"].docket_entry.docket.assigned_to.pk
+        if x["result"].docket_entry.docket.assigned_to
+        else None
+    ),
+    "attorney": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "attorney"
+        ]
+    ),
+    "attorney_id": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "attorney_id"
+        ]
+    ),
+    "caseName": lambda x: (
+        x["caseName"]
+        if x.get("caseName")
+        else x["result"].docket_entry.docket.case_name
+    ),
+    "case_name_full": lambda x: x["result"].docket_entry.docket.case_name_full,
+    "cause": lambda x: (
+        x["cause"] if x.get("cause") else x["result"].docket_entry.docket.cause
+    ),
+    "chapter": lambda x: (
+        x["result"].docket_entry.docket.bankruptcy_information.chapter
+        if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
+        else None
+    ),
+    "court": lambda x: x["result"].docket_entry.docket.court.full_name,
+    "court_citation_string": lambda x: (
+        x["court_citation_string"]
+        if x.get("court_citation_string")
+        else x["result"].docket_entry.docket.court.citation_string
+    ),
+    "court_exact": lambda x: x["result"].docket_entry.docket.court.pk,
+    "court_id": lambda x: x["result"].docket_entry.docket.court.pk,
+    "dateArgued": lambda x: (
+        x["result"].docket_entry.docket.date_argued.isoformat()
+        if x["result"].docket_entry.docket.date_argued
+        else None
+    ),
+    "dateFiled": lambda x: (
+        x["result"].docket_entry.docket.date_filed.isoformat()
+        if x["result"].docket_entry.docket.date_filed
+        else None
+    ),
+    "dateTerminated": lambda x: (
+        x["result"].docket_entry.docket.date_terminated.isoformat()
+        if x["result"].docket_entry.docket.date_terminated
+        else None
+    ),
+    "date_created": lambda x: x["result"]
+    .docket_entry.docket.date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "docketNumber": lambda x: (
+        x["docketNumber"]
+        if x.get("docketNumber")
+        else x["result"].docket_entry.docket.docket_number
+    ),
+    "docket_absolute_url": lambda x: x[
+        "result"
+    ].docket_entry.docket.get_absolute_url(),
+    "docket_id": lambda x: x["result"].docket_entry.docket_id,
+    "firm": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "firm"
+        ]
+    ),
+    "firm_id": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "firm_id"
+        ]
+    ),
+    "jurisdictionType": lambda x: x[
+        "result"
+    ].docket_entry.docket.jurisdiction_type,
+    "juryDemand": lambda x: (
+        x["juryDemand"]
+        if x.get("juryDemand")
+        else x["result"].docket_entry.docket.jury_demand
+    ),
+    "pacer_case_id": lambda x: x["result"].docket_entry.docket.pacer_case_id,
+    "party": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "party"
+        ]
+    ),
+    "party_id": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "party_id"
+        ]
+    ),
+    "recap_documents": [
+        {
+            "id": lambda x: x["result"].pk,
+            "docket_entry_id": lambda x: x["result"].docket_entry.pk,
+            "description": lambda x: (
+                x["description"]
+                if x.get("description")
+                else x["result"].docket_entry.description
+            ),
+            "entry_number": lambda x: x["result"].docket_entry.entry_number,
+            "entry_date_filed": lambda x: (
+                x["result"].docket_entry.date_filed.isoformat()
+                if x["result"].docket_entry.date_filed
+                else None
+            ),
+            "short_description": lambda x: (
+                x["short_description"]
+                if x.get("short_description")
+                else x["result"].description
+            ),
+            "document_type": lambda x: x["result"].get_document_type_display(),
+            "document_number": lambda x: (
+                int(x["result"].document_number)
+                if x["result"].document_number
+                else None
+            ),
+            "pacer_doc_id": lambda x: x["result"].pacer_doc_id or "",
+            "snippet": lambda x: (
+                x["snippet"]
+                if x.get("snippet")
+                else x["result"].plain_text or ""
+            ),
+            "attachment_number": lambda x: x["result"].attachment_number
+            or None,
+            "is_available": lambda x: x["result"].is_available,
+            "page_count": lambda x: x["result"].page_count or None,
+            "filepath_local": lambda x: x["result"].filepath_local.name
+            or None,
+            "absolute_url": lambda x: x["result"].get_absolute_url(),
+            "cites": lambda x: list(
+                x["result"]
+                .cited_opinions.all()
+                .values_list("cited_opinion_id", flat=True)
+            ),
+            "timestamp": lambda x: x["result"]
+            .date_created.isoformat()
+            .replace("+00:00", "Z"),
+        }
+    ],
+    "referredTo": lambda x: (
+        x["referredTo"]
+        if x.get("referredTo")
+        else (
+            x["result"].docket_entry.docket.referred_to.name_full
+            if x["result"].docket_entry.docket.referred_to
+            else None
+        )
+    ),
+    "referred_to_id": lambda x: (
+        x["result"].docket_entry.docket.referred_to.pk
+        if x["result"].docket_entry.docket.referred_to
+        else None
+    ),
+    "suitNature": lambda x: (
+        x["suitNature"]
+        if x.get("suitNature")
+        else x["result"].docket_entry.docket.nature_of_suit
+    ),
+    "timestamp": lambda x: x["result"]
+    .docket_entry.docket.date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "trustee_str": lambda x: (
+        x["result"].docket_entry.docket.bankruptcy_information.trustee_str
+        if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
+        else None
+    ),
 }
 
 
@@ -548,6 +731,9 @@ class RECAPSearchTestCase(SimpleTestCase):
                 referred_to=cls.judge_2,
                 nature_of_suit="440",
                 source=Docket.RECAP,
+                cause="401 Civil",
+                jurisdiction_type="'U.S. Government Defendant",
+                jury_demand="1,000,000",
             ),
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),

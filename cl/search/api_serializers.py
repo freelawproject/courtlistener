@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from datetime import timezone
 
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
@@ -8,14 +9,22 @@ from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.extras import get_highlight
 from cl.lib.document_serializer import (
+    DateField,
     DocumentSerializer,
+    HighlightedField,
     NullableListField,
     TimeStampField,
 )
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.constants import o_type_index_map
-from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
+    OpinionDocument,
+    PersonDocument,
+)
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     Citation,
@@ -413,4 +422,77 @@ class OpinionESResultSerializer(DocumentSerializer):
             "procedural_history",
             "panel_names",
             "sha1",
+        )
+
+
+class RECAPESResultSerializer(DocumentSerializer):
+    """The serializer for RECAPDocument results."""
+
+    # Fields from the RECAPDocument
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    description = HighlightedField(read_only=True)
+    short_description = HighlightedField(read_only=True)
+    snippet = HighlightedField(read_only=True, source="plain_text")
+
+    class Meta:
+        document = ESRECAPDocument
+        exclude = (
+            "docket_id",
+            "caseName",
+            "case_name_full",
+            "docketNumber",
+            "suitNature",
+            "cause",
+            "juryDemand",
+            "jurisdictionType",
+            "dateArgued",
+            "dateFiled",
+            "dateTerminated",
+            "assignedTo",
+            "assigned_to_id",
+            "referredTo",
+            "referred_to_id",
+            "court",
+            "court_id",
+            "court_citation_string",
+            "chapter",
+            "trustee_str",
+            "date_created",
+            "pacer_case_id",
+            "plain_text",
+        )
+
+
+class DocketESResultSerializer(DocumentSerializer):
+    """The serializer for Docket results."""
+
+    # Fields from the Docket.
+    referred_to_id = serializers.IntegerField(read_only=True)
+    assigned_to_id = serializers.IntegerField(read_only=True)
+    pacer_case_id = serializers.IntegerField(read_only=True)
+    dateArgued = DateField(read_only=True)
+    dateFiled = DateField(read_only=True)
+    dateTerminated = DateField(read_only=True)
+    date_created = serializers.DateTimeField(
+        read_only=True, default_timezone=timezone.utc
+    )
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    assignedTo = HighlightedField(read_only=True)
+    caseName = HighlightedField(read_only=True)
+    cause = HighlightedField(read_only=True)
+    court_citation_string = HighlightedField(read_only=True)
+    docketNumber = HighlightedField(read_only=True)
+    juryDemand = HighlightedField(read_only=True)
+    referredTo = HighlightedField(read_only=True)
+    suitNature = HighlightedField(read_only=True)
+    recap_documents = RECAPESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+
+    class Meta:
+        document = DocketDocument
+        exclude = (
+            "_related_instance_to_ignore",
+            "docket_child",
+            "docket_slug",
         )

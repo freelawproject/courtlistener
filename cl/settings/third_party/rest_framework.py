@@ -15,7 +15,7 @@ REST_FRAMEWORK = {
     # Versioning
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.URLPathVersioning",
     "DEFAULT_VERSION": "v3",
-    "ALLOWED_VERSIONS": {"v3"},
+    "ALLOWED_VERSIONS": {"v3", "v4"},
     # Throttles
     "DEFAULT_THROTTLE_CLASSES": (
         "rest_framework.throttling.AnonRateThrottle",

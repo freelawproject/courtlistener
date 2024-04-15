@@ -9,12 +9,20 @@ from cl.lib.elasticsearch_utils import (
     do_collapse_count_query,
     do_count_query,
     do_es_api_query,
+    limit_inner_hits,
+    merge_highlights_into_result,
     merge_unavailable_fields_on_parent_document,
+    set_results_highlights,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
 from cl.search.constants import SEARCH_HL_TAG
-from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    OpinionDocument,
+    PersonDocument,
+)
 from cl.search.models import SEARCH_TYPES
 
 
@@ -43,10 +51,12 @@ def get_object_list(request, cd, paginator):
         "type"
     ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(request, "p-es-active")
 
-    is_opinion_es_active = cd[
-        "type"
-    ] == SEARCH_TYPES.OPINION and waffle.flag_is_active(
-        request, "o-es-search-api-active"
+    is_opinion_es_active = cd["type"] == SEARCH_TYPES.OPINION and (
+        waffle.flag_is_active(request, "o-es-search-api-active")
+    )
+
+    is_recap_es_active = (
+        cd["type"] == SEARCH_TYPES.RECAP and request.version == "v4"
     )
 
     if is_oral_argument_active:
@@ -55,6 +65,8 @@ def get_object_list(request, cd, paginator):
         search_query = PersonDocument.search()
     elif is_opinion_es_active:
         search_query = OpinionDocument.search()
+    elif is_recap_es_active:
+        search_query = DocketDocument.search()
     else:
         search_query = None
 
@@ -64,9 +76,16 @@ def get_object_list(request, cd, paginator):
             child_docs_count_query,
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
-    elif search_query and is_opinion_es_active:
+    elif search_query and (is_opinion_es_active or is_recap_es_active):
+        highlighting_fields = {}
+        if cd["type"] == SEARCH_TYPES.OPINION:
+            highlighting_fields = {"text": 500}
         main_query = do_es_api_query(
-            search_query, cd, {"text": 500}, SEARCH_HL_TAG
+            search_query,
+            cd,
+            highlighting_fields,
+            SEARCH_HL_TAG,
+            request.version,
         )
     else:
         main_query = search_utils.build_main_query(
@@ -74,15 +93,21 @@ def get_object_list(request, cd, paginator):
         )
         main_query["caller"] = "api_search"
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if cd["type"] == SEARCH_TYPES.RECAP and request.version == "v3":
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if is_oral_argument_active or is_people_active or is_opinion_es_active:
+    if (
+        is_oral_argument_active
+        or is_people_active
+        or is_opinion_es_active
+        or is_recap_es_active
+    ):
         sl = ESList(
             main_query=main_query,
             offset=offset,
             page_size=page_size,
-            type=cd["type"],
+            clean_data=cd,
+            version=request.version,
         )
     else:
         sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
@@ -95,18 +120,27 @@ class ESList:
     as they are queried.
     """
 
-    def __init__(self, main_query, offset, page_size, type, length=None):
+    def __init__(
+        self,
+        main_query,
+        offset,
+        page_size,
+        clean_data,
+        length=None,
+        version="v3",
+    ):
         super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
-        self.type = type
+        self.clean_data = clean_data
         self._item_cache = []
         self._length = length
+        self._version = version
 
     def __len__(self):
         if self._length is None:
-            if self.type == SEARCH_TYPES.OPINION:
+            if self.clean_data["type"] == SEARCH_TYPES.OPINION:
                 query = Q(self.main_query.to_dict(count=True)["query"])
                 self._length = do_collapse_count_query(self.main_query, query)
             else:
@@ -129,27 +163,41 @@ class ESList:
             self.offset : self.offset + self.page_size
         ]
         results = self.main_query.execute()
-
         # Merge unavailable fields in ES by pulling data from the DB to make
         # the API backwards compatible
-        if self.type == SEARCH_TYPES.PEOPLE:
+        if self.clean_data["type"] == SEARCH_TYPES.PEOPLE:
             merge_unavailable_fields_on_parent_document(
-                results, self.type, "api"
+                results, self.clean_data["type"], "api"
             )
 
-        # Pull the text snippet up a level
+        if self._version == "v4":
+            limit_inner_hits({}, results, self.clean_data["type"])
+            set_results_highlights(results, self.clean_data["type"])
+
         for result in results:
+            child_result_objects = []
+            if hasattr(result, "child_docs"):
+                for child_doc in result.child_docs:
+                    child_result_objects.append(
+                        ESResultObject(initial=child_doc["_source"])
+                    )
+                result["child_docs"] = child_result_objects
+
             snippet = None
-            if hasattr(result.meta, "highlight") and hasattr(
-                result.meta.highlight, "text"
-            ):
-                snippet = result.meta.highlight["text"][0]
-            elif hasattr(result, "text"):
-                snippet = result["text"]
+            if self._version == "v3":
+                if hasattr(result.meta, "highlight") and hasattr(
+                    result.meta.highlight, "text"
+                ):
+                    snippet = result.meta.highlight["text"][0]
+                elif hasattr(result, "text"):
+                    snippet = result["text"]
 
             result_dict = result.to_dict(skip_empty=False)
-            result_dict["snippet"] = snippet
-            self._item_cache.append(ResultObject(initial=result_dict))
+            if snippet:
+                result_dict["snippet"] = snippet
+
+            # Send the object instead the JSON.
+            self._item_cache.append(ESResultObject(initial=result))
 
         # Now, assuming our _item_cache is all set, we just get the item.
         if isinstance(item, slice):
@@ -262,3 +310,9 @@ class ResultObject:
 
     def to_dict(self):
         return self._data
+
+
+class ESResultObject(ResultObject):
+
+    def __getattr__(self, key):
+        return getattr(self._data, key, None)

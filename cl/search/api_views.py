@@ -2,6 +2,7 @@ from http import HTTPStatus
 
 import waffle
 from rest_framework import pagination, permissions, response, viewsets
+from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
@@ -9,6 +10,7 @@ from cl.search import api_utils
 from cl.search.api_serializers import (
     CourtSerializer,
     DocketEntrySerializer,
+    DocketESResultSerializer,
     DocketSerializer,
     ExtendedPersonESSerializer,
     OAESResultSerializer,
@@ -206,6 +208,35 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                     cd["q"] = "*"  # Get everything
                 serializer = SearchResultSerializer(
                     result_page, many=True, context={"schema": sl.conn.schema}
+                )
+            return paginator.get_paginated_response(serializer.data)
+        # Invalid search.
+        return response.Response(
+            search_form.errors, status=HTTPStatus.BAD_REQUEST
+        )
+
+
+class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
+    # Default permissions use Django permissions, so here we AllowAny,
+    # but folks will need to log in to get past the thresholds.
+    permission_classes = (permissions.AllowAny,)
+
+    def list(self, request, *args, **kwargs):
+        search_form = SearchForm(request.GET, is_es_form=True)
+        if search_form.is_valid():
+            cd = search_form.cleaned_data
+            search_type = cd["type"]
+            paginator = pagination.PageNumberPagination()
+            sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
+            result_page = paginator.paginate_queryset(sl, request)
+            if search_type == SEARCH_TYPES.OPINION:
+                serializer = OpinionESResultSerializer(result_page, many=True)
+            elif search_type == SEARCH_TYPES.RECAP:
+                serializer = DocketESResultSerializer(result_page, many=True)
+            else:
+                # Not found error
+                raise NotFound(
+                    detail="Search type not found or not supported."
                 )
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.

@@ -810,13 +810,14 @@ def get_search_query(
 
 
 def build_es_base_query(
-    search_query: Search, cd: CleanData
+    search_query: Search, cd: CleanData, child_highlighting: bool = True
 ) -> tuple[Search, QueryString | None]:
     """Builds filters and fulltext_query based on the given cleaned
      data and returns an elasticsearch query.
 
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
     :return: A two-tuple, the Elasticsearch search query object and an ES
     QueryString for child documents, or None if there is no need to query
     child documents.
@@ -896,7 +897,10 @@ def build_es_base_query(
                 )
             )
             string_query, join_query = build_full_join_es_queries(
-                cd, child_query_fields, parent_query_fields
+                cd,
+                child_query_fields,
+                parent_query_fields,
+                child_highlighting=child_highlighting,
             )
         case SEARCH_TYPES.OPINION:
             str_query = cd.get("q", "")
@@ -1247,6 +1251,7 @@ def set_results_highlights(results: Page | Response, search_type: str) -> None:
             # Merge child document highlights
             if not hasattr(result, "child_docs"):
                 continue
+
             for child_doc in result.child_docs:
                 if hasattr(child_doc, "highlight"):
                     highlights = child_doc.highlight.to_dict()
@@ -1949,6 +1954,7 @@ def build_full_join_es_queries(
     child_query_fields: dict[str, list[str]],
     parent_query_fields: list[str],
     mlt_query: Query | None = None,
+    child_highlighting: bool = True,
 ) -> tuple[QueryString | list, QueryString | None]:
     """Build a complete Elasticsearch query with both parent and child document
       conditions.
@@ -1957,6 +1963,7 @@ def build_full_join_es_queries(
     :param child_query_fields: A dictionary mapping child fields document type.
     :param parent_query_fields: A list of fields for the parent document.
     :param mlt_query: the More Like This Query object.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
     :return: An Elasticsearch QueryString object.
     """
 
@@ -2043,9 +2050,13 @@ def build_full_join_es_queries(
         has_child_query = None
         if child_text_query or child_filters:
             hl_fields = (
-                SEARCH_OPINION_CHILD_HL_FIELDS
-                if cd["type"] == SEARCH_TYPES.OPINION
-                else SEARCH_RECAP_CHILD_HL_FIELDS
+                (
+                    SEARCH_OPINION_CHILD_HL_FIELDS
+                    if cd["type"] == SEARCH_TYPES.OPINION
+                    else SEARCH_RECAP_CHILD_HL_FIELDS
+                )
+                if child_highlighting
+                else {}
             )
             has_child_query = build_has_child_query(
                 join_query,
@@ -2422,6 +2433,7 @@ def do_es_api_query(
     cd: CleanData,
     highlighting_fields: dict[str, int],
     hl_tag: str,
+    api_version: str,
 ) -> Search:
     """Build an ES query for its use in the Search API and Webhooks.
 
@@ -2430,29 +2442,38 @@ def do_es_api_query(
     :param highlighting_fields: A dictionary mapping field names to fragment
     sizes for highlighting.
     :param hl_tag: The HTML tag to use for highlighting matched fragments.
+    :param api_version: The request API version.
     :return: The modified Search with the resultant query.
     """
 
-    s, join_query = build_es_base_query(search_query, cd)
-    s = build_child_docs_query(
-        join_query,
-        cd=cd,
-    )
-    s = search_query.query(s)
-    highlight_options, fields_to_exclude = build_highlights_dict(
-        highlighting_fields, hl_tag
-    )
-    s = s.source(excludes=fields_to_exclude)
-    extra_options: dict[str, dict[str, Any]] = {"highlight": highlight_options}
-    if cd["type"] == SEARCH_TYPES.OPINION:
-        extra_options.update(
-            {
-                "collapse": {
-                    "field": "cluster_id",
-                }
-            }
+    s, join_query = build_es_base_query(search_query, cd, cd["highlight"])
+    if api_version == "v3":
+        s = build_child_docs_query(
+            join_query,
+            cd=cd,
         )
-    main_query = s.extra(**extra_options)
+        s = search_query.query(s)
+        highlight_options, fields_to_exclude = build_highlights_dict(
+            highlighting_fields, hl_tag
+        )
+        s = s.source(excludes=fields_to_exclude)
+        extra_options: dict[str, dict[str, Any]] = {
+            "highlight": highlight_options
+        }
+        if cd["type"] == SEARCH_TYPES.OPINION:
+            extra_options.update(
+                {
+                    "collapse": {
+                        "field": "cluster_id",
+                    }
+                }
+            )
+        main_query = s.extra(**extra_options)
+    else:
+        main_query = s
+        if cd["highlight"]:
+            main_query = add_es_highlighting(s, cd)
+
     main_query = main_query.sort(build_sort_results(cd))
     return main_query
 
