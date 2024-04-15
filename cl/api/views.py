@@ -111,12 +111,48 @@ async def bulk_data_index(request: HttpRequest) -> HttpResponse:
     )
 
 
+def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
+    """
+    Parses a throttle rate string and returns a tuple containing the number of
+    citations allowed and the throttling duration in a format suitable for
+    templates.
+
+    Args:
+        rate (str): A string representing the throttle rate
+
+    Returns:
+        A tuple containing a two elements:
+            - The number of citations allowed (int).
+            - The throttling duration (str).
+    """
+    if not rate:
+        return None
+    duration_as_str = {"s": "second", "m": "minute", "h": "hour", "d": "day"}
+    num, period = rate.split("/")
+    return int(num), duration_as_str[period[0]]
+
+
 async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
     cite_count = await Citation.objects.acount()
+    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
+    default_throttle_rate = parse_throttle_rate_for_template(rate)
+    custom_throttle_rate = None
+    if request.user and request.user.is_authenticated:
+        rate = settings.REST_FRAMEWORK[  # type: ignore
+            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
+        ].get(request.user.username, None)
+        custom_throttle_rate = parse_throttle_rate_for_template(rate)
+
     return TemplateResponse(
         request,
         "citation-lookup-api.html",
-        {"cite_count": cite_count, "private": False},
+        {
+            "cite_count": cite_count,
+            "default_throttle_rate": default_throttle_rate,
+            "custom_throttle_rate": custom_throttle_rate,
+            "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
+            "private": False,
+        },
     )
 
 
