@@ -168,7 +168,9 @@ def merge_recap_into_caselaw(skip_until: int) -> None:
                 # Check for citations - now that we know its an opinion
                 citations = get_citations(rd.plain_text)
                 if len(citations) == 0:
-                    # if no citations are found simply skip it.
+                    logging.warning(
+                        f"Skipping opinion: {opinion.id}, for cluster: {cluster.id} on docket: {docket.id} without citations"
+                    )
                     continue
 
                 if (
@@ -201,6 +203,7 @@ def merge_recap_into_caselaw(skip_until: int) -> None:
                         )
                         opinion = Opinion(
                             cluster=cluster,
+                            plain_text=rd.plain_text,
                             type=Opinion.TRIAL_COURT,
                             author_str=judge_str,
                             page_count=rd.page_count,
