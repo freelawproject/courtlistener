@@ -33,8 +33,7 @@ def disable_debug_logging():
 def fetch_start_date(court: Court) -> str:
     """Fetch start date of opinions for a court
 
-    This function fetches the last date a federal district court received an
-    opinion (most likely from the Harvard import).
+    Find the latest OC date filed not from the recap db
 
     :param court: Court object
     :return: the most recent date for this court
