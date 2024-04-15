@@ -1,11 +1,15 @@
 import logging
 import re
+from typing import Optional
 
+from asgiref.sync import async_to_sync
 from django.db import transaction
 from django.db.models import Max, Q
 from eyecite.find import get_citations
 
 from cl.lib.command_utils import VerboseCommand
+from cl.people_db.lookup_utils import lookup_judge_by_full_name
+from cl.people_db.models import Person
 from cl.recap.models import RECAPDocument
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -16,9 +20,15 @@ from cl.search.models import (
     OpinionCluster,
 )
 
+logger = logging.getLogger("django.db.backends")
+logger.setLevel(logging.WARNING)
+
 
 def fetch_start_date(court: Court) -> str:
-    """Fetch start date
+    """Fetch start date of opinions for a court
+
+    This function fetches the last date a federal district court received an
+    opinion (most likely from the Harvard import).
 
     :param court: Court object
     :return: the most recent date for this court
@@ -61,46 +71,64 @@ def identify_judge_string(description: str) -> str:
     return first_pass.strip(".")
 
 
-def merge_recap_into_caselaw(
-    first_docket_id: int, min_date_str: str, max_date_str: str
-) -> None:
+def lookup_judge_from_entry(
+    judge_str: str, docket: Docket
+) -> Optional[Person]:
+    """Find Judge object in DB if available
+
+    :param rd: The RecapDocument object
+    :param docket: The associated Docket
+    :return: The Judge in the DB if any
+    """
+    author = async_to_sync(lookup_judge_by_full_name)(
+        judge_str, docket.court.id, None, require_living_judge=False
+    )
+    if author:
+        return author
+    elif docket.assigned_to.name_last in judge_str:
+        # Assume that if they found just has the same last name - its the
+        # current ID'd judge.
+        return docket.assigned_to
+    return None
+
+
+def merge_recap_into_caselaw(first_docket_id: int) -> None:
     """Merge Recap documents into Case Law DB
 
-    :param first_docket_id: A docket id to begin with if requestsed
-    :param min_date_str: Minimum date string to ingest opinions
-    :param max_date_str: Maximum date string to ingest opinions
+    :param first_docket_id: First Docket to Process
     :return: None
     """
+    court_position = 0
     if first_docket_id != None:
         # find court to begin with - and wait til you get to that court to begin
-        starting_court = Docket.objects.get(pk=first_docket_id).court
-        start = False
-    else:
-        start = True
+        court_position = Docket.objects.get(pk=first_docket_id).court.position
 
-    for court in Court.objects.filter(Q(jurisdiction="FD") & ~Q(id="dcd")):
-        if start == False:
-            if court.id != starting_court.id:
-                continue
-
-        latest_date_filed = fetch_start_date(court)
-        if latest_date_filed is None:
-            # Just in case its a historical court
-            logging.warning(f"Skipping court: {court.id}")
+    # Iterate over each federal district court, excluding DCD
+    for court in Court.objects.filter(
+        Q(jurisdiction=Court.FEDERAL_DISTRICT) & ~Q(id="dcd"), in_use=True
+    ).order_by("position"):
+        if court.position < court_position:
+            logging.info(f"Skipping court {court}")
             continue
 
-        logging.warning(f"Starting court: {court.id}")
+        latest_date_filed = fetch_start_date(court)
+        logging.info(f"Starting court: {court.id}")
+
         # lets iterate over every docket from recap
-        for docket in Docket.objects.filter(court=court, source=9).iterator():
+        if court.id == court_position:
+            dockets = Docket.objects.filter(
+                court=court,
+                source__in=[Docket.RECAP, Docket.RECAP_AND_IDB],
+                id__gte=first_docket_id,
+            ).order_by("id")
+        else:
+            dockets = Docket.objects.filter(
+                court=court, source__in=[Docket.RECAP, Docket.RECAP_AND_IDB]
+            ).order_by("id")
+        for docket in dockets.iterator():
             if "cr" in docket.docket_number:
-                # Exclude criminal cases
-                # Need to reprocess criminal cases
+                # Exclude criminal cases until we reprocess them
                 continue
-            if start == False:
-                if docket.id != first_docket_id:
-                    continue
-                else:
-                    start = True
             rds = RECAPDocument.objects.filter(
                 docket_entry__docket=docket,
                 is_available=True,
@@ -133,8 +161,10 @@ def merge_recap_into_caselaw(
                     # Exclude transfers from our mergers
                     continue
 
-                judge_str = identify_judge_string(rd.docket_entry.description)
                 try:
+                    docket_entry = rd.docket_entry.description
+                    judge_str = identify_judge_string(docket_entry)
+                    judge = lookup_judge_from_entry(judge_str, docket=docket)
                     with transaction.atomic():
                         cluster = OpinionCluster(
                             judges=judge_str,
@@ -156,54 +186,36 @@ def merge_recap_into_caselaw(
                             page_count=rd.page_count,
                             sha1=rd.sha1,
                         )
+                        if judge_str is not None:
+                            opinion.author = judge
                         cluster.save()
                         opinion.save()
                         logging.warning(
-                            f"New op {opinion.id}, cluster: {cluster.id} for docket {docket.id}"
+                            f"New Opinion: {opinion.id}, for cluster: {cluster.id} on docket: {docket.id}"
                         )
                 except ValueError as e:
                     logging.warning(f"Error saving new opinion {str(e)}")
 
 
 class Command(VerboseCommand):
-    """ """
+    help = "Merge recap opinions into CaseLaw db"
 
-    def __init__(self, stdout=None, stderr=None, no_color=False):
+    def __init__(self):
         super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--docket",
-            help=("Docket to start after"),
+            help=("Docket number to restart with"),
             default=None,
             required=False,
             type=int,
-        )
-        parser.add_argument(
-            "--min-date",
-            help=("Min Date range to process - yyyy-mm-dd format"),
-            default=None,
-            required=False,
-            type=str,
-        )
-        parser.add_argument(
-            "--max-date",
-            help=("Max Date to Process if not current - yyyy-mm-dd"),
-            default=None,
-            required=False,
-            type=str,
         )
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         first_docket_id = options["docket"]
 
-        # to implement for future back scraping
-        min_date_str = options["min_date"]
-        max_date_str = options["max_date"]
-
         merge_recap_into_caselaw(
             first_docket_id=first_docket_id,
-            min_date_str=min_date_str,
-            max_date_str=max_date_str,
         )
