@@ -20,8 +20,11 @@ from cl.search.models import (
     OpinionCluster,
 )
 
-logger = logging.getLogger("django.db.backends")
-logger.setLevel(logging.WARNING)
+
+def disable_logging():
+    """"""
+    logger = logging.getLogger("django.db.backends")
+    logger.setLevel(logging.WARNING)
 
 
 def fetch_start_date(court: Court) -> str:
@@ -75,7 +78,7 @@ def find_status(docket_entry: str) -> str:
     """Find precedential status
 
     :param docket_entry: Docket entry text
-    :return: If published - published otherwise unknown
+    :return: Published or unknown
     """
     if "(Order Published)" in docket_entry:
         return PRECEDENTIAL_STATUS.PUBLISHED
@@ -218,6 +221,11 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--disable-logging",
+            help="Flag to disable debug logging",
+            action="store_true",
+        )
+        parser.add_argument(
             "--skip-until",
             help=("Docket number to skip until"),
             default=None,
@@ -228,7 +236,6 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         skip_until = options["skip_until"]
-
-        merge_recap_into_caselaw(
-            skip_until=skip_until,
-        )
+        if options["disable_logging"]:
+            disable_logging()
+        merge_recap_into_caselaw(skip_until=skip_until)
