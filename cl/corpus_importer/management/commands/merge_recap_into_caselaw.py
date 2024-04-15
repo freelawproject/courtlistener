@@ -71,6 +71,18 @@ def identify_judge_string(description: str) -> str:
     return first_pass.strip(".")
 
 
+def find_status(docket_entry: str) -> str:
+    """Find precedential status
+
+    :param docket_entry: Docket entry text
+    :return: If published - published otherwise unknown
+    """
+    if "(Order Published)" in docket_entry:
+        return PRECEDENTIAL_STATUS.PUBLISHED
+    else:
+        return PRECEDENTIAL_STATUS.UNKNOWN
+
+
 def lookup_judge_from_entry(
     judge_str: str, docket: Docket
 ) -> Optional[Person]:
@@ -92,62 +104,60 @@ def lookup_judge_from_entry(
     return None
 
 
-def merge_recap_into_caselaw(first_docket_id: int) -> None:
+def merge_recap_into_caselaw(skip_until: int) -> None:
     """Merge Recap documents into Case Law DB
 
-    :param first_docket_id: First Docket to Process
+    :param skip_until: Docket ID to skip until if available
     :return: None
     """
-    court_position = 0
-    if first_docket_id != None:
-        # find court to begin with - and wait til you get to that court to begin
-        court_position = Docket.objects.get(pk=first_docket_id).court.position
+    skip_until_position = None
+    court_query = Court.objects.filter(
+        Q(jurisdiction=Court.FEDERAL_DISTRICT) & ~Q(id="dcd"), in_use=True
+    ).order_by("position")
+
+    if skip_until:
+        # Filter our previously done courts
+        skip_until_position = Docket.objects.get(pk=skip_until).court.position
+        court_query.filter(position__gte=skip_until_position)
 
     # Iterate over each federal district court, excluding DCD
-    for court in Court.objects.filter(
-        Q(jurisdiction=Court.FEDERAL_DISTRICT) & ~Q(id="dcd"), in_use=True
-    ).order_by("position"):
-        if court.position < court_position:
-            logging.info(f"Skipping court {court}")
+    for court in court_query:
+        if (latest_date_filed := fetch_start_date(court)) is None:
             continue
-
-        latest_date_filed = fetch_start_date(court)
         logging.info(f"Starting court: {court.id}")
 
-        # lets iterate over every docket from recap
-        if court.id == court_position:
-            dockets = Docket.objects.filter(
-                court=court,
-                source__in=[Docket.RECAP, Docket.RECAP_AND_IDB],
-                id__gte=first_docket_id,
-            ).order_by("id")
-        else:
-            dockets = Docket.objects.filter(
-                court=court, source__in=[Docket.RECAP, Docket.RECAP_AND_IDB]
-            ).order_by("id")
-        for docket in dockets.iterator():
+        docket_query = Docket.objects.filter(
+            court=court, source__in=[Docket.RECAP, Docket.RECAP_AND_IDB]
+        ).order_by("id")
+
+        if skip_until and court.position == skip_until_position:
+            docket_query = docket_query.filter(id__gte=skip_until)
+
+        for docket in docket_query.iterator():
             if "cr" in docket.docket_number:
                 # Exclude criminal cases until we reprocess them
                 continue
+
             rds = RECAPDocument.objects.filter(
                 docket_entry__docket=docket,
                 is_available=True,
                 is_free_on_pacer=True,
             )
+
             if rds.count() == 0:
-                # If no free on pacer documents - skip because we dont want to
-                # even bother this round
                 continue
 
             for rd in rds:
                 if rd.docket_entry.date_filed <= latest_date_filed:
-                    # Exclude documents entered before our date
+                    # Exclude documents entered before our last date filed
                     continue
+
                 if Opinion.objects.filter(sha1=rd.sha1).exists():
                     logging.warning(
                         f"Skipping document: {rd} as previously processed"
                     )
                     continue
+
                 # Check for citations - now that we know its an opinion
                 citations = get_citations(rd.plain_text)
                 if len(citations) == 0:
@@ -161,10 +171,13 @@ def merge_recap_into_caselaw(first_docket_id: int) -> None:
                     # Exclude transfers from our mergers
                     continue
 
+                p_status = find_status(
+                    docket_entry=rd.docket_entry.description
+                )
+                judge_str = identify_judge_string(rd.docket_entry.description)
+                judge = lookup_judge_from_entry(judge_str, docket=docket)
+
                 try:
-                    docket_entry = rd.docket_entry.description
-                    judge_str = identify_judge_string(docket_entry)
-                    judge = lookup_judge_from_entry(judge_str, docket=docket)
                     with transaction.atomic():
                         cluster = OpinionCluster(
                             judges=judge_str,
@@ -174,7 +187,7 @@ def merge_recap_into_caselaw(first_docket_id: int) -> None:
                             case_name=docket.case_name,
                             case_name_short=docket.case_name_short,
                             source=SOURCES.RECAP,
-                            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                            precedential_status=p_status,
                             blocked=False,
                             date_blocked=None,
                             docket=docket,
@@ -205,8 +218,8 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--docket",
-            help=("Docket number to restart with"),
+            "--skip-until",
+            help=("Docket number to skip until"),
             default=None,
             required=False,
             type=int,
@@ -214,8 +227,8 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
-        first_docket_id = options["docket"]
+        skip_until = options["skip_until"]
 
         merge_recap_into_caselaw(
-            first_docket_id=first_docket_id,
+            skip_until=skip_until,
         )
