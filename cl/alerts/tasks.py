@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
 from typing import Dict, List, Tuple, Union, cast
+from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync
 from celery import Task
@@ -11,6 +12,7 @@ from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 
@@ -29,10 +31,7 @@ from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import (
-    fetch_all_search_results,
-    merge_highlights_into_result,
-)
+from cl.lib.elasticsearch_utils import fetch_all_search_results
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
@@ -222,6 +221,9 @@ def make_alert_messages(
         notes, tags = get_docket_notes_and_tags_by_user(
             d.pk, recipient.user_pk
         )
+        unsubscribe_url = reverse(
+            "one_click_docket_alert_unsubscribe", args=[recipient.secret_key]
+        )
         email_context["notes"] = notes
         email_context["tags"] = tags
         email_context["username"] = recipient.username
@@ -237,7 +239,11 @@ def make_alert_messages(
             body=txt_template.render(email_context),
             from_email=settings.DEFAULT_ALERTS_EMAIL,
             to=[recipient.email_address],
-            headers={"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
+            headers={
+                "X-Entity-Ref-ID": f"docket.alert:{d.pk}",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": f"<https://www.courtlistener.com{unsubscribe_url}>",
+            },
         )
         html = html_template.render(email_context)
         msg.attach_alternative(html, "text/html")
@@ -486,10 +492,30 @@ def send_search_alert_emails(
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
         }
+        headers = {}
+        query_string = ""
+        if len(hits) == 1:
+            alert = hits[0][0]
+            unsubscribe_path = reverse(
+                "one_click_disable_alert", args=[alert.secret_key]
+            )
+            headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+        else:
+            params = {"keys": [hit[0].secret_key for hit in hits]}
+            query_string = urlencode(params, doseq=True)
+            unsubscribe_path = reverse("disable_alert_list")
+        headers["List-Unsubscribe"] = (
+            f"<https://www.courtlistener.com{unsubscribe_path}{'?' if query_string else ''}{query_string}>"
+        )
+
         txt = txt_template.render(context)
         html = html_template.render(context)
         msg = EmailMultiAlternatives(
-            subject, txt, settings.DEFAULT_ALERTS_EMAIL, [alert_user.email]
+            subject,
+            txt,
+            settings.DEFAULT_ALERTS_EMAIL,
+            [alert_user.email],
+            headers=headers,
         )
         msg.attach_alternative(html, "text/html")
         messages.append(msg)
@@ -529,10 +555,10 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         alert_user: UserProfile.user = alert_triggered.user
         # Set highlight if available in response.
         if hasattr(hit.meta, "highlight"):
-            merge_highlights_into_result(
-                hit.meta.highlight.to_dict(),
-                document_content_copy,
-            )
+            document_content_copy["meta"] = {}
+            document_content_copy["meta"][
+                "highlight"
+            ] = hit.meta.highlight.to_dict()
 
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.

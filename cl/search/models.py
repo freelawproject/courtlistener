@@ -9,11 +9,12 @@ from celery.canvas import chain
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from django.db.models import Q, QuerySet
 from django.db.models.functions import MD5
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
@@ -64,6 +65,11 @@ class PRECEDENTIAL_STATUS:
     @classmethod
     def get_status_value(cls, name):
         reverse_names = {value: key for key, value in cls.NAMES}
+        return reverse_names.get(name)
+
+    @classmethod
+    def get_status_value_reverse(cls, name):
+        reverse_names = {key: value for key, value in cls.NAMES}
         return reverse_names.get(name)
 
 
@@ -439,6 +445,14 @@ class Docket(AbstractDateTimeModel):
         RECAP_AND_SCRAPER_AND_IDB,
         COLUMBIA_AND_RECAP_AND_IDB,
         COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
+        HARVARD_AND_RECAP,
+        RECAP_AND_SCRAPER_AND_HARVARD,
+        COLUMBIA_AND_RECAP_AND_HARVARD,
+        COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
+        RECAP_AND_IDB_AND_HARVARD,
+        RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
+        COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
+        COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
     ]
     IDB_SOURCES = [
         IDB,
@@ -797,6 +811,8 @@ class Docket(AbstractDateTimeModel):
             "referred_to_id",
             "referred_to_str",
             "slug",
+            "pacer_case_id",
+            "source",
         ]
     )
     es_o_field_tracker = FieldTracker(
@@ -856,7 +872,15 @@ class Docket(AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"slug", "docket_number_core"}.union(update_fields)
 
-        super(Docket, self).save(update_fields=update_fields, *args, **kwargs)
+        try:
+            # Without a transaction wrapper, a failure will invalidate outer transactions
+            with transaction.atomic():
+                super().save(update_fields=update_fields, *args, **kwargs)
+        except IntegrityError:
+            # Temporary patch while we solve #3359
+            # If the error is not related to `date_modified` it will raise again
+            self.date_modified = timezone.now()
+            super().save(update_fields=update_fields, *args, **kwargs)
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
@@ -941,11 +965,7 @@ class Docket(AbstractDateTimeModel):
             self.court.jurisdiction == Court.FEDERAL_APPELLATE
         ):
             return None
-        return "https://ecf.%s.uscourts.gov/cgi-bin/%s?%s" % (
-            self.pacer_court_id,
-            path,
-            self.pacer_case_id,
-        )
+        return f"https://ecf.{self.pacer_court_id}.uscourts.gov/cgi-bin/{path}?{self.pacer_case_id}"
 
     def pacer_appellate_url_with_caseId(self, path):
         return (
@@ -1280,7 +1300,12 @@ class DocketEntry(AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Docket Entries"
         indexes = [
-            models.Index(fields=["recap_sequence_number", "entry_number"])
+            models.Index(
+                fields=["docket_id", "entry_number"],
+                name="entry_number_idx",
+                condition=Q(entry_number=1),
+            ),
+            models.Index(fields=["recap_sequence_number", "entry_number"]),
         ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1618,9 +1643,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"pacer_doc_id"}.union(update_fields)
 
-        super(RECAPDocument, self).save(
-            update_fields=update_fields, *args, **kwargs
-        )
+        super().save(update_fields=update_fields, *args, **kwargs)
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
@@ -1658,7 +1681,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         is deleted, but that should be OK.
         """
         id_cache = self.pk
-        super(RECAPDocument, self).delete(*args, **kwargs)
+        super().delete(*args, **kwargs)
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "search.RECAPDocument")
@@ -2280,7 +2303,7 @@ class Court(models.Model):
     )
     jurisdiction = models.CharField(
         help_text="the jurisdiction of the court, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in JURISDICTIONS]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS),
         max_length=3,
         choices=JURISDICTIONS,
     )
@@ -2517,7 +2540,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,
@@ -2975,9 +2998,7 @@ class OpinionCluster(AbstractDateTimeModel):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if update_fields:
             update_fields = {"slug"}.union(update_fields)
-        super(OpinionCluster, self).save(
-            update_fields=update_fields, *args, **kwargs
-        )
+        super().save(update_fields=update_fields, *args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -3007,7 +3028,7 @@ class OpinionCluster(AbstractDateTimeModel):
         is deleted, but that should be OK.
         """
         id_cache = self.pk
-        super(OpinionCluster, self).delete(*args, **kwargs)
+        super().delete(*args, **kwargs)
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "search.Opinion")
@@ -3474,8 +3495,7 @@ class Opinion(AbstractDateTimeModel):
         *args: List,
         **kwargs: Dict,
     ) -> None:
-        super(Opinion, self).save(*args, **kwargs)
-
+        super().save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
 

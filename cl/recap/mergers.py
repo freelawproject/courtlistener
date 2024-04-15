@@ -26,7 +26,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
@@ -307,7 +307,11 @@ async def update_docket_metadata(
     )
     d.date_terminated = docket_data.get("date_terminated") or d.date_terminated
     d.cause = docket_data.get("cause") or d.cause
-    d.nature_of_suit = docket_data.get("nature_of_suit") or d.nature_of_suit
+    # Avoid updating the nature_of_suit if the docket already has a
+    # nature_of_suit set, since this value doesn't change. See issue #3878.
+    d.nature_of_suit = d.nature_of_suit or docket_data.get(
+        "nature_of_suit", ""
+    )
     d.jury_demand = docket_data.get("jury_demand") or d.jury_demand
     d.jurisdiction_type = (
         docket_data.get("jurisdiction") or d.jurisdiction_type

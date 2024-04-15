@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from django.core.paginator import Paginator
 from django.shortcuts import render
 from django.template import loader
@@ -5,11 +7,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer, TemplateHTMLRenderer
 from rest_framework.response import Response
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_204_NO_CONTENT,
-)
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
@@ -47,7 +44,7 @@ class WebhooksViewSet(ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response(
-            status=HTTP_204_NO_CONTENT,
+            status=HTTPStatus.NO_CONTENT,
             headers={"HX-Trigger": "webhooksListChanged"},
         )
 
@@ -70,7 +67,7 @@ class WebhooksViewSet(ModelViewSet):
             webhook.user = request.user
             form.save()
             return Response(
-                status=HTTP_201_CREATED,
+                status=HTTPStatus.CREATED,
                 headers={"HX-Trigger": "webhooksListChanged"},
             )
         else:
@@ -90,7 +87,7 @@ class WebhooksViewSet(ModelViewSet):
             instance.user = request.user
             form.save()
             return Response(
-                status=HTTP_200_OK,
+                status=HTTPStatus.OK,
                 headers={"HX-Trigger": "webhooksListChanged"},
             )
         else:
@@ -265,7 +262,7 @@ class WebhooksViewSet(ModelViewSet):
         # On POST enqueue the webhook test event.
         send_test_webhook_event.delay(webhook.pk, event_dummy_content)
         return Response(
-            status=HTTP_200_OK,
+            status=HTTPStatus.OK,
         )
 
 

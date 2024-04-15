@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% load extras static humanize %}
+
+{% block title %}Citation Lookup and Verification API – CourtListener.com{% endblock %}
+{% block description %}Trained on over 50 million citations going back centuries, our citation lookup API can translate a citation you have to a link on our site or it can serve as a guardrail to help identify and prevent hallucinated citations.{% endblock %}
+{% block og_description %}Trained on over 50 million citations going back centuries, our citation lookup API can translate a citation you have to a link on our site or it can serve as a guardrail to help identify and prevent hallucinated citations.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#usage">Using the API</a></li>
+      <li><a href="#fields">Field Definitions</a></li>
+      <li><a href="#limitations">Limitations &amp; Throttles</a></li>
+      <li><a href="#examples">API Examples</a></li>
+      <ul>
+        <li><a href="#basic">Basic, Valid Lookup</a></li>
+        <li><a href="#failed">Failed Lookup</a></li>
+        <li><a href="#throttled">Throttled Citations</a></li>
+        <li><a href="#typoed">Typoed Reporter</a></li>
+        <li><a href="#ambiguous">Ambiguous Citation</a></li>
+      </ul>
+    </ul>
+  </div>
+</div>
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Citation Lookup and Verification&nbsp;API</h1>
+  <h2><code>{% url "citation-lookup-list" version="v3" %}</code></h2>
+  <p class="lead v-offset-above-3">Use this API to look up citations in CourtListener's database of {{ cite_count|intcomma }} citations.</p>
+  <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
+  </p>
+  <p>This API uses <a href="https://free.law/projects/eyecite">Eyecite</a>, a tool we developed with <a href="https://lil.law.harvard.edu/">Harvard Library Innovation Lab</a> to parse legal citations. To develop Eyecite, we analyzed more than 50 million citations going back more than two centuries. We believe we have identified every reporter abbreviation in American case law and that there is no case law citation that Eyecite cannot properly parse and interpret.
+  </p>
+  <p>This API uses the same authentication and serialization methods as the rest of the CourtListener APIs. It does not support filtering, pagination, ordering, or field selection.
+  </p>
+
+  <h2 id="usage">Usage</h2>
+  <p>The simplest way to query this API is to send it a blob of text. If the text does not have any citations, it will simply return an empty JSON object:
+  </p>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'text=Put some text here'\
+[]</pre>
+  <p>If the text contains valid citations, it will return a list of the citations, analyzing each. This example contains a single citation that is found:
+  </p>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'text=Obergefell v. Hodges (576 U.S. 644) established the right to marriage among same-sex couples'
+[
+  {
+    "citation": "576 U.S. 644",
+    "normalized_citations": [
+      "576 U.S. 644"
+    ],
+    "start_index": 22,
+    "end_index": 34,
+    "status": 200,
+    "error_message": "",
+    "clusters": [...one large cluster object here...]
+  }
+]</pre>
+  <p>If you have the volume, reporter, and page for a citation, you can look it up as follows:
+  </p>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'volume=576' \
+  --data 'reporter=U.S.' \
+  --data 'page=644'</pre>
+  <p>That returns the same response as above.</p>
+
+  <h2 id="fields">Field Definitions</h2>
+  <p>The fields returned by this API are:</p>
+  <ul>
+    <li><p><code>citation</code> — The citation you looked up. If you supplied the volume, reporter, and page, they will appear here as a single space-separated string.</p></li>
+    <li><p><code>normalized_citations</code> — Normalized versions of your citation if it contains a typo or if it is not the canonical (standard) abbreviation for a reporter. If the citation queried is ambiguous, more than one item can appear in this field. See examples below.</p></li>
+    <li><p><code>start_index</code> &amp; <code>end_index</code> —  These fields indicate the start and end positions where a citation is found in the text queried.</p></li>
+    <li><p><code>status</code> — indicates the outcome of a citation lookup. Its values correspond to HTTP status codes and can have one of five values:</p></li>
+    <ul>
+      <li><p><code>200 (OK)</code> — We found a citation, it was valid, and we were able to look it up in CourtListener.</p></li>
+      <li><p><code>404 (Not Found)</code> — We found a citation, it was valid, but we were unable to look it up in CourtListener.</p></li>
+      <li><p><code>400 (Bad Request)</code> — We found something that looks like a citation, but the reporter in the citation wasn’t in our system (e.g., “33 Umbrella 422” looks like a citation, but is not valid).</p></li>
+      <li><p><code>300 (Multiple Choices)</code> — We found a valid citation, it was valid, but it matched more than one item in CourtListener.</p></li>
+      <li><p><code>429 (Too Many Requests)</code> — This API will only lookup {{max_citation_per_request}} citations in a single request. Any citations after that point will have this status. They will be identified but will not be looked up. (See throttles below)</p></li>
+    </ul>
+    <li><p><code>error_message</code> — This field will contain additional details about any problems the lookup encounters.</p></li>
+    <li>
+      <p><code>clusters</code> — This is a list of the CourtListener <a href="{% url "rest_docs" %}#cluster-endpoint">cluster objects</a> that match the citation in your query. This key will contain multiple values when a citation matches more than one legal decision. This can happen when a citation is ambiguous or when multiple decisions are on a single page in a printed book (and thus share the same citation).</p>
+    </li>
+  </ul>
+  <h2 id="limitations">Limitations &amp; Throttles</h2>
+  <p>This API has four limitations on how much it can be used:
+  </p>
+  <ol>
+    <li><p>The performance of this API is affected by the number of citations it has to look up. Therefore, it is throttled to {{default_throttle_rate.0}} valid citation{{ default_throttle_rate.0|pluralize }} per {{default_throttle_rate.1}}{% if custom_throttle_rate %}, but your account allows {{custom_throttle_rate.0}} valid citation{{ custom_throttle_rate.0|pluralize }} per {{custom_throttle_rate.1}} {% endif %}. If you are below this throttle, you will be able to send a request to the API. If a request pushes you beyond this throttle, further requests will be denied. When your request is denied, the API will respond with a 429 HTTP code and a JSON object. The JSON object will contain a <code>wait_util</code> key that uses an ISO-8601 datetime to indicate when you will be able to make your next request.
+    </p></li>
+    <li><p>The API will look up at most {{max_citation_per_request}} citations in any single request. Any citations past that point will be parsed, but not matched to the CourtListener database. The <code>status</code> key of such citations will be 429, indicating “Too many citations requested.” See examples below for details.
+    </p></li>
+    <li><p>Text lookup requests to this API can only contain 64,000 characters at a time. Requests with more than this amount will be blocked for security. This is about 50 pages of legal content.
+    </p></li>
+    <li><p>To prevent denial of service attacks that do not contain any citations, this API has the same request throttle rates as the other CourtListener APIs. This way, even requests that do not contain citations can be throttled. (Most users will never encounter this throttle.)
+    </p></li>
+  </ol>
+  <p>A few other limitations to be aware of include:</p>
+  <ol>
+    <li><p>This API does not look up statutes, law journals, id, or supra citations. If you wish to match such citations, please use Eyecite directly.</p></li>
+    <li><p>This API will not attempt to match citations without volume numbers or page numbers (e.g. 22 U.S. ___).
+    </p></li>
+  </ol>
+
+  <h2 id="examples">API Examples</h2>
+  <h3 id="basic">Basic, Valid Lookup</h3>
+  <p>The following is a basic lookup using the <code>text</code> parameter and a block of text:</p>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'text=Obergefell v. Hodges (576 U.S. 644) established the right to marriage among same-sex couples'
+[
+  {
+    "citation": "576 U.S. 644",
+    "normalized_citations": [
+      "576 U.S. 644"
+    ],
+    "start_index": 22,
+    "end_index": 34,
+    "status": 200,
+    "error_message": "",
+    "clusters": [...one cluster here...]
+  }
+]</pre>
+  <h3 id="failed">Failed Lookup</h3>
+  <p>This query uses the volume-reporter-page triad, but fails because the citation does not exist:</p>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'volume=1' \
+  --data 'reporter=U.S.' \
+  --data 'page=200'
+[
+  {
+    "citation": "1 U.S. 200",
+    "normalized_citations": [
+      "1 U.S. 200"
+    ],
+    "start_index": 0,
+    "end_index": 10,
+    "status": 404,
+    "error_message": "Citation not found: '1 U.S. 200'",
+    "clusters": []
+  }
+]</pre>
+  <p>Note that:</p>
+  <ol>
+    <li><p>The <code>status</code> field is set to 404 indicating the citation was not found.</p></li>
+    <li><p>The <code>start_index</code> is 0, and the <code>end_index</code> is the length of the citation including space separators.</p></li>
+    <li><p>The <code>error_message</code> field provides details of the error.</p></li>
+  </ol>
+  <h3 id="throttled">Throttled Citations</h3>
+  <p>If your request contains more than {{max_citation_per_request}} citations, the {{max_citation_per_request|add:1}}<sup>st</sup> and subsequent citations will be returned with 429 <code>status</code> fields:
+  </p>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'text=Imagine a very long blob here, with {{max_citation_per_request|add:1}} citations.'
+[
+  ...{{max_citation_per_request}} citations would appear here, then the {{max_citation_per_request|add:1}}st and subsequent citations would be...
+  {
+    "citation": "576 U.S. 644",
+    "normalized_citations": [
+      "576 U.S. 644"
+    ],
+    "start_index": 10002,
+    "end_index": 10013,
+    "status": 429,
+    "error_message": "Too many citations requested.",
+    "clusters": []
+  }
+]</pre>
+  <p>Note that:</p>
+  <ol>
+    <li><p>All citations will be parsed and will provide normalized versions and index locations.</p></li>
+    <li><p>Citations after the {{max_citation_per_request}}<sup>th</sup> will return a <code>status</code> of 429, indicating "Too many citations requested."</p></li>
+    <li><p>A follow-up query that begins on the {{max_citation_per_request|add:1}}<sup>st</sup> <code>start_index</code> (in this case number 10002) will look up the next {{max_citation_per_request}} items.</p></li>
+  </ol>
+
+  <h3 id="typoed">Typoed/Non-Canonical Reporter Abbreviation</h3>
+  <p>If you query the non-canonical reporter abbreviation or if your reporter contains a known typo, we will provide the corrected citation in the <code>normalized_citations</code> key. The following example looks up a citation using "US" instead of the correct "U.S.":
+  </p>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'text=576 US 644'
+[
+  {
+    "citation": "576 US 644",
+    "normalized_citations": [
+      "576 U.S. 644"
+    ],
+    "start_index": 1,
+    "end_index": 11,
+    "status": 200,
+    "error_message": "",
+    "clusters": [...one cluster here...]
+  }
+]</pre>
+
+  <h3 id="ambiguous">Ambiguous Citation</h3>
+  <p>This lookup is for an ambiguous citation abbreviated as "H." This reporter abbreviation can refer to Handy's Ohio Reports, the Hawaii Reports, or Hill’s New York Reports. Only two of those reporter series have cases at the queried volume and page number, so the API returns two possible matches for the citation:
+  </p>
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  --data 'text=1 H. 150'
+[
+  {
+    "citation": "1 H. 150",
+    "normalized_citations": [
+      "1 Handy 150",
+      "1 Haw. 150",
+      "1 Hill 150"
+    ],
+    "start_index": 0,
+    "end_index": 8,
+    "status": 300,
+    "clusters": [
+      {
+        ...
+        "citations": [{
+          "volume": 1,
+          "reporter": "Handy",
+          "page": "150",
+          "type": 2
+        }],
+       ...
+       "case_name": "Louis v. Steamboat Buckeye",
+       ...
+      },
+      {
+        ...
+        "citations": [{
+          "volume": 1,
+          "reporter": "Haw.",
+          "page": "150",
+          "type": 2
+        }],
+        ...
+        "case_name": "Fell v. Parke",
+        ...
+      }
+    ]
+  }
+]</pre>
+  <p>Note that:</p>
+  <ol>
+    <li><p>The <code>normalized_citations</code> field returned three possible values for the ambiguous query.</p></li>
+    <li><p>The <code>status</code> field returned a 300 code, indicating "Multiple Choices."</p></li>
+    <li><p>There are two different objects returned in the <code>clusters</code> field.</p></li>
+  </ol>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

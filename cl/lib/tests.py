@@ -6,7 +6,6 @@ from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
 from django.test import override_settings
 from django.urls import reverse
-from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import append_query_conjunctions

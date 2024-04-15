@@ -1,5 +1,6 @@
 from .django import *
 from .misc import *
+from .project.citations import *
 from .project.email import *
 from .project.logging import *
 from .project.microservices import *
