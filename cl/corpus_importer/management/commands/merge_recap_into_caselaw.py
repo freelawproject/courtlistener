@@ -130,10 +130,17 @@ def merge_recap_into_caselaw(skip_until: int) -> None:
         logging.info(f"Starting court: {court.id}")
 
         docket_query = Docket.objects.filter(
-            court=court, source__in=[Docket.RECAP, Docket.RECAP_AND_IDB]
+            court=court,
+            source__in=[
+                Docket.RECAP,
+                Docket.RECAP_AND_IDB,
+                Docket.RECAP_AND_SCRAPER,
+            ],
         ).order_by("id")
 
         if skip_until and court.position == skip_until_position:
+            # This skips the dockets already processed on our first court
+            # if it contains skip until
             docket_query = docket_query.filter(id__gte=skip_until)
 
         for docket in docket_query.iterator():
@@ -145,16 +152,10 @@ def merge_recap_into_caselaw(skip_until: int) -> None:
                 docket_entry__docket=docket,
                 is_available=True,
                 is_free_on_pacer=True,
+                docket_entry__date_filed__gt=latest_date_filed,
             )
 
-            if rds.count() == 0:
-                continue
-
             for rd in rds:
-                if rd.docket_entry.date_filed <= latest_date_filed:
-                    # Exclude documents entered before our last date filed
-                    continue
-
                 if Opinion.objects.filter(sha1=rd.sha1).exists():
                     logging.warning(
                         f"Skipping document: {rd} as previously processed"
