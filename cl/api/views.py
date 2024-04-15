@@ -1,5 +1,6 @@
 import logging
 from datetime import date, timedelta
+from http import HTTPStatus
 from typing import Optional
 
 import waffle
@@ -10,8 +11,6 @@ from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from requests import Session
-from rest_framework import status
-from rest_framework.status import HTTP_400_BAD_REQUEST
 
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -23,7 +22,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
+from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
 from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 
@@ -109,6 +108,51 @@ async def bulk_data_index(request: HttpRequest) -> HttpResponse:
         request,
         "bulk-data.html",
         disclosure_coverage,
+    )
+
+
+def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
+    """
+    Parses a throttle rate string and returns a tuple containing the number of
+    citations allowed and the throttling duration in a format suitable for
+    templates.
+
+    Args:
+        rate (str): A string representing the throttle rate
+
+    Returns:
+        A tuple containing a two elements:
+            - The number of citations allowed (int).
+            - The throttling duration (str).
+    """
+    if not rate:
+        return None
+    duration_as_str = {"s": "second", "m": "minute", "h": "hour", "d": "day"}
+    num, period = rate.split("/")
+    return int(num), duration_as_str[period[0]]
+
+
+async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
+    cite_count = await Citation.objects.acount()
+    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
+    default_throttle_rate = parse_throttle_rate_for_template(rate)
+    custom_throttle_rate = None
+    if request.user and request.user.is_authenticated:
+        rate = settings.REST_FRAMEWORK[  # type: ignore
+            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
+        ].get(request.user.username, None)
+        custom_throttle_rate = parse_throttle_rate_for_template(rate)
+
+    return TemplateResponse(
+        request,
+        "citation-lookup-api.html",
+        {
+            "cite_count": cite_count,
+            "default_throttle_rate": default_throttle_rate,
+            "custom_throttle_rate": custom_throttle_rate,
+            "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
+            "private": False,
+        },
     )
 
 
@@ -230,7 +274,7 @@ async def get_result_count(request, version, day_count):
         return JsonResponse(
             {"error": "Invalid SearchForm"},
             safe=True,
-            status=HTTP_400_BAD_REQUEST,
+            status=HTTPStatus.BAD_REQUEST,
         )
     cd = search_form.cleaned_data
     search_type = cd["type"]
@@ -280,7 +324,7 @@ async def deprecated_api(request, v):
             "objects": [],
         },
         safe=False,
-        status=status.HTTP_410_GONE,
+        status=HTTPStatus.GONE,
     )
 
 

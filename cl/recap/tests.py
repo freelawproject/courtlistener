@@ -2,6 +2,7 @@ import json
 import os
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
+from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 from unittest.mock import ANY
@@ -20,12 +21,6 @@ from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
 from requests import ConnectionError
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,
-    HTTP_401_UNAUTHORIZED,
-)
 
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert
@@ -42,9 +37,9 @@ from cl.api.management.commands.cl_retry_webhooks import (
 )
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
 from cl.api.utils import get_next_webhook_retry_date
-from cl.lib.pacer import is_pacer_court_accessible
+from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.people_db.models import (
     Attorney,
@@ -110,6 +105,7 @@ from cl.recap.tasks import (
     process_recap_zip,
 )
 from cl.recap_rss.tasks import merge_rss_feed_contents
+from cl.scrapers.factories import PACERFreeDocumentRowFactory
 from cl.search.factories import (
     CourtFactory,
     DocketEntryFactory,
@@ -185,7 +181,7 @@ class RecapUploadsTest(TestCase):
     async def test_uploading_a_pdf(self, mock):
         """Can we upload a document and have it be saved correctly?"""
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         self.assertEqual(j["court"], self.court.id)
@@ -198,7 +194,7 @@ class RecapUploadsTest(TestCase):
         self.data.update({"upload_type": UPLOAD_TYPE.DOCUMENT_ZIP})
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         mock.assert_called()
 
     async def test_uploading_a_docket(self, mock):
@@ -212,14 +208,14 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_a_claims_registry_page(self, mock):
         """Can we upload claims registry data?"""
@@ -232,7 +228,7 @@ class RecapUploadsTest(TestCase):
             }
         )
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         mock.assert_called()
 
     async def test_uploading_an_attachment_page(self, mock):
@@ -244,14 +240,14 @@ class RecapUploadsTest(TestCase):
             }
         )
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_numbers_in_docket_uploads_fail(self, mock):
         """Are invalid uploads denied?
@@ -261,7 +257,7 @@ class RecapUploadsTest(TestCase):
         """
         self.data["upload_type"] = UPLOAD_TYPE.DOCKET
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_district_court_in_appellate_upload_fails(self, mock):
         """If you send a district court to an appellate endpoint, does it
@@ -271,7 +267,7 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_appellate_court_in_district_upload_fails(self, mock):
         """If you send appellate court info to a distric court, does it
@@ -283,44 +279,44 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_string_for_document_number_fails(self, mock):
         self.data["document_number"] = "asdf"  # Not an int.
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_no_numbers_in_docket_uploads_work(self, mock):
         self.data["upload_type"] = UPLOAD_TYPE.DOCKET
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
     async def test_pdf_without_pacer_case_id_works(self, mock):
         """Do we allow PDFs lacking a pacer_case_id value?"""
         del self.data["pacer_case_id"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
     async def test_uploading_non_ascii(self, mock):
         """Can we handle it if a client sends non-ascii strings?"""
         self.data["pacer_case_id"] = "☠☠☠"
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
         mock.assert_called()
 
     async def test_disallowed_court(self, mock):
         """Do posts fail if a bad court is given?"""
         self.data["court"] = "ala"
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_fails_no_document(self, mock):
         """Do posts fail if the lack an attachment?"""
         del self.data["filepath_local"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_user_associated_properly(self, mock):
         """Does the user get associated after the upload?"""
@@ -351,14 +347,14 @@ class RecapUploadsTest(TestCase):
         )
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_an_appellate_case_query_page(self, mock):
         """Can we upload an appellate case query and have it be saved correctly?
@@ -375,14 +371,14 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_an_appellate_attachment_page(self, mock):
         """Can we upload an appellate attachment page and have it be saved
@@ -401,14 +397,14 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     def test_processing_an_appellate_attachment_page(self, mock_upload):
         """Can we process an appellate attachment and transform the main recap
@@ -555,14 +551,14 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_case_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_uploading_an_appellate_case_query_result_page(self, mock):
         """Can we upload an appellate case query result page and have it be
@@ -581,14 +577,14 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         del self.data["document_number"]
         r = await self.async_client.post(self.path, self.data)
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
         r = await self.async_client.get(path)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_recap_upload_validate_pacer_case_id(self, mock):
         """Can we properly validate the pacer_case_id doesn't contain a dash -?"""
@@ -602,7 +598,7 @@ class RecapUploadsTest(TestCase):
         del self.data["pacer_doc_id"]
         r = await self.async_client.post(self.path, self.data)
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertIn(
             "PACER case ID can not contains dashes -", j["non_field_errors"][0]
         )
@@ -1030,7 +1026,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         self.data["court"] = "scotus"
         r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(
             j["non_field_errors"], ["scotus is not a PACER court ID."]
         )
@@ -1039,7 +1035,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         del self.data["mail"]["headers"]
         r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(
             j["non_field_errors"],
             ["The JSON value at key 'mail' should include 'headers'."],
@@ -1049,7 +1045,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         del self.data["receipt"]["recipients"]
         r = await self.async_client.post(self.path, self.data, format="json")
         j = json.loads(r.content)
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
         self.assertEqual(
             j["non_field_errors"],
             ["The JSON value at key 'receipt' should include 'recipients'."],
@@ -1063,8 +1059,12 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.get_or_cache_pacer_cookies",
         side_effect=lambda x, y, z: None,
     )
+    @mock.patch(
+        "cl.recap.tasks.is_docket_entry_sealed",
+        return_value=False,
+    )
     async def test_email_processing_queue_create(
-        self, mock_bucket_open, mock_cookies
+        self, mock_is_docket_entry_sealed, mock_bucket_open, mock_cookies
     ):
         self.assertEqual(await EmailProcessingQueue.objects.acount(), 0)
         await self.async_client.post(self.path, self.data, format="json")
@@ -2008,6 +2008,11 @@ class DescriptionCleanupTest(SimpleTestCase):
 
 
 class RecapDocketTaskTest(TestCase):
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.court = CourtFactory(id="scotus", jurisdiction="F")
+
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
         self.filename = "cand.html"
@@ -2113,6 +2118,99 @@ class RecapDocketTaskTest(TestCase):
         async_to_sync(process_recap_docket)(self.pq.pk)
         pq.refresh_from_db()
         self.assertEqual(pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    def test_avoid_overwriting_nature_of_suit_in_free_opinions(self) -> None:
+        """Test avoid updating the nature_of_suit from FreeOpinionReport if
+        the docket already has a nature_of_suit set, since this value doesn't
+        change. See issue #3878.
+        """
+
+        test_cases = [
+            ("810 copyright", "copyright"),
+            ("", "social welfare"),
+            ("", ""),
+        ]
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+        )
+        for initial_nature_of_suit, nature_of_suit_from_row in test_cases:
+            with self.subTest(
+                initial_nature_of_suit=initial_nature_of_suit,
+                nature_of_suit_from_row=nature_of_suit_from_row,
+            ):
+                # Update Docket with or without nature_of_suit
+                Docket.objects.filter(pk=d.pk).update(
+                    nature_of_suit=initial_nature_of_suit
+                )
+                d.refresh_from_db()
+                pacer_free_doc_row = PACERFreeDocumentRowFactory(
+                    court_id=self.court.pk,
+                    pacer_case_id=d.pacer_case_id,
+                    nature_of_suit=nature_of_suit_from_row,
+                )
+                pacer_free_doc_row.court = self.court
+                delattr(pacer_free_doc_row, "id")
+                lookup_and_save(pacer_free_doc_row)
+                d.refresh_from_db()
+                self.assertEqual(
+                    d.nature_of_suit,
+                    (
+                        nature_of_suit_from_row
+                        if not initial_nature_of_suit
+                        else initial_nature_of_suit
+                    ),
+                    msg="The nature_of_suit does not match.",
+                )
+        d.delete()
+
+    def test_avoid_overwriting_nature_of_suit_in_update_docket_metadata(
+        self,
+    ) -> None:
+        """Test avoid updating the nature_of_suit from update_docket_metadata
+         if the docket already has a nature_of_suit set, since this value doesn't
+        change. See issue #3878.
+        """
+
+        test_cases = [
+            ("810 copyright", "copyright"),
+            ("", "social welfare"),
+            ("", ""),
+        ]
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+        )
+        for initial_nature_of_suit, incoming_nature_of_suit in test_cases:
+            with self.subTest(
+                initial_nature_of_suit=initial_nature_of_suit,
+                incoming_nature_of_suit=incoming_nature_of_suit,
+            ):
+                # Update Docket with or without nature_of_suit
+                Docket.objects.filter(pk=d.pk).update(
+                    nature_of_suit=initial_nature_of_suit
+                )
+                docket_data = {
+                    "case_name": d.case_name,
+                    "docket_number": d.docket_number,
+                    "nature_of_suit": incoming_nature_of_suit,
+                }
+                d.refresh_from_db()
+                async_to_sync(update_docket_metadata)(d, docket_data)
+                d.save()
+                d.refresh_from_db()
+                self.assertEqual(
+                    d.nature_of_suit,
+                    (
+                        incoming_nature_of_suit
+                        if not initial_nature_of_suit
+                        else initial_nature_of_suit
+                    ),
+                    msg="The nature_of_suit does not match.",
+                )
+        d.delete()
 
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")
@@ -2379,19 +2477,19 @@ class RecapUploadAuthenticationTest(TestCase):
             HTTP_AUTHORIZATION="Token asdf"
         )  # Junk token.
         r = await self.async_client.post(self.path)
-        self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
         r = await self.async_client.get(self.path)
-        self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
     async def test_no_credentials(self) -> None:
         """Does POSTing and GETting fail if we lack credentials?"""
         self.async_client.credentials()
         r = await self.async_client.post(self.path)
-        self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
         r = await self.async_client.get(self.path)
-        self.assertEqual(r.status_code, HTTP_401_UNAUTHORIZED)
+        self.assertEqual(r.status_code, HTTPStatus.UNAUTHORIZED)
 
 
 class IdbImportTest(SimpleTestCase):
@@ -2504,6 +2602,10 @@ class IdbMergeTest(TestCase):
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
+)
+@mock.patch(
+    "cl.recap.tasks.is_docket_entry_sealed",
+    return_value=False,
 )
 class RecapEmailDocketAlerts(TestCase):
     """Test recap email docket alerts"""
@@ -2686,6 +2788,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -2760,6 +2863,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -2852,6 +2956,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -2914,6 +3019,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3010,6 +3116,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf,
         mock_get_document_number_from_confirmation_page,
     ):
@@ -3050,6 +3157,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3205,6 +3313,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3274,6 +3383,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3367,6 +3477,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3517,6 +3628,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -3611,6 +3723,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
         mock_att_response,
@@ -3766,6 +3879,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_pacer_court_accessible,
         mock_cookies,
+        mock_docket_entry_sealed,
         mock_cookie,
         mock_download_pdf,
         mock_webhook_post,
@@ -3810,6 +3924,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
@@ -3860,6 +3975,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_webhook_post,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
@@ -3935,6 +4051,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
@@ -4007,6 +4124,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_cookie,
         mock_download_pdf,
         mock_att_response,
@@ -4176,6 +4294,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
         mock_get_document_number_appellate,
@@ -4260,6 +4379,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pdf,
         mock_get_document_number_from_confirmation_page,
         mock_webhook_post,
@@ -4306,6 +4426,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
         mock_att_response,
@@ -4355,6 +4476,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_get_document_number_appellate,
         mock_webhook_post,
         mock_is_pacer_doc_sealed,
@@ -4396,6 +4518,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_webhook_post,
     ):
         """Can we add docket entries from a minute entry recap email
@@ -4436,6 +4559,173 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Failed to get docket entry"),
+    )
+    @mock.patch("cl.recap.tasks.add_docket_entries")
+    async def test_recap_email_sealed_entry_no_attachments(
+        self,
+        mock_add_docket_entries,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks if a docket entry without attachments that is
+        sealed on PACER is ignored.
+        """
+        mock_docket_entry_sealed.return_value = True
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=False,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[RECAPEmailDocketEntryDataFactory()],
+                )
+            ],
+        )
+
+        court = await sync_to_async(CourtFactory)(
+            id="sealed", jurisdiction="FB"
+        )
+        notification_payload = {
+            "court": court.id,
+            "mail": self.data["mail"],
+            "receipt": self.data["receipt"],
+        }
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            return_value=(email_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            await self.async_client.post(
+                self.path, notification_payload, format="json"
+            )
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        mock_docket_entry_sealed.assert_called_once_with(
+            court.pk,
+            docket_entry[0]["pacer_case_id"],
+            docket_entry[0]["pacer_doc_id"],
+        )
+
+        # the process_recap_email task returns before trying to add a new entry
+        mock_add_docket_entries.assert_not_called()
+
+        pq_query = ProcessingQueue.objects.filter(
+            pacer_doc_id=docket_entry[0]["pacer_doc_id"],
+            pacer_case_id=docket_entry[0]["pacer_case_id"],
+        )
+        self.assertEqual(await pq_query.acount(), 1)
+        processing_queue = await pq_query.afirst()
+        self.assertIn(
+            "Failed to get docket entry", processing_queue.error_message
+        )
+        # check we don't trigger alerts for sealed docket entries
+        self.assertEqual(len(mail.outbox), 0)
+
+        epq_query = EmailProcessingQueue.objects.filter(court_id=court.pk)
+        self.assertEqual(await pq_query.acount(), 1)
+        email_processing_queue = await epq_query.afirst()
+        self.assertEqual(
+            "Could not retrieve Docket Entry",
+            email_processing_queue.status_message,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
+        return_value=(None, "Failed to get docket entry"),
+    )
+    @mock.patch("cl.recap.tasks.get_and_merge_rd_attachments")
+    @mock.patch("cl.recap.tasks.add_docket_entries")
+    async def test_recap_email_sealed_entry_with_attachments(
+        self,
+        mock_add_docket_entries,
+        mock_merge_rd_attachments,
+        mock_download_pdf_by_magic_number,
+        mock_docket_entry_sealed,
+        mock_enqueue_alert,
+        mock_bucket_open,
+        mock_cookies,
+        mock_pacer_court_accessible,
+    ):
+        """This test checks if a docket entry with attachments that is
+        sealed on PACER is ignored.
+        """
+        mock_docket_entry_sealed.return_value = True
+
+        email_data = RECAPEmailNotificationDataFactory(
+            contains_attachments=True,
+            appellate=False,
+            dockets=[
+                RECAPEmailDocketDataFactory(
+                    docket_entries=[RECAPEmailDocketEntryDataFactory()],
+                )
+            ],
+        )
+
+        court = await sync_to_async(CourtFactory)(
+            id="sealed2", jurisdiction="FB"
+        )
+        notification_payload = {
+            "court": court.id,
+            "mail": self.data["mail"],
+            "receipt": self.data["receipt"],
+        }
+
+        with mock.patch(
+            "cl.recap.tasks.open_and_validate_email_notification",
+            return_value=(email_data, "HTML"),
+        ):
+            # Trigger a new recap.email notification from testing_1@recap.email
+            # auto-subscription option enabled
+            await self.async_client.post(
+                self.path, notification_payload, format="json"
+            )
+
+        docket_entry = email_data["dockets"][0]["docket_entries"]
+        mock_docket_entry_sealed.assert_called_once_with(
+            court.pk,
+            docket_entry[0]["pacer_case_id"],
+            docket_entry[0]["pacer_doc_id"],
+        )
+
+        # the process_recap_email task returns before trying to add a new entry
+        mock_add_docket_entries.assert_not_called()
+        mock_merge_rd_attachments.assert_not_called()
+
+        # check we didn't create a docket entry
+        docket_entry_query = DocketEntry.objects.filter(
+            docket__pacer_case_id=docket_entry[0]["pacer_case_id"],
+            entry_number=docket_entry[0]["document_number"],
+        )
+        self.assertEqual(await docket_entry_query.acount(), 0)
+
+        pq_query = ProcessingQueue.objects.filter(
+            pacer_doc_id=docket_entry[0]["pacer_doc_id"],
+            pacer_case_id=docket_entry[0]["pacer_case_id"],
+        )
+        self.assertEqual(await pq_query.acount(), 1)
+        processing_queue = await pq_query.afirst()
+        self.assertIn(
+            "Failed to get docket entry", processing_queue.error_message
+        )
+        # check we don't trigger alerts for sealed docket entries
+        self.assertEqual(len(mail.outbox), 0)
+
+        epq_query = EmailProcessingQueue.objects.filter(court_id=court.pk)
+        self.assertEqual(await pq_query.acount(), 1)
+        email_processing_queue = await epq_query.afirst()
+        self.assertEqual(
+            "Could not retrieve Docket Entry",
+            email_processing_queue.status_message,
+        )
+
+    @mock.patch(
+        "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d: (None, ""),
     )
     @mock.patch(
@@ -4448,6 +4738,7 @@ class RecapEmailDocketAlerts(TestCase):
         mock_bucket_open,
         mock_cookies,
         mock_pacer_court_accessible,
+        mock_docket_entry_sealed,
         mock_download_pacer_pdf_by_rd,
         mock_webhook_post,
     ):
@@ -5097,7 +5388,7 @@ class CheckCourtConnectivityTest(TestCase):
 
     def setUp(self) -> None:
         self.court_id = "alnb"
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
         key = self.r.keys(f"status:pacer:court.{self.court_id}:ip.127.0.0.1")
         if key:
             self.r.delete(*key)
@@ -5147,6 +5438,10 @@ class CheckCourtConnectivityTest(TestCase):
 @mock.patch(
     "cl.corpus_importer.tasks.get_document_number_from_confirmation_page",
     side_effect=lambda z, x: "011112443447",
+)
+@mock.patch(
+    "cl.recap.tasks.is_docket_entry_sealed",
+    return_value=False,
 )
 class WebhooksRetries(TestCase):
     """Test WebhookEvents retries"""
@@ -5213,17 +5508,18 @@ class WebhooksRetries(TestCase):
         recipient_user.save()
         self.recipient_user = recipient_user
 
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
 
     @classmethod
     def restart_webhook_executed(cls):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         key = r.keys("daemon:webhooks:executed")
         if key:
             r.delete(*key)
 
     def test_get_next_webhook_retry_date(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5260,6 +5556,7 @@ class WebhooksRetries(TestCase):
 
     def test_retry_webhook_disabled(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5293,6 +5590,7 @@ class WebhooksRetries(TestCase):
 
     def test_retry_webhook_events(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5393,6 +5691,7 @@ class WebhooksRetries(TestCase):
 
     def test_webhook_response_status_codes(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5445,6 +5744,7 @@ class WebhooksRetries(TestCase):
     )
     async def test_update_webhook_after_http_error(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5516,6 +5816,7 @@ class WebhooksRetries(TestCase):
     )
     async def test_update_webhook_after_network_error(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5588,6 +5889,7 @@ class WebhooksRetries(TestCase):
     )
     async def test_success_webhook_delivery(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5653,6 +5955,7 @@ class WebhooksRetries(TestCase):
     )
     async def test_retry_webhooks_integration(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5781,6 +6084,7 @@ class WebhooksRetries(TestCase):
 
     def test_webhook_disabling(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -5889,6 +6193,7 @@ class WebhooksRetries(TestCase):
 
     def test_cut_off_time_for_retry_events_and_restore_retry_counter(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -6025,6 +6330,7 @@ class WebhooksRetries(TestCase):
 
     def test_webhook_continues_failing_after_an_event_delivery(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -6164,6 +6470,7 @@ class WebhooksRetries(TestCase):
 
     def test_delete_old_webhook_events(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,
@@ -6214,6 +6521,7 @@ class WebhooksRetries(TestCase):
 
     def test_send_notifications_if_webhook_still_disabled(
         self,
+        mock_is_docket_entry_sealed,
         mock_enqueue_alert,
         mock_bucket_open,
         mock_cookies,

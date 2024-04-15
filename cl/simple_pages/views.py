@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from datetime import timedelta
+from http import HTTPStatus
 from typing import Any
 
 from asgiref.sync import sync_to_async
@@ -15,7 +16,6 @@ from django.template import loader
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.timezone import now
-from rest_framework.status import HTTP_429_TOO_MANY_REQUESTS
 
 from cl.audio.models import Audio
 from cl.disclosures.models import (
@@ -260,7 +260,7 @@ async def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
     return coverage_data
 
 
-async def coverage_graph(request: HttpRequest) -> HttpResponse:
+async def coverage(request: HttpRequest) -> HttpResponse:
     coverage_data_o = await get_coverage_data_o(request)
     return TemplateResponse(request, "help/coverage.html", coverage_data_o)
 
@@ -298,6 +298,14 @@ async def coverage_opinions(request: HttpRequest) -> HttpResponse:
 
     return TemplateResponse(
         request, "help/coverage_opinions.html", coverage_data_op
+    )
+
+
+async def coverage_recap(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "help/coverage_recap.html",
+        {"private": False},
     )
 
 
@@ -441,5 +449,5 @@ async def ratelimited(
         request,
         "429.html",
         {"private": True},
-        status=HTTP_429_TOO_MANY_REQUESTS,
+        status=HTTPStatus.TOO_MANY_REQUESTS,
     )

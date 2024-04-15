@@ -9,9 +9,13 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.disclosures.factories import (
+    DebtFactory,
     FinancialDisclosureFactory,
     FinancialDisclosurePositionFactory,
+    GiftFactory,
     InvestmentFactory,
+    ReimbursementFactory,
+    SpousalIncomeFactory,
 )
 from cl.disclosures.models import (
     CODES,
@@ -133,6 +137,31 @@ class DisclosureAPITest(TestCase):
         InvestmentFactory.create_batch(
             10, financial_disclosure=fd, redacted=True
         )
+        DebtFactory.create(
+            financial_disclosure=fd, creditor_name="JP Morgan Chase"
+        )
+        DebtFactory.create_batch(10, financial_disclosure=fd, redacted=False)
+        SpousalIncomeFactory.create(
+            financial_disclosure=fd,
+            source_type="A big Trust Fund",
+        )
+        SpousalIncomeFactory.create_batch(
+            10, financial_disclosure=fd, redacted=False
+        )
+        GiftFactory.create(
+            financial_disclosure=fd,
+            source="John Oliver",
+            description="Luxury Motor Coach",
+            value="2,000,000.00 dollars",
+        )
+        GiftFactory.create_batch(10, financial_disclosure=fd, redacted=False)
+        ReimbursementFactory.create(
+            financial_disclosure=fd,
+            location="Honolulu, Hawaii",
+        )
+        ReimbursementFactory.create_batch(
+            10, financial_disclosure=fd, redacted=False
+        )
 
     async def test_disclosure_position_api(self) -> None:
         """Can we query the financial disclosure position API?"""
@@ -206,6 +235,38 @@ class DisclosureAPITest(TestCase):
 
         r = await self.async_client.get(self.path, q)
         self.assertEqual(r.json()["count"], 1, msg="Wrong disclosure count")
+
+    async def test_gift_filtering(self) -> None:
+        """Can we filter gifts by description?"""
+        self.path = reverse("gift-list", kwargs={"version": "v3"})
+        self.q = {"description": "Luxury Motor Coach"}
+        r = await self.async_client.get(self.path, self.q)
+        self.assertEqual(r.json()["count"], 1, msg="Failed Gift filter")
+
+    async def test_reimbursement_filtering(self) -> None:
+        """Can we filter reimbursements by location?"""
+        self.path = reverse("reimbursement-list", kwargs={"version": "v3"})
+        self.q = {"location__icontains": "hawaii"}
+        r = await self.async_client.get(self.path, self.q)
+        self.assertEqual(
+            r.json()["count"], 1, msg="Failed Reimbursement filter"
+        )
+
+    async def test_spousal_income_filtering(self) -> None:
+        """Can we filter spousal income by source_type?"""
+        self.path = reverse("spouseincome-list", kwargs={"version": "v3"})
+        self.q = {"source_type__icontains": "trust fund"}
+        r = await self.async_client.get(self.path, self.q)
+        self.assertEqual(
+            r.json()["count"], 1, msg="Failed Spousal Income filter"
+        )
+
+    async def test_debt_filtering(self) -> None:
+        """Can we filter debts by creditor?"""
+        self.path = reverse("debt-list", kwargs={"version": "v3"})
+        self.q = {"creditor_name__icontains": "JP Morgan"}
+        r = await self.async_client.get(self.path, self.q)
+        self.assertEqual(r.json()["count"], 1, msg="Failed Debt filter")
 
 
 class DisclosureReactLoadTest(BaseSeleniumTest):
