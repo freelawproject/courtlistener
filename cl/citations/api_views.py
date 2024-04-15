@@ -1,10 +1,11 @@
 from http import HTTPStatus
 
-import eyecite
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.db.models import QuerySet
 from django.template.defaultfilters import slugify
 from django.utils.safestring import SafeString
+from eyecite.models import FullCaseCitation, ShortCaseCitation
 from rest_framework.exceptions import NotFound
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
@@ -12,16 +13,13 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from cl.api.utils import CitationCountRateThrottle
 from cl.citations.api_serializers import (
     CitationAPIRequestSerializer,
     CitationAPIResponseSerializer,
 )
 from cl.citations.types import CitationAPIResponse
-from cl.citations.utils import (
-    SLUGIFIED_EDITIONS,
-    filter_out_non_case_law_citations,
-    get_canonicals_from_reporter,
-)
+from cl.citations.utils import SLUGIFIED_EDITIONS, get_canonicals_from_reporter
 from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
 
@@ -30,27 +28,28 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
     serializer_class = CitationAPIRequestSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [CitationCountRateThrottle]
+    citation_list: list[FullCaseCitation | ShortCaseCitation] = []
 
-    def create(self, request: Request, *args, **kwargs):
-        # Uses the serializer to perform object level validations
+    def validate_request_data(self, request: Request):
+        # Perform object level validations before extracting citations
         citation_serializer = CitationAPIRequestSerializer(data=request.data)
         citation_serializer.is_valid(raise_exception=True)
 
-        # Get query parameters from the validated data
+        return citation_serializer.validated_data
+
+    def create(self, request: Request, *args, **kwargs):
         citations = []
-        data = citation_serializer.validated_data
+        data = self.request.data
         text = data.get("text", None)
         if text:
-            citation_objs = eyecite.get_citations(text)
-            citation_objs = filter_out_non_case_law_citations(citation_objs)
-            if not citation_objs:
+            # self.citations is set by the throttle class. This is a performance
+            # enhancement to avoid parsing the citations twice, first in the
+            # throttle and then again here.
+            if not self.citation_list:
                 return Response([])
 
-            for citation in citation_objs:
-                if not all(
-                    [citation.groups["volume"], citation.groups["page"]]
-                ):
-                    continue
+            for idx, citation in enumerate(self.citation_list):
 
                 start_index, end_index = citation.span()
                 citation_data = {
@@ -59,6 +58,16 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
                     "start_index": start_index,
                     "end_index": end_index,
                 }
+
+                if idx >= settings.MAX_CITATIONS_PER_REQUEST:
+                    citations.append(
+                        {
+                            **citation_data,
+                            "status": HTTPStatus.TOO_MANY_REQUESTS,
+                            "error_message": "Too many citations requested.",
+                        }
+                    )
+                    continue
 
                 reporter = citation.groups["reporter"]
                 volume = citation.groups["volume"]

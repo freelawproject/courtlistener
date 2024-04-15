@@ -5,7 +5,7 @@ from cl.search.api_serializers import OpinionClusterSerializer
 
 
 class CitationAPIRequestSerializer(serializers.Serializer):
-    text = serializers.CharField(required=False)
+    text = serializers.CharField(required=False, max_length=64_000)
     reporter = serializers.CharField(max_length=100, required=False)
     volume = serializers.IntegerField(required=False)
     page = serializers.CharField(required=False)
