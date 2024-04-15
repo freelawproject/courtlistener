@@ -21,8 +21,11 @@ from cl.search.models import (
 )
 
 
-def disable_logging():
-    """"""
+def disable_debug_logging():
+    """Turn off
+
+    :return:
+    """
     logger = logging.getLogger("django.db.backends")
     logger.setLevel(logging.WARNING)
 
@@ -222,7 +225,7 @@ class Command(VerboseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--disable-logging",
+            "--disable-debug",
             help="Flag to disable debug logging",
             action="store_true",
         )
@@ -237,6 +240,6 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         super(Command, self).handle(*args, **options)
         skip_until = options["skip_until"]
-        if options["disable_logging"]:
-            disable_logging()
+        if options["disable_debug"]:
+            disable_debug_logging()
         merge_recap_into_caselaw(skip_until=skip_until)
