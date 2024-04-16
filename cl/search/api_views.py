@@ -179,10 +179,10 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
 
     def list(self, request, *args, **kwargs):
 
-        is_opinion_es_active = waffle.flag_is_active(
+        is_opinion_active = waffle.flag_is_active(
             request, "o-es-search-api-active"
         )
-        search_form = SearchForm(request.GET, is_es_form=is_opinion_es_active)
+        search_form = SearchForm(request.GET, is_es_form=is_opinion_active)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 
@@ -199,7 +199,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 request, "p-es-active"
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
-            elif search_type == SEARCH_TYPES.OPINION and is_opinion_es_active:
+            elif search_type == SEARCH_TYPES.OPINION and is_opinion_active:
                 serializer = OpinionESResultSerializer(result_page, many=True)
             else:
                 if cd["q"] == "":
