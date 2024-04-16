@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core import mail
+from django.core.mail import send_mail
 from django.core.management import call_command
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -79,6 +80,7 @@ from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, ESIndexTestCase, TestCase
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
+from cl.users.models import EmailSent
 
 
 class AlertTest(SimpleUserDataMixin, TestCase):
@@ -3224,3 +3226,26 @@ class CleanUpSearchAlertsCommandTests(ESIndexTestCase, TestCase):
                 "Invalid Search Alert syntax.",
                 mock_logger.error.call_args[0][0],
             )
+
+
+@override_settings(EMAIL_BACKEND="cl.lib.email_backends.EmailBackend")
+class EmailWithSurrogatesTest(TestCase):
+
+    def setUp(self):
+        EmailSent.objects.all().delete()
+
+    @mock.patch("django_ses.SESBackend.get_rate_limit", return_value=10)
+    def test_can_send_mail_with_surrogate_pairs(self, mock_backend):
+        send_mail(
+            "Test surrogate pairs",
+            "government interest.\udce2\udc80\udc9d Saxe v. State Coll.",
+            "from@example.com",
+            ["to@example.com"],
+        )
+        # checks the message is properly stored in the DB
+        self.assertEqual(EmailSent.objects.count(), 1)
+        email = EmailSent.objects.first()
+        self.assertEqual(
+            email.plain_text,
+            "government interest.” Saxe v. State Coll.",
+        )

@@ -33,7 +33,7 @@ celery = "^5.3.6"
 certifi = "^2024.2.2"
 courts-db = "*"
 disposable-email-domains = "*"
-Django = "^5.0.3"
+Django = { git = "https://github.com/django/django.git", rev = "2e6ae1e96a405fc2ac318325956ce276cfb9830c" }
 django-cache-memoize = "==0.*"
 django-cors-headers = "^4.3.1"
 django-csp = "^3.7.0"
@@ -110,6 +110,7 @@ httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.3.1"
 django-permissions-policy = "^4.19.0"
 juriscraper = "^2.6.0"
+tiktoken = "^0.6.0"
 
 
 [tool.poetry.group.dev.dependencies]
