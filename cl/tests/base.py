@@ -19,6 +19,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from timeout_decorator import TimeoutError
 
 from cl.lib.decorators import retry
+from cl.lib.test_helpers import SerializeLockFileTestMixin
 from cl.search.models import SEARCH_TYPES
 from cl.tests.cases import ESIndexTestCase, StaticLiveServerTestCase
 
@@ -34,7 +35,9 @@ if "SELENIUM_TIMEOUT" in os.environ:
 @override_settings(
     ALLOWED_HOSTS=["*"],
 )
-class BaseSeleniumTest(StaticLiveServerTestCase, ESIndexTestCase):
+class BaseSeleniumTest(
+    SerializeLockFileTestMixin, StaticLiveServerTestCase, ESIndexTestCase
+):
     """Base class for Selenium Tests. Sets up a few attributes:
       * browser - instance of Selenium WebDriver
       * screenshot - boolean for if the test should save a final screenshot
@@ -81,8 +84,10 @@ class BaseSeleniumTest(StaticLiveServerTestCase, ESIndexTestCase):
 
     def setUp(self) -> None:
         self.reset_browser()
-        self._update_index()
         self.rebuild_index("audio.Audio")
+        self.delete_index("search.OpinionCluster")
+        self.create_index("search.OpinionCluster")
+        self._update_index()
 
     def reset_browser(self) -> None:
         self.browser.delete_all_cookies()

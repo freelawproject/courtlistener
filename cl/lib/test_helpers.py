@@ -633,7 +633,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class SerializeSolrTestMixin(SerializeMixin):
+class SerializeLockFileTestMixin(SerializeMixin):
     lockfile = __file__
 
 
@@ -655,7 +655,7 @@ class SimpleUserDataMixin:
     SOLR_URLS=settings.SOLR_TEST_URLS,
     ELASTICSEARCH_DISABLED=True,
 )
-class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
+class EmptySolrTestCase(SerializeLockFileTestMixin, TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
 
     Other Solr test classes subclass this one, adding additional content or
