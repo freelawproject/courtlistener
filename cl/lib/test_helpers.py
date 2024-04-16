@@ -1,5 +1,7 @@
 import datetime
 import json
+import unittest
+from functools import wraps
 from typing import Sized, cast
 
 import scorched
@@ -1115,3 +1117,15 @@ class AudioESTestCase(SimpleTestCase):
             judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
+
+
+def skip_if_common_tests_skipped(method):
+    """Decorator to skip common tests based on the skip_common_tests attribute."""
+
+    @wraps(method)
+    def wrapper_func(self, *args, **kwargs):
+        if getattr(self, "skip_common_tests", False):
+            raise unittest.SkipTest("Skip common tests within the class.")
+        return method(self, *args, **kwargs)
+
+    return wrapper_func

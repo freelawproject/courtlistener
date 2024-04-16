@@ -22,6 +22,7 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     RECAPSearchTestCase,
     recap_search_v4_api_keys,
+    skip_if_common_tests_skipped,
 )
 from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
@@ -2122,6 +2123,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     version_api = "v3"
+    skip_common_tests = True
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -2141,6 +2143,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         )
         return r
 
+    @skip_if_common_tests_skipped
     async def test_case_name_filter(self) -> None:
         """Confirm case_name filter works properly"""
         params = {
@@ -2151,6 +2154,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         # API, 2 result expected since RECAPDocuments are not grouped.
         await self._test_api_results_count(params, 1, "case_name")
 
+    @skip_if_common_tests_skipped
     async def test_court_filter(self) -> None:
         """Confirm court filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "court": "canb"}
@@ -2159,6 +2163,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         expected_results = 2 if self.version_api == "v3" else 1
         await self._test_api_results_count(params, expected_results, "court")
 
+    @skip_if_common_tests_skipped
     async def test_document_description_filter(self) -> None:
         """Confirm description filter works properly"""
         params = {
@@ -2171,6 +2176,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             params, expected_results, "description"
         )
 
+    @skip_if_common_tests_skipped
     async def test_docket_number_filter(self) -> None:
         """Confirm docket_number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
@@ -2181,12 +2187,14 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             params, expected_results, "docket_number"
         )
 
+    @skip_if_common_tests_skipped
     async def test_attachment_number_filter(self) -> None:
         """Confirm attachment number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "attachment_number": 2}
 
         await self._test_api_results_count(params, 1, "attachment_number")
 
+    @skip_if_common_tests_skipped
     async def test_assigned_to_judge_filter(self) -> None:
         """Confirm assigned_to filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "assigned_to": "Thalassa Miller"}
@@ -2197,6 +2205,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             params, expected_results, "assigned_to"
         )
 
+    @skip_if_common_tests_skipped
     async def test_referred_to_judge_filter(self) -> None:
         """Confirm referred_to_judge filter works properly"""
         params = {
@@ -2210,6 +2219,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             params, expected_results, "referred_to"
         )
 
+    @skip_if_common_tests_skipped
     async def test_nature_of_suit_filter(self) -> None:
         """Confirm nature_of_suit filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "nature_of_suit": "440"}
@@ -2220,12 +2230,14 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             params, expected_results, "nature_of_suit"
         )
 
+    @skip_if_common_tests_skipped
     async def test_filed_after_filter(self) -> None:
         """Confirm filed_after filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "filed_after": "2016-08-16"}
 
         await self._test_api_results_count(params, 1, "filed_after")
 
+    @skip_if_common_tests_skipped
     async def test_filed_before_filter(self) -> None:
         """Confirm filed_before filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "filed_before": "2015-08-17"}
@@ -2236,12 +2248,14 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             params, expected_results, "filed_before"
         )
 
+    @skip_if_common_tests_skipped
     async def test_document_number_filter(self) -> None:
         """Confirm document number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "document_number": "3"}
 
         await self._test_api_results_count(params, 1, "document_number")
 
+    @skip_if_common_tests_skipped
     async def test_available_only_field(self) -> None:
         """Confirm available only filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "available_only": True}
@@ -2249,6 +2263,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         # API
         await self._test_api_results_count(params, 1, "available_only")
 
+    @skip_if_common_tests_skipped
     async def test_combine_filters(self) -> None:
         """Confirm that combining filters works properly"""
         # Get results for a broad filter
@@ -2287,6 +2302,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         # API
         await self._test_api_results_count(params, 1, "filter + text query")
 
+    @skip_if_common_tests_skipped
     async def test_text_queries(self) -> None:
         """Confirm text queries works properly"""
         # Text query case name.
@@ -2325,6 +2341,7 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
     """
 
     tests_running_over_solr = True
+    skip_common_tests = False
 
     @classmethod
     def setUpTestData(cls):
@@ -2610,6 +2627,7 @@ class RECAPSearchAPIV4Test(
     """
 
     version_api = "v4"
+    skip_common_tests = False
 
     @classmethod
     def setUpTestData(cls):

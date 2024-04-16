@@ -163,16 +163,20 @@ class ESList:
             self.offset : self.offset + self.page_size
         ]
         results = self.main_query.execute()
-        # Merge unavailable fields in ES by pulling data from the DB to make
-        # the API backwards compatible
-        if self.clean_data["type"] == SEARCH_TYPES.PEOPLE:
-            merge_unavailable_fields_on_parent_document(
-                results, self.clean_data["type"], "api"
-            )
 
         if self._version == "v4":
             limit_inner_hits({}, results, self.clean_data["type"])
             set_results_highlights(results, self.clean_data["type"])
+
+        # Merge unavailable fields in ES by pulling data from the DB to make
+        # the API backwards compatible or retrieves the snippet from the DB
+        # when highlighting is disabled.
+        merge_unavailable_fields_on_parent_document(
+            results,
+            self.clean_data["type"],
+            "api",
+            self.clean_data["highlight"],
+        )
 
         for result in results:
             child_result_objects = []

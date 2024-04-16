@@ -14,6 +14,7 @@ from django.conf import settings
 from django.core.cache import caches
 from django.core.paginator import EmptyPage, Page
 from django.db.models import QuerySet
+from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http import HttpRequest
 from django.http.request import QueryDict
@@ -21,7 +22,6 @@ from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import A, MultiSearch, Q
 from elasticsearch_dsl import Search as SearchDSL
-from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrDict
@@ -59,6 +59,7 @@ from cl.search.constants import (
     SEARCH_ORAL_ARGUMENT_QUERY_FIELDS,
     SEARCH_PEOPLE_CHILD_QUERY_FIELDS,
     SEARCH_PEOPLE_PARENT_QUERY_FIELDS,
+    SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
@@ -76,6 +77,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     Court,
     OpinionCluster,
+    RECAPDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -600,13 +602,16 @@ def build_es_filters(cd: CleanData) -> List:
 
 
 def build_highlights_dict(
-    highlighting_fields: dict[str, int] | None, hl_tag: str
+    highlighting_fields: dict[str, int] | None,
+    hl_tag: str,
+    child_highlighting: bool = True,
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """Builds a dictionary for ES highlighting options and a list of fields to
     exclude from the _source.
 
     :param highlighting_fields: A dictionary of fields to highlight in child docs.
     :param hl_tag: The HTML tag to use for highlighting matched fragments.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
     :return: A tuple containing, a dictionary with the configuration for
     highlighting each field and aa list of field names to exclude from the
     _source results to avoid data redundancy.
@@ -629,6 +634,11 @@ def build_highlights_dict(
             # The original field is excluded from the response to avoid
             # returning the entire field from the index.
             fields_to_exclude.append(field)
+            if not child_highlighting:
+                # If highlighting is not enabled in child documents, return
+                # only the fields to exclude.
+                continue
+
         highlight_options["fields"][field] = {
             "type": settings.ES_HIGHLIGHTER,
             "matched_fields": [field, f"{field}.exact"],
@@ -648,6 +658,7 @@ def build_has_child_query(
     child_hits_limit: int,
     highlighting_fields: dict[str, int] | None = None,
     order_by: tuple[str, str] | None = None,
+    child_highlighting: bool = True,
 ) -> QueryString:
     """Build a 'has_child' query.
 
@@ -657,6 +668,7 @@ def build_has_child_query(
     :param highlighting_fields: List of fields to highlight in child docs.
     :param order_by: If provided the field to use to compute score for sorting
     results based on a child document field.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
     :return: The 'has_child' query.
     """
 
@@ -719,7 +731,7 @@ def build_has_child_query(
         )
 
     highlight_options, fields_to_exclude = build_highlights_dict(
-        highlighting_fields, SEARCH_HL_TAG
+        highlighting_fields, SEARCH_HL_TAG, child_highlighting
     )
 
     inner_hits = {
@@ -729,7 +741,7 @@ def build_has_child_query(
             "excludes": fields_to_exclude,
         },
     }
-    if highlight_options:
+    if highlight_options and child_highlighting:
         inner_hits["highlight"] = highlight_options
 
     return Q(
@@ -1424,6 +1436,7 @@ def merge_unavailable_fields_on_parent_document(
     results: Page | dict,
     search_type: str,
     request_type: Literal["frontend", "api"] = "frontend",
+    highlight: bool = True,
 ) -> None:
     """Merges unavailable fields on parent document from the database into
     search results, not all fields are required in frontend, so that fields are
@@ -1432,35 +1445,63 @@ def merge_unavailable_fields_on_parent_document(
     :param results: A Page object containing the search results to be modified.
     :param search_type: The search type to perform.
     :param request_type: The request type, frontend or api.
+    :param highlight: Whether highlighting is enabled.
     :return: None, the function modifies the search results object in place.
     """
 
-    if search_type != SEARCH_TYPES.PEOPLE:
-        return
+    match search_type:
+        case SEARCH_TYPES.PEOPLE:
+            # Merge positions courts.
+            person_ids = [d["id"] for d in results]
+            positions_in_page = Position.objects.filter(
+                person_id__in=person_ids
+            ).select_related(
+                "person",
+                "court",
+                "appointer",
+                "appointer__person",
+                "supervisor",
+                "predecessor",
+            )
+            position_db_mapping = fill_position_mapping(
+                positions_in_page, request_type
+            )
 
-    # Merge positions courts.
-    person_ids = [d["id"] for d in results]
-    positions_in_page = Position.objects.filter(
-        person_id__in=person_ids
-    ).select_related(
-        "person",
-        "court",
-        "appointer",
-        "appointer__person",
-        "supervisor",
-        "predecessor",
-    )
-    position_db_mapping = fill_position_mapping(
-        positions_in_page, request_type
-    )
+            for result in results:
+                person_id = result["id"]
+                for field in fields(position_db_mapping):
+                    position_dict = getattr(position_db_mapping, field.name)
+                    value = position_dict.get(person_id)
+                    cleaned_name = re.sub("_dict", "", field.name)
+                    result[cleaned_name] = value
+        case SEARCH_TYPES.RECAP if request_type == "api" and not highlight:
+            # Retrieves the plain_text from the DB to fill the snippet when
+            # highlighting is disabled.
+            rd_ids = {
+                doc["_source"]["id"]
+                for entry in results
+                for doc in entry["child_docs"]
+            }
+            recap_docs = (
+                RECAPDocument.objects.filter(pk__in=rd_ids)
+                .annotate(
+                    plain_text_short=Substr(
+                        "plain_text", 1, settings.NO_MATCH_HL_SIZE
+                    )
+                )
+                .values("id", "plain_text_short")
+            )
+            recap_docs_dict = {
+                doc["id"]: doc["plain_text_short"] for doc in recap_docs
+            }
+            for result in results:
+                for rd in result["child_docs"]:
+                    rd["_source"]["plain_text"] = recap_docs_dict[
+                        rd["_source"]["id"]
+                    ]
 
-    for result in results:
-        person_id = result["id"]
-        for field in fields(position_db_mapping):
-            position_dict = getattr(position_db_mapping, field.name)
-            value = position_dict.get(person_id)
-            cleaned_name = re.sub("_dict", "", field.name)
-            result[cleaned_name] = value
+        case _:
+            return
 
 
 def clean_count_query(search_query: Search) -> SearchDSL:
@@ -2056,7 +2097,7 @@ def build_full_join_es_queries(
                     else SEARCH_RECAP_CHILD_HL_FIELDS
                 )
                 if child_highlighting
-                else {}
+                else SEARCH_RECAP_CHILD_EXCLUDE_FIELDS
             )
             has_child_query = build_has_child_query(
                 join_query,
@@ -2064,6 +2105,7 @@ def build_full_join_es_queries(
                 query_hits_limit,
                 hl_fields,
                 get_child_sorting_key(cd),
+                child_highlighting=child_highlighting,
             )
 
         if parties_filters and not has_child_query:
