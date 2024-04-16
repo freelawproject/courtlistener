@@ -393,6 +393,9 @@ class OpinionESResultSerializer(DocumentSerializer):
         return PRECEDENTIAL_STATUS.get_status_value_reverse(obj.status)
 
     def get_snippet(self, obj):
+        # If the snippet has not yet been set upstream, set it here.
+        if hasattr(obj, "snippet"):
+            return obj.snippet
         return get_highlight(obj, "text")
 
     class Meta:
