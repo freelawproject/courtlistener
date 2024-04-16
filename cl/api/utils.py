@@ -17,6 +17,7 @@ from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
 from django_ratelimit.core import get_header
+from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
 from rest_framework.exceptions import Throttled
@@ -34,6 +35,7 @@ from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 from cl.users.tasks import notify_failing_webhook
 
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 BOOLEAN_LOOKUPS = ["exact"]
 DATETIME_LOOKUPS = [
     "exact",
@@ -377,7 +379,7 @@ class CitationCountRateThrottle(ExceptionalUserRateThrottle):
             return 1
 
         citation_objs = filter_out_non_case_law_and_non_valid_citations(
-            eyecite.get_citations(text)
+            eyecite.get_citations(text, tokenizer=HYPERSCAN_TOKENIZER)
         )
         view.citation_list = citation_objs
         return len(citation_objs)

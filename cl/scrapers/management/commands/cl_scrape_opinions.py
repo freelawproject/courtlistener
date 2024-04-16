@@ -10,6 +10,7 @@ from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
@@ -39,6 +40,8 @@ from cl.search.models import (
     OpinionCluster,
 )
 
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
 cnt = CaseNameTweaker()
@@ -48,7 +51,7 @@ def make_citation(
     cite_str: str, cluster: OpinionCluster, court_id: str
 ) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
-    citation_objs = get_citations(cite_str)
+    citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
     if not citation_objs:
         logger.error(
             "Could not parse citation from court '%s'",

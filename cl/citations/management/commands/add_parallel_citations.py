@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.citations.annotate_citations import get_and_clean_opinion_text
 from cl.citations.match_citations import build_date_range
@@ -14,6 +15,8 @@ from cl.citations.utils import get_years_from_reporter
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import Opinion, OpinionCluster
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 # Parallel citations need to be identified this many times before they should
 # be added to the database.
@@ -290,7 +293,10 @@ class Command(VerboseCommand):
         for o in opinions.iterator():
             subtasks.append(
                 identify_parallel_citations.s(
-                    get_citations(get_and_clean_opinion_text(o).cleaned_text)
+                    get_citations(
+                        get_and_clean_opinion_text(o).cleaned_text,
+                        tokenizer=HYPERSCAN_TOKENIZER,
+                    )
                 )
             )
             last_item = count == completed + 1

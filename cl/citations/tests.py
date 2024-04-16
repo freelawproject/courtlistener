@@ -22,6 +22,7 @@ from eyecite.test_factories import (
     supra_citation,
     unknown_citation,
 )
+from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from lxml import etree
 
@@ -80,6 +81,8 @@ from cl.search.models import (
 )
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class CitationTextTest(SimpleTestCase):
@@ -199,7 +202,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -254,7 +259,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(html=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -305,7 +312,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -798,7 +807,9 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
         # citation2a is 9 F. 1, so we expect no results.
         citation_str = "1 F. 9 (1795)"
-        citation = get_citations(citation_str)[0]
+        citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
+            0
+        ]
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
@@ -1104,7 +1115,7 @@ class ParallelCitationTest(SimpleTestCase):
                 citation_group_count=citation_group_count,
                 expected_num_parallel_citations=expected_num_parallel_citations,
             ):
-                citations = get_citations(q)
+                citations = get_citations(q, tokenizer=HYPERSCAN_TOKENIZER)
                 citation_groups = identify_parallel_citations(citations)
                 computed_num_citation_groups = len(citation_groups)
                 self.assertEqual(

@@ -27,6 +27,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from eyecite.tokenizers import HyperscanTokenizer
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
@@ -85,6 +86,8 @@ from cl.search.models import (
 )
 from cl.search.selectors import get_clusters_from_citation_str
 from cl.search.views import do_search
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -1158,7 +1161,9 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
         if await sync_to_async(form.is_valid)():
             # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
-            citations = eyecite.get_citations(cd["reporter"])
+            citations = eyecite.get_citations(
+                cd["reporter"], tokenizer=HYPERSCAN_TOKENIZER
+            )
             case_law_citations = filter_out_non_case_law_citations(citations)
             if not case_law_citations:
                 return TemplateResponse(
