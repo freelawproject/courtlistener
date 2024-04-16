@@ -18,6 +18,7 @@ from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from localflavor.us.models import USPostalCodeField, USZipCodeField
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
@@ -41,6 +42,8 @@ from cl.lib.search_index_utils import (
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class PRECEDENTIAL_STATUS:
@@ -2422,6 +2425,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
                 c = get_citations(
                     citation_str,
                     remove_ambiguous=False,
+                    tokenizer=HYPERSCAN_TOKENIZER,
                 )[0]
             except IndexError:
                 raise ValueError(f"Unable to parse citation '{citation_str}'")
