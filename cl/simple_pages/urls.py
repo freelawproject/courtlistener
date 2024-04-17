@@ -11,6 +11,7 @@ from cl.simple_pages.views import (
     contribute,
     coverage,
     coverage_fds,
+    coverage_oa,
     coverage_opinions,
     coverage_recap,
     delete_help,
@@ -42,6 +43,7 @@ urlpatterns = [
         coverage_fds,  # type: ignore[arg-type]
         name="coverage_fds",
     ),
+    path("help/coverage/oral-arguments/", coverage_oa, name="coverage_oa"),  # type: ignore[arg-type]
     path(
         "help/coverage/opinions/", coverage_opinions, name="coverage_opinions"  # type: ignore[arg-type]
     ),
