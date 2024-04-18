@@ -38,11 +38,9 @@
       </ul>
     </div>
   </div>
-{% endblock %}
 
-{% block content %}
   <div class="col-xs-12 col-sm-12 col-md-8 col-lg-6" role="main">
-    <h1 id="overview">PACER Data Coverage</h1>
+    <h1 id="overview">RECAP Archive Coverage — What PACER Data Does CourtListener Have?</h1>
     <p class="lead">The <a href="{% url "advanced_r" %}">RECAP Archive</a> is the biggest open collection of PACER data on the Internet.</p>
     <p>It contains hundreds of millions of docket entries, nearly every federal case, and millions of documents. On a given day, it is likely to gain numerous new dockets, thousands of new documents, and around 100,000 new docket entries.
     </p>
@@ -116,6 +114,7 @@
     <p>We host a fleet of social media bots</a> that download important documents from PACER so they can be shared with the public. The bots use <a href="{% url "api_index" %}">CourtListener APIs</a> to download content from PACER. As a result, anything the bots buy is automatically contributed to the RECAP Archive.
     </p>
     <p><a href="https://bots.law" class="btn btn-default">Meet the Bots</a></p>
+    {% include "includes/donate_footer_plea.html" %}
   </div>
 {% endblock %}
 
