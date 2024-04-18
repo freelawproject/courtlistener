@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load humanize %}
-{% load partition_util %}
 
 {% block title %}Coverage – CourtListener.com{% endblock %}
 {% block sidebar %}{% endblock %}
@@ -16,9 +15,6 @@
       <h3>Table of Contents</h3>
       <ul>
       <li><a href="#recap-archive">PACER Data Coverage</a></li>
-      <ul>
-        <li><a href="#adding-updating">Adding PACER Data</a></li>
-      </ul>
       <li>
         <a href="#opinions">Case Law Coverage</a>
       </li>
@@ -65,35 +61,12 @@
     <p><a href="{% url "advanced_p" %}" class="btn btn-default btn-lg">Judge Homepage</a>
     </p>
     <hr>
-
+  
+  
     <h2 id="oral-arguments">Oral Argument Recordings</h2>
-    <p>Although we have the largest collection of oral argument recordings on the Internet, we currently only have support for the Supreme Court and the Federal Circuit Courts listed below. For the courts listed below, we gather their oral argument recordings within about an hour of when the files are posted.
+    <p>We have the largest collection of oral argument audio recordings on the Internet. Currently our collection contains {{ oa_duration|intcomma }} minutes of recordings.
     </p>
-    <p>For many of these courts, we also laboriously gathered everything they had available on their website so that we'd have as complete a collection as possible.
-    </p>
-    <p><a href="{% url "alert_help" %}">Alerts</a>, <a href="{% url "podcasts" %}">podcasts</a>, <a href="{% url "advanced_oa" %}">search</a>, and all our other features are available for these courts.
-    </p>
-    <div class="row">
-      {% for row in courts_with_oral_argument_scrapers|rows:2 %}
-        <div class="col-sm-6">
-          <ul class="{% if not forloop.last %}bottom{% endif %}">
-            {% for court in row %}
-              <li>
-                <a href="/?q=&court_{{ court.pk }}=on&order_by=dateArgued+desc&type=oa"
-                   rel="nofollow"
-                >{{ court }}</a>
-              </li>
-            {% endfor %}
-          </ul>
-        </div>
-      {% endfor %}
-    </div>
-    <p>This list continues to grow as we receive <a href="https://donate.free.law/forms/supportflp">financial support</a>, code contributions, and <a href="{% url "contact" %}">requests</a> for additional jurisdictions. As with everything we do, your support helps make this project possible.
-    </p>
-    <p class="v-offset-above-3">
-      <a href="https://donate.free.law/forms/membership" class="btn btn-danger btn-lg">&nbsp;Join Free.law</a>
-      <a href="https://donate.free.law/forms/supportflp" class="btn btn-danger btn-lg"><i
-          class="fa fa-heart-o"></i>&nbsp;Donate to Support Our Work</a>
-    </p>
+    <p><a href="{% url "coverage_oa" %}" class="btn btn-default btn-lg">Oral Argument Coverage</a></p>
+    {% include "includes/donate_footer_plea.html" %}
   </div>
 {% endblock %}
