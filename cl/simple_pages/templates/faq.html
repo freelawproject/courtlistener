@@ -100,7 +100,7 @@
     <h3 id="who-and-what">What Is This Site? Who Runs It?</h3>
     <p>CourtListener is a legal research website and data provider currently containing:</p>
     <ul>
-      <li><a href="{% url "coverage" %}">{{ total_opinion_count|intcomma }}</a> legal opinions from federal, state, and specialty courts.</li>
+      <li><a href="{% url "coverage_opinions" %}">{{ total_opinion_count|intcomma }}</a> legal opinions from federal, state, and specialty courts.</li>
       <li>{{ total_recap_count|intcomma }} documents from the Federal PACER system.</li>
       <li>{{ total_oa_minutes|intcomma }} minutes of oral argument recordings.</li>
       <li>A database of {{ total_judge_count|intcomma }} judges.</li>
@@ -117,9 +117,9 @@
 
 
     <h3 id="submit-documents">Can I send you documents from my case?</h3>
-    <p>In general, no, we can't accept documents from you about your case. As you might expect, people occasionally create fraudulent documents and that's a risk we cannot take. If your case in a <a href="{% url "coverage" %}#scraped-jurisdictions">jurisdiction that we cover</a>, we will eventually receive the records directly from the court itself.
+    <p>In general, no, we can't accept documents from you about your case. As you might expect, people occasionally create fraudulent documents and that's a risk we cannot take. If your case in a <a href="{% url "coverage" %}">jurisdiction that we cover</a>, we will eventually receive the records directly from the court itself.
     </p>
-    <p>The exception to this is that if your documents are on PACER, it's possible for you to use our <a href="https://free.law/recap/">RECAP Project</a> to get us copies of the documents. To do so, simply install either our Firefox, Chrome or Safari extension, and then purchase the documents from PACER.
+    <p>The exception to this is that if your documents are on PACER, it is possible for you to use our <a href="https://free.law/recap/">RECAP Project</a> to get us copies of the documents. To do so, install either our Firefox, Chrome, Edge, or Safari extension, and then purchase the documents from PACER.
     </p>
 
 
@@ -153,9 +153,8 @@
         <a href="https://free.law/2013/11/12/citegeist/">
             CiteGeist</a>, produce search results that are particularly impressive.</p>
 
-    <p>Unlike many sites that may be several days or weeks behind, we strive to collect new case law from
-        the courts in near real time. For <a href="{% url "coverage" %}#scraped-jurisdictions">the courts we cover</a>, new
-        case law should typically appear within 30 minutes of being posted on the court's website.</p>
+    <p>Unlike many sites that may be several days or weeks behind, we strive to collect new case law from the courts in near real time. For <a href="{% url "coverage_opinions" %}">the courts we cover</a>, new case law should typically appear within 30 minutes of being posted on the court's website.
+    </p>
 
     <p>But the most important distinguishing factor about this site is that it is <a
             href="https://en.wikipedia.org/wiki/Open_source">open source</a> and <a
@@ -195,10 +194,10 @@
     <h3 id="oral-args">How Do You Get the Oral Arguments That You Have?</h3>
     <p>We get oral arguments by looking at court websites on approximately an
         hourly basis. We currently only check the sites listed on our <a
-            href="{% url "coverage" %}#scraped-jurisdictions">coverage page</a>. Once we
+            href="{% url "coverage_oa" %}">coverage page</a>. Once we
         have downloaded an oral argument, we convert it to an MP3, downsample
-        the audio for faster downloading, and add album art for your MP3
-        player. When the file is ready, it is added to the site and it becomes
+        the audio for faster downloading, and add album art for your audio
+        player. When the file is ready, it is added to the site, and it becomes
         available in search results, podcasts and bulk data.</p>
 
 
