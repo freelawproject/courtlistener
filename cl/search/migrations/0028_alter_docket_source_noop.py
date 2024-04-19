@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("search", "0026_drop_docket_unique_together_and_more"),
+        ("search", "0027_add_docket_entry_idx"),
     ]
 
     operations = [
