@@ -21,11 +21,7 @@ from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.elasticsearch_utils import (
-    build_child_docs_query,
-    build_es_base_query,
-    build_highlights_dict,
-)
+from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_ALERTS_OPINION_HL_FIELDS
@@ -72,11 +68,15 @@ def send_alert(user_profile, hits):
 
     txt_template = loader.get_template("alert_email.txt")
     html_template = loader.get_template("alert_email.html")
+    context = {"hits": hits}
     if waffle.switch_is_active("o-es-alerts-active"):
         txt_template = loader.get_template("alert_email_es.txt")
         html_template = loader.get_template("alert_email_es.html")
+        context = {
+            "hits": hits,
+            "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
+        }
 
-    context = {"hits": hits}
     headers = {}
     query_string = ""
     if len(hits) == 1:
@@ -127,9 +127,7 @@ class Command(VerboseCommand):
         }
         self.options = {}
         self.valid_ids = {}
-        self.o_es_alerts = (
-            True if waffle.switch_is_active("o-es-alerts-active") else False
-        )
+        self.o_es_alerts = bool(waffle.switch_is_active("o-es-alerts-active"))
 
     def __del__(self):
         for si in self.sis.values():
@@ -223,26 +221,17 @@ class Command(VerboseCommand):
 
             if self.o_es_alerts:
                 search_query = OpinionDocument.search()
-                s, join_query = build_es_base_query(search_query, cd)
-                s = build_child_docs_query(
-                    join_query,
-                    cd=cd,
+                s = do_es_api_query(
+                    search_query,
+                    cd,
+                    SEARCH_ALERTS_OPINION_HL_FIELDS,
+                    ALERTS_HL_TAG,
                 )
-                s = search_query.query(s)
-                highlight_options, fields_to_exclude = build_highlights_dict(
-                    SEARCH_ALERTS_OPINION_HL_FIELDS, ALERTS_HL_TAG
-                )
-                s = s.source(excludes=fields_to_exclude)
                 s = s.extra(
                     from_=0,
-                    size=20,
-                    highlight=highlight_options,
-                    collapse={
-                        "field": "cluster_id",
-                    },
+                    size=settings.SCHEDULED_ALERT_HITS_LIMIT,
                 )
                 results = s.execute()
-
             else:
                 # Ignore warnings from this bit of code. Otherwise, it complains
                 # about the query URL being too long and having to POST it instead

@@ -2,8 +2,8 @@
 {% load extras static humanize %}
 
 {% block title %}Citation Lookup and Verification API – CourtListener.com{% endblock %}
-{% block description %}Trained on over 50 million citations going back centuries, our citation lookup API can translate a citation you have to a link on our site or it can serve as a guardrail to help identify and prevent hallucinated citations.{% endblock %}
-{% block og_description %}Trained on over 50 million citations going back centuries, our citation lookup API can translate a citation you have to a link on our site or it can serve as a guardrail to help identify and prevent hallucinated citations.{% endblock %}
+{% block description %}Trained on over 50 million citations going back centuries, our citation lookup API can translate a citation you have to a link on our site, or it can serve as a guardrail to help identify and prevent hallucinated citations.{% endblock %}
+{% block og_description %}Trained on over 50 million citations going back centuries, our citation lookup API can translate a citation you have to a link on our site, or it can serve as a guardrail to help identify and prevent hallucinated citations.{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -101,7 +101,7 @@
       <li><p><code>404 (Not Found)</code> — We found a citation, it was valid, but we were unable to look it up in CourtListener.</p></li>
       <li><p><code>400 (Bad Request)</code> — We found something that looks like a citation, but the reporter in the citation wasn’t in our system (e.g., “33 Umbrella 422” looks like a citation, but is not valid).</p></li>
       <li><p><code>300 (Multiple Choices)</code> — We found a valid citation, it was valid, but it matched more than one item in CourtListener.</p></li>
-      <li><p><code>429 (Too Many Requests)</code> — This API will only lookup 250 citations in a single request. Any citations after that point will have this status. They will be identified but will not be looked up. (See throttles below)</p></li>
+      <li><p><code>429 (Too Many Requests)</code> — This API will only lookup {{max_citation_per_request}} citations in a single request. Any citations after that point will have this status. They will be identified but will not be looked up. (See throttles below)</p></li>
     </ul>
     <li><p><code>error_message</code> — This field will contain additional details about any problems the lookup encounters.</p></li>
     <li>
@@ -112,9 +112,9 @@
   <p>This API has four limitations on how much it can be used:
   </p>
   <ol>
-    <li><p>The performance of this API is affected by the number of citations it has to look up. Therefore, it is throttled to one valid citation per second. If you are below this throttle, you will be able to send a request to the API. If a request pushes you beyond this throttle, further requests will be denied. When your request is denied, the API will respond with a 429 HTTP code and a JSON object. The JSON object will contain a <code>wait_util</code> key that uses an ISO-8601 datetime to indicate when you will be able to make your next request.
+    <li><p>The performance of this API is affected by the number of citations it has to look up. Therefore, it is throttled to {{default_throttle_rate.0}} valid citation{{ default_throttle_rate.0|pluralize }} per {{default_throttle_rate.1}}{% if custom_throttle_rate %}, but your account allows {{custom_throttle_rate.0}} valid citation{{ custom_throttle_rate.0|pluralize }} per {{custom_throttle_rate.1}} {% endif %}. If you are below this throttle, you will be able to send a request to the API. If a request pushes you beyond this throttle, further requests will be denied. When your request is denied, the API will respond with a 429 HTTP code and a JSON object. The JSON object will contain a <code>wait_util</code> key that uses an ISO-8601 datetime to indicate when you will be able to make your next request.
     </p></li>
-    <li><p>The API will look up at most 250 citations in any single request. Any citations past that point will be parsed, but not matched to the CourtListener database. The <code>status</code> key of such citations will be 429, indicating “Too many requests.” See examples below for details.
+    <li><p>The API will look up at most {{max_citation_per_request}} citations in any single request. Any citations past that point will be parsed, but not matched to the CourtListener database. The <code>status</code> key of such citations will be 429, indicating “Too many citations requested.” See examples below for details.
     </p></li>
     <li><p>Text lookup requests to this API can only contain 64,000 characters at a time. Requests with more than this amount will be blocked for security. This is about 50 pages of legal content.
     </p></li>
@@ -174,13 +174,13 @@
     <li><p>The <code>error_message</code> field provides details of the error.</p></li>
   </ol>
   <h3 id="throttled">Throttled Citations</h3>
-  <p>If your request contains more than 250 citations, the 251<sup>st</sup> and subsequent citations will be returned with 429 <code>status</code> fields:
+  <p>If your request contains more than {{max_citation_per_request}} citations, the {{max_citation_per_request|add:1}}<sup>st</sup> and subsequent citations will be returned with 429 <code>status</code> fields:
   </p>
   <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  --data 'text=Imagine a very long blob here, with 251 citations.'
+  --data 'text=Imagine a very long blob here, with {{max_citation_per_request|add:1}} citations.'
 [
-  ...250 citations would appear here, then the 251st and subsequent citations would be...
+  ...{{max_citation_per_request}} citations would appear here, then the {{max_citation_per_request|add:1}}st and subsequent citations would be...
   {
     "citation": "576 U.S. 644",
     "normalized_citations": [
@@ -196,8 +196,8 @@
   <p>Note that:</p>
   <ol>
     <li><p>All citations will be parsed and will provide normalized versions and index locations.</p></li>
-    <li><p>Citations after the 250<sup>th</sup> will return a <code>status</code> of 429, indicating "Too Many Requests."</p></li>
-    <li><p>A follow-up query that begins on the 251<sup>st</sup> <code>start_index</code> (in this case number 10002) will look up the next 250 items.</p></li>
+    <li><p>Citations after the {{max_citation_per_request}}<sup>th</sup> will return a <code>status</code> of 429, indicating "Too many citations requested."</p></li>
+    <li><p>A follow-up query that begins on the {{max_citation_per_request|add:1}}<sup>st</sup> <code>start_index</code> (in this case number 10002) will look up the next {{max_citation_per_request}} items.</p></li>
   </ol>
 
   <h3 id="typoed">Typoed/Non-Canonical Reporter Abbreviation</h3>

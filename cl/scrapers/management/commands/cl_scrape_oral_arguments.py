@@ -16,7 +16,6 @@ from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import cl_scrape_opinions
-from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import process_audio_file
 from cl.scrapers.utils import (
     get_binary_content,
@@ -134,7 +133,6 @@ class Command(cl_scrape_opinions.Command):
             if msg:
                 fingerprint = [f"{court_str}-unexpected-content-type"]
                 logger.error(msg, extra={"fingerprint": fingerprint})
-                ErrorLog(log_level="WARNING", court=court, message=msg).save()
                 continue
 
             content = site.cleanup_content(r.content)

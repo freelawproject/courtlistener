@@ -21,11 +21,10 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
-    cl_report_scrape_status,
     cl_scrape_opinions,
     cl_scrape_oral_arguments,
 )
-from cl.scrapers.models import ErrorLog, UrlHash
+from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_binary_content, get_extension
@@ -360,43 +359,6 @@ class ExtensionIdentificationTest(SimpleTestCase):
         with open(os.path.join(self.path, "not_wpd.html"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".html")
-
-
-class ReportScrapeStatusTest(TestCase):
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
-    def setUp(self) -> None:
-        super().setUp()
-        self.court = Court.objects.get(pk="test")
-        # Make some errors that we can tally
-        ErrorLog(
-            log_level="WARNING", court=self.court, message="test_msg"
-        ).save()
-        ErrorLog(
-            log_level="CRITICAL", court=self.court, message="test_msg"
-        ).save()
-
-    def test_tallying_errors(self) -> None:
-        errors = cl_report_scrape_status.tally_errors()
-        self.assertEqual(
-            errors["test"],
-            [1, 1],
-            msg=f"Did not get expected error counts. Instead got: {errors['test']}",
-        )
-
-    @staticmethod
-    def test_simple_report_generation():
-        """Without doing the hard work of creating and checking for actual
-        errors, can we at least generate the report?
-
-        A better version of this test would check the contents of the generated
-        report by importing it from the test inbox.
-        """
-        cl_report_scrape_status.generate_report()
 
 
 class DupcheckerTest(TestCase):

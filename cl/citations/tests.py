@@ -1,15 +1,17 @@
 import itertools
 import json
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import List, Tuple
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
+from django.core.cache import cache as default_cache
 from django.core.management import call_command
-from django.test import AsyncClient
+from django.test import override_settings
 from django.urls import reverse
 from eyecite import get_citations
 from eyecite.test_factories import (
@@ -20,6 +22,7 @@ from eyecite.test_factories import (
     supra_citation,
     unknown_citation,
 )
+from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from lxml import etree
 
@@ -78,6 +81,8 @@ from cl.search.models import (
 )
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class CitationTextTest(SimpleTestCase):
@@ -197,7 +202,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -252,7 +259,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(html=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -303,7 +312,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -796,7 +807,9 @@ class CitationObjectTest(ESIndexTestCase, TestCase):
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
         # citation2a is 9 F. 1, so we expect no results.
         citation_str = "1 F. 9 (1795)"
-        citation = get_citations(citation_str)[0]
+        citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
+            0
+        ]
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
@@ -1102,7 +1115,7 @@ class ParallelCitationTest(SimpleTestCase):
                 citation_group_count=citation_group_count,
                 expected_num_parallel_citations=expected_num_parallel_citations,
             ):
-                citations = get_citations(q)
+                citations = get_citations(q, tokenizer=HYPERSCAN_TOKENIZER)
                 citation_groups = identify_parallel_citations(citations)
                 computed_num_citation_groups = len(citation_groups)
                 self.assertEqual(
@@ -1735,6 +1748,10 @@ class GroupParentheticalsTest(SimpleTestCase):
                 )
 
 
+@patch(
+    "cl.api.utils.CitationCountRateThrottle.get_cache_key_for_citations",
+    return_value="citations_tests",
+)
 class CitationLookUpApiTest(
     CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
@@ -1752,8 +1769,13 @@ class CitationLookUpApiTest(
         await self.async_client.alogin(
             username="citation-user", password="password"
         )
+        await default_cache.adelete_many(
+            ["citations_tests", "citation_throttle_test"]
+        )
 
-    async def test_can_handle_requests_with_no_citation_or_reporter(self):
+    async def test_can_handle_requests_with_no_citation_or_reporter(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"})
         )
@@ -1764,7 +1786,9 @@ class CitationLookUpApiTest(
             j["non_field_errors"][0],
         )
 
-    async def test_can_handle_requests_with_only_reporter(self):
+    async def test_can_handle_requests_with_only_reporter(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "ark"},
@@ -1780,7 +1804,21 @@ class CitationLookUpApiTest(
             j["page"][0],
         )
 
-    async def test_can_handle_random_text_as_a_citation(self):
+    async def test_can_handle_requests_with_big_pieces_of_text(
+        self, cache_key_mock
+    ):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "test" * 17_000},
+        )
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "Ensure this field has no more than 64000 characters.",
+            j["text"][0],
+        )
+
+    async def test_can_handle_random_text_as_a_citation(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "this is a text"},
@@ -1790,7 +1828,7 @@ class CitationLookUpApiTest(
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(len(data), 0)
 
-    async def test_can_handle_invalid_text_citations(self):
+    async def test_can_handle_invalid_text_citations(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "Maryland Code, Criminal Law § 11-208"},
@@ -1809,7 +1847,7 @@ class CitationLookUpApiTest(
         self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertEqual(len(data), 0)
 
-    async def test_can_filter_non_case_law_citations(self):
+    async def test_can_filter_non_case_law_citations(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             # Journal Citation
@@ -1847,7 +1885,9 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "671 P.2d 1085")
 
-    async def test_can_filter_out_citation_with_no_volume(self):
+    async def test_can_filter_out_citation_with_no_volume(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "Thomp. Cas., 21"},
@@ -1875,7 +1915,7 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "979 F. Supp. 726")
 
-    async def test_can_filter_out_citation_with_no_page(self):
+    async def test_can_filter_out_citation_with_no_page(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"text": "592 U.S. _"},
@@ -1898,7 +1938,7 @@ class CitationLookUpApiTest(
         first_citation = data[0]
         self.assertEqual(first_citation["citation"], "141 S. Ct. 1017")
 
-    async def test_can_handle_invalid_reporter(self):
+    async def test_can_handle_invalid_reporter(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {
@@ -1923,7 +1963,9 @@ class CitationLookUpApiTest(
         # The normalized citations list is empty because the reporter is invalid
         self.assertEqual(len(first_citation["normalized_citations"]), 0)
 
-    async def test_can_handle_ambiguous_reporter_variations(self) -> None:
+    async def test_can_handle_ambiguous_reporter_variations(
+        self, cache_key_mock
+    ) -> None:
 
         handy_citation = await sync_to_async(
             CitationWithParentsFactory.create
@@ -1967,7 +2009,9 @@ class CitationLookUpApiTest(
                 ],
             )
 
-    async def test_can_handle_invalid_page_number(self) -> None:
+    async def test_can_handle_invalid_page_number(
+        self, cache_key_mock
+    ) -> None:
         """Do we fail gracefully with invalid page numbers?"""
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
@@ -1991,7 +2035,9 @@ class CitationLookUpApiTest(
         self.assertEqual(normalized_citations[0], "1 F.2d asdf")
         self.assertIn("Citation not found:", first_citation["error_message"])
 
-    async def test_can_match_citation_with_reporter_volume_page(self):
+    async def test_can_match_citation_with_reporter_volume_page(
+        self, cache_key_mock
+    ):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "f2d", "volume": "56", "page": "9"},
@@ -2038,7 +2084,7 @@ class CitationLookUpApiTest(
             self.opinion_cluster_2.get_absolute_url(),
         )
 
-    async def test_can_handle_reporter_typos(self):
+    async def test_can_handle_reporter_typos(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
             {"reporter": "F2d", "volume": "56", "page": "9"},
@@ -2086,7 +2132,9 @@ class CitationLookUpApiTest(
             self.opinion_cluster_2.get_absolute_url(),
         )
 
-    async def test_can_handle_full_citation_within_text(self) -> None:
+    async def test_can_handle_full_citation_within_text(
+        self, cache_key_mock
+    ) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
         text_citation = (
@@ -2117,7 +2165,9 @@ class CitationLookUpApiTest(
             self.opinion_cluster_2.get_absolute_url(),
         )
 
-    async def test_can_extract_all_citations_within_text(self) -> None:
+    async def test_can_extract_all_citations_within_text(
+        self, cache_key_mock
+    ) -> None:
         la_rue_citation = await sync_to_async(
             CitationWithParentsFactory.create
         )(volume=139, reporter="U.S.", page="601", type=1)
@@ -2161,3 +2211,214 @@ class CitationLookUpApiTest(
 
         clusters = second_citation["clusters"]
         self.assertEqual(len(clusters), 0)
+
+    @override_settings(MAX_CITATIONS_PER_REQUEST=10)
+    async def test_can_look_up_max_citations_per_request(
+        self, cache_key_mock
+    ) -> None:
+        ten_citations = "56 F.2d 9, " * 10
+        text_citation = f"{ten_citations} 139 U.S. 601, 155 U.S. 597"
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": text_citation},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 12)
+
+        # This test limits citations to a maximum of 10 per request.
+        # Citations exceeding this limit will still be included in the response
+        # but will be marked with an error message and a status code of 429
+        # (Too Many Requests).
+        second_to_last_citation = data[-2]
+        self.assertEqual(second_to_last_citation["citation"], "139 U.S. 601")
+        self.assertEqual(
+            second_to_last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS
+        )
+        self.assertEqual(
+            second_to_last_citation["error_message"],
+            "Too many citations requested.",
+        )
+
+        last_citation = data[-1]
+        self.assertEqual(last_citation["citation"], "155 U.S. 597")
+        self.assertEqual(last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS)
+        self.assertEqual(
+            last_citation["error_message"], "Too many citations requested."
+        )
+
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value="20/m",
+    )
+    async def test_can_throttle_user_when_querying_exact_rate_limit(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
+        # Throttle users for 1 minute if they query for the exact number of
+        # citations allowed by the rate limit.
+        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False) as traveler:
+            ten_citations = "56 F.2d 9, " * 10
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 10)
+
+            # Ten more citations, This request should be allowed
+            traveler.shift(timedelta(seconds=5))
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 10)
+
+            # This request must not be allowed.
+            # User has reached the maximum number of citations allowed by the
+            # rate limit. Access will be restored one minute after the first
+            # request.
+            traveler.shift(timedelta(seconds=10))
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+
+            expected_time = test_date + timedelta(minutes=1)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value="20/m",
+    )
+    async def test_can_throttle_user_exceeding_citation_limit_by_small_number(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
+        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False) as traveler:
+            fifteen_citations = "56 F.2d 9, " * 15
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # fifteen more citations, This request should be allowed but the user
+            # will be throttle after making this request.
+            traveler.shift(timedelta(seconds=5))
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # This request must be rate limited. User has exceeded the lookup
+            # limit of 20 citations per minute with 30 citations. They must
+            # wait for previous requests to expire to free up citations in
+            # history. The first request(oldest one) added 15 citations to
+            # the cache, once this request is expire the user should be allowed
+            # to use the API again.
+            traveler.shift(timedelta(seconds=5))
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            expected_time = test_date + timedelta(minutes=1)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False) as traveler:
+            fifteen_citations = "56 F.2d 9, " * 15
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # twenty more citations, ten seconds after the first one. This
+            # request should be allowed but the user will be throttle after
+            # making this request.
+            traveler.shift(timedelta(seconds=15))
+            twenty_citations = "56 F.2d 9, " * 20
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": twenty_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 20)
+
+            # This request must be rate limited. User has exceeded the lookup
+            # limit of 20 citations per minute with 35 citations. They must
+            # wait for previous requests to expire to free up citations in
+            # history. The first request(oldest one) added 15 citations to the
+            # cache. However, even if this request expires, it will leave 20
+            # citations in history. This means the user need to wait for the
+            # second request to expire before making further requests.
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            expected_time = (
+                test_date + timedelta(minutes=1) + timedelta(seconds=15)
+            )
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value="20/m",
+    )
+    async def test_can_throttle_user_exceeding_citation_limit_by_big_margin(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
+        # throttle users that exceeds the max number of citations by a
+        # significant margin.
+        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False):
+            sixty_citations = "56 F.2d 9, " * 60
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": sixty_citations},
+            )
+
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 60)
+
+            # This test only allows 20 citations per minute, but the last request
+            # had 60. This request must be rate limited.
+            ten_citations = "56 F.2d 9, " * 10
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            self.assertEqual(
+                data["error_message"],
+                "Too many requests (allowed rate: 20/m).",
+            )
+            # User throttled for 3 minutes because the request contained 3
+            # times the allowed number of citations.
+            expected_time = test_date + timedelta(minutes=3)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())

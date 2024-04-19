@@ -216,7 +216,7 @@ ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 ###################################################
 # The maximum number of scheduled hits per alert. #
 ###################################################
-SCHEDULED_ALERT_HITS_LIMIT = 30
+SCHEDULED_ALERT_HITS_LIMIT = 20
 
 ################################
 # ES bulk indexing batch size #

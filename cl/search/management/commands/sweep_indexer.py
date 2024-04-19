@@ -41,7 +41,7 @@ def compose_indexer_redis_key() -> str:
     """Compose the redis key for the sweep indexer
     :return: A Redis key as a string.
     """
-    return f"es_sweep_indexer:log"
+    return "es_sweep_indexer:log"
 
 
 def log_indexer_last_status(
@@ -190,7 +190,7 @@ class Command(VerboseCommand):
 
         testing_mode = self.options.get("testing_mode", False)
         while True:
-            self.stdout.write(f"Starting a new sweep indexer cycle.")
+            self.stdout.write("Starting a new sweep indexer cycle.")
             self.execute_sweep_indexer_cycle()
             document_counts = get_documents_processed_count_and_restart()
             self.stdout.write(

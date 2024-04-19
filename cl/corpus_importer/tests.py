@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import make_aware, now
+from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 
@@ -110,6 +111,8 @@ from cl.search.models import (
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fakes import FakeFreeOpinionReport
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class JudgeExtractionTest(SimpleTestCase):
@@ -641,7 +644,9 @@ class HarvardTests(TestCase):
         :param case_law: Case object
         :return: First citation found
         """
-        cites = eyecite.get_citations(case_law["citations"][0]["cite"])
+        cites = eyecite.get_citations(
+            case_law["citations"][0]["cite"], tokenizer=HYPERSCAN_TOKENIZER
+        )
         cite = Citation.objects.get(
             volume=cites[0].groups["volume"],
             reporter=cites[0].groups["reporter"],

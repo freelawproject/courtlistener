@@ -788,7 +788,7 @@ def get_search_query(
                         score_mode="max",
                         query=Q("match_all"),
                         inner_hits={
-                            "name": f"text_query_inner_opinion",
+                            "name": "text_query_inner_opinion",
                             "size": 10,
                         },
                     ),
@@ -1934,7 +1934,7 @@ def nullify_parent_score_on_child_sorting(
             query=query,
             script_score={
                 "script": {
-                    "source": f""" return 0; """,
+                    "source": """ return 0; """,
                 },
             },
             # Replace the original score with the one computed by the script
@@ -2415,3 +2415,74 @@ def fetch_all_search_results(
             else:
                 search_after = response.hits[-1].meta.sort
     return all_search_hits
+
+
+def do_es_api_query(
+    search_query: Search,
+    cd: CleanData,
+    highlighting_fields: dict[str, int],
+    hl_tag: str,
+) -> Search:
+    """Build an ES query for its use in the Search API and Webhooks.
+
+    :param search_query: Elasticsearch DSL Search object.
+    :param cd: The query CleanedData
+    :param highlighting_fields: A dictionary mapping field names to fragment
+    sizes for highlighting.
+    :param hl_tag: The HTML tag to use for highlighting matched fragments.
+    :return: The modified Search with the resultant query.
+    """
+
+    s, join_query = build_es_base_query(search_query, cd)
+    s = build_child_docs_query(
+        join_query,
+        cd=cd,
+    )
+    s = search_query.query(s)
+    highlight_options, fields_to_exclude = build_highlights_dict(
+        highlighting_fields, hl_tag
+    )
+    s = s.source(excludes=fields_to_exclude)
+    extra_options: dict[str, dict[str, Any]] = {"highlight": highlight_options}
+    if cd["type"] == SEARCH_TYPES.OPINION:
+        extra_options.update(
+            {
+                "collapse": {
+                    "field": "cluster_id",
+                }
+            }
+        )
+    main_query = s.extra(**extra_options)
+    main_query = main_query.sort(build_sort_results(cd))
+    return main_query
+
+
+def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
+    """Execute an Elasticsearch count query for queries that uses collapse.
+    Uses a query with aggregation to determine the number of unique opinions
+    based on the 'cluster_id' field.
+
+    :param main_query: The Elasticsearch DSL Search object.
+    :param query: The ES Query object to perform the count query.
+    :return: The results count.
+    """
+
+    search_query = main_query.query(query)
+    search_query.aggs.bucket(
+        "unique_opinions",
+        "cardinality",
+        field="cluster_id",
+        precision_threshold=2_000,
+    )
+    search_query = search_query.extra(size=0, track_total_hits=True)
+    try:
+        total_results = (
+            search_query.execute().aggregations.unique_opinions.value
+        )
+    except (TransportError, ConnectionError, RequestError) as e:
+        logger.warning(
+            f"Error on count query request: {search_query.to_dict()}"
+        )
+        logger.warning(f"Error was: {e}")
+        total_results = None
+    return total_results

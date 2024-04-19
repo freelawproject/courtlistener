@@ -36,6 +36,7 @@ class SimpleSitemap(sitemaps.Sitemap):
                 "coverage_opinions", priority=0.4, changefreq="daily"
             ),
             make_url_dict("coverage_fds", priority=0.4),
+            make_url_dict("coverage_recap", priority=0.4),
             make_url_dict("feeds_info", priority=0.4, changefreq="never"),
             make_url_dict("podcasts", priority=0.6, changefreq="never"),
             make_url_dict("contribute", priority=0.6, changefreq="never"),

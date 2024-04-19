@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
+from django.utils import timezone
 from lxml import etree
 from requests import Session
 
@@ -37,6 +38,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
+    Citation,
     Court,
     Docket,
     Opinion,
@@ -46,6 +48,111 @@ from cl.search.models import (
 from cl.search.tasks import add_items_to_solr
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
+
+
+def midnight_pt_test(d: datetime.date) -> datetime.datetime:
+    """Cast a naive date object to midnight Pacific Time, either PST or PDT,
+    according to the date. This method also considers historical timezone
+    offsets, similar to how they are handled in DRF.
+    """
+    time_zone = timezone.get_current_timezone()
+    d = datetime.datetime.combine(d, datetime.time())
+    return timezone.make_aware(d, time_zone)
+
+
+opinion_search_api_keys = {
+    "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
+    "attorney": lambda x: x["result"].cluster.attorneys,
+    "author_id": lambda x: x["result"].author_id,
+    "caseName": lambda x: x["result"].cluster.case_name,
+    "citation": lambda x: [
+        str(cite) for cite in x["result"].cluster.citations.all()
+    ],
+    "citeCount": lambda x: x["result"].cluster.citation_count,
+    "cites": lambda x: (
+        list(
+            x["result"]
+            .cited_opinions.all()
+            .values_list("cited_opinion_id", flat=True)
+        )
+        if x["result"]
+        .cited_opinions.all()
+        .values_list("cited_opinion_id", flat=True)
+        else None
+    ),
+    "court": lambda x: x["result"].cluster.docket.court.full_name,
+    "court_citation_string": lambda x: x[
+        "result"
+    ].cluster.docket.court.citation_string,
+    "court_exact": lambda x: x["result"].cluster.docket.court_id,
+    "court_id": lambda x: x["result"].cluster.docket.court_id,
+    "cluster_id": lambda x: x["result"].cluster_id,
+    "dateArgued": lambda x: (
+        midnight_pt_test(x["result"].cluster.docket.date_argued).isoformat()
+        if x["result"].cluster.docket.date_argued
+        else None
+    ),
+    "dateFiled": lambda x: (
+        midnight_pt_test(x["result"].cluster.date_filed).isoformat()
+        if x["result"].cluster.date_filed
+        else None
+    ),
+    "dateReargued": lambda x: (
+        midnight_pt_test(x["result"].cluster.docket.date_reargued).isoformat()
+        if x["result"].cluster.docket.date_reargued
+        else None
+    ),
+    "dateReargumentDenied": lambda x: (
+        midnight_pt_test(
+            x["result"].cluster.docket.date_reargument_denied
+        ).isoformat()
+        if x["result"].cluster.docket.date_reargument_denied
+        else None
+    ),
+    "docketNumber": lambda x: x["result"].cluster.docket.docket_number,
+    "docket_id": lambda x: x["result"].cluster.docket_id,
+    "download_url": lambda x: x["result"].download_url,
+    "id": lambda x: x["result"].pk,
+    "joined_by_ids": lambda x: (
+        list(x["result"].joined_by.all().values_list("id", flat=True))
+        if x["result"].joined_by.all()
+        else None
+    ),
+    "panel_ids": lambda x: (
+        list(x["result"].cluster.panel.all().values_list("id", flat=True))
+        if x["result"].cluster.panel.all()
+        else None
+    ),
+    "type": lambda x: x["result"].type,
+    "judge": lambda x: x["result"].cluster.judges,
+    "lexisCite": lambda x: (
+        str(x["result"].cluster.citations.filter(type=Citation.LEXIS)[0])
+        if x["result"].cluster.citations.filter(type=Citation.LEXIS)
+        else ""
+    ),
+    "neutralCite": lambda x: (
+        str(x["result"].cluster.citations.filter(type=Citation.NEUTRAL)[0])
+        if x["result"].cluster.citations.filter(type=Citation.NEUTRAL)
+        else ""
+    ),
+    "local_path": lambda x: (
+        x["result"].local_path if x["result"].local_path else None
+    ),
+    "per_curiam": lambda x: x["result"].per_curiam,
+    "scdb_id": lambda x: x["result"].cluster.scdb_id,
+    "sibling_ids": lambda x: list(
+        x["result"].cluster.sub_opinions.all().values_list("id", flat=True)
+    ),
+    "status": lambda x: x["result"].cluster.get_precedential_status_display(),
+    "snippet": lambda x: x["snippet"],
+    "suitNature": lambda x: x["result"].cluster.nature_of_suit,
+    "date_created": lambda x: timezone.localtime(
+        x["result"].cluster.date_created
+    ).isoformat(),
+    "timestamp": lambda x: timezone.localtime(
+        x["result"].cluster.date_created
+    ).isoformat(),
+}
 
 
 class CourtTestCase(SimpleTestCase):
@@ -527,7 +634,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class SerializeSolrTestMixin(SerializeMixin):
+class SerializeLockFileTestMixin(SerializeMixin):
     lockfile = __file__
 
 
@@ -549,7 +656,7 @@ class SimpleUserDataMixin:
     SOLR_URLS=settings.SOLR_TEST_URLS,
     ELASTICSEARCH_DISABLED=True,
 )
-class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
+class EmptySolrTestCase(SerializeLockFileTestMixin, TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
 
     Other Solr test classes subclass this one, adding additional content or
