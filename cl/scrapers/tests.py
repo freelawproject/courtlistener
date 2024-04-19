@@ -18,6 +18,7 @@ from cl.audio.models import Audio
 from cl.donate.factories import DonationFactory
 from cl.donate.models import Donation
 from cl.lib.microservice_utils import microservice
+from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
     cl_scrape_opinions,
@@ -73,7 +74,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             case_name="Tarrant Regional Water District v. Herrmann old",
             docket_number="11-889",
             court=self.court,
-            source=Docket.SCRAPER,
+            source=Docket.RECAP,
             pacer_case_id=None,
         )
 
@@ -81,7 +82,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             case_name="State of Indiana v. Charles Barker old",
             docket_number="49S00-0308-DP-392",
             court=self.court,
-            source=Docket.SCRAPER,
+            source=Docket.IDB,
             pacer_case_id=None,
         )
 
@@ -89,7 +90,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             case_name="Intl Fidlty Ins Co v. Ideal Elec Sec Co old",
             docket_number="96-7169",
             court=self.court,
-            source=Docket.SCRAPER,
+            source=Docket.RECAP_AND_IDB,
             pacer_case_id="12345",
         )
 
@@ -116,6 +117,10 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         d_1.refresh_from_db()
         d_2.refresh_from_db()
         d_3.refresh_from_db()
+        self.assertEqual(d_1.source, Docket.RECAP_AND_SCRAPER)
+        self.assertEqual(d_2.source, Docket.SCRAPER_AND_IDB)
+        self.assertEqual(d_3.source, Docket.RECAP_AND_SCRAPER_AND_IDB)
+
         self.assertEqual(
             d_1.case_name, "Tarrant Regional Water District v. Herrmann"
         )
@@ -124,6 +129,78 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             d_3.case_name, "Intl Fidlty Ins Co v. Ideal Elec Sec Co"
         )
 
+    def test_opinion_dockets_source_assigment(self) -> None:
+        """Test that the opinion dockets source gets properly assigned."""
+        docket = DocketFactory.create(
+            case_name="Lorem Ipsum",
+            docket_number="11-8890",
+            court=self.court,
+            source=Docket.RECAP,
+            pacer_case_id="01111",
+        )
+        non_columbia_sources_tests = generate_docket_target_sources(
+            Docket.NON_COLUMBIA_SOURCES(), Docket.COLUMBIA
+        )
+        non_harvard_sources_tests = generate_docket_target_sources(
+            Docket.NON_HARVARD_SOURCES(), Docket.HARVARD
+        )
+        non_scraper_sources_tests = generate_docket_target_sources(
+            Docket.NON_SCRAPER_SOURCES(), Docket.SCRAPER
+        )
+
+        source_assigment_tests = [
+            (
+                non_columbia_sources_tests,
+                Docket.NON_COLUMBIA_SOURCES(),
+                Docket.COLUMBIA,
+            ),
+            (
+                non_harvard_sources_tests,
+                Docket.NON_HARVARD_SOURCES(),
+                Docket.HARVARD,
+            ),
+            (
+                non_scraper_sources_tests,
+                Docket.NON_SCRAPER_SOURCES(),
+                Docket.SCRAPER,
+            ),
+        ]
+
+        for (
+            expected_sources,
+            non_sources,
+            source_to_assign,
+        ) in source_assigment_tests:
+            with self.subTest(
+                f"Testing {source_to_assign} source assigment.",
+                expected_sources=expected_sources,
+                non_sources=non_sources,
+                source_to_assign=source_to_assign,
+            ):
+                self.assertEqual(
+                    len(expected_sources),
+                    len(non_sources),
+                    msg="Was a new non-recap source added?",
+                )
+                for source, expected_source in expected_sources.items():
+                    with self.subTest(
+                        f"Testing source {source} assigment.",
+                        source=source,
+                        expected_source=expected_source,
+                    ):
+                        Docket.objects.filter(pk=docket.pk).update(
+                            source=getattr(Docket, source)
+                        )
+                        docket.refresh_from_db()
+                        docket.add_opinions_source(source_to_assign)
+                        docket.save()
+                        docket.refresh_from_db()
+                        self.assertEqual(
+                            docket.source,
+                            getattr(Docket, expected_source),
+                            msg="The source does not match.",
+                        )
+
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
 
@@ -131,7 +208,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             case_name="Jeremy v. Julian old",
             docket_number="23-232388",
             court=self.court,
-            source=Docket.SCRAPER,
+            source=Docket.RECAP,
             pacer_case_id=None,
         )
 
@@ -154,6 +231,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         )
         d_1.refresh_from_db()
         self.assertEqual(d_1.case_name, "Jeremy v. Julian")
+        self.assertEqual(d_1.source, Docket.RECAP_AND_SCRAPER)
 
         # Confirm that OA Search Alerts are properly triggered after an OA is
         # scraped and its MP3 file is processed.

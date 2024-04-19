@@ -26,6 +26,7 @@ from cl.people_db.factories import (
     SchoolFactory,
 )
 from cl.people_db.models import Person, Race
+from cl.search.docket_sources import DocketSources
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -929,3 +930,37 @@ class AudioESTestCase(SimpleTestCase):
             judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
+
+
+def generate_docket_target_sources(
+    initial_sources: list[int], incoming_source: int
+) -> dict[str, str]:
+    """Generates a mapping for testing of docket target sources based on
+    initial sources and an incoming source.
+
+    :param initial_sources: A list of integers representing the initial source
+     values.
+    :param incoming_source: An integer representing the incoming source value
+    to be added to each of the initial sources.
+    :return: A dict mapping from initial source names to target source names,
+    based on the sum of the initial source value and the incoming source value.
+    e.g: {"RECAP": "COLUMBIA_AND_RECAP"}
+    """
+    inverse_sources = {
+        value: key
+        for key, value in DocketSources.__dict__.items()
+        if not key.startswith("__") and isinstance(value, int)
+    }
+
+    target_sources = {}
+    for source in initial_sources:
+        target_source = source + incoming_source
+        if incoming_source == Docket.RECAP and source == Docket.DEFAULT:
+            # Exception for  DEFAULT + RECAP source assignation.
+            target_sources[inverse_sources[source]] = "RECAP_AND_SCRAPER"
+        else:
+            target_sources[inverse_sources[source]] = inverse_sources[
+                target_source
+            ]
+
+    return target_sources

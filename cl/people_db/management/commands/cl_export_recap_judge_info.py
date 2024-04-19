@@ -55,7 +55,7 @@ class Command(VerboseCommand):
                 court.dockets.exclude(
                     Q(assigned_to_str="") & Q(referred_to_str="")
                 )
-                .filter(source__in=Docket.RECAP_SOURCES)
+                .filter(source__in=Docket.RECAP_SOURCES())
                 .only("assigned_to_str", "referred_to_str", "date_filed")
             )
             logger.info(f"Processing {dockets.count()} dockets in {court.pk}")

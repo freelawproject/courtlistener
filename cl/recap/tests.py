@@ -41,6 +41,7 @@ from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
+from cl.lib.test_helpers import generate_docket_target_sources
 from cl.people_db.models import (
     Attorney,
     AttorneyOrganizationAssociation,
@@ -2059,16 +2060,128 @@ class RecapDocketTaskTest(TestCase):
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.docket_id, existing_d.pk)
 
-    def test_adding_harvard_and_recap_source(self) -> None:
-        """Is the HARVARD_AND_RECAP source properly added when updating a
-        docket by RECAP, originally added by Harvard?
+    def test_add_recap_source(self) -> None:
+        """Is the RECAP source properly added to a docket originally added from
+        a different source?
         """
-        Docket.objects.create(
-            source=Docket.HARVARD, pacer_case_id="asdf", court_id="scotus"
+
+        non_recap_sources = generate_docket_target_sources(
+            Docket.NON_RECAP_SOURCES(), Docket.RECAP
         )
-        returned_data = async_to_sync(process_recap_docket)(self.pq.pk)
-        d = Docket.objects.get(pk=returned_data["docket_pk"])
-        self.assertEqual(d.source, Docket.HARVARD_AND_RECAP)
+        self.assertEqual(
+            len(non_recap_sources),
+            len(Docket.NON_RECAP_SOURCES()),
+            msg="Was a new non-recap source added?",
+        )
+        docket = DocketFactory.create(
+            source=Docket.DEFAULT, pacer_case_id="asdf", court_id=self.court.pk
+        )
+
+        def add_recap_source_and_save(docket_instance):
+            docket_instance.add_recap_source()
+            docket_instance.save()
+
+        pacer_free_doc_row = PACERFreeDocumentRowFactory(
+            court_id=self.court.pk, pacer_case_id=docket.pacer_case_id
+        )
+        pacer_free_doc_row.court = self.court
+        delattr(pacer_free_doc_row, "id")
+        tests = {
+            "add_recap_source_test": lambda x: add_recap_source_and_save(x),
+            "lookup_and_save_test": lambda x: lookup_and_save(
+                pacer_free_doc_row
+            ),
+        }
+        for test, method in tests.items():
+            for source, expected_source in non_recap_sources.items():
+                with self.subTest(
+                    f"Testing {test} source {source} assigment.",
+                    source=source,
+                    expected_source=expected_source,
+                ):
+                    Docket.objects.filter(pk=docket.pk).update(
+                        source=getattr(Docket, source)
+                    )
+                    docket.refresh_from_db()
+                    method(docket)
+                    docket.refresh_from_db()
+                    self.assertEqual(
+                        docket.source,
+                        getattr(Docket, expected_source),
+                        msg="The source does not match.",
+                    )
+
+    def test_add_idb_anon_2020_source(self) -> None:
+        """Is the IDB and ANON_2020 source properly added to a docket
+        originally added from a different source?
+        """
+
+        non_idb_sources = generate_docket_target_sources(
+            Docket.NON_IDB_SOURCES(), Docket.IDB
+        )
+
+        non_anon_2020_sources = generate_docket_target_sources(
+            Docket.NON_ANON_2020_SOURCES(), Docket.ANON_2020
+        )
+
+        self.assertEqual(
+            len(non_idb_sources),
+            len(Docket.NON_IDB_SOURCES()),
+            msg="Was a new non-recap source added?",
+        )
+
+        self.assertEqual(
+            len(non_anon_2020_sources),
+            len(Docket.NON_ANON_2020_SOURCES()),
+            msg="Was a new non-recap source added?",
+        )
+
+        docket = DocketFactory.create(
+            source=Docket.DEFAULT, pacer_case_id="asdf", court_id=self.court.pk
+        )
+
+        def add_idb_source_and_save(docket_instance):
+            docket_instance.add_idb_source()
+            docket_instance.save()
+
+        def add_anon_2020_source_and_save(docket_instance):
+            docket_instance.add_anon_2020_source()
+            docket_instance.save()
+
+        pacer_free_doc_row = PACERFreeDocumentRowFactory(
+            court_id=self.court.pk, pacer_case_id=docket.pacer_case_id
+        )
+        pacer_free_doc_row.court = self.court
+        delattr(pacer_free_doc_row, "id")
+        tests = {
+            "add_idb_source_test": (
+                non_idb_sources,
+                lambda x: add_idb_source_and_save(x),
+            ),
+            "add_anon_2020_source_test": (
+                non_anon_2020_sources,
+                lambda x: add_anon_2020_source_and_save(x),
+            ),
+        }
+        for test, test_assets in tests.items():
+            for source, expected_source in test_assets[0].items():
+                with self.subTest(
+                    f"Testing {test} source {source} assigment.",
+                    source=source,
+                    expected_source=expected_source,
+                ):
+                    assign_source_method = test_assets[1]
+                    Docket.objects.filter(pk=docket.pk).update(
+                        source=getattr(Docket, source)
+                    )
+                    docket.refresh_from_db()
+                    assign_source_method(docket)
+                    docket.refresh_from_db()
+                    self.assertEqual(
+                        docket.source,
+                        getattr(Docket, expected_source),
+                        msg="The source does not match.",
+                    )
 
     def test_docket_and_de_already_exist(self) -> None:
         """Can we parse if the docket and the docket entry already exist?"""
