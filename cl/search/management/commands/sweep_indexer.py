@@ -153,11 +153,11 @@ def build_parent_model_queryset(
     :return: A QuerySet that retrieves only IDs values.
     """
     model = apps.get_model(app_label)
-    query_args: dict[str, int] = {"pk__gte": last_document_id}
+    query_args: dict[str, int | list[int]] = {"pk__gte": last_document_id}
     if model == Docket:
         # If the model is Docket, incorporate a source filter to only match
         # Dockets that belong to the RECAP collection.
-        query_args["source__in"] = Docket.RECAP_SOURCES
+        query_args["source__in"] = Docket.RECAP_SOURCES()
     queryset = (
         model.objects.filter(**query_args)
         .order_by("pk")

@@ -607,7 +607,7 @@
             </div>
             <div class="col-md-4">
                 <h3>Coverage</h3>
-                <p>Our case law database combines the best data from many sources. On our <a href="{% url "coverage" %}">coverage page</a>, you can see court-by-court graphs of what we have and can see which courts we get data from on an ongoing basis.
+                <p>Our case law database combines the best data from many sources. On our <a href="{% url "coverage_opinions" %}">coverage page</a>, you can see court-by-court graphs of what we have and can see which courts we get data from on an ongoing basis.
                 </p>
                 <p>We are particularly proud of our Supreme Court data, which we consider to be the best collection available. We have made thousands of corrections to the other publicly available data sets, and have enhanced it with data from the <a href="https://free.law/2011/05/25/updated-scotus-dates/">Library of Congress</a> and the <a href="https://free.law/2014/12/21/scdb/">Supreme Court Database</a>.
                 </p>
@@ -625,7 +625,7 @@
             </div>
             <div class="col-md-4">
                 <h3>Alerts</h3>
-                <p>For the courts where we get content on an <a href="{% url "coverage" %}#scraped-jurisdictions">ongoing basis</a>, you can set up alerts for any search query. This way, you get an email whenever there is a new decision matching your query.
+                <p>For the courts where we get content on an <a href="{% url "coverage_opinions" %}">ongoing basis</a>, you can set up alerts for any search query. This way, you get an email whenever there is a new decision matching your query.
                 </p>
                 <p>Some popular queries are your company name or that of your competitor, a legal area that you follow, or even <a href="https://free.law/2016/01/30/citation-searching/">a citation alert</a> that emails when a certain case is cited. We also offer <a href="{% url "feeds_info" %}">custom RSS feeds</a> for any search query.
                 </p>
@@ -740,19 +740,13 @@
             </div>
             <div class="col-sm-4">
                 <h3>Coverage</h3>
-                <p>We collect oral argument audio from the Supreme Court and all of the Federal Circuit courts that provide it. On the state side, we are slowly adding support for additional courts, and we are looking for support to add more. You can see all of the courts that we support on an ongoing basis <a href="{% url "coverage" %}#scraped-jurisdictions">on our coverage page</a>.
+                <p>We collect oral argument audio from the Supreme Court and all of the Federal Circuit courts that provide it. On the state side, we are slowly adding support for additional courts, and we are looking for support to add more. You can see all of the courts that we support on an ongoing basis <a href="{% url "coverage_oa" %}">on our coverage page</a>.
                 </p>
                 <p>Our collection of SCOTUS recordings goes back to 2013. Before that, we recommend <a href="https://www.oyez.org" target="_blank">the wonderful Oyez Project</a>, which goes back to 1955.
                 </p>
 
                 <h3>Podcasts&nbsp;<i class="fa fa-podcast gray"></i></h3>
-                <p>For every jurisdiction <a
-                        href="{% url "coverage" %}#scraped-jurisdictions">that
-                    we support</a>, we provide Podcasts automatically, so you
-                    can listen to the latest arguments from that court. It's
-                    also possible to create a Podcast from any search that you
-                    make, allowing you to make custom Podcasts with only the
-                    information you want to hear.
+                <p>For every jurisdiction <a href="{% url "coverage_oa" %}">that we support</a>, we provide Podcasts automatically, so you can listen to the latest arguments from that court. It is also possible to create a Podcast from any search that you make, allowing you to make custom Podcasts with only the information you want to hear.
                 </p>
                 <p>
                     <a href="{% url "podcasts" %}" class="btn btn-primary">Learn

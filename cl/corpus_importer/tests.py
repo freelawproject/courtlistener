@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import make_aware, now
+from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 
@@ -110,6 +111,8 @@ from cl.search.models import (
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.tests.fakes import FakeFreeOpinionReport
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class JudgeExtractionTest(SimpleTestCase):
@@ -641,7 +644,9 @@ class HarvardTests(TestCase):
         :param case_law: Case object
         :return: First citation found
         """
-        cites = eyecite.get_citations(case_law["citations"][0]["cite"])
+        cites = eyecite.get_citations(
+            case_law["citations"][0]["cite"], tokenizer=HYPERSCAN_TOKENIZER
+        )
         cite = Citation.objects.get(
             volume=cites[0].groups["volume"],
             reporter=cites[0].groups["reporter"],
@@ -2961,7 +2966,11 @@ class HarvardMergerTests(TestCase):
         self.assertEqual(docket_1.source, Docket.HARVARD_AND_RECAP)
 
         with self.assertRaises(DocketSourceException):
-            docket_2 = DocketFactory(source=Docket.COLUMBIA_AND_RECAP)
+            # Raise DocketSourceException if the initial source already contains
+            # Harvard.
+            docket_2 = DocketFactory(
+                source=Docket.RECAP_AND_SCRAPER_AND_HARVARD
+            )
             cluster_2 = OpinionClusterWithParentsFactory(docket=docket_2)
             update_docket_source(cluster_2)
             docket_2.refresh_from_db()
@@ -3309,3 +3318,14 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
 <blockquote>Footnote sample
 </blockquote></footnote_body></p>""",
         )
+
+        # Ensure the cluster is not merged again if it has already been merged
+        # and the COLUMBIA source was assigned.
+        with patch(
+            "cl.corpus_importer.management.commands.columbia_merge.logger"
+        ) as mock_logger:
+            # Merge cluster
+            process_cluster(cluster.id, "/columbia/fake_filepath.xml")
+            mock_logger.info.assert_called_with(
+                f"Cluster id: {cluster.id} already merged"
+            )

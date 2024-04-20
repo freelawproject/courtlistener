@@ -16,6 +16,7 @@ from django.db import transaction
 from django.db.utils import OperationalError
 from eyecite.find import get_citations
 from eyecite.models import FullCaseCitation
+from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.diff_tools import normalize_phrase
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize, titlecase
 
@@ -32,6 +33,8 @@ from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
 from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
 from cl.search.tasks import add_items_to_solr
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 cnt = CaseNameTweaker()
 
@@ -333,7 +336,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
 
         # Cleanup whitespace on citations
         clean_cite = re.sub(r"\s+", " ", data["citations"][0]["cite"])
-        cites = get_citations(clean_cite)
+        cites = get_citations(clean_cite, tokenizer=HYPERSCAN_TOKENIZER)
         cites = [cite for cite in cites if isinstance(cite, FullCaseCitation)]
         if not cites:
             logger.warning(f"No citation found for {clean_cite}")
@@ -629,7 +632,7 @@ def find_previously_imported_cases(
 
     # Match against known citations.
     for cite in data["citations"]:
-        found_cite = get_citations(cite["cite"])
+        found_cite = get_citations(cite["cite"], tokenizer=HYPERSCAN_TOKENIZER)
         if (
             found_cite
             and isinstance(found_cite[0], FullCaseCitation)

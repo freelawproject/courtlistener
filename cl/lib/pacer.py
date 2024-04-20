@@ -102,14 +102,9 @@ def lookup_and_save(new, debug=False):
                 d = ds[0]
 
     # Add RECAP as a source if it's not already.
-    if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-        d.source = Docket.RECAP_AND_SCRAPER
-    elif d.source == Docket.COLUMBIA:
-        d.source = Docket.COLUMBIA_AND_RECAP
-    elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
+    d.add_recap_source()
 
-    if d.nature_of_suit:
+    if d.nature_of_suit and hasattr(new, "nature_of_suit"):
         # Avoid updating the nature_of_suit if the docket already has a
         # nature_of_suit set, since this value doesn't change. See issue #3878.
         delattr(new, "nature_of_suit")

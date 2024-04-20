@@ -1,8 +1,9 @@
 import logging
 from collections import OrderedDict, defaultdict
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Dict, List, Set, TypedDict, Union
 
+import eyecite
 from dateutil import parser
 from dateutil.rrule import DAILY, rrule
 from django.conf import settings
@@ -16,8 +17,10 @@ from django.utils.timezone import now
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_headers
 from django_ratelimit.core import get_header
+from eyecite.tokenizers import HyperscanTokenizer
 from requests import Response
 from rest_framework import serializers
+from rest_framework.exceptions import Throttled
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.request import clone_request
@@ -26,11 +29,13 @@ from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 
 from cl.api.models import WEBHOOK_EVENT_STATUS, Webhook, WebhookEvent
+from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Event
 from cl.stats.utils import MILESTONES_FLAT, get_milestone_range
 from cl.users.tasks import notify_failing_webhook
 
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 BOOLEAN_LOOKUPS = ["exact"]
 DATETIME_LOOKUPS = [
     "exact",
@@ -344,6 +349,155 @@ class ExceptionalUserRateThrottle(UserRateThrottle):
         if len(self.history) >= self.num_requests:
             return self.throttle_failure()
         return self.throttle_success()
+
+
+class CitationCountRateThrottle(ExceptionalUserRateThrottle):
+    """
+    Limits the rate of API calls that may be made by users based on the
+    number of citations they try to look up.
+    """
+
+    def get_citation_count_from_request(self, request, view) -> int:
+        """
+        Gets the number of citations from a request.
+
+        This helper method retrieves the number of citations from a request
+        object. It first validates the data using the `validate_request_data`
+        method. If valid, it extracts the citations list, stores it in the
+        view instance and it returns the number of citations in the list.
+
+        Returns:
+            int: The number of citations as an integer.
+        """
+        validated_data = view.validate_request_data(request)
+        text = validated_data.get("text", None)
+        if not text:
+            # Since the 'text' key is missing from the request, the user is
+            # likely trying to retrieve opinions using a reporter, volume,
+            # and page combination. This approach allows looking up one
+            # citation at a time.
+            return 1
+
+        citation_objs = filter_out_non_case_law_and_non_valid_citations(
+            eyecite.get_citations(text, tokenizer=HYPERSCAN_TOKENIZER)
+        )
+        view.citation_list = citation_objs
+        return len(citation_objs)
+
+    def get_cache_key_for_citations(self, request, view):
+        return self.cache_format % {
+            "scope": "citations",
+            "ident": request.user.pk,
+        }
+
+    def get_citations_rate(self, request):
+        """
+        Checks the settings for a custom citations API rate limit.
+
+        If the authenticated user has a custom rate limit set in the settings,
+        it returns that value. Otherwise, it returns the default rate limit.
+
+        Args:
+            request: The request object with the user's data.
+        """
+        default_rate = self.THROTTLE_RATES["citations"]
+        custom_rate = settings.REST_FRAMEWORK[
+            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
+        ].get(request.user.username, None)
+        return custom_rate or default_rate
+
+    def throttle_request_by_citation_count(self, request, view):
+        max_num_citations, _ = self.parse_rate(
+            self.get_citations_rate(request)
+        )
+
+        self.key = self.get_cache_key_for_citations(request, view)
+        self.history = self.cache.get(self.key, [])
+        self.request_timestamp = self.timer()
+
+        # Drop any requests from the history which have now passed the
+        # throttle duration
+        while self.history and self.history[-1][-1] <= self.request_timestamp:
+            self.history.pop()
+
+        citations_in_history = sum(
+            citation_count for citation_count, timestamps in self.history
+        )
+
+        if citations_in_history >= max_num_citations:
+            self.throttle_request(request)
+
+        self.save_citation_count(request, view)
+
+    def save_citation_count(self, request, view):
+        """
+        Inserts the number of citations and the expiration time along with
+        the key into the cache.
+        """
+        citation_count = self.get_citation_count_from_request(request, view)
+        if not citation_count:
+            return
+
+        max_num_citations, duration = self.parse_rate(
+            self.get_citations_rate(request)
+        )
+        expiration = (
+            citation_count * (duration / max_num_citations)
+            if citation_count > max_num_citations
+            else duration
+        )
+        self.history.insert(
+            0,
+            [
+                citation_count,
+                self.request_timestamp + expiration,
+            ],
+        )
+
+        self.cache.set(self.key, self.history, expiration)
+
+    def allow_request(self, request, view):
+        self.throttle_request_by_citation_count(request, view)
+        return super().allow_request(request, view)
+
+    def throttle_request(self, request):
+        """
+        This helper iterates through the request history in reverse
+        chronological order to calculate the soonest time a new request can be
+        made and raises the `Throttled` exception with the details.
+
+        The exception includes details about the throttling:
+
+        - `error_message`: A message indicating the request was throttled.
+        - `wait_until`: An ISO 8601 formatted string representing the soonest
+                    time the next request can be made without throttling.
+
+        Args:
+            request: The request object to be throttled.
+
+        Raises:
+            Throttled: The exception includes details about the throttling.
+        """
+        rate = self.get_citations_rate(request)
+        max_num_citations, _ = self.parse_rate(rate)
+        soonest_time = None
+        for idx in reversed(range(len(self.history))):
+            remaining_citation = sum(
+                citation_count for citation_count, _ in self.history[:idx]
+            )
+            if remaining_citation < max_num_citations or not idx:
+                datetime_obj = datetime.fromtimestamp(
+                    self.history[idx][-1], timezone.utc
+                )
+                soonest_time = datetime_obj.isoformat()
+                break
+
+        raise Throttled(
+            detail={
+                "error_message": f"Too many requests (allowed rate: {rate}).",
+                "wait_until": soonest_time,
+            }
+        )
 
 
 class RECAPUsersReadOnly(DjangoModelPermissions):

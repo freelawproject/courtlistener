@@ -29,6 +29,7 @@ from cl.people_db.factories import (
 )
 from cl.people_db.models import Person, Race
 from cl.search.documents import DocketDocument
+from cl.search.docket_sources import DocketSources
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -821,7 +822,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class SerializeSolrTestMixin(SerializeMixin):
+class SerializeLockFileTestMixin(SerializeMixin):
     lockfile = __file__
 
 
@@ -843,7 +844,7 @@ class SimpleUserDataMixin:
     SOLR_URLS=settings.SOLR_TEST_URLS,
     ELASTICSEARCH_DISABLED=True,
 )
-class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
+class EmptySolrTestCase(SerializeLockFileTestMixin, TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
 
     Other Solr test classes subclass this one, adding additional content or
@@ -1129,3 +1130,37 @@ def skip_if_common_tests_skipped(method):
         return method(self, *args, **kwargs)
 
     return wrapper_func
+
+
+def generate_docket_target_sources(
+    initial_sources: list[int], incoming_source: int
+) -> dict[str, str]:
+    """Generates a mapping for testing of docket target sources based on
+    initial sources and an incoming source.
+
+    :param initial_sources: A list of integers representing the initial source
+     values.
+    :param incoming_source: An integer representing the incoming source value
+    to be added to each of the initial sources.
+    :return: A dict mapping from initial source names to target source names,
+    based on the sum of the initial source value and the incoming source value.
+    e.g: {"RECAP": "COLUMBIA_AND_RECAP"}
+    """
+    inverse_sources = {
+        value: key
+        for key, value in DocketSources.__dict__.items()
+        if not key.startswith("__") and isinstance(value, int)
+    }
+
+    target_sources = {}
+    for source in initial_sources:
+        target_source = source + incoming_source
+        if incoming_source == Docket.RECAP and source == Docket.DEFAULT:
+            # Exception for  DEFAULT + RECAP source assignation.
+            target_sources[inverse_sources[source]] = "RECAP_AND_SCRAPER"
+        else:
+            target_sources[inverse_sources[source]] = inverse_sources[
+                target_source
+            ]
+
+    return target_sources
