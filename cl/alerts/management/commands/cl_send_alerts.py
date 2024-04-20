@@ -224,6 +224,7 @@ class Command(VerboseCommand):
                     cd,
                     SEARCH_ALERTS_OPINION_HL_FIELDS,
                     ALERTS_HL_TAG,
+                    "v3",
                 )
                 s = s.extra(
                     from_=0,

@@ -2511,12 +2511,12 @@ def do_es_api_query(
                 }
             )
         main_query = s.extra(**extra_options)
+        main_query = main_query.sort(build_sort_results(cd))
     else:
         main_query = s
         if cd["highlight"]:
             main_query = add_es_highlighting(s, cd)
 
-    main_query = main_query.sort(build_sort_results(cd))
     return main_query
 
 

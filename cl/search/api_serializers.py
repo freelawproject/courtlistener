@@ -319,8 +319,12 @@ class SearchResultSerializer(serializers.Serializer):
 class OAESResultSerializer(DocumentSerializer):
     """The serializer for Oral argument results."""
 
-    snippet = serializers.CharField(read_only=True)
+    snippet = serializers.SerializerMethodField(read_only=True)
     panel_ids = serializers.ListField(read_only=True)
+
+    def get_snippet(self, obj):
+        # If the snippet has not yet been set upstream, set it here.
+        return get_highlight(obj, "text")
 
     class Meta:
         document = AudioDocument
@@ -347,7 +351,7 @@ class PersonESResultSerializer(DocumentSerializer):
 class ExtendedPersonESSerializer(PersonESResultSerializer):
     """Extends the Person serializer with all the field we get from the db"""
 
-    snippet = serializers.CharField(read_only=True)
+    snippet = serializers.SerializerMethodField(read_only=True)
     appointer = serializers.ListField(read_only=True)
     court = serializers.ListField(read_only=True)
     court_exact = serializers.ListField(read_only=True)
@@ -371,6 +375,10 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
     selection_method = serializers.ListField(read_only=True)
     selection_method_id = serializers.ListField(read_only=True)
     termination_reason = serializers.ListField(read_only=True)
+
+    def get_snippet(self, obj):
+        # If the snippet has not yet been set upstream, set it here.
+        return get_highlight(obj, "text")
 
 
 class OpinionESResultSerializer(DocumentSerializer):
@@ -403,8 +411,6 @@ class OpinionESResultSerializer(DocumentSerializer):
 
     def get_snippet(self, obj):
         # If the snippet has not yet been set upstream, set it here.
-        if hasattr(obj, "snippet"):
-            return obj.snippet
         return get_highlight(obj, "text")
 
     class Meta:

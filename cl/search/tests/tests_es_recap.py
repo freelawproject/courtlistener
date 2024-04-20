@@ -16,7 +16,11 @@ from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 
-from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
+from cl.lib.elasticsearch_utils import (
+    build_es_main_query,
+    do_es_api_query,
+    fetch_es_results,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     IndexedSolrTestCase,
@@ -32,6 +36,8 @@ from cl.people_db.factories import (
     PartyTypeFactory,
     PersonFactory,
 )
+from cl.search.api_utils import ESList
+from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -2879,6 +2885,187 @@ class RECAPSearchAPIV4Test(
             "snippet": "This a plain text to be <mark>shown in the API</mark>",
         }
         await self._test_api_fields_content(r, content_to_compare)
+
+    @override_settings(SEARCH_API_PAGE_SIZE=6)
+    def test_recap_results_cursor_api_pagination(self) -> None:
+        """Test cursor pagination for V4 RECAP Search API."""
+
+        created_dockets = []
+        dockets_to_create = 20
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            for _ in range(dockets_to_create):
+                docket_entry = DocketEntryWithParentsFactory(
+                    docket__source=Docket.RECAP
+                )
+                RECAPDocumentFactory(
+                    docket_entry=docket_entry,
+                )
+                created_dockets.append(docket_entry.docket)
+
+        total_dockets = Docket.objects.all().count()
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        tests = [
+            {
+                "results": 6,
+                "count_exact": total_dockets,
+                "more": False,
+                "next": True,
+            },
+            {
+                "results": 6,
+                "count_exact": total_dockets,
+                "more": False,
+                "next": True,
+            },
+            {
+                "results": 6,
+                "count_exact": total_dockets,
+                "more": False,
+                "next": True,
+            },
+            {
+                "results": 6,
+                "count_exact": total_dockets,
+                "more": False,
+                "next": True,
+            },
+            {
+                "results": 1,
+                "count_exact": total_dockets,
+                "more": False,
+                "next": False,
+            },
+        ]
+        # API
+        next_page = None
+        unique_ids = set()
+        for test in tests:
+            with self.subTest(test=test):
+                if not next_page:
+                    r = self.client.get(
+                        reverse("search-list", kwargs={"version": "v4"}),
+                        search_params,
+                    )
+                else:
+                    r = self.client.get(next_page)
+                # Test page
+                self.assertEqual(
+                    len(r.data["results"]),
+                    test["results"],
+                    msg="Results in page didn't match.",
+                )
+                self.assertEqual(
+                    r.data["count"]["exact"],
+                    test["count_exact"],
+                    msg="Results count didn't match.",
+                )
+                self.assertEqual(
+                    r.data["count"]["more"],
+                    test["more"],
+                    msg="Results more key is incorrect.",
+                )
+                next_page = r.data["next"]
+                if next_page:
+                    self.assertTrue(
+                        next_page, msg="Next page value didn't match"
+                    )
+                else:
+                    self.assertFalse(
+                        next_page, msg="Next page value didn't match"
+                    )
+
+                for result in r.data["results"]:
+                    unique_ids.add(result["docket_id"])
+
+        self.assertEqual(
+            len(unique_ids),
+            total_dockets,
+            msg="Wrong number of dockets.",
+        )
+
+        # Remove Docket objects to avoid affecting other tests.
+        for created_docket in created_dockets:
+            created_docket.delete()
+
+    def test_recap_cursor_api_pagination_count(self) -> None:
+        """Test cursor pagination count for V4 RECAP Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_dockets = Docket.objects.all().count()
+        with override_settings(
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets - 1
+        ):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"]["exact"],
+                total_dockets - 1,
+                msg="Results count didn't match.",
+            )
+            self.assertEqual(
+                r.data["count"]["more"],
+                True,
+                msg="Results more key is incorrect.",
+            )
+
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"]["exact"],
+                total_dockets,
+                msg="Results count didn't match.",
+            )
+            self.assertEqual(
+                r.data["count"]["more"],
+                False,
+                msg="Results more key is incorrect.",
+            )
+
+    def test_recap_cursor_api_pagination_next_page(self) -> None:
+        """Test cursor pagination next_page for V4 RECAP Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_dockets = Docket.objects.all().count()
+
+        # Fewer results than page_size, no next page.
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets + 1):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertIsNone(r.data["next"])
+
+        # Results count greater than page_size, next page available.
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets - 1):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertTrue(r.data["next"])
+
+        # Exact number of results equals page_size; next page available.
+        # Since it's not possible to know for certain if there is a next page, it's better to show it.
+        with override_settings(
+            SEARCH_API_PAGE_SIZE=total_dockets,
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets,
+        ):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertTrue(r.data["next"])
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

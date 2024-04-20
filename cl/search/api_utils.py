@@ -6,11 +6,11 @@ from rest_framework.exceptions import ParseError
 from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    build_sort_results,
     do_collapse_count_query,
     do_count_query,
     do_es_api_query,
     limit_inner_hits,
-    merge_highlights_into_result,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
 )
@@ -77,6 +77,8 @@ def get_object_list(request, cd, paginator):
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
     elif search_query and (is_opinion_es_active or is_recap_es_active):
+        if request.version == "v3":
+            cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
             highlighting_fields = {"text": 500}
@@ -187,21 +189,8 @@ class ESList:
                     )
                 result["child_docs"] = child_result_objects
 
-            snippet = None
-            if self._version == "v3":
-                if hasattr(result.meta, "highlight") and hasattr(
-                    result.meta.highlight, "text"
-                ):
-                    snippet = result.meta.highlight["text"][0]
-                elif hasattr(result, "text"):
-                    snippet = result["text"]
-
-            result_dict = result.to_dict(skip_empty=False)
-            if snippet:
-                result_dict["snippet"] = snippet
-
             # Send the object instead the JSON.
-            self._item_cache.append(ESResultObject(initial=result))
+            self._item_cache.append(result)
 
         # Now, assuming our _item_cache is all set, we just get the item.
         if isinstance(item, slice):
@@ -303,6 +292,75 @@ class SolrList:
         our cache.
         """
         self._item_cache.append(p_object)
+
+
+class CursorESList:
+    """Handles the execution and postprocessing of Elasticsearch queries, as
+    well as the pagination logic for cursor-based pagination.
+    """
+
+    def __init__(
+        self, main_query, page_size, search_after, clean_data, version="v3"
+    ):
+        self.main_query = main_query
+        self.page_size = page_size
+        self.search_after = search_after
+        self.clean_data = clean_data
+        self.version = version
+        self._item_cache = []
+        self.results = None
+
+    def set_pagination(self, search_after, page_size):
+        self.search_after = search_after
+        self.page_size = page_size
+
+    def get_paginated_results(self):
+        """Executes the search query with pagination settings and processes
+        the results.
+        """
+        if self.search_after:
+            self.main_query = self.main_query.extra(
+                search_after=self.search_after
+            )
+
+        self.main_query = self.main_query[: self.page_size]
+        default_sorting = build_sort_results(self.clean_data)
+        self.main_query = self.main_query.sort(default_sorting, "docket_id")
+        self.results = self.main_query.execute()
+
+        self.process_results(self.results)
+        return self.results
+
+    def process_results(self, results):
+        """Processes the raw results from ES for handling inner hits,
+        highlighting and merging of unavailable fields.
+        """
+
+        limit_inner_hits({}, results, self.clean_data["type"])
+        set_results_highlights(results, self.clean_data["type"])
+        merge_unavailable_fields_on_parent_document(
+            results,
+            self.clean_data["type"],
+            "api",
+            self.clean_data["highlight"],
+        )
+        for result in results:
+            child_result_objects = []
+            if hasattr(result, "child_docs"):
+                for child_doc in result.child_docs:
+                    child_result_objects.append(
+                        ESResultObject(initial=child_doc["_source"])
+                    )
+                result["child_docs"] = child_result_objects
+
+    def get_search_after_sort_key(self):
+        """Retrieves the sort key from the last item in the current page to
+        use for the next page's search_after parameter.
+        """
+        if self.results and len(self.results) > 0:
+            last_result = self.results.hits[-1]
+            return last_result.meta.sort
+        return None
 
 
 class ResultObject:

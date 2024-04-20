@@ -5,7 +5,9 @@ from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
+from cl.api.pagination import ESCursorPagination
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
+from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_serializers import (
     CourtSerializer,
@@ -23,6 +25,8 @@ from cl.search.api_serializers import (
     SearchResultSerializer,
     TagSerializer,
 )
+from cl.search.constants import SEARCH_HL_TAG
+from cl.search.documents import DocketDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -226,12 +230,23 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
-            paginator = pagination.PageNumberPagination()
-            sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
-            result_page = paginator.paginate_queryset(sl, request)
-            if search_type == SEARCH_TYPES.OPINION:
-                serializer = OpinionESResultSerializer(result_page, many=True)
-            elif search_type == SEARCH_TYPES.RECAP:
+            search_query = DocketDocument.search()
+            highlighting_fields = {}
+            main_query = do_es_api_query(
+                search_query,
+                cd,
+                highlighting_fields,
+                SEARCH_HL_TAG,
+                request.version,
+            )
+            paginator = ESCursorPagination()
+            es_list_instance = api_utils.CursorESList(
+                main_query, None, None, cd, version=request.version
+            )
+            result_page = paginator.paginate_queryset(
+                es_list_instance, request
+            )
+            if search_type == SEARCH_TYPES.RECAP:
                 serializer = DocketESResultSerializer(result_page, many=True)
             else:
                 # Not found error
