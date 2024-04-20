@@ -50,10 +50,10 @@ def get_object_list(request, cd, paginator):
     is_people_active = cd[
         "type"
     ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(request, "p-es-active")
-    is_opinion_active = cd = cd["type"] == SEARCH_TYPES.OPINION and (
+    is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION and (
         waffle.flag_is_active(request, "o-es-search-api-active")
     )
-    is_recap_es_active = (
+    is_recap_active = (
         cd["type"] == SEARCH_TYPES.RECAP and request.version == "v4"
     )
 
@@ -63,7 +63,7 @@ def get_object_list(request, cd, paginator):
         search_query = PersonDocument.search()
     elif is_opinion_active:
         search_query = OpinionDocument.search()
-    elif is_recap_es_active:
+    elif is_recap_active:
         search_query = DocketDocument.search()
     else:
         search_query = None
@@ -74,7 +74,7 @@ def get_object_list(request, cd, paginator):
             child_docs_count_query,
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
-    elif search_query and (is_opinion_active or is_recap_es_active):
+    elif search_query and (is_opinion_active or is_recap_active):
         if request.version == "v3":
             cd["highlight"] = True
         highlighting_fields = {}
@@ -100,7 +100,7 @@ def get_object_list(request, cd, paginator):
         is_oral_argument_active
         or is_people_active
         or is_opinion_active
-        or is_recap_es_active
+        or is_recap_active
     ):
         sl = ESList(
             main_query=main_query,

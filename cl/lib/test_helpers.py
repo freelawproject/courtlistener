@@ -28,8 +28,8 @@ from cl.people_db.factories import (
     SchoolFactory,
 )
 from cl.people_db.models import Person, Race
-from cl.search.documents import DocketDocument
 from cl.search.docket_sources import DocketSources
+from cl.search.documents import DocketDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
