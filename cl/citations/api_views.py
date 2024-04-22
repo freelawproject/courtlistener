@@ -40,7 +40,7 @@ class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
 
     def create(self, request: Request, *args, **kwargs):
         citations = []
-        data = self.request.data
+        data = self.validate_request_data(request)
         text = data.get("text", None)
         if text:
             # self.citations is set by the throttle class. This is a performance
