@@ -2084,6 +2084,24 @@ class CitationLookUpApiTest(
             self.opinion_cluster_2.get_absolute_url(),
         )
 
+    async def test_can_handle_page_as_a_number(self, cache_key_mock):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"reporter": "f2d", "volume": "56", "page": 9},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 f2d 9")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+        self.assertEqual(normalized_citations[0], "56 F.2d 9")
+
     async def test_can_handle_reporter_typos(self, cache_key_mock):
         r = await self.async_client.post(
             reverse("citation-lookup-list", kwargs={"version": "v3"}),
