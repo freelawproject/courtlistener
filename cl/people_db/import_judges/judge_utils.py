@@ -3,11 +3,10 @@ Created on Wed Feb 17 12:31:34 2016
 
 @author: elliott
 """
+
 import re
 from collections import Counter
 from datetime import date, datetime
-
-import pandas as pd
 
 from cl.people_db.models import (
     GRANULARITY_DAY,
@@ -19,13 +18,13 @@ from cl.people_db.models import (
 
 def process_date(year, month, day):
     """return date object and accompanying granularity"""
-    if pd.isnull(year) or year in ["n/a", "N/A", "present"]:
+    if not year or year in ["n/a", "N/A", "present"]:
         pdate = None
         granularity = ""
-    elif pd.isnull(month):
+    elif not month:
         pdate = date(int(year), 1, 1)
         granularity = GRANULARITY_YEAR
-    elif pd.isnull(day):
+    elif not day:
         pdate = date(int(year), int(month), 1)
         granularity = GRANULARITY_MONTH
     else:
@@ -36,7 +35,7 @@ def process_date(year, month, day):
 
 def process_date_string(date_input):
     """Return date as YYYY-MM-DD"""
-    if pd.isnull(date_input):
+    if not date_input:
         return None
     date_object = datetime.strptime(date_input, "%Y-%m-%d")
     return date_object
@@ -46,7 +45,8 @@ C = Counter()  # for fixing school names.
 
 
 def get_school(schoolname, testing=False):
-    "Takes the name of a school from judges data and tries to match to a unique School object."
+    """Takes the name of a school from judges data and tries to match to a
+    unique School object."""
 
     if schoolname.isspace():
         return None
@@ -111,7 +111,7 @@ def get_school(schoolname, testing=False):
 
 
 def get_degree_level(degstr):
-    if pd.isnull(degstr) or degstr == "":
+    if not degstr or degstr == "":
         return ""
     degdict = {
         "ba": [
@@ -222,7 +222,7 @@ def get_suffix(suffstr):
         "III": "3",
         "IV": "4",
     }
-    if pd.isnull(suffstr):
+    if suffstr:
         return ""
     else:
         return suffdict[suffstr]
@@ -269,7 +269,7 @@ def get_aba(abastr):
             ]
         ]
     )
-    if pd.isnull(abastr):
+    if not abastr:
         return None
     aba = abadict[abastr]
     return aba

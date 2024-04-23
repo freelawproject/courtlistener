@@ -6,23 +6,28 @@ from cl.audio.feeds import (
     SearchPodcast,
 )
 from cl.audio.views import view_audio_file
+from cl.search.feeds import search_feed_error_handler
 
 urlpatterns = [
     path(
         "audio/<int:pk>/<blank-slug:_>/",
-        view_audio_file,
+        view_audio_file,  # type: ignore[arg-type]
         name="view_audio_file",
     ),
     # Podcasts
     path(
         "podcast/court/all/",
-        AllJurisdictionsPodcast(),
+        search_feed_error_handler(AllJurisdictionsPodcast()),
         name="all_jurisdictions_podcast",
     ),
     path(
         "podcast/court/<str:court>/",
-        JurisdictionPodcast(),
+        search_feed_error_handler(JurisdictionPodcast()),
         name="jurisdiction_podcast",
     ),
-    re_path(r"^podcast/(search)/", SearchPodcast(), name="search_podcast"),
+    re_path(
+        r"^podcast/(search)/",
+        search_feed_error_handler(SearchPodcast()),
+        name="search_podcast",
+    ),
 ]

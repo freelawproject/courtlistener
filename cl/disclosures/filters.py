@@ -4,6 +4,7 @@ from cl.api.utils import (
     ALL_TEXT_LOOKUPS,
     BOOLEAN_LOOKUPS,
     DATETIME_LOOKUPS,
+    INTEGER_LOOKUPS,
     NoEmptyFilterSet,
 )
 from cl.disclosures.models import (
@@ -20,7 +21,7 @@ from cl.disclosures.models import (
 from cl.people_db.models import Person
 
 disclosure_fields = {
-    "id": ["exact"],
+    "id": INTEGER_LOOKUPS,
     "date_created": DATETIME_LOOKUPS,
     "date_modified": DATETIME_LOOKUPS,
     "redacted": BOOLEAN_LOOKUPS,
@@ -36,7 +37,13 @@ class AgreementFilter(NoEmptyFilterSet):
     class Meta:
         model = Agreement
         fields = disclosure_fields.copy()
-        fields.update({"parties_and_terms": ALL_TEXT_LOOKUPS})
+        fields.update(
+            {
+                "parties_and_terms": ALL_TEXT_LOOKUPS,
+                "date_raw": ALL_TEXT_LOOKUPS,
+                "redacted": BOOLEAN_LOOKUPS,
+            }
+        )
 
 
 class DebtFilter(NoEmptyFilterSet):
@@ -48,6 +55,14 @@ class DebtFilter(NoEmptyFilterSet):
     class Meta:
         model = Debt
         fields = disclosure_fields.copy()
+        fields.update(
+            {
+                "creditor_name": ALL_TEXT_LOOKUPS,
+                "description": ALL_TEXT_LOOKUPS,
+                "value_code": ["exact"],
+                "redacted": BOOLEAN_LOOKUPS,
+            }
+        )
 
 
 class FinancialDisclosureFilter(NoEmptyFilterSet):
@@ -91,7 +106,7 @@ class FinancialDisclosureFilter(NoEmptyFilterSet):
     class Meta:
         model = FinancialDisclosure
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "person": ["exact"],
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
@@ -109,9 +124,12 @@ class GiftFilter(NoEmptyFilterSet):
     class Meta:
         model = Gift
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
+            "source": ALL_TEXT_LOOKUPS,
+            "description": ALL_TEXT_LOOKUPS,
+            "value": ALL_TEXT_LOOKUPS,
             "redacted": BOOLEAN_LOOKUPS,
         }
 
@@ -132,6 +150,7 @@ class InvestmentFilter(NoEmptyFilterSet):
                 "income_during_reporting_period_code": ["exact"],
                 "transaction_during_reporting_period": ALL_TEXT_LOOKUPS,
                 "transaction_value_code": ["exact"],
+                "redacted": BOOLEAN_LOOKUPS,
             }
         )
 
@@ -145,6 +164,14 @@ class NonInvestmentIncomeFilter(NoEmptyFilterSet):
     class Meta:
         model = NonInvestmentIncome
         fields = disclosure_fields.copy()
+        fields.update(
+            {
+                "date_raw": ALL_TEXT_LOOKUPS,
+                "source_type": ALL_TEXT_LOOKUPS,
+                "income_amount": ALL_TEXT_LOOKUPS,
+                "redacted": BOOLEAN_LOOKUPS,
+            }
+        )
 
 
 class PositionFilter(NoEmptyFilterSet):
@@ -156,6 +183,13 @@ class PositionFilter(NoEmptyFilterSet):
     class Meta:
         model = Position
         fields = disclosure_fields.copy()
+        fields.update(
+            {
+                "position": ALL_TEXT_LOOKUPS,
+                "organization_name": ALL_TEXT_LOOKUPS,
+                "redacted": BOOLEAN_LOOKUPS,
+            }
+        )
 
 
 class ReimbursementFilter(NoEmptyFilterSet):
@@ -167,6 +201,16 @@ class ReimbursementFilter(NoEmptyFilterSet):
     class Meta:
         model = Reimbursement
         fields = disclosure_fields.copy()
+        fields.update(
+            {
+                "date_raw": ALL_TEXT_LOOKUPS,
+                "location": ALL_TEXT_LOOKUPS,
+                "source": ALL_TEXT_LOOKUPS,
+                "purpose": ALL_TEXT_LOOKUPS,
+                "items_paid_or_provided": ALL_TEXT_LOOKUPS,
+                "redacted": BOOLEAN_LOOKUPS,
+            }
+        )
 
 
 class SpouseIncomeFilter(NoEmptyFilterSet):
@@ -178,3 +222,10 @@ class SpouseIncomeFilter(NoEmptyFilterSet):
     class Meta:
         model = SpouseIncome
         fields = disclosure_fields.copy()
+        fields.update(
+            {
+                "date_raw": ALL_TEXT_LOOKUPS,
+                "source_type": ALL_TEXT_LOOKUPS,
+                "redacted": BOOLEAN_LOOKUPS,
+            }
+        )

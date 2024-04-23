@@ -1,4 +1,4 @@
-FROM python:3.11-slim as build-base
+FROM python:3.12-slim as build-base
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
@@ -75,6 +75,9 @@ WORKDIR /opt/courtlistener
 ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
 
 USER root
+## Creates a directory for Hyperscan db
+RUN mkdir /opt/courtlistener/.hyperscan \
+    && chown -R www-data:www-data /opt/courtlistener/.hyperscan
 RUN chmod +x /opt/courtlistener/docker/django/docker-entrypoint.sh
 RUN chown www-data:www-data /opt/courtlistener/docker/django/docker-entrypoint.sh
 

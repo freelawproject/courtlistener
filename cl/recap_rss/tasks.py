@@ -256,8 +256,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         return
 
     logger.info(
-        "%s: Feed changed or doing a sweep. Moving on to the merge."
-        % feed_status.court_id
+        f"{feed_status.court_id}: Feed changed or doing a sweep. Moving on to the merge."
     )
     rss_feed.parse()
     logger.info(
@@ -358,7 +357,7 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
             if metadata_only:
                 continue
 
-            des_returned, rds_created, content_updated = async_to_sync(
+            items_returned, rds_created, content_updated = async_to_sync(
                 add_docket_entries
             )(d, docket["docket_entries"])
 

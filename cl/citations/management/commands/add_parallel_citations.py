@@ -6,16 +6,17 @@ from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.db import IntegrityError
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.citations.annotate_citations import get_and_clean_opinion_text
-from cl.citations.match_citations import (
-    build_date_range,
-    get_years_from_reporter,
-)
+from cl.citations.match_citations import build_date_range
 from cl.citations.tasks import identify_parallel_citations
+from cl.citations.utils import get_years_from_reporter
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.search.models import Opinion, OpinionCluster
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 # Parallel citations need to be identified this many times before they should
 # be added to the database.
@@ -47,7 +48,7 @@ class Command(VerboseCommand):
     )
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
-        super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
+        super().__init__(stdout=None, stderr=None, no_color=False)
         self.g = nx.Graph()
         self.conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
         self.update_count = 0
@@ -161,20 +162,18 @@ class Command(VerboseCommand):
 
         # For result_sets with more than 0 results, do all the citations have
         # the same ID?
-        unique_results = set(
-            [
-                results[0]["cluster_id"]
-                for node, results in result_sets
-                if len(results) > 0
-            ]
-        )
+        unique_results = {
+            results[0]["cluster_id"]
+            for node, results in result_sets
+            if len(results) > 0
+        }
         if len(unique_results) > 1:
             logger.info("  Got multiple IDs for the citations. Pass.\n")
             return
 
         # Are the number of unique reporters equal to the number of results?
         if len(
-            set([node.edition_guess.reporter for node, results in result_sets])
+            {node.edition_guess.reporter for node, results in result_sets}
         ) != len(result_sets):
             logger.info("  Got duplicated reporter in citations. Pass.\n")
             return
@@ -268,7 +267,7 @@ class Command(VerboseCommand):
         with actual items in the database and then updating them with parallel
         citations that are sufficiently likely to be good.
         """
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         no_option = not any([options.get("doc_id"), options.get("all")])
         if no_option:
             raise CommandError(
@@ -294,7 +293,10 @@ class Command(VerboseCommand):
         for o in opinions.iterator():
             subtasks.append(
                 identify_parallel_citations.s(
-                    get_citations(get_and_clean_opinion_text(o).cleaned_text)
+                    get_citations(
+                        get_and_clean_opinion_text(o).cleaned_text,
+                        tokenizer=HYPERSCAN_TOKENIZER,
+                    )
                 )
             )
             last_item = count == completed + 1

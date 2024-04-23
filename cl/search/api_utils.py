@@ -1,15 +1,20 @@
 import waffle
 from django.conf import settings
+from elasticsearch_dsl import Q
 from rest_framework.exceptions import ParseError
 
 from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    do_collapse_count_query,
+    do_count_query,
+    do_es_api_query,
     merge_unavailable_fields_on_parent_document,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
-from cl.search.documents import AudioDocument, PersonDocument
+from cl.search.constants import SEARCH_HL_TAG
+from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
 from cl.search.models import SEARCH_TYPES
 
 
@@ -29,8 +34,6 @@ def get_object_list(request, cd, paginator):
     if cd["type"] == SEARCH_TYPES.DOCKETS:
         group = True
 
-    total_query_results = 0
-
     is_oral_argument_active = cd[
         "type"
     ] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
@@ -40,20 +43,31 @@ def get_object_list(request, cd, paginator):
         "type"
     ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(request, "p-es-active")
 
+    is_opinion_active = cd[
+        "type"
+    ] == SEARCH_TYPES.OPINION and waffle.flag_is_active(
+        request, "o-es-search-api-active"
+    )
+
     if is_oral_argument_active:
         search_query = AudioDocument.search()
     elif is_people_active:
         search_query = PersonDocument.search()
+    elif is_opinion_active:
+        search_query = OpinionDocument.search()
     else:
         search_query = None
 
-    if search_query:
+    if search_query and (is_people_active or is_oral_argument_active):
         (
             main_query,
-            total_query_results,
+            child_docs_count_query,
             top_hits_limit,
-            total_child_results,
         ) = build_es_main_query(search_query, cd)
+    elif search_query and is_opinion_active:
+        main_query = do_es_api_query(
+            search_query, cd, {"text": 500}, SEARCH_HL_TAG
+        )
     else:
         main_query = search_utils.build_main_query(
             cd, highlight="text", facet=False, group=group
@@ -63,10 +77,9 @@ def get_object_list(request, cd, paginator):
     if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if is_oral_argument_active or is_people_active:
+    if is_oral_argument_active or is_people_active or is_opinion_active:
         sl = ESList(
             main_query=main_query,
-            count=total_query_results,
             offset=offset,
             page_size=page_size,
             type=cd["type"],
@@ -77,30 +90,34 @@ def get_object_list(request, cd, paginator):
     return sl
 
 
-class ESList(object):
+class ESList:
     """This class implements a yielding list object that fetches items from ES
     as they are queried.
     """
 
-    def __init__(
-        self, main_query, count, offset, page_size, type, length=None
-    ):
-        super(ESList, self).__init__()
+    def __init__(self, main_query, offset, page_size, type, length=None):
+        super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
         self.type = type
-        self.count = count
         self._item_cache = []
         self._length = length
 
     def __len__(self):
         if self._length is None:
-            self._length = self.count
+            if self.type == SEARCH_TYPES.OPINION:
+                query = Q(self.main_query.to_dict(count=True)["query"])
+                self._length = do_collapse_count_query(self.main_query, query)
+            else:
+                self._length = do_count_query(self.main_query)
         return self._length
 
     def __iter__(self):
-        for item in range(0, len(self)):
+        # Iterate over the results returned by the query, up to the specified
+        # page_size.
+        total_items = min(len(self), self.page_size)
+        for item in range(0, total_items):
             try:
                 yield self._item_cache[item]
             except IndexError:
@@ -115,18 +132,24 @@ class ESList(object):
 
         # Merge unavailable fields in ES by pulling data from the DB to make
         # the API backwards compatible
-        merge_unavailable_fields_on_parent_document(results, self.type, "api")
+        if self.type == SEARCH_TYPES.PEOPLE:
+            merge_unavailable_fields_on_parent_document(
+                results, self.type, "api"
+            )
+
         # Pull the text snippet up a level
         for result in results:
+            snippet = None
             if hasattr(result.meta, "highlight") and hasattr(
                 result.meta.highlight, "text"
             ):
-                result["snippet"] = result.meta.highlight["text"][0]
+                snippet = result.meta.highlight["text"][0]
             elif hasattr(result, "text"):
-                result["snippet"] = result["text"]
-            self._item_cache.append(
-                ResultObject(initial=result.to_dict(skip_empty=False))
-            )
+                snippet = result["text"]
+
+            result_dict = result.to_dict(skip_empty=False)
+            result_dict["snippet"] = snippet
+            self._item_cache.append(ResultObject(initial=result_dict))
 
         # Now, assuming our _item_cache is all set, we just get the item.
         if isinstance(item, slice):
@@ -151,13 +174,13 @@ class ESList(object):
         self._item_cache.append(p_object)
 
 
-class SolrList(object):
+class SolrList:
     """This implements a yielding list object that fetches items as they are
     queried.
     """
 
     def __init__(self, main_query, offset, type, length=None):
-        super(SolrList, self).__init__()
+        super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.type = type
@@ -230,7 +253,7 @@ class SolrList(object):
         self._item_cache.append(p_object)
 
 
-class ResultObject(object):
+class ResultObject:
     def __init__(self, initial=None):
         self.__dict__["_data"] = initial or {}
 

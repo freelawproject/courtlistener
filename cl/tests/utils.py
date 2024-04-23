@@ -3,9 +3,13 @@ from typing import Tuple
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
+from django.http import HttpHeaders  # type: ignore[attr-defined]
+from django.test import AsyncClient
+from django.utils.encoding import force_bytes
+from django.utils.http import urlencode
 from requests import Response
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient
+from rest_framework.test import APIRequestFactory
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
@@ -13,11 +17,88 @@ from selenium.webdriver.support.wait import WebDriverWait
 from cl.recap.factories import DocketDataFactory, DocketEntryDataFactory
 
 
-def make_client(user_pk: int) -> APIClient:
+class AsyncAPIClient(AsyncClient, APIRequestFactory):
+    def credentials(self, **kwargs):
+        """
+        Sets headers that will be used on every outgoing request.
+        """
+        self._credentials = [
+            (k.encode("latin1"), v.encode("latin1"))
+            for k, v in HttpHeaders(kwargs).items()
+        ]
+
+    async def get(self, path, data=None, **extra):
+        r = {
+            "QUERY_STRING": urlencode(data or {}, doseq=True),
+        }
+        if not data and "?" in path:
+            # Fix to support old behavior where you have the arguments in the
+            # url. See #1461.
+            query_string = force_bytes(path.split("?")[1])
+            query_string = query_string.decode("iso-8859-1")
+            r["QUERY_STRING"] = query_string
+        r.update(extra)
+        return await self.generic("GET", path, **r)
+
+    async def post(
+        self, path, data=None, format=None, content_type=None, **extra
+    ):
+        data, content_type = self._encode_data(data, format, content_type)
+        return await self.generic("POST", path, data, content_type, **extra)
+
+    async def put(
+        self, path, data=None, format=None, content_type=None, **extra
+    ):
+        data, content_type = self._encode_data(data, format, content_type)
+        return await self.generic("PUT", path, data, content_type, **extra)
+
+    async def patch(
+        self, path, data=None, format=None, content_type=None, **extra
+    ):
+        data, content_type = self._encode_data(data, format, content_type)
+        return await self.generic("PATCH", path, data, content_type, **extra)
+
+    async def delete(
+        self, path, data=None, format=None, content_type=None, **extra
+    ):
+        data, content_type = self._encode_data(data, format, content_type)
+        return await self.generic("DELETE", path, data, content_type, **extra)
+
+    async def options(
+        self, path, data=None, format=None, content_type=None, **extra
+    ):
+        data, content_type = self._encode_data(data, format, content_type)
+        return await self.generic("OPTIONS", path, data, content_type, **extra)
+
+    async def generic(
+        self,
+        method,
+        path,
+        data="",
+        content_type="application/octet-stream",
+        secure=False,
+        **extra,
+    ):
+        # Include the CONTENT_TYPE, regardless of whether or not data is empty.
+        if content_type is not None:
+            extra["CONTENT_TYPE"] = str(content_type)
+
+        return await super().generic(
+            method, path, data, content_type, secure, **extra
+        )
+
+    async def request(self, **kwargs):
+        # Ensure that any credentials set get added to every request.
+        if hasattr(self, "_credentials"):
+            kwargs.get("headers", []).extend(self._credentials)
+        return await super().request(**kwargs)
+
+
+def make_client(user_pk: int) -> AsyncAPIClient:
     user = User.objects.get(pk=user_pk)
     token, created = Token.objects.get_or_create(user=user)
     token_header = f"Token {token}"
-    client = APIClient()
+    client = AsyncAPIClient()
     client.credentials(HTTP_AUTHORIZATION=token_header)
     return client
 

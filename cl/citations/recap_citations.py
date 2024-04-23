@@ -1,16 +1,20 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from django.db import transaction
 from eyecite import get_citations
 from eyecite.models import CitationBase
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.citations.annotate_citations import get_and_clean_opinion_text
 from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
 )
-from cl.lib.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import OpinionsCitedByRECAPDocument, RECAPDocument
+from cl.search.tasks import index_related_cites_fields
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def store_recap_citations(document: RECAPDocument) -> None:
@@ -27,7 +31,9 @@ def store_recap_citations(document: RECAPDocument) -> None:
     )  # even though this function assumes the input is an opinion, it will work for RECAP documents.
 
     # Extract the citations from the document's text
-    citations: List[CitationBase] = get_citations(document.cleaned_text)
+    citations: List[CitationBase] = get_citations(
+        document.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+    )
 
     # If no citations are found, then there is nothing else to do for now.
     if not citations:
@@ -58,3 +64,9 @@ def store_recap_citations(document: RECAPDocument) -> None:
         ]
 
         OpinionsCitedByRECAPDocument.objects.bulk_create(objects_to_create)
+
+    # Update changes in ES.
+    index_related_cites_fields.delay(
+        OpinionsCitedByRECAPDocument.__name__,
+        document.pk,
+    )

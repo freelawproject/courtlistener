@@ -1,11 +1,12 @@
 from http.client import ResponseNotReady
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple
 
 from django.db import transaction
 from django.db.models import F
 from django.db.models.query import QuerySet
 from eyecite import get_citations
 from eyecite.models import CitationBase
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.celery_init import app
 from cl.citations.annotate_citations import (
@@ -23,21 +24,21 @@ from cl.citations.match_citations import (
 from cl.citations.parenthetical_utils import create_parenthetical_groups
 from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
-from cl.lib.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
-    OpinionsCitedByRECAPDocument,
     Parenthetical,
     RECAPDocument,
 )
-from cl.search.tasks import add_items_to_solr
+from cl.search.tasks import add_items_to_solr, index_related_cites_fields
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
 # "22 U.S. 44, 46 (13 Atl. 33)" would have a distance of 6.
 PARALLEL_DISTANCE = 6
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 @app.task
@@ -146,7 +147,9 @@ def store_opinion_citations_and_update_parentheticals(
     get_and_clean_opinion_text(opinion)
 
     # Extract the citations from the opinion's text
-    citations: List[CitationBase] = get_citations(opinion.cleaned_text)
+    citations: List[CitationBase] = get_citations(
+        opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+    )
 
     # If no citations are found, then there is nothing else to do for now.
     if not citations:
@@ -175,13 +178,11 @@ def store_opinion_citations_and_update_parentheticals(
         "pk", flat=True
     )
 
-    opinion_ids_to_update = set(
-        [
-            o.pk
-            for o in citation_resolutions.keys()
-            if o.pk not in currently_cited_opinions
-        ]
-    )
+    opinion_ids_to_update = {
+        o.pk
+        for o in citation_resolutions.keys()
+        if o.pk not in currently_cited_opinions
+    }
 
     clusters_to_update_par_groups_for = set()
     parentheticals: List[Parenthetical] = []
@@ -252,3 +253,11 @@ def store_opinion_citations_and_update_parentheticals(
 
         # Save all the changes to the citing opinion (send to solr later)
         opinion.save(index=False)
+
+    # Update changes in ES.
+    cluster_ids_to_update = list(
+        opinion_clusters_to_update.values_list("id", flat=True)
+    )
+    index_related_cites_fields.delay(
+        OpinionsCited.__name__, opinion.pk, cluster_ids_to_update
+    )

@@ -19,6 +19,8 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
+    OpinionDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
@@ -26,11 +28,13 @@ from cl.search.documents import (
 from cl.search.models import (
     BankruptcyInformation,
     Citation,
+    Court,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
     OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
@@ -80,10 +84,7 @@ pa_field_mapping = {
                 "docket_id": ["docket_id"],
                 "judges": ["judge"],
                 "nature_of_suit": ["suitNature"],
-                "get_precedential_status_display": [
-                    "status"
-                ],  # On fields where
-                # indexed values needs to be the display() value, use get_{field_name}_display as key.
+                "precedential_status": ["status"],
             },
         },
         Parenthetical: {
@@ -210,7 +211,6 @@ p_field_mapping = {
     },
 }
 
-
 position_field_mapping = {
     "save": {
         Person: {
@@ -296,6 +296,8 @@ docket_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "slug": ["docket_slug", "docket_absolute_url"],
+                "pacer_case_id": ["pacer_case_id"],
+                "source": [""],  # Not indexed field.
             },
         },
         Person: {
@@ -361,6 +363,7 @@ recap_document_field_mapping = {
                 "referred_to_id": ["referred_to_id", "referredTo"],
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
+                "pacer_case_id": ["pacer_case_id"],
             }
         },
         Person: {
@@ -376,6 +379,124 @@ recap_document_field_mapping = {
     "m2m": {},
     "reverse": {},
     "reverse-delete": {},
+}
+
+o_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "docket_number": ["docketNumber"],
+                "date_argued": ["dateArgued"],
+                "date_reargued": ["dateReargued"],
+                "date_reargument_denied": ["dateReargumentDenied"],
+            }
+        },
+        OpinionCluster: {
+            "sub_opinions": {
+                "case_name": ["caseName"],
+                "case_name_full": ["caseName", "caseNameFull"],
+                "case_name_short": ["caseName"],
+                "date_filed": ["dateFiled"],
+                "judges": ["judge"],
+                "attorneys": ["attorney"],
+                "nature_of_suit": ["suitNature"],
+                "precedential_status": ["status"],
+                "procedural_history": ["procedural_history"],
+                "posture": ["posture"],
+                "syllabus": ["syllabus"],
+                "scdb_id": ["scdb_id"],
+                "citation_count": ["citeCount"],
+                "slug": ["absolute_url"],
+            }
+        },
+        Opinion: {
+            "self": {
+                "author_id": ["author_id"],
+                "type": ["type", "type_text"],
+                "per_curiam": ["per_curiam"],
+                "download_url": ["download_url"],
+                "local_path": ["local_path"],
+                "html_columbia": ["text"],
+                "html_lawbox": ["text"],
+                "xml_harvard": ["text"],
+                "html_anon_2020": ["text"],
+                "html": ["text"],
+                "plain_text": ["text"],
+                "sha1": ["sha1"],
+            },
+        },
+    },
+    "delete": {Opinion: {}},
+    "m2m": {
+        Opinion.joined_by.through: {
+            "opinion": {
+                "joined_by_ids": "joined_by_ids",
+            },
+        },
+    },
+    "reverse": {
+        OpinionsCited: {"cited_opinions": {"all": ["cites"]}},
+    },  # For handling OpinionsCited.save() in add_manual_citations command
+    "reverse-delete": {},
+}
+
+o_cluster_field_mapping = {
+    "save": {
+        Docket: {
+            "docket": {
+                "court_id": ["court_exact"],
+                "docket_number": ["docketNumber"],
+                "date_argued": ["dateArgued"],
+                "date_reargued": ["dateReargued"],
+                "date_reargument_denied": ["dateReargumentDenied"],
+            }
+        },
+        OpinionCluster: {
+            "self": {
+                "docket_id": ["prepare"],
+                "case_name": ["caseName"],
+                "case_name_short": ["caseName"],
+                "case_name_full": ["caseNameFull", "caseName"],
+                "date_filed": ["dateFiled"],
+                "judges": ["judge"],
+                "attorneys": ["attorney"],
+                "nature_of_suit": ["suitNature"],
+                "precedential_status": ["status"],
+                "procedural_history": ["procedural_history"],
+                "posture": ["posture"],
+                "syllabus": ["syllabus"],
+                "scdb_id": ["scdb_id"],
+                "citation_count": ["citeCount"],
+                "slug": ["absolute_url"],
+                "source": ["source"],
+            },
+        },
+    },
+    "delete": {OpinionCluster: {}},
+    "m2m": {
+        OpinionCluster.panel.through: {
+            "opinioncluster": {
+                "panel_ids": "panel_ids",
+            },
+        },
+        OpinionCluster.non_participating_judges.through: {
+            "opinioncluster": {
+                "non_participating_judge_ids": "non_participating_judge_ids",
+            },
+        },
+    },
+    "reverse": {
+        Opinion: {"sub_opinions": {"cluster_id": ["sibling_ids"]}},
+        Citation: {
+            "citations": {"all": ["citation", "neutralCite", "lexisCite"]}
+        },
+    },
+    "reverse-delete": {
+        Opinion: {"cluster": {"all": ["sibling_ids"]}},
+        Citation: {
+            "cluster": {"all": ["citation", "neutralCite", "lexisCite"]}
+        },
+    },
 }
 
 
@@ -410,6 +531,14 @@ if not settings.ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED:
     _docket_signal_processor = ESSignalProcessor(
         Docket, DocketDocument, docket_field_mapping
     )
+if settings.ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED:
+    _o_signal_processor = ESSignalProcessor(
+        Opinion, OpinionDocument, o_field_mapping
+    )
+if settings.ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED:
+    _o_cluster_signal_processor = ESSignalProcessor(
+        OpinionCluster, OpinionClusterDocument, o_cluster_field_mapping
+    )
 
 
 @receiver(
@@ -430,7 +559,7 @@ def handle_recap_doc_change(
     # When we get updated text for a doc, we want to parse it for citations.
     if update_fields is not None and "plain_text" in update_fields:
         # Even though the task itself filters for qualifying ocr_status,
-        # we don't want to clog the TQ with unncessary items.
+        # we don't want to clog the TQ with unnecessary items.
         if instance.ocr_status in (
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,

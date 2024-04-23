@@ -4,6 +4,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from datetime import datetime
+from http import HTTPStatus
 from multiprocessing import process
 from typing import List, Optional, Tuple
 from zipfile import ZipFile
@@ -39,10 +40,6 @@ from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
 from requests.cookies import RequestsCookieJar
 from requests.packages.urllib3.exceptions import ReadTimeoutError
-from rest_framework.status import (
-    HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_504_GATEWAY_TIMEOUT,
-)
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.api.webhooks import send_recap_fetch_webhooks
@@ -52,6 +49,7 @@ from cl.corpus_importer.tasks import (
     download_pdf_by_magic_number,
     get_att_report_by_rd,
     get_document_number_for_appellate,
+    is_docket_entry_sealed,
     is_pacer_doc_sealed,
     make_attachment_pq_object,
     update_rd_metadata,
@@ -174,40 +172,61 @@ def do_pacer_fetch(fq: PacerFetchQueue):
     return result
 
 
-async def mark_pq_successful(pq, d_id=None, de_id=None, rd_id=None):
+async def mark_pq_successful(pq: ProcessingQueue) -> tuple[int, str]:
     """Mark the processing queue item as successfully completed.
 
     :param pq: The ProcessingQueue object to manipulate
+    :return: A two tuple, the PQ status, the PQ error message.
+    """
+    # Ditch the original file
+    await sync_to_async(pq.filepath_local.delete)(save=False)
+    message = "Successful upload! Nice work."
+    if pq.debug:
+        message = "Successful debugging upload! Nice work."
+    return await mark_pq_status(pq, message, PROCESSING_STATUS.SUCCESSFUL)
+
+
+async def associate_related_instances(
+    pq: ProcessingQueue | EmailProcessingQueue,
+    d_id: int | None = None,
+    de_id: int | None = None,
+    rd_id: int | list[int] | None = None,
+) -> None:
+    """Associate the related upload instances.
+
+    :param pq: The ProcessingQueue or EmailProcessingQueue object to manipulate
     :param d_id: The docket PK to associate with this upload. Either the docket
     that the RECAPDocument is associated with, or the docket that was uploaded.
     :param de_id: The docket entry to associate with this upload. Only applies
     to document uploads, which are associated with docket entries.
     :param rd_id: The RECAPDocument PK to associate with this upload. Only
-    applies to document uploads (obviously).
+    applies to document uploads (obviously). If the pq is a EmailProcessingQueue
+    this param accepts a list of RDs Pks.
+    :return: None
     """
-    # Ditch the original file
-    await sync_to_async(pq.filepath_local.delete)(save=False)
-    if pq.debug:
-        pq.error_message = "Successful debugging upload! Nice work."
+
+    if isinstance(pq, EmailProcessingQueue):
+        await pq.recap_documents.aadd(*rd_id)
     else:
-        pq.error_message = "Successful upload! Nice work."
-    pq.status = PROCESSING_STATUS.SUCCESSFUL
-    pq.docket_id = d_id
-    pq.docket_entry_id = de_id
-    pq.recap_document_id = rd_id
-    await pq.asave()
-    return pq.status, pq.error_message
+        pq.docket_id = d_id
+        pq.docket_entry_id = de_id
+        pq.recap_document_id = rd_id
+        await pq.asave()
 
 
 async def mark_pq_status(
-    pq, msg, status, message_property_name="error_message"
-):
+    pq: ProcessingQueue,
+    msg: str,
+    status: int,
+    message_property_name: str = "error_message",
+) -> tuple[int, str]:
     """Mark the processing queue item as some process, and log the message.
 
     :param pq: The ProcessingQueue object to manipulate
     :param msg: The message to log and to save to pq's error_message field.
     :param status: A pq status code as defined on the ProcessingQueue model.
     :param message_property_name: The message property to attach the msg argument to.
+    :return: A two tuple, the PQ status, the PQ error message.
     """
     if msg:
         logger.info(msg)
@@ -250,7 +269,7 @@ async def process_recap_pdf(pk):
                 d = await Docket.objects.aget(
                     pacer_case_id=pq.pacer_case_id, court_id=pq.court_id
                 )
-            except Docket.DoesNotExist as exc:
+            except Docket.DoesNotExist:
                 # No Docket and no RECAPDocument. Do a retry. Hopefully
                 # the docket will be in place soon (it could be in a
                 # different upload task that hasn't yet been processed).
@@ -285,7 +304,7 @@ async def process_recap_pdf(pk):
                 de = await DocketEntry.objects.aget(
                     docket=d, entry_number=pq.document_number
                 )
-            except DocketEntry.DoesNotExist as exc:
+            except DocketEntry.DoesNotExist:
                 logger.warning(
                     f"Unable to find docket entry for processing queue '{pq}'."
                 )
@@ -397,12 +416,13 @@ async def process_recap_pdf(pk):
 
     if not pq.debug:
         de = await DocketEntry.objects.aget(recap_documents=rd)
-        await mark_pq_successful(
+        await associate_related_instances(
             pq,
             d_id=de.docket_id,
-            de_id=rd.docket_entry_id,
+            de_id=de.pk,
             rd_id=rd.pk,
         )
+        await mark_pq_successful(pq)
         docket = await Docket.objects.aget(id=de.docket_id)
         await mark_ia_upload_needed(docket, save_docket=True)
     return rd
@@ -557,7 +577,8 @@ async def process_recap_docket(pk):
         d.pacer_case_id = pq.pacer_case_id
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     await d.asave()
@@ -571,7 +592,7 @@ async def process_recap_docket(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await add_docket_entries(
+    items_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
@@ -583,7 +604,8 @@ async def process_recap_docket(pk):
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -666,9 +688,8 @@ async def process_recap_attachment(
         return pq_status, msg, []
 
     await add_tags_to_objs(tag_names, rds_affected)
-    pq_status, msg = await mark_pq_successful(
-        pq, d_id=de.docket_id, de_id=de.pk
-    )
+    await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = await mark_pq_successful(pq)
     return pq_status, msg, rds_affected
 
 
@@ -735,7 +756,7 @@ async def process_recap_claims_register(pk):
     while True:
         try:
             await d.asave()
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -765,8 +786,8 @@ async def process_recap_claims_register(pk):
         "claims_registry.html",
         ContentFile(text.encode()),
     )
-
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {"docket_pk": d.pk}
 
 
@@ -821,14 +842,15 @@ async def process_recap_docket_history_report(pk):
     await update_docket_metadata(d, data)
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     retries = 5
     while True:
         try:
             await d.asave()
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -855,7 +877,7 @@ async def process_recap_docket_history_report(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await add_docket_entries(
+    items_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
@@ -863,7 +885,8 @@ async def process_recap_docket_history_report(pk):
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -930,7 +953,8 @@ async def process_case_query_page(pk):
             content_updated = True
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     retries = 5
@@ -938,7 +962,7 @@ async def process_case_query_page(pk):
         try:
             await d.asave()
             await sync_to_async(add_bankruptcy_data_to_docket)(d, data)
-        except IntegrityError as exc:
+        except IntegrityError:
             logger.warning(
                 "Race condition experienced while attempting docket save."
             )
@@ -964,8 +988,8 @@ async def process_case_query_page(pk):
         "case_report.html",
         ContentFile(text.encode()),
     )
-
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": content_updated,
@@ -1001,7 +1025,6 @@ async def process_recap_appellate_docket(pk):
         }
 
     This value is a dict so that it can be ingested in a Celery chain.
-
     """
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -1047,7 +1070,8 @@ async def process_recap_appellate_docket(pk):
         d.pacer_case_id = pq.pacer_case_id
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     if og_info is not None:
@@ -1064,7 +1088,7 @@ async def process_recap_appellate_docket(pk):
         ContentFile(text.encode()),
     )
 
-    des_returned, rds_created, content_updated = await add_docket_entries(
+    items_returned, rds_created, content_updated = await add_docket_entries(
         d, data["docket_entries"]
     )
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
@@ -1076,7 +1100,8 @@ async def process_recap_appellate_docket(pk):
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
@@ -1236,16 +1261,15 @@ async def process_recap_appellate_attachment(
             pq, msg, PROCESSING_STATUS.FAILED
         )
         return pq_status, msg, []
-    except RECAPDocument.DoesNotExist as exc:
+    except RECAPDocument.DoesNotExist:
         msg = "Could not find docket to associate with attachment metadata"
         pq_status, msg = await mark_pq_status(
             pq, msg, PROCESSING_STATUS.FAILED
         )
         return pq_status, msg, []
 
-    pq_status, msg = await mark_pq_successful(
-        pq, d_id=de.docket_id, de_id=de.pk
-    )
+    await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = await mark_pq_successful(pq)
     return pq_status, msg, rds_affected
 
 
@@ -1623,8 +1647,8 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
     except HTTPError as exc:
         msg = "Failed to get attachment page from network."
         if exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
             if self.request.retries == self.max_retries:
                 mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
@@ -2161,6 +2185,7 @@ def get_and_copy_recap_attachment_docs(
 class DocketUpdatedData:
     docket: Docket
     des_returned: list
+    rds_updated: list
     rds_created: list
     content_updated: bool
 
@@ -2286,8 +2311,9 @@ def get_and_merge_rd_attachments(
         PacerLoginException,
         RedisConnectionError,
     ),
-    max_retries=5,
-    interval_start=5 * 60,
+    max_retries=10,
+    retry_backoff=2 * 60,
+    retry_backoff_max=60 * 60,
 )
 def process_recap_email(
     self: Task, epq_pk: int, user_pk: int
@@ -2348,6 +2374,11 @@ def process_recap_email(
         user_pk,
         appellate,
     )
+    is_potentially_sealed_entry = (
+        is_docket_entry_sealed(epq.court_id, pacer_case_id, pacer_doc_id)
+        if pq.status == PROCESSING_STATUS.FAILED and not appellate
+        else False
+    )
     if appellate:
         # Get the document number for appellate documents.
         appellate_doc_num = get_document_number_for_appellate(
@@ -2385,13 +2416,21 @@ def process_recap_email(
                 # We only care about the ext w/S3PrivateUUIDStorageTest
                 ContentFile(body.encode()),
             )
+            if is_potentially_sealed_entry:
+                continue
+
             # Add docket entries for each docket
-            des_returned, rds_created, content_updated = async_to_sync(
-                add_docket_entries
-            )(docket, docket_data["docket_entries"])
+            (
+                (des_returned, rds_updated),
+                rds_created,
+                content_updated,
+            ) = async_to_sync(add_docket_entries)(
+                docket, docket_data["docket_entries"]
+            )
             d_updated = DocketUpdatedData(
                 docket=docket,
                 des_returned=des_returned,
+                rds_updated=rds_updated,
                 rds_created=rds_created,
                 content_updated=content_updated,
             )
@@ -2413,9 +2452,15 @@ def process_recap_email(
 
         # Get NEF attachments and merge them.
         all_attachment_rds = []
-        if data["contains_attachments"] is True:
+        if (
+            data["contains_attachments"] is True
+            and not is_potentially_sealed_entry
+        ):
             all_attachment_rds = get_and_merge_rd_attachments(
-                document_url, epq.court_id, dockets_updated, user_pk
+                document_url,
+                epq.court_id,
+                dockets_updated,
+                user_pk,
             )
             get_and_copy_recap_attachment_docs(
                 self,
@@ -2428,7 +2473,8 @@ def process_recap_email(
 
     # Send docket alerts and webhooks for each docket updated.
     recap_email_recipients = get_recap_email_recipients(epq.destination_emails)
-    all_main_rds = []
+    all_created_rds = []
+    all_updated_rds = []
     for docket_updated in dockets_updated:
         if docket_updated.content_updated:
             newly_enqueued = enqueue_docket_alert(docket_updated.docket.pk)
@@ -2448,13 +2494,29 @@ def process_recap_email(
                 recap_email_recipients,
                 des_pks,
             )
-        all_main_rds += docket_updated.rds_created
+        all_created_rds += docket_updated.rds_created
+        all_updated_rds += docket_updated.rds_updated
 
-    rds_to_extract_add_to_solr = all_attachment_rds + all_main_rds
-    msg = "Successful upload! Nice work."
-    async_to_sync(mark_pq_status)(
-        epq, msg, PROCESSING_STATUS.SUCCESSFUL, "status_message"
-    )
+    if not is_potentially_sealed_entry:
+        rds_to_extract_add_to_solr = all_attachment_rds + all_created_rds
+        rds_updated_or_created = (
+            all_attachment_rds + all_created_rds + all_updated_rds
+        )
+        async_to_sync(associate_related_instances)(
+            epq,
+            d_id=None,
+            de_id=None,
+            rd_id=[rd.pk for rd in rds_updated_or_created],
+        )
+        msg = "Successful upload! Nice work."
+        status = PROCESSING_STATUS.SUCCESSFUL
+    else:
+        rds_to_extract_add_to_solr = []
+        self.request.chain = None
+        msg = "Could not retrieve Docket Entry"
+        status = PROCESSING_STATUS.FAILED
+
+    async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
     return [rd.pk for rd in rds_to_extract_add_to_solr]
 
 

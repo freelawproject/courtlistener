@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Iterator
+from typing import Dict
 
 from juriscraper.pacer import DocketReport
 from tqdm import tqdm
@@ -72,5 +72,5 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         make_html(options)

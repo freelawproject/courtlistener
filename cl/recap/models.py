@@ -155,9 +155,7 @@ class ProcessingQueue(AbstractDateTimeModel):
     status = models.SmallIntegerField(
         help_text="The current status of this upload. Possible values "
         "are: %s"
-        % ", ".join(
-            ["(%s): %s" % (t[0], t[1]) for t in PROCESSING_STATUS.NAMES]
-        ),
+        % ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES),
         default=PROCESSING_STATUS.ENQUEUED,
         choices=PROCESSING_STATUS.NAMES,
         db_index=True,
@@ -272,9 +270,7 @@ class EmailProcessingQueue(AbstractDateTimeModel):
     status = models.SmallIntegerField(
         help_text="The current status of this upload. Possible values "
         "are: %s"
-        % ", ".join(
-            ["(%s): %s" % (t[0], t[1]) for t in PROCESSING_STATUS.NAMES]
-        ),
+        % ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES),
         default=PROCESSING_STATUS.ENQUEUED,
         choices=PROCESSING_STATUS.NAMES,
         db_index=True,
@@ -325,9 +321,7 @@ class PacerFetchQueue(AbstractDateTimeModel):
     status = models.SmallIntegerField(
         help_text="The current status of this request. Possible values "
         "are: %s"
-        % ", ".join(
-            ["(%s): %s" % (t[0], t[1]) for t in PROCESSING_STATUS.NAMES]
-        ),
+        % ", ".join(f"({t[0]}): {t[1]}" for t in PROCESSING_STATUS.NAMES),
         default=PROCESSING_STATUS.ENQUEUED,
         choices=PROCESSING_STATUS.NAMES,
         db_index=True,

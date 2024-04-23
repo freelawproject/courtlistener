@@ -3,8 +3,8 @@
 {% load extras %}
 
 {% block title %}REST API, v3.15 &ndash; CourtListener.com{% endblock %}
-{% block description %}REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
-{% block og_description %}REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
+{% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
+{% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -43,17 +43,17 @@
 
     <pre class="scrollable">curl -X OPTIONS "{% get_full_host %}{% url "api-root" version="v3" %}"</pre>
 
-    <p>An <code>OPTIONS</code> request is typically the best way to understand the API, however as of v3.1 we also offer an experimental <a href="{% url "swagger_schema" %}">swagger/OpenAPI interface</a>. These endpoints can be used with <a href="http://www.django-rest-framework.org/topics/api-clients/">a variety of bindings</a> to incorporate the API into your code.
+    <p>An <code>OPTIONS</code> request is typically the best way to understand the API.
     </p>
 
 
     <h2 id="support">Support</h2>
-    <p>Questions about the APIs can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our Github Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.
+    <p>Questions about the APIs can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our GitHub Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.
     </p>
     <p>
       <a href="https://github.com/freelawproject/courtlistener/discussions"
           target="_blank"
-          class="btn btn-default">Ask in Github Discussions</a>
+          class="btn btn-default">Ask in GitHub Discussions</a>
       <a href="{% url "contact" %}"
          target="_blank"
          class="btn btn-default">Send us a Private Message</a>
@@ -92,7 +92,7 @@
       </li>
       <li><code>Opinion Clusters</code> are collections of <code>Opinion</code> objects. <code>Opinions</code> can be Dissents, Concurrences or other types of opinion, and so this is how they are grouped together for a specific case. If we don't know if an <code>Opinion</code> is a Dissent, Concurrence or something else, we just call it a Combined Opinion. You can see all the different types of Opinions by sending an <code>OPTIONS</code> request to the <code>Opinion</code> endpoint.
       </li>
-      <li><code>Docket Entries</code> are the individual rows of data on a PACER docket. In PACER some rows on the docket refer to several files, and so <code>Docket Entries</code> contain <code>RECAP Document</code> objects to represent those sub-resources. Thus, the big picture is, <code>Dockets</code> contain <code>Docket Entries</code>. <code>Docket Entires</code> contain <code>RECAP Documents</code>.
+      <li><code>Docket Entries</code> are the individual rows of data on a PACER docket. In PACER some rows on the docket refer to several files, and so <code>Docket Entries</code> contain <code>RECAP Document</code> objects to represent those sub-resources. Thus, the big picture is, <code>Dockets</code> contain <code>Docket Entries</code>. <code>Docket Entries</code> contain <code>RECAP Documents</code>.
       </li>
       <li>As a general rule, metadata lives at the highest level where it makes sense. For example, it's possible to put docket numbers in the <code>Opinion Cluster</code> objects, but it makes more sense at a higher level&mdash;at the <code>Docket</code> level. A sometimes-confusing counter example are case names, which have metadata at the <code>Docket</code> level <em>and</em> at the <code>Opinion Cluster</code> level. This is because case names can change at different times, and because a single <code>Docket</code> could have multiple <code>Opinion Clusters</code>, each with a different case name. <a href="#case-names">See more information about case names.</a>
       </li>
@@ -486,9 +486,6 @@
       <a href="{% url "api-root" version="v3" %}"
         target="_blank"
         class="btn btn-lg btn-primary">Show All Endpoints</a>
-      <a href="{% url "swagger_schema" %}"
-         target="_blank"
-         class="btn btn-lg btn-primary">Show Swagger Schema</a>
     </p>
     <h3 id="docket-endpoint">{% url "docket-list" version="v3" %}</h3>
     <p><code>Docket</code> objects link <code>Opinion Cluster</code>, <code>Audio</code>, and <code>Docket Entry</code> objects together, following the conventional definition of a docket. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
@@ -615,6 +612,14 @@
     <p>The citation graph is also provided as <a href="{% url "bulk_data_index" %}#citation-data">a single CSV file</a> listing every citation between <code>Opinions</code>. Please don't attempt to crawl this endpoint &mdash; It has more than 10 million records.
     </p>
 
+
+    <h3 id="citation-lookup">Citation Lookup and Verification API</h3>
+    <p>Use this API to look up citations in CourtListener's database of millions of citations.</p>
+    <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
+    </p>
+    <p>
+      <a href="{% url "citation_lookup_api" %}" class="btn btn-primary btn-lg">Learn More</a>
+    </p>
 
     <h3 id="jurisdiction-endpoint">{% url "court-list" version="v3" %}</h3>
     <p>This endpoint provides basic information about the <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.

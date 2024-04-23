@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple, Union
 
 import httpx
 import requests
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -57,7 +57,7 @@ def update_document_from_text(opinion: Opinion) -> None:
     site = get_scraper_object_by_name(court)
     if site is None:
         return
-    metadata_dict = site.extract_from_text(opinion.plain_text)
+    metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
         ModelClass = apps.get_model(f"search.{model_name}")
         if model_name == "Docket":
@@ -67,6 +67,8 @@ def update_document_from_text(opinion: Opinion) -> None:
         elif model_name == "Citation":
             data["cluster_id"] = opinion.cluster_id
             ModelClass.objects.get_or_create(**data)
+        elif model_name == "Opinion":
+            opinion.__dict__.update(data)
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
@@ -129,8 +131,16 @@ def extract_doc_content(
         item=opinion,
     )
     if not response.is_success:
-        logging.warning(
-            f"Error from document-extract microservice: {response.status_code}"
+        logger.error(
+            f"Error from document-extract microservice: {response.status_code}",
+            extra=dict(
+                opinion_id=opinion.id,
+                url=opinion.download_url,
+                local_path=opinion.local_path.name,
+                fingerprint=[
+                    f"{opinion.cluster.docket.court_id}-document-extract-failure"
+                ],
+            ),
         )
         return
 
@@ -186,9 +196,10 @@ def extract_doc_content(
             # according to schedule
             opinion.save(index=True)
     except Exception:
-        print(
-            "****Error saving text to the db for: %s****\n%s"
-            % (opinion, traceback.format_exc())
+        logger.error(
+            "****Error saving text to the db for: %s****\n%s",
+            opinion,
+            traceback.format_exc(),
         )
         return
 

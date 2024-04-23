@@ -13,7 +13,7 @@ from cl.corpus_importer.tasks import make_docket_by_iquery
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import build_es_base_query
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.search.documents import DocketDocument
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     log_last_document_indexed,
@@ -117,7 +117,7 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
 
     :param options: The options from the handle method
     :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to make_redis_interface.
+    can be handed off to get_redis_interface.
     :return None
     """
 
@@ -130,7 +130,7 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
             r.hdel("iquery_status", court_id)
             continue
         r.hset("iquery_status", court_id, latest_pacer_case_id)
-    logger.info(f"Finished setting starting pacer_case_ids.")
+    logger.info("Finished setting starting pacer_case_ids.")
 
 
 def query_results_in_es(options):
@@ -173,7 +173,7 @@ def query_results_in_es(options):
     json_file = os.path.join(
         settings.MEDIA_ROOT,
         "ready_mix_cases",
-        f"extracted_ready_mix_cases.json",
+        "extracted_ready_mix_cases.json",
     )
     with open(json_file, "w", encoding="utf-8") as file:
         json.dump(
@@ -182,19 +182,19 @@ def query_results_in_es(options):
             indent=2,
             sort_keys=True,
         )
-    logger.info(f"Finished querying results in ES.")
+    logger.info("Finished querying results in ES.")
 
 
 def add_bank_cases_to_cl(options: OptionsType, r) -> None:
     """Iterate over courts and gather iquery results from them.
     :param options: The options from the handle method
     :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to make_redis_interface.
+    can be handed off to get_redis_interface.
     :return None
     """
     q = options["queue"]
     stop_threshold = options["stop_threshold"]
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
 
     # Only process court with a pacer_case_id from the provided year.
     court_ids = r.hkeys("iquery_status")
@@ -251,7 +251,7 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
                     "a new connection."
                 )
                 time.sleep(10)
-                r = make_redis_interface("CACHE")
+                r = get_redis_interface("CACHE")
                 # Continuing here will skip this court for this iteration; not
                 # a huge deal.
                 continue
@@ -339,7 +339,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         if options["task"] == "scrape-iquery":
             add_bank_cases_to_cl(options, r)
 

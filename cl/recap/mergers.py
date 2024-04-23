@@ -26,7 +26,7 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
@@ -307,7 +307,11 @@ async def update_docket_metadata(
     )
     d.date_terminated = docket_data.get("date_terminated") or d.date_terminated
     d.cause = docket_data.get("cause") or d.cause
-    d.nature_of_suit = docket_data.get("nature_of_suit") or d.nature_of_suit
+    # Avoid updating the nature_of_suit if the docket already has a
+    # nature_of_suit set, since this value doesn't change. See issue #3878.
+    d.nature_of_suit = d.nature_of_suit or docket_data.get(
+        "nature_of_suit", ""
+    )
     d.jury_demand = docket_data.get("jury_demand") or d.jury_demand
     d.jurisdiction_type = (
         docket_data.get("jurisdiction") or d.jurisdiction_type
@@ -729,8 +733,13 @@ async def get_or_make_docket_entry(
 
 
 async def add_docket_entries(
-    d, docket_entries, tags=None, do_not_update_existing=False
-):
+    d: Docket,
+    docket_entries: list[dict[str, Any]],
+    tags: list[str] | None = None,
+    do_not_update_existing: bool = False,
+) -> tuple[
+    tuple[list[DocketEntry], list[RECAPDocument]], list[RECAPDocument], bool
+]:
     """Update or create the docket entries and documents.
 
     :param d: The docket object to add things to and use for lookups.
@@ -739,15 +748,18 @@ async def add_docket_entries(
     docket entries created or updated in this function.
     :param do_not_update_existing: Whether docket entries should only be created and avoid
     updating an existing one.
-    :returns tuple of a list of created or existing
-    DocketEntry objects,  a list of RECAPDocument objects created, whether
-    any docket entry was created.
+    :return: A three tuple of:
+        - A two tuple of list of created or existing DocketEntry objects and
+        a list of existing RECAPDocument objects.
+        - A list of RECAPDocument objects created.
+        - A bool indicating whether any docket entry was created.
     """
     # Remove items without a date filed value.
     docket_entries = [de for de in docket_entries if de.get("date_filed")]
 
     rds_created = []
     des_returned = []
+    rds_updated = []
     content_updated = False
     calculate_recap_sequence_numbers(docket_entries, d.court_id)
     known_filing_dates = [d.date_last_filing]
@@ -776,7 +788,7 @@ async def add_docket_entries(
         de.recap_sequence_number = docket_entry["recap_sequence_number"]
         des_returned.append(de)
         if do_not_update_existing and not de_created:
-            return des_returned, rds_created, content_updated
+            return (des_returned, rds_updated), rds_created, content_updated
         await de.asave()
         if tags:
             for tag in tags:
@@ -826,11 +838,12 @@ async def add_docket_entries(
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
             rd = await RECAPDocument.objects.aget(**params)
+            rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             try:
+                params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
                 rd = await RECAPDocument.objects.acreate(
                     document_number=docket_entry["document_number"] or "",
-                    pacer_doc_id=docket_entry["pacer_doc_id"],
                     is_available=False,
                     **params,
                 )
@@ -888,7 +901,7 @@ async def add_docket_entries(
             date_last_filing=max(known_filing_dates)
         )
 
-    return des_returned, rds_created, content_updated
+    return (des_returned, rds_updated), rds_created, content_updated
 
 
 def check_json_for_terminated_entities(parties) -> bool:
@@ -1421,7 +1434,7 @@ def merge_pacer_docket_into_cl_docket(
         ContentFile(report.response.text.encode()),
     )
 
-    des_returned, rds_created, content_updated = async_to_sync(
+    items_returned, rds_created, content_updated = async_to_sync(
         add_docket_entries
     )(d, docket_data["docket_entries"], tags=tags)
     add_parties_and_attorneys(d, docket_data["parties"])

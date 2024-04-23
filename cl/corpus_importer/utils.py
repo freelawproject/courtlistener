@@ -12,6 +12,7 @@ from django.db.utils import IntegrityError
 from django.utils.timezone import now
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize, titlecase
 
 from cl.citations.utils import map_reporter_db_cite_type
@@ -23,6 +24,8 @@ from cl.people_db.lookup_utils import (
 )
 from cl.people_db.models import Person
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class OpinionMatchingException(Exception):
@@ -487,19 +490,17 @@ def merge_judges(
 
     file_data, cl_data = overlapping_data
     # We check if any word in the string is uppercase
-    cl_data_upper = (
-        True if [s for s in cl_data.split(",") if s.isupper()] else False
-    )
+    cl_data_upper = any(s.isupper() for s in cl_data.split(","))
 
     # Get last names keeping case and cleaning the string (We could have
     # the judge names in capital letters)
     cl_clean = set(find_all_judges(cl_data))
     # Lowercase courtlistener judge names for set operations
-    temp_cl_clean = set([c.lower() for c in cl_clean])
+    temp_cl_clean = {c.lower() for c in cl_clean}
     # Get last names in lowercase and cleaned
     file_data_cleaned = set(find_all_judges(file_data))
     # Lowercase file judge names for set operations
-    temp_file_data_clean = set([h.lower() for h in file_data_cleaned])
+    temp_file_data_clean = {h.lower() for h in file_data_cleaned}
     # Prepare judges string
     judges = titlecase(", ".join(find_all_judges(file_data)))
     if (
@@ -538,7 +539,7 @@ def merge_judges(
             # At least one success that matches the names, we can create a new judges
             # list
             new_judges_list = sorted(
-                list(set(cl_data_clean_list + file_data_clean_list))
+                set(cl_data_clean_list + file_data_clean_list)
             )
             return {"judges": titlecase(", ".join(new_judges_list))}
         else:
@@ -618,7 +619,7 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
     """
     for cite in cites:
         clean_cite = re.sub(r"\s+", " ", cite)
-        citation = get_citations(clean_cite)
+        citation = get_citations(clean_cite, tokenizer=HYPERSCAN_TOKENIZER)
         if (
             not citation
             or not isinstance(citation[0], FullCaseCitation)

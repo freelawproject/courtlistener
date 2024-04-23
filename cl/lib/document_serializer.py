@@ -1,26 +1,56 @@
 import copy
+import datetime
 from collections import OrderedDict
-from datetime import date, datetime
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 from django_elasticsearch_dsl import Document, fields
 from rest_framework import serializers
 from rest_framework.fields import empty
 from rest_framework.utils.field_mapping import get_field_kwargs
 
 
+class TimeStampField(serializers.Field):
+    """Handles a naive timestamp field."""
+
+    def to_representation(self, value):
+        if isinstance(value, datetime.datetime) and timezone.is_naive(value):
+            date_time_aware = timezone.make_aware(value, datetime.timezone.utc)
+            return serializers.DateTimeField().to_representation(
+                timezone.localtime(date_time_aware)
+            )
+        else:
+            raise serializers.ValidationError(
+                "Date or DateTime object expected."
+            )
+
+
 class DateOrDateTimeField(serializers.Field):
     """Handles both datetime and date objects."""
 
     def to_representation(self, value):
-        if isinstance(value, datetime):
+        if isinstance(value, datetime.datetime):
             return serializers.DateTimeField().to_representation(value)
-        elif isinstance(value, date):
+        elif isinstance(value, datetime.date):
             return serializers.DateField().to_representation(value)
         else:
             raise serializers.ValidationError(
                 "Date or DateTime object expected."
             )
+
+
+class NullableListField(serializers.ListField):
+    """A custom ListField that returns None when serialized if the list is
+    empty. For API V3 compatibility.
+    """
+
+    def to_representation(self, data):
+        """
+        Return "None" if the list is empty, otherwise return the list.
+        """
+        if not data:
+            return None
+        return super().to_representation(data)
 
 
 class DocumentSerializer(serializers.Serializer):
@@ -48,7 +78,7 @@ class DocumentSerializer(serializers.Serializer):
     }
 
     def __init__(self, instance=None, data=empty, **kwargs):
-        super(DocumentSerializer, self).__init__(instance, data, **kwargs)
+        super().__init__(instance, data, **kwargs)
 
         if not hasattr(self, "Meta"):
             raise ImproperlyConfigured(
@@ -93,9 +123,9 @@ class DocumentSerializer(serializers.Serializer):
 
     def get_fields(self):
         """Get the required fields for serializing the result."""
-        fields = getattr(self.Meta, "fields", tuple())
-        exclude = getattr(self.Meta, "exclude", tuple())
-        ignore_fields = getattr(self.Meta, "ignore_fields", tuple())
+        fields = getattr(self.Meta, "fields", ())
+        exclude = getattr(self.Meta, "exclude", ())
+        ignore_fields = getattr(self.Meta, "ignore_fields", ())
         document = getattr(self.Meta, "document")
         model = document.Django.model
         document_fields = document._fields

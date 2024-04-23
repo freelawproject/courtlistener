@@ -1,5 +1,6 @@
 from django.urls import path
 from django.views.generic import RedirectView
+from django.views.generic.base import TemplateView
 
 from cl.simple_pages.views import (
     advanced_search,
@@ -8,11 +9,12 @@ from cl.simple_pages.views import (
     contact,
     contact_thanks,
     contribute,
+    coverage,
     coverage_fds,
-    coverage_graph,
+    coverage_oa,
     coverage_opinions,
+    coverage_recap,
     delete_help,
-    donation_help,
     faq,
     feeds,
     help_home,
@@ -21,33 +23,37 @@ from cl.simple_pages.views import (
     old_terms,
     podcasts,
     recap_email_help,
-    robots,
     tag_notes_help,
     validate_for_wot,
 )
 
 urlpatterns = [
     # Footer stuff
-    path("faq/", faq, name="faq"),
-    path("feeds/", feeds, name="feeds_info"),
-    path("podcasts/", podcasts, name="podcasts"),
+    path("faq/", faq, name="faq"),  # type: ignore[arg-type]
+    path("feeds/", feeds, name="feeds_info"),  # type: ignore[arg-type]
+    path("podcasts/", podcasts, name="podcasts"),  # type: ignore[arg-type]
     path("contribute/", contribute, name="contribute"),  # type: ignore[arg-type]
-    path("contact/", contact, name="contact"),
+    path("contact/", contact, name="contact"),  # type: ignore[arg-type]
     path("contact/thanks/", contact_thanks, name="contact_thanks"),  # type: ignore[arg-type]
     # Help pages
     path("help/", help_home, name="help_home"),  # type: ignore[arg-type]
-    path("help/coverage/", coverage_graph, name="coverage"),
-    path(
-        "help/coverage/opinions/", coverage_opinions, name="coverage_opinions"
-    ),
+    path("help/coverage/", coverage, name="coverage"),  # type: ignore[arg-type]
     path(
         "help/coverage/financial-disclosures/",
-        coverage_fds,
+        coverage_fds,  # type: ignore[arg-type]
         name="coverage_fds",
     ),
+    path("help/coverage/oral-arguments/", coverage_oa, name="coverage_oa"),  # type: ignore[arg-type]
+    path(
+        "help/coverage/opinions/", coverage_opinions, name="coverage_opinions"  # type: ignore[arg-type]
+    ),
+    path(
+        "help/coverage/recap/",
+        coverage_recap,  # type: ignore[arg-type]
+        name="coverage_recap",
+    ),
     path("help/markdown/", markdown_help, name="markdown_help"),  # type: ignore[arg-type]
-    path("help/alerts/", alert_help, name="alert_help"),
-    path("help/donations/", donation_help, name="donation_help"),  # type: ignore[arg-type]
+    path("help/alerts/", alert_help, name="alert_help"),  # type: ignore[arg-type]
     path("help/delete-account/", delete_help, name="delete_help"),  # type: ignore[arg-type]
     path("help/tags-notes/", tag_notes_help, name="tag_notes_help"),  # type: ignore[arg-type]
     path("help/search-operators/", advanced_search, name="advanced_search"),  # type: ignore[arg-type]
@@ -71,7 +77,13 @@ urlpatterns = [
     path("terms/v/<int:v>/", old_terms, name="old_terms"),  # type: ignore[arg-type]
     path("terms/", latest_terms, name="terms"),  # type: ignore[arg-type]
     # Robots
-    path("robots.txt", robots, name="robots"),
+    path(
+        "robots.txt",
+        TemplateView.as_view(
+            template_name="robots.txt", content_type="text/plain"
+        ),
+        name="robots",
+    ),
     # SEO-related stuff
     path("mywot8f5568174e171ff0acff.html", validate_for_wot),  # type: ignore[arg-type]
 ]

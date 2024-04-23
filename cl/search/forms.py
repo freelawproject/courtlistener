@@ -1,6 +1,7 @@
 import re
 from collections import OrderedDict
 
+import waffle
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import ChoiceField, DateField
@@ -435,6 +436,9 @@ class SearchForm(forms.Form):
         }
 
     def __init__(self, *args, **kwargs):
+        request = kwargs.pop("request", None)
+        self.is_es_form = kwargs.pop("is_es_form", None)
+        self.courts = kwargs.pop("courts", None)
         super().__init__(*args, **kwargs)
 
         """
@@ -443,8 +447,20 @@ class SearchForm(forms.Form):
         names coming from the database, we need to interact directly with the
         fields dict.
         """
-        courts = Court.objects.filter(in_use=True)
-        for court in courts:
+
+        # Default values for Solr version.
+        default_status = "Precedential"
+        status_index = 1
+        if request and waffle.flag_is_active(request, "o-es-active"):
+            self.is_es_form = True
+        if self.is_es_form:
+            # Default values for ES version.
+            default_status = "Published"
+            status_index = 0
+
+        if not self.courts:
+            self.courts = Court.objects.filter(in_use=True)
+        for court in self.courts:
             self.fields[f"court_{court.pk}"] = forms.BooleanField(
                 label=court.short_name,
                 required=False,
@@ -454,19 +470,19 @@ class SearchForm(forms.Form):
 
         for status in PRECEDENTIAL_STATUS.NAMES:
             attrs = {}
-            if status[1] == "Precedential":
+            if status[status_index] == default_status:
                 initial = True
                 attrs.update({"checked": "checked"})
             else:
                 initial = False
             new_field = forms.BooleanField(
-                label=status[1],
+                label=status[status_index],
                 required=False,
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs),
             )
             new_field.as_str_types = [SEARCH_TYPES.OPINION]
-            self.fields[f"stat_{status[1]}"] = new_field
+            self.fields[f"stat_{status[status_index]}"] = new_field
 
     # This is a particularly nasty area of the code due to several factors:
     #  1. Django doesn't have a good method of setting default values for
@@ -559,6 +575,10 @@ class SearchForm(forms.Form):
         """
         cleaned_data = self.cleaned_data
 
+        default_status = "stat_Precedential"
+        if self.is_es_form:
+            default_status = "stat_Published"
+
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
         for field_name in self.get_date_field_names():
             before = cleaned_data.get(f"{field_name}_before")
@@ -602,7 +622,7 @@ class SearchForm(forms.Form):
                 if key.startswith("stat_"):
                     cleaned_data[key] = False
             # ...except precedential
-            cleaned_data["stat_Precedential"] = True
+            cleaned_data[default_status] = True
 
         cleaned_data["_court_count"] = len(court_bools)
         cleaned_data["_stat_count"] = len(stat_bools)
@@ -680,16 +700,21 @@ def clean_up_date_formats(
             )
 
 
-def _clean_form(get_params, cd, courts):
+def _clean_form(get_params, cd, courts, is_es_form=False):
     """Returns cleaned up values as a Form object."""
     # Send the user the cleaned up query
     get_params["q"] = cd["q"]
 
+    status_index = 1
+    if is_es_form:
+        status_index = 0
     # Clean up the date formats. This is probably no longer needed since we do
     # date cleanup on the client side via our datepickers, but it's probably
     # fine to leave it here until there's a reason to remove it. It could be
     # helpful if somebody finds a way not to use the datepickers (js off, say)
-    for date_field in SearchForm().get_date_field_names():
+    for date_field in SearchForm(
+        get_params, is_es_form=is_es_form, courts=courts
+    ).get_date_field_names():
         clean_up_date_formats(cd, date_field, get_params)
 
     get_params["order_by"] = cd["order_by"]
@@ -699,9 +724,11 @@ def _clean_form(get_params, cd, courts):
         get_params[f"court_{court.pk}"] = cd[f"court_{court.pk}"]
 
     for status in PRECEDENTIAL_STATUS.NAMES:
-        get_params[f"stat_{status[1]}"] = cd[f"stat_{status[1]}"]
+        get_params[f"stat_{status[status_index]}"] = cd[
+            f"stat_{status[status_index]}"
+        ]
 
     # Ensure that we have the cleaned_data and other related attributes set.
-    form = SearchForm(get_params)
+    form = SearchForm(get_params, is_es_form=is_es_form, courts=courts)
     form.is_valid()
     return form

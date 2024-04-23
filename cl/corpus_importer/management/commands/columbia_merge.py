@@ -17,6 +17,7 @@ manage.py columbia_merge --debug --csv-file /opt/courtlistener/cl/assets/media/t
 
 
 """
+
 import os.path
 import re
 from difflib import SequenceMatcher
@@ -58,26 +59,6 @@ from cl.corpus_importer.utils import (
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import extract_judge_last_name, find_just_name
 from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
-
-VALID_UPDATED_DOCKET_SOURCES = [
-    Docket.COLUMBIA,
-    Docket.COLUMBIA_AND_RECAP,
-    Docket.COLUMBIA_AND_SCRAPER,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
-    Docket.COLUMBIA_AND_IDB,
-    Docket.COLUMBIA_AND_RECAP_AND_IDB,
-    Docket.COLUMBIA_AND_SCRAPER_AND_IDB,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-    Docket.HARVARD_AND_COLUMBIA,
-    Docket.COLUMBIA_AND_RECAP_AND_HARVARD,
-    Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
-    Docket.COLUMBIA_AND_IDB_AND_HARVARD,
-    Docket.COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
-    Docket.COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-]
-
 
 VALID_MERGED_SOURCES = [
     key
@@ -195,7 +176,7 @@ def update_matching_opinions(
                         # columbia names are better
                         op.author_str = author_str
                     else:
-                        raise AuthorException(f"Authors don't match")
+                        raise AuthorException("Authors don't match")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str
@@ -254,9 +235,11 @@ def map_and_merge_opinions(
                 per_curiam=op["per_curiam"],
                 cluster_id=cluster_id,
                 type=opinion_type,
-                author_str=titlecase(find_just_name(author.strip(":")))
-                if author
-                else "",
+                author_str=(
+                    titlecase(find_just_name(author.strip(":")))
+                    if author
+                    else ""
+                ),
             )
 
             logger.info(f"Opinion created for cluster: {cluster_id}")
@@ -410,11 +393,10 @@ def process_cluster(
     """
 
     cluster = (
-        OpinionCluster.objects.filter(id=cluster_id)
-        .exclude(
-            Q(source__in=VALID_MERGED_SOURCES)
-            | Q(docket__source__in=VALID_UPDATED_DOCKET_SOURCES)
+        OpinionCluster.objects.filter(
+            id=cluster_id, docket__source__in=Docket.NON_COLUMBIA_SOURCES()
         )
+        .exclude(source__in=VALID_MERGED_SOURCES)
         .first()
     )
     if not cluster:
@@ -450,9 +432,9 @@ def process_cluster(
         "file": filepath,
         "attorneys": attorneys,
         "citations": fetch_simple_tags(soup, "citation"),
-        "docket_number": clean_docket_number(docket_number)
-        if docket_number
-        else None,
+        "docket_number": (
+            clean_docket_number(docket_number) if docket_number else None
+        ),
         "panel": extract_judge_last_name(panel_tags),
         "posture": posture,
         "case_name": format_case_name(reporter_captions),

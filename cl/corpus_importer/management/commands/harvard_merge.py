@@ -135,7 +135,7 @@ def fetch_non_harvard_data(harvard_data: Dict[str, Any]) -> Dict[str, Any]:
     author_list = list(map(titlecase, author_list))
 
     # Flatten and dedupe list of judges
-    judges = ", ".join(sorted(list(set(judge_list + author_list))))
+    judges = ", ".join(sorted(set(judge_list + author_list)))
 
     all_data = {"judges": judges}
     short_fields = ["attorneys", "disposition", "otherdate", "seealso"]
@@ -275,23 +275,9 @@ def update_docket_source(cluster: OpinionCluster) -> None:
     :return: None
     """
     docket = cluster.docket
-    new_docket_source = Docket.HARVARD + docket.source
-    if new_docket_source in [
-        Docket.HARVARD,
-        Docket.HARVARD_AND_RECAP,
-        Docket.SCRAPER_AND_HARVARD,
-        Docket.RECAP_AND_SCRAPER_AND_HARVARD,
-        Docket.HARVARD_AND_COLUMBIA,
-        Docket.DIRECT_INPUT_AND_HARVARD,
-        Docket.IDB_AND_HARVARD,
-        Docket.RECAP_AND_IDB_AND_HARVARD,
-        Docket.SCRAPER_AND_IDB_AND_HARVARD,
-        Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-        Docket.ANON_2020_AND_HARVARD,
-        Docket.ANON_2020_AND_SCRAPER_AND_HARVARD,
-    ]:
-        # Source is limited to those options because those are the only
-        # valid options when we sum the source with harvard source
+    if docket.source in Docket.NON_HARVARD_SOURCES():
+        # Add the Harvard source only if it has not been added before.
+        new_docket_source = Docket.HARVARD + docket.source
         docket.source = new_docket_source
         docket.save()
     else:
@@ -600,7 +586,7 @@ def update_matching_opinions(
                     find_just_name(op.author_str).lower()
                     != find_just_name(author_str).lower()
                 ):
-                    raise AuthorException(f"Authors don't match")
+                    raise AuthorException("Authors don't match")
                 elif any(s.isupper() for s in op.author_str.split(",")):
                     # Some names are uppercase, update with processed names
                     op.author_str = author_str
@@ -661,15 +647,15 @@ def map_and_merge_opinions(
                     xml_harvard=str(op),
                     cluster_id=cluster.id,
                     type=opinion_type,
-                    author_str=titlecase(
-                        find_just_name(author.text.strip(":"))
-                    )
-                    if author
-                    else "",
+                    author_str=(
+                        titlecase(find_just_name(author.text.strip(":")))
+                        if author
+                        else ""
+                    ),
                 )
             else:
                 raise OpinionTypeException(
-                    f"Harvard opinion has no type "
+                    "Harvard opinion has no type "
                     f"attribute: {cluster.filepath_json_harvard}"
                 )
     else:

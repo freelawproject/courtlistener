@@ -30,9 +30,7 @@ case "$1" in
         --workers ${NUM_WORKERS:-48} \
         --worker-class cl.workers.UvicornWorker \
         --limit-request-line 6000 \
-        --max-requests 10000 \
-        --max-requests-jitter 100 \
-        --timeout 180 \
+        --timeout 0 \
         --bind 0.0.0.0:8000
     ;;
 'rss-scraper')
@@ -40,6 +38,9 @@ case "$1" in
     ;;
 'retry-webhooks')
     exec /opt/courtlistener/manage.py cl_retry_webhooks
+    ;;
+'sweep-indexer')
+    exec /opt/courtlistener/manage.py sweep_indexer
     ;;
 *)
     echo "Unknown command"

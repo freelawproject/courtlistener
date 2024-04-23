@@ -22,7 +22,7 @@ def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
     return set(
         Docket.objects.filter(
             date_filed__isnull=True,
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             court__jurisdiction__in=[
                 Court.FEDERAL_DISTRICT,
                 Court.FEDERAL_BANKRUPTCY,
@@ -86,7 +86,7 @@ def get_docket_ids() -> Set[int]:
         ) as e:
             logger.warning(
                 "iQuery scraper was unable to get results from Plausible. Got "
-                "exception: %s" % e
+                f"exception: {e}"
             )
         else:
             # Filter to docket pages with some amount of traffic
@@ -130,7 +130,7 @@ def get_docket_ids() -> Set[int]:
             Q(date_created__gt=one_week_ago)
             | Q(date_modified__gt=one_week_ago),
             case_name="",
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             court__jurisdiction__in=[
                 Court.FEDERAL_DISTRICT,
                 Court.FEDERAL_BANKRUPTCY,
@@ -167,7 +167,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         do_missing_date_filed = options["do_missing_date_filed"]
         if do_missing_date_filed:
             docket_ids = get_docket_ids_missing_info(do_missing_date_filed)
@@ -180,12 +180,13 @@ class Command(VerboseCommand):
         )
         # Shuffle the dockets to make sure we don't hit one district all at
         # once.
-        random.shuffle(list(docket_ids))
+        docket_ids_list = list(docket_ids)
+        random.shuffle(docket_ids_list)
         queue = options["queue"]
         throttle = CeleryThrottle(queue_name=queue)
         now = datetime.now().date()
         include_old_terminated = options["include_old_terminated"]
-        for i, docket_id in enumerate(docket_ids):
+        for i, docket_id in enumerate(docket_ids_list):
             throttle.maybe_wait()
 
             if i % 500 == 0:

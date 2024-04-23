@@ -30,7 +30,7 @@
         <h2>
           <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
              class="black-link no-underline"
-             {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ cluster.caption|safe|v_wrapper }}</a>
+             {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ caption|safe|v_wrapper }}</a>
         </h2>
 
         <div id="authorities">
@@ -50,7 +50,7 @@
                         <span class="bullet-tail">{{ authority.date_filed }}</span>
                         {% if authority.citation_count > 1 %}
                             Also cited by <a href="/?q=cites%3A({{ authority.sub_opinions.all|OR_join }})"
-                                             rel="nofollow">{{ authority.citation_count|add:"-1" }} other opinion{{ authority.citation_count|add:"-1"|pluralize }}</a>
+                                             rel="nofollow">{{ authority.citation_count|add:"-1" }} opinion{{ authority.citation_count|add:"-1"|pluralize }}</a>
                         {% else %}
                             Cited by 0 other opinions
                         {% endif %}

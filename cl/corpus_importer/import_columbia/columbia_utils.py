@@ -540,9 +540,9 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
         # We use opinion index to ensure that all footnotes are linked to the
         # corresponding opinion
         for ref in foot_references:
-            if (match := re.search(r"[\*\d]+", ref)) is not None:
+            if (match := re.search(r"[*\d]+", ref)) is not None:
                 f_num = match.group()
-            elif (match := re.search(r"\[fn(.+)\]", ref)) is not None:
+            elif (match := re.search(r"\[fn(.+)]", ref)) is not None:
                 f_num = match.group(1)
             else:
                 f_num = None
@@ -552,24 +552,24 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
 
         # Add footnotes to opinion
         footnotes = re.findall(
-            "<footnote_body>.[\s\S]*?</footnote_body>", text
+            r"<footnote_body>.[\s\S]*?</footnote_body>", text
         )
         for fn in footnotes:
             content = re.search(
-                "<footnote_body>(.[\s\S]*?)</footnote_body>", fn
+                r"<footnote_body>(.[\s\S]*?)</footnote_body>", fn
             )
             if content:
-                rep = r'<div class="footnote">%s</div>' % content.group(1)
+                rep = rf'<div class="footnote">{content.group(1)}</div>'
                 text = text.replace(fn, rep)
 
         # Replace footnote numbers
         foot_numbers = re.findall(
-            "<footnote_number>.*?</footnote_number>", text
+            r"<footnote_number>.*?</footnote_number>", text
         )
         for ref in foot_numbers:
-            if (match := re.search(r"[\*\d]+", ref)) is not None:
+            if (match := re.search(r"[*\d]+", ref)) is not None:
                 f_num = match.group()
-            elif (match := re.search(r"\[fn(.+)\]", ref)) is not None:
+            elif (match := re.search(r"\[fn(.+)]", ref)) is not None:
                 f_num = match.group(1)
             else:
                 f_num = None
@@ -665,11 +665,9 @@ def find_dates_in_xml(soup: BeautifulSoup) -> dict:
     )
     parsed_dates = parse_dates(found_dates)
     current_year = date.today().year
-    date_filed = (
-        date_argued
-    ) = (
-        date_reargued
-    ) = date_reargument_denied = date_cert_granted = date_cert_denied = None
+    date_filed = date_argued = date_reargued = date_reargument_denied = (
+        date_cert_granted
+    ) = date_cert_denied = None
     unknown_date = None
 
     for date_cluster in parsed_dates:
@@ -739,7 +737,7 @@ def find_judges(opinions=None) -> str:
 
     judge_list = list(itertools.chain.from_iterable(judges))
     judge_list = list(map(titlecase, judge_list))
-    return ", ".join(sorted(list(set(judge_list))))
+    return ", ".join(sorted(set(judge_list)))
 
 
 def map_opinion_types(opinions=None) -> None:
