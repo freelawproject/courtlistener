@@ -25,15 +25,20 @@
         </li>
         <li role="separator" class="divider"></li>
       {% endif %}
-      {% if rd.pacer_url %}
+      {% if rd.pacer_url or '-' in rd.pacer_doc_id%}
         <li>
             <a href="{{ rd.pacer_url }}"
-              {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+              {% if '-' in rd.pacer_doc_id %}
+                data-toggle="modal" data-target="#modal-buy-acms"
+                class="open_buy_acms_modal"
+              {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                 data-toggle="modal" data-target="#modal-buy-pacer"
                 class="open_buy_pacer_modal"
-             {% endif %}
+              {% endif %}
               target="_blank"
-              rel="nofollow">Buy on PACER</a>
+              rel="nofollow">
+              {% if '-' in rd.pacer_doc_id %}Direct Link Unavailable{% else %}Buy on PACER{% endif %}
+            </a>
         </li>
       {% endif %}
     </ul>
@@ -42,16 +47,23 @@
     {% if rd.is_sealed %}
       <span class="btn btn-primary disabled">This Item is Sealed</span>
     {% else %}
-      {% if rd.pacer_url %}
+      {% if rd.pacer_url or '-' in rd.pacer_doc_id%}
         <a href="{{ rd.pacer_url }}"
-          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+          {% if '-' in rd.pacer_doc_id %}
+            data-toggle="modal" data-target="#modal-buy-acms"
+            class="disabled open_buy_acms_modal cursor btn btn-primary"
+            style="pointer-events: all;"
+          {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
             data-toggle="modal" data-target="#modal-buy-pacer"
             class="open_buy_pacer_modal btn btn-primary"
-          {% else%}
+          {% else %}
             class="btn btn-primary"
           {% endif %}
           target="_blank"
-          rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
+          rel="nofollow">
+          <i class="fa fa-external-link"></i>
+          {% if '-' in rd.pacer_doc_id %}Direct Link Unavailable{% else %}Buy on PACER{% endif %}
+        </a>
       {% endif %}
     {% endif %}
   {% endif %}

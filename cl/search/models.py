@@ -542,7 +542,7 @@ class Docket(AbstractDateTimeModel, DocketSources):
     )
     # Nullable for unique constraint requirements.
     pacer_case_id = fields.CharNullField(
-        help_text="The cased ID provided by PACER.",
+        help_text="The case ID provided by PACER.",
         max_length=100,
         blank=True,
         null=True,
@@ -849,6 +849,12 @@ class Docket(AbstractDateTimeModel, DocketSources):
             "incDktEntries=Y"
         )
 
+    def pacer_acms_url(self):
+        return (
+            f"https://{self.pacer_court_id}-showdoc.azurewebsites.us/"
+            f"{self.docket_number}"
+        )
+
     @property
     def pacer_docket_url(self):
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
@@ -859,6 +865,8 @@ class Docket(AbstractDateTimeModel, DocketSources):
 
             if not self.pacer_case_id:
                 return self.pacer_appellate_url_with_caseNum(path)
+            elif self.pacer_case_id.count("-") > 1:
+                return self.pacer_acms_url()
             else:
                 return self.pacer_appellate_url_with_caseId(path)
         else:
@@ -1224,11 +1232,8 @@ class AbstractPacerDocument(models.Model):
         null=True,
     )
     pacer_doc_id = models.CharField(
-        help_text=(
-            "The ID of the document in PACER. This information is "
-            "provided by RECAP."
-        ),
-        max_length=32,  # Same as in RECAP
+        help_text="The ID of the document in PACER.",
+        max_length=64,  # Increased to support storing docketEntryId from ACMS.
         blank=True,
     )
     is_available = models.BooleanField(
@@ -1286,6 +1291,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
             "The short description of the docket entry that appears on "
             "the attachments page."
         ),
+        blank=True,
+    )
+    acms_document_guid = models.CharField(
+        help_text="The GUID of the document in ACMS.",
+        max_length=64,
         blank=True,
     )
 
@@ -1387,7 +1397,13 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         court = self.docket_entry.docket.court
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
-            if court.jurisdiction == Court.FEDERAL_APPELLATE:
+            if self.pacer_doc_id.count("-") > 1:
+                # It seems like loading the ACMS Download Page using links is not
+                # possible. we've implemented a modal window that explains this
+                # issue and guides users towards using the button to access the
+                # docket report.
+                return self.docket_entry.docket.pacer_docket_url
+            elif court.jurisdiction == Court.FEDERAL_APPELLATE:
                 template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
                 template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
@@ -1884,7 +1900,7 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     )
     pacer_case_id = models.CharField(
         help_text=(
-            "The cased ID provided by PACER. Noted in this case on a "
+            "The case ID provided by PACER. Noted in this case on a "
             "per-document-level, since we've learned that some "
             "documents from other cases can appear in curious places."
         ),
