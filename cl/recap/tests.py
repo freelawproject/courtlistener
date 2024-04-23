@@ -606,7 +606,7 @@ class RecapUploadsTest(TestCase):
             j["non_field_errors"][0],
         )
 
-    def test_recap_upload_validate_acms_pacer_case_id(self, mock):
+    async def test_recap_upload_validate_acms_pacer_case_id(self, mock):
         """Can we properly validate a pacer_case_id that is a GUIDs.?"""
         self.data.update(
             {
@@ -616,10 +616,10 @@ class RecapUploadsTest(TestCase):
             }
         )
         del self.data["pacer_doc_id"]
-        r = self.client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         j = json.loads(r.content)
 
-        self.assertEqual(r.status_code, HTTP_201_CREATED)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
     def test_processing_an_acms_docket(self, mock_upload):
         """Can we process an ACMS docket report?
