@@ -435,7 +435,7 @@ def build_text_filter(field: str, value: str) -> List:
     return []
 
 
-def build_sort_results(cd: CleanData) -> Dict:
+def build_sort_results(cd: CleanData, toggle: bool = False) -> Dict:
     """Given cleaned data, find order_by value and return dict to use with
     ElasticSearch sort
 
@@ -443,13 +443,30 @@ def build_sort_results(cd: CleanData) -> Dict:
     :return: The short dict.
     """
 
+    order_by = cd.get("order_by")
+    if toggle:
+        sort_components = order_by.split(",")
+        toggle_sort_components = []
+        for component in sort_components:
+            if "desc" in component:
+                toggle_sort_components.append(component.replace("desc", "asc"))
+            elif "asc" in component:
+                toggle_sort_components.append(component.replace("asc", "desc"))
+            else:
+                toggle_sort_components.append(component)
+
+        order_by = ", ".join(toggle_sort_components)
+
     order_by_map = {
         "score desc": {"_score": {"order": "desc"}},
+        "score asc": {"_score": {"order": "asc"}},
         "dateArgued desc": {"dateArgued": {"order": "desc"}},
         "dateArgued asc": {"dateArgued": {"order": "asc"}},
         "random_ desc": {"random_": {"order": "desc"}},
         "random_ asc": {"random_": {"order": "asc"}},
         "name_reverse asc": {"name_reverse": {"order": "asc"}},
+        "docket_id asc": {"docket_id": {"order": "asc"}},
+        "docket_id desc": {"docket_id": {"order": "desc"}},
         "dob desc,name_reverse asc": {
             "dob": {"order": "desc"},
             "name_reverse": {"order": "asc"},
@@ -483,7 +500,6 @@ def build_sort_results(cd: CleanData) -> Dict:
     else:
         random_order_field_id = "id"
 
-    order_by = cd.get("order_by")
     if order_by and "random_" in order_by:
         # Return random sorting if available.
         # Define the random seed using the value defined in random_{seed}

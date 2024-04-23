@@ -286,7 +286,7 @@ class SolrList:
                 return []
 
     def append(self, p_object):
-        """Lightly override the append method so we get items duplicated in
+        """Lightly override the append method, so we get items duplicated in
         our cache.
         """
         self._item_cache.append(p_object)
@@ -307,9 +307,12 @@ class CursorESList:
         self.version = version
         self._item_cache = []
         self.results = None
+        self.reverse = None
 
-    def set_pagination(self, search_after, page_size):
-        self.search_after = search_after
+    def set_pagination(self, cursor, page_size):
+
+        if cursor is not None:
+            (self.search_after, self.reverse) = cursor
         self.page_size = page_size
 
     def get_paginated_results(self):
@@ -322,8 +325,20 @@ class CursorESList:
             )
 
         self.main_query = self.main_query[: self.page_size]
-        default_sorting = build_sort_results(self.clean_data)
-        self.main_query = self.main_query.sort(default_sorting, "docket_id")
+
+        toggle_sort = False
+        if self.reverse:
+            # Toggle the original sorting key to handle backward pagination
+            toggle_sort = True
+
+        default_sorting = build_sort_results(self.clean_data, toggle_sort)
+        default_unique_order = {
+            "type": self.clean_data["type"],
+            "order_by": "docket_id desc",
+        }
+        unique_sorting = build_sort_results(default_unique_order, toggle_sort)
+
+        self.main_query = self.main_query.sort(default_sorting, unique_sorting)
         self.results = self.main_query.execute()
 
         self.process_results(self.results)
@@ -351,12 +366,27 @@ class CursorESList:
                     )
                 result["child_docs"] = child_result_objects
 
+        if self.reverse:
+            # If doing backward pagination, reverse the results of the current
+            # page to maintain consistency of the results on the page,
+            # because the original order is inverse when paginating backwards.
+            self.results.hits.reverse()
+
     def get_search_after_sort_key(self):
         """Retrieves the sort key from the last item in the current page to
         use for the next page's search_after parameter.
         """
         if self.results and len(self.results) > 0:
             last_result = self.results.hits[-1]
+            return last_result.meta.sort
+        return None
+
+    def get_reverse_search_after_sort_key(self):
+        """Retrieves the sort key from the last item in the current page to
+        use for the next page's search_after parameter.
+        """
+        if self.results and len(self.results) > 0:
+            last_result = self.results.hits[0]
             return last_result.meta.sort
         return None
 

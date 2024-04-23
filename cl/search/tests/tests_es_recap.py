@@ -2940,9 +2940,11 @@ class RECAPSearchAPIV4Test(
                 "next": False,
             },
         ]
-        # API
+        # Test forward pagination.
         next_page = None
         unique_ids = set()
+        ids_per_page = []
+        current_page = None
         for test in tests:
             with self.subTest(test=test):
                 if not next_page:
@@ -2973,16 +2975,76 @@ class RECAPSearchAPIV4Test(
                     self.assertTrue(
                         next_page, msg="Next page value didn't match"
                     )
+                    current_page = next_page
                 else:
                     self.assertFalse(
                         next_page, msg="Next page value didn't match"
                     )
-
+                ids_in_page = set()
                 for result in r.data["results"]:
                     unique_ids.add(result["docket_id"])
+                    ids_in_page.add(result["docket_id"])
+
+                ids_per_page.append(ids_in_page)
 
         self.assertEqual(
             len(unique_ids),
+            total_dockets,
+            msg="Wrong number of dockets.",
+        )
+
+        # Test backward pagination.
+        tests.reverse()
+        previous_page = None
+        unique_ids_prev = set()
+        for test in tests:
+            with self.subTest(test=test):
+                if not previous_page:
+                    r = self.client.get(current_page)
+                else:
+                    r = self.client.get(previous_page)
+
+                # Test page
+                self.assertEqual(
+                    len(r.data["results"]),
+                    test["results"],
+                    msg="Results in page didn't match.",
+                )
+                self.assertEqual(
+                    r.data["count"]["exact"],
+                    test["count_exact"],
+                    msg="Results count didn't match.",
+                )
+                self.assertEqual(
+                    r.data["count"]["more"],
+                    test["more"],
+                    msg="Results more key is incorrect.",
+                )
+                previous_page = r.data["previous"]
+                if previous_page:
+                    self.assertTrue(
+                        previous_page, msg="Previous page value didn't match"
+                    )
+                else:
+                    self.assertFalse(
+                        previous_page, msg="Previous page value didn't match"
+                    )
+
+                ids_in_page_got = set()
+                for result in r.data["results"]:
+                    unique_ids_prev.add(result["docket_id"])
+                    ids_in_page_got.add(result["docket_id"])
+
+                current_page_ids_prev = ids_per_page.pop()
+
+                self.assertEqual(
+                    current_page_ids_prev,
+                    ids_in_page_got,
+                    msg="Wrong dockets.",
+                )
+
+        self.assertEqual(
+            len(unique_ids_prev),
             total_dockets,
             msg="Wrong number of dockets.",
         )
