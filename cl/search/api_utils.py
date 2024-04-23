@@ -24,6 +24,7 @@ from cl.search.documents import (
     PersonDocument,
 )
 from cl.search.models import SEARCH_TYPES
+from cl.search.types import ESCursor
 
 
 def get_object_list(request, cd, paginator):
@@ -308,12 +309,18 @@ class CursorESList:
         self._item_cache = []
         self.results = None
         self.reverse = None
+        self.cursor = None
 
     def set_pagination(self, cursor, page_size):
 
-        if cursor is not None:
-            (self.search_after, self.reverse) = cursor
-        self.page_size = page_size
+        self.cursor = cursor
+        if self.cursor is not None:
+            (self.search_after, self.reverse) = self.cursor
+
+        # Return one extra document beyond the page size so we're able to
+        # determine if there are more documents and decide whether to display a
+        # next or previous page link.
+        self.page_size = page_size + 1
 
     def get_paginated_results(self):
         """Executes the search query with pagination settings and processes
@@ -372,23 +379,28 @@ class CursorESList:
             # because the original order is inverse when paginating backwards.
             self.results.hits.reverse()
 
+    def _get_search_after_key(self, position):
+        if self.results and len(self.results) > 0:
+            limited_results = limit_api_results_to_page(
+                self.results.hits, self.cursor
+            )
+            last_result = limited_results[position]
+            return last_result.meta.sort
+        return None
+
     def get_search_after_sort_key(self):
         """Retrieves the sort key from the last item in the current page to
         use for the next page's search_after parameter.
         """
-        if self.results and len(self.results) > 0:
-            last_result = self.results.hits[-1]
-            return last_result.meta.sort
-        return None
+        last_result_in_page = -1
+        return self._get_search_after_key(last_result_in_page)
 
     def get_reverse_search_after_sort_key(self):
         """Retrieves the sort key from the last item in the current page to
         use for the next page's search_after parameter.
         """
-        if self.results and len(self.results) > 0:
-            last_result = self.results.hits[0]
-            return last_result.meta.sort
-        return None
+        first_result_in_page = 0
+        return self._get_search_after_key(first_result_in_page)
 
 
 class ResultObject:
@@ -406,3 +418,13 @@ class ESResultObject(ResultObject):
 
     def __getattr__(self, key):
         return getattr(self._data, key, None)
+
+
+def limit_api_results_to_page(result_items, cursor: ESCursor):
+    reverse = False
+    if cursor is not None:
+        search_after, reverse = cursor
+    if reverse:
+        return result_items[-settings.SEARCH_API_PAGE_SIZE :]
+    else:
+        return result_items[: settings.SEARCH_API_PAGE_SIZE]

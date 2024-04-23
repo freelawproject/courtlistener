@@ -1,3 +1,4 @@
+from collections import namedtuple
 from enum import StrEnum
 from typing import Any, Literal, Type, Union
 
@@ -106,3 +107,6 @@ class EventTable(StrEnum):
     DOCKET_ENTRY = "search.DocketEntry"
     RECAP_DOCUMENT = "search.RECAPDocument"
     UNDEFINED = ""
+
+
+ESCursor = namedtuple("ESCursor", ["search_after", "reverse"])

@@ -16,11 +16,7 @@ from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 
-from cl.lib.elasticsearch_utils import (
-    build_es_main_query,
-    do_es_api_query,
-    fetch_es_results,
-)
+from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     IndexedSolrTestCase,
@@ -36,8 +32,6 @@ from cl.people_db.factories import (
     PartyTypeFactory,
     PersonFactory,
 )
-from cl.search.api_utils import ESList
-from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -2946,7 +2940,7 @@ class RECAPSearchAPIV4Test(
         ids_per_page = []
         current_page = None
         for test in tests:
-            with self.subTest(test=test):
+            with self.subTest(test=test, msg="forward pagination"):
                 if not next_page:
                     r = self.client.get(
                         reverse("search-list", kwargs={"version": "v4"}),
@@ -2998,7 +2992,7 @@ class RECAPSearchAPIV4Test(
         previous_page = None
         unique_ids_prev = set()
         for test in tests:
-            with self.subTest(test=test):
+            with self.subTest(test=test, msg="backward pagination"):
                 if not previous_page:
                     r = self.client.get(current_page)
                 else:
@@ -3128,6 +3122,23 @@ class RECAPSearchAPIV4Test(
                 reverse("search-list", kwargs={"version": "v4"}), search_params
             )
             self.assertTrue(r.data["next"])
+
+    def test_recap_cursor_api_pagination_previous_page(self) -> None:
+        """Test cursor pagination previous_page for V4 RECAP Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_dockets = Docket.objects.all().count()
+
+        # No previous page link since we're in the previous page.
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertIsNone(r.data["previous"])
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

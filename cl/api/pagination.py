@@ -1,5 +1,4 @@
 from base64 import b64decode, b64encode
-from collections import namedtuple
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -8,6 +7,8 @@ from rest_framework.exceptions import NotFound
 from rest_framework.pagination import BasePagination, PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
+
+from cl.search.types import ESCursor
 
 
 class ShallowOnlyPageNumberPagination(PageNumberPagination):
@@ -71,9 +72,6 @@ class BigPagination(ShallowOnlyPageNumberPagination):
     page_size = 300
 
 
-Cursor = namedtuple("Cursor", ["search_after", "reverse"])
-
-
 class ESCursorPagination(BasePagination):
     """Custom pagination class to handle ES cursor pagination, based in the ES
     search_after param.
@@ -102,6 +100,7 @@ class ESCursorPagination(BasePagination):
         self.es_list_instance.set_pagination(self.cursor, self.page_size)
         results = self.es_list_instance.get_paginated_results()
         self.results_in_page = len(results)
+
         self.results_count = results.hits.total.value
         return results
 
@@ -126,7 +125,7 @@ class ESCursorPagination(BasePagination):
         if not self.has_next(search_after_sort_key):
             return None
 
-        cursor = Cursor(search_after=search_after_sort_key, reverse=False)
+        cursor = ESCursor(search_after=search_after_sort_key, reverse=False)
         return self.encode_cursor(cursor)
 
     def get_previous_link(self):
@@ -139,13 +138,13 @@ class ESCursorPagination(BasePagination):
         if not self.has_prev(reverse_search_after_sort_key):
             return None
 
-        cursor = Cursor(
+        cursor = ESCursor(
             search_after=reverse_search_after_sort_key, reverse=True
         )
         return self.encode_cursor(cursor)
 
     def decode_cursor(self, request):
-        """Given a request with a cursor, return a `Cursor` instance."""
+        """Given a request with a cursor, return a `ESCursor` instance."""
         encoded = request.query_params.get(self.cursor_query_param)
         if encoded is None:
             return None
@@ -158,10 +157,10 @@ class ESCursorPagination(BasePagination):
 
         except (TypeError, ValueError):
             raise NotFound(self.invalid_cursor_message)
-        return Cursor(search_after=search_after, reverse=reverse)
+        return ESCursor(search_after=search_after, reverse=reverse)
 
     def encode_cursor(self, cursor):
-        """Given a Cursor instance, return an url with encoded cursor."""
+        """Given a ESCursor instance, return an url with encoded cursor."""
         tokens = {}
         if cursor.search_after != 0:
             tokens["s"] = cursor.search_after
@@ -205,4 +204,10 @@ class ESCursorPagination(BasePagination):
         """Determines if there is a next page based on the search_after key
         and results count.
         """
+        if search_after_sort_key is None:
+            return False
+        if self.cursor is None:
+            return False
+        if self.results_in_page > self.page_size:
+            return True
         return True

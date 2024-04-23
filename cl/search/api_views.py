@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 import waffle
+from django.conf import settings
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
@@ -243,11 +244,17 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             es_list_instance = api_utils.CursorESList(
                 main_query, None, None, cd, version=request.version
             )
-            result_page = paginator.paginate_queryset(
+            results_page = paginator.paginate_queryset(
                 es_list_instance, request
             )
+
+            # Avoid displaying the extra document used to determine if more
+            # documents remain.
+            results_page = api_utils.limit_api_results_to_page(
+                results_page, paginator.cursor
+            )
             if search_type == SEARCH_TYPES.RECAP:
-                serializer = DocketESResultSerializer(result_page, many=True)
+                serializer = DocketESResultSerializer(results_page, many=True)
             else:
                 # Not found error
                 raise NotFound(
