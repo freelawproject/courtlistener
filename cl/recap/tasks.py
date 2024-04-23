@@ -1169,7 +1169,8 @@ async def process_recap_acms_docket(pk):
         d.pacer_case_id = pq.pacer_case_id
 
     if pq.debug:
-        await mark_pq_successful(pq, d_id=d.pk)
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
         return {"docket_pk": d.pk, "content_updated": False}
 
     if og_info is not None:
@@ -1194,7 +1195,8 @@ async def process_recap_acms_docket(pk):
         newly_enqueued = enqueue_docket_alert(d.pk)
         if newly_enqueued:
             await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
-    await mark_pq_successful(pq, d_id=d.pk)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
     return {
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
