@@ -1,6 +1,8 @@
 import waffle
 from django.conf import settings
 from elasticsearch_dsl import Q
+from elasticsearch_dsl.response import Response
+from elasticsearch_dsl.utils import AttrList
 from rest_framework.exceptions import ParseError
 
 from cl.lib import search_utils
@@ -317,7 +319,7 @@ class CursorESList:
         if self.cursor is not None:
             (self.search_after, self.reverse) = self.cursor
 
-        # Return one extra document beyond the page size so we're able to
+        # Return one extra document beyond the page size, so we're able to
         # determine if there are more documents and decide whether to display a
         # next or previous page link.
         self.page_size = page_size + 1
@@ -420,11 +422,28 @@ class ESResultObject(ResultObject):
         return getattr(self._data, key, None)
 
 
-def limit_api_results_to_page(result_items, cursor: ESCursor):
+def limit_api_results_to_page(
+    results: Response | AttrList, cursor: ESCursor
+) -> Response | AttrList:
+    """In ES Cursor pagination, an additional document is returned in each
+    query response to determine whether to display the next page or previous
+    pages. Here we limit the API results to the number defined in
+    settings for a single page, according to the navigation action being
+    performed.
+
+    :param results: The results returned by ES.
+    :param cursor: A ESCursor instance containing the "search_after" parameter
+     and a boolean "reverse" indicating if going backwards.
+    :return: A slice of the results list, limited to the number of items as
+    specified by the SEARCH_API_PAGE_SIZE.
+    """
+
     reverse = False
     if cursor is not None:
         search_after, reverse = cursor
     if reverse:
-        return result_items[-settings.SEARCH_API_PAGE_SIZE :]
+        # Limit results in page starting from the last item.
+        return results[-settings.SEARCH_API_PAGE_SIZE :]
     else:
-        return result_items[: settings.SEARCH_API_PAGE_SIZE]
+        # Limit results in page starting from the first item.
+        return results[: settings.SEARCH_API_PAGE_SIZE]

@@ -435,19 +435,25 @@ def build_text_filter(field: str, value: str) -> List:
     return []
 
 
-def build_sort_results(cd: CleanData, toggle: bool = False) -> Dict:
-    """Given cleaned data, find order_by value and return dict to use with
-    ElasticSearch sort
+def toggle_sort_order(
+    order_by: str | None, toggle_sorting: bool
+) -> str | None:
+    """Toggle the sorting order of the given "order_by" string from ascending
+    to descending, or vice versa. This is used for changing the sort direction
+    in queries, useful to perform backward pagination for the V4 Search API.
 
-    :param cd: The user input CleanedData
-    :return: The short dict.
+    :param order_by: A string specifying the fields and sort directions,
+    separated by commas, e.g., "score asc, score desc".
+    :param toggle_sorting: A boolean flag that indicates whether the sorting
+    order should be toggled. If False, the original "order_by" is returned.
+    :return: A modified "order_by" string with toggled sort directions.
     """
 
-    order_by = cd.get("order_by")
-    if toggle:
+    if toggle_sorting and order_by:
         sort_components = order_by.split(",")
         toggle_sort_components = []
         for component in sort_components:
+            component = component.strip()
             if "desc" in component:
                 toggle_sort_components.append(component.replace("desc", "asc"))
             elif "asc" in component:
@@ -455,7 +461,23 @@ def build_sort_results(cd: CleanData, toggle: bool = False) -> Dict:
             else:
                 toggle_sort_components.append(component)
 
-        order_by = ", ".join(toggle_sort_components)
+        return ", ".join(toggle_sort_components)
+
+    return order_by
+
+
+def build_sort_results(cd: CleanData, toggle_sorting: bool = False) -> Dict:
+    """Given cleaned data, find order_by value and return dict to use with
+    ElasticSearch sort
+
+    :param cd: The user input CleanedData
+    :param toggle_sorting: Whether to toggle the sorting order to perform backward
+    pagination for the V4 Search API.
+    :return: The short dict.
+    """
+
+    order_by = cd.get("order_by")
+    order_by = toggle_sort_order(order_by, toggle_sorting)
 
     order_by_map = {
         "score desc": {"_score": {"order": "desc"}},

@@ -3,6 +3,7 @@ from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.paginator import InvalidPage
+from elasticsearch_dsl.response import Response as ESResponse
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import BasePagination, PageNumberPagination
 from rest_framework.response import Response
@@ -88,7 +89,9 @@ class ESCursorPagination(BasePagination):
         self.cursor_query_param = "cursor"
         self.invalid_cursor_message = "Invalid cursor"
 
-    def paginate_queryset(self, es_list_instance, request, view=None):
+    def paginate_queryset(
+        self, es_list_instance, request, view=None
+    ) -> ESResponse:
         """Paginate the Elasticsearch query and retrieve the results."""
 
         self.base_url = request.build_absolute_uri()
@@ -122,7 +125,7 @@ class ESCursorPagination(BasePagination):
         search_after_sort_key = (
             self.es_list_instance.get_search_after_sort_key()
         )
-        if not self.has_next(search_after_sort_key):
+        if not self.has_next():
             return None
 
         cursor = ESCursor(search_after=search_after_sort_key, reverse=False)
@@ -135,7 +138,7 @@ class ESCursorPagination(BasePagination):
         reverse_search_after_sort_key = (
             self.es_list_instance.get_reverse_search_after_sort_key()
         )
-        if not self.has_prev(reverse_search_after_sort_key):
+        if not self.has_prev():
             return None
 
         cursor = ESCursor(
@@ -190,24 +193,32 @@ class ESCursorPagination(BasePagination):
             > settings.ELASTICSEARCH_MAX_RESULT_COUNT,
         }
 
-    def has_next(self, search_after_sort_key):
+    def has_next(self):
         """Determines if there is a next page based on the search_after key
         and results count.
         """
-        if search_after_sort_key is None:
-            return False
-        if self.results_in_page < self.page_size:
-            return False
+        if not self.cursor or not self.cursor.reverse:
+            # If this is the first page or if going forward, check if the
+            # number of results on the page exceeds the page size.
+            # This indicates that there is a next page.
+            return self.results_in_page > self.page_size
+
+        # If going backward, it indicates that there was a next page.
         return True
 
-    def has_prev(self, search_after_sort_key):
+    def has_prev(self):
         """Determines if there is a next page based on the search_after key
         and results count.
         """
-        if search_after_sort_key is None:
-            return False
+        # Check if it's the first page or if there are no results on the page.
         if self.cursor is None:
             return False
-        if self.results_in_page > self.page_size:
-            return True
+
+        if self.cursor.reverse:
+            # If going backwards, check if the results contains more items than
+            # the page size. This indicates that there is a previous page to
+            # display.
+            return self.results_in_page > self.page_size
+
+        # If going forward, it indicates that there was a previous page.
         return True

@@ -3103,25 +3103,14 @@ class RECAPSearchAPIV4Test(
             r = self.client.get(
                 reverse("search-list", kwargs={"version": "v4"}), search_params
             )
-            self.assertIsNone(r.data["next"])
+            self.assertIsNone(r.data["next"], msg="Next page doesn't match")
 
         # Results count greater than page_size, next page available.
         with override_settings(SEARCH_API_PAGE_SIZE=total_dockets - 1):
             r = self.client.get(
                 reverse("search-list", kwargs={"version": "v4"}), search_params
             )
-            self.assertTrue(r.data["next"])
-
-        # Exact number of results equals page_size; next page available.
-        # Since it's not possible to know for certain if there is a next page, it's better to show it.
-        with override_settings(
-            SEARCH_API_PAGE_SIZE=total_dockets,
-            ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets,
-        ):
-            r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}), search_params
-            )
-            self.assertTrue(r.data["next"])
+            self.assertTrue(r.data["next"], msg="Next page doesn't match")
 
     def test_recap_cursor_api_pagination_previous_page(self) -> None:
         """Test cursor pagination previous_page for V4 RECAP Search API."""
@@ -3133,12 +3122,73 @@ class RECAPSearchAPIV4Test(
         }
         total_dockets = Docket.objects.all().count()
 
-        # No previous page link since we're in the previous page.
-        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets):
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets - 1):
             r = self.client.get(
                 reverse("search-list", kwargs={"version": "v4"}), search_params
             )
-            self.assertIsNone(r.data["previous"])
+            # No previous page link since we're in the first page, but next.
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+            next_page = r.data["next"]
+            self.assertTrue(next_page, msg="Next page doesn't macht")
+
+            # Go to next page, not next page but previous.
+            r = self.client.get(next_page)
+            self.assertIsNone(r.data["next"], msg="Next page doesn't macht")
+            previous_page = r.data["previous"]
+            self.assertTrue(previous_page, msg="Previous page doesn't macht")
+
+            # Go back to previous page, first page no previous page but next.
+            r = self.client.get(previous_page)
+            self.assertTrue(r.data["next"], msg="Next page doesn't macht")
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+
+    def test_recap_cursor_results_equals_page_size(self) -> None:
+        """Test cursor pagination previous_page for V4 RECAP Search API."""
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            docket = DocketFactory(source=Docket.RECAP)
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_dockets = Docket.objects.all().count()
+        print("total_dockets/2", total_dockets / 2)
+        page_size = int(total_dockets / 2)
+        with override_settings(SEARCH_API_PAGE_SIZE=page_size):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            # No previous page link since we're in the first page, but next.
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+            next_page = r.data["next"]
+            self.assertTrue(next_page, msg="Next page doesn't macht")
+
+            # Go to next page, previous page but no next since results in page
+            # are equal to page_size.
+            r = self.client.get(next_page)
+            previous_page = r.data["previous"]
+            self.assertTrue(previous_page, msg="Previous page doesn't macht")
+            self.assertEqual(len(r.data["results"]), page_size)
+            self.assertIsNone(r.data["next"], msg="Next page doesn't macht")
+
+            # Go back previous page, next page but no previous since results in
+            # page are equal to page_size.
+            r = self.client.get(previous_page)
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+            self.assertEqual(len(r.data["results"]), page_size)
+            self.assertTrue(r.data["next"], msg="Next page doesn't macht")
+
+        docket.delete()
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

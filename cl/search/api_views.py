@@ -1,7 +1,6 @@
 from http import HTTPStatus
 
 import waffle
-from django.conf import settings
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
