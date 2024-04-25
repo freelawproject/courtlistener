@@ -340,16 +340,18 @@ class CursorESList:
             # Toggle the original sorting key to handle backward pagination
             toggle_sort = True
 
-        default_sorting = build_sort_results(self.clean_data, toggle_sort)
+        default_sorting = build_sort_results(
+            self.clean_data, toggle_sort, "v4"
+        )
         default_unique_order = {
             "type": self.clean_data["type"],
             "order_by": "docket_id desc",
         }
-        unique_sorting = build_sort_results(default_unique_order, toggle_sort)
-
+        unique_sorting = build_sort_results(
+            default_unique_order, toggle_sort, "v4"
+        )
         self.main_query = self.main_query.sort(default_sorting, unique_sorting)
         self.results = self.main_query.execute()
-
         self.process_results(self.results)
         return self.results
 

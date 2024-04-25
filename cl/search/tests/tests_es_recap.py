@@ -2701,7 +2701,7 @@ class RECAPSearchAPIV4Test(
                 docket=DocketFactory(
                     court=cls.court_api,
                     date_reargued=None,
-                    source=Docket.RECAP,
+                    source=Docket.RECAP_AND_SCRAPER,
                 ),
                 description="",
             )
@@ -2880,6 +2880,155 @@ class RECAPSearchAPIV4Test(
         }
         await self._test_api_fields_content(r, content_to_compare)
 
+    def test_date_filed_sorting_function_score(self) -> None:
+        """Test if the function score used for the dateFiled sorting in the V4
+        of the RECAP Search API works as expected."""
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            docket_recent = DocketFactory(
+                case_name="SUBPOENAS SERVED NEW",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+            docket_old = DocketFactory(
+                case_name="SUBPOENAS SERVED OLD",
+                source=Docket.RECAP,
+                date_filed=datetime.date(1732, 2, 23),
+            )
+            docket_null_date_filed = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED NULL",
+                source=Docket.RECAP,
+            )
+
+        # Query string, order by dateFiled desc
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": False,
+        }
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 5)
+
+        # Note that dockets where the date_field is null are sent to the bottom
+        # of the results
+        self.assertTrue(
+            r.content.decode().index(f"{docket_recent.docket_number}")
+            < r.content.decode().index(f"{self.de_1.docket.docket_number}")
+            < r.content.decode().index(f"{self.de.docket.docket_number}")
+            < r.content.decode().index(f"{docket_old.docket_number}")
+            < r.content.decode().index(
+                f"{docket_null_date_filed.docket_number}"
+            ),
+            msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled desc.",
+        )
+
+        # Query string, order by dateFiled asc
+        search_params["order_by"] = "dateFiled asc"
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+
+        # Note that dockets where the date_field is null are sent to the bottom
+        # of the results
+        self.assertTrue(
+            r.content.decode().index(f"{docket_old.docket_number}")
+            < r.content.decode().index(f"{self.de.docket.docket_number}")
+            < r.content.decode().index(f"{self.de_1.docket.docket_number}")
+            < r.content.decode().index(f"{docket_recent.docket_number}")
+            < r.content.decode().index(
+                f"{docket_null_date_filed.docket_number}"
+            ),
+            msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled desc.",
+        )
+
+        # Match all query, order by dateFiled desc
+        del search_params["q"]
+        search_params["order_by"] = "dateFiled desc"
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 8)
+        # Note that dockets where the date_field is null are sent to the bottom
+        # of the results (docket_id desc)
+        self.assertTrue(
+            r.content.decode().index(
+                f"{docket_recent.docket_number}"
+            )  # 2024/2/23
+            < r.content.decode().index(
+                f"{self.de_1.docket.docket_number}"
+            )  # 2016/8/16
+            < r.content.decode().index(
+                f"{self.de_api.docket.docket_number}"
+            )  # 2016/4/16
+            < r.content.decode().index(
+                f"{self.de.docket.docket_number}"
+            )  # 2015/8/16
+            < r.content.decode().index(
+                f"{docket_old.docket_number}"
+            )  # 1732/2/23
+            < r.content.decode().index(
+                f"{docket_null_date_filed.docket_number}"
+            )  # Null date_filed, pk 3
+            < r.content.decode().index(
+                f"{self.empty_docket_api.docket_number}"
+            )  # Null date_filed, pk 2
+            < r.content.decode().index(
+                f"{self.de_empty_fields_api.docket.docket_number}"
+            ),  # Null date_filed, pk 1
+            msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled desc.",
+        )
+
+        # Query string, order by dateFiled asc
+        search_params["order_by"] = "dateFiled asc"
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 8)
+
+        # Note that dockets where the date_field is null are sent to the bottom
+        # of the results
+        self.assertTrue(
+            r.content.decode().index(
+                f"{docket_old.docket_number}"
+            )  # 1732/2/23
+            < r.content.decode().index(
+                f"{self.de.docket.docket_number}"
+            )  # 2015/8/16
+            < r.content.decode().index(
+                f"{self.de_api.docket.docket_number}"
+            )  # 2016/4/16
+            < r.content.decode().index(
+                f"{self.de_1.docket.docket_number}"
+            )  # 2016/8/16
+            < r.content.decode().index(
+                f"{docket_recent.docket_number}"
+            )  # 2024/2/23
+            < r.content.decode().index(
+                f"{docket_null_date_filed.docket_number}"
+            )  # Null date_filed, pk 3
+            < r.content.decode().index(
+                f"{self.empty_docket_api.docket_number}"
+            )  # Null date_filed, pk 2
+            < r.content.decode().index(
+                f"{self.de_empty_fields_api.docket.docket_number}"
+            ),  # Null date_filed, pk 1
+            msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled asc.",
+        )
+
+        docket_recent.delete()
+        docket_old.delete()
+        docket_null_date_filed.delete()
+
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_cursor_api_pagination(self) -> None:
         """Test cursor pagination for V4 RECAP Search API."""
@@ -2889,7 +3038,7 @@ class RECAPSearchAPIV4Test(
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             for _ in range(dockets_to_create):
                 docket_entry = DocketEntryWithParentsFactory(
-                    docket__source=Docket.RECAP
+                    docket__source=Docket.RECAP,
                 )
                 RECAPDocumentFactory(
                     docket_entry=docket_entry,
@@ -2934,114 +3083,131 @@ class RECAPSearchAPIV4Test(
                 "next": False,
             },
         ]
-        # Test forward pagination.
-        next_page = None
-        unique_ids = set()
-        ids_per_page = []
-        current_page = None
-        for test in tests:
-            with self.subTest(test=test, msg="forward pagination"):
-                if not next_page:
-                    r = self.client.get(
-                        reverse("search-list", kwargs={"version": "v4"}),
-                        search_params,
-                    )
-                else:
-                    r = self.client.get(next_page)
-                # Test page
-                self.assertEqual(
-                    len(r.data["results"]),
-                    test["results"],
-                    msg="Results in page didn't match.",
-                )
-                self.assertEqual(
-                    r.data["count"]["exact"],
-                    test["count_exact"],
-                    msg="Results count didn't match.",
-                )
-                self.assertEqual(
-                    r.data["count"]["more"],
-                    test["more"],
-                    msg="Results more key is incorrect.",
-                )
-                next_page = r.data["next"]
-                if next_page:
-                    self.assertTrue(
-                        next_page, msg="Next page value didn't match"
-                    )
-                    current_page = next_page
-                else:
-                    self.assertFalse(
-                        next_page, msg="Next page value didn't match"
-                    )
-                ids_in_page = set()
-                for result in r.data["results"]:
-                    unique_ids.add(result["docket_id"])
-                    ids_in_page.add(result["docket_id"])
 
-                ids_per_page.append(ids_in_page)
+        order_types = [
+            "score desc",
+            "dateFiled desc",
+            "dateFiled asc",
+            "entry_date_filed asc",
+            "entry_date_filed desc",
+        ]
 
-        self.assertEqual(
-            len(unique_ids),
-            total_dockets,
-            msg="Wrong number of dockets.",
-        )
+        for order_type in order_types:
+            # Test forward pagination.
+            next_page = None
+            unique_ids = set()
+            ids_per_page = []
+            current_page = None
+            with self.subTest(order_type=order_type, msg="Sorting order."):
+                search_params["order_by"] = order_type
+                for test in tests:
+                    with self.subTest(test=test, msg="forward pagination"):
+                        if not next_page:
+                            r = self.client.get(
+                                reverse(
+                                    "search-list", kwargs={"version": "v4"}
+                                ),
+                                search_params,
+                            )
+                        else:
+                            r = self.client.get(next_page)
+                        # Test page
+                        self.assertEqual(
+                            len(r.data["results"]),
+                            test["results"],
+                            msg="Results in page didn't match.",
+                        )
+                        self.assertEqual(
+                            r.data["count"]["exact"],
+                            test["count_exact"],
+                            msg="Results count didn't match.",
+                        )
+                        self.assertEqual(
+                            r.data["count"]["more"],
+                            test["more"],
+                            msg="Results more key is incorrect.",
+                        )
+                        next_page = r.data["next"]
+                        if next_page:
+                            self.assertTrue(
+                                next_page, msg="Next page value didn't match"
+                            )
+                            current_page = next_page
+                        else:
+                            self.assertFalse(
+                                next_page, msg="Next page value didn't match"
+                            )
+                        ids_in_page = set()
+                        for result in r.data["results"]:
+                            unique_ids.add(result["docket_id"])
+                            ids_in_page.add(result["docket_id"])
 
-        # Test backward pagination.
-        tests.reverse()
-        previous_page = None
-        unique_ids_prev = set()
-        for test in tests:
-            with self.subTest(test=test, msg="backward pagination"):
-                if not previous_page:
-                    r = self.client.get(current_page)
-                else:
-                    r = self.client.get(previous_page)
-
-                # Test page
-                self.assertEqual(
-                    len(r.data["results"]),
-                    test["results"],
-                    msg="Results in page didn't match.",
-                )
-                self.assertEqual(
-                    r.data["count"]["exact"],
-                    test["count_exact"],
-                    msg="Results count didn't match.",
-                )
-                self.assertEqual(
-                    r.data["count"]["more"],
-                    test["more"],
-                    msg="Results more key is incorrect.",
-                )
-                previous_page = r.data["previous"]
-                if previous_page:
-                    self.assertTrue(
-                        previous_page, msg="Previous page value didn't match"
-                    )
-                else:
-                    self.assertFalse(
-                        previous_page, msg="Previous page value didn't match"
-                    )
-
-                ids_in_page_got = set()
-                for result in r.data["results"]:
-                    unique_ids_prev.add(result["docket_id"])
-                    ids_in_page_got.add(result["docket_id"])
-
-                current_page_ids_prev = ids_per_page.pop()
+                        ids_per_page.append(ids_in_page)
 
                 self.assertEqual(
-                    current_page_ids_prev,
-                    ids_in_page_got,
-                    msg="Wrong dockets.",
+                    len(unique_ids),
+                    total_dockets,
+                    msg="Wrong number of dockets.",
                 )
 
-        self.assertEqual(
-            len(unique_ids_prev),
-            total_dockets,
-            msg="Wrong number of dockets.",
-        )
+                # Test backward pagination.
+                tests_backward = tests.copy()
+                tests_backward.reverse()
+                previous_page = None
+                unique_ids_prev = set()
+                for test in tests_backward:
+                    with self.subTest(test=test, msg="backward pagination"):
+                        if not previous_page:
+                            r = self.client.get(current_page)
+                        else:
+                            r = self.client.get(previous_page)
+
+                        # Test page
+                        self.assertEqual(
+                            len(r.data["results"]),
+                            test["results"],
+                            msg="Results in page didn't match.",
+                        )
+                        self.assertEqual(
+                            r.data["count"]["exact"],
+                            test["count_exact"],
+                            msg="Results count didn't match.",
+                        )
+                        self.assertEqual(
+                            r.data["count"]["more"],
+                            test["more"],
+                            msg="Results more key is incorrect.",
+                        )
+                        previous_page = r.data["previous"]
+                        if previous_page:
+                            self.assertTrue(
+                                previous_page,
+                                msg="Previous page value didn't match",
+                            )
+                        else:
+                            self.assertFalse(
+                                previous_page,
+                                msg="Previous page value didn't match",
+                            )
+
+                        ids_in_page_got = set()
+                        for result in r.data["results"]:
+                            unique_ids_prev.add(result["docket_id"])
+                            ids_in_page_got.add(result["docket_id"])
+
+                        current_page_ids_prev = ids_per_page.pop()
+
+                        self.assertEqual(
+                            current_page_ids_prev,
+                            ids_in_page_got,
+                            msg="Wrong dockets.",
+                        )
+
+                self.assertEqual(
+                    len(unique_ids_prev),
+                    total_dockets,
+                    msg="Wrong number of dockets.",
+                )
 
         # Remove Docket objects to avoid affecting other tests.
         for created_docket in created_dockets:
@@ -3088,31 +3254,7 @@ class RECAPSearchAPIV4Test(
                 msg="Results more key is incorrect.",
             )
 
-    def test_recap_cursor_api_pagination_next_page(self) -> None:
-        """Test cursor pagination next_page for V4 RECAP Search API."""
-
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "order_by": "score desc",
-            "highlight": False,
-        }
-        total_dockets = Docket.objects.all().count()
-
-        # Fewer results than page_size, no next page.
-        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets + 1):
-            r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}), search_params
-            )
-            self.assertIsNone(r.data["next"], msg="Next page doesn't match")
-
-        # Results count greater than page_size, next page available.
-        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets - 1):
-            r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}), search_params
-            )
-            self.assertTrue(r.data["next"], msg="Next page doesn't match")
-
-    def test_recap_cursor_api_pagination_previous_page(self) -> None:
+    def test_recap_cursor_api_pagination_next_and_previous_page(self) -> None:
         """Test cursor pagination previous_page for V4 RECAP Search API."""
 
         search_params = {
@@ -3121,6 +3263,16 @@ class RECAPSearchAPIV4Test(
             "highlight": False,
         }
         total_dockets = Docket.objects.all().count()
+
+        # Fewer results than page_size, no next page, no previous page.
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets + 1):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertIsNone(r.data["next"], msg="Next page doesn't match")
+            self.assertIsNone(
+                r.data["previous"], msg="Next page doesn't match"
+            )
 
         with override_settings(SEARCH_API_PAGE_SIZE=total_dockets - 1):
             r = self.client.get(
@@ -3158,7 +3310,49 @@ class RECAPSearchAPIV4Test(
             "highlight": False,
         }
         total_dockets = Docket.objects.all().count()
-        print("total_dockets/2", total_dockets / 2)
+        page_size = int(total_dockets / 2)
+        with override_settings(SEARCH_API_PAGE_SIZE=page_size):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            # No previous page link since we're in the first page, but next.
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+            next_page = r.data["next"]
+            self.assertTrue(next_page, msg="Next page doesn't macht")
+
+            # Go to next page, previous page but no next since results in page
+            # are equal to page_size.
+            r = self.client.get(next_page)
+            previous_page = r.data["previous"]
+            self.assertTrue(previous_page, msg="Previous page doesn't macht")
+            self.assertEqual(len(r.data["results"]), page_size)
+            self.assertIsNone(r.data["next"], msg="Next page doesn't macht")
+
+            # Go back previous page, next page but no previous since results in
+            # page are equal to page_size.
+            r = self.client.get(previous_page)
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+            self.assertEqual(len(r.data["results"]), page_size)
+            self.assertTrue(r.data["next"], msg="Next page doesn't macht")
+
+        docket.delete()
+
+    def test_recap_cursor_results_consistency(self) -> None:
+        """Test cursor pagination previous_page for V4 RECAP Search API."""
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            docket = DocketFactory(source=Docket.RECAP)
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_dockets = Docket.objects.all().count()
         page_size = int(total_dockets / 2)
         with override_settings(SEARCH_API_PAGE_SIZE=page_size):
             r = self.client.get(

@@ -466,19 +466,23 @@ def toggle_sort_order(
     return order_by
 
 
-def build_sort_results(cd: CleanData, toggle_sorting: bool = False) -> Dict:
+def build_sort_results(
+    cd: CleanData,
+    toggle_sorting: bool = False,
+    api_version: Literal["v3", "v4"] | None = None,
+) -> Dict:
     """Given cleaned data, find order_by value and return dict to use with
     ElasticSearch sort
 
     :param cd: The user input CleanedData
     :param toggle_sorting: Whether to toggle the sorting order to perform backward
     pagination for the V4 Search API.
+    :param api_version: Optional, the request API version.
     :return: The short dict.
     """
 
     order_by = cd.get("order_by")
     order_by = toggle_sort_order(order_by, toggle_sorting)
-
     order_by_map = {
         "score desc": {"_score": {"order": "desc"}},
         "score asc": {"_score": {"order": "asc"}},
@@ -511,6 +515,21 @@ def build_sort_results(cd: CleanData, toggle_sorting: bool = False) -> Dict:
         "citeCount desc": {"citeCount": {"order": "desc"}},
         "citeCount asc": {"citeCount": {"order": "asc"}},
     }
+
+    if api_version == "v4":
+        # Override dateFiled sorting keys in V4 API to work alongside the custom
+        # function score for sorting by dateFiled.
+        order_by_map["dateFiled desc"] = {"_score": {"order": "desc"}}
+        order_by_map["dateFiled asc"] = {"_score": {"order": "desc"}}
+
+    if toggle_sorting and api_version == "v4":
+        # Override the sorting keys in the V4 API when toggle_sorting is True
+        # for backward cursor pagination based on fields that use a custom
+        # function score.
+        order_by_map["entry_date_filed asc"] = {"_score": {"order": "asc"}}
+        order_by_map["entry_date_filed desc"] = {"_score": {"order": "asc"}}
+        order_by_map["dateFiled desc"] = {"_score": {"order": "asc"}}
+        order_by_map["dateFiled asc"] = {"_score": {"order": "asc"}}
 
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
         order_by_map["score desc"] = {"score": {"order": "desc"}}
@@ -551,17 +570,27 @@ def build_sort_results(cd: CleanData, toggle_sorting: bool = False) -> Dict:
     return order_by_map[order_by]
 
 
-def get_child_sorting_key(cd: CleanData) -> tuple[str, str]:
+def get_child_sorting_key(
+    cd: CleanData, api_version: Literal["v3", "v4"] | None = None
+) -> tuple[str, str]:
     """Given cleaned data, find order_by value and return a key to use within
     a has_child query.
 
     :param cd: The user input CleanedData
+    :param api_version: Optional, the request API version.
     :return: A two tuple containing the short key and the order (asc or desc).
     """
     order_by_map_child = {
         "entry_date_filed asc": ("entry_date_filed", "asc"),
         "entry_date_filed desc": ("entry_date_filed", "desc"),
     }
+    if api_version == "v4":
+        order_by_map_child.update(
+            {
+                "dateFiled desc": ("dateFiled", "desc"),
+                "dateFiled asc": ("dateFiled", "asc"),
+            }
+        )
     order_by = cd.get("order_by", "")
     return order_by_map_child.get(order_by, ("", ""))
 
@@ -690,55 +719,45 @@ def build_highlights_dict(
     return highlight_options, fields_to_exclude
 
 
-def build_has_child_query(
-    query: QueryString | str,
-    child_type: str,
-    child_hits_limit: int,
-    highlighting_fields: dict[str, int] | None = None,
-    order_by: tuple[str, str] | None = None,
-    child_highlighting: bool = True,
+def build_custom_function_score_for_date(
+    query: QueryString | str, order_by: tuple[str, str], default_score: int
 ) -> QueryString:
-    """Build a 'has_child' query.
+    """Build a custom function score query for based on a date field.
+
+    Define the function score for sorting, based on the child sort_field. When
+    the order is 'entry_date_filed desc', the 'date_filed_time' value, adjusted
+    by washington_bd_offset, is used as the score, sorting newer documents
+    first. In 'asc' order, the score is the difference between 'current_time'
+    (also adjusted by the washington_bd_offset) and 'date_filed_time',
+    prioritizing older documents. If a document does not have a 'date_filed'
+    set, the function returns 1. This ensures that dockets containing documents
+    without a 'date_filed' are displayed before dockets without filings, which
+    have a default score of 0. washington_bd_offset is based on George
+    Washington's birthday (February 22, 1732), ensuring all epoch millisecond
+    values are positive and compatible with ES scoring system. This approach
+    allows for handling dates in our system both before and after January 1, 1970 (epoch time),
+    within a positive scoring range.
 
     :param query: The Elasticsearch query string or QueryString object.
-    :param child_type: The type of the child document.
-    :param child_hits_limit: The maximum number of child hits to be returned.
-    :param highlighting_fields: List of fields to highlight in child docs.
     :param order_by: If provided the field to use to compute score for sorting
     results based on a child document field.
-    :param child_highlighting: Whether highlighting should be enabled in child docs.
-    :return: The 'has_child' query.
+    :param default_score: The default score to return when the document lacks
+    the sort field.
+    :return: The modified QueryString object with applied function score.
     """
 
-    if order_by and all(order_by) and child_type == "recap_document":
-        sort_field, order = order_by
-        # Define the function score for sorting, based on the child sort_field.
-        # When the order is 'entry_date_filed desc', the 'date_filed_time'
-        # value, adjusted by washington_bd_offset, is used as the score,
-        # sorting newer documents first. In 'asc' order, the score is the
-        # difference between 'current_time' (also adjusted by the
-        # washington_bd_offset) and 'date_filed_time', prioritizing older
-        # documents. If a document does not have a 'date_filed' set, the
-        # function returns 1. This ensures that dockets containing documents
-        # without a 'date_filed' are displayed before dockets without filings,
-        # which have a default score of 0. washington_bd_offset is based
-        # on George Washington's birthday (February 22, 1732), ensuring all
-        # epoch millisecond values are positive and compatible with ES scoring
-        # system. This approach allows for handling dates in our system both
-        # before and after January 1, 1970 (epoch time), within a positive
-        # scoring range.
-
-        query = Q(
-            "function_score",
-            query=query,
-            script_score={
-                "script": {
-                    "source": f"""
+    sort_field, order = order_by
+    query = Q(
+        "function_score",
+        query=query,
+        script_score={
+            "script": {
+                "source": f"""
                     // Check if the document has a value for the 'sort_field'
                     if (doc['{sort_field}'].size() == 0) {{
-                        return 1;  // If not, return 1 as the score
+                        return {default_score};  // If not, return 'default_score' as the score
                     }} else {{
-                        // Offset based on the postive epoch time for Washington's birthday to ensure positive scores.
+                        // Offset based on the positive epoch time for Washington's birthday to ensure positive scores.
                         // (February 22, 1732)
                         long washington_bd_offset = 7506086400000L;
                         // Get the current time in milliseconds, include the washington_bd_offset to work with positive epoch times.
@@ -755,18 +774,51 @@ def build_has_child_query(
                             // in order to boost older documents if the order is asc.
                             long diff = current_time - date_filed_time;
 
-                            // Return the difference if it's non-negative, otherwise return 1
-                            return diff >= 0 ? diff : 1;
+                            // Return the difference if it's non-negative, otherwise return 'default_score'
+                            return diff >= 0 ? diff : {default_score};
                         }}
                     }}
-                    """,
-                    # Parameters passed to the script
-                    "params": {"order": order},
-                },
+                        """,
+                # Parameters passed to the script
+                "params": {"order": order, "default_score": default_score},
             },
-            # Replace the original score with the one computed by the script
-            boost_mode="replace",
-        )
+        },
+        # Replace the original score with the one computed by the script
+        boost_mode="replace",
+    )
+
+    return query
+
+
+def build_has_child_query(
+    query: QueryString | str,
+    child_type: str,
+    child_hits_limit: int,
+    highlighting_fields: dict[str, int] | None = None,
+    order_by: tuple[str, str] | None = None,
+    child_highlighting: bool = True,
+    api_version: Literal["v3", "v4"] = None,
+) -> QueryString:
+    """Build a 'has_child' query.
+
+    :param query: The Elasticsearch query string or QueryString object.
+    :param child_type: The type of the child document.
+    :param child_hits_limit: The maximum number of child hits to be returned.
+    :param highlighting_fields: List of fields to highlight in child docs.
+    :param order_by: If provided the field to use to compute score for sorting
+    results based on a child document field.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :param api_version: Optional, the request API version.
+    :return: The 'has_child' query.
+    """
+
+    if order_by and all(order_by) and child_type == "recap_document":
+        if api_version == "v4":
+            query = nullify_query_score(query)
+        else:
+            query = build_custom_function_score_for_date(
+                query, order_by, default_score=1
+            )
 
     highlight_options, fields_to_exclude = build_highlights_dict(
         highlighting_fields, SEARCH_HL_TAG, child_highlighting
@@ -796,6 +848,7 @@ def get_search_query(
     search_query: Search,
     filters: list,
     string_query: QueryString,
+    api_version: Literal["v3", "v4"] | None = None,
 ) -> Search:
     """Get the appropriate search query based on the given parameters.
 
@@ -803,6 +856,7 @@ def get_search_query(
     :param search_query: Elasticsearch DSL Search object
     :param filters: A list of filter objects to be applied.
     :param string_query: An Elasticsearch QueryString object.
+    :param api_version: Optional, the request API version.
     :return: The modified Search object based on the given conditions.
     """
     if not any([filters, string_query]):
@@ -818,10 +872,11 @@ def get_search_query(
                     "recap_document",
                     query_hits_limit,
                     SEARCH_RECAP_CHILD_HL_FIELDS,
-                    get_child_sorting_key(cd),
+                    get_child_sorting_key(cd, api_version),
+                    api_version=api_version,
                 )
-                match_all_parent_query = nullify_parent_score_on_child_sorting(
-                    cd, Q("match", docket_child="docket")
+                match_all_parent_query = apply_custom_score_to_parent_query(
+                    cd, Q("match", docket_child="docket"), api_version
                 )
                 return search_query.query(
                     Q(
@@ -860,7 +915,10 @@ def get_search_query(
 
 
 def build_es_base_query(
-    search_query: Search, cd: CleanData, child_highlighting: bool = True
+    search_query: Search,
+    cd: CleanData,
+    child_highlighting: bool = True,
+    api_version: Literal["v3", "v4"] | None = None,
 ) -> tuple[Search, QueryString | None]:
     """Builds filters and fulltext_query based on the given cleaned
      data and returns an elasticsearch query.
@@ -868,6 +926,7 @@ def build_es_base_query(
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
     :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :param api_version: Optional, the request API version.
     :return: A two-tuple, the Elasticsearch search query object and an ES
     QueryString for child documents, or None if there is no need to query
     child documents.
@@ -951,6 +1010,7 @@ def build_es_base_query(
                 child_query_fields,
                 parent_query_fields,
                 child_highlighting=child_highlighting,
+                api_version=api_version,
             )
         case SEARCH_TYPES.OPINION:
             str_query = cd.get("q", "")
@@ -984,10 +1044,15 @@ def build_es_base_query(
                 )
             )
             string_query, join_query = build_full_join_es_queries(
-                cd, child_query_fields, parent_query_fields, mlt_query
+                cd,
+                child_query_fields,
+                parent_query_fields,
+                mlt_query,
             )
 
-    search_query = get_search_query(cd, search_query, filters, string_query)
+    search_query = get_search_query(
+        cd, search_query, filters, string_query, api_version
+    )
     return search_query, join_query
 
 
@@ -1993,37 +2058,62 @@ def do_es_feed_query(
     return response
 
 
-def nullify_parent_score_on_child_sorting(
-    cd: CleanData, query: Query
-) -> Query:
-    """Nullify the parent score in child document sorting.
+def nullify_query_score(query: Query) -> Query:
+    """Nullify the scoring of a query.
+    This function modifies the scoring of the given query to always return zero,
+    which is useful for prioritizing a score set upstream or downstream.
 
-    It applies a function score to the parent query to nullify the parent score
-    (sets it to 0) to prioritize child documents sorting criteria.
-    This will ensure that dockets without documents come last on results.
+    :param query: The ES Query object to be modified.
+    :return: The modified Query object with a script score that always
+    returns zero.
+    """
+
+    query = Q(
+        "function_score",
+        query=query,
+        script_score={
+            "script": {
+                "source": """ return 0; """,
+            },
+        },
+        # Replace the original score with the one computed by the script
+        boost_mode="replace",
+    )
+    return query
+
+
+def apply_custom_score_to_parent_query(
+    cd: CleanData, query: Query, api_version: Literal["v3", "v4"] | None = None
+) -> Query:
+    """Apply a custom function score to a parent document.
 
     :param cd: The query CleanedData
     :param query: The ES Query object to be modified.
+    :param api_version: Optional, the request API version.
     :return: The function_score query contains the base query, applied when
     child_order is used.
     """
-    child_order_by = get_child_sorting_key(cd)
+    child_order_by = get_child_sorting_key(cd, api_version)
     if (
         child_order_by
         and all(child_order_by)
         and cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
     ):
-        query = Q(
-            "function_score",
-            query=query,
-            script_score={
-                "script": {
-                    "source": """ return 0; """,
-                },
-            },
-            # Replace the original score with the one computed by the script
-            boost_mode="replace",
-        )
+        sort_field, order = child_order_by
+        if sort_field == "entry_date_filed":
+            # It applies a function score to the parent query to nullify the
+            # parent score (sets it to 0) to prioritize child documents sorting
+            # criteria. This will ensure that dockets without documents come
+            # last on results.
+            query = nullify_query_score(query)
+        elif sort_field == "dateFiled" and api_version:
+            # Applies a custom function score to sort dockets based on their
+            # dateFiled field. This serves as a workaround to enable the use of
+            # the  search_after cursor for pagination on documents with a None
+            # dateFiled.
+            query = build_custom_function_score_for_date(
+                query, child_order_by, default_score=0
+            )
 
     return query
 
@@ -2034,6 +2124,7 @@ def build_full_join_es_queries(
     parent_query_fields: list[str],
     mlt_query: Query | None = None,
     child_highlighting: bool = True,
+    api_version: Literal["v3", "v4"] | None = None,
 ) -> tuple[QueryString | list, QueryString | None]:
     """Build a complete Elasticsearch query with both parent and child document
       conditions.
@@ -2043,6 +2134,7 @@ def build_full_join_es_queries(
     :param parent_query_fields: A list of fields for the parent document.
     :param mlt_query: the More Like This Query object.
     :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :param api_version: Optional, the request API version.
     :return: An Elasticsearch QueryString object.
     """
 
@@ -2142,8 +2234,9 @@ def build_full_join_es_queries(
                 child_type,
                 query_hits_limit,
                 hl_fields,
-                get_child_sorting_key(cd),
+                get_child_sorting_key(cd, api_version),
                 child_highlighting=child_highlighting,
+                api_version=api_version,
             )
 
         if parties_filters and not has_child_query:
@@ -2156,7 +2249,8 @@ def build_full_join_es_queries(
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
-                get_child_sorting_key(cd),
+                get_child_sorting_key(cd, api_version),
+                api_version=api_version,
             )
 
         if has_child_query:
@@ -2209,8 +2303,8 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
         if parent_query:
-            parent_query = nullify_parent_score_on_child_sorting(
-                cd, parent_query
+            parent_query = apply_custom_score_to_parent_query(
+                cd, parent_query, api_version
             )
             q_should.append(parent_query)
 
@@ -2513,7 +2607,7 @@ def do_es_api_query(
     cd: CleanData,
     highlighting_fields: dict[str, int],
     hl_tag: str,
-    api_version: str,
+    api_version: Literal["v3", "v4"],
 ) -> Search:
     """Build an ES query for its use in the Search API and Webhooks.
 
@@ -2526,7 +2620,9 @@ def do_es_api_query(
     :return: The modified Search with the resultant query.
     """
 
-    s, join_query = build_es_base_query(search_query, cd, cd["highlight"])
+    s, join_query = build_es_base_query(
+        search_query, cd, cd["highlight"], api_version
+    )
     if api_version == "v3":
         s = build_child_docs_query(
             join_query,
@@ -2549,7 +2645,9 @@ def do_es_api_query(
                 }
             )
         main_query = s.extra(**extra_options)
-        main_query = main_query.sort(build_sort_results(cd))
+        main_query = main_query.sort(
+            build_sort_results(cd, api_version=api_version)
+        )
     else:
         main_query = s
         if cd["highlight"]:
