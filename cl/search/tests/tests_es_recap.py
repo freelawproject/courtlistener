@@ -3025,9 +3025,10 @@ class RECAPSearchAPIV4Test(
             msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled asc.",
         )
 
-        docket_recent.delete()
-        docket_old.delete()
-        docket_null_date_filed.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_recent.delete()
+            docket_old.delete()
+            docket_null_date_filed.delete()
 
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_cursor_api_pagination(self) -> None:
@@ -3209,9 +3210,10 @@ class RECAPSearchAPIV4Test(
                     msg="Wrong number of dockets.",
                 )
 
-        # Remove Docket objects to avoid affecting other tests.
-        for created_docket in created_dockets:
-            created_docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            # Remove Docket objects to avoid affecting other tests.
+            for created_docket in created_dockets:
+                created_docket.delete()
 
     def test_recap_cursor_api_pagination_count(self) -> None:
         """Test cursor pagination count for V4 RECAP Search API."""
@@ -3299,7 +3301,8 @@ class RECAPSearchAPIV4Test(
             )
 
     def test_recap_cursor_results_equals_page_size(self) -> None:
-        """Test cursor pagination previous_page for V4 RECAP Search API."""
+        """Test cursor pagination previous and next page when the number of
+        equals the page_size."""
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
             docket = DocketFactory(source=Docket.RECAP)
@@ -3339,50 +3342,164 @@ class RECAPSearchAPIV4Test(
             self.assertEqual(len(r.data["results"]), page_size)
             self.assertTrue(r.data["next"], msg="Next page doesn't macht")
 
-        docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
 
+    @override_settings(SEARCH_API_PAGE_SIZE=2)
     def test_recap_cursor_results_consistency(self) -> None:
-        """Test cursor pagination previous_page for V4 RECAP Search API."""
+        """Test cursor pagination results consistency when documents are indexed
+        or removed."""
 
-        with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            docket = DocketFactory(source=Docket.RECAP)
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 1",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2023, 2, 23),
+            )
+            docket_1 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 2",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2022, 2, 23),
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": False,
+        }
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"]["exact"], 4)
+        next_page = r.data["next"]
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 0",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+
+        ids_in_previous_page = {docket.pk, docket_1.pk, docket_0.pk}
+        r = self.client.get(next_page)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"]["exact"], 5)
+
+        current_page_ids = set()
+        for result in r.data["results"]:
+            current_page_ids.add(result["docket_id"])
+
+        # No Dockets from the previous page are shown in the next page.
+        self.assertFalse(ids_in_previous_page & current_page_ids)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0.delete()
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"]["exact"], 4)
+        next_page = r.data["next"]
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_3 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 3",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2017, 2, 23),
+            )
+
+        r = self.client.get(next_page)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"]["exact"], 5)
+        self.assertTrue(r.data["next"])
+
+        current_page_ids = set()
+        for result in r.data["results"]:
+            current_page_ids.add(result["docket_id"])
+
+        expected_ids = {docket_3.pk, self.de_1.docket.pk}
+        # No Dockets from the previous page are shown in the next page.
+        self.assertEqual(expected_ids, current_page_ids)
+
+        next_page = r.data["next"]
+        r = self.client.get(next_page)
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["count"]["exact"], 5)
+        self.assertIsNone(r.data["next"])
+        self.assertEqual(r.data["results"][0]["docket_id"], self.de.docket.pk)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+
+    @override_settings(SEARCH_API_PAGE_SIZE=6)
+    def test_recap_results_more_docs_field(self) -> None:
+        """Test the more_docs fields to be shown properly when a docket has
+        more than 5 RECAPDocuments matched."""
+
+        rds_to_create = settings.CHILD_HITS_PER_RESULT + 1
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_entry = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+            )
+            for i in range(rds_to_create):
+                RECAPDocumentFactory(
+                    docket_entry=docket_entry,
+                    document_number=i,
+                )
 
         search_params = {
             "type": SEARCH_TYPES.RECAP,
             "order_by": "score desc",
             "highlight": False,
+            "q": f"docket_id:{docket_entry.docket.pk}",
         }
-        total_dockets = Docket.objects.all().count()
-        page_size = int(total_dockets / 2)
-        with override_settings(SEARCH_API_PAGE_SIZE=page_size):
-            r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}), search_params
-            )
-            # No previous page link since we're in the first page, but next.
-            self.assertIsNone(
-                r.data["previous"], msg="Previous page doesn't macht"
-            )
-            next_page = r.data["next"]
-            self.assertTrue(next_page, msg="Next page doesn't macht")
 
-            # Go to next page, previous page but no next since results in page
-            # are equal to page_size.
-            r = self.client.get(next_page)
-            previous_page = r.data["previous"]
-            self.assertTrue(previous_page, msg="Previous page doesn't macht")
-            self.assertEqual(len(r.data["results"]), page_size)
-            self.assertIsNone(r.data["next"], msg="Next page doesn't macht")
+        test_cases = [
+            {
+                "expected_results": settings.CHILD_HITS_PER_RESULT,
+                "more_docs": True,
+            },
+            {
+                "expected_results": settings.CHILD_HITS_PER_RESULT,
+                "more_docs": False,
+            },
+            {
+                "expected_results": settings.CHILD_HITS_PER_RESULT - 1,
+                "more_docs": False,
+            },
+        ]
 
-            # Go back previous page, next page but no previous since results in
-            # page are equal to page_size.
-            r = self.client.get(previous_page)
-            self.assertIsNone(
-                r.data["previous"], msg="Previous page doesn't macht"
-            )
-            self.assertEqual(len(r.data["results"]), page_size)
-            self.assertTrue(r.data["next"], msg="Next page doesn't macht")
+        for test_case in test_cases:
+            with self.subTest(test_case=test_case, msg="More docs test."):
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertEqual(len(r.data["results"]), 1)
+                self.assertEqual(
+                    len(r.data["results"][0]["recap_documents"]),
+                    test_case["expected_results"],
+                )
+                self.assertEqual(
+                    r.data["results"][0]["more_docs"], test_case["more_docs"]
+                )
 
-        docket.delete()
+                with self.captureOnCommitCallbacks(execute=True):
+                    RECAPDocument.objects.filter(
+                        docket_entry__docket=docket_entry.docket
+                    ).first().delete()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_entry.docket.delete()
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

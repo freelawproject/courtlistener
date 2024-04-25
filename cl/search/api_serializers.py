@@ -494,6 +494,9 @@ class DocketESResultSerializer(DocumentSerializer):
     recap_documents = RECAPESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
+    more_docs = serializers.BooleanField(
+        read_only=True, source="child_remaining"
+    )
 
     class Meta:
         document = DocketDocument

@@ -337,6 +337,7 @@ recap_search_v4_api_keys = {
         if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
         else None
     ),
+    "more_docs": lambda x: False,
 }
 
 
