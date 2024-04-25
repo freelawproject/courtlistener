@@ -1333,6 +1333,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
             ),
+            models.Index(
+                fields=["pacer_doc_id"],
+                name="pacer_doc_id_idx",
+                condition=~Q(pacer_doc_id=""),
+            ),
         ]
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
 
