@@ -13,7 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from cl.api.utils import CitationCountRateThrottle
+from cl.api.utils import CitationCountRateThrottle, LoggingMixin
 from cl.citations.api_serializers import (
     CitationAPIRequestSerializer,
     CitationAPIResponseSerializer,
@@ -24,7 +24,7 @@ from cl.search.models import OpinionCluster
 from cl.search.selectors import get_clusters_from_citation_str
 
 
-class CitationLookupViewSet(CreateModelMixin, GenericViewSet):
+class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
     serializer_class = CitationAPIRequestSerializer
     permission_classes = [IsAuthenticated]

@@ -1,6 +1,7 @@
 from datetime import date, datetime, time
 
 import pytz
+from django.utils.timezone import is_naive
 
 from cl.recap.constants import COURT_TIMEZONES
 
@@ -26,12 +27,25 @@ def localize_date_and_time(
     """Localize the date and time into local court timezone, split it into
     date and time.
 
+    If given a "naive datetime" (no timezone information), assume the
+    time is in the court's local time. and return timezone-aware date
+    and time objects. If given a timezone-aware datetime, convert it
+    to the court's local timezone and return timezone-aware date and
+    time objects.
+
     :param court_id: The court_id to get the timezone from.
     :param date_filed: The date or datetime instance provided by the source.
     :return: A tuple of date_filed and time_filed or None if no time available.
     """
     if isinstance(date_filed, datetime):
-        datetime_filed_local = convert_to_court_timezone(court_id, date_filed)
+        if is_naive(date_filed):
+            datetime_filed_local = localize_naive_datetime_to_court_timezone(
+                court_id, date_filed
+            )
+        else:
+            datetime_filed_local = convert_to_court_timezone(
+                court_id, date_filed
+            )
         time_filed = datetime_filed_local.time()
         date_filed = datetime_filed_local.date()
         return date_filed, time_filed
