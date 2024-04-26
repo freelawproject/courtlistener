@@ -10,9 +10,9 @@ from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_serializers import (
+    BaseDocketESResultSerializer,
     CourtSerializer,
     DocketEntrySerializer,
-    DocketESResultSerializer,
     DocketSerializer,
     ExtendedPersonESSerializer,
     OAESResultSerializer,
@@ -21,7 +21,9 @@ from cl.search.api_serializers import (
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
+    RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
+    RECAPESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
 )
@@ -253,7 +255,15 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                 results_page, paginator.cursor
             )
             if search_type == SEARCH_TYPES.RECAP:
-                serializer = DocketESResultSerializer(results_page, many=True)
+                serializer = RECAPESResultSerializer(results_page, many=True)
+            elif search_type == SEARCH_TYPES.DOCKETS:
+                serializer = BaseDocketESResultSerializer(
+                    results_page, many=True
+                )
+            elif search_type == SEARCH_TYPES.RECAP_DOCUMENT:
+                serializer = RECAPDocumentESResultSerializer(
+                    results_page, many=True
+                )
             else:
                 # Not found error
                 raise NotFound(

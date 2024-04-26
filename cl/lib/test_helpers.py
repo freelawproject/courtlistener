@@ -158,7 +158,7 @@ opinion_search_api_keys = {
 }
 
 
-recap_search_v4_api_keys = {
+docket_v4_api_keys = {
     "assignedTo": lambda x: (
         x["assignedTo"]
         if x.get("assignedTo")
@@ -261,55 +261,7 @@ recap_search_v4_api_keys = {
             "party_id"
         ]
     ),
-    "recap_documents": [
-        {
-            "id": lambda x: x["result"].pk,
-            "docket_entry_id": lambda x: x["result"].docket_entry.pk,
-            "description": lambda x: (
-                x["description"]
-                if x.get("description")
-                else x["result"].docket_entry.description
-            ),
-            "entry_number": lambda x: x["result"].docket_entry.entry_number,
-            "entry_date_filed": lambda x: (
-                x["result"].docket_entry.date_filed.isoformat()
-                if x["result"].docket_entry.date_filed
-                else None
-            ),
-            "short_description": lambda x: (
-                x["short_description"]
-                if x.get("short_description")
-                else x["result"].description
-            ),
-            "document_type": lambda x: x["result"].get_document_type_display(),
-            "document_number": lambda x: (
-                int(x["result"].document_number)
-                if x["result"].document_number
-                else None
-            ),
-            "pacer_doc_id": lambda x: x["result"].pacer_doc_id or "",
-            "snippet": lambda x: (
-                x["snippet"]
-                if x.get("snippet")
-                else x["result"].plain_text or ""
-            ),
-            "attachment_number": lambda x: x["result"].attachment_number
-            or None,
-            "is_available": lambda x: x["result"].is_available,
-            "page_count": lambda x: x["result"].page_count or None,
-            "filepath_local": lambda x: x["result"].filepath_local.name
-            or None,
-            "absolute_url": lambda x: x["result"].get_absolute_url(),
-            "cites": lambda x: list(
-                x["result"]
-                .cited_opinions.all()
-                .values_list("cited_opinion_id", flat=True)
-            ),
-            "timestamp": lambda x: x["result"]
-            .date_created.isoformat()
-            .replace("+00:00", "Z"),
-        }
-    ],
+    "recap_documents": [],
     "referredTo": lambda x: (
         x["referredTo"]
         if x.get("referredTo")
@@ -338,6 +290,50 @@ recap_search_v4_api_keys = {
         else None
     ),
     "more_docs": lambda x: False,
+}
+
+recap_document_v4_api_keys = {
+    "id": lambda x: x["result"].pk,
+    "docket_entry_id": lambda x: x["result"].docket_entry.pk,
+    "description": lambda x: (
+        x["description"]
+        if x.get("description")
+        else x["result"].docket_entry.description
+    ),
+    "entry_number": lambda x: x["result"].docket_entry.entry_number,
+    "entry_date_filed": lambda x: (
+        x["result"].docket_entry.date_filed.isoformat()
+        if x["result"].docket_entry.date_filed
+        else None
+    ),
+    "short_description": lambda x: (
+        x["short_description"]
+        if x.get("short_description")
+        else x["result"].description
+    ),
+    "document_type": lambda x: x["result"].get_document_type_display(),
+    "document_number": lambda x: (
+        int(x["result"].document_number)
+        if x["result"].document_number
+        else None
+    ),
+    "pacer_doc_id": lambda x: x["result"].pacer_doc_id or "",
+    "snippet": lambda x: (
+        x["snippet"] if x.get("snippet") else x["result"].plain_text or ""
+    ),
+    "attachment_number": lambda x: x["result"].attachment_number or None,
+    "is_available": lambda x: x["result"].is_available,
+    "page_count": lambda x: x["result"].page_count or None,
+    "filepath_local": lambda x: x["result"].filepath_local.name or None,
+    "absolute_url": lambda x: x["result"].get_absolute_url(),
+    "cites": lambda x: list(
+        x["result"]
+        .cited_opinions.all()
+        .values_list("cited_opinion_id", flat=True)
+    ),
+    "timestamp": lambda x: x["result"]
+    .date_created.isoformat()
+    .replace("+00:00", "Z"),
 }
 
 

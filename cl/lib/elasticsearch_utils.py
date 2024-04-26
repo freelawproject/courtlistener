@@ -206,6 +206,7 @@ def add_fields_boosting(
     if cd["type"] in [
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
     ]:
         qf = BOOSTS["es"][cd["type"]].copy()
 
@@ -213,6 +214,7 @@ def add_fields_boosting(
         SEARCH_TYPES.ORAL_ARGUMENT,
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
         SEARCH_TYPES.OPINION,
     ]:
         # Give a boost on the case_name field if it's obviously a case_name
@@ -493,6 +495,8 @@ def build_sort_results(
         "name_reverse asc": {"name_reverse": {"order": "asc"}},
         "docket_id asc": {"docket_id": {"order": "asc"}},
         "docket_id desc": {"docket_id": {"order": "desc"}},
+        "id asc": {"id": {"order": "asc"}},
+        "id desc": {"id": {"order": "desc"}},
         "dob desc,name_reverse asc": {
             "dob": {"order": "desc"},
             "name_reverse": {"order": "asc"},
@@ -534,7 +538,11 @@ def build_sort_results(
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
         order_by_map["score desc"] = {"score": {"order": "desc"}}
 
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    ]:
         random_order_field_id = "docket_id"
     elif cd["type"] in [SEARCH_TYPES.OPINION]:
         random_order_field_id = "cluster_id"
@@ -981,7 +989,11 @@ def build_es_base_query(
                 parent_query_fields,
                 cd.get("q", ""),
             )
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
             child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
@@ -1814,7 +1826,11 @@ def build_has_child_filters(
             if appointer:
                 queries_list.extend(build_text_filter("appointer", appointer))
 
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    ]:
         if child_type == "recap_document":
             available_only = cd.get("available_only", "")
             description = cd.get("description", "")
@@ -1885,7 +1901,11 @@ def build_join_es_filters(cd: CleanData) -> List:
         # Build position has child filter:
         queries_list.extend(build_has_child_filters("position", cd))
 
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    ]:
         queries_list.extend(
             [
                 *build_term_query(
@@ -2085,7 +2105,7 @@ def nullify_query_score(query: Query) -> Query:
 def apply_custom_score_to_parent_query(
     cd: CleanData, query: Query, api_version: Literal["v3", "v4"] | None = None
 ) -> Query:
-    """Apply a custom function score to a parent document.
+    """Apply a custom function score to a main document.
 
     :param cd: The query CleanedData
     :param query: The ES Query object to be modified.
@@ -2107,6 +2127,21 @@ def apply_custom_score_to_parent_query(
             # last on results.
             query = nullify_query_score(query)
         elif sort_field == "dateFiled" and api_version:
+            # Applies a custom function score to sort dockets based on their
+            # dateFiled field. This serves as a workaround to enable the use of
+            # the  search_after cursor for pagination on documents with a None
+            # dateFiled.
+            query = build_custom_function_score_for_date(
+                query, child_order_by, default_score=0
+            )
+
+    if (
+        child_order_by
+        and all(child_order_by)
+        and cd["type"] == SEARCH_TYPES.RECAP_DOCUMENT
+    ):
+        sort_field, order = child_order_by
+        if sort_field == "dateFiled" and api_version:
             # Applies a custom function score to sort dockets based on their
             # dateFiled field. This serves as a workaround to enable the use of
             # the  search_after cursor for pagination on documents with a None
@@ -2140,7 +2175,11 @@ def build_full_join_es_queries(
 
     q_should = []
     match cd["type"]:
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
             child_type = "recap_document"
         case SEARCH_TYPES.OPINION:
             child_type = "opinion"
@@ -2149,6 +2188,7 @@ def build_full_join_es_queries(
     if cd["type"] in [
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
         SEARCH_TYPES.OPINION,
     ]:
         # Build child filters.
@@ -2337,7 +2377,11 @@ def limit_inner_hits(
     match search_type:
         case SEARCH_TYPES.OPINION:
             child_type = "opinion"
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
             child_type = "recap_document"
         case _:
             return
@@ -2649,9 +2693,18 @@ def do_es_api_query(
             build_sort_results(cd, api_version=api_version)
         )
     else:
-        main_query = s
-        if cd["highlight"]:
-            main_query = add_es_highlighting(s, cd)
+        if cd["type"] == SEARCH_TYPES.RECAP_DOCUMENT:
+            # The RECAP_DOCUMENT search type returns only child documents.
+            s = build_child_docs_query(
+                join_query,
+                cd=cd,
+            )
+            s = apply_custom_score_to_parent_query(cd, s, api_version)
+            main_query = search_query.query(s)
+        else:
+            main_query = s
+            if cd["highlight"]:
+                main_query = add_es_highlighting(s, cd)
 
     return main_query
 

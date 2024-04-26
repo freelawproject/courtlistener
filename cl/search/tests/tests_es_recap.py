@@ -21,7 +21,8 @@ from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     RECAPSearchTestCase,
-    recap_search_v4_api_keys,
+    docket_v4_api_keys,
+    recap_document_v4_api_keys,
     skip_if_common_tests_skipped,
 )
 from cl.lib.view_utils import increment_view_count
@@ -2707,7 +2708,7 @@ class RECAPSearchAPIV4Test(
             )
             cls.rd_empty_fields_api = RECAPDocumentFactory(
                 docket_entry=cls.de_empty_fields_api,
-                description="",
+                description="empty fields",
                 pacer_doc_id="",
             )
 
@@ -2748,16 +2749,14 @@ class RECAPSearchAPIV4Test(
         for (
             field,
             get_expected_value,
-        ) in recap_search_v4_api_keys.items():
+        ) in docket_v4_api_keys.items():
             with self.subTest(field=field):
                 actual_value = api_response.data["results"][0].get(field)
                 if field == "recap_documents":
                     for child_field, child_value in actual_value[0].items():
                         with self.subTest(child_field=child_field):
                             get_child_expected_value = (
-                                recap_search_v4_api_keys.get(field)[0].get(
-                                    child_field
-                                )
+                                recap_document_v4_api_keys.get(child_field)
                             )
                             child_expected_value = await sync_to_async(
                                 get_child_expected_value
@@ -2776,6 +2775,58 @@ class RECAPSearchAPIV4Test(
                         expected_value,
                         f"Parent field '{field}' does not match.",
                     )
+
+    def _test_results_ordering(self, results, expected_order, field):
+        """Ensure dockets appear in the response in a specific order."""
+
+        actual_order = [result[field] for result in results]
+        self.assertEqual(
+            actual_order,
+            expected_order,
+            msg=f"Expected order {expected_order}, but got {actual_order}",
+        )
+
+    def _test_page_variables(self, response, test_case, current_page):
+        """Ensure the page variables are the correct ones according to the
+        current page."""
+
+        # Test page
+        self.assertEqual(
+            len(response.data["results"]),
+            test_case["results"],
+            msg="Results in page didn't match.",
+        )
+        self.assertEqual(
+            response.data["count"]["exact"],
+            test_case["count_exact"],
+            msg="Results count didn't match.",
+        )
+        self.assertEqual(
+            response.data["count"]["more"],
+            test_case["more"],
+            msg="Results more key is incorrect.",
+        )
+        next_page = response.data["next"]
+        expected_next_page = test_case["next"]
+        if expected_next_page:
+            self.assertTrue(next_page, msg="Next page value didn't match")
+            current_page = next_page
+        else:
+            self.assertFalse(next_page, msg="Next page value didn't match")
+
+        previous_page = response.data["previous"]
+        expected_previous_page = test_case["previous"]
+        if expected_previous_page:
+            self.assertTrue(
+                previous_page,
+                msg="Previous page value didn't match",
+            )
+        else:
+            self.assertFalse(
+                previous_page,
+                msg="Previous page value didn't match",
+            )
+        return next_page, previous_page, current_page
 
     async def test_case_name_filter(self) -> None:
         """Confirm case_name filter works properly"""
@@ -2796,11 +2847,9 @@ class RECAPSearchAPIV4Test(
         r = await self._test_api_results_count(search_params, 1, "API fields")
 
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(recap_search_v4_api_keys))
+        self.assertEqual(keys_count, len(docket_v4_api_keys))
         rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
-        self.assertEqual(
-            rd_keys_count, len(recap_search_v4_api_keys["recap_documents"][0])
-        )
+        self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(r, content_to_compare)
 
@@ -2816,11 +2865,9 @@ class RECAPSearchAPIV4Test(
         r = await self._test_api_results_count(search_params, 1, "API fields")
 
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(recap_search_v4_api_keys))
+        self.assertEqual(keys_count, len(docket_v4_api_keys))
         rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
-        self.assertEqual(
-            rd_keys_count, len(recap_search_v4_api_keys["recap_documents"][0])
-        )
+        self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {"result": self.rd_empty_fields_api}
         await self._test_api_fields_content(r, content_to_compare)
 
@@ -2832,7 +2879,7 @@ class RECAPSearchAPIV4Test(
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(recap_search_v4_api_keys))
+        self.assertEqual(keys_count, len(docket_v4_api_keys))
         recap_documents = r.data["results"][0].get("recap_documents")
         self.assertEqual(recap_documents, [])
 
@@ -2851,11 +2898,9 @@ class RECAPSearchAPIV4Test(
         }
         r = await self._test_api_results_count(search_params, 1, "API fields")
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(recap_search_v4_api_keys))
+        self.assertEqual(keys_count, len(docket_v4_api_keys))
         rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
-        self.assertEqual(
-            rd_keys_count, len(recap_search_v4_api_keys["recap_documents"][0])
-        )
+        self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {
             "result": self.rd_api,
         }
@@ -2903,127 +2948,95 @@ class RECAPSearchAPIV4Test(
 
         # Query string, order by dateFiled desc
         search_params = {
-            "type": SEARCH_TYPES.RECAP,
             "q": "SUBPOENAS SERVED",
             "order_by": "dateFiled desc",
             "highlight": False,
         }
 
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v4"}),
-            search_params,
-        )
-        self.assertEqual(len(r.data["results"]), 5)
+        params_date_filed_asc = search_params.copy()
+        params_date_filed_asc["order_by"] = "dateFiled asc"
 
-        # Note that dockets where the date_field is null are sent to the bottom
-        # of the results
-        self.assertTrue(
-            r.content.decode().index(f"{docket_recent.docket_number}")
-            < r.content.decode().index(f"{self.de_1.docket.docket_number}")
-            < r.content.decode().index(f"{self.de.docket.docket_number}")
-            < r.content.decode().index(f"{docket_old.docket_number}")
-            < r.content.decode().index(
-                f"{docket_null_date_filed.docket_number}"
-            ),
-            msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled desc.",
-        )
+        params_match_all_date_filed_desc = search_params.copy()
+        del params_match_all_date_filed_desc["q"]
+        params_match_all_date_filed_desc["order_by"] = "dateFiled desc"
 
-        # Query string, order by dateFiled asc
-        search_params["order_by"] = "dateFiled asc"
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v4"}),
-            search_params,
-        )
+        params_match_all_date_filed_asc = search_params.copy()
+        del params_match_all_date_filed_asc["q"]
+        params_match_all_date_filed_asc["order_by"] = "dateFiled asc"
+        test_cases = [
+            {
+                "name": "Query string, order by dateFiled desc",
+                "search_params": search_params,
+                "expected_results": 5,
+                "expected_order": [
+                    docket_recent.pk,
+                    self.de_1.docket.pk,
+                    self.de.docket.pk,
+                    docket_old.pk,
+                    docket_null_date_filed.pk,
+                ],
+            },
+            {
+                "name": "Query string, order by dateFiled asc",
+                "search_params": params_date_filed_asc,
+                "expected_results": 5,
+                "expected_order": [
+                    docket_old.pk,
+                    self.de.docket.pk,
+                    self.de_1.docket.pk,
+                    docket_recent.pk,
+                    docket_null_date_filed.pk,
+                ],
+            },
+            {
+                "name": "Match all query, order by dateFiled desc",
+                "search_params": params_match_all_date_filed_desc,
+                "expected_results": 8,
+                "expected_order": [
+                    docket_recent.pk,  # 2024/2/23
+                    self.de_1.docket.pk,  # 2016/8/16
+                    self.de_api.docket.pk,  # 2016/4/16
+                    self.de.docket.pk,  # 2015/8/16
+                    docket_old.pk,  # 1732/2/23
+                    docket_null_date_filed.pk,  # Null date_filed, pk 3
+                    self.empty_docket_api.pk,  # Null date_filed, pk 2
+                    self.de_empty_fields_api.docket.pk,  # Null date_filed, pk 1
+                ],
+            },
+            {
+                "name": "Match all query, order by dateFiled asc",
+                "search_params": params_match_all_date_filed_asc,
+                "expected_results": 8,
+                "expected_order": [
+                    docket_old.pk,  # 1732/2/23
+                    self.de.docket.pk,  # 2015/8/16
+                    self.de_api.docket.pk,  # 2016/4/16
+                    self.de_1.docket.pk,  # 2016/8/16
+                    docket_recent.pk,  # 2024/2/23
+                    docket_null_date_filed.pk,  # Null date_filed, pk 3
+                    self.empty_docket_api.pk,  # Null date_filed, pk 2
+                    self.de_empty_fields_api.docket.pk,  # Null date_filed, pk 1
+                ],
+            },
+        ]
 
-        # Note that dockets where the date_field is null are sent to the bottom
-        # of the results
-        self.assertTrue(
-            r.content.decode().index(f"{docket_old.docket_number}")
-            < r.content.decode().index(f"{self.de.docket.docket_number}")
-            < r.content.decode().index(f"{self.de_1.docket.docket_number}")
-            < r.content.decode().index(f"{docket_recent.docket_number}")
-            < r.content.decode().index(
-                f"{docket_null_date_filed.docket_number}"
-            ),
-            msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled desc.",
-        )
-
-        # Match all query, order by dateFiled desc
-        del search_params["q"]
-        search_params["order_by"] = "dateFiled desc"
-
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v4"}),
-            search_params,
-        )
-        self.assertEqual(len(r.data["results"]), 8)
-        # Note that dockets where the date_field is null are sent to the bottom
-        # of the results (docket_id desc)
-        self.assertTrue(
-            r.content.decode().index(
-                f"{docket_recent.docket_number}"
-            )  # 2024/2/23
-            < r.content.decode().index(
-                f"{self.de_1.docket.docket_number}"
-            )  # 2016/8/16
-            < r.content.decode().index(
-                f"{self.de_api.docket.docket_number}"
-            )  # 2016/4/16
-            < r.content.decode().index(
-                f"{self.de.docket.docket_number}"
-            )  # 2015/8/16
-            < r.content.decode().index(
-                f"{docket_old.docket_number}"
-            )  # 1732/2/23
-            < r.content.decode().index(
-                f"{docket_null_date_filed.docket_number}"
-            )  # Null date_filed, pk 3
-            < r.content.decode().index(
-                f"{self.empty_docket_api.docket_number}"
-            )  # Null date_filed, pk 2
-            < r.content.decode().index(
-                f"{self.de_empty_fields_api.docket.docket_number}"
-            ),  # Null date_filed, pk 1
-            msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled desc.",
-        )
-
-        # Query string, order by dateFiled asc
-        search_params["order_by"] = "dateFiled asc"
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v4"}),
-            search_params,
-        )
-        self.assertEqual(len(r.data["results"]), 8)
-
-        # Note that dockets where the date_field is null are sent to the bottom
-        # of the results
-        self.assertTrue(
-            r.content.decode().index(
-                f"{docket_old.docket_number}"
-            )  # 1732/2/23
-            < r.content.decode().index(
-                f"{self.de.docket.docket_number}"
-            )  # 2015/8/16
-            < r.content.decode().index(
-                f"{self.de_api.docket.docket_number}"
-            )  # 2016/4/16
-            < r.content.decode().index(
-                f"{self.de_1.docket.docket_number}"
-            )  # 2016/8/16
-            < r.content.decode().index(
-                f"{docket_recent.docket_number}"
-            )  # 2024/2/23
-            < r.content.decode().index(
-                f"{docket_null_date_filed.docket_number}"
-            )  # Null date_filed, pk 3
-            < r.content.decode().index(
-                f"{self.empty_docket_api.docket_number}"
-            )  # Null date_filed, pk 2
-            < r.content.decode().index(
-                f"{self.de_empty_fields_api.docket.docket_number}"
-            ),  # Null date_filed, pk 1
-            msg=f"'{self.de_1.docket.docket_number}' should come BEFORE '{self.de.docket.docket_number}' when order_by dateFiled asc.",
-        )
+        search_types = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        for search_type in search_types:
+            for test in test_cases:
+                test["search_params"]["type"] = search_type
+                with self.subTest(test=test, msg=f'{test["name"]}'):
+                    r = self.client.get(
+                        reverse("search-list", kwargs={"version": "v4"}),
+                        test["search_params"],
+                    )
+                    self.assertEqual(
+                        len(r.data["results"]), test["expected_results"]
+                    )
+                    # Note that dockets where the date_field is null are sent to the bottom
+                    # of the results
+                    self._test_results_ordering(
+                        r.data["results"], test["expected_order"], "docket_id"
+                    )
 
         with self.captureOnCommitCallbacks(execute=True):
             docket_recent.delete()
@@ -3058,33 +3071,37 @@ class RECAPSearchAPIV4Test(
                 "count_exact": total_dockets,
                 "more": False,
                 "next": True,
+                "previous": False,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
                 "more": False,
                 "next": True,
+                "previous": True,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
                 "more": False,
                 "next": True,
+                "previous": True,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
                 "more": False,
                 "next": True,
+                "previous": True,
             },
             {
                 "results": 1,
                 "count_exact": total_dockets,
                 "more": False,
                 "next": False,
+                "previous": True,
             },
         ]
-
         order_types = [
             "score desc",
             "dateFiled desc",
@@ -3092,11 +3109,10 @@ class RECAPSearchAPIV4Test(
             "entry_date_filed asc",
             "entry_date_filed desc",
         ]
-
         for order_type in order_types:
             # Test forward pagination.
             next_page = None
-            unique_ids = set()
+            all_document_ids = []
             ids_per_page = []
             current_page = None
             with self.subTest(order_type=order_type, msg="Sorting order."):
@@ -3112,41 +3128,19 @@ class RECAPSearchAPIV4Test(
                             )
                         else:
                             r = self.client.get(next_page)
-                        # Test page
-                        self.assertEqual(
-                            len(r.data["results"]),
-                            test["results"],
-                            msg="Results in page didn't match.",
+                        # Test page variables.
+                        next_page, _, current_page = self._test_page_variables(
+                            r, test, current_page
                         )
-                        self.assertEqual(
-                            r.data["count"]["exact"],
-                            test["count_exact"],
-                            msg="Results count didn't match.",
-                        )
-                        self.assertEqual(
-                            r.data["count"]["more"],
-                            test["more"],
-                            msg="Results more key is incorrect.",
-                        )
-                        next_page = r.data["next"]
-                        if next_page:
-                            self.assertTrue(
-                                next_page, msg="Next page value didn't match"
-                            )
-                            current_page = next_page
-                        else:
-                            self.assertFalse(
-                                next_page, msg="Next page value didn't match"
-                            )
                         ids_in_page = set()
                         for result in r.data["results"]:
-                            unique_ids.add(result["docket_id"])
+                            all_document_ids.append(result["docket_id"])
                             ids_in_page.add(result["docket_id"])
-
                         ids_per_page.append(ids_in_page)
 
+                # Confirm all the documents were shown when paginating forwards.
                 self.assertEqual(
-                    len(unique_ids),
+                    len(all_document_ids),
                     total_dockets,
                     msg="Wrong number of dockets.",
                 )
@@ -3155,7 +3149,7 @@ class RECAPSearchAPIV4Test(
                 tests_backward = tests.copy()
                 tests_backward.reverse()
                 previous_page = None
-                unique_ids_prev = set()
+                all_ids_prev = []
                 for test in tests_backward:
                     with self.subTest(test=test, msg="backward pagination"):
                         if not previous_page:
@@ -3163,49 +3157,26 @@ class RECAPSearchAPIV4Test(
                         else:
                             r = self.client.get(previous_page)
 
-                        # Test page
-                        self.assertEqual(
-                            len(r.data["results"]),
-                            test["results"],
-                            msg="Results in page didn't match.",
+                        # Test page variables.
+                        _, previous_page, current_page = (
+                            self._test_page_variables(r, test, current_page)
                         )
-                        self.assertEqual(
-                            r.data["count"]["exact"],
-                            test["count_exact"],
-                            msg="Results count didn't match.",
-                        )
-                        self.assertEqual(
-                            r.data["count"]["more"],
-                            test["more"],
-                            msg="Results more key is incorrect.",
-                        )
-                        previous_page = r.data["previous"]
-                        if previous_page:
-                            self.assertTrue(
-                                previous_page,
-                                msg="Previous page value didn't match",
-                            )
-                        else:
-                            self.assertFalse(
-                                previous_page,
-                                msg="Previous page value didn't match",
-                            )
-
                         ids_in_page_got = set()
                         for result in r.data["results"]:
-                            unique_ids_prev.add(result["docket_id"])
+                            all_ids_prev.append(result["docket_id"])
                             ids_in_page_got.add(result["docket_id"])
-
                         current_page_ids_prev = ids_per_page.pop()
-
+                        # Check if IDs obtained with forward pagination match
+                        # the IDs obtained when paginating backwards.
                         self.assertEqual(
                             current_page_ids_prev,
                             ids_in_page_got,
                             msg="Wrong dockets.",
                         )
 
+                # Confirm all the documents were shown when paginating backwards.
                 self.assertEqual(
-                    len(unique_ids_prev),
+                    len(all_ids_prev),
                     total_dockets,
                     msg="Wrong number of dockets.",
                 )
@@ -3439,6 +3410,8 @@ class RECAPSearchAPIV4Test(
 
         with self.captureOnCommitCallbacks(execute=True):
             docket.delete()
+            docket_1.delete()
+            docket_3.delete()
 
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_more_docs_field(self) -> None:
@@ -3500,6 +3473,137 @@ class RECAPSearchAPIV4Test(
 
         with self.captureOnCommitCallbacks(execute=True):
             docket_entry.docket.delete()
+
+    async def test_results_docket_api_type_fields(self) -> None:
+        """Confirm fields in V4 RECAP Search API results d type."""
+
+        search_params = {
+            "type": SEARCH_TYPES.DOCKETS,
+            "q": f"docket_id:{self.de_api.docket.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(docket_v4_api_keys) - 2)
+        self.assertTrue("recap_documents" not in r.data["results"][0])
+        self.assertTrue("more_docs" not in r.data["results"][0])
+
+    async def test_results_recap_type_api_type_fields(self) -> None:
+        """Confirm fields in V4 RECAP Search API results rd type."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP_DOCUMENT,
+            "q": f"id:{self.rd_api.pk}",
+            "order_by": "score desc",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(recap_document_v4_api_keys))
+
+    def test_date_filed_sorting_function_score_rd_type(self) -> None:
+        """Test if the function score used for the dateFiled sorting in the V4
+        of the RECAP Search API works as expected for the RD type."""
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            latest_null_date_filed = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_api,
+                    date_reargued=None,
+                    source=Docket.RECAP_AND_SCRAPER,
+                ),
+                description="",
+            )
+            rd_null_date_filed = RECAPDocumentFactory(
+                docket_entry=latest_null_date_filed,
+                description="latest null rd",
+                pacer_doc_id="",
+            )
+
+        search_params = {
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": False,
+        }
+
+        params_date_filed_asc = search_params.copy()
+        params_date_filed_asc["order_by"] = "dateFiled asc"
+
+        params_match_all_date_filed_desc = search_params.copy()
+        del params_match_all_date_filed_desc["q"]
+        params_match_all_date_filed_desc["order_by"] = "dateFiled desc"
+
+        params_match_all_date_filed_asc = search_params.copy()
+        del params_match_all_date_filed_asc["q"]
+        params_match_all_date_filed_asc["order_by"] = "dateFiled asc"
+        test_cases = [
+            {
+                "name": "Query string, order by dateFiled desc",
+                "search_params": search_params,
+                "expected_results": 3,
+                "expected_order": [
+                    self.rd_2.pk,  # 2016/08/16
+                    self.rd_att.pk,  # 2015/08/16 pk 2
+                    self.rd.pk,  # 2015/08/16 pk 1
+                ],
+            },
+            {
+                "name": "Query string, order by dateFiled asc",
+                "search_params": params_date_filed_asc,
+                "expected_results": 3,
+                "expected_order": [
+                    self.rd_att.pk,  # 2015/08/16 pk 2
+                    self.rd.pk,  # 2015/08/16 pk 1
+                    self.rd_2.pk,  # 2016/08/16
+                ],
+            },
+            {
+                "name": "Match all query, order by dateFiled desc",
+                "search_params": params_match_all_date_filed_desc,
+                "expected_results": 6,
+                "expected_order": [
+                    self.rd_2.pk,  # 2016/08/16
+                    self.rd_api.pk,  # 2016/04/16
+                    self.rd_att.pk,  # 2015/08/16 pk 2
+                    self.rd.pk,  # 2015/08/16 pk 1
+                    rd_null_date_filed.pk,  # None pk 4
+                    self.rd_empty_fields_api.pk,  # None pk 3
+                ],
+            },
+            {
+                "name": "Match all query, order by dateFiled asc",
+                "search_params": params_match_all_date_filed_asc,
+                "expected_results": 6,
+                "expected_order": [
+                    self.rd_att.pk,  # 2015/08/16 pk 2
+                    self.rd.pk,  # 2015/08/16 pk 1
+                    self.rd_api.pk,  # 2016/04/16
+                    self.rd_2.pk,  # 2016/08/16
+                    rd_null_date_filed.pk,  # None pk 4
+                    self.rd_empty_fields_api.pk,  # None pk 3
+                ],
+            },
+        ]
+        search_types = [SEARCH_TYPES.RECAP_DOCUMENT]
+        for search_type in search_types:
+            for test in test_cases:
+                test["search_params"]["type"] = search_type
+                with self.subTest(test=test, msg=f'{test["name"]}'):
+                    r = self.client.get(
+                        reverse("search-list", kwargs={"version": "v4"}),
+                        test["search_params"],
+                    )
+                    self.assertEqual(
+                        len(r.data["results"]), test["expected_results"]
+                    )
+                    # Note that dockets where the date_field is null are sent to the bottom
+                    # of the results
+                    self._test_results_ordering(
+                        r.data["results"], test["expected_order"], "id"
+                    )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            latest_null_date_filed.docket.delete()
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

@@ -332,7 +332,6 @@ class CursorESList:
             self.main_query = self.main_query.extra(
                 search_after=self.search_after
             )
-
         self.main_query = self.main_query[: self.page_size]
 
         toggle_sort = False
@@ -343,10 +342,22 @@ class CursorESList:
         default_sorting = build_sort_results(
             self.clean_data, toggle_sort, "v4"
         )
+
         default_unique_order = {
             "type": self.clean_data["type"],
-            "order_by": "docket_id desc",
         }
+        if self.clean_data["type"] == SEARCH_TYPES.RECAP_DOCUMENT:
+            default_unique_order.update(
+                {
+                    "order_by": "id desc",
+                }
+            )
+        else:
+            default_unique_order.update(
+                {
+                    "order_by": "docket_id desc",
+                }
+            )
         unique_sorting = build_sort_results(
             default_unique_order, toggle_sort, "v4"
         )

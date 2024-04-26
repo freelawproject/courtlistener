@@ -431,7 +431,7 @@ class OpinionESResultSerializer(DocumentSerializer):
         )
 
 
-class RECAPESResultSerializer(DocumentSerializer):
+class RECAPDocumentESResultSerializer(DocumentSerializer):
     """The serializer for RECAPDocument results."""
 
     # Fields from the RECAPDocument
@@ -469,8 +469,8 @@ class RECAPESResultSerializer(DocumentSerializer):
         )
 
 
-class DocketESResultSerializer(DocumentSerializer):
-    """The serializer for Docket results."""
+class BaseDocketESResultSerializer(DocumentSerializer):
+    """The base serializer for Docket results."""
 
     # Fields from the Docket.
     referred_to_id = serializers.IntegerField(read_only=True)
@@ -491,12 +491,6 @@ class DocketESResultSerializer(DocumentSerializer):
     juryDemand = HighlightedField(read_only=True)
     referredTo = HighlightedField(read_only=True)
     suitNature = HighlightedField(read_only=True)
-    recap_documents = RECAPESResultSerializer(
-        many=True, read_only=True, source="child_docs"
-    )
-    more_docs = serializers.BooleanField(
-        read_only=True, source="child_remaining"
-    )
 
     class Meta:
         document = DocketDocument
@@ -505,3 +499,14 @@ class DocketESResultSerializer(DocumentSerializer):
             "docket_child",
             "docket_slug",
         )
+
+
+class RECAPESResultSerializer(BaseDocketESResultSerializer):
+    """The serializer for RECAP Search results."""
+
+    recap_documents = RECAPDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+    more_docs = serializers.BooleanField(
+        read_only=True, source="child_remaining"
+    )
