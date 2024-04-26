@@ -158,7 +158,7 @@ opinion_search_api_keys = {
 }
 
 
-docket_v4_api_keys = {
+docket_v4_api_keys_base = {
     "assignedTo": lambda x: (
         x["assignedTo"]
         if x.get("assignedTo")
@@ -261,7 +261,6 @@ docket_v4_api_keys = {
             "party_id"
         ]
     ),
-    "recap_documents": [],
     "referredTo": lambda x: (
         x["referredTo"]
         if x.get("referredTo")
@@ -289,8 +288,15 @@ docket_v4_api_keys = {
         if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
         else None
     ),
-    "more_docs": lambda x: False,
 }
+
+docket_v4_api_keys = docket_v4_api_keys_base.copy()
+docket_v4_api_keys.update(
+    {
+        "more_docs": lambda x: False,
+        "recap_documents": [],  # type: ignore
+    }
+)
 
 recap_document_v4_api_keys = {
     "id": lambda x: x["result"].pk,

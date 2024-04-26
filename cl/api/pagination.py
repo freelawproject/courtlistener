@@ -6,9 +6,11 @@ from django.core.paginator import InvalidPage
 from elasticsearch_dsl.response import Response as ESResponse
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import BasePagination, PageNumberPagination
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
 
+from cl.search.api_utils import CursorESList
 from cl.search.types import ESCursor
 
 
@@ -90,15 +92,13 @@ class ESCursorPagination(BasePagination):
         self.invalid_cursor_message = "Invalid cursor"
 
     def paginate_queryset(
-        self, es_list_instance, request, view=None
+        self, es_list_instance: CursorESList, request: Request, view=None
     ) -> ESResponse:
         """Paginate the Elasticsearch query and retrieve the results."""
 
         self.base_url = request.build_absolute_uri()
-
         self.request = request
         self.cursor = self.decode_cursor(request)
-
         self.es_list_instance = es_list_instance
         self.es_list_instance.set_pagination(self.cursor, self.page_size)
         results = self.es_list_instance.get_paginated_results()
@@ -118,7 +118,7 @@ class ESCursorPagination(BasePagination):
             }
         )
 
-    def get_next_link(self):
+    def get_next_link(self) -> str | None:
         """Constructs the URL for the next page based on the current page's
         last item.
         """
@@ -131,7 +131,7 @@ class ESCursorPagination(BasePagination):
         cursor = ESCursor(search_after=search_after_sort_key, reverse=False)
         return self.encode_cursor(cursor)
 
-    def get_previous_link(self):
+    def get_previous_link(self) -> str | None:
         """Constructs the URL for the next page based on the current page's
         last item.
         """
@@ -146,7 +146,7 @@ class ESCursorPagination(BasePagination):
         )
         return self.encode_cursor(cursor)
 
-    def decode_cursor(self, request):
+    def decode_cursor(self, request: Request) -> ESCursor | None:
         """Given a request with a cursor, return a `ESCursor` instance."""
         encoded = request.query_params.get(self.cursor_query_param)
         if encoded is None:
@@ -162,7 +162,7 @@ class ESCursorPagination(BasePagination):
             raise NotFound(self.invalid_cursor_message)
         return ESCursor(search_after=search_after, reverse=reverse)
 
-    def encode_cursor(self, cursor):
+    def encode_cursor(self, cursor: ESCursor) -> str:
         """Given a ESCursor instance, return an url with encoded cursor."""
         tokens = {}
         if cursor.search_after != 0:
@@ -176,7 +176,7 @@ class ESCursorPagination(BasePagination):
             self.base_url, self.cursor_query_param, encoded
         )
 
-    def get_results_count(self):
+    def get_results_count(self) -> dict[str, bool | int]:
         """Provides a structured count of results based on settings.
 
         :return: A dictionary containing "exact" count and whether there are
@@ -193,7 +193,7 @@ class ESCursorPagination(BasePagination):
             > settings.ELASTICSEARCH_MAX_RESULT_COUNT,
         }
 
-    def has_next(self):
+    def has_next(self) -> bool:
         """Determines if there is a next page based on the search_after key
         and results count.
         """
@@ -206,7 +206,7 @@ class ESCursorPagination(BasePagination):
         # If going backward, it indicates that there was a next page.
         return True
 
-    def has_prev(self):
+    def has_prev(self) -> bool:
         """Determines if there is a next page based on the search_after key
         and results count.
         """

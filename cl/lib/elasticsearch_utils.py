@@ -805,7 +805,7 @@ def build_has_child_query(
     highlighting_fields: dict[str, int] | None = None,
     order_by: tuple[str, str] | None = None,
     child_highlighting: bool = True,
-    api_version: Literal["v3", "v4"] = None,
+    api_version: Literal["v3", "v4"] | None = None,
 ) -> QueryString:
     """Build a 'has_child' query.
 
@@ -1548,7 +1548,7 @@ def fill_position_mapping(
 
 
 def merge_unavailable_fields_on_parent_document(
-    results: Page | dict,
+    results: Page | dict | Response,
     search_type: str,
     request_type: Literal["frontend", "api"] = "frontend",
     highlight: bool = True,
@@ -1589,14 +1589,21 @@ def merge_unavailable_fields_on_parent_document(
                     value = position_dict.get(person_id)
                     cleaned_name = re.sub("_dict", "", field.name)
                     result[cleaned_name] = value
-        case SEARCH_TYPES.RECAP if request_type == "api" and not highlight:
+        case (
+            SEARCH_TYPES.RECAP | SEARCH_TYPES.RECAP_DOCUMENT
+        ) if request_type == "api" and not highlight:
             # Retrieves the plain_text from the DB to fill the snippet when
             # highlighting is disabled.
-            rd_ids = {
-                doc["_source"]["id"]
-                for entry in results
-                for doc in entry["child_docs"]
-            }
+
+            if search_type == SEARCH_TYPES.RECAP:
+                rd_ids = {
+                    doc["_source"]["id"]
+                    for entry in results
+                    for doc in entry["child_docs"]
+                }
+            else:
+                rd_ids = {entry["id"] for entry in results}
+
             recap_docs = (
                 RECAPDocument.objects.filter(pk__in=rd_ids)
                 .annotate(
@@ -1610,10 +1617,13 @@ def merge_unavailable_fields_on_parent_document(
                 doc["id"]: doc["plain_text_short"] for doc in recap_docs
             }
             for result in results:
-                for rd in result["child_docs"]:
-                    rd["_source"]["plain_text"] = recap_docs_dict[
-                        rd["_source"]["id"]
-                    ]
+                if search_type == SEARCH_TYPES.RECAP:
+                    for rd in result["child_docs"]:
+                        rd["_source"]["plain_text"] = recap_docs_dict[
+                            rd["_source"]["id"]
+                        ]
+                else:
+                    result["plain_text"] = recap_docs_dict[result["id"]]
 
         case _:
             return
@@ -2114,42 +2124,34 @@ def apply_custom_score_to_parent_query(
     child_order is used.
     """
     child_order_by = get_child_sorting_key(cd, api_version)
-    if (
-        child_order_by
-        and all(child_order_by)
-        and cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
-    ):
-        sort_field, order = child_order_by
-        if sort_field == "entry_date_filed":
-            # It applies a function score to the parent query to nullify the
-            # parent score (sets it to 0) to prioritize child documents sorting
-            # criteria. This will ensure that dockets without documents come
-            # last on results.
-            query = nullify_query_score(query)
-        elif sort_field == "dateFiled" and api_version:
-            # Applies a custom function score to sort dockets based on their
-            # dateFiled field. This serves as a workaround to enable the use of
-            # the  search_after cursor for pagination on documents with a None
-            # dateFiled.
-            query = build_custom_function_score_for_date(
-                query, child_order_by, default_score=0
-            )
-
-    if (
-        child_order_by
-        and all(child_order_by)
-        and cd["type"] == SEARCH_TYPES.RECAP_DOCUMENT
-    ):
-        sort_field, order = child_order_by
-        if sort_field == "dateFiled" and api_version:
-            # Applies a custom function score to sort dockets based on their
-            # dateFiled field. This serves as a workaround to enable the use of
-            # the  search_after cursor for pagination on documents with a None
-            # dateFiled.
-            query = build_custom_function_score_for_date(
-                query, child_order_by, default_score=0
-            )
-
+    valid_child_order_by = child_order_by and all(child_order_by)
+    match cd["type"]:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if valid_child_order_by:
+            sort_field, order = child_order_by
+            if sort_field == "entry_date_filed":
+                # It applies a function score to the parent query to nullify
+                # the parent score (sets it to 0) to prioritize child documents
+                # sorting criteria. This will ensure that dockets without
+                # documents come last on results.
+                query = nullify_query_score(query)
+            elif sort_field == "dateFiled" and api_version:
+                # Applies a custom function score to sort Dockets based on
+                # their dateFiled field. This serves as a workaround to enable
+                # the use of the  search_after cursor for pagination on
+                # documents with a None dateFiled.
+                query = build_custom_function_score_for_date(
+                    query, child_order_by, default_score=0
+                )
+        case SEARCH_TYPES.RECAP_DOCUMENT if valid_child_order_by:
+            sort_field, order = child_order_by
+            if sort_field in ["dateFiled", "entry_date_filed"] and api_version:
+                # Applies a custom function score to sort RECAPDocuments based
+                # on their docket dateFiled or entry_date_filed field. This
+                # serves as a workaround to enable the use of the  search_after
+                # cursor for pagination on documents with a None dateFiled.
+                query = build_custom_function_score_for_date(
+                    query, child_order_by, default_score=0
+                )
     return query
 
 
@@ -2667,19 +2669,22 @@ def do_es_api_query(
     s, join_query = build_es_base_query(
         search_query, cd, cd["highlight"], api_version
     )
+    extra_options: dict[str, dict[str, Any]] = {}
     if api_version == "v3":
+        # Build query parameters for the ES V3 Search API endpoints.
+        # V3 endpoints display child documents. Here, the child documents query
+        # is retrieved, and extra parameters like highlighting, field exclusion,
+        # and sorting are set.
         s = build_child_docs_query(
             join_query,
             cd=cd,
         )
-        s = search_query.query(s)
+        main_query = search_query.query(s)
         highlight_options, fields_to_exclude = build_highlights_dict(
             highlighting_fields, hl_tag
         )
-        s = s.source(excludes=fields_to_exclude)
-        extra_options: dict[str, dict[str, Any]] = {
-            "highlight": highlight_options
-        }
+        main_query = main_query.source(excludes=fields_to_exclude)
+        extra_options["highlight"] = highlight_options
         if cd["type"] == SEARCH_TYPES.OPINION:
             extra_options.update(
                 {
@@ -2688,24 +2693,36 @@ def do_es_api_query(
                     }
                 }
             )
-        main_query = s.extra(**extra_options)
+        main_query = main_query.extra(**extra_options)
         main_query = main_query.sort(
             build_sort_results(cd, api_version=api_version)
         )
     else:
+        # Build query params for the ES V4 Search API endpoints.
         if cd["type"] == SEARCH_TYPES.RECAP_DOCUMENT:
             # The RECAP_DOCUMENT search type returns only child documents.
+            # Here, the child documents query is retrieved, highlighting and
+            # field exclusion are set.
             s = build_child_docs_query(
                 join_query,
                 cd=cd,
             )
             s = apply_custom_score_to_parent_query(cd, s, api_version)
             main_query = search_query.query(s)
+            highlight_options, fields_to_exclude = build_highlights_dict(
+                SEARCH_RECAP_CHILD_HL_FIELDS, hl_tag
+            )
+            main_query = main_query.source(excludes=fields_to_exclude)
+            if cd["highlight"]:
+                extra_options["highlight"] = highlight_options
+                main_query = main_query.extra(**extra_options)
         else:
+            # DOCKETS and RECAP search types. Use the same query parameters as
+            # in the frontend. Only switch highlighting according to the user
+            # request.
             main_query = s
             if cd["highlight"]:
                 main_query = add_es_highlighting(s, cd)
-
     return main_query
 
 

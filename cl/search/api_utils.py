@@ -19,12 +19,7 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
 from cl.search.constants import SEARCH_HL_TAG
-from cl.search.documents import (
-    AudioDocument,
-    DocketDocument,
-    OpinionDocument,
-    PersonDocument,
-)
+from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
 from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESCursor
 
@@ -56,9 +51,6 @@ def get_object_list(request, cd, paginator):
     is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION and (
         waffle.flag_is_active(request, "o-es-search-api-active")
     )
-    is_recap_active = (
-        cd["type"] == SEARCH_TYPES.RECAP and request.version == "v4"
-    )
 
     if is_oral_argument_active:
         search_query = AudioDocument.search()
@@ -66,8 +58,6 @@ def get_object_list(request, cd, paginator):
         search_query = PersonDocument.search()
     elif is_opinion_active:
         search_query = OpinionDocument.search()
-    elif is_recap_active:
-        search_query = DocketDocument.search()
     else:
         search_query = None
 
@@ -77,7 +67,7 @@ def get_object_list(request, cd, paginator):
             child_docs_count_query,
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
-    elif search_query and (is_opinion_active or is_recap_active):
+    elif search_query and is_opinion_active:
         if request.version == "v3":
             cd["highlight"] = True
         highlighting_fields = {}
@@ -313,7 +303,7 @@ class CursorESList:
         self.reverse = None
         self.cursor = None
 
-    def set_pagination(self, cursor, page_size):
+    def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
 
         self.cursor = cursor
         if self.cursor is not None:
@@ -324,7 +314,7 @@ class CursorESList:
         # next or previous page link.
         self.page_size = page_size + 1
 
-    def get_paginated_results(self):
+    def get_paginated_results(self) -> Response:
         """Executes the search query with pagination settings and processes
         the results.
         """
@@ -333,40 +323,13 @@ class CursorESList:
                 search_after=self.search_after
             )
         self.main_query = self.main_query[: self.page_size]
-
-        toggle_sort = False
-        if self.reverse:
-            # Toggle the original sorting key to handle backward pagination
-            toggle_sort = True
-
-        default_sorting = build_sort_results(
-            self.clean_data, toggle_sort, "v4"
-        )
-
-        default_unique_order = {
-            "type": self.clean_data["type"],
-        }
-        if self.clean_data["type"] == SEARCH_TYPES.RECAP_DOCUMENT:
-            default_unique_order.update(
-                {
-                    "order_by": "id desc",
-                }
-            )
-        else:
-            default_unique_order.update(
-                {
-                    "order_by": "docket_id desc",
-                }
-            )
-        unique_sorting = build_sort_results(
-            default_unique_order, toggle_sort, "v4"
-        )
+        default_sorting, unique_sorting = self.get_api_query_sorting()
         self.main_query = self.main_query.sort(default_sorting, unique_sorting)
         self.results = self.main_query.execute()
         self.process_results(self.results)
         return self.results
 
-    def process_results(self, results):
+    def process_results(self, results: Response) -> None:
         """Processes the raw results from ES for handling inner hits,
         highlighting and merging of unavailable fields.
         """
@@ -394,28 +357,70 @@ class CursorESList:
             # because the original order is inverse when paginating backwards.
             self.results.hits.reverse()
 
-    def _get_search_after_key(self, position):
+    def _get_search_after_key(self, index_position: int) -> AttrList | None:
         if self.results and len(self.results) > 0:
             limited_results = limit_api_results_to_page(
                 self.results.hits, self.cursor
             )
-            last_result = limited_results[position]
+            last_result = limited_results[index_position]
             return last_result.meta.sort
         return None
 
-    def get_search_after_sort_key(self):
+    def get_search_after_sort_key(self) -> AttrList | None:
         """Retrieves the sort key from the last item in the current page to
         use for the next page's search_after parameter.
         """
         last_result_in_page = -1
         return self._get_search_after_key(last_result_in_page)
 
-    def get_reverse_search_after_sort_key(self):
+    def get_reverse_search_after_sort_key(self) -> AttrList | None:
         """Retrieves the sort key from the last item in the current page to
         use for the next page's search_after parameter.
         """
         first_result_in_page = 0
         return self._get_search_after_key(first_result_in_page)
+
+    def get_api_query_sorting(self):
+        """Build the sorting settings for an ES query to work with the
+        'search_after' pagination. Two sorting keys are returned: the default
+        sorting requested by the user and a unique sorting key based on a
+        unique field across documents, acting as a tiebreaker for the default
+        sorting.
+
+        :return: A tuple containing default_sorting and unique_sorting
+        settings.
+        """
+
+        # Toggle the original sorting key to handle backward pagination
+        toggle_sort = True if self.reverse else False
+        default_sorting = build_sort_results(
+            self.clean_data, toggle_sort, "v4"
+        )
+        default_unique_order = {
+            "type": self.clean_data["type"],
+        }
+        match self.clean_data["type"]:
+            case SEARCH_TYPES.RECAP_DOCUMENT:
+                # Use the 'id' field as a unique sorting key for the 'rd'
+                # search type.
+                default_unique_order.update(
+                    {
+                        "order_by": "id desc",
+                    }
+                )
+            case _:
+                # Use the 'docket_id' field as a unique sorting key for the
+                # 'd' and 'r' search type.
+                default_unique_order.update(
+                    {
+                        "order_by": "docket_id desc",
+                    }
+                )
+
+        unique_sorting = build_sort_results(
+            default_unique_order, toggle_sort, "v4"
+        )
+        return default_sorting, unique_sorting
 
 
 class ResultObject:
