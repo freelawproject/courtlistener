@@ -3816,6 +3816,39 @@ class RECAPSearchAPIV4Test(
             for created_docket in created_dockets:
                 created_docket.delete()
 
+    def test_invalid_pagination_cursor(self) -> None:
+        """Test to confirm that an invalid cursor error message is sent when
+        an invalid cursor or incompatible search type to the cursor is
+        requested in the V4 RECAP Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+            "cursor": "x-invalid_cursor-y",
+        }
+        total_dockets = Docket.objects.all().count()
+        # Invalid cursor string.
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        self.assertEqual(r.data["detail"], "Invalid cursor")
+
+        # If a cursor is generated for an initial search type and then the search
+        # type is changed without restarting the whole request, the cursor
+        # will be incompatible with the new search type. Raise an Invalid Cursor
+        # Error.
+        del search_params["cursor"]
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets - 1):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            next = r.data["next"].replace(
+                "type=r", f"type={SEARCH_TYPES.DOCKETS}"
+            )
+            r = self.client.get(next)
+            self.assertEqual(r.data["detail"], "Invalid cursor")
+
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     """Tests for RECAP Search Feed"""

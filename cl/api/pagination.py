@@ -88,6 +88,7 @@ class ESCursorPagination(BasePagination):
         self.results_in_page = None
         self.base_url = None
         self.cursor = None
+        self.search_type = None
         self.cursor_query_param = "cursor"
         self.invalid_cursor_message = "Invalid cursor"
 
@@ -98,8 +99,9 @@ class ESCursorPagination(BasePagination):
 
         self.base_url = request.build_absolute_uri()
         self.request = request
-        self.cursor = self.decode_cursor(request)
         self.es_list_instance = es_list_instance
+        self.search_type = self.es_list_instance.clean_data["type"]
+        self.cursor = self.decode_cursor(request)
         self.es_list_instance.set_pagination(self.cursor, self.page_size)
         results = self.es_list_instance.get_paginated_results()
         self.results_in_page = len(results)
@@ -128,7 +130,11 @@ class ESCursorPagination(BasePagination):
         if not self.has_next():
             return None
 
-        cursor = ESCursor(search_after=search_after_sort_key, reverse=False)
+        cursor = ESCursor(
+            search_after=search_after_sort_key,
+            reverse=False,
+            search_type=self.search_type,
+        )
         return self.encode_cursor(cursor)
 
     def get_previous_link(self) -> str | None:
@@ -142,12 +148,15 @@ class ESCursorPagination(BasePagination):
             return None
 
         cursor = ESCursor(
-            search_after=reverse_search_after_sort_key, reverse=True
+            search_after=reverse_search_after_sort_key,
+            reverse=True,
+            search_type=self.search_type,
         )
         return self.encode_cursor(cursor)
 
     def decode_cursor(self, request: Request) -> ESCursor | None:
         """Given a request with a cursor, return a `ESCursor` instance."""
+
         encoded = request.query_params.get(self.cursor_query_param)
         if encoded is None:
             return None
@@ -157,10 +166,18 @@ class ESCursorPagination(BasePagination):
             search_after = tokens.get("s", None)
             reverse = tokens.get("r", ["0"])[0]
             reverse = bool(int(reverse))
-
+            search_type = tokens.get("t", [None])[0]
         except (TypeError, ValueError):
             raise NotFound(self.invalid_cursor_message)
-        return ESCursor(search_after=search_after, reverse=reverse)
+
+        if search_type != self.search_type:
+            # If the search_type has changed in the request, but the search type
+            # in the cursor doesn't match, raise an invalid cursor error to
+            # avoid pagination inconsistencies.
+            raise NotFound(self.invalid_cursor_message)
+        return ESCursor(
+            search_after=search_after, reverse=reverse, search_type=search_type
+        )
 
     def encode_cursor(self, cursor: ESCursor) -> str:
         """Given a ESCursor instance, return an url with encoded cursor."""
@@ -169,6 +186,8 @@ class ESCursorPagination(BasePagination):
             tokens["s"] = cursor.search_after
         if cursor.reverse:
             tokens["r"] = "1"
+        if cursor.search_type:
+            tokens["t"] = self.search_type
 
         querystring = urlencode(tokens, doseq=True)
         encoded = b64encode(querystring.encode("ascii")).decode("ascii")

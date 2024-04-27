@@ -109,4 +109,4 @@ class EventTable(StrEnum):
     UNDEFINED = ""
 
 
-ESCursor = namedtuple("ESCursor", ["search_after", "reverse"])
+ESCursor = namedtuple("ESCursor", ["search_after", "reverse", "search_type"])

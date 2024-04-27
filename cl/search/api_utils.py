@@ -89,12 +89,7 @@ def get_object_list(request, cd, paginator):
     if cd["type"] == SEARCH_TYPES.RECAP and request.version == "v3":
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if (
-        is_oral_argument_active
-        or is_people_active
-        or is_opinion_active
-        or is_recap_active
-    ):
+    if is_oral_argument_active or is_people_active or is_opinion_active:
         sl = ESList(
             main_query=main_query,
             offset=offset,
@@ -307,7 +302,7 @@ class CursorESList:
 
         self.cursor = cursor
         if self.cursor is not None:
-            (self.search_after, self.reverse) = self.cursor
+            (self.search_after, self.reverse, _) = self.cursor
 
         # Return one extra document beyond the page size, so we're able to
         # determine if there are more documents and decide whether to display a
@@ -458,7 +453,7 @@ def limit_api_results_to_page(
 
     reverse = False
     if cursor is not None:
-        search_after, reverse = cursor
+        search_after, reverse, _ = cursor
     if reverse:
         # Limit results in page starting from the last item.
         return results[-settings.SEARCH_API_PAGE_SIZE :]
