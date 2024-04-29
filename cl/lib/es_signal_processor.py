@@ -742,6 +742,17 @@ class ESSignalProcessor:
 
         mapping_fields = self.documents_model_mapping["save"][sender]
         if (
+            isinstance(instance, Docket)
+            and not instance.source in Docket.RECAP_SOURCES()
+            and mapping_fields.get(
+                "self", None
+            )  # Apply only to signals intended to affect the DocketDocument mapping.
+        ):
+            # Avoid saving or updating the Docket in ES if it doesn't belong to
+            # RECAP.
+            return
+
+        if (
             created
             and mapping_fields.get("self", None)
             and type(instance) != Audio

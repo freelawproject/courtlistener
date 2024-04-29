@@ -1,13 +1,9 @@
 import time
+from http import HTTPStatus
 
 from django.contrib.auth.hashers import make_password
 from django.test.client import AsyncClient
 from django.urls import reverse
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,
-)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -430,7 +426,7 @@ class APITests(APITestCase):
     async def test_make_a_tag(self) -> None:
         # Make a simple tag
         response = await self.make_a_good_tag(self.client)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
         # Link it to the docket
         tag_id = response.json()["id"]
@@ -438,7 +434,7 @@ class APITests(APITestCase):
         response = await self.tag_a_docket(
             self.client, docket_to_tag_id, tag_id
         )
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
         # And does everything make sense?
         tag = await UserTag.objects.aget(pk=tag_id)
@@ -450,7 +446,7 @@ class APITests(APITestCase):
             "name": "tag with space",
         }
         response = await self.client.post(self.tag_path, data, format="json")
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_rename_tag_via_put(self) -> None:
         response = await self.make_a_good_tag(self.client)
@@ -470,7 +466,7 @@ class APITests(APITestCase):
         response = await self.client.put(
             put_path, {"name": new_name}, format="json"
         )
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         await tag.arefresh_from_db()
         self.assertEqual(tag.name, new_name)
 
@@ -484,7 +480,7 @@ class APITests(APITestCase):
 
         # All tags for the user
         response = await self.client.get(self.tag_path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
         # Prefix query
@@ -527,19 +523,19 @@ class APITests(APITestCase):
         response = await self.tag_a_docket(
             self.client, docket_to_tag_id, tag_id
         )
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
         response = await self.tag_a_docket(
             self.client2, docket_to_tag_id, tag_id
         )
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
         # Same as above, but with a public tag
         await UserTag.objects.filter(pk=tag_id).aupdate(published=True)
         response = await self.tag_a_docket(
             self.client2, docket_to_tag_id, tag_id
         )
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_can_filter_tag_associations_using_docket_id(self) -> None:
         """Test filter for the docket field in the docket-tags endpoint"""
@@ -557,11 +553,11 @@ class APITests(APITestCase):
 
         # filter the associations using the docket id
         response = await self.client.get(self.docket_path, {"docket": 1})
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 1)
 
         response = await self.client.get(self.docket_path, {"docket": 2})
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
     async def test_can_filter_tag_associations_using_user_id(self) -> None:
@@ -586,26 +582,26 @@ class APITests(APITestCase):
 
         # query the associations(own + public) for docket #1 using client 1
         response = await self.client.get(self.docket_path, {"docket": 1})
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 3)
 
         # query the associations(own + public) for docket #1 using client 2
         response = await self.client2.get(self.docket_path, {"docket": 1})
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
         # filter association using user id
         response = await self.client.get(
             self.docket_path, {"docket": 1, "tag__user": self.pandora.user.pk}
         )
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
         response = await self.client2.get(
             self.docket_path,
             {"docket": 1, "tag__user": self.unconfirmed.user.pk},
         )
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 1)
 
     async def test_can_only_see_your_tag_associations(self) -> None:

@@ -2,6 +2,7 @@ import datetime
 import math
 import re
 import unittest
+from http import HTTPStatus
 from unittest import mock
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -12,10 +13,9 @@ from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from elasticsearch_dsl import Q
 from lxml import etree, html
-from rest_framework.status import HTTP_200_OK
 
 from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import IndexedSolrTestCase, RECAPSearchTestCase
 from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
@@ -41,6 +41,7 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 )
 from cl.search.models import (
     SEARCH_TYPES,
+    Docket,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
 )
@@ -358,6 +359,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 date_filed=datetime.date(2015, 8, 16),
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:21-bk-1235",
+                source=Docket.RECAP,
             )
 
         r = async_to_sync(self._test_article_count)(
@@ -437,12 +439,12 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             reverse("show_results"),
             {"type": SEARCH_TYPES.RECAP, "document_number": "1"},
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         r = await self.async_client.get(
             reverse("show_results"),
             {"type": SEARCH_TYPES.RECAP, "attachment_number": "1"},
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_case_name_filter(self) -> None:
         """Confirm case_name filter works properly"""
@@ -547,6 +549,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="5:90-cv-04007",
                 nature_of_suit="440",
+                source=Docket.RECAP,
             )
 
         # perform the previous query and check we still get one result
@@ -619,6 +622,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:17-cv-04465",
                 nature_of_suit="440",
+                source=Docket.RECAP,
             )
             e_1_d_1 = DocketEntryWithParentsFactory(
                 docket=docket,
@@ -649,6 +653,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 court=self.court,
                 case_name="Eaton Vance AZ Muni v. National Voluntary",
                 docket_number="1:17-cv-04465",
+                source=Docket.RECAP,
             )
             e_28_d_2 = DocketEntryWithParentsFactory(
                 docket=docket_2,
@@ -676,6 +681,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 court=self.court,
                 case_name="Kathleen B. Thomas",
                 docket_number="1:17-cv-04465",
+                source=Docket.RECAP,
             )
             e_14_d_3 = DocketEntryWithParentsFactory(
                 docket=docket_3,
@@ -772,6 +778,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 court=self.court,
                 case_name="Ready Mix Hampton",
                 date_filed=datetime.date(2021, 8, 16),
+                source=Docket.RECAP,
             )
             BankruptcyInformationFactory(docket=docket, chapter="7")
 
@@ -779,6 +786,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 court=self.court,
                 case_name="Ready Mix Hampton",
                 date_filed=datetime.date(2021, 8, 16),
+                source=Docket.RECAP,
             )
             BankruptcyInformationFactory(docket=docket_2, chapter="8")
 
@@ -817,6 +825,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:17-cv-04465",
                 nature_of_suit="440",
+                source=Docket.RECAP,
             )
             e_1_d_1 = DocketEntryWithParentsFactory(
                 docket=docket,
@@ -864,6 +873,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 case_name="America v. Lorem",
                 court=self.court,
                 docket_number="3:98-ms-148395",
+                source=Docket.RECAP,
             )
             firm_2 = AttorneyOrganizationFactory(
                 name="America LLP", lookup_key="4421in816"
@@ -898,6 +908,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 case_name="America v. Lorem",
                 court=self.court,
                 docket_number="1:56-ms-1000",
+                source=Docket.RECAP,
             )
             firm_3 = AttorneyOrganizationFactory(
                 name="America LLP", lookup_key="4421in818"
@@ -941,6 +952,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 case_name="California v. America",
                 date_filed=datetime.date(2010, 8, 16),
                 docket_number="1:19-cv-04400",
+                source=Docket.RECAP,
             )
             PartyTypeFactory.create(
                 party=PartyFactory(
@@ -1368,6 +1380,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # at Docket level.
         self._count_child_documents(0, r.content.decode(), 0, "advance firm")
 
+        # Advanced query string, pacer_case_id
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"pacer_case_id:{self.de_1.docket.pacer_case_id}",
+        }
+        # Frontend
+        r = await self._test_article_count(params, 1, "pacer_case_id")
+        # 1 Child document matched.
+        self._count_child_documents(0, r.content.decode(), 1, "pacer_case_id")
+
         # Advanced query string, page_count OR document_type
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -1438,7 +1460,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         r = async_to_sync(self._test_article_count)(params, 1, "cites")
         # Count child documents under docket.
-        self._count_child_documents(0, r.content.decode(), 1, '"pacer_doc_id"')
+
+        self._count_child_documents(0, r.content.decode(), 1, '"cites"')
 
         # Add a new OpinionsCitedByRECAPDocument
         with self.captureOnCommitCallbacks(execute=True):
@@ -1463,7 +1486,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         r = async_to_sync(self._test_article_count)(params, 1, "cites")
         # Count child documents under docket.
-        self._count_child_documents(0, r.content.decode(), 2, '"pacer_doc_id"')
+        self._count_child_documents(0, r.content.decode(), 2, '"cites"')
         with self.captureOnCommitCallbacks(execute=True):
             opinion_2.cluster.docket.delete()
 
@@ -1797,10 +1820,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Confirm phrase search are properly highlighted.
         self.assertIn(
-            f"<mark>this was finished, this unwieldy process</mark>",
+            "<mark>this was finished, this unwieldy process</mark>",
             r.content.decode(),
         )
-        self.assertIn(f"<mark>ipsum</mark>", r.content.decode())
+        self.assertIn("<mark>ipsum</mark>", r.content.decode())
 
         with self.captureOnCommitCallbacks(execute=True):
             rd_1.delete()
@@ -1831,6 +1854,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     docket_number="12-1236",
                     court=self.court_2,
                     case_name="SUBPOENAS SERVED FOUR",
+                    source=Docket.RECAP,
                 ),
                 entry_number=4,
                 date_filed=None,
@@ -1863,6 +1887,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     docket_number="12-1238",
                     court=self.court_2,
                     case_name="Macenas Justo",
+                    source=Docket.RECAP,
                 ),
                 date_filed=datetime.date(2013, 6, 19),
             )
@@ -1877,6 +1902,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     docket_number="12-0000",
                     court=self.court_2,
                     case_name="SUBPOENAS SERVED OLD",
+                    source=Docket.RECAP,
                 ),
                 entry_number=6,
                 date_filed=datetime.date(1732, 2, 23),
@@ -1899,6 +1925,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 court=self.court,
                 case_name="SUBPOENAS SERVED FIVE",
                 docket_number="12-1237",
+                source=Docket.RECAP,
             )
 
             PartyTypeFactory.create(
@@ -2086,6 +2113,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 assigned_to=None,
                 referred_to=None,
                 nature_of_suit="440",
+                source=Docket.RECAP,
             )
         # Restart save chain mock count.
         mock_es_save_chain.reset_mock()
@@ -2586,6 +2614,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     assigned_to=self.judge,
                     referred_to=self.judge_2,
                     nature_of_suit="440",
+                    source=Docket.RECAP,
                 ),
                 date_filed=None,
                 description="MOTION for Leave to File Document attachment",
@@ -2610,7 +2639,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:title", 1),
@@ -2623,14 +2651,9 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 3),
             ("//atom:entry/atom:summary", 3),
         )
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        xml_tree = self.assert_es_feed_content(
+            node_tests, response, namespaces
+        )
 
         # Confirm items are ordered by entry_date_filed desc
         published_format = "%Y-%m-%dT%H:%M:%S%z"
@@ -2670,7 +2693,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//atom:feed/atom:title", 1),
             ("//atom:feed/atom:link", 2),
@@ -2682,15 +2704,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 2),
             ("//atom:entry/atom:summary", 2),
         )
-
-        for test, count in node_tests:
-            node_count = len(xml_tree.xpath(test, namespaces=namespaces))  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
         # Match all case.
         params = {
@@ -2703,7 +2717,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         node_tests = (
             ("//atom:feed/atom:title", 1),
             ("//atom:feed/atom:link", 2),
@@ -2715,17 +2728,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 3),
             ("//atom:entry/atom:summary", 3),
         )
-
-        for test, count in node_tests:
-            node_count = len(
-                xml_tree.xpath(test, namespaces=namespaces)
-            )  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
         # Parent Filter + Child Filter + Query string + Parties
         params = {
@@ -2742,7 +2745,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:title", 1),
@@ -2755,16 +2757,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 1),
             ("//atom:entry/atom:summary", 1),
         )
-        for test, count in node_tests:
-            node_count = len(
-                xml_tree.xpath(test, namespaces=namespaces)
-            )  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
         # Only party filters. Return all the RECAPDocuments where parent dockets
         # match the party filters.
@@ -2779,7 +2772,6 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(
             200, response.status_code, msg="Did not get a 200 OK status code."
         )
-        xml_tree = etree.fromstring(response.content)
         namespaces = {"atom": "http://www.w3.org/2005/Atom"}
         node_tests = (
             ("//atom:feed/atom:title", 1),
@@ -2792,16 +2784,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             ("//atom:entry/atom:id", 2),
             ("//atom:entry/atom:summary", 2),
         )
-        for test, count in node_tests:
-            node_count = len(
-                xml_tree.xpath(test, namespaces=namespaces)
-            )  # type: ignore
-            self.assertEqual(
-                node_count,
-                count,
-                msg="Did not find %s node(s) with XPath query: %s. "
-                "Instead found: %s" % (count, test, node_count),
-            )
+        self.assert_es_feed_content(node_tests, response, namespaces)
 
     def test_cleanup_control_characters_for_xml_rendering(self) -> None:
         """Can we remove control characters in the plain_text for a proper XML
@@ -2816,6 +2799,7 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                     court=self.court,
                     case_name="Lorem Ipsum",
                     date_filed=datetime.date(2020, 5, 20),
+                    source=Docket.RECAP,
                 ),
                 date_filed=datetime.date(2020, 5, 20),
                 description="MOTION for Leave to File Document attachment",
@@ -2853,6 +2837,42 @@ class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             de_1.delete()
 
+    def test_catch_es_errors(self) -> None:
+        """Can we catch es errors and just render an empy feed?"""
+
+        # Bad syntax error.
+        params = {
+            "q": "Leave /:",
+            "type": SEARCH_TYPES.RECAP,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            400, response.status_code, msg="Did not get a 400 OK status code."
+        )
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
+        )
+        # Unbalanced parentheses
+        params = {
+            "q": "(Leave ",
+            "type": SEARCH_TYPES.RECAP,
+        }
+        response = self.client.get(
+            reverse("search_feed", args=["search"]),
+            params,
+        )
+        self.assertEqual(
+            400, response.status_code, msg="Did not get a 400 OK status code."
+        )
+        self.assertEqual(
+            "Invalid search syntax. Please check your request and try again.",
+            response.content.decode(),
+        )
+
 
 class IndexDocketRECAPDocumentsCommandTest(
     ESIndexTestCase, TransactionTestCase
@@ -2862,12 +2882,20 @@ class IndexDocketRECAPDocumentsCommandTest(
     def setUp(self):
         self.rebuild_index("search.Docket")
         self.court = CourtFactory(id="canb", jurisdiction="FB")
+        # Non-recap Docket
+        DocketFactory(
+            court=self.court,
+            date_filed=datetime.date(2016, 8, 16),
+            date_argued=datetime.date(2012, 6, 23),
+            source=Docket.HARVARD,
+        )
         self.de = DocketEntryWithParentsFactory(
             docket=DocketFactory(
                 court=self.court,
                 date_filed=datetime.date(2015, 8, 16),
                 docket_number="1:21-bk-1234",
                 nature_of_suit="440",
+                source=Docket.RECAP,
             ),
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
@@ -2886,6 +2914,7 @@ class IndexDocketRECAPDocumentsCommandTest(
                 court=self.court,
                 date_filed=datetime.date(2016, 8, 16),
                 date_argued=datetime.date(2012, 6, 23),
+                source=Docket.RECAP,
             ),
             entry_number=None,
             date_filed=datetime.date(2014, 7, 19),
@@ -2897,7 +2926,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.delete_index("search.Docket")
         self.create_index("search.Docket")
 
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)
@@ -2980,24 +3009,28 @@ class IndexDocketRECAPDocumentsCommandTest(
         d_1 = DocketFactory(
             court=court,
             date_filed=datetime.date(2019, 8, 16),
+            source=Docket.RECAP,
         )
         BankruptcyInformationFactory(docket=d_1, chapter="7")
 
         d_2 = DocketFactory(
             court=court,
             date_filed=datetime.date(2020, 8, 16),
+            source=Docket.RECAP,
         )
         BankruptcyInformationFactory(docket=d_2, chapter="7")
 
         d_3 = DocketFactory(
             court=court,
             date_filed=datetime.date(2021, 8, 16),
+            source=Docket.RECAP,
         )
         BankruptcyInformationFactory(docket=d_3, chapter="7")
 
         d_4 = DocketFactory(
             court=court,
             date_filed=datetime.date(2021, 8, 16),
+            source=Docket.RECAP,
         )
         BankruptcyInformationFactory(docket=d_4, chapter="13")
 
@@ -3185,9 +3218,7 @@ class RECAPIndexingTest(
         """Confirm a minute entry can be properly indexed."""
 
         de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=self.court,
-            ),
+            docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
             entry_number=None,
@@ -3208,9 +3239,7 @@ class RECAPIndexingTest(
         can be properly indexed."""
 
         de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=self.court,
-            ),
+            docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
             entry_number=3010113237867,
@@ -3228,6 +3257,18 @@ class RECAPIndexingTest(
 
     def test_index_recap_parent_and_child_objects(self) -> None:
         """Confirm Dockets and RECAPDocuments are properly indexed in ES"""
+
+        non_recap_docket = DocketFactory(
+            court=self.court,
+            case_name="SUBPOENAS SERVED ON",
+            case_name_full="Jackson & Sons Holdings vs. Bank",
+            date_filed=datetime.date(2015, 8, 16),
+            date_argued=datetime.date(2013, 5, 20),
+            docket_number="1:21-bk-1234",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
+
         docket_entry_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
                 court=self.court,
@@ -3237,6 +3278,7 @@ class RECAPIndexingTest(
                 date_argued=datetime.date(2013, 5, 20),
                 docket_number="1:21-bk-1234",
                 nature_of_suit="440",
+                source=Docket.RECAP,
             ),
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
@@ -3271,6 +3313,7 @@ class RECAPIndexingTest(
                 case_name_full="The State of Franklin v. Solutions LLC",
                 date_filed=datetime.date(2016, 8, 16),
                 date_argued=datetime.date(2012, 6, 23),
+                source=Docket.HARVARD_AND_RECAP,
             ),
             entry_number=3,
             date_filed=datetime.date(2014, 7, 19),
@@ -3284,6 +3327,9 @@ class RECAPIndexingTest(
             plain_text="Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas nunc justo. Integer varius sapien arcu, quis laoreet lacus consequat vel.",
             pacer_doc_id="016156723121",
         )
+
+        # The non-recap docket shouldn't be indexed.
+        self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
 
         s = DocketDocument.search()
         s = s.query(Q("match", docket_child="docket"))
@@ -3301,6 +3347,14 @@ class RECAPIndexingTest(
     def test_update_and_remove_parent_child_objects_in_es(self) -> None:
         """Confirm child documents can be updated and removed properly."""
 
+        non_recap_docket = DocketFactory(
+            court=self.court,
+            date_filed=datetime.date(2013, 8, 16),
+            date_argued=datetime.date(2010, 5, 20),
+            docket_number="1:21-bk-0000",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
         de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
                 court=self.court,
@@ -3312,10 +3366,15 @@ class RECAPIndexingTest(
                 assigned_to=None,
                 referred_to=None,
                 nature_of_suit="440",
+                source=Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
+                pacer_case_id="973390",
             ),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
         )
+        # The Docket is not indexed yet here because it doesn't belong to RECAP
+        self.assertFalse(DocketDocument.exists(id=de_1.docket.pk))
+
         rd_1 = RECAPDocumentFactory(
             docket_entry=de_1,
             description="Leave to File",
@@ -3343,9 +3402,12 @@ class RECAPIndexingTest(
 
         docket_pk = de_1.docket.pk
         rd_pk = rd_1.pk
+        # After adding a RECAPDocument. The docket is automatically indexed.
         self.assertTrue(DocketDocument.exists(id=docket_pk))
-
         self.assertTrue(DocketDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP))
+
+        # The non-recap Docket is not indexed.
+        self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
 
         # Confirm parties fields are indexed into DocketDocument.
         # Index docket parties using index_docket_parties_in_es task.
@@ -3362,6 +3424,8 @@ class RECAPIndexingTest(
         self.assertEqual(None, docket_doc.referredTo)
         self.assertEqual(None, docket_doc.assigned_to_id)
         self.assertEqual(None, docket_doc.referred_to_id)
+        self.assertEqual(de_1.docket.date_created, docket_doc.date_created)
+        self.assertEqual(de_1.docket.pacer_case_id, docket_doc.pacer_case_id)
 
         # Confirm assigned_to and referred_to are properly updated in Docket.
         judge = PersonFactory.create(name_first="Thalassa", name_last="Miller")
@@ -3369,7 +3433,8 @@ class RECAPIndexingTest(
             name_first="Persephone", name_last="Sinclair"
         )
 
-        # Update docket field:
+        # Update docket fields:
+        de_1.docket.source = Docket.RECAP
         de_1.docket.case_name = "USA vs Bank"
         de_1.docket.assigned_to = judge
         de_1.docket.referred_to = judge_2
@@ -3382,6 +3447,7 @@ class RECAPIndexingTest(
         de_1.docket.date_argued = datetime.date(2021, 8, 19)
         de_1.docket.date_filed = datetime.date(2022, 8, 19)
         de_1.docket.date_terminated = datetime.date(2023, 8, 19)
+        de_1.docket.pacer_case_id = "288700"
 
         de_1.docket.save()
 
@@ -3399,10 +3465,24 @@ class RECAPIndexingTest(
         self.assertEqual(
             de_1.docket.date_terminated, docket_doc.dateTerminated.date()
         )
+        self.assertEqual(de_1.docket.pacer_case_id, docket_doc.pacer_case_id)
         self.assertIn(judge.name_full, docket_doc.assignedTo)
         self.assertIn(judge_2.name_full, docket_doc.referredTo)
         self.assertEqual(judge.pk, docket_doc.assigned_to_id)
         self.assertEqual(judge_2.pk, docket_doc.referred_to_id)
+
+        # Track source changes in a non-recap Docket.
+        # First update to a different non-recap source.
+        non_recap_docket.source = Docket.COLUMBIA
+        non_recap_docket.save()
+        # The non-recap Docket shouldn't be indexed yet.
+        self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
+
+        # Update it to a RECAP Source.
+        non_recap_docket.source = Docket.COLUMBIA_AND_RECAP
+        non_recap_docket.save()
+        # The non-recap Docket is now indexed.
+        self.assertTrue(DocketDocument.exists(id=non_recap_docket.pk))
 
         # Confirm docket best case name and slug.
         de_1.docket.case_name = ""
@@ -3444,6 +3524,7 @@ class RECAPIndexingTest(
         rd_doc = DocketDocument.get(id=ES_CHILD_ID(rd_pk).RECAP)
         self.assertEqual("Notification to File Ipsum", rd_doc.description)
         self.assertEqual(99, rd_doc.entry_number)
+        self.assertEqual(rd_1.date_created, rd_doc.date_created)
 
         # Update RECAPDocument fields.
         f = SimpleUploadedFile("recap_filename", b"file content more content")
@@ -3561,6 +3642,7 @@ class RECAPIndexingTest(
                 docket_number="1:21-bk-1234",
                 assigned_to=judge,
                 nature_of_suit="440",
+                source=Docket.RECAP,
             ),
             date_filed=datetime.date(2015, 8, 19),
             description="MOTION for Leave to File Amicus Curiae Lorem",
@@ -3619,6 +3701,7 @@ class RECAPIndexingTest(
         de.docket.date_terminated = datetime.date(2022, 6, 10)
         de.docket.assigned_to = judge_2
         de.docket.referred_to = judge
+        de.docket.pacer_case_id = "3456783"
         de.docket.save()
 
         # Query the parent docket by its updated name.
@@ -3692,6 +3775,10 @@ class RECAPIndexingTest(
             self._compare_response_child_value(
                 response, 0, i, de.docket.assigned_to.pk, "assigned_to_id"
             )
+            self._compare_response_child_value(
+                response, 0, i, de.docket.pacer_case_id, "pacer_case_id"
+            )
+
         # Update judge name.
         judge.name_first = "William"
         judge.name_last = "Anderson"
@@ -3769,6 +3856,52 @@ class RECAPIndexingTest(
         indexing tasks.
         """
 
+        # Avoid calling es_save_document for a non-recap docket.
+        with mock.patch(
+            "cl.lib.es_signal_processor.es_save_document.si",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                es_save_document, *args, **kwargs
+            ),
+        ):
+            non_recap_docket = DocketFactory(
+                court=self.court,
+                pacer_case_id="asdf0",
+                docket_number="12-cv-02354",
+                case_name="Vargas v. Wilkins",
+                source=Docket.COLUMBIA,
+            )
+
+        # No es_save_document task should be called on a non-recap docket creation
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
+
+        # Update a non-recap docket to a different non-recap source
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            non_recap_docket.source = Docket.HARVARD
+            non_recap_docket.save()
+        # No update_es_document task should be called on a non-recap source change
+        self.reset_and_assert_task_count(expected=0)
+        self.assertFalse(DocketDocument.exists(id=non_recap_docket.pk))
+
+        # Update a non-recap docket to a recap source
+        with mock.patch(
+            "cl.lib.es_signal_processor.update_es_document.delay",
+            side_effect=lambda *args, **kwargs: self.count_task_calls(
+                update_es_document, *args, **kwargs
+            ),
+        ):
+            non_recap_docket.source = Docket.RECAP_AND_IDB_AND_HARVARD
+            non_recap_docket.save()
+        # update_es_document task should be called 1 time
+        self.reset_and_assert_task_count(expected=1)
+        # The docket should now be indexed.
+        self.assertTrue(DocketDocument.exists(id=non_recap_docket.pk))
+
         # Index docket on creation.
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
@@ -3781,6 +3914,7 @@ class RECAPIndexingTest(
                 pacer_case_id="asdf",
                 docket_number="12-cv-02354",
                 case_name="Vargas v. Wilkins",
+                source=Docket.RECAP,
             )
 
         # Only one es_save_document task should be called on creation.
@@ -3798,6 +3932,7 @@ class RECAPIndexingTest(
                 court=self.court,
                 pacer_case_id="aaaaa",
                 docket_number="12-cv-02358",
+                source=Docket.RECAP,
             )
 
         # No update_es_document task should be called on creation.
@@ -3888,6 +4023,7 @@ class RECAPIndexingTest(
             pacer_case_id="asdf",
             docket_number="12-cv-02354",
             case_name="Vargas v. Wilkins",
+            source=Docket.RECAP,
         )
 
         # RECAP Document creation:
@@ -3985,7 +4121,9 @@ class RECAPIndexingTest(
         self.reset_and_assert_task_count(expected=0)
 
         # Create a new Docket and DocketEntry.
-        docket_2 = DocketFactory(court=self.court, docket_number="21-0000")
+        docket_2 = DocketFactory(
+            court=self.court, docket_number="21-0000", source=Docket.RECAP
+        )
         de_2 = DocketEntryWithParentsFactory(
             docket=docket_2,
             date_filed=datetime.date(2016, 8, 19),
@@ -4187,9 +4325,7 @@ class RECAPIndexingTest(
         """Confirm control chars are removed at indexing time."""
 
         de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=self.court,
-            ),
+            docket=DocketFactory(court=self.court, source=Docket.RECAP),
             date_filed=datetime.date(2024, 8, 19),
             entry_number=1,
         )
@@ -4207,9 +4343,7 @@ class RECAPIndexingTest(
     def test_prepare_parties(self) -> None:
         """Confirm prepare_parties return the expected values."""
 
-        d = docket = DocketFactory(
-            court=self.court,
-        )
+        d = docket = DocketFactory(court=self.court, source=Docket.RECAP)
         firm = AttorneyOrganizationFactory(
             lookup_key="00kingofprussiaroadradnorkesslertopazmeltzercheck1908",
             name="Law Firm LLP",
@@ -4296,6 +4430,14 @@ class RECAPHistoryTablesIndexingTest(
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         super().setUpTestData()
+        # Non-RECAP Docket.
+        cls.non_recap_docket = DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2010, 8, 16),
+            docket_number="45-bk-2632",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
 
     def setUp(self):
         call_command(
@@ -4305,7 +4447,7 @@ class RECAPHistoryTablesIndexingTest(
             pk_offset=0,
             testing_mode=True,
         )
-        self.r = make_redis_interface("CACHE")
+        self.r = get_redis_interface("CACHE")
         keys = self.r.keys(compose_redis_key(SEARCH_TYPES.RECAP))
         if keys:
             self.r.delete(*keys)
@@ -4340,6 +4482,15 @@ class RECAPHistoryTablesIndexingTest(
         self.assertEqual(docket_doc_2.cause, "")
         rd_3_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_2.pk).RECAP)
         self.assertEqual(rd_3_doc.cause, "")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            # Trigger a change in a non-recap Docket.
+            self.non_recap_docket.docket_number = "12-45324"
+            self.non_recap_docket.save()
+
+        # The docket shouldn't be indexed.
+        self.assertFalse(DocketDocument.exists(id=self.non_recap_docket.pk))
+
         # Call the indexing command for "docket" to update documents based on
         # events within the specified date range.
         start_date = datetime.datetime.now() - datetime.timedelta(days=2)
@@ -4353,6 +4504,9 @@ class RECAPHistoryTablesIndexingTest(
             start_date=start_date.date().isoformat(),
             end_date=end_date.date().isoformat(),
         )
+
+        # The non-recap docket shouldn't be indexed.
+        self.assertFalse(DocketDocument.exists(id=self.non_recap_docket.pk))
 
         # New data should now be updated in the docket and its child documents
         docket_doc = DocketDocument.get(id=docket_instance.pk)

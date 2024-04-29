@@ -1,5 +1,7 @@
+from http import HTTPStatus
+
 import waffle
-from rest_framework import pagination, permissions, response, status, viewsets
+from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.pagination import PageNumberPagination
 
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
@@ -11,6 +13,7 @@ from cl.search.api_serializers import (
     ExtendedPersonESSerializer,
     OAESResultSerializer,
     OpinionClusterSerializer,
+    OpinionESResultSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
@@ -175,7 +178,11 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
     permission_classes = (permissions.AllowAny,)
 
     def list(self, request, *args, **kwargs):
-        search_form = SearchForm(request.GET)
+
+        is_opinion_active = waffle.flag_is_active(
+            request, "o-es-search-api-active"
+        )
+        search_form = SearchForm(request.GET, is_es_form=is_opinion_active)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 
@@ -192,6 +199,8 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 request, "p-es-active"
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
+            elif search_type == SEARCH_TYPES.OPINION and is_opinion_active:
+                serializer = OpinionESResultSerializer(result_page, many=True)
             else:
                 if cd["q"] == "":
                     cd["q"] = "*"  # Get everything
@@ -201,5 +210,5 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(
-            search_form.errors, status=status.HTTP_400_BAD_REQUEST
+            search_form.errors, status=HTTPStatus.BAD_REQUEST
         )

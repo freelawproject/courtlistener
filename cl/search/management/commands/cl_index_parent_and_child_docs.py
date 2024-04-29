@@ -12,9 +12,16 @@ from cl.lib.es_signal_processor import (
     check_fields_that_changed,
     get_fields_to_update,
 )
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import Person
-from cl.search.documents import ESRECAPDocument
+from cl.search.documents import (
+    DocketDocument,
+    ESRECAPDocument,
+    OpinionClusterDocument,
+    OpinionDocument,
+    PersonDocument,
+)
+from cl.search.management.commands.sweep_indexer import get_es_doc_id
 from cl.search.models import (
     SEARCH_TYPES,
     Docket,
@@ -33,7 +40,7 @@ from cl.search.tasks import (
     remove_parent_and_child_docs_by_query,
     update_children_docs_by_query,
 )
-from cl.search.types import EventTable
+from cl.search.types import ESDocumentClassType, EventTable
 
 
 def compose_redis_key(
@@ -61,7 +68,7 @@ def log_last_document_indexed(
     :return: The data logged to redis.
     """
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     pipe = r.pipeline()
     pipe.hgetall(log_key)
     log_info: Mapping[str | bytes, int | str] = {
@@ -86,7 +93,7 @@ def get_last_parent_document_id_processed(
     :return: The last document ID indexed.
     """
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     log_key = compose_redis_key(search_type, event_doc_type)
     stored_values = r.hgetall(log_key)
     last_document_id = int(stored_values.get("last_document_id", 0))
@@ -120,6 +127,7 @@ def get_unique_oldest_history_rows(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
                     pgh_created_at__lte=end_date,
+                    source__in=Docket.RECAP_SOURCES(),
                 )
                 .order_by("id", "pgh_created_at")
                 .distinct("id")
@@ -304,17 +312,17 @@ class Command(VerboseCommand):
             type=str,
             required=False,
             choices=["parent", "child"],
-            help=f"The document type to index, only 'parent' or 'child' documents. "
-            f"If not provided, parent and child documents will be indexed.",
+            help="The document type to index, only 'parent' or 'child' documents. "
+            "If not provided, parent and child documents will be indexed.",
         )
         parser.add_argument(
             "--update-from-event-tables",
             type=str,
             required=False,
             choices=[member for member in EventTable],
-            help=f"The document type to update from event history tables. "
-            f"'search.Docket' for dockets, 'search.DocketEntry' for docket "
-            f"entries or 'search.RECAPDocument' for RECAP Documents.",
+            help="The document type to update from event history tables. "
+            "'search.Docket' for dockets, 'search.DocketEntry' for docket "
+            "entries or 'search.RECAPDocument' for RECAP Documents.",
             default="",
         )
         parser.add_argument(
@@ -328,6 +336,11 @@ class Command(VerboseCommand):
             type=valid_date_time,
             help="Start date in ISO-8601 format for a range of documents to "
             "update.",
+        )
+        parser.add_argument(
+            "--missing",
+            action="store_true",
+            help="Use this flag to only index documents missing in the index.",
         )
 
     def handle(self, *args, **options):
@@ -351,6 +364,7 @@ class Command(VerboseCommand):
         start_date: date | None = options.get("start_date", None)
         end_date: date | None = options.get("end_date", None)
 
+        es_document = None
         match search_type:
             case SEARCH_TYPES.PEOPLE:
                 queryset = Person.objects.filter(
@@ -359,6 +373,7 @@ class Command(VerboseCommand):
                 q = [item.pk for item in queryset if item.is_judge]
                 count = len(q)
                 task_to_use = "index_parent_and_child_docs"
+                es_document = PersonDocument
             case SEARCH_TYPES.RECAP:
                 if update_from_event_tables and start_date and end_date:
                     # Get unique oldest events from history table.
@@ -377,19 +392,23 @@ class Command(VerboseCommand):
                     queryset = (
                         RECAPDocument.objects.filter(pk__gte=pk_offset)
                         .order_by("pk")
-                        .values_list("pk", flat=True)
+                        .values_list("pk", "docket_entry__docket_id")
                     )
                     task_to_use = "index_parent_or_child_docs"
+                    es_document = ESRECAPDocument
                 else:
                     queryset = (
-                        Docket.objects.filter(pk__gte=pk_offset)
+                        Docket.objects.filter(
+                            pk__gte=pk_offset,
+                            source__in=Docket.RECAP_SOURCES(),
+                        )
                         .order_by("pk")
                         .values_list("pk", flat=True)
                     )
                     task_to_use = "index_parent_and_child_docs"
                     if document_type == "parent":
                         task_to_use = "index_parent_or_child_docs"
-
+                        es_document = DocketDocument
                 q = queryset.iterator()
                 count = queryset.count()
 
@@ -398,9 +417,10 @@ class Command(VerboseCommand):
                     queryset = (
                         Opinion.objects.filter(pk__gte=pk_offset)
                         .order_by("pk")
-                        .values_list("pk", flat=True)
+                        .values_list("pk", "cluster_id")
                     )
                     task_to_use = "index_parent_or_child_docs"
+                    es_document = OpinionDocument
                 else:
                     # Get Opinion Clusters objects by pk_offset.
                     queryset = (
@@ -411,6 +431,7 @@ class Command(VerboseCommand):
                     task_to_use = "index_parent_and_child_docs"
                     if document_type == "parent":
                         task_to_use = "index_parent_or_child_docs"
+                        es_document = OpinionClusterDocument
 
                 q = queryset.iterator()
                 count = queryset.count()
@@ -418,7 +439,9 @@ class Command(VerboseCommand):
             case _:
                 return
 
-        self.process_queryset(q, count, search_type, chunk_size, task_to_use)
+        self.process_queryset(
+            q, count, search_type, chunk_size, task_to_use, es_document
+        )
 
     def process_queryset(
         self,
@@ -427,6 +450,7 @@ class Command(VerboseCommand):
         search_type: str,
         chunk_size: int,
         task_to_use: str,
+        es_document: ESDocumentClassType | None = None,
     ) -> None:
         """Process a queryset and execute tasks based on the specified celery
         task_to_use.
@@ -438,6 +462,8 @@ class Command(VerboseCommand):
         :param search_type: The search type related to the update/remove action.
         :param chunk_size: The number of items to process in a single chunk.
         :param task_to_use: The name of the celery task to execute.
+        :param es_document: Optional: The ES document class for checking
+        document existence in ES.
         :return: None
         """
 
@@ -448,7 +474,7 @@ class Command(VerboseCommand):
         testing_mode = self.options.get("testing_mode", False)
         pk_offset = self.options["pk_offset"]
         document_type = self.options.get("document_type", None)
-
+        missing = self.options.get("missing", False)
         fields_map = {}
         if event_doc_type == EventTable.DOCKET:
             fields_map = recap_document_field_mapping["save"][Docket][
@@ -474,14 +500,29 @@ class Command(VerboseCommand):
         for item in items:
             item_id = item
             changed_fields = []
-            if isinstance(item, tuple):
-                item_id, changed_fields = item
+            if missing and es_document:
+                # If the "missing" flag is passed, check if the document
+                # already exists in ES to avoid scheduling it for indexing.
+                if isinstance(item, tuple):
+                    item_id = item[0]
+                    parent_document_id = item[1]
+                else:
+                    item_id = item
+                    parent_document_id = item
+
+                doc_id = get_es_doc_id(es_document, item_id)
+                if not es_document.exists(
+                    id=doc_id, routing=parent_document_id
+                ):
+                    chunk.append(item_id)
+            else:
+                if isinstance(item, tuple):
+                    item_id, changed_fields = item
+                chunk.append(item_id)
             processed_count += 1
             last_item = count == processed_count
-            chunk.append(item_id)
             if processed_count % chunk_size == 0 or last_item:
                 throttle.maybe_wait()
-
                 match task_to_use:
                     case "index_parent_and_child_docs":
                         index_parent_and_child_docs.si(

@@ -8,7 +8,7 @@ from django.db.models import F
 from django.utils.timezone import now
 
 from cl.lib.db_tools import fetchall_as_dict
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Stat
 
 MILESTONES = OrderedDict(
@@ -71,7 +71,7 @@ async def tally_stat(name, inc=1, date_logged=None):
 
 
 def check_redis() -> bool:
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     try:
         r.ping()
     except (redis.exceptions.ConnectionError, ConnectionRefusedError):

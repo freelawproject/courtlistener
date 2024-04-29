@@ -156,6 +156,12 @@ SEARCH_OPINION_HL_FIELDS = [
     "suitNature",
 ]
 
+SEARCH_ALERTS_OPINION_HL_FIELDS = {
+    "caseName": 0,
+    "docketNumber": 0,
+    "text": 500,
+}
+
 
 # In RECAP Search, it is necessary to display 'plain_text' as a truncated snippet,
 # where the snippet length is determined by 'fragment_size'.

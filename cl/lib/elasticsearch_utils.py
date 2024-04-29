@@ -95,23 +95,6 @@ def elasticsearch_enabled(func: Callable) -> Callable:
     return wrapper_func
 
 
-def es_index_exists(index_name: str) -> bool:
-    """Confirm if the Elasticsearch index exists in the default instance.
-    :param index_name: The index name to check.
-    :return: True if the index exists, otherwise False.
-    """
-    try:
-        es = connections.get_connection()
-        index_exists = es.indices.exists(index=index_name)
-    except (TransportError, ConnectionError) as e:
-        logger.warning(
-            f"Error in ES connection when checking index existence: {index_name}"
-        )
-        logger.warning(f"Error was: {e}")
-        index_exists = False
-    return index_exists
-
-
 def build_numeric_range_query(
     field: str,
     lower_bound: int | float,
@@ -616,6 +599,49 @@ def build_es_filters(cd: CleanData) -> List:
     return queries_list
 
 
+def build_highlights_dict(
+    highlighting_fields: dict[str, int] | None, hl_tag: str
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Builds a dictionary for ES highlighting options and a list of fields to
+    exclude from the _source.
+
+    :param highlighting_fields: A dictionary of fields to highlight in child docs.
+    :param hl_tag: The HTML tag to use for highlighting matched fragments.
+    :return: A tuple containing, a dictionary with the configuration for
+    highlighting each field and aa list of field names to exclude from the
+    _source results to avoid data redundancy.
+    """
+
+    if highlighting_fields is None:
+        highlighting_fields = {}
+    highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
+
+    fields_to_exclude = []
+    for field, fragment_size in highlighting_fields.items():
+        number_of_fragments = 1 if fragment_size else 0
+        # In fields that have a defined fragment size in their HL mapping
+        # e.g., SEARCH_RECAP_CHILD_HL_FIELDS, a 'no_match_size' parameter
+        # is also set. If there are no matching fragments to highlight,
+        # this setting will return a specified amount of text from the
+        # beginning of the field.
+        no_match_size = settings.NO_MATCH_HL_SIZE if fragment_size else 0
+        if fragment_size and not field.endswith("exact"):
+            # The original field is excluded from the response to avoid
+            # returning the entire field from the index.
+            fields_to_exclude.append(field)
+        highlight_options["fields"][field] = {
+            "type": settings.ES_HIGHLIGHTER,
+            "matched_fields": [field, f"{field}.exact"],
+            "fragment_size": fragment_size,
+            "no_match_size": no_match_size,
+            "number_of_fragments": number_of_fragments,
+            "pre_tags": [f"<{hl_tag}>"],
+            "post_tags": [f"</{hl_tag}>"],
+        }
+
+    return highlight_options, fields_to_exclude
+
+
 def build_has_child_query(
     query: QueryString | str,
     child_type: str,
@@ -692,32 +718,9 @@ def build_has_child_query(
             boost_mode="replace",
         )
 
-    if highlighting_fields is None:
-        highlighting_fields = {}
-    highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
-
-    fields_to_exclude = []
-    for field, fragment_size in highlighting_fields.items():
-        number_of_fragments = 1 if fragment_size else 0
-        # In fields that have a defined fragment size in their HL mapping
-        # e.g., SEARCH_RECAP_CHILD_HL_FIELDS, a 'no_match_size' parameter
-        # is also set. If there are no matching fragments to highlight,
-        # this setting will return a specified amount of text from the
-        # beginning of the field.
-        no_match_size = settings.NO_MATCH_HL_SIZE if fragment_size else 0
-        if fragment_size and not field.endswith("exact"):
-            # The original field is excluded from the response to avoid
-            # returning the entire field from the index.
-            fields_to_exclude.append(field)
-        highlight_options["fields"][field] = {
-            "type": settings.ES_HIGHLIGHTER,
-            "matched_fields": [field, f"{field}.exact"],
-            "fragment_size": fragment_size,
-            "no_match_size": no_match_size,
-            "number_of_fragments": number_of_fragments,
-            "pre_tags": ["<mark>"],
-            "post_tags": ["</mark>"],
-        }
+    highlight_options, fields_to_exclude = build_highlights_dict(
+        highlighting_fields, SEARCH_HL_TAG
+    )
 
     inner_hits = {
         "name": f"filter_query_inner_{child_type}",
@@ -785,7 +788,7 @@ def get_search_query(
                         score_mode="max",
                         query=Q("match_all"),
                         inner_hits={
-                            "name": f"text_query_inner_opinion",
+                            "name": "text_query_inner_opinion",
                             "size": 10,
                         },
                     ),
@@ -1804,6 +1807,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                     "judge",
                     cd.get("judge", ""),
                 ),
+                *build_term_query("id", cd.get("id", "").split()),
             ]
         )
 
@@ -1837,13 +1841,48 @@ def add_highlighting_for_feed_query(s: Search, field: str) -> Search:
     return s
 
 
+def build_search_feed_query(
+    search_query: Search,
+    cd: CleanData,
+    jurisdiction: bool,
+    exclude_docs_for_empty_field: str,
+) -> Search:
+    """Builds a search query for the feed based on cd and jurisdiction flag.
+
+    :param search_query:  Elasticsearch DSL Search object
+    :param cd: The query CleanedData
+    :param jurisdiction: Whether to perform a jurisdiction query with all the
+    child opinions.
+    :param exclude_docs_for_empty_field: Field that should not be empty for a
+    document to be included
+    :return: An Elasticsearch DSL Search object containing the feed query.
+    """
+
+    hl_field = "text"
+    if cd["type"] == SEARCH_TYPES.RECAP:
+        hl_field = "plain_text"
+    s, join_query = build_es_base_query(search_query, cd)
+    if jurisdiction or cd["type"] == SEARCH_TYPES.RECAP:
+        # An Opinion Jurisdiction feed or RECAP Search displays child documents
+        # Eliminate items that lack the ordering field and apply highlighting
+        # to create a snippet for the plain_text or text fields.
+        s = build_child_docs_query(
+            join_query,
+            cd=cd,
+            exclude_docs_for_empty_field=exclude_docs_for_empty_field,
+        )
+        s = search_query.query(s)
+        s = add_highlighting_for_feed_query(s, hl_field)
+    return s
+
+
 def do_es_feed_query(
     search_query: Search,
     cd: CleanData,
     rows: int = 20,
     jurisdiction: bool = False,
     exclude_docs_for_empty_field: str = "",
-) -> Response:
+) -> Response | list:
     """Execute an Elasticsearch query for podcasts.
 
     :param search_query: Elasticsearch DSL Search object
@@ -1855,30 +1894,10 @@ def do_es_feed_query(
     document to be included
     :return: The Elasticsearch DSL response.
     """
-    match cd["type"]:
-        case SEARCH_TYPES.RECAP:
-            _, join_query = build_es_base_query(search_query, cd)
-            # Eliminate items that lack the ordering field.
-            s = build_child_docs_query(
-                join_query,
-                cd,
-                exclude_docs_for_empty_field=exclude_docs_for_empty_field,
-            )
-            s = search_query.query(s)
-            s = add_highlighting_for_feed_query(s, "plain_text")
 
-        case _:
-            s, join_query = build_es_base_query(search_query, cd)
-            if jurisdiction:
-                # Eliminate items that lack the ordering field.
-                s = build_child_docs_query(
-                    join_query,
-                    cd=cd,
-                    exclude_docs_for_empty_field=exclude_docs_for_empty_field,
-                )
-                s = search_query.query(s)
-                s = add_highlighting_for_feed_query(s, "text")
-
+    s = build_search_feed_query(
+        search_query, cd, jurisdiction, exclude_docs_for_empty_field
+    )
     s = s.sort(build_sort_results(cd))
     response = s.extra(from_=0, size=rows).execute()
     if cd["type"] == SEARCH_TYPES.OPINION:
@@ -1915,7 +1934,7 @@ def nullify_parent_score_on_child_sorting(
             query=query,
             script_score={
                 "script": {
-                    "source": f""" return 0; """,
+                    "source": """ return 0; """,
                 },
             },
             # Replace the original score with the one computed by the script
@@ -2396,3 +2415,74 @@ def fetch_all_search_results(
             else:
                 search_after = response.hits[-1].meta.sort
     return all_search_hits
+
+
+def do_es_api_query(
+    search_query: Search,
+    cd: CleanData,
+    highlighting_fields: dict[str, int],
+    hl_tag: str,
+) -> Search:
+    """Build an ES query for its use in the Search API and Webhooks.
+
+    :param search_query: Elasticsearch DSL Search object.
+    :param cd: The query CleanedData
+    :param highlighting_fields: A dictionary mapping field names to fragment
+    sizes for highlighting.
+    :param hl_tag: The HTML tag to use for highlighting matched fragments.
+    :return: The modified Search with the resultant query.
+    """
+
+    s, join_query = build_es_base_query(search_query, cd)
+    s = build_child_docs_query(
+        join_query,
+        cd=cd,
+    )
+    s = search_query.query(s)
+    highlight_options, fields_to_exclude = build_highlights_dict(
+        highlighting_fields, hl_tag
+    )
+    s = s.source(excludes=fields_to_exclude)
+    extra_options: dict[str, dict[str, Any]] = {"highlight": highlight_options}
+    if cd["type"] == SEARCH_TYPES.OPINION:
+        extra_options.update(
+            {
+                "collapse": {
+                    "field": "cluster_id",
+                }
+            }
+        )
+    main_query = s.extra(**extra_options)
+    main_query = main_query.sort(build_sort_results(cd))
+    return main_query
+
+
+def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
+    """Execute an Elasticsearch count query for queries that uses collapse.
+    Uses a query with aggregation to determine the number of unique opinions
+    based on the 'cluster_id' field.
+
+    :param main_query: The Elasticsearch DSL Search object.
+    :param query: The ES Query object to perform the count query.
+    :return: The results count.
+    """
+
+    search_query = main_query.query(query)
+    search_query.aggs.bucket(
+        "unique_opinions",
+        "cardinality",
+        field="cluster_id",
+        precision_threshold=2_000,
+    )
+    search_query = search_query.extra(size=0, track_total_hits=True)
+    try:
+        total_results = (
+            search_query.execute().aggregations.unique_opinions.value
+        )
+    except (TransportError, ConnectionError, RequestError) as e:
+        logger.warning(
+            f"Error on count query request: {search_query.to_dict()}"
+        )
+        logger.warning(f"Error was: {e}")
+        total_results = None
+    return total_results

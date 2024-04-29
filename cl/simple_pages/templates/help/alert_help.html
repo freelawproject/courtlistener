@@ -47,18 +47,11 @@
     <hr>
 
     <h2 id="recap-alerts">RECAP Alerts for PACER</h2>
-    <p>RECAP Alerts are a way of keeping up with cases in the PACER federal court filing system. These alerts monitor tens of thousands of cases across the country for new docket entries and send an email whenever new entries are acquired. In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
+    <p>RECAP Alerts are a way of keeping up with cases in the PACER federal court filing system. These alerts monitor tens of thousands of cases across the country for new docket entries and send an email whenever new entries are found. In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
     </p>
-    <p>The sources for these alerts are as described in detail on our <a href="{% url "coverage" %}">coverage page</a> and include:
+    <p>The sources for these alerts are as described in detail on our <a href="{% url "coverage_recap" %}">coverage page</a>.
     </p>
-    <ul>
-      <li>The RECAP extensions</li>
-      <li>PACER judicial opinion scraper</li>
-      <li>Client work that we do at Free Law Project</li>
-      <li>PACER RSS feeds</li>
-      <li>The <a href="https://twitter.com/big_cases">Big Cases Twitter bot</a></li>
-    </ul>
-    <p>For active cases, this means that alerts will come any time from a few seconds after the content is posted to PACER (for a case of national importance), to an hour or two, for a case of lesser importance in a jurisdiction that does not regularly provide public updates via their RSS feed.
+    <p>For active cases, alerts can come within seconds of a new filing. For less active cases, it can take more time or alerts may not arrive at all, if we do not have a way of getting updates for the case.
     </p>
     <p>For closed cases, we get new content and can send alerts when we do client work on those cases or when a <a href="https://free.law/recap/">RECAP extension</a> user shares a docket with us.
     </p>
@@ -118,7 +111,7 @@
     </p>
 
     <h3>Coverage Gaps</h3>
-    <p>A major source we use for our alerts are RSS feeds provided by the courts. Unfortunately, even after supplementing these with <a href="{% url "coverage" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything being filed in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones. The lists below are updated around the clock and provide a summary of which courts provide RSS feeds.
+    <p>A major source we use for our alerts are RSS feeds provided by the courts. Unfortunately, even after supplementing these with <a href="{% url "coverage_recap" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything being filed in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones. The lists below are updated around the clock and provide a summary of which courts provide RSS feeds.
     </p>
 
     <h4 class="v-offset-above-2">Full RSS Feeds</h4>
@@ -251,14 +244,14 @@
     <h3>Editing or Deleting an Alert</h3>
     <p>Existing alerts can be edited or deleted from <a href="{% url "profile_alerts" %}">your user profile</a>. By clicking the <a class="btn btn-xs btn-primary"><i class="fa fa-pencil"></i>Edit</a> button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
     </p>
-    <p>From your profile page, you can also easily delete an alert.</p>
+    <p>From your profile page, you can also delete an alert.</p>
 
     <h3>Disabling an Alert</h3>
     <p>If you wish to temporarily disable an alert, you can edit it and set the rate to "Off". Every alert email also has a one-click link for disabling the alert that triggered it.
     </p>
 
     <h3>Supported Jurisdictions</h3>
-    <p>Alerts are available for many jurisdictions across the country, and we are frequently expanding them to support even more courts. To see which courts are currently supported, check <a href="{% url "coverage" %}#scraped-jurisdictions">our coverage page</a> where we list the jurisdictions that we regularly scrape for oral arguments or opinions.
+    <p>Alerts are available for many jurisdictions across the country, and we are frequently expanding them to support even more courts. To see which courts are currently supported, check <a href="{% url "coverage_opinions" %}">our coverage page</a> where we list the jurisdictions that we regularly scrape for oral arguments or opinions.
     </p>
     <p>If there is a jurisdiction that is not currently listed, please <a href="{% url "contact" %}">let us know you are interested in it</a>, and we will do our best to add it to our list.
     </p>

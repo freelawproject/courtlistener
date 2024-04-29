@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %} Manage your Search Alerts – CourtListener.com{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  <script src="{% static "js/loading-states.js" %}" defer></script>
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="col-sm-2"></div>
+<div class="col-sm-8">
+  <div class="text-center">
+    <h1 class="mb-2">Manage your search alerts subscriptions</h1>
+  </div>
+  <p class="lead">
+    The alert email you received contained results for multiple alerts. Use this page to disable or edit any alerts that
+    are cluttering your inbox.
+  </p>
+
+  <div class="col-xs-12">
+    <div class="table-responsive">
+      <table class="table settings-table" hx-ext="loading-states" data-loading-class="hidden">
+        {% include "includes/search_alerts/table_header.html" %}
+        <tbody hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+          {% for alert in alerts %}
+            {% include "includes/search_alerts/table_row.html" with alert=alert %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% include "includes/docket_alert_donation.html" %}
+</div>
+{% endblock %}

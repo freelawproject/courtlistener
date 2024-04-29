@@ -6,9 +6,10 @@ from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
 from django_elasticsearch_dsl.registries import registry
+from lxml import etree
 from rest_framework.test import APITestCase
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 
 
 class OutputBlockerTestMixin:
@@ -52,7 +53,7 @@ class RestartRateLimitMixin:
 
     @classmethod
     def restart_rate_limit(cls):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         keys = r.keys(":1:rl:*")
         if keys:
             r.delete(*keys)
@@ -68,7 +69,7 @@ class RestartSentEmailQuotaMixin:
 
     @classmethod
     def restart_sent_email_quota(cls, prefix="email"):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         keys = r.keys(f"{prefix}:*")
 
         if keys:
@@ -169,7 +170,7 @@ class ESIndexTestCase(SimpleTestCase):
 
     @classmethod
     def restart_celery_throttle_key(cls):
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         keys = r.keys("celery_throttle:*")
         if keys:
             r.delete(*keys)
@@ -178,6 +179,32 @@ class ESIndexTestCase(SimpleTestCase):
     def tearDown(self) -> None:
         self.restart_celery_throttle_key()
         super().tearDown()
+
+    def assert_es_feed_content(self, node_tests, response, namespaces):
+        """Common assertion that checks the presence of specified nodes in an
+        ES feed test.
+
+        :param node_tests: A list of tuples, each containing an XPath query
+        string and the expected count of nodes.
+        :param response: The HTTP response that contains XML content.
+        :param namespaces: A dictionary of XML namespaces required to parse
+        the XPath expressions.
+        :return: A lxml etree object parsed from the response content.
+        """
+        xml_tree = etree.fromstring(response.content)
+        for test_content, count in node_tests:
+            with self.subTest(test_content=test_content):
+                node_count = len(
+                    xml_tree.xpath(test_content, namespaces=namespaces)
+                )  # type: ignore
+                self.assertEqual(
+                    node_count,
+                    count,
+                    msg="Did not find %s node(s) with XPath query: %s. "
+                    "Instead found: %s" % (count, test_content, node_count),
+                )
+
+        return xml_tree
 
 
 class CountESTasksTestCase(SimpleTestCase):
