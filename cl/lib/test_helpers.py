@@ -342,6 +342,13 @@ recap_document_v4_api_keys = {
     .replace("+00:00", "Z"),
 }
 
+rd_type_v4_api_keys = recap_document_v4_api_keys.copy()
+rd_type_v4_api_keys.update(
+    {
+        "docket_id": lambda x: x["result"].docket_entry.docket_id,
+    }
+)
+
 
 class CourtTestCase(SimpleTestCase):
     """Court test case factories"""

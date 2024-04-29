@@ -21,7 +21,7 @@ from cl.search.api_serializers import (
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
-    RECAPDocumentESResultSerializer,
+    RECAPDocumentESResultSerializerBase,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
     SearchResultSerializer,
@@ -261,7 +261,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                     results_page, many=True
                 )
             elif search_type == SEARCH_TYPES.RECAP_DOCUMENT:
-                serializer = RECAPDocumentESResultSerializer(
+                serializer = RECAPDocumentESResultSerializerBase(
                     results_page, many=True
                 )
             else:

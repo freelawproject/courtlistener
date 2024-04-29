@@ -22,7 +22,7 @@ from cl.lib.test_helpers import (
     IndexedSolrTestCase,
     RECAPSearchTestCase,
     docket_v4_api_keys,
-    docket_v4_api_keys_base,
+    rd_type_v4_api_keys,
     recap_document_v4_api_keys,
     skip_if_common_tests_skipped,
 )
@@ -3530,11 +3530,11 @@ class RECAPSearchAPIV4Test(
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(recap_document_v4_api_keys))
+        self.assertEqual(keys_count, len(rd_type_v4_api_keys))
 
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r, content_to_compare, recap_document_v4_api_keys
+            r, content_to_compare, rd_type_v4_api_keys
         )
 
     def test_dates_sorting_function_score_for_rd_type(self) -> None:

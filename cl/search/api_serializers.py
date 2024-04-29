@@ -431,7 +431,7 @@ class OpinionESResultSerializer(DocumentSerializer):
         )
 
 
-class RECAPDocumentESResultSerializer(DocumentSerializer):
+class RECAPDocumentESResultSerializerBase(DocumentSerializer):
     """The serializer for RECAPDocument results."""
 
     # Fields from the RECAPDocument
@@ -443,7 +443,6 @@ class RECAPDocumentESResultSerializer(DocumentSerializer):
     class Meta:
         document = ESRECAPDocument
         exclude = (
-            "docket_id",
             "caseName",
             "case_name_full",
             "docketNumber",
@@ -466,6 +465,15 @@ class RECAPDocumentESResultSerializer(DocumentSerializer):
             "date_created",
             "pacer_case_id",
             "plain_text",
+        )
+
+
+class RECAPDocumentESResultSerializer(RECAPDocumentESResultSerializerBase):
+    """The serializer for RECAPDocument results."""
+
+    class Meta(RECAPDocumentESResultSerializerBase.Meta):
+        exclude = RECAPDocumentESResultSerializerBase.Meta.exclude + (
+            "docket_id",
         )
 
 
