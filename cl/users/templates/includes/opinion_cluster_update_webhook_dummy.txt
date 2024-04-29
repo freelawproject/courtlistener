@@ -1,0 +1,45 @@
+{
+   "payload":{
+        "docket_id": 1,
+        "panel": [
+            { }
+        ] ,
+        "non_participating_judges": [
+            {}
+        ],
+        "judges": "J Gallegar",
+        "date_filed": "",
+        "date_filed_is_approximate": True,
+        "slug": "",
+        "case_name_short": "",
+        "case_name": "",
+        "case_name_full": "",
+        "scdb_id": "",
+        "source": "",
+        "procedural_history": "",
+        "attorneys": "",
+        "nature_of_suit": "",
+        "posture": "",
+        "syllabus": "",
+        "headnotes": "",
+        "summary": "",
+        "disposition": "",
+        "history": "",
+        "other_dates": "",
+        "cross_reference": "",
+        "correction": "",
+        "citation_count": "",
+        "precedential_status": "",
+        "date_blocked": "",
+        "blocked": "",
+        "filepath_json_harvard": "",
+        "arguments": "",
+        "headmatter": "",
+    }
+   "webhook":{
+      "version":1,
+      "event_type":3,
+      "date_created":"2024-01-06T14:21:40.855097-07:00",
+      "deprecation_date":null
+   }
+}

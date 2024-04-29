@@ -179,6 +179,28 @@ class OpinionSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
         fields = "__all__"
 
 
+class OpinionSerializerOffline(
+    DynamicFieldsMixin, serializers.ModelSerializer
+):
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
+    cluster_id = serializers.ReadOnlyField()
+    # Using PrimaryKeyRelatedField for cluster
+    author = serializers.PrimaryKeyRelatedField(queryset=Person.objects.all())
+    # Using PrimaryKeyRelatedField for joined_by with many=True for representing many-to-many relationship
+    opinions_cited = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Opinion.objects.all()
+    )
+    joined_by = serializers.PrimaryKeyRelatedField(
+        queryset=Person.objects.all()
+    )
+
+    class Meta:
+        model = Opinion
+        fields = "__all__"
+
+
 class OpinionsCitedSerializer(
     DynamicFieldsMixin, HyperlinkedModelSerializerWithId
 ):
@@ -243,6 +265,35 @@ class OpinionClusterSerializer(
         queryset=Opinion.objects.all(),
         style={"base_template": "input.html"},
     )
+    citations = CitationSerializer(many=True)
+
+    class Meta:
+        model = OpinionCluster
+        fields = "__all__"
+
+
+class OpinionClusterSerializerOffline(
+    DynamicFieldsMixin, serializers.ModelSerializer
+):
+    absolute_url = serializers.CharField(
+        source="get_absolute_url", read_only=True
+    )
+    panel = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Person.objects.all()
+    )
+    non_participating_judges = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Person.objects.all()
+    )
+    judges = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Person.objects.all()
+    )
+    docket_id = serializers.PrimaryKeyRelatedField(
+        queryset=Docket.objects.all()
+    )
+    sub_opinions = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Opinion.objects.all()
+    )
+    # Assuming CitationSerializer is defined elsewhere and is suitable as is
     citations = CitationSerializer(many=True)
 
     class Meta:

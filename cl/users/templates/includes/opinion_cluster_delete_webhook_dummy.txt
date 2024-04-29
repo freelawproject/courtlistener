@@ -1,0 +1,11 @@
+{
+   "payload":{
+      "ids": [1, 2],
+   },
+   "webhook":{
+      "version":1,
+      "event_type":3,
+      "date_created":"2024-01-06T14:21:40.855097-07:00",
+      "deprecation_date":null
+   }
+}

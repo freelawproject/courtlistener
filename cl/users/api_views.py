@@ -160,6 +160,72 @@ class WebhooksViewSet(ModelViewSet):
                 event_dummy_curl = event_curl_template.render(
                     {"endpoint_url": webhook.url}
                 ).strip()
+            case WebhookEventType.OPINION_CLUSTER_CREATE:
+                event_template = loader.get_template(
+                    "includes/opinion_cluster_create_webhook_dummy.txt"
+                )
+                event_dummy_content = event_template.render().strip()
+                event_curl_template = loader.get_template(
+                    "includes/opinion_cluster_create_webhook_dummy_curl.txt"
+                )
+                event_dummy_curl = event_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
+            case WebhookEventType.OPINION_CLUSTER_UPDATE:
+                event_template = loader.get_template(
+                    "includes/opinion_cluster_update_webhook_dummy.txt"
+                )
+                event_dummy_content = event_template.render().strip()
+                event_curl_template = loader.get_template(
+                    "includes/opinion_cluster_udpate_webhook_dummy_curl.txt"
+                )
+                event_dummy_curl = event_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
+            case WebhookEventType.OPINION_CLUSTER_DELETE:
+                event_template = loader.get_template(
+                    "includes/opinion_cluster_delete_webhook_dummy.txt"
+                )
+                event_dummy_content = event_template.render().strip()
+                event_curl_template = loader.get_template(
+                    "includes/opinion_cluster_delete_webhook_dummy_curl.txt"
+                )
+                event_dummy_curl = event_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
+            case WebhookEventType.OPINION_CREATE:
+                event_template = loader.get_template(
+                    "includes/opinion_create_webhook_dummy.txt"
+                )
+                event_dummy_content = event_template.render().strip()
+                event_curl_template = loader.get_template(
+                    "includes/opinion_create_webhook_dummy_curl.txt"
+                )
+                event_dummy_curl = event_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
+            case WebhookEventType.OPINION_UPDATE:
+                event_template = loader.get_template(
+                    "includes/opinion_update_webhook_dummy.txt"
+                )
+                event_dummy_content = event_template.render().strip()
+                event_curl_template = loader.get_template(
+                    "includes/opinion_update_webhook_dummy_curl.txt"
+                )
+                event_dummy_curl = event_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
+            case WebhookEventType.OPINION_DELETE:
+                event_template = loader.get_template(
+                    "includes/opinion_delete_webhook_dummy.txt"
+                )
+                event_dummy_content = event_template.render().strip()
+                event_curl_template = loader.get_template(
+                    "includes/opinion_delete_webhook_dummy_curl.txt"
+                )
+                event_dummy_curl = event_curl_template.render(
+                    {"endpoint_url": webhook.url}
+                ).strip()
             case _:
                 # Webhook types with no support yet.
                 event_dummy_content = (
@@ -182,6 +248,12 @@ class WebhooksViewSet(ModelViewSet):
                         WebhookEventType.SEARCH_ALERT,
                         WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
                         WebhookEventType.RECAP_FETCH,
+                        WebhookEventType.OPINION_CLUSTER_CREATE,
+                        WebhookEventType.OPINION_CLUSTER_UPDATE,
+                        WebhookEventType.OPINION_CLUSTER_DELETE,
+                        WebhookEventType.OPINION_CREATE,
+                        WebhookEventType.OPINION_UPDATE,
+                        WebhookEventType.OPINION_DELETE,
                     ],
                 },
                 template_name="includes/webhooks_htmx/webhooks-test-webhook.html",

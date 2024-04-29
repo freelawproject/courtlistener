@@ -1,0 +1,39 @@
+curl --request POST \
+  --url '{{ endpoint_url }}' \
+  --header 'Content-Type: application/json' \
+  --header 'Idempotency-Key: 59f1be59-e428-427a-a346-9cacded5c1d4' \
+  --data '{
+   "payload":{
+    "id": 1,
+    "absolute_url": "https://www.courtlistener.com/opinion/123455",
+    "cluster_id": 12,
+    "opinions_cited": [1, 2, 3],
+    "author": {
+
+    },
+    "author_str": "J Kirby",
+    "joined_by": [
+
+    ],
+    "joined_by_str": "J Gallegar",
+    "per_curiam": False,
+    "sha1": "",
+    "page_count": 10,
+    "download_url": "",
+    "local_path": "",
+    "plain_text": "",
+    "html": "",
+    "html_lawbox": "",
+    "html_columbia": "",
+    "html_anon_2020": "",
+    "xml_harvard": "",
+    "html_with_citations": "",
+    "extracted_by_ocr": ""
+   },
+   "webhook":{
+      "version":1,
+      "event_type":3,
+      "date_created":"2024-01-06T14:21:40.855097-07:00",
+      "deprecation_date":null
+   }
+}'

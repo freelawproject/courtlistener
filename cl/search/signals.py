@@ -1,7 +1,9 @@
 from django.conf import settings
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
+from cl.api.models import WebhookEventType
+from cl.api.tasks import add_webhook_event_to_queue
 from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
@@ -567,3 +569,86 @@ def handle_recap_doc_change(
             find_citations_and_parantheticals_for_recap_documents.apply_async(
                 args=([instance.pk],)
             )
+
+
+@receiver(
+    post_save,
+    sender=Opinion,
+    dispatch_uid="handle_opinion_created_or_updated_webhooks",
+)
+def handle_opinion_created_or_updated_webhook(
+    sender, instance: Opinion, created: bool, update_fields=None, **kwargs
+):
+    """
+    Send a webhook to the webapp when an opinion is created.
+    """
+    if created:
+        return add_webhook_event_to_queue(
+            WebhookEventType.OPINION_CREATE, instance.id
+        )
+    changed_fields = instance.webhook_tracked_fields.changed()
+    if changed_fields:
+        fields_that_changed = list(changed_fields.keys())
+        return add_webhook_event_to_queue(
+            WebhookEventType.OPINION_UPDATE, (instance.id, fields_that_changed)
+        )
+
+
+@receiver(
+    post_delete,
+    sender=Opinion,
+    dispatch_uid="handle_opinion_deleted_webhooks",
+)
+def handle_opinion_deleted_webhook(
+    sender, instance: Opinion, created: bool, update_fields=None, **kwargs
+):
+    """
+    Send a webhook to the webapp when an opinion is created.
+    """
+    return add_webhook_event_to_queue(
+        WebhookEventType.OPINION_DELETE, instance.id
+    )
+
+
+@receiver(
+    post_save,
+    sender=OpinionCluster,
+    dispatch_uid="handle_opinion__cluster_created_or_updated_webhooks",
+)
+def handle_opinion_cluster_created_or_updated_webhook(
+    sender,
+    instance: OpinionCluster,
+    created: bool,
+    update_fields=None,
+    **kwargs
+):
+    """
+    Send a webhook to the webapp when an opinion is created.
+    """
+    if created:
+        return add_webhook_event_to_queue(
+            WebhookEventType.OPINION_CLUSTER_CREATE, instance.id
+        )
+    changed_fields = instance.webhook_tracked_fields.changed()
+    if changed_fields:
+        fields_that_changed = list(changed_fields.keys())
+        return add_webhook_event_to_queue(
+            WebhookEventType.OPINION_CLUSTER_UPDATE,
+            (instance.id, fields_that_changed),
+        )
+
+
+@receiver(
+    post_delete,
+    sender=Opinion,
+    dispatch_uid="handle_opinion_cluster_deleted_webhooks",
+)
+def handle_opinion_cluster_deleted_webhook(
+    sender, instance: Opinion, created: bool, update_fields=None, **kwargs
+):
+    """
+    Send a webhook to the webapp when an opinion is created.
+    """
+    return add_webhook_event_to_queue(
+        WebhookEventType.OPINION_CLUSTER_DELETE, instance.id
+    )
