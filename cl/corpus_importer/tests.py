@@ -13,7 +13,8 @@ from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, now
+from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 
@@ -58,7 +59,10 @@ from cl.corpus_importer.management.commands.troller_bk import (
     log_added_items_to_redis,
     merge_rss_data,
 )
-from cl.corpus_importer.tasks import generate_ia_json
+from cl.corpus_importer.tasks import (
+    generate_ia_json,
+    get_and_save_free_document_report,
+)
 from cl.corpus_importer.utils import (
     ClusterSourceException,
     DocketSourceException,
@@ -82,6 +86,7 @@ from cl.people_db.lookup_utils import (
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
 from cl.recap_rss.models import RssItemCache
+from cl.scrapers.models import PACERFreeDocumentRow
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -105,6 +110,9 @@ from cl.search.models import (
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.fakes import FakeFreeOpinionReport
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class JudgeExtractionTest(SimpleTestCase):
@@ -478,6 +486,33 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.city, "Seattle")
         self.assertEqual(godfrey_llp.state, "WA")
 
+    @patch(
+        "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
+        return_value=None,
+    )
+    def test_get_and_save_free_document_report(self, mock_cookies) -> None:
+        """Test the retrieval and storage of free document report data."""
+
+        with patch(
+            "cl.corpus_importer.tasks.FreeOpinionReport",
+            new=FakeFreeOpinionReport,
+        ):
+            get_and_save_free_document_report(
+                "cand", now().date(), now().date()
+            )
+
+        row = PACERFreeDocumentRow.objects.all()
+        self.assertEqual(row.count(), 1)
+        self.assertEqual(row[0].court_id, "cand")
+        self.assertEqual(row[0].docket_number, "5:18-ap-07075")
+        self.assertTrue(row[0].description)
+        self.assertTrue(row[0].date_filed)
+        self.assertTrue(row[0].document_number)
+        self.assertTrue(row[0].nature_of_suit)
+        self.assertTrue(row[0].pacer_case_id)
+        self.assertTrue(row[0].pacer_doc_id)
+        self.assertTrue(row[0].pacer_seq_no)
+
 
 class GetQuarterTest(SimpleTestCase):
     """Can we properly figure out when the quarter that we're currently in
@@ -609,7 +644,9 @@ class HarvardTests(TestCase):
         :param case_law: Case object
         :return: First citation found
         """
-        cites = eyecite.get_citations(case_law["citations"][0]["cite"])
+        cites = eyecite.get_citations(
+            case_law["citations"][0]["cite"], tokenizer=HYPERSCAN_TOKENIZER
+        )
         cite = Citation.objects.get(
             volume=cites[0].groups["volume"],
             reporter=cites[0].groups["reporter"],
@@ -2929,7 +2966,11 @@ class HarvardMergerTests(TestCase):
         self.assertEqual(docket_1.source, Docket.HARVARD_AND_RECAP)
 
         with self.assertRaises(DocketSourceException):
-            docket_2 = DocketFactory(source=Docket.COLUMBIA_AND_RECAP)
+            # Raise DocketSourceException if the initial source already contains
+            # Harvard.
+            docket_2 = DocketFactory(
+                source=Docket.RECAP_AND_SCRAPER_AND_HARVARD
+            )
             cluster_2 = OpinionClusterWithParentsFactory(docket=docket_2)
             update_docket_source(cluster_2)
             docket_2.refresh_from_db()
@@ -3277,3 +3318,14 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
 <blockquote>Footnote sample
 </blockquote></footnote_body></p>""",
         )
+
+        # Ensure the cluster is not merged again if it has already been merged
+        # and the COLUMBIA source was assigned.
+        with patch(
+            "cl.corpus_importer.management.commands.columbia_merge.logger"
+        ) as mock_logger:
+            # Merge cluster
+            process_cluster(cluster.id, "/columbia/fake_filepath.xml")
+            mock_logger.info.assert_called_with(
+                f"Cluster id: {cluster.id} already merged"
+            )

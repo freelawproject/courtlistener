@@ -80,7 +80,7 @@ def upload_recap_data(options):
             Q(ia_upload_failure_count__lte=3)
             | Q(ia_upload_failure_count=None),
             ia_needs_upload=True,
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             pk__gt=last_pk,
         )
         .order_by("pk")

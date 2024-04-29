@@ -175,6 +175,8 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "faq"},
             {"viewname": "coverage"},
             {"viewname": "coverage_fds"},
+            {"viewname": "coverage_recap"},
+            {"viewname": "coverage_oa"},
             {"viewname": "feeds_info"},
             {"viewname": "contribute"},
             {"viewname": "contact"},
