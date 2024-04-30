@@ -1,12 +1,16 @@
+import logging
+
 import waffle
 from django.conf import settings
-from elasticsearch_dsl import Q
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
+from elasticsearch_dsl import MultiSearch, Q
 from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrList
 from rest_framework.exceptions import ParseError
 
 from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import (
+    build_cardinality_count,
     build_es_main_query,
     build_sort_results,
     do_collapse_count_query,
@@ -19,9 +23,17 @@ from cl.lib.elasticsearch_utils import (
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import map_to_docket_entry_sorting
 from cl.search.constants import SEARCH_HL_TAG
-from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    OpinionDocument,
+    PersonDocument,
+)
+from cl.search.exception import ElasticBadRequestError, ElasticServerError
 from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESCursor
+
+logger = logging.getLogger(__name__)
 
 
 def get_object_list(request, cd, paginator):
@@ -297,6 +309,11 @@ class CursorESList:
         self.results = None
         self.reverse = None
         self.cursor = None
+        self.cardinality_query = {
+            SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
+            SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
+            SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
+        }
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
 
@@ -309,7 +326,7 @@ class CursorESList:
         # next or previous page link.
         self.page_size = page_size + 1
 
-    def get_paginated_results(self) -> Response:
+    def get_paginated_results(self) -> tuple[Response, Response]:
         """Executes the search query with pagination settings and processes
         the results.
         """
@@ -317,12 +334,40 @@ class CursorESList:
             self.main_query = self.main_query.extra(
                 search_after=self.search_after
             )
+
+        # Main query parameters
         self.main_query = self.main_query[: self.page_size]
         default_sorting, unique_sorting = self.get_api_query_sorting()
         self.main_query = self.main_query.sort(default_sorting, unique_sorting)
-        self.results = self.main_query.execute()
+
+        # Cardinality query parameters
+        query = Q(self.main_query.to_dict(count=True)["query"])
+        unique_field, search_document = self.cardinality_query[
+            self.clean_data["type"]
+        ]
+        base_search = search_document.search()
+        cardinality_query = build_cardinality_count(
+            base_search, query, unique_field
+        )
+
+        try:
+            multi_search = MultiSearch()
+            multi_search = multi_search.add(self.main_query).add(
+                cardinality_query
+            )
+            responses = multi_search.execute()
+            self.results = responses[0]
+            cardinality_count_response = responses[1]
+        except (TransportError, ConnectionError, RequestError) as e:
+            raise ElasticServerError()
+        except ApiError as e:
+            if "Failed to parse query" in str(e):
+                raise ElasticBadRequestError()
+            else:
+                logger.error("Multi-search API Error: %s", e)
+                raise ElasticServerError()
         self.process_results(self.results)
-        return self.results
+        return self.results, cardinality_count_response
 
     def process_results(self, results: Response) -> None:
         """Processes the raw results from ES for handling inner hits,

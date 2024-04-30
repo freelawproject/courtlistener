@@ -84,7 +84,8 @@ class ESCursorPagination(BasePagination):
         self.page_size = settings.SEARCH_API_PAGE_SIZE
         self.request = None
         self.es_list_instance = None
-        self.results_count = None
+        self.results_count_exact = None
+        self.results_count_approximate = None
         self.results_in_page = None
         self.base_url = None
         self.cursor = None
@@ -103,10 +104,12 @@ class ESCursorPagination(BasePagination):
         self.search_type = self.es_list_instance.clean_data["type"]
         self.cursor = self.decode_cursor(request)
         self.es_list_instance.set_pagination(self.cursor, self.page_size)
-        results = self.es_list_instance.get_paginated_results()
+        results, cardinality_count = (
+            self.es_list_instance.get_paginated_results()
+        )
         self.results_in_page = len(results)
-
-        self.results_count = results.hits.total.value
+        self.results_count_approximate = cardinality_count
+        self.results_count_exact = results.hits.total.value
         return results
 
     def get_paginated_response(self, data):
@@ -195,22 +198,23 @@ class ESCursorPagination(BasePagination):
             self.base_url, self.cursor_query_param, encoded
         )
 
-    def get_results_count(self) -> dict[str, bool | int]:
-        """Provides a structured count of results based on settings.
+    def get_results_count(self) -> int:
+        """Provides the count of results based on either the main query count
+         hits or the cardinality query, if the results hits exceed the
+         ELASTICSEARCH_MAX_RESULT_COUNT.
 
-        :return: A dictionary containing "exact" count and whether there are
-        "more" or equal results than ELASTICSEARCH_MAX_RESULT_COUNT.
+        :return: An integer representing the number of results matching the query.
         """
-        return {
-            "exact": (
-                self.results_count
-                if self.results_count
-                <= settings.ELASTICSEARCH_MAX_RESULT_COUNT
-                else settings.ELASTICSEARCH_MAX_RESULT_COUNT
-            ),
-            "more": self.results_count
-            > settings.ELASTICSEARCH_MAX_RESULT_COUNT,
-        }
+
+        approximate_count = (
+            self.results_count_approximate.aggregations.unique_documents.value
+        )
+        return (
+            self.results_count_exact
+            if self.results_count_exact
+            <= settings.ELASTICSEARCH_MAX_RESULT_COUNT
+            else approximate_count
+        )
 
     def has_next(self) -> bool:
         """Determines if there is a next page based on the search_after key

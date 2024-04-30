@@ -2808,14 +2808,9 @@ class RECAPSearchAPIV4Test(
             msg="Results in page didn't match.",
         )
         self.assertEqual(
-            response.data["count"]["exact"],
+            response.data["count"],
             test_case["count_exact"],
             msg="Results count didn't match.",
-        )
-        self.assertEqual(
-            response.data["count"]["more"],
-            test_case["more"],
-            msg="Results more key is incorrect.",
         )
         next_page = response.data["next"]
         expected_next_page = test_case["next"]
@@ -3093,35 +3088,30 @@ class RECAPSearchAPIV4Test(
             {
                 "results": 6,
                 "count_exact": total_dockets,
-                "more": False,
                 "next": True,
                 "previous": False,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
-                "more": False,
                 "next": True,
                 "previous": True,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
-                "more": False,
                 "next": True,
                 "previous": True,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
-                "more": False,
                 "next": True,
                 "previous": True,
             },
             {
                 "results": 1,
                 "count_exact": total_dockets,
-                "more": False,
                 "next": False,
                 "previous": True,
             },
@@ -3219,36 +3209,79 @@ class RECAPSearchAPIV4Test(
             "highlight": False,
         }
         total_dockets = Docket.objects.all().count()
+        total_rds = RECAPDocument.objects.all().count()
+
+        ## Get count from cardinality.
         with override_settings(
             ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets - 1
         ):
+            # RECAP Search request, count dockets.
             r = self.client.get(
                 reverse("search-list", kwargs={"version": "v4"}), search_params
             )
             self.assertEqual(
-                r.data["count"]["exact"],
-                total_dockets - 1,
-                msg="Results count didn't match.",
-            )
-            self.assertEqual(
-                r.data["count"]["more"],
-                True,
-                msg="Results more key is incorrect.",
-            )
-
-        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets):
-            r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}), search_params
-            )
-            self.assertEqual(
-                r.data["count"]["exact"],
+                r.data["count"],
                 total_dockets,
                 msg="Results count didn't match.",
             )
+
+            # DOCKETS Search request, count dockets.
+            search_params["type"] = SEARCH_TYPES.DOCKETS
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
             self.assertEqual(
-                r.data["count"]["more"],
-                False,
-                msg="Results more key is incorrect.",
+                r.data["count"],
+                total_dockets,
+                msg="Results count didn't match.",
+            )
+
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds - 1):
+            # RECAP_DOCUMENT Search request, count RDs.
+            search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_rds,
+                msg="Results count didn't match.",
+            )
+
+        ## Get count from main query.
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets):
+            # RECAP Search request, count dockets.
+            search_params["type"] = SEARCH_TYPES.RECAP
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_dockets,
+                msg="Results count didn't match.",
+            )
+
+            # DOCKETS Search request, count dockets.
+            search_params["type"] = SEARCH_TYPES.DOCKETS
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_dockets,
+                msg="Results count didn't match.",
+            )
+
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds):
+            # RECAP_DOCUMENT Search request, count RDs.
+            search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_rds,
+                msg="Results count didn't match.",
             )
 
     def test_recap_cursor_api_pagination_next_and_previous_page(self) -> None:
@@ -3371,7 +3404,7 @@ class RECAPSearchAPIV4Test(
             search_params,
         )
         self.assertEqual(len(r.data["results"]), 2)
-        self.assertEqual(r.data["count"]["exact"], 4)
+        self.assertEqual(r.data["count"], 4)
         next_page = r.data["next"]
         with self.captureOnCommitCallbacks(execute=True):
             docket_0 = DocketFactory(
@@ -3384,7 +3417,7 @@ class RECAPSearchAPIV4Test(
         ids_in_previous_page = {docket.pk, docket_1.pk, docket_0.pk}
         r = self.client.get(next_page)
         self.assertEqual(len(r.data["results"]), 2)
-        self.assertEqual(r.data["count"]["exact"], 5)
+        self.assertEqual(r.data["count"], 5)
 
         current_page_ids = set()
         for result in r.data["results"]:
@@ -3401,7 +3434,7 @@ class RECAPSearchAPIV4Test(
             search_params,
         )
         self.assertEqual(len(r.data["results"]), 2)
-        self.assertEqual(r.data["count"]["exact"], 4)
+        self.assertEqual(r.data["count"], 4)
         next_page = r.data["next"]
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -3414,7 +3447,7 @@ class RECAPSearchAPIV4Test(
 
         r = self.client.get(next_page)
         self.assertEqual(len(r.data["results"]), 2)
-        self.assertEqual(r.data["count"]["exact"], 5)
+        self.assertEqual(r.data["count"], 5)
         self.assertTrue(r.data["next"])
 
         current_page_ids = set()
@@ -3428,7 +3461,7 @@ class RECAPSearchAPIV4Test(
         next_page = r.data["next"]
         r = self.client.get(next_page)
         self.assertEqual(len(r.data["results"]), 1)
-        self.assertEqual(r.data["count"]["exact"], 5)
+        self.assertEqual(r.data["count"], 5)
         self.assertIsNone(r.data["next"])
         self.assertEqual(r.data["results"][0]["docket_id"], self.de.docket.pk)
 
@@ -3706,28 +3739,24 @@ class RECAPSearchAPIV4Test(
             {
                 "results": 4,
                 "count_exact": total_rds,
-                "more": False,
                 "next": True,
                 "previous": False,
             },
             {
                 "results": 4,
                 "count_exact": total_rds,
-                "more": False,
                 "next": True,
                 "previous": True,
             },
             {
                 "results": 4,
                 "count_exact": total_rds,
-                "more": False,
                 "next": True,
                 "previous": True,
             },
             {
                 "results": 3,
                 "count_exact": total_rds,
-                "more": False,
                 "next": False,
                 "previous": True,
             },

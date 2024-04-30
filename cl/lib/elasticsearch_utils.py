@@ -2726,6 +2726,33 @@ def do_es_api_query(
     return main_query
 
 
+def build_cardinality_count(
+    base_query: Search, query: Query, unique_field: str
+) -> Search:
+    """Build an Elasticsearch cardinality aggregation.
+    This aggregation estimates the count of unique documents based on the
+    specified unique field. The precision_threshold, set by
+    ELASTICSEARCH_CARDINALITY_PRECISION, determines the point at which the
+    count begins to trade accuracy for performance.
+
+    :param base_query: The Elasticsearch DSL Search object.
+    :param query: The ES Query object to perform the count query.
+    :param unique_field: The field name on which the cardinality aggregation
+    will be based to estimate uniqueness.
+
+    :return: The ES cardinality aggregation query.
+    """
+
+    search_query = base_query.query(query)
+    search_query.aggs.bucket(
+        "unique_documents",
+        "cardinality",
+        field=unique_field,
+        precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
+    )
+    return search_query.extra(size=0, track_total_hits=True)
+
+
 def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
     """Execute an Elasticsearch count query for queries that uses collapse.
     Uses a query with aggregation to determine the number of unique opinions
@@ -2736,17 +2763,10 @@ def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
     :return: The results count.
     """
 
-    search_query = main_query.query(query)
-    search_query.aggs.bucket(
-        "unique_opinions",
-        "cardinality",
-        field="cluster_id",
-        precision_threshold=2_000,
-    )
-    search_query = search_query.extra(size=0, track_total_hits=True)
+    search_query = build_cardinality_count(main_query, query, "cluster_id")
     try:
         total_results = (
-            search_query.execute().aggregations.unique_opinions.value
+            search_query.execute().aggregations.unique_documents.value
         )
     except (TransportError, ConnectionError, RequestError) as e:
         logger.warning(
