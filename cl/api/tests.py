@@ -145,6 +145,10 @@ class CoverageTests(IndexedSolrTestCase):
         self.assertIn("total", j)
 
 
+@mock.patch(
+    "cl.api.utils.get_logging_prefix",
+    return_value="api:test_counts",
+)
 class ApiQueryCountTests(TransactionTestCase):
     """Check that the number of queries for an API doesn't explode
 
@@ -176,15 +180,21 @@ class ApiQueryCountTests(TransactionTestCase):
         ProcessingQueueFactory.create(court_id="scotus", uploader=up.user)
         AudioFactory.create(docket_id=1)
 
+        r = get_redis_interface("STATS")
+        api_prefix = "api:test_counts.count"
+        r.set(api_prefix, 101)
+
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
 
-    def test_audio_api_query_counts(self) -> None:
+    def test_audio_api_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(4):
             path = reverse("audio-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_no_bad_query_on_empty_parameters(self) -> None:
+    def test_no_bad_query_on_empty_parameters(
+        self, mock_logging_prefix
+    ) -> None:
         with CaptureQueriesContext(connection) as ctx:
             # Test issue 2066, ensuring that we ignore empty filters.
             path = reverse("docketentry-list", kwargs={"version": "v3"})
@@ -197,7 +207,7 @@ class ApiQueryCountTests(TransactionTestCase):
                         f"banished: {bad_query=}"
                     )
 
-    def test_search_api_query_counts(self) -> None:
+    def test_search_api_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(7):
             path = reverse("docket-list", kwargs={"version": "v3"})
             self.client.get(path)
@@ -218,7 +228,7 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("opinion-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_party_api_query_counts(self) -> None:
+    def test_party_api_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(9):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
@@ -227,7 +237,7 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_recap_api_query_counts(self) -> None:
+    def test_recap_api_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(3):
             path = reverse("processingqueue-list", kwargs={"version": "v3"})
             self.client.get(path)
@@ -236,7 +246,7 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
             self.client.get(path, {"pacer_doc_id": "17711118263"})
 
-    def test_recap_api_required_filter(self) -> None:
+    def test_recap_api_required_filter(self, mock_logging_prefix) -> None:
         path = reverse("fast-recapdocument-list", kwargs={"version": "v3"})
         r = self.client.get(path, {"pacer_doc_id": "17711118263"})
         self.assertEqual(r.status_code, HTTPStatus.OK)
