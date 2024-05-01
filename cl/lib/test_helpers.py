@@ -1134,10 +1134,10 @@ def skip_if_common_tests_skipped(method):
     """Decorator to skip common tests based on the skip_common_tests attribute."""
 
     @wraps(method)
-    def wrapper_func(self, *args, **kwargs):
+    async def wrapper_func(self, *args, **kwargs):
         if getattr(self, "skip_common_tests", False):
             raise unittest.SkipTest("Skip common tests within the class.")
-        return method(self, *args, **kwargs)
+        return await method(self, *args, **kwargs)
 
     return wrapper_func
 
