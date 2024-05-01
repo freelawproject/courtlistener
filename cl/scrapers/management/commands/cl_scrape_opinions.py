@@ -230,18 +230,6 @@ class Command(VerboseCommand):
             default=False,
             help="Disable duplicate aborting.",
         )
-        parser.add_argument(
-            "--backscrape-start",
-            dest="backscrape_start",
-            help="Starting value for backscraper iterable creation. "
-            "Each scraper handles the parsing of the argument,"
-            "since the value may represent a year, a string, a date, etc.",
-        )
-        parser.add_argument(
-            "--backscrape-end",
-            dest="backscrape_end",
-            help="End value for backscraper iterable creation.",
-        )
 
     def scrape_court(self, site, full_crawl=False, ocr_available=True):
         # Get the court object early for logging
@@ -358,9 +346,9 @@ class Command(VerboseCommand):
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
 
-    def parse_and_scrape_site(self, mod, full_crawl, _, __):
+    def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site().parse()
-        self.scrape_court(site, full_crawl)
+        self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -396,12 +384,7 @@ class Command(VerboseCommand):
                 i += 1
                 continue
             try:
-                self.parse_and_scrape_site(
-                    mod,
-                    options["full_crawl"],
-                    options.get("backscrape_start"),
-                    options.get("backscrape_end"),
-                )
+                self.parse_and_scrape_site(mod, options)
             except Exception as e:
                 capture_exception(
                     e, fingerprint=[module_string, "{{ default }}"]
