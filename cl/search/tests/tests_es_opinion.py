@@ -440,7 +440,7 @@ class OpinionV3APISearchTest(
         for page in range(1, total_pages + 1):
             search_query = OpinionClusterDocument.search()
             offset = max(0, (page - 1) * page_size)
-            main_query = do_es_api_query(
+            main_query, _ = do_es_api_query(
                 search_query, cd, {"text": 500}, SEARCH_HL_TAG, "v3"
             )
             hits = ESList(

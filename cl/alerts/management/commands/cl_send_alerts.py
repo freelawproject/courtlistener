@@ -221,7 +221,7 @@ class Command(VerboseCommand):
 
             if self.o_es_alerts:
                 search_query = OpinionDocument.search()
-                s = do_es_api_query(
+                s, _ = do_es_api_query(
                     search_query,
                     cd,
                     SEARCH_ALERTS_OPINION_HL_FIELDS,

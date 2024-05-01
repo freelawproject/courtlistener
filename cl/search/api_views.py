@@ -234,7 +234,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             search_type = cd["type"]
             search_query = DocketDocument.search()
             highlighting_fields = {}
-            main_query = do_es_api_query(
+            main_query, child_docs_query = do_es_api_query(
                 search_query,
                 cd,
                 highlighting_fields,
@@ -243,7 +243,12 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             )
             paginator = ESCursorPagination()
             es_list_instance = api_utils.CursorESList(
-                main_query, None, None, cd, version=request.version
+                main_query,
+                child_docs_query,
+                None,
+                None,
+                cd,
+                version=request.version,
             )
             results_page = paginator.paginate_queryset(
                 es_list_instance, request

@@ -85,7 +85,7 @@ def get_object_list(request, cd, paginator):
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
             highlighting_fields = {"text": 500}
-        main_query = do_es_api_query(
+        main_query, _ = do_es_api_query(
             search_query,
             cd,
             highlighting_fields,
@@ -298,9 +298,16 @@ class CursorESList:
     """
 
     def __init__(
-        self, main_query, page_size, search_after, clean_data, version="v3"
+        self,
+        main_query,
+        child_docs_query,
+        page_size,
+        search_after,
+        clean_data,
+        version="v3",
     ):
         self.main_query = main_query
+        self.child_docs_query = child_docs_query
         self.page_size = page_size
         self.search_after = search_after
         self.clean_data = clean_data
@@ -326,7 +333,7 @@ class CursorESList:
         # next or previous page link.
         self.page_size = page_size + 1
 
-    def get_paginated_results(self) -> tuple[Response, Response]:
+    def get_paginated_results(self) -> tuple[Response, Response, Response]:
         """Executes the search query with pagination settings and processes
         the results.
         """
@@ -350,14 +357,31 @@ class CursorESList:
             base_search, query, unique_field
         )
 
+        # Build a cardinality query to count child documents.
+        child_cardinality_query = None
+        child_cardinality_count_response = None
+        if self.child_docs_query:
+            child_unique_field, _ = self.cardinality_query[
+                SEARCH_TYPES.RECAP_DOCUMENT
+            ]
+            child_cardinality_query = build_cardinality_count(
+                base_search, self.child_docs_query, child_unique_field
+            )
         try:
             multi_search = MultiSearch()
             multi_search = multi_search.add(self.main_query).add(
                 cardinality_query
             )
+            # If a cardinality query is available for the search_type, add it
+            # to the multi-search query.
+            if child_cardinality_query:
+                multi_search = multi_search.add(child_cardinality_query)
+
             responses = multi_search.execute()
             self.results = responses[0]
             cardinality_count_response = responses[1]
+            if child_cardinality_query:
+                child_cardinality_count_response = responses[2]
         except (TransportError, ConnectionError, RequestError) as e:
             raise ElasticServerError()
         except ApiError as e:
@@ -367,7 +391,11 @@ class CursorESList:
                 logger.error("Multi-search API Error: %s", e)
                 raise ElasticServerError()
         self.process_results(self.results)
-        return self.results, cardinality_count_response
+        return (
+            self.results,
+            cardinality_count_response,
+            child_cardinality_count_response,
+        )
 
     def process_results(self, results: Response) -> None:
         """Processes the raw results from ES for handling inner hits,

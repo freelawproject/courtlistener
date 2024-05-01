@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
 
 from cl.search.api_utils import CursorESList
+from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESCursor
 
 
@@ -86,6 +87,7 @@ class ESCursorPagination(BasePagination):
         self.es_list_instance = None
         self.results_count_exact = None
         self.results_count_approximate = None
+        self.child_results_count = None
         self.results_in_page = None
         self.base_url = None
         self.cursor = None
@@ -104,24 +106,34 @@ class ESCursorPagination(BasePagination):
         self.search_type = self.es_list_instance.clean_data["type"]
         self.cursor = self.decode_cursor(request)
         self.es_list_instance.set_pagination(self.cursor, self.page_size)
-        results, cardinality_count = (
+        results, cardinality_count, child_cardinality_count = (
             self.es_list_instance.get_paginated_results()
         )
         self.results_in_page = len(results)
         self.results_count_approximate = cardinality_count
         self.results_count_exact = results.hits.total.value
+        self.child_results_count = child_cardinality_count
         return results
 
     def get_paginated_response(self, data):
         """Generate a custom paginated response using the data provided."""
-        return Response(
-            {
-                "count": self.get_results_count(),
-                "next": self.get_next_link(),
-                "previous": self.get_previous_link(),
-                "results": data,
-            }
-        )
+
+        base_response = {
+            "count": self.get_results_count(),
+        }
+        remaining_fields = {
+            "next": self.get_next_link(),
+            "previous": self.get_previous_link(),
+            "results": data,
+        }
+
+        if self.search_type == SEARCH_TYPES.RECAP:
+            # Include the document_count for the "r" search type.
+            base_response.update(
+                {"document_count": self.get_child_results_count()}
+            )
+        base_response.update(remaining_fields)
+        return Response(base_response)
 
     def get_next_link(self) -> str | None:
         """Constructs the URL for the next page based on the current page's
@@ -215,6 +227,14 @@ class ESCursorPagination(BasePagination):
             <= settings.ELASTICSEARCH_MAX_RESULT_COUNT
             else approximate_count
         )
+
+    def get_child_results_count(self) -> int:
+        """Provides the count of child documents based on a cardinality query.
+        :return: An integer representing the number of child documents
+        matching the query.
+        """
+
+        return self.child_results_count.aggregations.unique_documents.value
 
     def has_next(self) -> bool:
         """Determines if there is a next page based on the search_after key

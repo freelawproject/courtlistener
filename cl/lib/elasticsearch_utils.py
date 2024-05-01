@@ -2654,7 +2654,7 @@ def do_es_api_query(
     highlighting_fields: dict[str, int],
     hl_tag: str,
     api_version: Literal["v3", "v4"],
-) -> Search:
+) -> tuple[Search, Query | None]:
     """Build an ES query for its use in the Search API and Webhooks.
 
     :param search_query: Elasticsearch DSL Search object.
@@ -2663,9 +2663,12 @@ def do_es_api_query(
     sizes for highlighting.
     :param hl_tag: The HTML tag to use for highlighting matched fragments.
     :param api_version: The request API version.
-    :return: The modified Search with the resultant query.
+    :return: A two-tuple, the Elasticsearch search query object and an ES
+    Query for child documents, or None if there is no need to query
+    child documents.
     """
 
+    child_docs_query = None
     s, join_query = build_es_base_query(
         search_query, cd, cd["highlight"], api_version
     )
@@ -2698,16 +2701,19 @@ def do_es_api_query(
             build_sort_results(cd, api_version=api_version)
         )
     else:
+        child_docs_query = build_child_docs_query(
+            join_query,
+            cd=cd,
+        )
         # Build query params for the ES V4 Search API endpoints.
         if cd["type"] == SEARCH_TYPES.RECAP_DOCUMENT:
             # The RECAP_DOCUMENT search type returns only child documents.
             # Here, the child documents query is retrieved, highlighting and
             # field exclusion are set.
-            s = build_child_docs_query(
-                join_query,
-                cd=cd,
+
+            s = apply_custom_score_to_parent_query(
+                cd, child_docs_query, api_version
             )
-            s = apply_custom_score_to_parent_query(cd, s, api_version)
             main_query = search_query.query(s)
             highlight_options, fields_to_exclude = build_highlights_dict(
                 SEARCH_RECAP_CHILD_HL_FIELDS, hl_tag
@@ -2723,7 +2729,7 @@ def do_es_api_query(
             main_query = s
             if cd["highlight"]:
                 main_query = add_es_highlighting(s, cd)
-    return main_query
+    return main_query, child_docs_query
 
 
 def build_cardinality_count(

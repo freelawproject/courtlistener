@@ -2797,7 +2797,9 @@ class RECAPSearchAPIV4Test(
                 msg=f'Expected order {test["expected_order"]}, but got {actual_order}',
             )
 
-    def _test_page_variables(self, response, test_case, current_page):
+    def _test_page_variables(
+        self, response, test_case, current_page, search_type
+    ):
         """Ensure the page variables are the correct ones according to the
         current page."""
 
@@ -2812,6 +2814,19 @@ class RECAPSearchAPIV4Test(
             test_case["count_exact"],
             msg="Results count didn't match.",
         )
+        if search_type == SEARCH_TYPES.RECAP:
+            self.assertEqual(
+                response.data["document_count"],
+                test_case["document_count"],
+                msg="Document count didn't match.",
+            )
+        else:
+            self.assertNotIn(
+                "document_count",
+                response.data,
+                msg="Document count should not be present.",
+            )
+
         next_page = response.data["next"]
         expected_next_page = test_case["next"]
         if expected_next_page:
@@ -3079,6 +3094,7 @@ class RECAPSearchAPIV4Test(
                 created_dockets.append(docket_entry.docket)
 
         total_dockets = Docket.objects.all().count()
+        total_rds = RECAPDocument.objects.all().count()
         search_params = {
             "type": SEARCH_TYPES.RECAP,
             "order_by": "score desc",
@@ -3088,30 +3104,35 @@ class RECAPSearchAPIV4Test(
             {
                 "results": 6,
                 "count_exact": total_dockets,
+                "document_count": total_rds,
                 "next": True,
                 "previous": False,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
+                "document_count": total_rds,
                 "next": True,
                 "previous": True,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
+                "document_count": total_rds,
                 "next": True,
                 "previous": True,
             },
             {
                 "results": 6,
                 "count_exact": total_dockets,
+                "document_count": total_rds,
                 "next": True,
                 "previous": True,
             },
             {
                 "results": 1,
                 "count_exact": total_dockets,
+                "document_count": total_rds,
                 "next": False,
                 "previous": True,
             },
@@ -3144,7 +3165,7 @@ class RECAPSearchAPIV4Test(
                             r = self.client.get(next_page)
                         # Test page variables.
                         next_page, _, current_page = self._test_page_variables(
-                            r, test, current_page
+                            r, test, current_page, search_params["type"]
                         )
                         ids_in_page = set()
                         for result in r.data["results"]:
@@ -3173,7 +3194,9 @@ class RECAPSearchAPIV4Test(
 
                         # Test page variables.
                         _, previous_page, current_page = (
-                            self._test_page_variables(r, test, current_page)
+                            self._test_page_variables(
+                                r, test, current_page, search_params["type"]
+                            )
                         )
                         ids_in_page_got = set()
                         for result in r.data["results"]:
@@ -3224,6 +3247,11 @@ class RECAPSearchAPIV4Test(
                 total_dockets,
                 msg="Results count didn't match.",
             )
+            self.assertEqual(
+                r.data["document_count"],
+                total_rds,
+                msg="Document count didn't match.",
+            )
 
             # DOCKETS Search request, count dockets.
             search_params["type"] = SEARCH_TYPES.DOCKETS
@@ -3234,6 +3262,11 @@ class RECAPSearchAPIV4Test(
                 r.data["count"],
                 total_dockets,
                 msg="Results count didn't match.",
+            )
+            self.assertNotIn(
+                "document_count",
+                r.data,
+                msg="Document count should not be present.",
             )
 
         with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds - 1):
@@ -3246,6 +3279,11 @@ class RECAPSearchAPIV4Test(
                 r.data["count"],
                 total_rds,
                 msg="Results count didn't match.",
+            )
+            self.assertNotIn(
+                "document_count",
+                r.data,
+                msg="Document count should not be present.",
             )
 
         ## Get count from main query.
@@ -3260,6 +3298,12 @@ class RECAPSearchAPIV4Test(
                 total_dockets,
                 msg="Results count didn't match.",
             )
+            # Document count is always retrieved from a cardinality query.
+            self.assertEqual(
+                r.data["document_count"],
+                total_rds,
+                msg="Document count didn't match.",
+            )
 
             # DOCKETS Search request, count dockets.
             search_params["type"] = SEARCH_TYPES.DOCKETS
@@ -3270,6 +3314,11 @@ class RECAPSearchAPIV4Test(
                 r.data["count"],
                 total_dockets,
                 msg="Results count didn't match.",
+            )
+            self.assertNotIn(
+                "document_count",
+                r.data,
+                msg="Document count should not be present.",
             )
 
         with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds):
@@ -3282,6 +3331,11 @@ class RECAPSearchAPIV4Test(
                 r.data["count"],
                 total_rds,
                 msg="Results count didn't match.",
+            )
+            self.assertNotIn(
+                "document_count",
+                r.data,
+                msg="Document count should not be present.",
             )
 
     def test_recap_cursor_api_pagination_next_and_previous_page(self) -> None:
@@ -3405,6 +3459,7 @@ class RECAPSearchAPIV4Test(
         )
         self.assertEqual(len(r.data["results"]), 2)
         self.assertEqual(r.data["count"], 4)
+        self.assertEqual(r.data["document_count"], 3)
         next_page = r.data["next"]
         with self.captureOnCommitCallbacks(execute=True):
             docket_0 = DocketFactory(
@@ -3418,6 +3473,7 @@ class RECAPSearchAPIV4Test(
         r = self.client.get(next_page)
         self.assertEqual(len(r.data["results"]), 2)
         self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
 
         current_page_ids = set()
         for result in r.data["results"]:
@@ -3435,6 +3491,7 @@ class RECAPSearchAPIV4Test(
         )
         self.assertEqual(len(r.data["results"]), 2)
         self.assertEqual(r.data["count"], 4)
+        self.assertEqual(r.data["document_count"], 3)
         next_page = r.data["next"]
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -3448,6 +3505,7 @@ class RECAPSearchAPIV4Test(
         r = self.client.get(next_page)
         self.assertEqual(len(r.data["results"]), 2)
         self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
         self.assertTrue(r.data["next"])
 
         current_page_ids = set()
@@ -3462,6 +3520,7 @@ class RECAPSearchAPIV4Test(
         r = self.client.get(next_page)
         self.assertEqual(len(r.data["results"]), 1)
         self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
         self.assertIsNone(r.data["next"])
         self.assertEqual(r.data["results"][0]["docket_id"], self.de.docket.pk)
 
@@ -3789,7 +3848,7 @@ class RECAPSearchAPIV4Test(
                             r = self.client.get(next_page)
                         # Test page variables.
                         next_page, _, current_page = self._test_page_variables(
-                            r, test, current_page
+                            r, test, current_page, search_params["type"]
                         )
                         ids_in_page = set()
                         for result in r.data["results"]:
@@ -3818,7 +3877,9 @@ class RECAPSearchAPIV4Test(
 
                         # Test page variables.
                         _, previous_page, current_page = (
-                            self._test_page_variables(r, test, current_page)
+                            self._test_page_variables(
+                                r, test, current_page, search_params["type"]
+                            )
                         )
                         ids_in_page_got = set()
                         for result in r.data["results"]:
