@@ -78,7 +78,7 @@ async def court_index(request: HttpRequest) -> HttpResponse:
 
 async def rest_docs(request, version=None):
     """Show the correct version of the rest docs"""
-    courts = await make_court_variable()
+    courts = []  # await make_court_variable()
     court_count = len(courts)
     context = {"court_count": court_count, "courts": courts, "private": False}
     return TemplateResponse(
@@ -153,6 +153,14 @@ async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
             "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
             "private": False,
         },
+    )
+
+
+async def financial_disclosures_api(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "financial-disclosure-docs-vlatest.html",
+        {"private": False},
     )
 
 
