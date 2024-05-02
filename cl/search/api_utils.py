@@ -26,6 +26,7 @@ from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
 )
@@ -316,10 +317,11 @@ class CursorESList:
         self.results = None
         self.reverse = None
         self.cursor = None
-        self.cardinality_query = {
+        self.unique_field_query = {
             SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
             SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
             SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
+            SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
         }
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
@@ -347,9 +349,10 @@ class CursorESList:
         default_sorting, unique_sorting = self.get_api_query_sorting()
         self.main_query = self.main_query.sort(default_sorting, unique_sorting)
 
+        print("<<<< Main query: ", self.main_query.to_dict())
         # Cardinality query parameters
         query = Q(self.main_query.to_dict(count=True)["query"])
-        unique_field, search_document = self.cardinality_query[
+        unique_field, search_document = self.unique_field_query[
             self.clean_data["type"]
         ]
         base_search = search_document.search()
@@ -361,7 +364,7 @@ class CursorESList:
         child_cardinality_query = None
         child_cardinality_count_response = None
         if self.child_docs_query:
-            child_unique_field, _ = self.cardinality_query[
+            child_unique_field, _ = self.unique_field_query[
                 SEARCH_TYPES.RECAP_DOCUMENT
             ]
             child_cardinality_query = build_cardinality_count(
@@ -467,23 +470,15 @@ class CursorESList:
         default_unique_order = {
             "type": self.clean_data["type"],
         }
-        match self.clean_data["type"]:
-            case SEARCH_TYPES.RECAP_DOCUMENT:
-                # Use the 'id' field as a unique sorting key for the 'rd'
-                # search type.
-                default_unique_order.update(
-                    {
-                        "order_by": "id desc",
-                    }
-                )
-            case _:
-                # Use the 'docket_id' field as a unique sorting key for the
-                # 'd' and 'r' search type.
-                default_unique_order.update(
-                    {
-                        "order_by": "docket_id desc",
-                    }
-                )
+
+        unique_field, _ = self.unique_field_query[self.clean_data["type"]]
+        # Use a document unique field as a unique sorting key for the current
+        # search type.
+        default_unique_order.update(
+            {
+                "order_by": f"{unique_field} desc",
+            }
+        )
 
         unique_sorting = build_sort_results(
             default_unique_order, toggle_sort, "v4"

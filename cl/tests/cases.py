@@ -2,14 +2,17 @@ import sys
 from io import StringIO
 from unittest import mock
 
+from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
+from django.urls import reverse
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree
 from rest_framework.test import APITestCase
 
 from cl.lib.redis_utils import get_redis_interface
+from cl.search.models import SEARCH_TYPES
 
 
 class OutputBlockerTestMixin:
@@ -229,3 +232,114 @@ class CountESTasksTestCase(SimpleTestCase):
             self.task_call_count == expected
         ), f"Expected {expected} task calls, but got {self.task_call_count}"
         self.task_call_count = 0
+
+
+class V4SearchAPIAssertions(SimpleTestCase):
+    """Common assertions for V4 Search API tests."""
+
+    async def _test_api_fields_content(
+        self,
+        api_response,
+        content_to_compare,
+        fields_to_compare,
+        child_document_keys,
+    ):
+        for (
+            field,
+            get_expected_value,
+        ) in fields_to_compare.items():
+            with self.subTest(field=field):
+                actual_value = api_response.data["results"][0].get(field)
+                if field in ["recap_documents", "opinions"]:
+                    for child_field, child_value in actual_value[0].items():
+                        with self.subTest(child_field=child_field):
+                            get_child_expected_value = child_document_keys.get(
+                                child_field
+                            )
+                            child_expected_value = await sync_to_async(
+                                get_child_expected_value
+                            )(content_to_compare)
+                            self.assertEqual(
+                                child_value,
+                                child_expected_value,
+                                f"Child field '{field}' does not match.",
+                            )
+                else:
+                    expected_value = await sync_to_async(get_expected_value)(
+                        content_to_compare
+                    )
+                    self.assertEqual(
+                        actual_value,
+                        expected_value,
+                        f"Parent field '{field}' does not match.",
+                    )
+
+    def _test_results_ordering(self, test, field):
+        """Ensure dockets appear in the response in a specific order."""
+
+        with self.subTest(test=test, msg=f'{test["name"]}'):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}),
+                test["search_params"],
+            )
+            self.assertEqual(len(r.data["results"]), test["expected_results"])
+            # Note that dockets where the date_field is null are sent to the bottom
+            # of the results
+            actual_order = [result[field] for result in r.data["results"]]
+            self.assertEqual(
+                actual_order,
+                test["expected_order"],
+                msg=f'Expected order {test["expected_order"]}, but got {actual_order}',
+            )
+
+    def _test_page_variables(
+        self, response, test_case, current_page, search_type
+    ):
+        """Ensure the page variables are the correct ones according to the
+        current page."""
+
+        # Test page
+        self.assertEqual(
+            len(response.data["results"]),
+            test_case["results"],
+            msg="Results in page didn't match.",
+        )
+        self.assertEqual(
+            response.data["count"],
+            test_case["count_exact"],
+            msg="Results count didn't match.",
+        )
+        if search_type == SEARCH_TYPES.RECAP:
+            self.assertEqual(
+                response.data["document_count"],
+                test_case["document_count"],
+                msg="Document count didn't match.",
+            )
+        else:
+            self.assertNotIn(
+                "document_count",
+                response.data,
+                msg="Document count should not be present.",
+            )
+
+        next_page = response.data["next"]
+        expected_next_page = test_case["next"]
+        if expected_next_page:
+            self.assertTrue(next_page, msg="Next page value didn't match")
+            current_page = next_page
+        else:
+            self.assertFalse(next_page, msg="Next page value didn't match")
+
+        previous_page = response.data["previous"]
+        expected_previous_page = test_case["previous"]
+        if expected_previous_page:
+            self.assertTrue(
+                previous_page,
+                msg="Previous page value didn't match",
+            )
+        else:
+            self.assertFalse(
+                previous_page,
+                msg="Previous page value didn't match",
+            )
+        return next_page, previous_page, current_page

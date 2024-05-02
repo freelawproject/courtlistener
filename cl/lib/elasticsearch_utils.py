@@ -495,6 +495,8 @@ def build_sort_results(
         "name_reverse asc": {"name_reverse": {"order": "asc"}},
         "docket_id asc": {"docket_id": {"order": "asc"}},
         "docket_id desc": {"docket_id": {"order": "desc"}},
+        "cluster_id asc": {"cluster_id": {"order": "asc"}},
+        "cluster_id desc": {"cluster_id": {"order": "desc"}},
         "id asc": {"id": {"order": "asc"}},
         "id desc": {"id": {"order": "desc"}},
         "dob desc,name_reverse asc": {
@@ -2678,6 +2680,8 @@ def do_es_api_query(
         # V3 endpoints display child documents. Here, the child documents query
         # is retrieved, and extra parameters like highlighting, field exclusion,
         # and sorting are set.
+        # Note that in V3 Case Law Search, opinions are collapsed by cluster_id
+        # meaning that only one result per cluster is shown.
         s = build_child_docs_query(
             join_query,
             cd=cd,

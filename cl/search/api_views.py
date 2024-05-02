@@ -16,8 +16,8 @@ from cl.search.api_serializers import (
     DocketSerializer,
     ExtendedPersonESSerializer,
     OAESResultSerializer,
+    OpinionClusterESResultSerializer,
     OpinionClusterSerializer,
-    OpinionESResultSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
@@ -26,9 +26,10 @@ from cl.search.api_serializers import (
     RECAPESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
+    V3OpinionESResultSerializer,
 )
 from cl.search.constants import SEARCH_HL_TAG
-from cl.search.documents import DocketDocument
+from cl.search.documents import DocketDocument, OpinionClusterDocument
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -208,7 +209,9 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
             elif search_type == SEARCH_TYPES.OPINION and is_opinion_active:
-                serializer = OpinionESResultSerializer(result_page, many=True)
+                serializer = V3OpinionESResultSerializer(
+                    result_page, many=True
+                )
             else:
                 if cd["q"] == "":
                     cd["q"] = "*"  # Get everything
@@ -227,12 +230,19 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     # but folks will need to log in to get past the thresholds.
     permission_classes = (permissions.AllowAny,)
 
+    document_search_classes = {
+        SEARCH_TYPES.RECAP: DocketDocument,
+        SEARCH_TYPES.DOCKETS: DocketDocument,
+        SEARCH_TYPES.RECAP_DOCUMENT: DocketDocument,
+        SEARCH_TYPES.OPINION: OpinionClusterDocument,
+    }
+
     def list(self, request, *args, **kwargs):
         search_form = SearchForm(request.GET, is_es_form=True)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
-            search_query = DocketDocument.search()
+            search_query = self.document_search_classes[search_type].search()
             highlighting_fields = {}
             main_query, child_docs_query = do_es_api_query(
                 search_query,
@@ -259,21 +269,29 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             results_page = api_utils.limit_api_results_to_page(
                 results_page, paginator.cursor
             )
-            if search_type == SEARCH_TYPES.RECAP:
-                serializer = RECAPESResultSerializer(results_page, many=True)
-            elif search_type == SEARCH_TYPES.DOCKETS:
-                serializer = BaseDocketESResultSerializer(
-                    results_page, many=True
-                )
-            elif search_type == SEARCH_TYPES.RECAP_DOCUMENT:
-                serializer = RECAPDocumentESResultSerializerBase(
-                    results_page, many=True
-                )
-            else:
-                # Not found error
-                raise NotFound(
-                    detail="Search type not found or not supported."
-                )
+
+            match search_type:
+                case SEARCH_TYPES.RECAP:
+                    serializer = RECAPESResultSerializer(
+                        results_page, many=True
+                    )
+                case SEARCH_TYPES.DOCKETS:
+                    serializer = BaseDocketESResultSerializer(
+                        results_page, many=True
+                    )
+                case SEARCH_TYPES.RECAP_DOCUMENT:
+                    serializer = RECAPDocumentESResultSerializerBase(
+                        results_page, many=True
+                    )
+                case SEARCH_TYPES.OPINION:
+                    serializer = OpinionClusterESResultSerializer(
+                        results_page, many=True
+                    )
+                case _:
+                    # Not found error
+                    raise NotFound(
+                        detail="Search type not found or not supported."
+                    )
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(

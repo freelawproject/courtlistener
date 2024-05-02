@@ -22,6 +22,7 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
 )
@@ -381,8 +382,8 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
         return get_highlight(obj, "text")
 
 
-class OpinionESResultSerializer(DocumentSerializer):
-    """The serializer for Opinion results."""
+class V3OpinionESResultSerializer(DocumentSerializer):
+    """The serializer for V3 Opinion Search API results."""
 
     cluster_id = serializers.IntegerField(read_only=True)
 
@@ -518,3 +519,47 @@ class RECAPESResultSerializer(BaseDocketESResultSerializer):
     more_docs = serializers.BooleanField(
         read_only=True, source="child_remaining"
     )
+
+
+class OpinionDocumentESResultSerializer(DocumentSerializer):
+    """The serializer for OpinionDocument results."""
+
+    snippet = HighlightedField(read_only=True, source="text")
+
+    class Meta:
+        document = OpinionDocument
+        fields = (
+            "id",
+            "author_id",
+            "type",
+            "per_curiam",
+            "download_url",
+            "local_path",
+            "sha1",
+            "cites",
+            "joined_by_ids",
+        )
+
+
+class OpinionClusterESResultSerializer(DocumentSerializer):
+    """The serializer for OpinionCluster Search results."""
+
+    dateArgued = DateField(read_only=True)
+    dateFiled = DateField(read_only=True)
+    dateReargued = DateField(read_only=True)
+    dateReargumentDenied = DateField(read_only=True)
+    date_created = serializers.DateTimeField(
+        read_only=True, default_timezone=timezone.utc
+    )
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    opinions = OpinionDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+
+    class Meta:
+        document = OpinionClusterDocument
+        exclude = (
+            "court_exact",
+            "_related_instance_to_ignore",
+            "cluster_child",
+        )

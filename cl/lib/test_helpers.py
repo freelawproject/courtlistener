@@ -63,15 +63,43 @@ def midnight_pt_test(d: datetime.date) -> datetime.datetime:
     return timezone.make_aware(d, time_zone)
 
 
-opinion_search_api_keys = {
+opinion_cluster_v3_v4_common_fields = {
     "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
     "attorney": lambda x: x["result"].cluster.attorneys,
-    "author_id": lambda x: x["result"].author_id,
     "caseName": lambda x: x["result"].cluster.case_name,
     "citation": lambda x: [
         str(cite) for cite in x["result"].cluster.citations.all()
     ],
     "citeCount": lambda x: x["result"].cluster.citation_count,
+    "court": lambda x: x["result"].cluster.docket.court.full_name,
+    "court_citation_string": lambda x: x[
+        "result"
+    ].cluster.docket.court.citation_string,
+    "court_id": lambda x: x["result"].cluster.docket.court_id,
+    "cluster_id": lambda x: x["result"].cluster_id,
+    "docketNumber": lambda x: x["result"].cluster.docket.docket_number,
+    "docket_id": lambda x: x["result"].cluster.docket_id,
+    "judge": lambda x: x["result"].cluster.judges,
+    "lexisCite": lambda x: (
+        str(x["result"].cluster.citations.filter(type=Citation.LEXIS)[0])
+        if x["result"].cluster.citations.filter(type=Citation.LEXIS)
+        else ""
+    ),
+    "neutralCite": lambda x: (
+        str(x["result"].cluster.citations.filter(type=Citation.NEUTRAL)[0])
+        if x["result"].cluster.citations.filter(type=Citation.NEUTRAL)
+        else ""
+    ),
+    "scdb_id": lambda x: x["result"].cluster.scdb_id,
+    "sibling_ids": lambda x: list(
+        x["result"].cluster.sub_opinions.all().values_list("id", flat=True)
+    ),
+    "status": lambda x: x["status"],
+    "suitNature": lambda x: x["result"].cluster.nature_of_suit,
+}
+
+opinion_document_v3_v4_common_fields = {
+    "author_id": lambda x: x["result"].author_id,
     "cites": lambda x: (
         list(
             x["result"]
@@ -83,13 +111,31 @@ opinion_search_api_keys = {
         .values_list("cited_opinion_id", flat=True)
         else None
     ),
-    "court": lambda x: x["result"].cluster.docket.court.full_name,
-    "court_citation_string": lambda x: x[
-        "result"
-    ].cluster.docket.court.citation_string,
+    "download_url": lambda x: x["result"].download_url,
+    "id": lambda x: x["result"].pk,
+    "joined_by_ids": lambda x: (
+        list(x["result"].joined_by.all().values_list("id", flat=True))
+        if x["result"].joined_by.all()
+        else None
+    ),
+    "type": lambda x: x["type"],
+    "local_path": lambda x: (
+        x["result"].local_path if x["result"].local_path else None
+    ),
+    "per_curiam": lambda x: x["result"].per_curiam,
+    "snippet": lambda x: x["snippet"],
+}
+
+opinion_cluster_v3_fields = opinion_cluster_v3_v4_common_fields.copy()
+opinion_document_v3_fields = opinion_document_v3_v4_common_fields.copy()
+
+opinion_v3_search_api_keys = {
     "court_exact": lambda x: x["result"].cluster.docket.court_id,
-    "court_id": lambda x: x["result"].cluster.docket.court_id,
-    "cluster_id": lambda x: x["result"].cluster_id,
+    "panel_ids": lambda x: (
+        list(x["result"].cluster.panel.all().values_list("id", flat=True))
+        if x["result"].cluster.panel.all()
+        else None
+    ),
     "dateArgued": lambda x: (
         midnight_pt_test(x["result"].cluster.docket.date_argued).isoformat()
         if x["result"].cluster.docket.date_argued
@@ -112,43 +158,6 @@ opinion_search_api_keys = {
         if x["result"].cluster.docket.date_reargument_denied
         else None
     ),
-    "docketNumber": lambda x: x["result"].cluster.docket.docket_number,
-    "docket_id": lambda x: x["result"].cluster.docket_id,
-    "download_url": lambda x: x["result"].download_url,
-    "id": lambda x: x["result"].pk,
-    "joined_by_ids": lambda x: (
-        list(x["result"].joined_by.all().values_list("id", flat=True))
-        if x["result"].joined_by.all()
-        else None
-    ),
-    "panel_ids": lambda x: (
-        list(x["result"].cluster.panel.all().values_list("id", flat=True))
-        if x["result"].cluster.panel.all()
-        else None
-    ),
-    "type": lambda x: x["result"].type,
-    "judge": lambda x: x["result"].cluster.judges,
-    "lexisCite": lambda x: (
-        str(x["result"].cluster.citations.filter(type=Citation.LEXIS)[0])
-        if x["result"].cluster.citations.filter(type=Citation.LEXIS)
-        else ""
-    ),
-    "neutralCite": lambda x: (
-        str(x["result"].cluster.citations.filter(type=Citation.NEUTRAL)[0])
-        if x["result"].cluster.citations.filter(type=Citation.NEUTRAL)
-        else ""
-    ),
-    "local_path": lambda x: (
-        x["result"].local_path if x["result"].local_path else None
-    ),
-    "per_curiam": lambda x: x["result"].per_curiam,
-    "scdb_id": lambda x: x["result"].cluster.scdb_id,
-    "sibling_ids": lambda x: list(
-        x["result"].cluster.sub_opinions.all().values_list("id", flat=True)
-    ),
-    "status": lambda x: x["result"].cluster.get_precedential_status_display(),
-    "snippet": lambda x: x["snippet"],
-    "suitNature": lambda x: x["result"].cluster.nature_of_suit,
     "date_created": lambda x: timezone.localtime(
         x["result"].cluster.date_created
     ).isoformat(),
@@ -156,6 +165,67 @@ opinion_search_api_keys = {
         x["result"].cluster.date_created
     ).isoformat(),
 }
+opinion_v3_search_api_keys.update(opinion_cluster_v3_fields)
+opinion_v3_search_api_keys.update(opinion_document_v3_fields)
+
+
+opinion_v4_search_api_keys = {
+    "non_participating_judge_ids": lambda x: (
+        list(
+            x["result"]
+            .cluster.non_participating_judges.all()
+            .values_list("id", flat=True)
+        )
+    ),
+    "source": lambda x: x["result"].cluster.source,
+    "caseNameFull": lambda x: x["result"].cluster.case_name_full,
+    "panel_names": lambda x: [
+        judge.name_full for judge in x["result"].cluster.panel.all()
+    ],
+    "procedural_history": lambda x: x["result"].cluster.procedural_history,
+    "posture": lambda x: x["result"].cluster.posture,
+    "syllabus": lambda x: x["result"].cluster.syllabus,
+    "opinions": [],  # type: ignore,
+    "panel_ids": lambda x: (
+        list(x["result"].cluster.panel.all().values_list("id", flat=True))
+        if x["result"].cluster.panel.all()
+        else []
+    ),
+    "dateArgued": lambda x: (
+        x["result"].cluster.docket.date_argued.isoformat()
+        if x["result"].cluster.docket.date_argued
+        else None
+    ),
+    "dateFiled": lambda x: (
+        x["result"].cluster.date_filed.isoformat()
+        if x["result"].cluster.date_filed
+        else None
+    ),
+    "dateReargued": lambda x: (
+        x["result"].cluster.docket.date_reargued.isoformat()
+        if x["result"].cluster.docket.date_reargued
+        else None
+    ),
+    "dateReargumentDenied": lambda x: (
+        x["result"].cluster.docket.date_reargument_denied.isoformat()
+        if x["result"].cluster.docket.date_reargument_denied
+        else None
+    ),
+    "date_created": lambda x: x["result"]
+    .cluster.date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "timestamp": lambda x: x["result"]
+    .cluster.date_created.isoformat()
+    .replace("+00:00", "Z"),
+}
+
+opinion_cluster_v4_common_fields = opinion_cluster_v3_v4_common_fields.copy()
+opinion_v4_search_api_keys.update(opinion_cluster_v4_common_fields)
+
+opinion_document_v4_api_keys = {
+    "sha1": lambda x: x["result"].sha1,
+}
+opinion_document_v4_api_keys.update(opinion_document_v3_v4_common_fields)
 
 
 docket_v4_api_keys_base = {

@@ -25,7 +25,10 @@ from cl.lib.test_helpers import (
     EmptySolrTestCase,
     PeopleTestCase,
     SearchTestCase,
-    opinion_search_api_keys,
+    opinion_document_v4_api_keys,
+    opinion_v3_search_api_keys,
+    opinion_v4_search_api_keys,
+    skip_if_common_tests_skipped,
 )
 from cl.people_db.factories import PersonFactory
 from cl.search.api_utils import ESList
@@ -69,19 +72,21 @@ from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
     TransactionTestCase,
+    V4SearchAPIAssertions,
 )
 from cl.users.factories import UserProfileWithParentsFactory
 
 
-@override_flag("o-es-search-api-active", active=True)
-class OpinionV3APISearchTest(
-    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+class OpinionSearchAPICommonTests(
+    CourtTestCase, PeopleTestCase, SearchTestCase
 ):
+    version_api = "v3"
+    skip_common_tests = True
+
     @classmethod
     def setUpTestData(cls):
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
-            cls.rebuild_index("search.OpinionCluster")
             court = CourtFactory(
                 id="canb",
                 jurisdiction="FB",
@@ -158,12 +163,14 @@ class OpinionV3APISearchTest(
         )
         return r
 
+    @skip_if_common_tests_skipped
     async def test_can_perform_a_regular_text_query(self) -> None:
         search_params = {"q": "supreme"}
 
         r = await self._test_api_results_count(search_params, 1, "text_query")
         self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_search_with_white_spaces_only(self) -> None:
         """Does everything work when whitespace is in various fields?"""
         search_params = {"q": " ", "judge": " ", "case_name": " "}
@@ -174,12 +181,14 @@ class OpinionV3APISearchTest(
         )
         self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filter_using_the_case_name(self) -> None:
         search_params = {"q": "*", "case_name": "honda"}
 
         r = await self._test_api_results_count(search_params, 1, "case_name")
         self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_query_with_an_old_date(self) -> None:
         """Do we have any recurrent issues with old dates and strftime (issue
         220)?"""
@@ -188,6 +197,7 @@ class OpinionV3APISearchTest(
         r = await self._test_api_results_count(search_params, 4, "filed_after")
         self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filter_using_filed_range(self) -> None:
         """Does querying by date work?"""
         search_params = {
@@ -199,6 +209,7 @@ class OpinionV3APISearchTest(
         r = await self._test_api_results_count(search_params, 1, "filed_range")
         self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filter_using_a_docket_number(self) -> None:
         """Can we query by docket number?"""
         search_params = {"q": "*", "docket_number": "2"}
@@ -208,6 +219,7 @@ class OpinionV3APISearchTest(
         )
         self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filter_by_citation_number(self) -> None:
         """Can we query by citation number?"""
         get_dicts = [{"q": "*", "citation": "33"}, {"q": "citation:33"}]
@@ -217,6 +229,7 @@ class OpinionV3APISearchTest(
             )
             self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filter_using_neutral_citation(self) -> None:
         """Can we query by neutral citation numbers?"""
         search_params = {"q": "*", "neutral_cite": "22"}
@@ -226,6 +239,7 @@ class OpinionV3APISearchTest(
         )
         self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filter_using_judge_name(self) -> None:
         """Can we query by judge name?"""
         search_array = [{"q": "*", "judge": "david"}, {"q": "judge:david"}]
@@ -235,6 +249,7 @@ class OpinionV3APISearchTest(
             )
             self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filter_by_nature_of_suit(self) -> None:
         """Can we query by nature of suit?"""
         search_params = {"q": 'suitNature:"copyright"'}
@@ -242,6 +257,7 @@ class OpinionV3APISearchTest(
         r = await self._test_api_results_count(search_params, 1, "suit_nature")
         self.assertIn("Honda", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filtering_by_citation_count(self) -> None:
         """Can we find Documents by citation filtering?"""
         search_params = {"q": "*", "cited_lt": 7, "cited_gt": 5}
@@ -255,6 +271,7 @@ class OpinionV3APISearchTest(
 
         r = self._test_api_results_count(search_params, 0, "citation_count")
 
+    @skip_if_common_tests_skipped
     async def test_citation_ordering_by_citation_count(self) -> None:
         """Can the results be re-ordered by citation count?"""
         search_params = {"q": "*", "order_by": "citeCount desc"}
@@ -283,30 +300,7 @@ class OpinionV3APISearchTest(
             "citeCount." % (most_cited_name, less_cited_name),
         )
 
-    async def test_random_ordering(self) -> None:
-        """Can the results be ordered randomly?
-
-        This test is difficult since we can't check that things actually get
-        ordered randomly, but we can at least make sure the query succeeds.
-        """
-        search_params = {"q": "*", "order_by": "random_123 desc"}
-
-        await self._test_api_results_count(search_params, 4, "order random")
-
-    async def test_issue_635_leading_zeros(self) -> None:
-        """Do queries with leading zeros work equal to ones without?"""
-        search_params = {"docket_number": "005", "stat_Errata": "on"}
-        expected = 1
-
-        await self._test_api_results_count(
-            search_params, expected, "docket_number"
-        )
-
-        search_params["docket_number"] = "5"
-        await self._test_api_results_count(
-            search_params, expected, "docket_number"
-        )
-
+    @skip_if_common_tests_skipped
     async def test_issue_1193_docket_numbers_as_phrase(self) -> None:
         """Are docket numbers searched as a phrase?"""
         # Search for the full docket number. Does it work?
@@ -320,6 +314,7 @@ class OpinionV3APISearchTest(
         search_params["docket_number"] = "docket 005 number"
         await self._test_api_results_count(search_params, 0, "docket_number")
 
+    @skip_if_common_tests_skipped
     async def test_can_use_docket_number_proximity(self) -> None:
         """Test docket_number proximity query, so that docket numbers like
         1:21-cv-1234 can be matched by queries like: 21-1234
@@ -351,6 +346,7 @@ class OpinionV3APISearchTest(
         )
         self.assertIn("Washington", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_can_filter_with_docket_number_suffixes(self) -> None:
         """Test docket_number with suffixes can be found."""
         # Indexed: 1:21-cv-1234 -> Search: 1:21-cv-1234-ABC
@@ -375,6 +371,7 @@ class OpinionV3APISearchTest(
         )
         self.assertIn("Lorem", r.content.decode())
 
+    @skip_if_common_tests_skipped
     async def test_api_results_count(self) -> None:
         """Test the results count returned by the API"""
         search_params = {
@@ -392,6 +389,37 @@ class OpinionV3APISearchTest(
         )
         self.assertEqual(r.data["count"], 5, msg="Wrong number of results.")
 
+
+@override_flag("o-es-search-api-active", active=True)
+class OpinionV3APISearchTest(
+    OpinionSearchAPICommonTests, ESIndexTestCase, TestCase
+):
+    skip_common_tests = False
+
+    async def test_random_ordering(self) -> None:
+        """Can the results be ordered randomly?
+
+        This test is difficult since we can't check that things actually get
+        ordered randomly, but we can at least make sure the query succeeds.
+        """
+        search_params = {"q": "*", "order_by": "random_123 desc"}
+
+        await self._test_api_results_count(search_params, 4, "order random")
+
+    async def test_issue_635_leading_zeros(self) -> None:
+        """Do queries with leading zeros work equal to ones without?"""
+        search_params = {"docket_number": "005", "stat_Errata": "on"}
+        expected = 1
+
+        await self._test_api_results_count(
+            search_params, expected, "docket_number"
+        )
+
+        search_params["docket_number"] = "5"
+        await self._test_api_results_count(
+            search_params, expected, "docket_number"
+        )
+
     async def test_results_api_fields(self) -> None:
         """Confirm fields in Opinion Search API results."""
         search_params = {"q": f"id:{self.opinion_2.pk} AND secret"}
@@ -399,15 +427,17 @@ class OpinionV3APISearchTest(
         r = await self._test_api_results_count(search_params, 1, "API fields")
 
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(opinion_search_api_keys))
+        self.assertEqual(keys_count, len(opinion_v3_search_api_keys))
         for (
             field,
             get_expected_value,
-        ) in opinion_search_api_keys.items():
+        ) in opinion_v3_search_api_keys.items():
             with self.subTest(field=field):
                 expected_value = await sync_to_async(get_expected_value)(
                     {
                         "result": self.opinion_2,
+                        "type": self.opinion_2.type,
+                        "status": self.opinion_2.cluster.get_precedential_status_display(),
                         "snippet": "my plain text <mark>secret</mark> word for queries",
                     }
                 )
@@ -488,6 +518,67 @@ class OpinionV3APISearchTest(
         # Remove Opinion objects to avoid affecting other tests.
         for created_opinion in created_opinions:
             created_opinion.delete()
+
+
+class OpinionV4APISearchTest(
+    OpinionSearchAPICommonTests,
+    ESIndexTestCase,
+    TestCase,
+    V4SearchAPIAssertions,
+):
+    version_api = "v4"
+    skip_common_tests = False
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in API with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    async def test_results_api_fields(self) -> None:
+        """Confirm fields in V4 Opinion Search API results."""
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"id:{self.opinion_2.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(
+            keys_count,
+            len(opinion_v4_search_api_keys),
+            msg="Parent fields count didn't match.",
+        )
+        rd_keys_count = len(r.data["results"][0]["opinions"][0])
+        self.assertEqual(
+            rd_keys_count,
+            len(opinion_document_v4_api_keys),
+            msg="Child fields count didn't match.",
+        )
+        content_to_compare = {
+            "result": self.opinion_2,
+            "snippet": "my plain text secret word for queries",
+            "type": o_type_index_map.get(self.opinion_2.type),
+            "status": self.opinion_2.cluster.precedential_status,
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            opinion_v4_search_api_keys,
+            opinion_document_v4_api_keys,
+        )
 
 
 class OpinionsESSearchTest(
