@@ -174,6 +174,11 @@ urlpatterns = [
         name="citation_lookup_api",
     ),
     path(
+        "help/api/rest/v3/financial-disclosures/",
+        views.financial_disclosures_api,
+        name="financial_disclosures_api",
+    ),
+    path(
         "help/api/rest/changes/",
         views.rest_change_log,
         name="rest_change_log",

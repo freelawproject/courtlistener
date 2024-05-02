@@ -186,6 +186,8 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "markdown_help"},
             {"viewname": "advanced_search"},
             {"viewname": "webhooks_getting_started"},
+            {"viewname": "citation_lookup_api"},
+            {"viewname": "financial_disclosures_api"},
             {"viewname": "replication_docs"},
             {"viewname": "webhooks_docs"},
             {"viewname": "old_terms", "args": ["1"]},
