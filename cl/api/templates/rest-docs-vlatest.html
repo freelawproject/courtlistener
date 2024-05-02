@@ -712,92 +712,11 @@
     </ul>
 
 
-    <h3 id="financialdisclosure-endpoint">Financial Disclosure Endpoints</h3>
-    <p>This endpoint provides an API for financial disclosures of current and former federal judges beginning in 1987. You can learn more about which disclosures are included and the limitations of this data source on our <a href="{% url "coverage_fds" %}">coverage page for financial disclosures</a>.
+    <h3 id="financialdisclosure-endpoint">Financial Disclosure APIs</h3>
+    <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have. Use these APIs to work with this information.</p>
+    <p>
+      <a href="{% url "financial_disclosures_api" %}" class="btn btn-primary btn-lg">Learn More</a>
     </p>
-    <h4 id="financialdisclosure-background">Background on the Information</h4>
-    <p>Judicial officers and certain judicial employees in the United States are required to file financial disclosure reports by <a href="https://www.law.cornell.edu/uscode/text/5a/compiledact-95-521/title-I">Title I of the Ethics in Government Act of 1978</a>. The Act requires that designated federal officials disclose publicly their personal financial interests, to ensure confidence in the integrity of the federal government by demonstrating that they are able to carry out their duties without compromising the public trust.
-    </p>
-    <p>The Act enumerates the types of information required and prescribes the general format and procedures for the reports. Our APIs mirror the Act's language, with APIs corresponding to each required disclosure type:</p>
-    <ul>
-      <li>
-        <p><strong>Financial Disclosures</strong> &mdash; <code>{% url "financialdisclosure-list" version="v3" %}</code></p>
-        <p>This endpoint contains information about the main document itself and is the link between the other financial disclosure endpoints and the judges themselves.
-        </p>
-      </li>
-      <li>
-        <p><strong>Positions</strong> &mdash; <code>{% url "disclosureposition-list" version="v3" %}</code></p>
-        <p>This endpoint lists the positions held as an officer, director, trustee, general partner, proprietor, representative, executor, employee, or consultant of any corporation, company, firm, partnership, trust, or other business enterprise, any nonprofit organization, any labor organization, or any educational or other institution other than the United States.
-        </p>
-      </li>
-      <li>
-        <p><strong>Agreements</strong> &mdash; <code>{% url "agreement-list" version="v3" %}</code></p>
-        <p>Agreement or arrangement of the filer in existence at any time during the reporting period.</p>
-      </li>
-      <li>
-        <p><strong>Non-Investment income</strong> &mdash; <code>{% url "noninvestmentincome-list" version="v3" %}</code></p>
-        <p> Source, type, and the actual amount or value of earned or other non-investment income aggregating $200 or more from any one source that is received.</p>
-      </li>
-      <li>
-        <p><strong>Non-Investment income (Spouse)</strong> &mdash; <code>{% url "spouseincome-list" version="v3" %}</code></p>
-        <p>The source and type earned of non-investment income from the spouse of the filer of the financial disclosure.</p>
-      </li>
-      <li>
-        <p><strong>Reimbursements</strong> &mdash; <code>{% url "reimbursement-list" version="v3" %}</code></p>
-        <p>The identity of the source and a brief description (including travel locations, dates, and nature of expenses provided) of any travel-related reimbursements aggregating more than $415 in value that are received by the filer from one source during the reporting period.</p>
-      </li>
-      <li>
-        <p><strong>Gifts</strong> &mdash; <code>{% url "gift-list" version="v3" %}</code></p>
-        <p>The source, a brief description, and the value of all gifts aggregating more than $415 in value that are received by the filer during the reporting period from any one source.</p>
-      </li>
-      <li>
-        <p><strong>Debts</strong> &mdash; <code>{% url "debt-list" version="v3" %}</code></p>
-        <p>All liabilities specified by that section that are owed during the period beginning on January 1 of the preceding calendar year and ending fewer than 31 days before the date on which the report is filed.</p>
-      </li>
-      <li>
-        <p><strong>Investments</strong> &mdash; <code>{% url "investment-list" version="v3" %}</code></p>
-        <p>The source and type of investment income, including dividends, rents, interest, capital gains, or income from qualified or excepted trusts.</p>
-      </li>
-    </ul>
-
-    <h4>General Notes on Financial Disclosures</h4>
-    <ol>
-      <li><p>We attempted identify all redactions within each disclosure. When a line in the disclosure contains a redaction, it will usually have a <code>redacted</code> field present and set to <code>True</code>. This is your hint that you may want to investigate that row more carefully.
-      </p></li>
-      <li><p><code>Investments</code>, <code>Debts</code>,and <code>Gifts</code> use form based value codes to indicate monetary ranges instead of exact values. Place an <code>OPTIONS</code> request to these endpoints to learn the values of those fields.
-      </p></li>
-      <li>
-        <p><code>Investment</code> objects contain the field <code>has_inferred_values</code>. This field indicates that we inferred an investment <code>description</code> based on the style of data entry. For example, an investment could have been bought in Q1, while a dividend was paid out
-        in Q2 before being sold in Q4. Often, after the first entry of the investment, subsequent rows in the table are mostly blank. In this instance, we infer the values.
-        </p>
-        <p>The table below gives a brief example where we would infer that the blank cell below the cell for <code>AAPL</code> also refers to <code>AAPL</code>:</p>
-        <table class="table">
-          <tr>
-            <th>Description</th>
-            <th>Date</th>
-            <th>Type</th>
-          </tr>
-          <tr>
-            <td>AAPL</td>
-            <td>2020-01-01</td>
-            <td>Bought</td>
-          </tr>
-          <tr>
-            <td>&mdash;</td>
-            <td>2020-02-01</td>
-            <td>Sold</td>
-          </tr>
-        </table>
-        <p>In this (slightly contrived) instance our DB would have two rows in the <code>Investment</code> table. The first would be for the purchase of the <code>AAPL</code> stock, and the second would be for the sale of it.
-        </p>
-      </li>
-    </ol>
-
-    <h4>Useful Examples</h4>
-    <p>One can query for investments by stock name, transaction dates and even gross values. For example, the following query is for financial disclosures with individual investments valued above $50,000,000.00. Note that this uses a value code as explained in the general notes above:</p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "investment-list" version="v3" %}?gross_value_code=P4&fields=investments"</pre>
-    <p>Additionally, one could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a href="{% url "view_person" 1213 "ruth-bader-ginsberg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "financialdisclosure-list" version="v3" %}?person=1213&fields=gifts"</pre>
 
     <h3 id="recap-endpoint">RECAP Endpoints</h3>
     <p>The RECAP endpoints provide three high-level features. They allow you to check if a PACER item exists in CourtListener, they allow you to upload items to CourtListener for processing, and they allow you to request that we fetch items from PACER on your behalf.
