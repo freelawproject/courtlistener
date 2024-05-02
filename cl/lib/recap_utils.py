@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 
 BASE_DOWNLOAD_URL = "https://www.archive.org/download"
@@ -91,11 +93,22 @@ def needs_ocr(content):
     OCR is needed, we need to remove this text and see if anything is left. The
     line usually looks something like:
 
-    Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 1 of 1
-    Appeal: 15-1504 Doc: 6 Filed: 05/12/2015 Pg: 1 of 4
-    Appellate Case: 14-3253 Page: 1 Date Filed: 01/14/2015 Entry ID: 4234486
-    USCA Case #16-1062 Document #1600692 Filed: 02/24/2016 Page 1 of 3
-    USCA11 Case: 21-12355 Date Filed: 07/13/202 Page: 1 of 2
+        Case 2:06-cv-00376-SRW Document 1-2 Filed 04/25/2006 Page 1 of 1
+        Appeal: 15-1504 Doc: 6 Filed: 05/12/2015 Pg: 1 of 4
+        Appellate Case: 14-3253 Page: 1 Date Filed: 01/14/2015 Entry ID: 4234486
+        USCA Case #16-1062 Document #1600692 Filed: 02/24/2016 Page 1 of 3
+        USCA11 Case: 21-12355 Date Filed: 07/13/202 Page: 1 of 2
+
+    Some bankruptcy cases also have two-line headers due to the document
+    description being in the header. That means the second line often looks
+    like:
+
+        Page 1 of 90
+        Main Document Page 1 of 16
+        Document     Page 1 of 12
+        Invoices Page 1 of 57
+        A - RLF Invoices Page 1 of 83
+        Final Distribution Report Page 1 of 5
 
     This function removes these lines so that if no text remains, we can be sure
     that the PDF needs OCR.
@@ -103,9 +116,13 @@ def needs_ocr(content):
     :param content: The content of a PDF.
     :return: boolean indicating if OCR is needed.
     """
+    bad_starters = ("Appellate", "Appeal", "Case", "Page", "USCA", )
+    pagination_re = re.compile(r"Page\s+\d+\s+of\s+\d+")
     for line in content.splitlines():
         line = line.strip()
-        if line.startswith(("Case", "Appellate", "Appeal", "USCA")):
+        if line.startswith(bad_starters):
+            continue
+        elif pagination_re.search(line):
             continue
         elif line:
             # We found a line with good content. No OCR needed.
