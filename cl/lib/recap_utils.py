@@ -116,7 +116,13 @@ def needs_ocr(content):
     :param content: The content of a PDF.
     :return: boolean indicating if OCR is needed.
     """
-    bad_starters = ("Appellate", "Appeal", "Case", "Page", "USCA", )
+    bad_starters = (
+        "Appellate",
+        "Appeal",
+        "Case",
+        "Page",
+        "USCA",
+    )
     pagination_re = re.compile(r"Page\s+\d+\s+of\s+\d+")
     for line in content.splitlines():
         line = line.strip()
