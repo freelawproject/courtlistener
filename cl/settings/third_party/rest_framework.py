@@ -28,6 +28,8 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Email non-functional; making many requests, 2024-04-23
+        "NicolasMadan": "10/hour",
         # Didn't respond to emails, 2023-10-02
         "Tylersuard": "10/hour",
         # Didn't respond to emails, 2023-08-04
