@@ -75,13 +75,9 @@ class JurisdictionPodcast(JurisdictionFeed):
             "iTunes_email": self.iTunes_email,
             "iTunes_explicit": self.iTunes_explicit,
         }
-        if isinstance(obj, tuple) and hasattr(obj[1], "pk"):
-            path = static(f"png/producer-{obj[1].pk}-2000x2000.png")
-        else:
-            # Not a jurisdiction API -- A search API.
-            path = static("png/producer-2000x2000.png")
+        img_path = static("png/producer-2000x2000.png")
         extra_args["iTunes_image_url"] = (
-            f"https://storage.courtlistener.com{path}"
+            f"https://storage.courtlistener.com{img_path}"
         )
 
         return extra_args
