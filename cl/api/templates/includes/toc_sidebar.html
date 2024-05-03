@@ -1,4 +1,8 @@
 <div id="toc">
+  <h4 class="v-offset-below-3">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "help_home" %}">Back to Help</a>
+  </h4>
   <h3><span>Table of Contents</span></h3>
   <ul>
     <li><a href="#api-overview">Getting Started &amp; Overview</a></li>
@@ -48,6 +52,19 @@
       <li><a href="#upgrades">Upgrades &amp; Fixes</a></li>
     </ul>
     <li>
+      <a href="#apis">APIs</a>
+      <a class="collapse-header" data-toggle="collapse" href="#collapseApis" role="button" aria-expanded="false"
+        aria-controls="collapseEndpoints">
+        [+]
+      </a>
+    </li>
+    <ul class="collapse" id="collapseApis">
+      <li><a href="#citation-lookup">Citation Lookup</a></li>
+      <li><a href="#search-api">Search API</a></li>
+      <li><a href="#alerts">Alert APIs</a></li>
+      <li><a href="#disclosure-apis">Financial Disclosure APIs</a></li>
+    </ul>
+    <li>
       <a href="#endpoints">Endpoints</a>
       <a class="collapse-header" data-toggle="collapse" href="#collapseEndpoints" role="button" aria-expanded="false"
         aria-controls="collapseEndpoints">
@@ -66,9 +83,7 @@
       <li><a href="#opinion-endpoint">{% url "opinion-list" version="v3" %}</a></li>
       <li><a href="#audio-endpoint">{% url "audio-list" version="v3" %}</a></li>
       <li><a href="#cites-endpoint">{% url "opinionscited-list" version="v3" %}</a></li>
-      <li><a href="#citation-lookup">Citation Lookup</a></li>
       <li><a href="#jurisdiction-endpoint">{% url "court-list" version="v3" %}</a></li>
-      <li><a href="#search-endpoint">{% url "search-list" version="v3" %}</a></li>
       <li>
         <a href="#judge-endpoint">Judge Endpoints</a>
         <a class="collapse-header" data-toggle="collapse" href="#collapseJudgeEndpoints" role="button"
@@ -81,9 +96,6 @@
         <li><a href="#judge-field-notes">Field-Level Notes</a></li>
       </ul>
       <li>
-        <a href="#financialdisclosure-endpoint">Financial Disclosure APIs</a>
-      </li>
-      <li>
         <a href="#recap-endpoint">RECAP Endpoints</a>
         <a class="collapse-header" data-toggle="collapse" href="#collapseRecapEndpoints" role="button"
           aria-expanded="false" aria-controls="collapseRecapEndpoints">
@@ -95,7 +107,6 @@
         <li><a href="#recap-query">{% url "fast-recapdocument-list" version="v3" %}</a></li>
         <li><a href="#pacer-fetch">{% url "pacerfetchqueue-list" version="v3" %}</a></li>
       </ul>
-      <li><a href="#alerts">Alert APIs</a></li>
       <li>
         <a href="#visualization-endpoint">{% url "scotusmap-list" version="v3" %}
           &amp; {% url "jsonversion-list" version="v3" %}</a>
