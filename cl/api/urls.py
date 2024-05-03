@@ -179,6 +179,11 @@ urlpatterns = [
         name="financial_disclosures_api",
     ),
     path(
+        "help/api/rest/v3/alerts/",
+        views.alert_api_help,
+        name="alert_api_help",
+    ),
+    path(
         "help/api/rest/changes/",
         views.rest_change_log,
         name="rest_change_log",

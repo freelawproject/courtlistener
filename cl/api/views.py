@@ -156,7 +156,15 @@ async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def financial_disclosures_api(request: HttpRequest) -> HttpResponse:
+async def alert_api_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "alert-api-docs-vlatest.html",
+        {"private": False},
+    )
+
+
+async def financial_disclosures_api_help_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
         "financial-disclosure-docs-vlatest.html",
