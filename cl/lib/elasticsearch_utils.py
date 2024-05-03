@@ -526,15 +526,28 @@ def build_sort_results(
         "citeCount asc": {"citeCount": {"order": "asc"}},
     }
 
-    if api_version == "v4":
-        # Override dateFiled sorting keys in V4 API to work alongside the custom
-        # function score for sorting by dateFiled.
+    if api_version == "v4" and cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    ]:
+        # Override dateFiled sorting keys in V4 RECAP Search API to work
+        # alongside the custom function score for sorting by dateFiled.
         order_by_map["dateFiled desc"] = {"_score": {"order": "desc"}}
         order_by_map["dateFiled asc"] = {"_score": {"order": "desc"}}
 
-    if toggle_sorting and api_version == "v4":
-        # Override the sorting keys in the V4 API when toggle_sorting is True
-        # for backward cursor pagination based on fields that use a custom
+    if (
+        toggle_sorting
+        and api_version == "v4"
+        and cd["type"]
+        in [
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+            SEARCH_TYPES.RECAP_DOCUMENT,
+        ]
+    ):
+        # Override the sorting keys in V4 RECAP Search API when toggle_sorting
+        # is True for backward cursor pagination based on fields that use a custom
         # function score.
         order_by_map["entry_date_filed asc"] = {"_score": {"order": "asc"}}
         order_by_map["entry_date_filed desc"] = {"_score": {"order": "asc"}}
@@ -2209,7 +2222,7 @@ def apply_custom_score_to_parent_query(
                 # sorting criteria. This will ensure that dockets without
                 # documents come last on results.
                 query = nullify_query_score(query)
-            elif sort_field == "dateFiled" and api_version:
+            elif sort_field == "dateFiled" and api_version == "v4":
                 # Applies a custom function score to sort Dockets based on
                 # their dateFiled field. This serves as a workaround to enable
                 # the use of the  search_after cursor for pagination on
@@ -2219,7 +2232,10 @@ def apply_custom_score_to_parent_query(
                 )
         case SEARCH_TYPES.RECAP_DOCUMENT if valid_child_order_by:
             sort_field, order = child_order_by
-            if sort_field in ["dateFiled", "entry_date_filed"] and api_version:
+            if (
+                sort_field in ["dateFiled", "entry_date_filed"]
+                and api_version == "v4"
+            ):
                 # Applies a custom function score to sort RECAPDocuments based
                 # on their docket dateFiled or entry_date_filed field. This
                 # serves as a workaround to enable the use of the  search_after

@@ -94,48 +94,54 @@ class OpinionSearchAPICommonTests(
                 jurisdiction="FB",
                 full_name="court of the Medical Worries",
             )
-            OpinionClusterFactoryWithChildrenAndParents(
-                case_name="Strickland v. Washington.",
-                case_name_full="Strickland v. Washington.",
-                docket=DocketFactory(
-                    court=court,
-                    docket_number="1:21-cv-1234",
-                    source=Docket.HARVARD,
-                ),
-                sub_opinions=RelatedFactory(
-                    OpinionWithChildrenFactory,
-                    factory_related_name="cluster",
-                    html_columbia="<p>Code, &#167; 1-815</p>",
-                ),
-                date_filed=datetime.date(2020, 8, 15),
-                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                syllabus="some rando syllabus",
-                procedural_history="some rando history",
-                source="C",
-                judges="",
-                attorneys="a bunch of crooks!",
-                slug="case-name-cluster",
-                citation_count=1,
-                scdb_votes_minority=3,
-                scdb_votes_majority=6,
+            cls.opinion_cluster_4 = (
+                OpinionClusterFactoryWithChildrenAndParents(
+                    case_name="Strickland v. Washington.",
+                    case_name_full="Strickland v. Washington.",
+                    docket=DocketFactory(
+                        court=court,
+                        docket_number="1:21-cv-1234",
+                        source=Docket.HARVARD,
+                    ),
+                    sub_opinions=RelatedFactory(
+                        OpinionWithChildrenFactory,
+                        factory_related_name="cluster",
+                        html_columbia="<p>Code, &#167; 1-815</p>",
+                    ),
+                    date_filed=datetime.date(2020, 8, 15),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                    syllabus="some rando syllabus",
+                    procedural_history="some rando history",
+                    source="C",
+                    judges="",
+                    attorneys="a bunch of crooks!",
+                    slug="case-name-cluster",
+                    citation_count=1,
+                    scdb_votes_minority=3,
+                    scdb_votes_majority=6,
+                )
             )
-            OpinionClusterFactoryWithChildrenAndParents(
-                case_name="Strickland v. Lorem.",
-                case_name_full="Strickland v. Lorem.",
-                date_filed=datetime.date(2020, 8, 15),
-                docket=DocketFactory(
-                    court=court, docket_number="123456", source=Docket.HARVARD
-                ),
-                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-                syllabus="some rando syllabus",
-                procedural_history="some rando history",
-                source="C",
-                judges="",
-                attorneys="a bunch of crooks!",
-                slug="case-name-cluster",
-                citation_count=1,
-                scdb_votes_minority=3,
-                scdb_votes_majority=6,
+            cls.opinion_cluster_5 = (
+                OpinionClusterFactoryWithChildrenAndParents(
+                    case_name="Strickland v. Lorem.",
+                    case_name_full="Strickland v. Lorem.",
+                    date_filed=datetime.date(2020, 8, 15),
+                    docket=DocketFactory(
+                        court=court,
+                        docket_number="123456",
+                        source=Docket.HARVARD,
+                    ),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                    syllabus="some rando syllabus",
+                    procedural_history="some rando history",
+                    source="C",
+                    judges="",
+                    attorneys="a bunch of crooks!",
+                    slug="case-name-cluster",
+                    citation_count=1,
+                    scdb_votes_minority=3,
+                    scdb_votes_majority=6,
+                )
             )
             super().setUpTestData()
 
@@ -447,8 +453,6 @@ class OpinionV3APISearchTest(
                 expected_value = await sync_to_async(get_expected_value)(
                     {
                         "result": self.opinion_2,
-                        "type": self.opinion_2.type,
-                        "status": self.opinion_2.cluster.get_precedential_status_display(),
                         "snippet": "my plain text <mark>secret</mark> word for queries",
                     }
                 )
@@ -601,11 +605,7 @@ class OpinionV4APISearchTest(
             len(opinion_document_v4_api_keys),
             msg="Child fields count didn't match.",
         )
-        content_to_compare = {
-            "result": self.opinion_2,
-            "type": o_type_index_map.get(self.opinion_2.type),
-            "status": self.opinion_2.cluster.precedential_status,
-        }
+        content_to_compare = {"result": self.opinion_2, "V4": True}
         await self._test_api_fields_content(
             r,
             content_to_compare,
@@ -725,11 +725,7 @@ class OpinionV4APISearchTest(
         self.assertEqual(keys_count, len(opinion_v4_search_api_keys))
         rd_keys_count = len(r.data["results"][0]["opinions"][0])
         self.assertEqual(rd_keys_count, len(opinion_document_v4_api_keys))
-        content_to_compare = {
-            "result": self.opinion_2,
-            "type": o_type_index_map.get(self.opinion_2.type),
-            "status": self.opinion_2.cluster.precedential_status,
-        }
+        content_to_compare = {"result": self.opinion_2, "V4": True}
         await self._test_api_fields_content(
             r,
             content_to_compare,
@@ -752,8 +748,7 @@ class OpinionV4APISearchTest(
             "court_citation_string": "<mark>Test</mark>",
             "docketNumber": "<mark>docket number 2</mark>",
             "snippet": "my plain text <mark>secret word</mark> for queries",
-            "type": o_type_index_map.get(self.opinion_2.type),
-            "status": self.opinion_2.cluster.precedential_status,
+            "V4": True,
         }
         await self._test_api_fields_content(
             r,
@@ -763,7 +758,7 @@ class OpinionV4APISearchTest(
         )
 
     @override_settings(SEARCH_API_PAGE_SIZE=3)
-    def test_recap_results_cursor_api_pagination_for_r_type(self) -> None:
+    def test_opinion_results_cursor_api_pagination(self) -> None:
         """Test cursor pagination for V4 Opinion Search API."""
 
         created_clusters = []
@@ -898,10 +893,9 @@ class OpinionV4APISearchTest(
             msg="Wrong number of clusters.",
         )
 
-        with self.captureOnCommitCallbacks(execute=True):
-            # Remove OpinionCluster objects to avoid affecting other tests.
-            for created_cluster in created_clusters:
-                created_cluster.delete()
+        # Remove OpinionCluster objects to avoid affecting other tests.
+        for created_cluster in created_clusters:
+            created_cluster.delete()
 
     def test_recap_cursor_api_pagination_count(self) -> None:
         """Test cursor pagination count for V4 Opinion Search API."""
@@ -958,8 +952,6 @@ class OpinionV4APISearchTest(
         content_to_compare = {
             "result": self.empty_opinion,
             "V4": True,
-            "type": o_type_index_map.get(self.empty_opinion.type),
-            "status": self.empty_opinion.cluster.precedential_status,
         }
         await self._test_api_fields_content(
             r,
@@ -995,9 +987,81 @@ class OpinionV4APISearchTest(
             settings.CHILD_HITS_PER_RESULT,
             msg="Results cardinality count didn't match.",
         )
+        cluster.delete()
 
-        with self.captureOnCommitCallbacks(execute=True):
-            cluster.delete()
+    def test_opinions_specific_sorting_keys(self) -> None:
+        """Test if the dateFiled and citeCount sorting keys work properly in
+        the V4 Opinions Search API. Note that no function score is used in the
+        Opinions search because it is not required; dateFiled is a mandatory
+        field in the OpinionCluster model."""
+
+        # Query string, order by dateFiled desc
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "order_by": "dateFiled desc",
+            "highlight": False,
+            f"stat_{PRECEDENTIAL_STATUS.PUBLISHED}": "on",
+            f"stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}": "on",
+        }
+        params_date_filed_asc = search_params.copy()
+        params_date_filed_asc["order_by"] = "dateFiled asc"
+        params_cite_count_desc = search_params.copy()
+        params_cite_count_desc["order_by"] = "citeCount desc"
+        params_cite_count_asc = search_params.copy()
+        params_cite_count_asc["order_by"] = "citeCount asc"
+
+        test_cases = [
+            {
+                "name": "Query order by dateFiled desc",
+                "search_params": search_params,
+                "expected_results": 5,
+                "expected_order": [
+                    self.empty_cluster.pk,  # 2024/02/23
+                    self.opinion_cluster_5.pk,  # 2020/08/15 pk 2
+                    self.opinion_cluster_4.pk,  # 2020/08/15 pk 1
+                    self.opinion_cluster_3.pk,  # 2015/08/15
+                    self.opinion_cluster_2.pk,  # 1895/06/09
+                ],
+            },
+            {
+                "name": "Query order by dateFiled asc",
+                "search_params": params_date_filed_asc,
+                "expected_results": 5,
+                "expected_order": [
+                    self.opinion_cluster_2.pk,  # 1895/06/09
+                    self.opinion_cluster_3.pk,  # 2015/08/15
+                    self.opinion_cluster_5.pk,  # 2020/08/15 pk 2
+                    self.opinion_cluster_4.pk,  # 2020/08/15 pk 1
+                    self.empty_cluster.pk,  # 2024/02/23
+                ],
+            },
+            {
+                "name": "Query order by citeCount desc",
+                "search_params": params_cite_count_desc,
+                "expected_results": 5,
+                "expected_order": [
+                    self.opinion_cluster_3.pk,  # 8
+                    self.opinion_cluster_2.pk,  # 6
+                    self.opinion_cluster_5.pk,  # 1 pk 2
+                    self.opinion_cluster_4.pk,  # 1 pk 1
+                    self.empty_cluster.pk,  # 0
+                ],
+            },
+            {
+                "name": "Query order by citeCount asc",
+                "search_params": params_cite_count_asc,
+                "expected_results": 5,
+                "expected_order": [
+                    self.empty_cluster.pk,  # 0
+                    self.opinion_cluster_5.pk,  # 1 pk 2
+                    self.opinion_cluster_4.pk,  # 1 pk 1
+                    self.opinion_cluster_2.pk,  # 6
+                    self.opinion_cluster_3.pk,  # 8
+                ],
+            },
+        ]
+        for test in test_cases:
+            self._test_results_ordering(test, "cluster_id")
 
 
 class OpinionsESSearchTest(

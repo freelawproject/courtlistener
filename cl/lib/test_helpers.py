@@ -28,6 +28,7 @@ from cl.people_db.factories import (
     SchoolFactory,
 )
 from cl.people_db.models import Person, Race
+from cl.search.constants import o_type_index_map
 from cl.search.docket_sources import DocketSources
 from cl.search.documents import DocketDocument
 from cl.search.factories import (
@@ -104,11 +105,72 @@ opinion_cluster_v3_v4_common_fields = {
     "sibling_ids": lambda x: list(
         x["result"].cluster.sub_opinions.all().values_list("id", flat=True)
     ),
-    "status": lambda x: x["status"],
+    "status": lambda x: (
+        x["result"].cluster.precedential_status
+        if x.get("V4")
+        else x["result"].cluster.get_precedential_status_display()
+    ),
     "suitNature": lambda x: (
         x["suitNature"]
         if x.get("suitNature")
         else x["result"].cluster.nature_of_suit
+    ),
+    "panel_ids": lambda x: (
+        list(x["result"].cluster.panel.all().values_list("id", flat=True))
+        if x["result"].cluster.panel.all()
+        else [] if x.get("V4") else None
+    ),
+    "dateArgued": lambda x: (
+        (
+            x["result"].cluster.docket.date_argued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].cluster.docket.date_argued
+            ).isoformat()
+        )
+        if x["result"].cluster.docket.date_argued
+        else None
+    ),
+    "dateFiled": lambda x: (
+        (
+            x["result"].cluster.date_filed.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(x["result"].cluster.date_filed).isoformat()
+        )
+        if x["result"].cluster.date_filed
+        else None
+    ),
+    "dateReargued": lambda x: (
+        (
+            x["result"].cluster.docket.date_reargued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].cluster.docket.date_reargued
+            ).isoformat()
+        )
+        if x["result"].cluster.docket.date_reargued
+        else None
+    ),
+    "dateReargumentDenied": lambda x: (
+        (
+            x["result"].cluster.docket.date_reargument_denied.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].cluster.docket.date_reargument_denied
+            ).isoformat()
+        )
+        if x["result"].cluster.docket.date_reargument_denied
+        else None
+    ),
+    "date_created": lambda x: (
+        x["result"].date_created.isoformat().replace("+00:00", "Z")
+        if x.get("V4")
+        else timezone.localtime(x["result"].cluster.date_created).isoformat()
+    ),
+    "timestamp": lambda x: (
+        x["result"].date_created.isoformat().replace("+00:00", "Z")
+        if x.get("V4")
+        else timezone.localtime(x["result"].cluster.date_created).isoformat()
     ),
 }
 
@@ -132,7 +194,11 @@ opinion_document_v3_v4_common_fields = {
         if x["result"].joined_by.all()
         else [] if x.get("V4") else None
     ),
-    "type": lambda x: x["type"],
+    "type": lambda x: (
+        o_type_index_map.get(x["result"].type)
+        if x.get("V4")
+        else x["result"].type
+    ),
     "local_path": lambda x: (
         x["result"].local_path if x["result"].local_path else None
     ),
@@ -147,43 +213,9 @@ opinion_document_v3_fields = opinion_document_v3_v4_common_fields.copy()
 
 opinion_v3_search_api_keys = {
     "court_exact": lambda x: x["result"].cluster.docket.court_id,
-    "panel_ids": lambda x: (
-        list(x["result"].cluster.panel.all().values_list("id", flat=True))
-        if x["result"].cluster.panel.all()
-        else None
-    ),
-    "dateArgued": lambda x: (
-        midnight_pt_test(x["result"].cluster.docket.date_argued).isoformat()
-        if x["result"].cluster.docket.date_argued
-        else None
-    ),
-    "dateFiled": lambda x: (
-        midnight_pt_test(x["result"].cluster.date_filed).isoformat()
-        if x["result"].cluster.date_filed
-        else None
-    ),
-    "dateReargued": lambda x: (
-        midnight_pt_test(x["result"].cluster.docket.date_reargued).isoformat()
-        if x["result"].cluster.docket.date_reargued
-        else None
-    ),
-    "dateReargumentDenied": lambda x: (
-        midnight_pt_test(
-            x["result"].cluster.docket.date_reargument_denied
-        ).isoformat()
-        if x["result"].cluster.docket.date_reargument_denied
-        else None
-    ),
-    "date_created": lambda x: timezone.localtime(
-        x["result"].cluster.date_created
-    ).isoformat(),
-    "timestamp": lambda x: timezone.localtime(
-        x["result"].cluster.date_created
-    ).isoformat(),
 }
 opinion_v3_search_api_keys.update(opinion_cluster_v3_fields)
 opinion_v3_search_api_keys.update(opinion_document_v3_fields)
-
 
 opinion_v4_search_api_keys = {
     "non_participating_judge_ids": lambda x: (
@@ -202,37 +234,6 @@ opinion_v4_search_api_keys = {
     "posture": lambda x: x["result"].cluster.posture,
     "syllabus": lambda x: x["result"].cluster.syllabus,
     "opinions": [],  # type: ignore
-    "panel_ids": lambda x: (
-        list(x["result"].cluster.panel.all().values_list("id", flat=True))
-        if x["result"].cluster.panel.all()
-        else []
-    ),
-    "dateArgued": lambda x: (
-        x["result"].cluster.docket.date_argued.isoformat()
-        if x["result"].cluster.docket.date_argued
-        else None
-    ),
-    "dateFiled": lambda x: (
-        x["result"].cluster.date_filed.isoformat()
-        if x["result"].cluster.date_filed
-        else None
-    ),
-    "dateReargued": lambda x: (
-        x["result"].cluster.docket.date_reargued.isoformat()
-        if x["result"].cluster.docket.date_reargued
-        else None
-    ),
-    "dateReargumentDenied": lambda x: (
-        x["result"].cluster.docket.date_reargument_denied.isoformat()
-        if x["result"].cluster.docket.date_reargument_denied
-        else None
-    ),
-    "date_created": lambda x: x["result"]
-    .cluster.date_created.isoformat()
-    .replace("+00:00", "Z"),
-    "timestamp": lambda x: x["result"]
-    .cluster.date_created.isoformat()
-    .replace("+00:00", "Z"),
 }
 
 opinion_cluster_v4_common_fields = opinion_cluster_v3_v4_common_fields.copy()
