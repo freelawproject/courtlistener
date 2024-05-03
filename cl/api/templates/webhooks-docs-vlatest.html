@@ -14,8 +14,19 @@
 {% endblock %}
 
 {% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+  
 <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
   <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
     <h3>Table of Contents</h3>
     <ul>
       <li><a href="#getting-started">Getting Started</a></li>
