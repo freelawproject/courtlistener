@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Legal Alert APIs – CourtListener.com{% endblock %}
+{% block og_title %}Legal Alert APIs – CourtListener.com{% endblock %}
+
+{% block description %}Use these APIs to automatically track search queries and cases. Alerts can be sent to your inbox or server.{% endblock %}
+{% block og_description %}Use these APIs to automatically track search queries and cases. Alerts can be sent to your inbox or server.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#search">Search Alerts</a></li>
+      <ul>
+        <li><a href="#example">Example Usage</a></li>
+      </ul>
+      <li><a href="#dockets">Docket Alerts</a></li>
+      <ul>
+        <li><a href="#docket-examples">Example Usage</a></li>
+      </ul>
+      <li><a href="#coming-soon">Coming Soon</a></li>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Legal Alert&nbsp;APIs</h1>
+  <p class="lead v-offset-above-3">Use these APIs to create, modify, list, and delete search and docket alerts in our system.</p>
+  <p>Once configured, alerts can notify you by email or with a <a href="{% url "webhooks_docs" %}">webhook event sent to your server</a>.
+  </p>
+  <p>This page focuses on the alerts API itself. To learn more about alerts generally, read the alert documentation.
+  </p>
+  <p>
+    <a href="{% url "alert_help" %}" class="btn btn-lg btn-primary">Learn About Alerts</a>
+  </p>
+
+  <h2 id="search">Search Alerts <small>— <nobr><code>{% url "alert-list" version="v3" %}</code></nobr></small></h2>
+  <p>Search Alerts update you when there is new information in our search engine.</p>
+  <p>This system scales to support thousands or even millions of alerts, allowing organizations to stay updated about numerous topics. This is a powerful system when used with <a href="{% url "webhooks_docs" %}">webhooks</a>.
+  </p>
+  <p>Search alerts have three required fields:</p>
+  <ul>
+    <li><strong><code>name</code></strong> &mdash; A human-friendly name for the alert.</li>
+    <li><strong><code>query</code></strong> &mdash; Search parameters you get from the front end, as a string.
+    </li>
+    <li><strong><code>rate</code></strong> &mdash; How frequently you want to receive email updates. Webhook events are always sent in real time. This field accepts the following values:
+    </li>
+    <ul>
+      <li><code>rt</code> — Real time</li>
+      <li><code>dly</code> — Daily</li>
+      <li><code>wly</code> — Weekly</li>
+      <li><code>mly</code> — Monthly</li>
+    </ul>
+  </ul>
+  <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
+  <pre class="pre-scrollable">curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-list" version="v3" %}" </pre>
+
+  <h3 id="example">Example Usage</h3>
+  <p>Let's say we want to know about case law involving Apple Inc. On the front end, we search for "Apple Inc" (in quotes) and <a href="/?q=%22Apple%20Inc%22&type=o">get query parameters</a> like:
+  </p>
+  <pre>q=%22Apple%20Inc%22&type=o</pre>
+  <p>We can create that as an alert with an HTTP <code>POST</code> request:</p>
+  <pre class="pre-scrollable">curl -X POST \
+  --data 'name=Apple' \
+  --data 'query=q=%22Apple%20Inc%22&type=o' \
+  --data 'rate=rt' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-list" version="v3" %}"</pre>
+  <p>The response:</p>
+  <pre class="pre-scrollable">{
+  "resource_uri": "https://www.courtlistener.com/api/rest/v3/alerts/4839/",
+  "id": 4839,
+  "date_created": "2024-05-02T15:29:32.048912-07:00",
+  "date_modified": "2024-05-02T15:29:32.048929-07:00",
+  "date_last_hit": null,
+  "name": "Apple",
+  "query": "q=\"Apple Inc\"",
+  "rate": "rt",
+  "alert_type": "o",
+  "secret_key": "ybSBXwtDcMKI2SxPZDCEx02DSSUF7EEvx1CjOk4f"
+}</pre>
+  <p>Search Alerts can be modified with HTTP <code>PATCH</code> requests. For example, to change the rate to <code>dly</code>:
+  </p>
+  <pre class="pre-scrollable">curl -X PATCH \
+  --data 'rate=dly' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-detail" version="v3" pk="4839" %}"</pre>
+  <p>Search Alerts can be deleted with HTTP <code>DELETE</code> requests:</p>
+  <pre class="pre-scrollable">curl -X DELETE \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-detail" version="v3" pk="4839" %}"</pre>
+  <p>To list your alerts, send an HTTP <code>GET</code> request with no filters:</p>
+  <pre class="pre-scrollable">curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "alert-list" version="v3" %}" </pre>
+
+
+  <h2 id="dockets">Docket Alerts <small>— <nobr><code>{% url "docket-alert-list" version="v3" %}</code></nobr></small></h2>
+  <p>Docket Alerts keep you updated about cases by sending notifications by email or webhook whenever there is new information in our system. Use this API to create, modify, list, and delete Docket Alerts.
+  </p>
+  <p>Docket Alerts are always sent as soon as an update is available. See <a href="{% url "alert_help" %}">the help page on Docket Alerts</a> to learn more about how we get updates.
+  </p>
+  <p>Docket Alerts have two fields you can set:</p>
+  <ul>
+    <li><p><strong><code>docket</code></strong> — Required: The docket you want to subscribe to or unsubscribe from.</p></li>
+    <li>
+      <p><strong><code>alert_type</code></strong> — Whether to subscribe or unsubscribe from the docket.</p>
+      <p>This field is part of <a href="{% url 'recap_email_help' %}">@recap.email</a>'s auto-subscribe feature. If you are not using @recap.email or have auto-subscribe disabled, you can ignore this field.
+      </p>
+      <p>If you are using @recap.email and have auto-subscribe enabled <a href="{% url "view_recap_email" %}">in your profile</a>, Docket Alerts will be automatically created for you as CourtListener receives notifications about cases. To permanently unsubscribe from a case for which you are receiving notifications from PACER, create an "Unsubscription" for the case.
+      </p>
+    </li>
+  </ul>
+  <p>To learn more about this API, make an HTTP <code>OPTIONS</code> request:</p>
+  <pre class="pre-scrollable">curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}"</pre>
+
+  <h3 id="docket-examples">Example Usage</h3>
+  <p>To create a Docket Alert, send a POST request with the <code>docket</code> ID you wish to subscribe to.
+  </p>
+  <p>This example subscribes to docket number 1:</p>
+  <pre class="pre-scrollable">curl -X POST \
+  --data 'docket=1' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}"</pre>
+  <p>The response:</p>
+  <pre class="pre-scrollable">{
+  "id": 133013,
+  "date_created": "2024-05-02T16:35:58.562617-07:00",
+  "date_modified": "2024-05-02T16:35:58.562629-07:00",
+  "date_last_hit": null,
+  "secret_key": "Xv6sg4xkarzyWdzABi84AyjzV3CslJs9Ldippq3s",
+  "alert_type": 1,
+  "docket": 1
+}</pre>
+  <p>To unsubscribe from a docket, you can either delete the alert with an HTTP <code>DELETE</code> request:</p>
+  <pre class="pre-scrollable">curl -X DELETE \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-detail" version="v3" pk="133013" %}"</pre>
+  <p>Or, if you are using @recap.email and have auto-subscribe enabled, you can send an HTTP <code>PATCH</code> request to change it from a subscription (<code>alert_type=1</code>) to an unsubscription (<code>alert_type=0</code>):
+  </p>
+  <pre class="pre-scrollable">curl -X PATCH \
+  --data 'alert_type=0' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-detail" version="v3" pk="133013" %}"</pre>
+  <p>To list your Docket Alerts, send an HTTP <code>GET</code> request with no filters:</p>
+  <pre class="pre-scrollable">curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}" </pre>
+
+  <h2 id="coming-soon">Coming Soon</h2>
+  <p>We are currently developing a scalable alert system that will update you when keywords appear in PACER documents or cases. To join the beta test for this system, please <a href="{% url "contact" %}">get in touch</a>.
+  </p>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

@@ -14,8 +14,19 @@
 {% endblock %}
 
 {% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
 <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
   <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
     <h3>Table of Contents</h3>
     <ul>
       <li><a href="#getting-started">Getting Started</a></li>
@@ -224,7 +235,7 @@
       <strong>For normal users</strong>, the best way is <a href="{% url 'alert_help' %}#recap-alerts">via the CourtListener website itself</a>.
     </li>
     <li>
-      <p><strong>For servers</strong>, the best way is to use the <a href="{% url 'rest_docs' %}#docket-alerts-endpoint">Docket Alert endpoint</a> of our REST API.</p>
+      <p><strong>For servers</strong>, the best way is to use the <a href="{% url 'alert_api_help' %}#dockets">Docket Alert API</a>.</p>
       <p>For example, this shell code searches for the <a href="{% url 'view_docket' '64911367' 'trump-v-united-states' %}">Trump Mar-A-Lago</a> case and then subscribes your account to it:</p>
       <pre class="v-offset-below-1 scrollable" >curl --silent \
   --url '{% get_full_host %}{% url "search-list" version="v3" %}?type=d&docket_number=22-cv-81294&case_name=trump' \
@@ -279,7 +290,7 @@ xargs curl -X POST \
       <p><strong>For normal users</strong>, subscribe to a query <a href="{% url 'alert_help' %}#search-alerts">via the CourtListener website itself</a>.</p>
     </li>
     <li>
-      <p><strong>For servers</strong>, the best way is to use the <a href="{% url 'rest_docs' %}#alerts-endpoint">Search Alert endpoint</a> of our REST API.
+      <p><strong>For servers</strong>, the best way is to use the <a href="{% url 'alert_api_help' %}#search">Search Alert API</a>.
       </p>
       <p>For example, this shell code creates a Search Alert for new legal decisions mentioning the <a href="{% url "view_case" 2812209 "obergefell-v-hodges" %}">Obergefell v. Hodges case</a>:</p>
       <pre class="v-offset-below-1 scrollable" >curl -X POST \
@@ -303,9 +314,9 @@ xargs curl -X POST \
    },
    "webhook": {...}
 }</pre>
-  <p>The <code>results</code> key is based on the Search API endpoint and has all of the same fields. Review <a href="{% url 'rest_docs' %}#search-endpoint">the Search API documentation</a> for details on how it works; it is slightly different than all of our other API endpoints.
+  <p>The <code>results</code> key is based on the Search API endpoint and has all the same fields. Review <a href="{% url 'search_api_help' %}">the Search API documentation</a> for details on how it works; it is slightly different than all of our other API endpoints.
   </p>
-  <p>The <code>alert</code> key is based on the <a href="{% url 'rest_docs' %}#alerts-endpoint">Search Alert endpoint</a> and has all the same fields except for the <code>resource_uri</code> field, which is omitted.
+  <p>The <code>alert</code> key is based on the <a href="{% url 'alert_api_help' %}#search">Search Alert endpoint</a> and has all the same fields except for the <code>resource_uri</code> field, which is omitted.
   </p>
   <p>To get a description of the Search Alert object, do an HTTP <code>OPTIONS</code> request to the API endpoint:</p>
   <pre>curl -X OPTIONS \
@@ -361,9 +372,9 @@ xargs curl -X POST \
    },
    "webhook":{...}
 }</pre>
-  <p><code>old_alerts</code> and <code>disabled_alerts</code> contain a list of docket alert objects based on the <a href="{% url 'rest_docs' %}#docket-alerts-endpoint">Docket Alerts API</a> and have all the same fields. </p>
+  <p><code>old_alerts</code> and <code>disabled_alerts</code> contain a list of docket alert objects based on the <a href="{% url 'alert_api_help' %}#dockets">Docket Alerts API</a> and have all the same fields. </p>
   <h4>Re-upping a docket alert</h4>
-  <p>If a case has been dormant for a long time and you wish to continue monitoring it, you must re-up the alert. To do this, simply send an HTTP PATCH request to the <a href="{% url 'rest_docs' %}#docket-alerts-endpoint">Docket Alerts</a> API endpoint:</p>
+  <p>If a case has been dormant for a long time, and you wish to continue monitoring it, you must re-up the alert. To do this, send an HTTP PATCH request to the <a href="{% url 'alert_api_help' %}#dockets">Docket Alerts API</a>:</p>
   <pre>curl -X PATCH \
   --data 'alert_type=1' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
