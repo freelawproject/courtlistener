@@ -177,7 +177,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "coverage_fds"},
             {"viewname": "coverage_recap"},
             {"viewname": "coverage_oa"},
-
             # Info pages
             {"viewname": "faq"},
             {"viewname": "feeds_info"},
@@ -185,11 +184,9 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "replication_docs"},
             {"viewname": "terms"},
             {"viewname": "robots"},
-
             # Contact
             {"viewname": "contact"},
             {"viewname": "contact_thanks"},
-
             # Help pages
             {"viewname": "help_home"},
             {"viewname": "alert_help"},
@@ -198,7 +195,6 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "advanced_search"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
-
             # API help pages
             {"viewname": "webhooks_docs"},
             {"viewname": "webhooks_getting_started"},

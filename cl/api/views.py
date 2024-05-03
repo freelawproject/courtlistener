@@ -164,7 +164,9 @@ async def alert_api_help(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def financial_disclosures_api_help_help(request: HttpRequest) -> HttpResponse:
+async def financial_disclosures_api_help_help(
+    request: HttpRequest,
+) -> HttpResponse:
     return TemplateResponse(
         request,
         "financial-disclosure-docs-vlatest.html",
