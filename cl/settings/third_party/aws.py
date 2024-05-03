@@ -3,9 +3,6 @@ import environ
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
 
-AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
-AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
-
 # S3
 AWS_STORAGE_BUCKET_NAME = env(
     "AWS_STORAGE_BUCKET_NAME", default="com-courtlistener-storage"
