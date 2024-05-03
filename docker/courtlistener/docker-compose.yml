@@ -84,6 +84,10 @@ services:
       - cl_net_overlay
     env_file:
       - ../../.env.dev
+    environment:
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
 
   cl-django:
     container_name: cl-django
@@ -113,6 +117,10 @@ services:
       - cl_net_overlay
     env_file:
       - ../../.env.dev
+    environment:
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
 
   cl-selenium:
     container_name: cl-selenium
