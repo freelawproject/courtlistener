@@ -1,30 +1,42 @@
 {% extends "base.html" %}
-{% load static %}
-{% load humanize %}
-{% load partition_util %}
+{% load static humanize partition_util %}
 
-{% block title %}Help with Alerts – CourtListener.com{% endblock %}
+{% block title %}Help with Search and Docket Alerts – CourtListener.com{% endblock %}
+{% block og_title %}Help with Search and Docket Alerts – CourtListener.com{% endblock %}
+
+{% block description %}Get help creating and using search and docket alerts on CourtListener.{% endblock %}
+{% block og_description %}Get help creating and using search and docket alerts on CourtListener.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
 {% block footer-scripts %}
   {% include "includes/anchors.html" %}
 {% endblock %}
-{% block sidebar %}{% endblock %}
-
 
 {% block content %}
-  <div class="hidden-xs col-sm-1 col-md-2"></div>
-  <div class="col-xs-12 col-sm-10 col-md-8">
-    <h1>Help with Alerts on CourtListener</h1>
-    <p>CourtListener was created in 2009 as an alert and awareness tool for people that were interested in keeping up with new cases or topics in the federal circuit courts.
-    </p>
-    <p>We currently have three kinds of alerts: Search Alerts, RECAP Alerts for PACER, and Citation Alerts.</p>
-    <p>Read on to learn more or skip ahead to the section that interests you:</p>
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "help_home" %}">Back to Help</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "help_home" %}">Back to Help</a>
+    </h4>
+    <h3>Table of Contents</h3>
     <ul>
+      <li><a href="#about">Overview</a></li>
       <li>
-        <a href="#recap-alerts">RECAP Alerts for PACER</a>
+        <a href="#recap-alerts">Docket Alerts</a>
         <ul>
-          <li><a href="#limitations-on-recap-alerts">Limitations on RECAP Alerts</a></li>
-          <li><a href="#creating-a-recap-alert">Creating a RECAP Alert</a></li>
-          <li><a href="#disabling-a-recap-alert">Disabling a RECAP Alert</a></li>
+          <li><a href="#limitations">Limitations</a></li>
+          <li><a href="#creating-docket-alert">Creating Alerts</a></li>
+          <li><a href="#disabling-docket-alert">Disabling Alerts</a></li>
           <li><a href="#coverage-gaps">Coverage Gaps</a></li>
         </ul>
       </li>
@@ -33,256 +45,269 @@
         <ul>
           <li><a href="#creating-alerts">Creating Alerts</a></li>
           <li><a href="#enabling-real-time-alerts">Enabling Real Time Alerts</a></li>
-          <li><a href="#editing-or-deleting-an-alert">Editing or Deleting an Alert</a></li>
-          <li><a href="#disabling-an-alert">Disabling an Alert</a></li>
+          <li><a href="#editing-search-alerts">Editing an Alert</a></li>
+          <li><a href="#editing-search-alerts">Deleting an Alert</a></li>
+          <li><a href="#disabling-search-alerts">Disabling an Alert</a></li>
+          <li><a href="#courts">Supported Courts</a></li>
         </ul>
       </li>
       <li><a href="#citation-alerts">Citation Alerts</a></li>
       <li><a href="#coming-soon">Coming Soon</a></li>
     </ul>
-    <p>We hope that if you find our alerts useful, you will become a member of <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP. It is the best thing you can do to support ongoing feature development and maintenance.
-    </p>
-    <p><a href="https://donate.free.law/forms/membership"
-          class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i> Join Now</a></p>
-    <hr>
-
-    <h2 id="recap-alerts">RECAP Alerts for PACER</h2>
-    <p>RECAP Alerts are a way of keeping up with cases in the PACER federal court filing system. These alerts monitor tens of thousands of cases across the country for new docket entries and send an email whenever new entries are found. In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
-    </p>
-    <p>The sources for these alerts are as described in detail on our <a href="{% url "coverage_recap" %}">coverage page</a>.
-    </p>
-    <p>For active cases, alerts can come within seconds of a new filing. For less active cases, it can take more time or alerts may not arrive at all, if we do not have a way of getting updates for the case.
-    </p>
-    <p>For closed cases, we get new content and can send alerts when we do client work on those cases or when a <a href="https://free.law/recap/">RECAP extension</a> user shares a docket with us.
-    </p>
-
-    <h3>Limitations on RECAP Alerts</h3>
-    <p>As a non-profit, we try to provide our services to as many people as possible. We currently allow <span class="bold">{{ MAX_FREE_DOCKET_ALERTS }}</span> docket alerts for free, and give a bonus of <span class="bold">{{ DOCKET_ALERT_RECAP_BONUS }}</span> alerts to anybody with the RECAP Extension installed.
-    </p>
-    <p>Monthly donors can create as many alerts as they need, though we may set up some reasonable limits in the future, based on usage.
-    </p>
-    <p>Corporate rates are also available for large organizations needing to provide alerts to many users.
-    </p>
-    <p>We also can sometimes provide need-based exceptions to these rules. If you might need an exception, <a href="{% url "contact" %}">please let us know</a>. This feature is intended for individual users. If you think you may need to use alerts for a commercial endeavor, please <a href="{% url "contact" %}">get in touch</a>.
-    </p>
-    <p>
-      <a href="https://free.law/recap/"
-         class="btn btn-default">Install RECAP</a>
-      <a href="https://donate.free.law/forms/membership"
-         class="btn btn-default"><i class="fa fa-heart-o"></i> Become a Free.law Member</a>
-    </p>
-
-    <h3>Creating a RECAP Alert</h3>
-    <p>To create a RECAP Alert, simply find the docket you are interested in following, and look for the button on the top that says, "<i class="fa fa-bell gray"></i> Get Alerts":
-    </p>
-    <p>
-      <img src="{% static "png/docket-alert-button.png" %}"
-           alt="screenshot of the enable button"
-           class="img-responsive img-rounded shadow center-block"
-           height="31"
-           width="94">
-    </p>
-    <p>That's all there is to it. You'll begin getting alerts as soon as the docket has a new docket entry.
-    </p>
-    <p>Here's an example of what an email might look like:</p>
-
-    <p class="v-offset-above-2">
-      <a href="{% static "png/alert-example.png" %}">
-        <img src="{% static "png/alert-example.png" %}"
-             width="749"
-             height="529"
-             class="img-responsive img-rounded center-block shadow"
-        >
-      </a>
-    </p>
-    <p class="v-offset-below-2 gray alt small">
-      (Click for full size version.)
-    </p>
-
-    <h3>Disabling a RECAP Alert</h3>
-    <p>To disable an a RECAP Alert, simply pull up the docket you no longer are interested in, and press the button that says, "<i class="fa fa-bell-slash-o"></i> Disable Alerts":
-    </p>
-    <p>
-      <img src="{% static "png/docket-alert-disable-button.png" %}"
-           alt="screenshot of the disable button"
-           class="img-responsive img-rounded shadow center-block"
-           height="31"
-           width="119">
-    </p>
-
-    <h3>Coverage Gaps</h3>
-    <p>A major source we use for our alerts are RSS feeds provided by the courts. Unfortunately, even after supplementing these with <a href="{% url "coverage_recap" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything being filed in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones. The lists below are updated around the clock and provide a summary of which courts provide RSS feeds.
-    </p>
-
-    <h4 class="v-offset-above-2">Full RSS Feeds</h4>
-    <p>The courts below have complete RSS feeds.</p>
-
-    <ul class="nav nav-tabs" role="tablist">
-      <li role="presentation"><a href="#full-feeds-FD" aria-controls="full-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
-      <li role="presentation"><a href="#full-feeds-FB" aria-controls="full-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
-    </ul>
-
-    {% regroup full_feeds|dictsort:"jurisdiction" by jurisdiction as full_feed_courts %}
-    <div class="tab-content">
-      {% for group in full_feed_courts %}
-        <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="full-feeds-{{ group.grouper }}">
-          <div class="row v-offset-above-1">
-            {% for row in group.list|rows:2 %}
-              <div class="col-xs-12 col-sm-6">
-                <ul>
-                  {% for court in row %}
-                    <li>{{ court.short_name }}</li>
-                  {% endfor %}
-                </ul>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-
-    <h4 class="v-offset-above-2">Partial RSS Feeds</h4>
-    <p>Other courts only provide some types of documents in their RSS feeds. You can see which docket entry types are provided by these courts below.</p>
-    <ul class="nav nav-tabs" role="tablist">
-      <li role="presentation" class="active"><a href="#partial-feeds-F" aria-controls="partial-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
-      <li role="presentation"><a href="#partial-feeds-FD" aria-controls="partial-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
-      <li role="presentation"><a href="#partial-feeds-FB" aria-controls="partial-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
-    </ul>
-
-    {% regroup partial_feeds|dictsort:"jurisdiction" by jurisdiction as partial_feed_courts %}
-    <div class="tab-content">
-      {% for group in partial_feed_courts %}
-        <div role="tabpanel" class="tab-pane {% if group.grouper == "F" %}active{% endif %}" id="partial-feeds-{{ group.grouper }}">
-          <table class="table table-striped">
-            {% for court in group.list %}
-              <tr>
-                <td><span class="text-nowrap">{{ court.short_name }}</span></td>
-                <td>{{ court.pacer_rss_entry_types }}</td>
-              </tr>
-            {% endfor %}
-          </table>
-        </div>
-      {% endfor %}
-    </div>
-
-    <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
-
-
-    <h4 class="v-offset-above-2">No RSS Feeds</h4>
-    <p>The following courts do not provide RSS feeds of their latest filings:
-    </p>
-
-    <ul class="nav nav-tabs" role="tablist">
-      <li role="presentation" class="active"><a href="#no-feeds-F" aria-controls="no-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
-      <li role="presentation"><a href="#no-feeds-FD" aria-controls="no-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
-      <li role="presentation"><a href="#no-feeds-FB" aria-controls="no-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
-    </ul>
-
-    {% regroup no_feeds|dictsort:"jurisdiction" by jurisdiction as no_feed_courts %}
-    <div class="tab-content">
-      {% for group in no_feed_courts %}
-        <div role="tabpanel" class="tab-pane {% if group.grouper == "F" %}active{% endif %}" id="no-feeds-{{ group.grouper }}">
-          <div class="row v-offset-above-1">
-            {% for row in group.list|rows:2 %}
-              <div class="col-xs-12 col-sm-6">
-                <ul>
-                  {% for court in row %}
-                    <li>{{ court.short_name }}</li>
-                  {% endfor %}
-                </ul>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-
-    <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
-
-    <hr>
-
-
-    <h2 id="search-alerts">Search Alerts</h2>
-    <p>Search alerts are triggered by our search engine and are thus a powerful way to get fine-tuned alerts on cases or topics that you are following.
-    </p>
-    <h3>Creating Alerts</h3>
-    <p>Creating a search alert is usually straightforward. Simply do a search in CourtListener's Case Law or Oral Argument sections and then click the bell icon in the search bar (<i class="fa fa-bell-o gray"></i>) or click the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button in the sidebar on the left.
-    </p>
-    <p>
-      <img src="{% static "png/search-bar.png" %}"
-           alt="screenshot of the search bar"
-           class="img-responsive img-rounded shadow center-block"
-           height="76"
-           width="1185">
-    </p>
-    <p>After you click the bell icon (<i class="fa fa-bell-o gray"></i>) or the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button, you will see a pop-up like this, where you can see the filters applied to your alert, how many results it had over the past 100 days, and give it a name and frequency.
-    </p>
-    <p>
-      <img src="{% static "png/alert-modal.png" %}"
-           alt="screenshot of the create alert form"
-           class="img-responsive img-rounded shadow center-block"
-           height="873"
-           width="1090">
-    </p>
-
-    <p>The available rates are "Real Time", "Daily", "Weekly", "Monthly", or "Off". Real Time alerts are usually delivered within about an hour of when something is published by the court. Daily, weekly, and monthly alerts come at the end of the day, week, and month.
-    </p>
-    <p>Alerts that are Off will not be run. This can be useful for temporarily disabling an alert.
-    </p>
-
-    <h3>Enabling Real Time Alerts</h3>
-    <p>Real Time alerts are only available for supporters of Free Law Project. If you see a message like the one below, you will <a href="https://donate.free.law/forms/membership">need to become a member</a> to enable Real Time alerts:
-    </p>
-    <p>
-      <img src="{% static "png/real-time-donation-required.png" %}"
-           alt="screenshot of the please donate for real time notification"
-           class="img-responsive img-rounded shadow center-block"
-           height="388"
-           width="1034">
-    </p>
-
-    <h3>Editing or Deleting an Alert</h3>
-    <p>Existing alerts can be edited or deleted from <a href="{% url "profile_alerts" %}">your user profile</a>. By clicking the <a class="btn btn-xs btn-primary"><i class="fa fa-pencil"></i>Edit</a> button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
-    </p>
-    <p>From your profile page, you can also delete an alert.</p>
-
-    <h3>Disabling an Alert</h3>
-    <p>If you wish to temporarily disable an alert, you can edit it and set the rate to "Off". Every alert email also has a one-click link for disabling the alert that triggered it.
-    </p>
-
-    <h3>Supported Jurisdictions</h3>
-    <p>Alerts are available for many jurisdictions across the country, and we are frequently expanding them to support even more courts. To see which courts are currently supported, check <a href="{% url "coverage_opinions" %}">our coverage page</a> where we list the jurisdictions that we regularly scrape for oral arguments or opinions.
-    </p>
-    <p>If there is a jurisdiction that is not currently listed, please <a href="{% url "contact" %}">let us know you are interested in it</a>, and we will do our best to add it to our list.
-    </p>
-
-    <h2>Citation Alerts</h2>
-    <p>Citation alerts are a way to keep up with citations to a case of interest. When you have a citation alert, you will get an email whenever a new case cites that case. Like regular search alerts described above, citation alerts can be configured with custom queries, filters, or jurisdictions.
-    </p>
-    <p>To create a citation alert, start at webpage for the case that interests you. In this example, we will use <a href="/opinion/108713/roe-v-wade/"><em>Roe v. Wade</em></a>.
-    </p>
-    <p>On that page, in the sidebar on the left, any cases that cite it are listed, and there is a button to "Get Citation Alerts":
-    </p>
-    <p>
-      <img src="{% static "png/citing-opinions.png" %}"
-           alt="screenshot of the citing opinions sidebar"
-           class="img-responsive img-rounded shadow center-block"
-           width="241"
-           height="253">
-    </p>
-
-    <p>Clicking that button will perform a search in CourtListener that <a href="/?q=cites%3A(108713)&show_alert_modal=yes" rel="nofollow">shows the case law that cites <em>Roe v. Wade</em></a>, and a dialog will appear where you can easily save the alert.</p>
-    <p>If you prefer to modify the alert, you can close the dialog that popped up, tweak the query and filters you wish to apply, and then save it as you would any regular alert.
-    </p>
-    <p>For more on citation alerts, <a href="https://free.law/2016/01/30/citation-searching/">see our blog post announcing this feature</a>.
-    </p>
-    <hr>
-
-    <h2>Coming Soon</h2>
-    <p>We do not currently support search alerts for the RECAP Archive, but we plan to do so soon.
-    </p>
-    <p>We are also working on automating alerts for use by other software systems via POST requests and callbacks. If interested, please let us know to be an early tester.
-    </p>
-    <p>Please stay tuned!</p>
   </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Help with Search and Docket&nbsp;Alerts</h1>
+  <p class="lead">Since 2009, CourtListener has helped people keep up with new cases and legal topics.</p>
+  <p>We currently have three kinds of alerts: Search Alerts, Docket Alerts for PACER, and Citation Alerts.</p>
+
+  <h2 id="recap-alerts">Docket Alerts for PACER</h2>
+  <p>Docket Alerts allow you to keep up with federal cases and bankruptcies in the PACER system. These alerts monitor tens of thousands of cases across the country for new docket entries and send emails and <a href="{% url "webhooks_docs" %}">webhook events</a> whenever new data is found.
+  </p>
+  <p>Our alerts are only as good as our sources. To learn more about the data sources that trigger alerts see our <a href="{% url "coverage_recap" %}">coverage page</a>.
+  </p>
+  <p>For active cases, alerts can come within seconds of a new filing. For less active cases, it can take more time or alerts may not arrive at all, if we do not have a source of new information for that case.
+  </p>
+  <p>In the last 24 hours, {{ d_update_count|intcomma }} dockets and {{ de_update_count|intcomma }} docket entries were updated.
+  </p>
+
+  <h3 id="limitations">Limitations</h3>
+  <p>As a non-profit, we aim to provide our services to as many people as possible. We currently allow <span class="bold">{{ MAX_FREE_DOCKET_ALERTS }}</span> docket alerts for free, and give a bonus of <span class="bold">{{ DOCKET_ALERT_RECAP_BONUS }}</span> alerts to anybody with the <a href="https://free.law/recap/">RECAP Extension</a> installed.
+  </p>
+  <p>Members can create as many alerts as they need, though we may set up some reasonable limits in the future, based on usage.
+  </p>
+  <p>Corporate rates are available for large organizations needing to provide alerts to many users. This feature is intended for individual users. If you think you may need to use alerts for a commercial endeavor, please <a href="{% url "contact" %}">get in touch</a>.
+  </p>
+  <p>We can sometimes provide need-based exceptions to these rates. If you might need an exception, <a href="{% url "contact" %}">please let us know</a>.
+  </p>
+  <p>
+    <a href="https://free.law/recap/"
+       class="btn btn-primary">Install RECAP</a>
+    <a href="https://donate.free.law/forms/membership"
+       class="btn btn-danger"><i class="fa fa-heart-o"></i> Join Free.law</a>
+  </p>
+
+  <h3 id="creating-docket-alert">Creating a Docket Alert</h3>
+  <p>To create a RECAP Alert, find the docket you are interested in following, and press the button on the top that says, "<i class="fa fa-bell gray"></i> Get Alerts":
+  </p>
+  <p>
+    <img src="{% static "png/docket-alert-button.png" %}"
+         alt="screenshot of the enable button"
+         class="img-responsive img-rounded shadow center-block"
+         height="31"
+         width="94">
+  </p>
+  <p>That's all there is to it. You'll begin getting alerts as soon as the docket has a new docket entry.
+  </p>
+  <p>Here's an example of what an email might look like:</p>
+  <p class="v-offset-above-2">
+    <a href="{% static "png/alert-example.png" %}">
+      <img src="{% static "png/alert-example.png" %}"
+           width="749"
+           height="529"
+           class="img-responsive img-rounded center-block shadow"
+      >
+    </a>
+  </p>
+  <p class="v-offset-below-2 gray alt small">
+    (Click for full size version.)
+  </p>
+
+  <h3 id="disabling-docket-alert">Disabling a Docket Alert</h3>
+  <p>To disable a Docket Alert, find the docket you no longer are interested in, and press the button that says, "<i class="fa fa-bell-slash-o"></i> Disable Alerts":
+  </p>
+  <p>
+    <img src="{% static "png/docket-alert-disable-button.png" %}"
+         alt="screenshot of the disable button"
+         class="img-responsive img-rounded shadow center-block"
+         height="31"
+         width="119">
+  </p>
+
+  <h3 id="coverage-gaps">Coverage Gaps</h3>
+  <p>A major source we use for our alerts is RSS feeds provided by the courts. Even after supplementing these with <a href="{% url "coverage_recap" %}">the sources listed on our coverage page</a>, we are not always able to provide complete coverage of everything new in PACER. The problem is that some courts do not provide RSS feeds, and others only provide partial ones. The lists below are updated around the clock and provide a summary of which courts provide RSS feeds.
+  </p>
+
+  <h4 class="v-offset-above-2">Full RSS Feeds</h4>
+  <p>The courts below have complete RSS feeds, allowing us to always know when cases in these courts are updated.</p>
+
+  <ul class="nav nav-tabs" role="tablist">
+    <li role="presentation" class="active"><a href="#full-feeds-FD" aria-controls="full-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+    <li role="presentation"><a href="#full-feeds-FB" aria-controls="full-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+  </ul>
+
+  {% regroup full_feeds|dictsort:"jurisdiction" by jurisdiction as full_feed_courts %}
+  <div class="tab-content">
+    {% for group in full_feed_courts %}
+      <div role="tabpanel" class="tab-pane {% if group.grouper == "FD" %}active{% endif %}" id="full-feeds-{{ group.grouper }}">
+        <div class="row v-offset-above-1">
+          {% for row in group.list|rows:2 %}
+            <div class="col-xs-12 col-sm-6">
+              <ul>
+                {% for court in row %}
+                  <li>{{ court.short_name }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <h4 class="v-offset-above-2">Partial RSS Feeds</h4>
+  <p>The courts below only provide some types of documents in their RSS feeds. This means we can send alerts for the types of documents they support and for any content we get from other sources.
+  </p>
+  <p>You can see which docket entry types are provided by these courts below.</p>
+  <ul class="nav nav-tabs" role="tablist">
+    <li role="presentation" class="active"><a href="#partial-feeds-F" aria-controls="partial-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
+    <li role="presentation"><a href="#partial-feeds-FD" aria-controls="partial-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+    <li role="presentation"><a href="#partial-feeds-FB" aria-controls="partial-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+  </ul>
+
+  {% regroup partial_feeds|dictsort:"jurisdiction" by jurisdiction as partial_feed_courts %}
+  <div class="tab-content">
+    {% for group in partial_feed_courts %}
+      <div role="tabpanel" class="tab-pane {% if group.grouper == "F" %}active{% endif %}" id="partial-feeds-{{ group.grouper }}">
+        <table class="table table-striped">
+          {% for court in group.list %}
+            <tr>
+              <td><span class="text-nowrap">{{ court.short_name }}</span></td>
+              <td>{{ court.pacer_rss_entry_types }}</td>
+            </tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endfor %}
+  </div>
+
+  <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
+
+
+  <h4 class="v-offset-above-2">No RSS Feeds</h4>
+  <p>The courts below do not provide RSS feeds of their latest filings. This means our alerts will only be sent when we get updates from other sources.
+  </p>
+
+  <ul class="nav nav-tabs" role="tablist">
+    <li role="presentation" class="active"><a href="#no-feeds-F" aria-controls="no-feeds-appellate" role="tab" data-toggle="tab">Appellate Courts</a></li>
+    <li role="presentation"><a href="#no-feeds-FD" aria-controls="no-feeds-district" role="tab" data-toggle="tab">District Courts</a></li>
+    <li role="presentation"><a href="#no-feeds-FB" aria-controls="no-feeds-bankr" role="tab" data-toggle="tab">Bankruptcy Courts</a></li>
+  </ul>
+
+  {% regroup no_feeds|dictsort:"jurisdiction" by jurisdiction as no_feed_courts %}
+  <div class="tab-content">
+    {% for group in no_feed_courts %}
+      <div role="tabpanel" class="tab-pane {% if group.grouper == "F" %}active{% endif %}" id="no-feeds-{{ group.grouper }}">
+        <div class="row v-offset-above-1">
+          {% for row in group.list|rows:2 %}
+            <div class="col-xs-12 col-sm-6">
+              <ul>
+                {% for court in row %}
+                  <li>{{ court.short_name }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  <p>If you rely on one of these courts, we strongly encourage you to contact the court to request a full and complete PACER RSS feed.</p>
+
+  <hr>
+
+
+  <h2 id="search-alerts">Search Alerts</h2>
+  <p>Search alerts are triggered by our search engine and are a powerful way to get fine-tuned alerts on cases or topics that you are following.
+  </p>
+  <h3>Creating Alerts</h3>
+  <p>To create a Search Alert, begin with a search in CourtListener's Case Law or Oral Argument database. In the results page, click the bell icon in the search bar (<i class="fa fa-bell-o gray"></i>) or click the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button in the sidebar on the left.
+  </p>
+  <p>
+    <img src="{% static "png/search-bar.png" %}"
+         alt="screenshot of the search bar"
+         class="img-responsive img-rounded shadow center-block"
+         height="76"
+         width="1185">
+  </p>
+  <p>After you click the bell icon (<i class="fa fa-bell-o gray"></i>) or the <a class="btn btn-success btn-xs"><i class="fa fa-bell-o"></i> Get Alerts</a> button, you will see a pop-up like this, where you can see the filters applied to your alert, how many results it had over the past 100 days, and give it a name and frequency.
+  </p>
+  <p>
+    <img src="{% static "png/alert-modal.png" %}"
+         alt="screenshot of the create alert form"
+         class="img-responsive img-rounded shadow center-block"
+         height="873"
+         width="1090">
+  </p>
+
+  <p>The available rates are "Real Time," "Daily," "Weekly," "Monthly," or "Off." Real Time alerts are usually delivered within about an hour of when something is published by the court. Daily, weekly, and monthly alerts come at the end of the day, week, and month.
+  </p>
+  <p>Alerts that are Off will not be run. This can be useful for temporarily disabling an alert.
+  </p>
+
+  <h3>Enabling Real Time Alerts</h3>
+  <p>Real Time alerts are available for Free Law Project members. If you see a message like the one below, you will <a href="https://donate.free.law/forms/membership">need to become a member</a> to enable Real Time alerts:
+  </p>
+  <p>
+    <img src="{% static "png/real-time-donation-required.png" %}"
+         alt="screenshot of the please donate for real time notification"
+         class="img-responsive img-rounded shadow center-block"
+         height="388"
+         width="1034">
+  </p>
+  <p class="v-offset-above-2">
+    <a href="https://donate.free.law/forms/membership"
+       class="btn btn-danger"><i class="fa fa-heart-o"></i> Join Free.law</a>
+  </p>
+
+  <h3 id="editing-search-alerts">Editing or Deleting a Search Alert</h3>
+  <p>Existing alerts can be edited or deleted from <a href="{% url "profile_alerts" %}">your user profile</a>. By clicking the <a class="btn btn-xs btn-primary"><i class="fa fa-pencil"></i>Edit</a> button, you will be taken back to the search screen with the alert configured for editing. There, you can refine your search, or the name or frequency of the alert.
+  </p>
+  <p>From your profile page, you can also delete an alert.</p>
+
+  <h3 id="disabling-search-alerts">Disabling a Search Alert</h3>
+  <p>To temporarily disable an alert, edit it and set the rate to "Off." Every alert email also has a one-click link for disabling the alert that triggered it.
+  </p>
+
+  <h3 id="courts">Supported Courts</h3>
+  <p>Search alerts are available for many jurisdictions across the country, and we are frequently expanding our system to support even more locations. To see which courts are currently supported, check <a href="{% url "coverage" %}">our coverage pages</a>, where we list the jurisdictions that we regularly scrape for oral arguments or case law.
+  </p>
+  <p>If there is a jurisdiction that is not currently listed, please <a href="{% url "contact" %}">express your interest</a>, and we will do our best to add it to our list.
+  </p>
+
+  <h2 id="citation-alerts">Citation Alerts</h2>
+  <p>Citation alerts make it possible to keep up with citations to a case of interest. For example, if you are following election law, you might want an alert whenever a new case cites existing landmark cases in your field.
+  </p>
+  <p>Citation alerts can be configured with custom queries, filters, or jurisdictions. This allows you to set up alerts like:
+
+  </p>
+  <blockquote>Whenever the Supreme Court cites <em>Roe v. Wade</em> and mentions the First Amendment, send me an email.</blockquote>
+  <p>To create a citation alert, start at webpage for the case that interests you. In this example, we will use <a href="/opinion/108713/roe-v-wade/"><em>Roe v. Wade</em></a>.
+  </p>
+  <p>On that page, in the sidebar on the left, any cases that cite it are listed, and there is a button to "Get Citation Alerts":
+  </p>
+  <p>
+    <img src="{% static "png/citing-opinions.png" %}"
+         alt="screenshot of the citing opinions sidebar"
+         class="img-responsive img-rounded shadow center-block"
+         width="241"
+         height="253">
+  </p>
+
+  <p>Clicking that button will perform a search in CourtListener that <a href="/?q=cites%3A(108713)&show_alert_modal=yes" rel="nofollow">shows the case law that cites <em>Roe v. Wade</em></a>, and a dialog will appear where you can save the alert.</p>
+  <p>If you prefer to modify the alert, you can close the dialog that appeared, tweak the query and filters you wish to apply, and then save it as you would any regular alert.
+  </p>
+  <p>For more on citation alerts, <a href="https://free.law/2016/01/30/citation-searching/">see our blog post announcing this feature</a>.
+  </p>
+  <hr>
+
+  <h2>Coming Soon</h2>
+  <p>We do not currently support search alerts or citation alerts for PACER filings, but we plan to do so soon.
+  </p>
+  <p>Please stay tuned!</p>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
 {% endblock %}
