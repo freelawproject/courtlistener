@@ -15,7 +15,11 @@ from cl.lib.elasticsearch_utils import (
     build_join_fulltext_queries,
 )
 from cl.lib.search_index_utils import solr_list
-from cl.lib.test_helpers import CourtTestCase, PeopleTestCase
+from cl.lib.test_helpers import (
+    CourtTestCase,
+    PeopleTestCase,
+    skip_if_common_tests_skipped,
+)
 from cl.people_db.factories import (
     ABARatingFactory,
     EducationFactory,
@@ -36,6 +40,564 @@ from cl.tests.cases import (
     TestCase,
     TransactionTestCase,
 )
+
+
+class PeopleSearchAPICommonTests(CourtTestCase, PeopleTestCase):
+    version_api = "v3"
+    skip_common_tests = True
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v3"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    @skip_if_common_tests_skipped
+    async def test_name_field(self) -> None:
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}
+        # API
+        await self._test_api_results_count(params, 2, "name")
+
+    @skip_if_common_tests_skipped
+    async def test_court_filter(self) -> None:
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}
+        # API
+        await self._test_api_results_count(params, 1, "court")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}
+        # API
+        await self._test_api_results_count(params, 0, "court")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}
+        # API
+        await self._test_api_results_count(params, 1, "court")
+
+    @skip_if_common_tests_skipped
+    async def test_dob_filters(self) -> None:
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "born_after": "1941",
+            "born_before": "1943",
+        }
+        # API
+        await self._test_api_results_count(params, 1, "born_{before|after}")
+
+        # Are reversed dates corrected?
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "born_after": "1943",
+            "born_before": "1941",
+        }
+        # API
+        await self._test_api_results_count(params, 1, "born_{before|after}")
+
+        # Just one filter, but Judy is older than this.
+        params = {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"}
+        # API
+        await self._test_api_results_count(
+            params,
+            0,
+            "born_{before|after}",
+        )
+
+    @skip_if_common_tests_skipped
+    async def test_birth_location(self) -> None:
+        """Can we filter by city and state?"""
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brookyln"}
+        # API
+        await self._test_api_results_count(params, 1, "dob_city")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"}
+        # API
+        await self._test_api_results_count(
+            params,
+            0,
+            "dob_city",
+        )
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "dob_city": "brookyln",
+            "dob_state": "NY",
+        }
+        # API
+        await self._test_api_results_count(params, 1, "dob_city")
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "dob_city": "brookyln",
+            "dob_state": "OK",
+        }
+        # API
+        await self._test_api_results_count(params, 0, "dob_city")
+
+    @skip_if_common_tests_skipped
+    async def test_schools_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "school": "american"}
+        # API
+        await self._test_api_results_count(params, 1, "school")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}
+        # API
+        await self._test_api_results_count(params, 0, "school")
+
+    @skip_if_common_tests_skipped
+    async def test_appointer_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"}
+        # API
+        await self._test_api_results_count(params, 2, "appointer")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"}
+        # API
+        await self._test_api_results_count(params, 0, "appointer")
+
+    @skip_if_common_tests_skipped
+    async def test_selection_method_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"}
+        # API
+        await self._test_api_results_count(params, 1, "selection_method")
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "selection_method": "e_non_part",
+        }
+
+        # API
+        await self._test_api_results_count(
+            params,
+            0,
+            "selection_method",
+        )
+
+    @skip_if_common_tests_skipped
+    async def test_political_affiliation_filter(self) -> None:
+        params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"}
+        # API
+        await self._test_api_results_count(params, 1, "political_affiliation")
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"}
+        # API
+        await self._test_api_results_count(params, 0, "political_affiliation")
+
+    @skip_if_common_tests_skipped
+    async def test_advanced_search(self) -> None:
+        # Search by advanced field.
+        params = {"type": SEARCH_TYPES.PEOPLE, "q": "name:Judith Sheindlin"}
+        # API
+        await self._test_api_results_count(params, 2, "q")
+
+        # Combine fields of the parent document in advanced search.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "name:Judith Sheindlin AND dob_city:Queens",
+        }
+        # API
+        r = await self._test_api_results_count(params, 1, "q")
+        self.assertIn("Olivia", r.content.decode())
+
+        # Combine fields from the parent and the child mapping in advanced search.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "appointer:Clinton AND dob_city:Queens",
+        }
+        # API
+        r = await self._test_api_results_count(params, 1, "q")
+        self.assertIn("Olivia", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "appointer:Clinton AND races:(Black or African American)",
+        }
+        # API
+        r = await self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "appointer:Clinton AND political_affiliation_id:i",
+        }
+        # API
+        r = await self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
+
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "selection_method_id:e_part AND dob_state_id:NY",
+        }
+        # API
+        r = await self._test_api_results_count(params, 1, "q")
+        self.assertIn("Judith", r.content.decode())
+
+
+class PeopleV3APISearchTest(
+    PeopleSearchAPICommonTests, ESIndexTestCase, TestCase
+):
+    skip_common_tests = False
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.PEOPLE,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    async def test_search_query_and_order(self) -> None:
+        # Search by name and relevance result order.
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "order_by": "score desc",
+        }
+
+        # API
+        r = await self._test_api_results_count(params, 2, "q")
+        self.assertTrue(
+            r.content.decode().index("Olivia")
+            < r.content.decode().index("Susan"),
+            msg="'Susan' should come AFTER 'Olivia'.",
+        )
+
+        # Search by name and dob order.
+        # Frontend
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "order_by": "dob desc,name_reverse asc",
+        }
+        # API
+        r = await self._test_api_results_count(params, 2, "q")
+        self.assertTrue(
+            r.content.decode().index("Olivia")
+            < r.content.decode().index("Susan"),
+            msg="'Susan' should come AFTER 'Olivia'.",
+        )
+
+        # Search by name and filter.
+        params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "Judith Sheindlin",
+            "school": "american",
+        }
+        # API
+        await self._test_api_results_count(params, 1, "q + school")
+
+    async def test_api_fields(self) -> None:
+        """Confirm the search API for People return the expected fields."""
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
+        r = await self._test_api_results_count(params, 1, "API")
+        keys_to_check = [
+            "aba_rating",
+            "absolute_url",
+            "alias",
+            "alias_ids",
+            "appointer",
+            "court",
+            "court_exact",
+            "date_confirmation",
+            "date_elected",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "date_granularity_start",
+            "date_granularity_termination",
+            "date_hearing",
+            "date_judicial_committee_action",
+            "date_nominated",
+            "date_recess_appointment",
+            "date_referred_to_judicial_committee",
+            "date_retirement",
+            "date_start",
+            "date_termination",
+            "dob",
+            "dob_city",
+            "dob_state",
+            "dob_state_id",
+            "dod",
+            "fjc_id",
+            "gender",
+            "id",
+            "judicial_committee_action",
+            "name",
+            "name_reverse",
+            "nomination_process",
+            "political_affiliation",
+            "political_affiliation_id",
+            "position_type",
+            "predecessor",
+            "races",
+            "religion",
+            "school",
+            "selection_method",
+            "selection_method_id",
+            "snippet",
+            "supervisor",
+            "termination_reason",
+            "timestamp",
+            "date_created",
+        ]
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, 47)
+        for key in keys_to_check:
+            self.assertTrue(
+                key in r.data["results"][0],
+                msg=f"Key {key} not found in the result object.",
+            )
+
+    def test_merge_unavailable_fields_api(self) -> None:
+        """Confirm unavailable ES fields are properly merged from DB in the API"""
+        with self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory.create(name_first="John American")
+            position_5 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+
+            position_6 = PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_2,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_2,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="clerk",
+                person=self.person_2,
+                supervisor=person,
+                date_nominated=datetime.date(2015, 11, 14),
+                date_recess_appointment=datetime.date(2016, 11, 14),
+                date_referred_to_judicial_committee=datetime.date(
+                    2017, 11, 14
+                ),
+                date_judicial_committee_action=datetime.date(2017, 10, 14),
+                date_confirmation=datetime.date(2017, 10, 11),
+                date_hearing=datetime.date(2017, 10, 16),
+                date_retirement=datetime.date(2020, 10, 10),
+                date_termination=datetime.date(2019, 10, 24),
+                date_granularity_termination="%Y-%m-%d",
+                how_selected="a_legis",
+                nomination_process="fed_senate",
+            )
+
+        params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
+
+        # API
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v3"}), params
+        )
+        self.assertEqual(len(r.data["results"]), 1)
+        # Compare whether every field in the results contains the same content,
+        # regardless of the order.
+        self.assertEqual(
+            Counter(r.data["results"][0]["court"]),
+            Counter(
+                [position_6.court.short_name, self.position_2.court.short_name]
+            ),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["court_exact"]),
+            Counter([self.position_2.court.pk, position_6.court.pk]),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["position_type"]),
+            Counter(
+                [
+                    self.position_2.get_position_type_display(),
+                    position_6.get_position_type_display(),
+                ]
+            ),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["appointer"]),
+            Counter(
+                [
+                    self.position_2.appointer.person.name_full_reverse,
+                    position_6.appointer.person.name_full_reverse,
+                ]
+            ),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["supervisor"]),
+            Counter([position_6.supervisor.name_full_reverse]),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["predecessor"]),
+            Counter(
+                [
+                    self.position_2.predecessor.name_full_reverse,
+                    position_6.predecessor.name_full_reverse,
+                ]
+            ),
+        )
+
+        positions = self.person_2.positions.all()
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_nominated"]),
+            Counter(solr_list(positions, "date_nominated")),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_elected"]),
+            Counter(solr_list(positions, "date_elected")),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_recess_appointment"]),
+            Counter(solr_list(positions, "date_recess_appointment")),
+        )
+        self.assertEqual(
+            Counter(
+                r.data["results"][0]["date_referred_to_judicial_committee"]
+            ),
+            Counter(
+                solr_list(positions, "date_referred_to_judicial_committee")
+            ),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_judicial_committee_action"]),
+            Counter(solr_list(positions, "date_judicial_committee_action")),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_hearing"]),
+            Counter(solr_list(positions, "date_hearing")),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_confirmation"]),
+            Counter(solr_list(positions, "date_confirmation")),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_start"]),
+            Counter(solr_list(positions, "date_start")),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_granularity_start"]),
+            Counter(
+                [
+                    self.position_2.date_granularity_start,
+                    self.position_3.date_granularity_start,
+                    position_6.date_granularity_start,
+                ]
+            ),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_retirement"]),
+            Counter(solr_list(positions, "date_retirement")),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_termination"]),
+            Counter(solr_list(positions, "date_termination")),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["date_granularity_termination"]),
+            Counter([position_6.date_granularity_termination]),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["judicial_committee_action"]),
+            Counter(
+                [
+                    self.position_2.get_judicial_committee_action_display(),
+                    position_6.get_judicial_committee_action_display(),
+                ]
+            ),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["nomination_process"]),
+            Counter(
+                [
+                    self.position_2.get_nomination_process_display(),
+                    position_6.get_nomination_process_display(),
+                ]
+            ),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["selection_method"]),
+            Counter(
+                [
+                    self.position_2.get_how_selected_display(),
+                    position_6.get_how_selected_display(),
+                ]
+            ),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["selection_method_id"]),
+            Counter([self.position_2.how_selected, position_6.how_selected]),
+        )
+        self.assertEqual(
+            Counter(r.data["results"][0]["termination_reason"]),
+            Counter(
+                [
+                    self.position_2.get_termination_reason_display(),
+                    position_6.get_termination_reason_display(),
+                ]
+            ),
+        )
+
+        position_5.delete()
+        position_6.delete()
+        person.delete()
+
+
+class PeopleV4APISearchTest(
+    PeopleSearchAPICommonTests, ESIndexTestCase, TestCase
+):
+    skip_common_tests = False
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.PEOPLE,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v3"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
 
 
 class PeopleSearchTestElasticSearch(
@@ -59,22 +621,6 @@ class PeopleSearchTestElasticSearch(
         r = self.client.get("/", params)
         tree = html.fromstring(r.content.decode())
         got = len(tree.xpath("//article"))
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of search results with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
-        )
-        return r
-
-    def _test_api_results_count(self, params, expected_count, field_name):
-        r = self.client.get(
-            reverse("search-list", kwargs={"version": "v3"}), params
-        )
-        got = len(r.data["results"])
         self.assertEqual(
             got,
             expected_count,
@@ -225,28 +771,19 @@ class PeopleSearchTestElasticSearch(
         # Frontend
         params = {"type": SEARCH_TYPES.PEOPLE, "name": "judith"}
         self._test_article_count(params, 2, "name")
-        # API
-        self._test_api_results_count(params, 2, "name")
 
     def test_court_filter(self) -> None:
         # Frontend
         params = {"type": SEARCH_TYPES.PEOPLE, "court": "ca1"}
         self._test_article_count(params, 1, "court")
 
-        # API
-        self._test_api_results_count(params, 1, "court")
-
         # Frontend
         params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus"}
         self._test_article_count(params, 0, "court")
-        # API
-        self._test_api_results_count(params, 0, "court")
 
         # Frontend
         params = {"type": SEARCH_TYPES.PEOPLE, "court": "scotus ca1"}
         self._test_article_count(params, 1, "court")
-        # API
-        self._test_api_results_count(params, 1, "court")
 
     def test_dob_filters(self) -> None:
         # Frontend
@@ -256,8 +793,6 @@ class PeopleSearchTestElasticSearch(
             "born_before": "1943",
         }
         self._test_article_count(params, 1, "born_{before|after}")
-        # API
-        self._test_api_results_count(params, 1, "born_{before|after}")
 
         # Are reversed dates corrected?
         params = {
@@ -267,19 +802,11 @@ class PeopleSearchTestElasticSearch(
         }
         # Frontend
         self._test_article_count(params, 1, "born_{before|after}")
-        # API
-        self._test_api_results_count(params, 1, "born_{before|after}")
 
         # Just one filter, but Judy is older than this.
         params = {"type": SEARCH_TYPES.PEOPLE, "born_after": "1946"}
         # Frontend
         self._test_article_count(params, 0, "born_{before|after}")
-        # API
-        self._test_api_results_count(
-            params,
-            0,
-            "born_{before|after}",
-        )
 
     def test_birth_location(self) -> None:
         """Can we filter by city and state?"""
@@ -291,18 +818,10 @@ class PeopleSearchTestElasticSearch(
             1,
             "dob_city",
         )
-        # API
-        self._test_api_results_count(params, 1, "dob_city")
 
         params = {"type": SEARCH_TYPES.PEOPLE, "dob_city": "brooklyn2"}
         # Frontend
         self._test_article_count(
-            params,
-            0,
-            "dob_city",
-        )
-        # API
-        self._test_api_results_count(
             params,
             0,
             "dob_city",
@@ -315,8 +834,6 @@ class PeopleSearchTestElasticSearch(
         }
         # Frontend
         self._test_article_count(params, 1, "dob_city")
-        # API
-        self._test_api_results_count(params, 1, "dob_city")
 
         params = {
             "type": SEARCH_TYPES.PEOPLE,
@@ -329,21 +846,15 @@ class PeopleSearchTestElasticSearch(
             0,
             "dob_city",
         )
-        # API
-        self._test_api_results_count(params, 0, "dob_city")
 
     def test_schools_filter(self) -> None:
         params = {"type": SEARCH_TYPES.PEOPLE, "school": "american"}
         # Frontend
         self._test_article_count(params, 1, "school")
-        # API
-        self._test_api_results_count(params, 1, "school")
 
         params = {"type": SEARCH_TYPES.PEOPLE, "school": "pitzer"}
         # Frontend
         self._test_article_count(params, 0, "school")
-        # API
-        self._test_api_results_count(params, 0, "school")
 
     def test_appointer_filter(self) -> None:
         params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "clinton"}
@@ -353,21 +864,15 @@ class PeopleSearchTestElasticSearch(
             2,
             "appointer",
         )
-        # API
-        self._test_api_results_count(params, 2, "appointer")
 
         params = {"type": SEARCH_TYPES.PEOPLE, "appointer": "obama"}
         # Frontend
         self._test_article_count(params, 0, "appointer")
-        # API
-        self._test_api_results_count(params, 0, "appointer")
 
     def test_selection_method_filter(self) -> None:
         params = {"type": SEARCH_TYPES.PEOPLE, "selection_method": "e_part"}
         # Frontend
         self._test_article_count(params, 1, "selection_method")
-        # API
-        self._test_api_results_count(params, 1, "selection_method")
 
         params = {
             "type": SEARCH_TYPES.PEOPLE,
@@ -375,25 +880,15 @@ class PeopleSearchTestElasticSearch(
         }
         # Frontend
         self._test_article_count(params, 0, "selection_method")
-        # API
-        self._test_api_results_count(
-            params,
-            0,
-            "selection_method",
-        )
 
     def test_political_affiliation_filter(self) -> None:
         params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "d"}
         # Frontend
         self._test_article_count(params, 1, "political_affiliation")
-        # API
-        self._test_api_results_count(params, 1, "political_affiliation")
 
         params = {"type": SEARCH_TYPES.PEOPLE, "political_affiliation": "r"}
         # Frontend
         self._test_article_count(params, 0, "political_affiliation")
-        # API
-        self._test_api_results_count(params, 0, "political_affiliation")
 
     def test_search_query_and_order(self) -> None:
         # Search by name and relevance result order.
@@ -409,8 +904,6 @@ class PeopleSearchTestElasticSearch(
             < r.content.decode().index("Susan"),
             msg="'Susan' should come AFTER 'Olivia'.",
         )
-        # API
-        self._test_api_results_count(params, 2, "q")
 
         # Search by name and dob order.
         # Frontend
@@ -425,8 +918,6 @@ class PeopleSearchTestElasticSearch(
             < r.content.decode().index("Susan"),
             msg="'Susan' should come AFTER 'Olivia'.",
         )
-        # API
-        self._test_api_results_count(params, 2, "q")
 
         # Search by name and filter.
         params = {
@@ -436,16 +927,12 @@ class PeopleSearchTestElasticSearch(
         }
         # Frontend
         self._test_article_count(params, 1, "q + school")
-        # API
-        self._test_api_results_count(params, 1, "q + school")
 
     def test_advanced_search(self) -> None:
         # Search by advanced field.
         # Frontend
         params = {"type": SEARCH_TYPES.PEOPLE, "q": "name:Judith Sheindlin"}
         self._test_article_count(params, 2, "q")
-        # API
-        self._test_api_results_count(params, 2, "q")
 
         # Combine fields of the parent document in advanced search.
         params = {
@@ -459,9 +946,6 @@ class PeopleSearchTestElasticSearch(
             "q",
         )
         self.assertIn("Olivia", r.content.decode())
-        # API
-        r = self._test_api_results_count(params, 1, "q")
-        self.assertIn("Olivia", r.content.decode())
 
         # Combine fields from the parent and the child mapping in advanced search.
         params = {
@@ -474,9 +958,6 @@ class PeopleSearchTestElasticSearch(
             "q",
         )
         self.assertIn("Olivia", r.content.decode())
-        # API
-        r = self._test_api_results_count(params, 1, "q")
-        self.assertIn("Olivia", r.content.decode())
 
         params = {
             "type": SEARCH_TYPES.PEOPLE,
@@ -487,9 +968,6 @@ class PeopleSearchTestElasticSearch(
             1,
             "q",
         )
-        self.assertIn("Judith", r.content.decode())
-        # API
-        r = self._test_api_results_count(params, 1, "q")
         self.assertIn("Judith", r.content.decode())
 
         params = {
@@ -502,9 +980,6 @@ class PeopleSearchTestElasticSearch(
             "q",
         )
         self.assertIn("Judith", r.content.decode())
-        # API
-        r = self._test_api_results_count(params, 1, "q")
-        self.assertIn("Judith", r.content.decode())
 
         params = {
             "type": SEARCH_TYPES.PEOPLE,
@@ -515,9 +990,6 @@ class PeopleSearchTestElasticSearch(
             1,
             "q",
         )
-        self.assertIn("Judith", r.content.decode())
-        # API
-        r = self._test_api_results_count(params, 1, "q")
         self.assertIn("Judith", r.content.decode())
 
     def test_parent_document_fields_on_search_results(self):
@@ -868,265 +1340,6 @@ class PeopleSearchTestElasticSearch(
         }
         r = self._test_article_count(params, 1, "q")
         self.assertIn("<mark>Independent</mark>", r.content.decode())
-
-    def test_api_fields(self) -> None:
-        """Confirm the search API for People return the expected fields."""
-
-        params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
-        r = self._test_api_results_count(params, 1, "API")
-        keys_to_check = [
-            "aba_rating",
-            "absolute_url",
-            "alias",
-            "alias_ids",
-            "appointer",
-            "court",
-            "court_exact",
-            "date_confirmation",
-            "date_elected",
-            "date_granularity_dob",
-            "date_granularity_dod",
-            "date_granularity_start",
-            "date_granularity_termination",
-            "date_hearing",
-            "date_judicial_committee_action",
-            "date_nominated",
-            "date_recess_appointment",
-            "date_referred_to_judicial_committee",
-            "date_retirement",
-            "date_start",
-            "date_termination",
-            "dob",
-            "dob_city",
-            "dob_state",
-            "dob_state_id",
-            "dod",
-            "fjc_id",
-            "gender",
-            "id",
-            "judicial_committee_action",
-            "name",
-            "name_reverse",
-            "nomination_process",
-            "political_affiliation",
-            "political_affiliation_id",
-            "position_type",
-            "predecessor",
-            "races",
-            "religion",
-            "school",
-            "selection_method",
-            "selection_method_id",
-            "snippet",
-            "supervisor",
-            "termination_reason",
-            "timestamp",
-            "date_created",
-        ]
-        keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 47)
-        for key in keys_to_check:
-            self.assertTrue(
-                key in r.data["results"][0],
-                msg=f"Key {key} not found in the result object.",
-            )
-
-    def test_merge_unavailable_fields_api(self) -> None:
-        """Confirm unavailable ES fields are properly merged from DB in the API"""
-        with self.captureOnCommitCallbacks(execute=True):
-            person = PersonFactory.create(name_first="John American")
-            position_5 = PositionFactory.create(
-                date_granularity_start="%Y-%m-%d",
-                court=self.court_1,
-                date_start=datetime.date(2015, 12, 14),
-                predecessor=self.person_3,
-                appointer=self.position_1,
-                judicial_committee_action="no_rep",
-                termination_reason="retire_mand",
-                position_type="c-jud",
-                person=person,
-                how_selected="e_part",
-                nomination_process="fed_senate",
-            )
-
-            position_6 = PositionFactory.create(
-                date_granularity_start="%Y-%m-%d",
-                court=self.court_2,
-                date_start=datetime.date(2015, 12, 14),
-                predecessor=self.person_2,
-                appointer=self.position_1,
-                judicial_committee_action="no_rep",
-                termination_reason="retire_mand",
-                position_type="clerk",
-                person=self.person_2,
-                supervisor=person,
-                date_nominated=datetime.date(2015, 11, 14),
-                date_recess_appointment=datetime.date(2016, 11, 14),
-                date_referred_to_judicial_committee=datetime.date(
-                    2017, 11, 14
-                ),
-                date_judicial_committee_action=datetime.date(2017, 10, 14),
-                date_confirmation=datetime.date(2017, 10, 11),
-                date_hearing=datetime.date(2017, 10, 16),
-                date_retirement=datetime.date(2020, 10, 10),
-                date_termination=datetime.date(2019, 10, 24),
-                date_granularity_termination="%Y-%m-%d",
-                how_selected="a_legis",
-                nomination_process="fed_senate",
-            )
-
-        params = {"type": SEARCH_TYPES.PEOPLE, "q": "Susan"}
-
-        # API
-        r = self._test_api_results_count(params, 1, "API")
-
-        # Compare whether every field in the results contains the same content,
-        # regardless of the order.
-        self.assertEqual(
-            Counter(r.data["results"][0]["court"]),
-            Counter(
-                [position_6.court.short_name, self.position_2.court.short_name]
-            ),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["court_exact"]),
-            Counter([self.position_2.court.pk, position_6.court.pk]),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["position_type"]),
-            Counter(
-                [
-                    self.position_2.get_position_type_display(),
-                    position_6.get_position_type_display(),
-                ]
-            ),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["appointer"]),
-            Counter(
-                [
-                    self.position_2.appointer.person.name_full_reverse,
-                    position_6.appointer.person.name_full_reverse,
-                ]
-            ),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["supervisor"]),
-            Counter([position_6.supervisor.name_full_reverse]),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["predecessor"]),
-            Counter(
-                [
-                    self.position_2.predecessor.name_full_reverse,
-                    position_6.predecessor.name_full_reverse,
-                ]
-            ),
-        )
-
-        positions = self.person_2.positions.all()
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_nominated"]),
-            Counter(solr_list(positions, "date_nominated")),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_elected"]),
-            Counter(solr_list(positions, "date_elected")),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_recess_appointment"]),
-            Counter(solr_list(positions, "date_recess_appointment")),
-        )
-        self.assertEqual(
-            Counter(
-                r.data["results"][0]["date_referred_to_judicial_committee"]
-            ),
-            Counter(
-                solr_list(positions, "date_referred_to_judicial_committee")
-            ),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_judicial_committee_action"]),
-            Counter(solr_list(positions, "date_judicial_committee_action")),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_hearing"]),
-            Counter(solr_list(positions, "date_hearing")),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_confirmation"]),
-            Counter(solr_list(positions, "date_confirmation")),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_start"]),
-            Counter(solr_list(positions, "date_start")),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_granularity_start"]),
-            Counter(
-                [
-                    self.position_2.date_granularity_start,
-                    self.position_3.date_granularity_start,
-                    position_6.date_granularity_start,
-                ]
-            ),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_retirement"]),
-            Counter(solr_list(positions, "date_retirement")),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_termination"]),
-            Counter(solr_list(positions, "date_termination")),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["date_granularity_termination"]),
-            Counter([position_6.date_granularity_termination]),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["judicial_committee_action"]),
-            Counter(
-                [
-                    self.position_2.get_judicial_committee_action_display(),
-                    position_6.get_judicial_committee_action_display(),
-                ]
-            ),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["nomination_process"]),
-            Counter(
-                [
-                    self.position_2.get_nomination_process_display(),
-                    position_6.get_nomination_process_display(),
-                ]
-            ),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["selection_method"]),
-            Counter(
-                [
-                    self.position_2.get_how_selected_display(),
-                    position_6.get_how_selected_display(),
-                ]
-            ),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["selection_method_id"]),
-            Counter([self.position_2.how_selected, position_6.how_selected]),
-        )
-        self.assertEqual(
-            Counter(r.data["results"][0]["termination_reason"]),
-            Counter(
-                [
-                    self.position_2.get_termination_reason_display(),
-                    position_6.get_termination_reason_display(),
-                ]
-            ),
-        )
-
-        position_5.delete()
-        position_6.delete()
-        person.delete()
 
 
 class IndexJudgesPositionsCommandTest(
