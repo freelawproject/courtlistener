@@ -172,6 +172,14 @@ async def financial_disclosures_api_help_help(request: HttpRequest) -> HttpRespo
     )
 
 
+async def search_api_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "search_api-docs-vlatest.html",
+        {"private": False},
+    )
+
+
 def strip_zero_years(data):
     """Removes zeroes from the ends of the court data
 
