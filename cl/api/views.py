@@ -175,7 +175,7 @@ async def financial_disclosures_api_help_help(request: HttpRequest) -> HttpRespo
 async def search_api_help(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(
         request,
-        "search_api-docs-vlatest.html",
+        "search-api-docs-vlatest.html",
         {"private": False},
     )
 
