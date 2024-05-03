@@ -13,11 +13,14 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import caches
 from django.core.paginator import EmptyPage, Page
-from django.db.models import QuerySet
+from django.db.models import Case
+from django.db.models import Q as QObject
+from django.db.models import QuerySet, TextField, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http import HttpRequest
 from django.http.request import QueryDict
+from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import A, MultiSearch, Q
@@ -26,6 +29,7 @@ from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrDict
 
+from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.bot_detector import is_bot
 from cl.lib.date_time import midnight_pt
 from cl.lib.paginators import ESPaginator
@@ -52,18 +56,17 @@ from cl.search.constants import (
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
-    SEARCH_OPINION_CHILD_HL_FIELDS,
     SEARCH_OPINION_HL_FIELDS,
     SEARCH_OPINION_QUERY_FIELDS,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_ORAL_ARGUMENT_QUERY_FIELDS,
     SEARCH_PEOPLE_CHILD_QUERY_FIELDS,
     SEARCH_PEOPLE_PARENT_QUERY_FIELDS,
-    SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
+    api_child_highlight_map,
 )
 from cl.search.exception import (
     BadProximityQuery,
@@ -76,6 +79,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Court,
+    Opinion,
     OpinionCluster,
     RECAPDocument,
 )
@@ -1062,6 +1066,8 @@ def build_es_base_query(
                 child_query_fields,
                 parent_query_fields,
                 mlt_query,
+                child_highlighting=child_highlighting,
+                api_version=api_version,
             )
 
     search_query = get_search_query(
@@ -1554,6 +1560,7 @@ def merge_unavailable_fields_on_parent_document(
     search_type: str,
     request_type: Literal["frontend", "api"] = "frontend",
     highlight: bool = True,
+    api_version: Literal["v3", "v4"] = "v3",
 ) -> None:
     """Merges unavailable fields on parent document from the database into
     search results, not all fields are required in frontend, so that fields are
@@ -1563,6 +1570,7 @@ def merge_unavailable_fields_on_parent_document(
     :param search_type: The search type to perform.
     :param request_type: The request type, frontend or api.
     :param highlight: Whether highlighting is enabled.
+     :param api_version: The request API version.
     :return: None, the function modifies the search results object in place.
     """
 
@@ -1593,7 +1601,7 @@ def merge_unavailable_fields_on_parent_document(
                     result[cleaned_name] = value
         case (
             SEARCH_TYPES.RECAP | SEARCH_TYPES.RECAP_DOCUMENT
-        ) if request_type == "api" and not highlight:
+        ) if request_type == "api" and api_version == "v4" and not highlight:
             # Retrieves the plain_text from the DB to fill the snippet when
             # highlighting is disabled.
 
@@ -1621,11 +1629,76 @@ def merge_unavailable_fields_on_parent_document(
             for result in results:
                 if search_type == SEARCH_TYPES.RECAP:
                     for rd in result["child_docs"]:
-                        rd["_source"]["plain_text"] = recap_docs_dict[
-                            rd["_source"]["id"]
-                        ]
+                        rd["_source"]["plain_text"] = recap_docs_dict.get(
+                            rd["_source"]["id"], ""
+                        )
                 else:
-                    result["plain_text"] = recap_docs_dict[result["id"]]
+                    result["plain_text"] = recap_docs_dict.get(
+                        result["id"], ""
+                    )
+
+        case (
+            SEARCH_TYPES.OPINION
+        ) if request_type == "api" and api_version == "v4" and not highlight:
+            # Retrieves the Opinion plain_text from the DB to fill the snippet
+            # when highlighting is disabled. Considering the same prioritization
+            # as in the OpinionDocument indexing into ES.
+
+            opinion_ids = {
+                doc["_source"]["id"]
+                for entry in results
+                for doc in entry["child_docs"]
+            }
+            opinions = (
+                Opinion.objects.filter(pk__in=opinion_ids)
+                .annotate(
+                    text_to_show=Case(
+                        When(
+                            ~QObject(html_columbia__exact=""),
+                            then=Substr(
+                                "html_columbia", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(html_lawbox__exact=""),
+                            then=Substr(
+                                "html_lawbox", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(xml_harvard__exact=""),
+                            then=Substr(
+                                "xml_harvard", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(html_anon_2020__exact=""),
+                            then=Substr(
+                                "html_anon_2020", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(html__exact=""),
+                            then=Substr("html", 1, settings.NO_MATCH_HL_SIZE),
+                        ),
+                        default=Substr(
+                            "plain_text", 1, settings.NO_MATCH_HL_SIZE
+                        ),
+                        output_field=TextField(),
+                    )
+                )
+                .values("id", "text_to_show")
+            )
+            opinion_docs_dict = {
+                doc["id"]: doc["text_to_show"] for doc in opinions
+            }
+            for result in results:
+                for op in result["child_docs"]:
+                    op["_source"]["text"] = html_decode(
+                        strip_tags(
+                            opinion_docs_dict.get(op["_source"]["id"], "")
+                        )
+                    )
 
         case _:
             return
@@ -2264,15 +2337,9 @@ def build_full_join_es_queries(
         _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
         has_child_query = None
         if child_text_query or child_filters:
-            hl_fields = (
-                (
-                    SEARCH_OPINION_CHILD_HL_FIELDS
-                    if cd["type"] == SEARCH_TYPES.OPINION
-                    else SEARCH_RECAP_CHILD_HL_FIELDS
-                )
-                if child_highlighting
-                else SEARCH_RECAP_CHILD_EXCLUDE_FIELDS
-            )
+            hl_fields = api_child_highlight_map[
+                (child_highlighting, cd["type"])
+            ]
             has_child_query = build_has_child_query(
                 join_query,
                 child_type,
@@ -2727,9 +2794,9 @@ def do_es_api_query(
                 extra_options["highlight"] = highlight_options
                 main_query = main_query.extra(**extra_options)
         else:
-            # DOCKETS and RECAP search types. Use the same query parameters as
-            # in the frontend. Only switch highlighting according to the user
-            # request.
+            # DOCKETS, RECAP and OPINION search types. Use the same query
+            # parameters as in the frontend. Only switch highlighting according
+            # to the user request.
             main_query = s
             if cd["highlight"]:
                 main_query = add_es_highlighting(s, cd)

@@ -525,6 +525,10 @@ class OpinionDocumentESResultSerializer(DocumentSerializer):
     """The serializer for OpinionDocument results."""
 
     snippet = HighlightedField(read_only=True, source="text")
+    date_created = TimeStampField(
+        read_only=True, default_timezone=timezone.utc
+    )
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
 
     class Meta:
         document = OpinionDocument
@@ -544,6 +548,9 @@ class OpinionDocumentESResultSerializer(DocumentSerializer):
 class OpinionClusterESResultSerializer(DocumentSerializer):
     """The serializer for OpinionCluster Search results."""
 
+    opinions = OpinionDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
     dateArgued = DateField(read_only=True)
     dateFiled = DateField(read_only=True)
     dateReargued = DateField(read_only=True)
@@ -552,9 +559,11 @@ class OpinionClusterESResultSerializer(DocumentSerializer):
         read_only=True, default_timezone=timezone.utc
     )
     timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
-    opinions = OpinionDocumentESResultSerializer(
-        many=True, read_only=True, source="child_docs"
-    )
+
+    caseName = HighlightedField(read_only=True)
+    court_citation_string = HighlightedField(read_only=True)
+    docketNumber = HighlightedField(read_only=True)
+    suitNature = HighlightedField(read_only=True)
 
     class Meta:
         document = OpinionClusterDocument

@@ -12,12 +12,14 @@ from django.db.models import F
 from django.http import HttpRequest
 from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
+from django.utils.html import strip_tags
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
 from waffle.testutils import override_flag
 
+from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -136,13 +138,6 @@ class OpinionSearchAPICommonTests(
                 scdb_votes_majority=6,
             )
             super().setUpTestData()
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.OPINION,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
-            )
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -384,10 +379,13 @@ class OpinionSearchAPICommonTests(
             f"stat_{PRECEDENTIAL_STATUS.RELATING_TO}": "on",
             f"stat_{PRECEDENTIAL_STATUS.UNKNOWN}": "on",
         }
+        expected_results = 5 if self.version_api == "v3" else 6
         r = await self._test_api_results_count(
-            search_params, 5, "API results count"
+            search_params, expected_results, "API results count"
         )
-        self.assertEqual(r.data["count"], 5, msg="Wrong number of results.")
+        self.assertEqual(
+            r.data["count"], expected_results, msg="Wrong number of results."
+        )
 
 
 @override_flag("o-es-search-api-active", active=True)
@@ -395,6 +393,19 @@ class OpinionV3APISearchTest(
     OpinionSearchAPICommonTests, ESIndexTestCase, TestCase
 ):
     skip_common_tests = False
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            super().setUpTestData()
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.OPINION,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
 
     async def test_random_ordering(self) -> None:
         """Can the results be ordered randomly?
@@ -529,6 +540,29 @@ class OpinionV4APISearchTest(
     version_api = "v4"
     skip_common_tests = False
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            docket_empty = DocketFactory.create()
+            cls.empty_cluster = OpinionClusterFactory.create(
+                precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+                docket=docket_empty,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+            cls.empty_opinion = OpinionFactory.create(
+                cluster=cls.empty_cluster, plain_text=""
+            )
+
+            super().setUpTestData()
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.OPINION,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
+
     async def _test_api_results_count(
         self, params, expected_count, field_name
     ):
@@ -569,7 +603,6 @@ class OpinionV4APISearchTest(
         )
         content_to_compare = {
             "result": self.opinion_2,
-            "snippet": "my plain text secret word for queries",
             "type": o_type_index_map.get(self.opinion_2.type),
             "status": self.opinion_2.cluster.precedential_status,
         }
@@ -579,6 +612,392 @@ class OpinionV4APISearchTest(
             opinion_v4_search_api_keys,
             opinion_document_v4_api_keys,
         )
+
+    def test_extract_snippet_from_db_highlight_disabled(self) -> None:
+        """Confirm that the snippet can be properly extracted from the database,
+        prioritizing the different text fields available in the content when
+        highlighting is disabled."""
+
+        with self.captureOnCommitCallbacks(execute=True):
+
+            c_2_opinion_1 = OpinionFactory.create(
+                extracted_by_ocr=True,
+                author=self.person_2,
+                html_columbia="<b>html_columbia</b> &amp; text from DB ",
+                html_lawbox="<b>html_lawbox</b> &amp; text from DB",
+                cluster=self.opinion_cluster_2,
+            )
+
+            c_2_opinion_2 = OpinionFactory.create(
+                extracted_by_ocr=True,
+                author=self.person_2,
+                html_lawbox="<b>html_lawbox</b> &amp; text from DB",
+                xml_harvard="<b>xml_harvard</b> &amp; text from DB",
+                cluster=self.opinion_cluster_2,
+            )
+            c_2_opinion_3 = OpinionFactory.create(
+                extracted_by_ocr=True,
+                author=self.person_2,
+                xml_harvard="<b>xml_harvard</b> &amp; text from DB",
+                html_anon_2020="<b>html_anon_2020</b> &amp; text from DB",
+                cluster=self.opinion_cluster_2,
+            )
+
+            c_3_opinion_1 = OpinionFactory.create(
+                extracted_by_ocr=True,
+                author=self.person_2,
+                html_anon_2020="<b>html_anon_2020</b> &amp; text from DB",
+                html="<b>html</b> &amp; text from DB",
+                cluster=self.opinion_cluster_3,
+            )
+            c_3_opinion_2 = OpinionFactory.create(
+                extracted_by_ocr=True,
+                author=self.person_2,
+                html="<b>html</b> &amp; text from DB",
+                plain_text="plain_text text from DB",
+                cluster=self.opinion_cluster_3,
+            )
+
+        test_cases = [
+            (
+                self.opinion_cluster_3.pk,
+                {
+                    c_3_opinion_1.pk: c_3_opinion_1.html_anon_2020,
+                    c_3_opinion_2.pk: c_3_opinion_2.html,
+                    self.opinion_3.pk: self.opinion_3.plain_text,
+                },
+            ),
+            (
+                self.opinion_cluster_2.pk,
+                {
+                    c_2_opinion_1.pk: c_2_opinion_1.html_columbia,
+                    c_2_opinion_2.pk: c_2_opinion_2.html_lawbox,
+                    c_2_opinion_3.pk: c_2_opinion_2.xml_harvard,
+                    self.opinion_2.pk: self.opinion_2.plain_text,
+                },
+            ),
+        ]
+        # Opinion Search type HL disabled, snippet is extracted from DB.
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"cluster_id:({self.opinion_cluster_2.pk} OR {self.opinion_cluster_3.pk})",
+            "order_by": "dateFiled desc",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        for result, (cluster_pk, opinions) in zip(
+            r.data["results"], test_cases
+        ):
+            self.assertEqual(cluster_pk, result["cluster_id"])
+            cluster_opinions = result["opinions"]
+            for result_opinion in cluster_opinions:
+                with self.subTest(
+                    result_opinion=result_opinion,
+                    msg="Test snippet extracted from DB.",
+                ):
+                    expected_text = html_decode(
+                        strip_tags(opinions[result_opinion["id"]])
+                    )
+                    self.assertEqual(expected_text, result_opinion["snippet"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            c_2_opinion_1.delete()
+            c_2_opinion_2.delete()
+            c_2_opinion_3.delete()
+            c_3_opinion_1.delete()
+            c_3_opinion_2.delete()
+
+    async def test_results_api_highlighted_fields(self) -> None:
+        """Confirm highlighted fields in V4 Opinion Search API results."""
+        # API HL disabled.
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"id:{self.opinion_2.pk} suitNature:copyright court_citation_string:Test text:(secret word) citation:(22 AL) OR citation:(33 state)",
+            "case_name": "Howard",
+            "docket_number": "docket number 2",
+        }
+
+        # Opinion Search type HL disabled.
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(opinion_v4_search_api_keys))
+        rd_keys_count = len(r.data["results"][0]["opinions"][0])
+        self.assertEqual(rd_keys_count, len(opinion_document_v4_api_keys))
+        content_to_compare = {
+            "result": self.opinion_2,
+            "type": o_type_index_map.get(self.opinion_2.type),
+            "status": self.opinion_2.cluster.precedential_status,
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            opinion_v4_search_api_keys,
+            opinion_document_v4_api_keys,
+        )
+
+        # Opinion Search type HL enabled.
+        search_params["type"] = SEARCH_TYPES.OPINION
+        search_params["highlight"] = True
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        content_to_compare = {
+            "result": self.opinion_2,
+            "caseName": "<mark>Howard</mark> v. Honda",
+            "citation": [
+                "<mark>22</mark> <mark>AL</mark> 339",
+                "<mark>33</mark> <mark>state</mark> 1",
+            ],
+            "suitNature": "<mark>copyright</mark>",
+            "court_citation_string": "<mark>Test</mark>",
+            "docketNumber": "<mark>docket number 2</mark>",
+            "snippet": "my plain text <mark>secret word</mark> for queries",
+            "type": o_type_index_map.get(self.opinion_2.type),
+            "status": self.opinion_2.cluster.precedential_status,
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            opinion_v4_search_api_keys,
+            opinion_document_v4_api_keys,
+        )
+
+    @override_settings(SEARCH_API_PAGE_SIZE=3)
+    def test_recap_results_cursor_api_pagination_for_r_type(self) -> None:
+        """Test cursor pagination for V4 Opinion Search API."""
+
+        created_clusters = []
+        cluster_to_create = 6
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            for _ in range(cluster_to_create):
+                cluster = OpinionClusterFactoryWithChildrenAndParents(
+                    docket=DocketFactory(
+                        court=self.court_1,
+                        source=Docket.HARVARD,
+                    ),
+                    sub_opinions=RelatedFactory(
+                        OpinionWithChildrenFactory,
+                        factory_related_name="cluster",
+                    ),
+                    date_filed=datetime.date(2023, 8, 15),
+                    precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                )
+                created_clusters.append(cluster)
+
+        total_clusters = OpinionCluster.objects.filter(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED
+        ).count()
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        tests = [
+            {
+                "results": 3,
+                "count_exact": total_clusters,
+                "next": True,
+                "previous": False,
+            },
+            {
+                "results": 3,
+                "count_exact": total_clusters,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 3,
+                "count_exact": total_clusters,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 1,
+                "count_exact": total_clusters,
+                "next": False,
+                "previous": True,
+            },
+        ]
+
+        order_types = [
+            "score desc",
+            "dateFiled desc",
+            "dateFiled asc",
+            "citeCount desc",
+            "citeCount asc",
+        ]
+        for order_type in order_types:
+            # Test forward pagination.
+            next_page = None
+            all_document_ids = []
+            ids_per_page = []
+            current_page = None
+            with self.subTest(order_type=order_type, msg="Sorting order."):
+                search_params["order_by"] = order_type
+                for test in tests:
+                    with self.subTest(test=test, msg="forward pagination"):
+                        if not next_page:
+                            r = self.client.get(
+                                reverse(
+                                    "search-list", kwargs={"version": "v4"}
+                                ),
+                                search_params,
+                            )
+                        else:
+                            r = self.client.get(next_page)
+                        # Test page variables.
+                        next_page, _, current_page = self._test_page_variables(
+                            r, test, current_page, search_params["type"]
+                        )
+                        ids_in_page = set()
+                        for result in r.data["results"]:
+                            all_document_ids.append(result["docket_id"])
+                            ids_in_page.add(result["docket_id"])
+                        ids_per_page.append(ids_in_page)
+
+            # Confirm all the documents were shown when paginating forwards.
+            self.assertEqual(
+                len(all_document_ids),
+                total_clusters,
+                msg="Wrong number of clusters.",
+            )
+
+        # Test backward pagination.
+        tests_backward = tests.copy()
+        tests_backward.reverse()
+        previous_page = None
+        all_ids_prev = []
+        for test in tests_backward:
+            with self.subTest(test=test, msg="backward pagination"):
+                if not previous_page:
+                    r = self.client.get(current_page)
+                else:
+                    r = self.client.get(previous_page)
+
+                # Test page variables.
+                _, previous_page, current_page = self._test_page_variables(
+                    r, test, current_page, search_params["type"]
+                )
+                ids_in_page_got = set()
+                for result in r.data["results"]:
+                    all_ids_prev.append(result["docket_id"])
+                    ids_in_page_got.add(result["docket_id"])
+                current_page_ids_prev = ids_per_page.pop()
+                # Check if IDs obtained with forward pagination match
+                # the IDs obtained when paginating backwards.
+                self.assertEqual(
+                    current_page_ids_prev,
+                    ids_in_page_got,
+                    msg="Wrong clusters in page.",
+                )
+
+        # Confirm all the documents were shown when paginating backwards.
+        self.assertEqual(
+            len(all_ids_prev),
+            total_clusters,
+            msg="Wrong number of clusters.",
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            # Remove OpinionCluster objects to avoid affecting other tests.
+            for created_cluster in created_clusters:
+                created_cluster.delete()
+
+    def test_recap_cursor_api_pagination_count(self) -> None:
+        """Test cursor pagination count for V4 Opinion Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_clusters = OpinionCluster.objects.filter(
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED
+        ).count()
+        ## Get count from cardinality.
+        with override_settings(
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_clusters - 1
+        ):
+            # Opinion Search request, count clusters.
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_clusters,
+                msg="Results cardinality count didn't match.",
+            )
+
+        ## Get count from main query.
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_clusters):
+            # Opinion Search request, count clusters.
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_clusters,
+                msg="Results main query count didn't match.",
+            )
+
+    async def test_results_api_empty_fields(self) -> None:
+        """Confirm empty fields values in V4 Opinion Search API results."""
+
+        # Confirm expected values for empty fields.
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"id:{self.empty_opinion.pk}",
+            f"stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}": "on",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(opinion_v4_search_api_keys))
+        op_doc_keys_count = len(r.data["results"][0]["opinions"][0])
+        self.assertEqual(op_doc_keys_count, len(opinion_document_v4_api_keys))
+        content_to_compare = {
+            "result": self.empty_opinion,
+            "V4": True,
+            "type": o_type_index_map.get(self.empty_opinion.type),
+            "status": self.empty_opinion.cluster.precedential_status,
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            opinion_v4_search_api_keys,
+            opinion_document_v4_api_keys,
+        )
+
+    def test_nested_opinions_limit(self) -> None:
+        """Test nested opinions limit for V4 Opinion Search API."""
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            cluster = OpinionClusterFactory.create(
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                docket=self.docket_1,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+            opinions_to_create = 6
+            for _ in range(opinions_to_create):
+                OpinionFactory.create(cluster=cluster, plain_text="")
+
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"cluster_id:{cluster.pk}",
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        self.assertEqual(
+            len(r.data["results"][0]["opinions"]),
+            settings.CHILD_HITS_PER_RESULT,
+            msg="Results cardinality count didn't match.",
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster.delete()
 
 
 class OpinionsESSearchTest(

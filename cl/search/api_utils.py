@@ -177,6 +177,7 @@ class ESList:
             self.clean_data["type"],
             "api",
             self.clean_data["highlight"],
+            self._version,
         )
 
         for result in results:
@@ -349,7 +350,6 @@ class CursorESList:
         default_sorting, unique_sorting = self.get_api_query_sorting()
         self.main_query = self.main_query.sort(default_sorting, unique_sorting)
 
-        print("<<<< Main query: ", self.main_query.to_dict())
         # Cardinality query parameters
         query = Q(self.main_query.to_dict(count=True)["query"])
         unique_field, search_document = self.unique_field_query[
@@ -412,6 +412,7 @@ class CursorESList:
             self.clean_data["type"],
             "api",
             self.clean_data["highlight"],
+            self.version,
         )
         for result in results:
             child_result_objects = []
