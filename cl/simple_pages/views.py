@@ -230,9 +230,6 @@ async def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
         opinion_courts = Court.objects.filter(
             in_use=True, has_opinion_scraper=True
         )
-        oral_argument_courts = Court.objects.filter(
-            in_use=True, has_oral_argument_scraper=True
-        )
         count_fds = await FinancialDisclosure.objects.all().acount()
         count_investments = await Investment.objects.all().acount()
         count_people = await Person.objects.all().acount()
@@ -252,7 +249,6 @@ async def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
             "count_investments": count_investments,
             "count_people": count_people,
             "courts_with_opinion_scrapers": opinion_courts,
-            "courts_with_oral_argument_scrapers": oral_argument_courts,
             "private": False,
         }
         one_day = 60 * 60 * 24
@@ -260,9 +256,23 @@ async def get_coverage_data_o(request: HttpRequest) -> dict[str, Any]:
     return coverage_data
 
 
-async def coverage_graph(request: HttpRequest) -> HttpResponse:
+async def coverage(request: HttpRequest) -> HttpResponse:
     coverage_data_o = await get_coverage_data_o(request)
     return TemplateResponse(request, "help/coverage.html", coverage_data_o)
+
+
+async def coverage_oa(request: HttpRequest) -> HttpResponse:
+    oral_argument_courts = Court.objects.filter(
+        in_use=True, has_oral_argument_scraper=True
+    )
+    return TemplateResponse(
+        request,
+        "help/coverage_oa.html",
+        {
+            "courts_with_oral_argument_scrapers": oral_argument_courts,
+            "private": False,
+        },
+    )
 
 
 async def coverage_opinions(request: HttpRequest) -> HttpResponse:
@@ -298,6 +308,14 @@ async def coverage_opinions(request: HttpRequest) -> HttpResponse:
 
     return TemplateResponse(
         request, "help/coverage_opinions.html", coverage_data_op
+    )
+
+
+async def coverage_recap(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "help/coverage_recap.html",
+        {"private": False},
     )
 
 

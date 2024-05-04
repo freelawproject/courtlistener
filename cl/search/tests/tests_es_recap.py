@@ -1820,10 +1820,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Confirm phrase search are properly highlighted.
         self.assertIn(
-            f"<mark>this was finished, this unwieldy process</mark>",
+            "<mark>this was finished, this unwieldy process</mark>",
             r.content.decode(),
         )
-        self.assertIn(f"<mark>ipsum</mark>", r.content.decode())
+        self.assertIn("<mark>ipsum</mark>", r.content.decode())
 
         with self.captureOnCommitCallbacks(execute=True):
             rd_1.delete()

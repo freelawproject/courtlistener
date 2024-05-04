@@ -272,11 +272,6 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
-        r = self.client.post(
-            reverse("citation_redirector"), self.citation, follow=True
-        )
-        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
-
     async def test_multiple_results(self) -> None:
         """Do we return a 300 status code when there are multiple results?"""
         # Duplicate the citation and add it to another cluster instead.
@@ -289,6 +284,15 @@ class CitationRedirectorTest(TestCase):
             reverse("citation_redirector", kwargs=self.citation)
         )
         self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "56 F.2d 9 (1st Cir. 2015)"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+
         await f2_cite.adelete()
 
     async def test_handle_ambiguous_reporter_variations(self) -> None:
@@ -319,6 +323,15 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "1 bad-reporter 1"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
+
         r = await self.async_client.get(
             reverse(
                 "citation_redirector",
@@ -331,6 +344,15 @@ class CitationRedirectorTest(TestCase):
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
         self.assertIn("Unable to Find Reporter", r.content.decode())
 
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "Maryland Code, Criminal Law § 11-208"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
+
         r = await self.async_client.get(
             reverse(
                 "citation_redirector",
@@ -342,6 +364,15 @@ class CitationRedirectorTest(TestCase):
         )
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
         self.assertIn("Unable to Find Reporter", r.content.decode())
+
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "§ 97-29-63"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
 
     async def test_invalid_page_number_1918(self) -> None:
         """Do we fail gracefully with invalid page numbers?"""
@@ -587,20 +618,18 @@ class CitationRedirectorTest(TestCase):
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
-
-        r = self.client.get(
-            reverse(
-                "citation_redirector",
-                kwargs={
-                    "reporter": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)",
-                },
-            ),
+        r = self.client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)",
+            },
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
         self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "opinion.html")
         self.assertEqual(
-            r.redirect_chain[0][0], "/opinion/2/case-name-cluster/"
+            r.context["cluster"].get_absolute_url(),
+            "/opinion/2/case-name-cluster/",
         )
 
     async def test_avoid_exception_possible_matches_page_with_letter(
@@ -639,6 +668,53 @@ class CitationRedirectorTest(TestCase):
             ),
         )
         self.assertStatus(r, HTTPStatus.NOT_FOUND)
+
+    async def test_can_handle_text_with_slashes(self):
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "ARB/11/20/"},
+            follow=True,
+        )
+        self.assertTemplateUsed(r, "volumes_for_reporter.html")
+        self.assertIn("No Citations Detected", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "https://dockets.justia.com/docket/circuit-courts/ca5/20-10820"
+            },
+            follow=True,
+        )
+        self.assertTemplateUsed(r, "volumes_for_reporter.html")
+        self.assertIn("No Citations Detected", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    async def test_can_filter_out_non_case_law_citation(self):
+        chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
+            volume=22, reporter="U.S.", page="444", type=1
+        )
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "§102 USC 222 is the statute that was discussed in 22 U.S. 444"
+            },
+            follow=True,
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "opinion.html")
+        self.assertIn(str(chests_of_tea), r.content.decode())
+
+    async def test_show_error_for_non_opinion_citations(self):
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "44 Vand. L. Rev. 1041"},
+            follow=True,
+        )
+
+        self.assertIn("No Citations Detected", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
 
 class ViewRecapDocketTest(TestCase):

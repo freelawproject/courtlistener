@@ -21,9 +21,15 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "cl.api.utils.ExceptionalUserRateThrottle",
     ),
-    "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "5000/hour",
+        "citations": "60/min",
+    },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Email non-functional; making many requests, 2024-04-23
+        "NicolasMadan": "10/hour",
         # Didn't respond to emails, 2023-10-02
         "Tylersuard": "10/hour",
         # Didn't respond to emails, 2023-08-04
@@ -66,6 +72,7 @@ REST_FRAMEWORK = {
         "WarrenLex": "20000/hour",  # For big litigation days (wow)
         "quevon24": "500000/hour",  # Perform tests, clone cases in local env
     },
+    "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {},
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.BasicAuthentication",

@@ -496,6 +496,10 @@ a.black-link:focus {
   cursor: hand;
 }
 
+.open_buy_acms_modal.cursor{
+  cursor: pointer;
+}
+
 .cursor-help {
   cursor: help;
 }

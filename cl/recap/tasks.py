@@ -24,6 +24,7 @@ from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    ACMSDocketReport,
     AppellateDocketReport,
     AttachmentPage,
     CaseQuery,
@@ -138,6 +139,8 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         await sync_to_async(process_recap_appellate_case_query_result_page)(
             pq.pk
         )
+    elif pq.upload_type == UPLOAD_TYPE.ACMS_DOCKET_JSON:
+        docket = await process_recap_acms_docket(pq.pk)
 
 
 def do_pacer_fetch(fq: PacerFetchQueue):
@@ -999,6 +1002,12 @@ def parse_appellate_text(court_id, text):
     return report.data
 
 
+def parse_acms_json(court_id, json):
+    report = ACMSDocketReport(court_id)
+    report._parse_text(json)
+    return report.data
+
+
 async def process_recap_appellate_docket(pk):
     """Process an uploaded appellate docket from the RECAP API endpoint.
 
@@ -1086,6 +1095,101 @@ async def process_recap_appellate_docket(pk):
     if data["parties"]:
         # Index or re-index parties only if the docket has parties.
         await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+    await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
+    if content_updated:
+        newly_enqueued = enqueue_docket_alert(d.pk)
+        if newly_enqueued:
+            await sync_to_async(send_alert_and_webhook.delay)(d.pk, start_time)
+    await associate_related_instances(pq, d_id=d.pk)
+    await mark_pq_successful(pq)
+    return {
+        "docket_pk": d.pk,
+        "content_updated": bool(rds_created or content_updated),
+    }
+
+
+async def process_recap_acms_docket(pk):
+    """Process uploaded ACMS appellate docket JSON from the RECAP API endpoint.
+
+    :param pk: The primary key of the processing queue item you want to work
+    on.
+    :returns: A dict of the form:
+
+        {
+            // The PK of the docket that's created or updated
+            'docket_pk': 22,
+            // A boolean indicating whether a new docket entry or
+            // recap document was created (implying a Solr needs
+            // updating).
+            'content_updated': True,
+        }
+
+    This value is a dict so that it can be ingested in a Celery chain.
+
+    """
+    start_time = now()
+    pq = await ProcessingQueue.objects.aget(pk=pk)
+    await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+    logger.info(f"Processing ACMS RECAP item (debug is: {pq.debug}): {pq}")
+
+    try:
+        text = pq.filepath_local.read().decode()
+    except IOError as exc:
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
+        await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        return None
+
+    if process.current_process().daemon:
+        data = parse_acms_json(map_cl_to_pacer_id(pq.court_id), text)
+    else:
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            data = await asyncio.get_running_loop().run_in_executor(
+                pool,
+                parse_acms_json,
+                map_cl_to_pacer_id(pq.court_id),
+                text,
+            )
+    logger.info(f"Parsing completed of item {pq}")
+
+    if data == {}:
+        # Not really a docket. Some sort of invalid document (see Juriscraper).
+        msg = "Not a valid docket upload."
+        await mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        return None
+
+    # Merge the contents of the docket into CL.
+    d = await find_docket_object(
+        pq.court_id, pq.pacer_case_id, data["docket_number"]
+    )
+
+    d.add_recap_source()
+    await update_docket_metadata(d, data)
+    d, og_info = await update_docket_appellate_metadata(d, data)
+    if not d.pacer_case_id:
+        d.pacer_case_id = pq.pacer_case_id
+
+    if pq.debug:
+        await associate_related_instances(pq, d_id=d.pk)
+        await mark_pq_successful(pq)
+        return {"docket_pk": d.pk, "content_updated": False}
+
+    if og_info is not None:
+        await og_info.asave()
+        d.originating_court_information = og_info
+    await d.asave()
+
+    pacer_file = await PacerHtmlFiles.objects.acreate(
+        content_object=d, upload_type=UPLOAD_TYPE.ACMS_DOCKET_JSON
+    )
+    await sync_to_async(pacer_file.filepath.save)(
+        "docket.json",  # We only care about the ext w/S3PrivateUUIDStorageTest
+        ContentFile(text.encode()),
+    )
+
+    des_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
+    await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)

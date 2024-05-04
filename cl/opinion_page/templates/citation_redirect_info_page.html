@@ -36,11 +36,11 @@
 {% endblock %}
 
 {% block description %}
-  Use our citation look up tool to find case law by citation or to browse reporters. Our unique database of reporters and our extensive collection of citations makes for a powerful combination.
+  Use our citation lookup tool to find case law by citation or to browse reporters. Our unique database of reporters and our extensive collection of citations makes for a powerful combination.
 {% endblock %}
 
 {% block og_description %}
-  Use our citation look up tool to find case law by citation or to browse reporters. Our unique database of reporters and our extensive collection of citations makes for a powerful combination.
+  Use our citation lookup tool to find case law by citation or to browse reporters. Our unique database of reporters and our extensive collection of citations makes for a powerful combination.
 {% endblock %}
 
 {% block content %}
@@ -51,11 +51,6 @@
 
           <p class="text-center">If you have a citation you want to look up,
             put it in here, and we'll look it up.</p>
-          {% if form.errors %}
-            <div class="alert alert-danger">
-              <p class="text-center bottom">Error: Citation field is required.</p>
-            </div>
-          {% endif %}
         </div>
         <div id="main-query-box" class="row" >
           <form action="" method="post" class="form-inline" role="form">
@@ -65,10 +60,11 @@
               <div class="input-group" >
                 <input id="id_full_citation"
                        class="form-control input-lg"
-                       value=""
+                       value="{{ form.reporter.value|default:'' }}"
                        name="reporter"
                        autocomplete="off"
                        placeholder="{{ form.reporter.field.widget.attrs.placeholder }}"
+                       required
                        type="text" >
                 <span class="input-group-btn" >
                   <button type="submit"
@@ -88,7 +84,8 @@
             </p>
             <p>This tool is limited by the citations that we have in our system. As we improve our collection and add citations to records that we have, this tool will automatically work for those records as well.
             </p>
-            <p>You can <a href="https://free.law/2015/11/30/our-new-citation-finder/" target="_blank">read more about this tool</a> on our blog.</p>
+            <p>This page is also available as a powerful <a href="{% url "citation_lookup_api" %}">citation lookup API</a>.
+            </p>
         </div>
 
         <div class="hidden-sm hidden-xs col-md-1 col-lg-2"></div>

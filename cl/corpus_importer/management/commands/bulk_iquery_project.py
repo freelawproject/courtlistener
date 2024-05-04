@@ -154,7 +154,7 @@ def update_open_cases(options) -> None:
     )
     ds = (
         Docket.objects.filter(
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             date_terminated=None,
             court__in=courts,
             pacer_case_id__isnull=False,

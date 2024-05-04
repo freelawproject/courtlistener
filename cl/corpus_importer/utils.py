@@ -12,6 +12,7 @@ from django.db.utils import IntegrityError
 from django.utils.timezone import now
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize, titlecase
 
 from cl.citations.utils import map_reporter_db_cite_type
@@ -23,6 +24,8 @@ from cl.people_db.lookup_utils import (
 )
 from cl.people_db.models import Person
 from cl.search.models import Citation, Docket, Opinion, OpinionCluster
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class OpinionMatchingException(Exception):
@@ -623,7 +626,7 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
     """
     for cite in cites:
         clean_cite = re.sub(r"\s+", " ", cite)
-        citation = get_citations(clean_cite)
+        citation = get_citations(clean_cite, tokenizer=HYPERSCAN_TOKENIZER)
         if (
             not citation
             or not isinstance(citation[0], FullCaseCitation)

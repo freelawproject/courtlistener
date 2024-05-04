@@ -57,3 +57,17 @@ class RssDocketDataFactory(factory.DictFactory):
     trustee_str = Faker("text", max_nb_chars=15)
     type = Faker("text", max_nb_chars=8)
     pacer_case_id = Faker("random_id_string")
+
+
+class FreeOpinionRowDataFactory(factory.DictFactory):
+    case_name = Faker("case_name")
+    cause = Faker("text", max_nb_chars=8)
+    court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
+    date_filed = Faker("date_object")
+    description = Faker("text", max_nb_chars=10)
+    docket_number = Faker("federal_district_docket_number")
+    document_number = Faker("pyint", min_value=1, max_value=100)
+    nature_of_suit = Faker("text", max_nb_chars=8)
+    pacer_case_id = Faker("random_id_string")
+    pacer_doc_id = Faker("random_id_string")
+    pacer_seq_no = Faker("pyint", min_value=1, max_value=10000)

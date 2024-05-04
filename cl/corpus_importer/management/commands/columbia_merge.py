@@ -61,25 +61,6 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import extract_judge_last_name, find_just_name
 from cl.search.models import SOURCES, Docket, Opinion, OpinionCluster
 
-VALID_UPDATED_DOCKET_SOURCES = [
-    Docket.COLUMBIA,
-    Docket.COLUMBIA_AND_RECAP,
-    Docket.COLUMBIA_AND_SCRAPER,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER,
-    Docket.COLUMBIA_AND_IDB,
-    Docket.COLUMBIA_AND_RECAP_AND_IDB,
-    Docket.COLUMBIA_AND_SCRAPER_AND_IDB,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-    Docket.HARVARD_AND_COLUMBIA,
-    Docket.COLUMBIA_AND_RECAP_AND_HARVARD,
-    Docket.COLUMBIA_AND_SCRAPER_AND_HARVARD,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
-    Docket.COLUMBIA_AND_IDB_AND_HARVARD,
-    Docket.COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
-    Docket.COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
-    Docket.COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-]
-
 VALID_MERGED_SOURCES = [
     key
     for key in dict(SOURCES.NAMES).keys()
@@ -443,11 +424,10 @@ def process_cluster(
     """
 
     cluster = (
-        OpinionCluster.objects.filter(id=cluster_id)
-        .exclude(
-            Q(source__in=VALID_MERGED_SOURCES)
-            | Q(docket__source__in=VALID_UPDATED_DOCKET_SOURCES)
+        OpinionCluster.objects.filter(
+            id=cluster_id, docket__source__in=Docket.NON_COLUMBIA_SOURCES()
         )
+        .exclude(source__in=VALID_MERGED_SOURCES)
         .first()
     )
     if not cluster:
