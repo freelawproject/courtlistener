@@ -25,6 +25,7 @@ from cl.search.documents import (
     OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
+    PositionDocument,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -341,7 +342,7 @@ class OAESResultSerializer(DocumentSerializer):
         )
 
 
-class PersonESResultSerializer(DocumentSerializer):
+class V3PersonESResultSerializer(DocumentSerializer):
     """The serializer for Person results."""
 
     class Meta:
@@ -349,7 +350,7 @@ class PersonESResultSerializer(DocumentSerializer):
         exclude = ("text", "person_child")
 
 
-class ExtendedPersonESSerializer(PersonESResultSerializer):
+class ExtendedPersonESSerializer(V3PersonESResultSerializer):
     """Extends the Person serializer with all the field we get from the db"""
 
     snippet = serializers.SerializerMethodField(read_only=True)
@@ -571,4 +572,64 @@ class OpinionClusterESResultSerializer(DocumentSerializer):
             "court_exact",
             "_related_instance_to_ignore",
             "cluster_child",
+        )
+
+
+class PositionESResultSerializer(DocumentSerializer):
+    """The serializer for Positions Search results."""
+
+    date_created = TimeStampField(
+        read_only=True, default_timezone=timezone.utc
+    )
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+
+    class Meta:
+        document = PositionDocument
+        exclude = (
+            "absolute_url",
+            "absolute_url",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "id",
+            "alias_ids",
+            "races",
+            "political_affiliation_id",
+            "fjc_id",
+            "name",
+            "gender",
+            "religion",
+            "alias",
+            "dob",
+            "dod",
+            "dob_city",
+            "dob_state",
+            "dob_state_id",
+            "political_affiliation",
+            "positions",
+            "aba_rating",
+            "school",
+            "_related_instance_to_ignore",
+            "person_child",
+        )
+
+
+class PersonESResultSerializer(DocumentSerializer):
+    """The serializer for Person Search results."""
+
+    dob = DateField(read_only=True)
+    dod = DateField(read_only=True)
+    date_created = serializers.DateTimeField(
+        read_only=True, default_timezone=timezone.utc
+    )
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    positions = PositionESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+
+    class Meta:
+        document = PersonDocument
+        exclude = (
+            "_related_instance_to_ignore",
+            "person_child",
+            "name_reverse",
         )

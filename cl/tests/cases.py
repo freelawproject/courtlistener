@@ -250,7 +250,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
         ) in fields_to_compare.items():
             with self.subTest(field=field):
                 actual_value = api_response.data["results"][0].get(field)
-                if field in ["recap_documents", "opinions"]:
+                if field in ["recap_documents", "opinions", "positions"]:
                     for child_field, child_value in actual_value[0].items():
                         with self.subTest(child_field=child_field):
                             get_child_expected_value = child_document_keys.get(

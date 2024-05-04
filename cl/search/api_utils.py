@@ -323,6 +323,7 @@ class CursorESList:
             SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
             SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
             SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
+            SEARCH_TYPES.PEOPLE: ("id", PersonDocument),
         }
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:

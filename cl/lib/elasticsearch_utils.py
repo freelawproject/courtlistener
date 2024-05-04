@@ -889,6 +889,25 @@ def get_search_query(
     if not any([filters, string_query]):
         match cd["type"]:
             case SEARCH_TYPES.PEOPLE:
+                if api_version == "v4":
+
+                    q_should = [
+                        Q(
+                            "has_child",
+                            type="position",
+                            score_mode="max",
+                            query=Q("match_all"),
+                            inner_hits={
+                                "name": "filter_query_inner_position",
+                                "size": 10,
+                            },
+                        ),
+                        Q("match", person_child="person"),
+                    ]
+                    search_query = search_query.query(
+                        Q("bool", should=q_should, minimum_should_match=1)
+                    )
+                    return search_query
                 return search_query.query(Q("match", person_child="person"))
             case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                 # Match all query for RECAP and Dockets, it'll return dockets
@@ -962,7 +981,7 @@ def build_es_base_query(
     string_query = None
     join_query = None
     join_field_documents = [SEARCH_TYPES.PEOPLE]
-    if cd["type"] in join_field_documents:
+    if cd["type"] in join_field_documents and not api_version == "v4":
         filters = build_join_es_filters(cd)
     else:
         filters = build_es_filters(cd)
@@ -1003,11 +1022,20 @@ def build_es_base_query(
                     ],
                 )
             )
-            string_query = build_join_fulltext_queries(
-                child_query_fields,
-                parent_query_fields,
-                cd.get("q", ""),
-            )
+            if api_version == "v4":
+                string_query, join_query = build_full_join_es_queries(
+                    cd,
+                    child_query_fields,
+                    parent_query_fields,
+                    child_highlighting=child_highlighting,
+                    api_version=api_version,
+                )
+            else:
+                string_query = build_join_fulltext_queries(
+                    child_query_fields,
+                    parent_query_fields,
+                    cd.get("q", ""),
+                )
         case (
             SEARCH_TYPES.RECAP
             | SEARCH_TYPES.DOCKETS
@@ -1982,7 +2010,6 @@ def build_join_es_filters(cd: CleanData) -> List:
         # Build parent document filters.
         queries_list.extend(
             [
-                Q("match", person_child="person"),
                 *build_term_query("dob_state_id", cd.get("dob_state", "")),
                 *build_term_query(
                     "political_affiliation_id",
@@ -1996,8 +2023,6 @@ def build_join_es_filters(cd: CleanData) -> List:
                 *build_text_filter("school", cd.get("school", "")),
             ]
         )
-        # Build position has child filter:
-        queries_list.extend(build_has_child_filters("position", cd))
 
     if cd["type"] in [
         SEARCH_TYPES.RECAP,
@@ -2276,6 +2301,8 @@ def build_full_join_es_queries(
             child_type = "recap_document"
         case SEARCH_TYPES.OPINION:
             child_type = "opinion"
+        case SEARCH_TYPES.PEOPLE:
+            child_type = "position"
 
     join_query = None
     if cd["type"] in [
@@ -2283,6 +2310,7 @@ def build_full_join_es_queries(
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
         SEARCH_TYPES.OPINION,
+        SEARCH_TYPES.PEOPLE,
     ]:
         # Build child filters.
         child_filters = build_has_child_filters(child_type, cd)
@@ -2353,9 +2381,9 @@ def build_full_join_es_queries(
         _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
         has_child_query = None
         if child_text_query or child_filters:
-            hl_fields = api_child_highlight_map[
-                (child_highlighting, cd["type"])
-            ]
+            hl_fields = api_child_highlight_map.get(
+                (child_highlighting, cd["type"]), {}
+            )
             has_child_query = build_has_child_query(
                 join_query,
                 child_type,
@@ -2400,11 +2428,12 @@ def build_full_join_es_queries(
                 )
             )
         parent_query = None
-        default_parent_filter = (
-            Q("match", cluster_child="opinion_cluster")
-            if child_type == "opinion"
-            else Q("match", docket_child="docket")
-        )
+        parent_filter_dict = {
+            "opinion": Q("match", cluster_child="opinion_cluster"),
+            "recap_document": Q("match", docket_child="docket"),
+            "position": Q("match", person_child="person"),
+        }
+        default_parent_filter = parent_filter_dict[child_type]
         match parent_filters, string_query:
             case [], []:
                 pass
@@ -2470,6 +2499,8 @@ def limit_inner_hits(
             | SEARCH_TYPES.RECAP_DOCUMENT
         ):
             child_type = "recap_document"
+        case SEARCH_TYPES.PEOPLE:
+            child_type = "position"
         case _:
             return
 

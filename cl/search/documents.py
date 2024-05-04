@@ -520,34 +520,34 @@ class PersonBaseDocument(Document):
             pa.get_political_party_display()
             for pa in instance.political_affiliations.all()
             if pa
-        ] or None
+        ]
 
     def prepare_dob_state(self, instance):
         return instance.get_dob_state_display()
 
     def prepare_alias(self, instance):
-        return [r.name_full for r in instance.aliases.all()] or None
+        return [r.name_full for r in instance.aliases.all()]
 
     def prepare_aba_rating(self, instance):
         return [
             r.get_rating_display() for r in instance.aba_ratings.all() if r
-        ] or None
+        ]
 
     def prepare_school(self, instance):
-        return [e.school.name for e in instance.educations.all()] or None
+        return [e.school.name for e in instance.educations.all()]
 
     def prepare_races(self, instance):
-        return [r.get_race_display() for r in instance.race.all()] or None
+        return [r.get_race_display() for r in instance.race.all()]
 
     def prepare_alias_ids(self, instance):
-        return [alias.pk for alias in instance.aliases.all()] or None
+        return [alias.pk for alias in instance.aliases.all()]
 
     def prepare_political_affiliation_id(self, instance):
         return [
             pa.political_party
             for pa in instance.political_affiliations.all()
             if pa
-        ] or None
+        ]
 
 
 @people_db_index.document
@@ -734,22 +734,20 @@ class PositionDocument(PersonBaseDocument):
             pa.get_political_party_display()
             for pa in instance.person.political_affiliations.all()
             if pa
-        ] or None
+        ]
 
     def prepare_alias(self, instance):
-        return [r.name_full for r in instance.person.aliases.all()] or None
+        return [r.name_full for r in instance.person.aliases.all()]
 
     def prepare_aba_rating(self, instance):
         return [
             r.get_rating_display()
             for r in instance.person.aba_ratings.all()
             if r
-        ] or None
+        ]
 
     def prepare_school(self, instance):
-        return [
-            e.school.name for e in instance.person.educations.all()
-        ] or None
+        return [e.school.name for e in instance.person.educations.all()]
 
     def prepare_races(self, instance):
         return [
@@ -757,14 +755,14 @@ class PositionDocument(PersonBaseDocument):
         ] or None
 
     def prepare_alias_ids(self, instance):
-        return [alias.pk for alias in instance.person.aliases.all()] or None
+        return [alias.pk for alias in instance.person.aliases.all()]
 
     def prepare_political_affiliation_id(self, instance):
         return [
             pa.political_party
             for pa in instance.person.political_affiliations.all()
             if pa
-        ] or None
+        ]
 
 
 @people_db_index.document

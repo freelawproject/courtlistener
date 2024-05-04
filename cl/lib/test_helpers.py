@@ -443,6 +443,165 @@ rd_type_v4_api_keys.update(
 )
 
 
+people_v4_fields = {
+    "absolute_url": lambda x: x["result"].person.get_absolute_url(),
+    "date_granularity_dob": lambda x: x["result"].person.date_granularity_dob,
+    "date_granularity_dod": lambda x: x["result"].person.date_granularity_dod,
+    "id": lambda x: x["result"].person.pk,
+    "alias_ids": lambda x: (
+        [alias.pk for alias in x["result"].person.aliases.all()]
+        if x["result"].person.aliases.all()
+        else []
+    ),
+    "races": lambda x: (
+        [r.get_race_display() for r in x["result"].person.race.all()]
+        if x["result"].person.race.all()
+        else []
+    ),
+    "political_affiliation_id": lambda x: (
+        [
+            pa.political_party
+            for pa in x["result"].person.political_affiliations.all()
+        ]
+        if x["result"].person.political_affiliations.all()
+        else []
+    ),
+    "fjc_id": lambda x: str(x["result"].person.fjc_id),
+    "name": lambda x: x["result"].person.name_full,
+    "gender": lambda x: x["result"].person.get_gender_display(),
+    "religion": lambda x: x["result"].person.religion,
+    "alias": lambda x: (
+        [r.name_full for r in x["result"].person.aliases.all()]
+        if x["result"].person.aliases.all()
+        else []
+    ),
+    "dob": lambda x: x["result"].person.date_dob.isoformat(),
+    "dod": lambda x: x["result"].person.date_dod.isoformat(),
+    "dob_city": lambda x: x["result"].person.dob_city,
+    "dob_state": lambda x: x["result"].person.get_dob_state_display(),
+    "dob_state_id": lambda x: x["result"].person.dob_state,
+    "political_affiliation": lambda x: (
+        [
+            pa.get_political_party_display()
+            for pa in x["result"].person.political_affiliations.all()
+        ]
+        if x["result"].person.political_affiliations.all()
+        else []
+    ),
+    "positions": [],  # type: ignore
+    "aba_rating": lambda x: (
+        [r.get_rating_display() for r in x["result"].person.aba_ratings.all()]
+        if x["result"].person.aba_ratings.all()
+        else []
+    ),
+    "school": lambda x: (
+        [e.school.name for e in x["result"].person.educations.all()]
+        if x["result"].person.educations.all()
+        else []
+    ),
+    "timestamp": lambda x: x["result"]
+    .person.date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "date_created": lambda x: x["result"]
+    .person.date_created.isoformat()
+    .replace("+00:00", "Z"),
+}
+
+position_v4_fields = {
+    "court": lambda x: x["result"].court.short_name,
+    "court_full_name": lambda x: x["result"].court.full_name,
+    "court_exact": lambda x: x["result"].court.pk,
+    "court_citation_string": lambda x: x["result"].court.citation_string,
+    "organization_name": lambda x: x["result"].organization_name,
+    "job_title": lambda x: x["result"].job_title,
+    "position_type": lambda x: x["result"].get_position_type_display(),
+    "appointer": lambda x: (
+        x["result"].appointer.person.name_full_reverse
+        if x["result"].appointer and x["result"].appointer.person
+        else None
+    ),
+    "supervisor": lambda x: (
+        x["result"].supervisor.name_full_reverse
+        if x["result"].supervisor
+        else None
+    ),
+    "predecessor": lambda x: (
+        x["result"].predecessor.name_full_reverse
+        if x["result"].predecessor
+        else None
+    ),
+    "date_nominated": lambda x: (
+        x["result"].date_nominated.isoformat()
+        if x["result"].date_nominated
+        else None
+    ),
+    "date_elected": lambda x: (
+        x["result"].date_elected.isoformat()
+        if x["result"].date_elected
+        else None
+    ),
+    "date_recess_appointment": lambda x: (
+        x["result"].date_recess_appointment.isoformat()
+        if x["result"].date_recess_appointment
+        else None
+    ),
+    "date_referred_to_judicial_committee": lambda x: (
+        x["result"].date_referred_to_judicial_committee.isoformat()
+        if x["result"].date_referred_to_judicial_committee
+        else None
+    ),
+    "date_judicial_committee_action": lambda x: (
+        x["result"].date_judicial_committee_action.isoformat()
+        if x["result"].date_judicial_committee_action
+        else None
+    ),
+    "date_hearing": lambda x: (
+        x["result"].date_hearing.isoformat()
+        if x["result"].date_hearing
+        else None
+    ),
+    "date_confirmation": lambda x: (
+        x["result"].date_confirmation.isoformat()
+        if x["result"].date_confirmation
+        else None
+    ),
+    "date_start": lambda x: (
+        x["result"].date_start.isoformat() if x["result"].date_start else None
+    ),
+    "date_granularity_start": lambda x: x["result"].date_granularity_start,
+    "date_retirement": lambda x: (
+        x["result"].date_retirement.isoformat()
+        if x["result"].date_retirement
+        else None
+    ),
+    "date_termination": lambda x: (
+        x["result"].date_termination.isoformat()
+        if x["result"].date_termination
+        else None
+    ),
+    "date_granularity_termination": lambda x: x[
+        "result"
+    ].date_granularity_termination,
+    "judicial_committee_action": lambda x: x[
+        "result"
+    ].get_judicial_committee_action_display(),
+    "nomination_process": lambda x: x[
+        "result"
+    ].get_nomination_process_display(),
+    "selection_method": lambda x: x["result"].get_how_selected_display(),
+    "selection_method_id": lambda x: x["result"].how_selected,
+    "termination_reason": lambda x: x[
+        "result"
+    ].get_termination_reason_display(),
+    "timestamp": lambda x: x["result"]
+    .person.date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "date_created": lambda x: x["result"]
+    .person.date_created.isoformat()
+    .replace("+00:00", "Z"),
+}
+
+
 class CourtTestCase(SimpleTestCase):
     """Court test case factories"""
 

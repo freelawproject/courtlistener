@@ -21,6 +21,7 @@ from cl.search.api_serializers import (
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
+    PersonESResultSerializer,
     RECAPDocumentESResultSerializerBase,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
@@ -29,7 +30,11 @@ from cl.search.api_serializers import (
     V3OpinionESResultSerializer,
 )
 from cl.search.constants import SEARCH_HL_TAG
-from cl.search.documents import DocketDocument, OpinionClusterDocument
+from cl.search.documents import (
+    DocketDocument,
+    OpinionClusterDocument,
+    PersonDocument,
+)
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -235,6 +240,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         SEARCH_TYPES.DOCKETS: DocketDocument,
         SEARCH_TYPES.RECAP_DOCUMENT: DocketDocument,
         SEARCH_TYPES.OPINION: OpinionClusterDocument,
+        SEARCH_TYPES.PEOPLE: PersonDocument,
     }
 
     def list(self, request, *args, **kwargs):
@@ -285,6 +291,10 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                     )
                 case SEARCH_TYPES.OPINION:
                     serializer = OpinionClusterESResultSerializer(
+                        results_page, many=True
+                    )
+                case SEARCH_TYPES.PEOPLE:
+                    serializer = PersonESResultSerializer(
                         results_page, many=True
                     )
                 case _:

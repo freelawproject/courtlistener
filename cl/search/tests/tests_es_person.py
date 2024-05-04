@@ -4,8 +4,10 @@ from collections import Counter
 from functools import reduce
 from unittest import mock
 
+import time_machine
 from django.core.management import call_command
 from django.urls import reverse
+from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import html
 
@@ -18,6 +20,8 @@ from cl.lib.search_index_utils import solr_list
 from cl.lib.test_helpers import (
     CourtTestCase,
     PeopleTestCase,
+    people_v4_fields,
+    position_v4_fields,
     skip_if_common_tests_skipped,
 )
 from cl.people_db.factories import (
@@ -39,6 +43,7 @@ from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
     TransactionTestCase,
+    V4SearchAPIAssertions,
 )
 
 
@@ -565,27 +570,32 @@ class PeopleV3APISearchTest(
 
 
 class PeopleV4APISearchTest(
-    PeopleSearchAPICommonTests, ESIndexTestCase, TestCase
+    PeopleSearchAPICommonTests,
+    ESIndexTestCase,
+    TestCase,
+    V4SearchAPIAssertions,
 ):
     skip_common_tests = False
 
     @classmethod
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
-        super().setUpTestData()
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.PEOPLE,
-            queue="celery",
-            pk_offset=0,
-            testing_mode=True,
-        )
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            super().setUpTestData()
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.PEOPLE,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
     ):
         r = await self.async_client.get(
-            reverse("search-list", kwargs={"version": "v3"}), params
+            reverse("search-list", kwargs={"version": "v4"}), params
         )
         got = len(r.data["results"])
         self.assertEqual(
@@ -598,6 +608,34 @@ class PeopleV4APISearchTest(
             "Params were: %s" % (field_name, expected_count, got, params),
         )
         return r
+
+    async def test_results_api_fields(self) -> None:
+        """Confirm fields in V4 People Search API results."""
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": f"id:{self.person_2.pk} AND nomination_process:(U.S. Senate)",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(
+            keys_count,
+            len(people_v4_fields),
+            msg="Parent fields count didn't match.",
+        )
+        position_keys_count = len(r.data["results"][0]["positions"][0])
+        self.assertEqual(
+            position_keys_count,
+            len(position_v4_fields),
+            msg="Child fields count didn't match.",
+        )
+        content_to_compare = {"result": self.position_2, "V4": True}
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            people_v4_fields,
+            position_v4_fields,
+        )
 
 
 class PeopleSearchTestElasticSearch(
