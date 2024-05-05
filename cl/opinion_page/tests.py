@@ -279,11 +279,16 @@ class CitationRedirectorTest(TestCase):
         f2_cite.pk = None
         f2_cite.cluster_id = 3
         await f2_cite.asave()
+
         self.citation["reporter"] = slugify(self.citation["reporter"])
         r = await self.async_client.get(
             reverse("citation_redirector", kwargs=self.citation)
         )
         self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+        # The page is displaying the expected message
+        self.assertIn("Found More than One Result", r.content.decode())
+        # the list of citations is showing the court names
+        self.assertIn("Testing Supreme Court |", r.content.decode())
 
         # Test the search bar input
         r = await self.async_client.post(
@@ -292,6 +297,10 @@ class CitationRedirectorTest(TestCase):
             follow=True,
         )
         self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+        # The page is displaying the expected message
+        self.assertIn("Found More than One Result", r.content.decode())
+        # the list of citations is showing the court names
+        self.assertIn("Testing Supreme Court |", r.content.decode())
 
         await f2_cite.adelete()
 
