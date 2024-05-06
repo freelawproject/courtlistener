@@ -156,6 +156,7 @@ def update_matching_opinions(
     :param matches: dict with matching position from cl and columbia opinions
     :param cl_cleaned_opinions: list of cl opinions
     :param columbia_opinions: list of columbia opinions
+    :param filepath: xml file from which the opinion was extracted
     :return: None
     """
     for columbia_pos, cl_pos in matches.items():
@@ -201,6 +202,9 @@ def update_matching_opinions(
             file_opinion["opinion"], columbia_pos
         )
         op.html_columbia = str(converted_text)
+        if not op.local_path:
+            # Store file path only if it is empty in the Opinion object
+            op.local_path = filepath
         op.save()
 
 
