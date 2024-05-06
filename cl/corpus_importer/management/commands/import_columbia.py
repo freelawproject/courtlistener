@@ -17,7 +17,6 @@ from typing import Optional
 import pandas as pd
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
-from django.conf import settings
 from django.db import transaction
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
@@ -55,7 +54,7 @@ CASE_NAME_TWEAKER = CaseNameTweaker()
 
 
 def find_duplicates(
-    data: dict, valid_citations: list
+        data: dict, valid_citations: list
 ) -> Optional[OpinionCluster]:
     """Check if there is a duplicate cluster
 
@@ -331,9 +330,9 @@ def import_opinion(filepath: str) -> None:
     for citation in columbia_data["citations"]:
         cites = get_citations(citation)
         if (
-            cites
-            and isinstance(cites[0], FullCaseCitation)
-            and cites[0].groups.get("volume", False)
+                cites
+                and isinstance(cites[0], FullCaseCitation)
+                and cites[0].groups.get("volume", False)
         ):
             valid_citations.append(cites[0])
 
@@ -353,8 +352,8 @@ def import_opinion(filepath: str) -> None:
         return
 
     if possible_match:
-        # Log a message if we have a possible match, avoid adding
-        # incorrect data
+        # Log a message and abort if we have a possible match, avoid adding
+        # incorrect data, review this manually
         logger.info(
             f"Match found: {possible_match.pk} for columbia file: {filepath}"
         )
@@ -370,7 +369,8 @@ def parse_columbia_opinions(options: dict) -> None:
     :param options: options passed from management command
     :return: None
     """
-    csv_filepath, xml_dir = options["csv_file"], options["xml_dir"]
+    csv_filepath = options["csv_file"]  # type: str
+    xml_dir = options["xml_dir"]  # type: str
     skip_until, limit = options["skip_until"], options["limit"]
     total_processed = 0
     start = False if skip_until else True
@@ -387,7 +387,7 @@ def parse_columbia_opinions(options: dict) -> None:
             continue
 
         # filepath example: indiana/court_opinions/documents/2713f39c5a8e8684.xml
-        xml_path = os.path.join(xml_dir, filepath)
+        xml_path = os.path.join(xml_dir, filepath)  # type: str
         if not os.path.exists(xml_path):
             logger.warning(f"No file at: {xml_path}")
             continue
