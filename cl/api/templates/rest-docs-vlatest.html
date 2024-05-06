@@ -13,6 +13,14 @@
 {% endblock %}
 
 {% block content %}
+
+  <div class="col-xs-12 hidden-md hidden-lg">
+    <h4 class="v-offset-below-2">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "help_home" %}">Back to Help</a>
+    </h4>
+  </div>
+
   <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
     {% include "includes/toc_sidebar.html" %}
   </div>
@@ -472,7 +480,6 @@
     </ol>
 
 
-
     <h3 id="upgrades">Upgrades and Fixes</h3>
     <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are encouraged. Just get in touch via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
     </p>
@@ -481,12 +488,36 @@
     <p>(Upgrades requiring downtime are scheduled according to our maintenance schedule as described in the sidebar below.)</p>
 
 
-    <h2 id="endpoints">Endpoints</h2>
-    <p>
-      <a href="{% url "api-root" version="v3" %}"
-        target="_blank"
-        class="btn btn-lg btn-primary">Show All Endpoints</a>
+    <h2 id="apis">APIs</h2>
+    <h3 id="citation-lookup">Citation Lookup and Verification API</h3>
+    <p>Use this API to look up citations in CourtListener's database of millions of citations.</p>
+    <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
     </p>
+    <p>
+      <a href="{% url "citation_lookup_api" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="search-api">Search API</h3>
+    <p>CourtListener allows you to search across hundreds of millions of items with advanced fields and operators. Use this API to automate the CourtListener search engine.
+    </p>
+    <p>
+      <a href="{% url "search_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+    </p>
+
+    <h3 id="alerts">Alert APIs</h3>
+    <p>CourtListener is a scalable system for sending alerts by email or webhook based on search queries or for particular cases. Use these APIs to create, modify, list, and delete alerts.</p>
+    <p>
+      <a href="{% url "alert_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+    </p>
+
+    <h3 id="disclosure-apis">Financial Disclosure APIs</h3>
+    <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have. Use these APIs to work with this information.</p>
+    <p>
+      <a href="{% url "financial_disclosures_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+
+    <h2 id="endpoints">Endpoints</h2>
     <h3 id="docket-endpoint">{% url "docket-list" version="v3" %}</h3>
     <p><code>Docket</code> objects link <code>Opinion Cluster</code>, <code>Audio</code>, and <code>Docket Entry</code> objects together, following the conventional definition of a docket. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
     </p>
@@ -598,7 +629,6 @@
     </ul>
 
 
-
     <h3 id="audio-endpoint">{% url "audio-list" version="v3" %}</h3>
     <p>The <code>audio</code> endpoint is modeled after the <code>Opinion Cluster</code> endpoint and has very similar behavior, except instead of serving collections of opinions, it currently serves oral arguments and may later serve other similar audio files. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
     </p>
@@ -613,76 +643,11 @@
     </p>
 
 
-    <h3 id="citation-lookup">Citation Lookup and Verification API</h3>
-    <p>Use this API to look up citations in CourtListener's database of millions of citations.</p>
-    <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
-    </p>
-    <p>
-      <a href="{% url "citation_lookup_api" %}" class="btn btn-primary btn-lg">Learn More</a>
-    </p>
-
     <h3 id="jurisdiction-endpoint">{% url "court-list" version="v3" %}</h3>
     <p>This endpoint provides basic information about the <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
     </p>
     <p>Please cache the results of this endpoint to your system. It does not change often.</p>
 
-
-
-    <h3 id="search-endpoint">{% url "search-list" version="v3" %}</h3>
-    <p>This endpoint allows you to query our search engine in a similar manner to our front end. Because this endpoint does not use the Django models directly, this endpoint is quite different than any other. Unlike other endpoints, it does not support <code>OPTIONS</code> requests and thus is not self-documenting, however this endpoint is easy to use because GET parameters from the front end can simply be copy-pasted onto this endpoint. For example, this URL on the front end:
-    </p>
-    <pre class="pre-scrollable">{% get_full_host %}{% url "show_results" %}?q=foo</pre>
-    <p>Becomes this, on the API:</p>
-    <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo</pre>
-
-    <p>Several Additional differences should also be noted:</p>
-    <ul>
-      <li>
-        <p><strong>Ordering</strong>: Instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
-        </p>
-        <p>In addition, results may be sorted randomly by using <code>random_{your-seed} desc/asc</code> as your sort parameter. It's important to notice that <code>{your-seed}</code> must be an integer to get results that are consistent across pagination. If a non-integer value is used, the system will default to using the current timestamp as the seed. This means results will vary for each page load.
-        </p>
-        <p>For example:</p>
-        <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo&order_by=random_123+desc</pre>
-        <p>This way of sorting the results also works on the front end, but does not show up via the dropdowns.
-        </p>
-      </li>
-      <li>
-        <p><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax. To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you want and then using that query (and variations thereof) to query the API. On the backend, very similar code serves both the API and the front end.
-        </p>
-        <p><code>GET</code> parameters from the front end can be copy-pasted to the API endpoint.
-        </p>
-      </li>
-      <li>
-        <p><strong>Fields</strong>: The fields on this endpoint often differ slightly from those in the other endpoints. Both their names and their values may be different. For example, instead of having a field called <code>nature_of_suit</code>, this endpoint has a field called <code>suitNature</code>. Instead of having a number of citation fields (<code>federal_cite_one</code>, <code>state_cite_two</code>, etc.), this endpoint just has all the citations in a single field called <code>citations</code>, which provides the same values as a list.
-        </p>
-        <p>These changes are all necessary to make this endpoint a powerful and user friendly search engine. For example, users can query natures of suit using a query like <code>suitNature:foo</code> instead of having to write underscores. Users can search all citations at once, not having to think about whether it's a federal citation or a state one or something else.
-        </p>
-        <p>You can see the field definitions on the <a href="{% url "advanced_search" %}#fielded-queries-fieldname-term">Advanced Search Help Page</a>.
-        </p>
-      </li>
-      <li>This endpoint can return different kinds of objects, depending on the <code>type</code> parameter. Currently supported parameters are:
-        <ul>
-          <li><code>o</code> &mdash; Opinions</li>
-          <li><code>r</code> &mdash; Document-oriented results from the RECAP Archive</li>
-          <li><code>d</code> &mdash; Docket-oriented results from the RECAP Archive</li>
-          <li><code>p</code> &mdash; Judges</li>
-          <li><code>oa</code> &mdash; Oral Arguments</li>
-        </ul>
-      </li>
-      <li>As in the front end, when the <code>type</code> is set to return opinions, only precedential results are returned by default. To get other precedential statuses, you need to explicitly request them.
-      </li>
-      <li>The <code>r</code> <code>type</code> returns a flat list of document results from the RECAP Archive, unlike as is done in the front end, where the results are nested. This is to simplify the backend and to aid in performance of API requests. The <code>d</code> <code>type</code> returns a flat list of docket results from the RECAP Archive.
-      </li>
-    </ul>
-    <p>Some fields warrant more details:
-    </p>
-    <ul>
-      <li><strong><code>snippet</code></strong>: This field contains the same values as are found on the front end, utilizing the HTML5 <code>&lt;mark&gt;</code> element to identify up to five matches in a document. If you wish to use the snippet but do not want highlighting, simply use CSS to give the <code>mark</code> element no styling, like a <code>span</code> element. This field only responds to arguments provided to the <code>q</code> parameter. If that parameter is not used, the <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
-      </li>
-      <li><strong><code>stat_*</code></strong>: For this Boolean field, we provide opinionated default values. Because most searchers are not interested in non-precedential (unpublished) results, we leave them out by default. If you wish to receive these items, you must explicitly ask for them as you do on the front end.
-      </li>
-    </ul>
 
     <h3 id="judge-endpoint">Judge Endpoints</h3>
     <p>We are pleased to share the world's first REST API of federal and state judges. This database is very detailed, containing nearly 100 fields. As with the other endpoints, the best way to find field-level descriptions is by sending an <code>OPTIONS</code> request to an endpoint. If you don't have a clear understanding of a field after sending an options request and reading this documentation, please <a href="{% url "contact" %}">contact us</a> so we may help.
@@ -711,12 +676,6 @@
       </li>
     </ul>
 
-
-    <h3 id="financialdisclosure-endpoint">Financial Disclosure APIs</h3>
-    <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have. Use these APIs to work with this information.</p>
-    <p>
-      <a href="{% url "financial_disclosures_api" %}" class="btn btn-primary btn-lg">Learn More</a>
-    </p>
 
     <h3 id="recap-endpoint">RECAP Endpoints</h3>
     <p>The RECAP endpoints provide three high-level features. They allow you to check if a PACER item exists in CourtListener, they allow you to upload items to CourtListener for processing, and they allow you to request that we fetch items from PACER on your behalf.
@@ -935,35 +894,6 @@ PACER_TO_CL_IDS = {
     <p>If you have questions about our approach, please see <a href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.
     </p>
 
-    <h3 id="alerts-endpoint">{% url "alert-list" version="v3" %}</h3>
-    <p><a href="{% url "alert_help" %}#search-alerts">Search alerts</a> can be made, viewed, modified, and deleted using this endpoint. This can be extremely useful for organizations that need alerts on many topics or on a changing array of topics. To create an alert, send:
-    </p>
-    <ul>
-      <li><strong><code>name</code></strong> &mdash; A human-friendly name for the alert.</li>
-      <li><strong><code>query</code></strong> &mdash; The URL parameters you would get when creating the alert on the front end.</li>
-      <li><strong><code>rate</code></strong> &mdash; How frequently you want your alert query to be checked and alert emails to be sent.</li>
-    </ul>
-    <p>Here's an example of making an alert realtime (<code>rt</code>) instead of weekly (<code>wly</code>).</p>
-    <pre class="scrollable">curl -X PATCH \
-  --data rate=rt \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "alert-detail" version="v3" pk=9999 %}"</pre>
-    <p>As always, for more details place an <code>OPTIONS</code> request to the endpoint.</p>
-
-    <h3 id="docket-alerts-endpoint">{% url "docket-alert-list" version="v3" %}</h3>
-    <p><a href="{% url "alert_help" %}#recap-alerts">Docket Alerts</a> can be made, viewed, modified, and deleted using this endpoint. This can be useful for organizations using <a href="{% url 'webhooks_docs' %}#docket-alerts">Docket Alert Webhooks</a> or if you need docket alerts on many dockets.
-    </p>
-    <p>To create a docket alert, send a POST request with the <code>docket</code> ID you wish to subscribe to.
-    </p>
-    <p>An optional secondary argument, <code>alert_type</code>, may also be sent. This argument works with our auto-subscribe feature. When auto-subscribe is enabled in your account and your <a href="{% url 'recap_email_help' %}">@recap.email</a> email address receives a notification from PACER, we will automatically subscribe you to that case. If instead you wish to <em>not</em> get notifications for that case, while keeping auto-subscribe on, you must "unsubscribe" from the case. To do this, create a docket alert with the <code>alert_type</code> set to <code>0</code>, which represents an unsubscription.
-    </p>
-    <p>For more details place an <code>OPTIONS</code> request to the endpoint.</p>
-
-    <p>Here’s an example of creating a docket alert subscription on a docket with <code>ID</code> 1.</p>
-    <pre class="scrollable">curl -X POST \
-  --data 'docket=1' \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}"</pre>
 
     <h3 id="visualization-endpoint">{% url "scotusmap-list" version="v3" %}
       &amp; {% url "jsonversion-list" version="v3" %}</h3>
