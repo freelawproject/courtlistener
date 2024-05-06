@@ -3450,7 +3450,7 @@ class RECAPSearchAPIV4Test(
         """Test the more_docs fields to be shown properly when a docket has
         more than 5 RECAPDocuments matched."""
 
-        rds_to_create = settings.CHILD_HITS_PER_RESULT + 1
+        rds_to_create = settings.RECAP_CHILD_HITS_PER_RESULT + 1
         with self.captureOnCommitCallbacks(execute=True):
             docket_entry = DocketEntryWithParentsFactory(
                 docket__source=Docket.RECAP,
@@ -3470,15 +3470,15 @@ class RECAPSearchAPIV4Test(
 
         test_cases = [
             {
-                "expected_results": settings.CHILD_HITS_PER_RESULT,
+                "expected_results": settings.RECAP_CHILD_HITS_PER_RESULT,
                 "more_docs": True,
             },
             {
-                "expected_results": settings.CHILD_HITS_PER_RESULT,
+                "expected_results": settings.RECAP_CHILD_HITS_PER_RESULT,
                 "more_docs": False,
             },
             {
-                "expected_results": settings.CHILD_HITS_PER_RESULT - 1,
+                "expected_results": settings.RECAP_CHILD_HITS_PER_RESULT - 1,
                 "more_docs": False,
             },
         ]

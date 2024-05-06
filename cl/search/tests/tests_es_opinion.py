@@ -960,6 +960,7 @@ class OpinionV4APISearchTest(
             opinion_document_v4_api_keys,
         )
 
+    @override_settings(OPINION_HITS_PER_RESULT=6)
     def test_nested_opinions_limit(self) -> None:
         """Test nested opinions limit for V4 Opinion Search API."""
 
@@ -967,7 +968,7 @@ class OpinionV4APISearchTest(
             cluster = OpinionClusterFactory.create(
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 docket=self.docket_1,
-                date_filed=datetime.date(2024, 2, 23),
+                date_filed=datetime.date(2024, 8, 23),
             )
             opinions_to_create = 6
             for _ in range(opinions_to_create):
@@ -984,8 +985,8 @@ class OpinionV4APISearchTest(
         )
         self.assertEqual(
             len(r.data["results"][0]["opinions"]),
-            settings.CHILD_HITS_PER_RESULT,
-            msg="Results cardinality count didn't match.",
+            settings.OPINION_HITS_PER_RESULT,
+            msg="Results count didn't match.",
         )
         cluster.delete()
 
@@ -1141,25 +1142,6 @@ class OpinionsESSearchTest(
             got,
             expected_count,
             msg="Did not get the right number of search results in Frontend with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
-        )
-        return r
-
-    async def _test_api_results_count(
-        self, params, expected_count, field_name
-    ):
-        """Get the result count in a API query response"""
-        r = await self.async_client.get(
-            reverse("search-list", kwargs={"version": "v3"}), params
-        )
-        got = len(r.data["results"])
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of search results in API with %s "
             "filter applied.\n"
             "Expected: %s\n"
             "     Got: %s\n\n"
@@ -1799,6 +1781,42 @@ class OpinionsESSearchTest(
         self.assertIn("<mark>word</mark>", r.content.decode())
         self.assertIn("<mark>queries</mark>", r.content.decode())
 
+    @override_settings(OPINION_HITS_PER_RESULT=6)
+    def test_nested_opinions_limit_frontend(self) -> None:
+        """Test nested opinions limit for Opinion Search in the frontend."""
+
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory.create(
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                docket=self.docket_1,
+                date_filed=datetime.date(2024, 8, 23),
+            )
+            opinions_to_create = 6
+            for _ in range(opinions_to_create):
+                OpinionFactory.create(cluster=cluster, plain_text="")
+
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"cluster_id:{cluster.pk}",
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        r = self.client.get("/", search_params)
+
+        # Count nested opinions in the cluster results.
+        expected_count = 6
+        tree = html.fromstring(r.content.decode())
+        article = tree.xpath("//article")[0]
+        got = len(article.xpath(".//h4"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of child documents \n"
+            "Expected: %s\n"
+            "     Got: %s\n\n" % (expected_count, got),
+        )
+        cluster.delete()
+
 
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
@@ -2059,8 +2077,8 @@ class IndexOpinionDocumentsCommandTest(
         self.create_index("search.OpinionCluster")
 
     def test_cl_index_parent_and_child_docs_command(self):
-        """Confirm the command can properly index Dockets and their
-        RECAPDocuments into the ES."""
+        """Confirm the command can properly index OpinionCluster and their
+        Opinions into the ES."""
 
         s = OpinionClusterDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
@@ -2085,7 +2103,7 @@ class IndexOpinionDocumentsCommandTest(
             s.count(), 6, msg="Wrong number of Opinions returned."
         )
 
-        # RECAPDocuments are indexed.
+        # Opinions are indexed.
         opinions_pks = [
             self.opinion_1.pk,
             self.opinion_2.pk,
