@@ -939,8 +939,8 @@ def get_search_query(
                         score_mode="max",
                         query=Q("match_all"),
                         inner_hits={
-                            "name": "text_query_inner_opinion",
-                            "size": 10,
+                            "name": "filter_query_inner_opinion",
+                            "size": settings.OPINION_HITS_PER_RESULT,
                         },
                     ),
                     Q("match", cluster_child="opinion_cluster"),
@@ -2542,24 +2542,36 @@ def get_child_top_hits_limit(
      query hits.
     """
 
-    frontend_hits_limit = settings.CHILD_HITS_PER_RESULT
-    # Increase the CHILD_HITS_PER_RESULT value by 1. This is done to determine
-    # whether there are more than CHILD_HITS_PER_RESULT results, which would
+    match search_type:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
+            child_limit = settings.RECAP_CHILD_HITS_PER_RESULT
+        case SEARCH_TYPES.OPINION:
+            child_limit = settings.OPINION_HITS_PER_RESULT
+        case _:
+            child_limit = 0
+
+    display_hits_limit = child_limit
+    # Increase the RECAP_CHILD_HITS_PER_RESULT value by 1. This is done to determine
+    # whether there are more than RECAP_CHILD_HITS_PER_RESULT results, which would
     # trigger the "View Additional Results" button on the frontend.
-    query_hits_limit = settings.CHILD_HITS_PER_RESULT + 1
+    query_hits_limit = child_limit + 1
 
     if search_type not in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        return frontend_hits_limit, query_hits_limit
+        return display_hits_limit, query_hits_limit
 
     if search_type == SEARCH_TYPES.DOCKETS:
-        frontend_hits_limit = 1
+        display_hits_limit = 1
 
     docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
     if docket_id_query:
-        frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
+        display_hits_limit = settings.VIEW_MORE_CHILD_HITS
         query_hits_limit = settings.VIEW_MORE_CHILD_HITS + 1
 
-    return frontend_hits_limit, query_hits_limit
+    return display_hits_limit, query_hits_limit
 
 
 def do_count_query(
