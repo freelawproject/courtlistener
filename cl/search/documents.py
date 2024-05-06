@@ -750,9 +750,7 @@ class PositionDocument(PersonBaseDocument):
         return [e.school.name for e in instance.person.educations.all()]
 
     def prepare_races(self, instance):
-        return [
-            r.get_race_display() for r in instance.person.race.all()
-        ] or None
+        return [r.get_race_display() for r in instance.person.race.all()]
 
     def prepare_alias_ids(self, instance):
         return [alias.pk for alias in instance.person.aliases.all()]

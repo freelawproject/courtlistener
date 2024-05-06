@@ -912,7 +912,9 @@ def get_search_query(
             case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                 # Match all query for RECAP and Dockets, it'll return dockets
                 # with child documents and also empty dockets.
-                _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
+                _, query_hits_limit = get_child_top_hits_limit(
+                    cd, cd["type"], api_version=api_version
+                )
                 match_all_child_query = build_has_child_query(
                     "match_all",
                     "recap_document",
@@ -980,11 +982,7 @@ def build_es_base_query(
 
     string_query = None
     join_query = None
-    join_field_documents = [SEARCH_TYPES.PEOPLE]
-    if cd["type"] in join_field_documents and not api_version == "v4":
-        filters = build_join_es_filters(cd)
-    else:
-        filters = build_es_filters(cd)
+    filters = build_es_filters(cd)
 
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
@@ -1007,6 +1005,8 @@ def build_es_base_query(
                         "appointer",
                         "supervisor",
                         "predecessor",
+                        # Person field.
+                        "name",
                     ],
                 )
             )
@@ -1022,20 +1022,14 @@ def build_es_base_query(
                     ],
                 )
             )
-            if api_version == "v4":
-                string_query, join_query = build_full_join_es_queries(
-                    cd,
-                    child_query_fields,
-                    parent_query_fields,
-                    child_highlighting=child_highlighting,
-                    api_version=api_version,
-                )
-            else:
-                string_query = build_join_fulltext_queries(
-                    child_query_fields,
-                    parent_query_fields,
-                    cd.get("q", ""),
-                )
+            string_query, join_query = build_full_join_es_queries(
+                cd,
+                child_query_fields,
+                parent_query_fields,
+                child_highlighting=child_highlighting,
+                api_version=api_version,
+            )
+
         case (
             SEARCH_TYPES.RECAP
             | SEARCH_TYPES.DOCKETS
@@ -1853,74 +1847,6 @@ def fetch_es_results(
     return [], 0, error, None, None
 
 
-def build_join_fulltext_queries(
-    child_query_fields: dict[str, list[str]],
-    parent_fields: list[str],
-    value: str,
-    mlt_query: Query | None = None,
-) -> QueryString | List:
-    """Creates a full text query string for join parent-child documents.
-
-    :param child_query_fields: A list of child name fields to search in.
-    :param parent_fields: The parent fields to search in.
-    :param value: The string value to search for.
-    :param mlt_query: A More like this query, optional.
-    :return: A Elasticsearch QueryString or [] if the "value" param is empty.
-    """
-
-    if not value and not mlt_query:
-        return []
-    q_should = []
-    # Build  child documents fulltext queries.
-    for child_type, fields in child_query_fields.items():
-        highlight_options: dict[str, dict[str, Any]] = {"fields": {}}
-        match child_type:
-            case "opinion":
-                highlight_options["fields"]["text"] = {
-                    "type": "plain",
-                    "fragment_size": 100,
-                    "number_of_fragments": 100,
-                    "pre_tags": ["<mark>"],
-                    "post_tags": ["</mark>"],
-                }
-                highlight_options["fields"]["text.exact"] = {
-                    "type": "plain",
-                    "fragment_size": 100,
-                    "number_of_fragments": 100,
-                    "pre_tags": ["<mark>"],
-                    "post_tags": ["</mark>"],
-                }
-
-        inner_hits = {"name": f"text_query_inner_{child_type}", "size": 10}
-
-        if highlight_options:
-            inner_hits["highlight"] = highlight_options
-
-        child_query = []
-        if value:
-            child_query.append(build_fulltext_query(fields, value))
-
-        if mlt_query:
-            child_query.append(mlt_query)
-
-        query = Q(
-            "has_child",
-            type=child_type,
-            score_mode="max",
-            query=Q("bool", should=child_query),
-            inner_hits=inner_hits,
-        )
-        q_should.append(query)
-
-    # Build parent document fulltext queries.
-    if parent_fields and value:
-        q_should.append(build_fulltext_query(parent_fields, value))
-
-    if q_should:
-        return Q("bool", should=q_should, minimum_should_match=1)
-    return []
-
-
 def build_has_child_filters(
     child_type: str, cd: CleanData
 ) -> list[QueryString]:
@@ -1982,24 +1908,12 @@ def build_has_child_filters(
                 queries_list.extend(
                     build_term_query("attachment_number", attachment_number)
                 )
-            return queries_list
 
-    if not queries_list:
-        return []
-
-    return [
-        Q(
-            "has_child",
-            type=child_type,
-            score_mode="max",
-            query=reduce(operator.iand, queries_list),
-            inner_hits={"name": f"filter_inner_{child_type}", "size": 10},
-        )
-    ]
+    return queries_list
 
 
 def build_join_es_filters(cd: CleanData) -> List:
-    """Builds join elasticsearch filters based on the CleanData object.
+    """Builds parent join elasticsearch filters based on the CleanData object.
 
     :param cd: An object containing cleaned user data.
     :return: The list of Elasticsearch queries built.
@@ -2378,7 +2292,9 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
 
-        _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
+        _, query_hits_limit = get_child_top_hits_limit(
+            cd, cd["type"], api_version=api_version
+        )
         has_child_query = None
         if child_text_query or child_filters:
             hl_fields = api_child_highlight_map.get(
@@ -2531,13 +2447,16 @@ def limit_inner_hits(
 
 
 def get_child_top_hits_limit(
-    search_params: QueryDict | CleanData, search_type: str
+    search_params: QueryDict | CleanData,
+    search_type: str,
+    api_version: Literal["v3", "v4"] | None = None,
 ) -> tuple[int, int]:
     """Get the frontend and query hit limits for child documents.
 
     :param search_params: Either a QueryDict or CleanData object containing the
     search parameters.
     :param search_type: Elasticsearch DSL Search object
+    :param api_version: Optional, the request API version.
     :return: A two tuple containing the limit for frontend hits, the limit for
      query hits.
     """
@@ -2551,6 +2470,8 @@ def get_child_top_hits_limit(
             child_limit = settings.RECAP_CHILD_HITS_PER_RESULT
         case SEARCH_TYPES.OPINION:
             child_limit = settings.OPINION_HITS_PER_RESULT
+        case SEARCH_TYPES.PEOPLE:
+            child_limit = settings.PEOPLE_HITS_PER_RESULT
         case _:
             child_limit = 0
 
@@ -2558,7 +2479,11 @@ def get_child_top_hits_limit(
     # Increase the RECAP_CHILD_HITS_PER_RESULT value by 1. This is done to determine
     # whether there are more than RECAP_CHILD_HITS_PER_RESULT results, which would
     # trigger the "View Additional Results" button on the frontend.
-    query_hits_limit = child_limit + 1
+    query_hits_limit = (
+        0
+        if (search_type == SEARCH_TYPES.PEOPLE and not api_version == "v4")
+        else child_limit + 1
+    )
 
     if search_type not in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
         return display_hits_limit, query_hits_limit

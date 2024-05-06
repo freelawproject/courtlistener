@@ -12,6 +12,7 @@ from cl.lib.document_serializer import (
     DateField,
     DocumentSerializer,
     HighlightedField,
+    NoneToListField,
     NullableListField,
     TimeStampField,
 )
@@ -621,6 +622,13 @@ class PersonESResultSerializer(DocumentSerializer):
     date_created = serializers.DateTimeField(
         read_only=True, default_timezone=timezone.utc
     )
+    political_affiliation = NoneToListField(read_only=True, required=False)
+    political_affiliation_id = NoneToListField(read_only=True, required=False)
+    aba_rating = NoneToListField(read_only=True, required=False)
+    school = NoneToListField(read_only=True, required=False)
+    races = NoneToListField(read_only=True, required=False)
+    alias = NoneToListField(read_only=True, required=False)
+    alias_ids = NoneToListField(read_only=True, required=False)
     timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
     positions = PositionESResultSerializer(
         many=True, read_only=True, source="child_docs"

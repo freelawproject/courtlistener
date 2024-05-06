@@ -1,21 +1,16 @@
 import datetime
-import operator
 from collections import Counter
-from functools import reduce
 from unittest import mock
 
 import time_machine
 from django.core.management import call_command
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import html
 
-from cl.lib.elasticsearch_utils import (
-    build_es_main_query,
-    build_join_es_filters,
-    build_join_fulltext_queries,
-)
+from cl.lib.elasticsearch_utils import build_es_base_query, build_es_main_query
 from cl.lib.search_index_utils import solr_list
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -637,6 +632,177 @@ class PeopleV4APISearchTest(
             position_v4_fields,
         )
 
+    @override_settings(PEOPLE_HITS_PER_RESULT=4)
+    def test_match_positions_by_parent_and_child_field(self) -> None:
+        """Confirm positions can be matched properly by different combinations
+        of queries in V4 People Search API results."""
+
+        with self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory.create(name_first="John American")
+            PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(2015, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_mand",
+                position_type="c-jud",
+                person=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+            PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(1990, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_vol",
+                position_type="c-jud",
+                person=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+
+            # Create 3 extra positions for a total of 5
+            for i in range(3):
+                PositionFactory.create(
+                    date_granularity_start="%Y-%m-%d",
+                    date_start=datetime.date(1980, 12, 14),
+                    organization_name="Private company.",
+                    job_title="Corporate Lawyer",
+                    position_type=None,
+                    person=person,
+                )
+
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "John American",
+        }
+        # API
+        # Query by parent fields, all positions of a Person are returned.
+        # Up to PEOPLE_HITS_PER_RESULT
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        self.assertEqual(
+            len(r.data["results"]),
+            1,
+            msg="Results didn't match.",
+        )
+        self.assertEqual(
+            len(r.data["results"][0]["positions"]),
+            4,
+            msg="Positions didn't match.",
+        )
+
+        # Query by child field
+        search_params["q"] = "termination_reason:(Voluntary Retirement)"
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        self.assertEqual(
+            len(r.data["results"][0]["positions"]),
+            1,
+            msg="Positions didn't match.",
+        )
+        self.assertEqual(
+            r.data["results"][0]["positions"][0]["termination_reason"],
+            "Voluntary Retirement",
+        )
+
+        # Query by match all. All positions of a Person are returned.
+        # Up to PEOPLE_HITS_PER_RESULT
+        search_params["q"] = ""
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        self.assertEqual(
+            len(r.data["results"]),
+            3,
+            msg="Results didn't match.",
+        )
+        for result in r.data["results"]:
+            if result["id"] == person.pk:
+                self.assertEqual(len(result["positions"]), 4)
+
+        person.delete()
+
+    def test_verify_empty_lists_type_fields_after_partial_update(self):
+        """Verify that list fields related to foreign keys are returned as
+        empty lists after a partial update that removes the related instance
+        and empties the list field. Due to a bug in ES DSL, partial updates
+        convert list fields to None. At serialization time, we correct this
+        value to maintain consistent field type and return an empty list."""
+        with self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory.create(
+                name_first="John American",
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+                date_dob=datetime.date(1940, 10, 21),
+                date_dod=datetime.date(2021, 11, 25),
+            )
+            PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(1990, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_vol",
+                position_type="c-jud",
+                person=person,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+            person.race.add(self.w_race)
+            po_af = PoliticalAffiliationFactory.create(
+                political_party="i",
+                source="b",
+                date_start=datetime.date(2015, 12, 14),
+                person=person,
+                date_granularity_start="%Y-%m-%d",
+            )
+            education = EducationFactory(
+                degree_level="ba",
+                person=person,
+                school=self.school_1,
+            )
+            aba_rating = ABARatingFactory(
+                rating="nq",
+                person=person,
+                year_rated="2015",
+            )
+
+        # Remove related instances to make the lists fields empty.
+        with self.captureOnCommitCallbacks(execute=True):
+            person.race.remove(self.w_race)
+            po_af.delete()
+            education.delete()
+            aba_rating.delete()
+
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "John American",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+
+        fields_to_tests = [
+            "political_affiliation",
+            "political_affiliation_id",
+            "aba_rating",
+            "school",
+            "races",
+        ]
+        # Lists fields should return []
+        for field in fields_to_tests:
+            with self.subTest(field=field, msg="List fields test."):
+                self.assertEqual(r.data["results"][0][field], [])
+
 
 class PeopleSearchTestElasticSearch(
     CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
@@ -707,43 +873,6 @@ class PeopleSearchTestElasticSearch(
                 PersonDocument.exists(id=ES_CHILD_ID(position_pk).POSITION)
             )
 
-    def test_has_child_queries(self) -> None:
-        """Test the build_join_fulltext_queries has child query, it returns a
-        list of parent documents where their child's documents or the parent
-        document itself match the query.
-        """
-        # Query only over child objects, match position appointer.
-        query_values = {"position": ["appointer"]}
-        s = PersonDocument.search()
-        has_child_queries = build_join_fulltext_queries(
-            query_values, [], "Bill"
-        )
-        s = s.query(has_child_queries)
-        response = s.execute().to_dict()
-        self.assertEqual(s.count(), 2)
-
-        for hit in response["hits"]["hits"]:
-            self.assertIn(
-                "Bill",
-                hit["inner_hits"]["text_query_inner_position"][0].appointer,
-            )
-
-        person = PersonFactory.create(name_first="John American")
-        position_5 = PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court=self.court_1,
-            date_start=datetime.date(2015, 12, 14),
-            predecessor=self.person_2,
-            appointer=self.position_1,
-            judicial_committee_action="no_rep",
-            termination_reason="retire_mand",
-            position_type="c-jud",
-            person=person,
-            how_selected="e_part",
-            nomination_process="fed_senate",
-        )
-        person.delete()
-
     def test_has_child_filters(self) -> None:
         """Test the build_join_es_filters has child filter, it returns a
         list of parent documents where their child's documents or the parent
@@ -769,9 +898,8 @@ class PeopleSearchTestElasticSearch(
             "type": SEARCH_TYPES.PEOPLE,
         }
         s = PersonDocument.search()
-        has_child_filters = build_join_es_filters(cd)
-        s = s.filter(reduce(operator.iand, has_child_filters))
-        self.assertEqual(s.count(), 2)
+        main_query, _ = build_es_base_query(s, cd)
+        self.assertEqual(main_query.count(), 2)
 
         # Query by parent field dob_state and child field selection_method.
         cd = {
@@ -780,9 +908,8 @@ class PeopleSearchTestElasticSearch(
             "type": SEARCH_TYPES.PEOPLE,
         }
         s = PersonDocument.search()
-        has_child_filters = build_join_es_filters(cd)
-        s = s.filter(reduce(operator.iand, has_child_filters))
-        self.assertEqual(s.count(), 1)
+        main_query, _ = build_es_base_query(s, cd)
+        self.assertEqual(main_query.count(), 1)
 
         position_5.delete()
 
@@ -1125,7 +1252,13 @@ class PeopleSearchTestElasticSearch(
         position_6.delete()
         person.delete()
 
-    def test_has_child_queries_combine_filters(self) -> None:
+    @mock.patch(
+        "cl.lib.elasticsearch_utils.get_child_top_hits_limit",
+        return_value=(5, 5),
+    )
+    def test_has_child_queries_combine_filters(
+        self, mock_get_child_top_hits_limit
+    ) -> None:
         """Test confirm if we can combine multiple has child filter inner hits
         into a single dict.
         """
@@ -1142,21 +1275,22 @@ class PeopleSearchTestElasticSearch(
         #    Inner hits:
         #       Position 2
         #          Appointer Bill Clinton.
+
         response = s.execute().to_dict()
         self.assertEqual(s.count(), 1)
         self.assertEqual(
             1,
             len(
                 response["hits"]["hits"][0]["inner_hits"][
-                    "filter_inner_position"
+                    "filter_query_inner_position"
                 ]["hits"]["hits"]
             ),
         )
         self.assertIn(
             "Bill",
-            response["hits"]["hits"][0]["inner_hits"]["filter_inner_position"][
-                "hits"
-            ]["hits"][0]["_source"]["appointer"],
+            response["hits"]["hits"][0]["inner_hits"][
+                "filter_query_inner_position"
+            ]["hits"]["hits"][0]["_source"]["appointer"],
         )
         with self.captureOnCommitCallbacks(execute=True):
             appointer = PersonFactory.create(
@@ -1201,21 +1335,21 @@ class PeopleSearchTestElasticSearch(
             2,
             len(
                 response["hits"]["hits"][0]["inner_hits"][
-                    "filter_inner_position"
+                    "filter_query_inner_position"
                 ]["hits"]["hits"]
             ),
         )
         self.assertIn(
             "Bill",
-            response["hits"]["hits"][0]["inner_hits"]["filter_inner_position"][
-                "hits"
-            ]["hits"][0]["_source"]["appointer"],
+            response["hits"]["hits"][0]["inner_hits"][
+                "filter_query_inner_position"
+            ]["hits"]["hits"][0]["_source"]["appointer"],
         )
         self.assertIn(
             "Obama",
-            response["hits"]["hits"][0]["inner_hits"]["filter_inner_position"][
-                "hits"
-            ]["hits"][1]["_source"]["appointer"],
+            response["hits"]["hits"][0]["inner_hits"][
+                "filter_query_inner_position"
+            ]["hits"]["hits"][1]["_source"]["appointer"],
         )
 
         cd = {
@@ -1880,7 +2014,7 @@ class PeopleIndexingTest(
             Counter(pos_5_doc.races),
         )
         # political_affiliation_id is removed form position doc.
-        self.assertEqual(None, pos_5_doc.political_affiliation_id)
+        self.assertEqual([], pos_5_doc.political_affiliation_id)
 
         # Update dob and dod:
         person.date_dob = datetime.date(1940, 10, 25)
@@ -2048,7 +2182,7 @@ class PeopleIndexingTest(
         person_3_doc = PersonDocument.get(self.person_3.pk)
         pos_doc = PositionDocument.get(id=ES_CHILD_ID(position_6.pk).POSITION)
         self.assertEqual(None, person_3_doc.aba_rating)
-        self.assertEqual(None, pos_doc.aba_rating)
+        self.assertEqual([], pos_doc.aba_rating)
 
     def test_person_indexing_and_tasks_count(self) -> None:
         """Confirm a Person is properly indexed in ES with the right number of
