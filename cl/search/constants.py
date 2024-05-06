@@ -176,6 +176,10 @@ SEARCH_RECAP_CHILD_HL_FIELDS = {
 SEARCH_OPINION_CHILD_HL_FIELDS = {
     "text": 100,
 }
+SEARCH_RECAP_CHILD_EXCLUDE_FIELDS = {
+    "plain_text": 100,
+}
+
 
 # Search query for related items
 RELATED_PATTERN = re.compile(
@@ -218,6 +222,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         },
         SEARCH_TYPES.RECAP: recap_boosts_qf,
         SEARCH_TYPES.DOCKETS: recap_boosts_qf,
+        SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
             "text": 1.0,
             "caseName": 4.0,
@@ -237,6 +242,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "es": {
         SEARCH_TYPES.RECAP: recap_boosts_es,
         SEARCH_TYPES.DOCKETS: recap_boosts_es,
+        SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_es,
     },
     # Phrase-based boosts.
     "pf": {

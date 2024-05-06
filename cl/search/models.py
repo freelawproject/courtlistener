@@ -3720,6 +3720,7 @@ class SEARCH_TYPES:
     OPINION = "o"
     RECAP = "r"
     DOCKETS = "d"
+    RECAP_DOCUMENT = "rd"
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
     PARENTHETICAL = "pa"
@@ -3727,6 +3728,7 @@ class SEARCH_TYPES:
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
         (DOCKETS, "RECAP Dockets"),
+        (RECAP_DOCUMENT, "RECAP Documents"),
         (ORAL_ARGUMENT, "Oral Arguments"),
         (PEOPLE, "People"),
         (PARENTHETICAL, "Parenthetical"),
