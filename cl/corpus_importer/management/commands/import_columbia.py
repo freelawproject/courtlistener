@@ -54,7 +54,7 @@ CASE_NAME_TWEAKER = CaseNameTweaker()
 
 
 def find_duplicates(
-        data: dict, valid_citations: list
+    data: dict, valid_citations: list
 ) -> Optional[OpinionCluster]:
     """Check if there is a duplicate cluster
 
@@ -330,9 +330,9 @@ def import_opinion(filepath: str) -> None:
     for citation in columbia_data["citations"]:
         cites = get_citations(citation)
         if (
-                cites
-                and isinstance(cites[0], FullCaseCitation)
-                and cites[0].groups.get("volume", False)
+            cites
+            and isinstance(cites[0], FullCaseCitation)
+            and cites[0].groups.get("volume", False)
         ):
             valid_citations.append(cites[0])
 
