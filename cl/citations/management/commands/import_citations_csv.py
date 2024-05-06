@@ -9,7 +9,7 @@ How to run the command:
 manage.py import_citations_csv --csv /opt/courtlistener/cl/assets/media/wl_citations_1.csv
 
 """
-
+import os.path
 from typing import Optional
 
 import numpy as np
@@ -65,7 +65,7 @@ def process_csv_data(
             end = True
 
         cluster_id = int(row.get("cluster_id"))
-        citation_to_add = row.get("citation")
+        citation_to_add = row.get("citation_to_add")
 
         if not OpinionCluster.objects.filter(id=cluster_id).exists():
             logger.info(
@@ -124,6 +124,10 @@ class Command(BaseCommand):
                 if options["start_row"] > options["end_row"]:
                     print("--start-row can't be greater than --end-row")
                     return
+
+            if not os.path.exists(options["csv"]):
+                print(f"Csv file: {options['csv']} doesn't exist.")
+                return
 
             data = load_citations_file(options["csv"])
             if not data.empty:
