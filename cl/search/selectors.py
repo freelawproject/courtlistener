@@ -29,11 +29,9 @@ async def get_clusters_from_citation_str(
     citation_str = " ".join([volume, reporter, page])
     clusters = None
     try:
-        clusters = (
-            OpinionCluster.objects.filter(citation=citation_str)
-            .select_related("docket")
-            .prefetch_related(Prefetch("docket__court", to_attr="court_data"))
-        )
+        clusters = OpinionCluster.objects.filter(
+            citation=citation_str
+        ).select_related("docket__court")
     except ValueError:
         # Unable to parse the citation.
         cluster_count = 0
@@ -83,16 +81,10 @@ async def get_clusters_from_citation_str(
         if possible_match:
             # There may be different page cite formats that aren't yet
             # accounted for by this code.
-            clusters = (
-                OpinionCluster.objects.filter(
-                    id=possible_match.id,
-                    sub_opinions__html_with_citations__contains=f"*{page}",
-                )
-                .select_related("docket")
-                .prefetch_related(
-                    Prefetch("docket__court", to_attr="court_data")
-                )
-            )
+            clusters = OpinionCluster.objects.filter(
+                id=possible_match.id,
+                sub_opinions__html_with_citations__contains=f"*{page}",
+            ).select_related("docket__court")
             cluster_count = 1 if await clusters.aexists() else 0
 
     return clusters, cluster_count

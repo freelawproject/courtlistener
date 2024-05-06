@@ -9,16 +9,37 @@ from rest_framework import serializers
 from rest_framework.fields import empty
 from rest_framework.utils.field_mapping import get_field_kwargs
 
+from cl.custom_filters.templatetags.extras import render_string_or_list
+
 
 class TimeStampField(serializers.Field):
     """Handles a naive timestamp field."""
 
+    def __init__(self, default_timezone=None, **kwargs):
+        self.timezone = None
+        if default_timezone is not None:
+            self.timezone = default_timezone
+        super().__init__(**kwargs)
+
     def to_representation(self, value):
         if isinstance(value, datetime.datetime) and timezone.is_naive(value):
-            date_time_aware = timezone.make_aware(value, datetime.timezone.utc)
-            return serializers.DateTimeField().to_representation(
-                timezone.localtime(date_time_aware)
-            )
+            if self.timezone:
+                return serializers.DateTimeField(
+                    default_timezone=self.timezone
+                ).to_representation(value)
+            else:
+                date_time_aware = timezone.make_aware(
+                    value, datetime.timezone.utc
+                )
+                return serializers.DateTimeField().to_representation(
+                    timezone.localtime(date_time_aware)
+                )
+        if isinstance(value, str):
+            format_string = "%Y-%m-%dT%H:%M:%S.%f"
+            parsed_datetime = datetime.datetime.strptime(value, format_string)
+            return serializers.DateTimeField(
+                default_timezone=self.timezone
+            ).to_representation(parsed_datetime)
         else:
             raise serializers.ValidationError(
                 "Date or DateTime object expected."
@@ -34,9 +55,18 @@ class DateOrDateTimeField(serializers.Field):
         elif isinstance(value, datetime.date):
             return serializers.DateField().to_representation(value)
         else:
-            raise serializers.ValidationError(
-                "Date or DateTime object expected."
-            )
+            return value
+
+
+class CoerceDateField(serializers.Field):
+    """Coerces datetime-like inputs into a date representation. If the input
+    is not a datetime, it returns the date directly.
+    """
+
+    def to_representation(self, value):
+        if isinstance(value, datetime.datetime):
+            return serializers.DateField().to_representation(value.date())
+        return serializers.DateField().to_representation(value)
 
 
 class NullableListField(serializers.ListField):
@@ -51,6 +81,13 @@ class NullableListField(serializers.ListField):
         if not data:
             return None
         return super().to_representation(data)
+
+
+class HighlightedField(serializers.Field):
+    """Handles highlighted text fields."""
+
+    def to_representation(self, value):
+        return render_string_or_list(value)
 
 
 class DocumentSerializer(serializers.Serializer):
@@ -129,7 +166,6 @@ class DocumentSerializer(serializers.Serializer):
         document = getattr(self.Meta, "document")
         model = document.Django.model
         document_fields = document._fields
-
         declared_fields = copy.deepcopy(self._declared_fields)
         field_mapping = OrderedDict()
 

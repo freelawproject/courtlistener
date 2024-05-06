@@ -435,18 +435,20 @@ class OpinionV3APISearchTest(
         cd = {
             "type": SEARCH_TYPES.OPINION,
             "order_by": "score desc",
+            "highlight": False,
         }
         for page in range(1, total_pages + 1):
             search_query = OpinionClusterDocument.search()
             offset = max(0, (page - 1) * page_size)
-            main_query = do_es_api_query(
-                search_query, cd, {"text": 500}, SEARCH_HL_TAG
+            main_query, _ = do_es_api_query(
+                search_query, cd, {"text": 500}, SEARCH_HL_TAG, "v3"
             )
             hits = ESList(
                 main_query=main_query,
                 offset=offset,
                 page_size=page_size,
-                type=cd["type"],
+                clean_data=cd,
+                version="v3",
             )
             for result in hits:
                 ids_in_results.add(result.id)
