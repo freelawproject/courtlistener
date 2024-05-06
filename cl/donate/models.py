@@ -208,6 +208,7 @@ class NeonMembership(AbstractDateTimeModel):
     TIER_4 = 6
     TIER_5 = 7
     PLATINUM = 8
+    EDU = 9
     TYPES = (
         (BASIC, "CL Membership - Basic"),
         (LEGACY, "CL Legacy Membership"),
@@ -217,6 +218,7 @@ class NeonMembership(AbstractDateTimeModel):
         (TIER_4, "CL Membership - Tier 4"),
         (TIER_5, "CL Membership - Tier 5"),
         (PLATINUM, "CL Platinum Membership"),
+        (EDU, "EDU Membership"),
     )
     TYPES_INVERTED = invert_choices_group_lookup(TYPES)
     user = models.OneToOneField(

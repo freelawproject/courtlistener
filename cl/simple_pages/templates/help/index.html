@@ -27,21 +27,33 @@
     <h2 class="v-offset-above-3">About our Data</h2>
     <p class="lead">We've built some of the biggest open datasets in the world. Learn more about them:</p>
     <ol>
-      <li><p><a href="{% url "coverage" %}">RECAP and Oral Argument Coverage</a></p></li>
+      <li><p><a href="{% url "coverage" %}">Coverage Homepage</a></p></li>
+      <li><p><a href="{% url "coverage_recap" %}">PACER Data Coverage</a></p></li>
       <li><p><a href="{% url "coverage_opinions" %}">Case Law Coverage</a></p></li>
       <li><p><a href="{% url "coverage_fds" %}">Financial Disclosure Coverage</a></p></li>
-      <li><p><a href="https://free.law/projects/judge-db" target="_blank">Judge Database Coverage and Background</a></p></li>
+      <li><p><a href="https://free.law/projects/judge-db" target="_blank">Judge Coverage</a></p></li>
+      <li><p><a href="{% url "coverage_oa" %}">Oral Argument Recording Coverage</a></p></li>
     </ol>
 
     <h2 class="v-offset-above-3">Developer Documentation</h2>
     <p class="lead">The following documentation is available for developers:</p>
     <ol>
-      <li><p><a href="{% url "api_index" %}">Data Services on CourtListener</a></p></li>
-      <li><p><a href="{% url "rest_docs" %}">REST API Documentation</a></p></li>
-      <li><p><a href="{% url "webhooks_docs" %}">Webhook Documentation</a></p></li>
-      <li><p><a href="{% url "webhooks_getting_started" %}">Getting started with Webhooks</a></p></li>
+      <li><p>API Documentation</p></li>
+      <ul>
+        <li><p><a href="{% url "rest_docs" %}">REST API Overview</a></p></li>
+        <li><p><a href="{% url "citation_lookup_api" %}">Citation Lookup API</a></p></li>
+        <li><p><a href="{% url "financial_disclosures_api_help" %}">Financial Disclosure APIs</a></p></li>
+        <li><p><a href="{% url "search_api_help" %}">Search APIs</a></p></li>
+        <li><p><a href="{% url "alert_api_help" %}">Alert APIs</a></p></li>
+      </ul>
+      <li><p>Webhook Documentation</p></li>
+      <ul>
+        <li><p><a href="{% url "webhooks_docs" %}">Webhook Overview</a></p></li>
+        <li><p><a href="{% url "webhooks_getting_started" %}">Getting Started</a></p></li>
+      </ul>
       <li><p><a href="{% url "bulk_data_index" %}">Bulk Data Documentation</a></p></li>
       <li><p><a href="{% url "replication_docs" %}">Replication Documentation</a></p></li>
+      <li><p><a href="{% url "api_index" %}">Data Services on CourtListener</a></p></li>
     </ol>
 
     <h2 class="v-offset-above-3">Removing Content</h2>

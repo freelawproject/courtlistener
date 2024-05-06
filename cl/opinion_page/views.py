@@ -1,10 +1,10 @@
 import datetime
 from collections import OrderedDict, defaultdict
+from http import HTTPStatus
 from typing import Dict, Union
 from urllib.parse import urlencode
 
 import eyecite
-import natsort
 import waffle
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
@@ -27,15 +27,20 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from eyecite.tokenizers import HyperscanTokenizer
 from reporters_db import (
     EDITIONS,
     NAMES_TO_EDITIONS,
     REPORTERS,
     VARIATIONS_ONLY,
 )
-from rest_framework.status import HTTP_300_MULTIPLE_CHOICES, HTTP_404_NOT_FOUND
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
+from cl.citations.utils import (
+    SLUGIFIED_EDITIONS,
+    filter_out_non_case_law_citations,
+    get_canonicals_from_reporter,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
@@ -79,7 +84,10 @@ from cl.search.models import (
     Parenthetical,
     RECAPDocument,
 )
+from cl.search.selectors import get_clusters_from_citation_str
 from cl.search.views import do_search
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
@@ -815,7 +823,7 @@ async def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
         request,
         "volumes_for_reporter.html",
         context,
-        status=HTTP_404_NOT_FOUND,
+        status=HTTPStatus.NOT_FOUND,
     )
 
 
@@ -921,20 +929,23 @@ async def reporter_or_volume_handler(
         reporter, volume
     )
 
-    paginator = Paginator(cases_in_volume, 100, orphans=5)
     page = request.GET.get("page", 1)
-    try:
-        cases = await sync_to_async(paginator.page)(page)
-    except PageNotAnInteger:
-        cases = await sync_to_async(paginator.page)(1)
-    except EmptyPage:
-        cases = await sync_to_async(paginator.page)(paginator.num_pages)
+
+    @sync_to_async
+    def paginate_volumes(volumes, volume_page):
+        paginator = Paginator(volumes, 100, orphans=10)
+        try:
+            return paginator.page(volume_page)
+        except PageNotAnInteger:
+            return paginator.page(1)
+        except EmptyPage:
+            return paginator.page(paginator.num_pages)
 
     return TemplateResponse(
         request,
         "volumes_for_reporter.html",
         {
-            "cases": cases,
+            "cases": await paginate_volumes(cases_in_volume, page),
             "reporter": reporter,
             "variation_names": variation_names,
             "volume": volume,
@@ -980,62 +991,9 @@ async def citation_handler(
     """Load the page when somebody looks up a complete citation"""
 
     citation_str = " ".join([volume, reporter, page])
-    try:
-        clusters = OpinionCluster.objects.filter(citation=citation_str)
-    except ValueError:
-        # Unable to parse the citation.
-        cluster_count = 0
-    else:
-        cluster_count = await clusters.acount()
-
-    if cluster_count == 0:
-        # We didn't get an exact match on the volume/reporter/page. Perhaps
-        # it's a pincite. Try to find the citation immediately *before* this
-        # one in the same book. To do so, get all the opinions from the book,
-        # sort them by page number (in Python, b/c pages can have letters),
-        # then find the citation just before the requested one.
-
-        possible_match = None
-
-        # Create a list of the closest opinion clusters id and page to the
-        # input citation
-        closest_opinion_clusters = [
-            opinion
-            async for opinion in OpinionCluster.objects.filter(
-                citations__reporter=reporter, citations__volume=volume
-            )
-            .annotate(cite_page=(F("citations__page")))
-            .values_list("id", "cite_page")
-        ]
-
-        # Create a temporal item and add it to the values list
-        citation_item = (0, page)
-        closest_opinion_clusters.append((0, page))
-
-        # Natural sort page numbers ascending order
-        sort_possible_matches = natsort.natsorted(
-            closest_opinion_clusters, key=lambda item: item[1]
-        )
-
-        # Find the position of the item that we added
-        citation_item_position = sort_possible_matches.index(citation_item)
-
-        if citation_item_position > 0:
-            # if the position is greater than 0, then the previous item in
-            # the list is the closest citation, we get the id of the
-            # previous item, and we get the object
-            possible_match = await OpinionCluster.objects.aget(
-                id=sort_possible_matches[citation_item_position - 1][0]
-            )
-
-        if possible_match:
-            # There may be different page cite formats that aren't yet
-            # accounted for by this code.
-            clusters = OpinionCluster.objects.filter(
-                id=possible_match.id,
-                sub_opinions__html_with_citations__contains=f"*{page}",
-            )
-            cluster_count = 1 if await clusters.aexists() else 0
+    clusters, cluster_count = await get_clusters_from_citation_str(
+        reporter, volume, page
+    )
 
     # Show the correct page....
     if cluster_count == 0:
@@ -1048,7 +1006,7 @@ async def citation_handler(
                 "citation_str": citation_str,
                 "private": False,
             },
-            status=HTTP_404_NOT_FOUND,
+            status=HTTPStatus.NOT_FOUND,
         )
 
     if cluster_count == 1:
@@ -1057,11 +1015,6 @@ async def citation_handler(
         return HttpResponseRedirect(clusters_first.get_absolute_url())
 
     if cluster_count > 1:
-        clusters_list = []
-        async for cluster in clusters:
-            docket = await Docket.objects.aget(pk=cluster.docket_id)
-            cluster.court = await Court.objects.aget(pk=docket.court_id)
-            clusters_list.append(cluster)
         # Multiple results. Show them.
         return TemplateResponse(
             request,
@@ -1069,10 +1022,10 @@ async def citation_handler(
             {
                 "too_many": True,
                 "citation_str": citation_str,
-                "clusters": clusters_list,
+                "clusters": clusters,
                 "private": await clusters.filter(blocked=True).aexists(),
             },
-            status=HTTP_300_MULTIPLE_CHOICES,
+            status=HTTPStatus.MULTIPLE_CHOICES,
         )
     return HttpResponse(status=500)
 
@@ -1084,7 +1037,7 @@ def make_citation_url_dict(
     d = {"reporter": reporter}
     if volume:
         d["volume"] = volume
-    if page:
+    if volume and page:
         d["page"] = page
     return d
 
@@ -1114,16 +1067,7 @@ async def attempt_reporter_variation(
     :param volume: The volume requested, if provided
     :param page: The page requested, if provided
     """
-    # Make a slugified variations dict
-    slugified_variations = {}
-    for variant, canonicals in VARIATIONS_ONLY.items():
-        slugged_canonicals = []
-        for canonical in canonicals:
-            slugged_canonicals.append(slugify(canonical))
-        slugified_variations[str(slugify(variant))] = slugged_canonicals
-
-    # Look up the user's request in the variations dict
-    possible_canonicals = slugified_variations.get(reporter, [])
+    possible_canonicals = get_canonicals_from_reporter(reporter)
     if len(possible_canonicals) == 0:
         # Couldn't find it as a variation. Give up.
         return await throw_404(
@@ -1146,18 +1090,16 @@ async def attempt_reporter_variation(
     elif len(possible_canonicals) > 1:
         # The reporter variation is ambiguous b/c it can refer to more than
         # one reporter. Abort with a 300 status.
-        return HttpResponse(
-            content=loader.render_to_string(
-                "citation_redirect_info_page.html",
-                {
-                    "too_many_reporter_variations": True,
-                    "reporter": reporter,
-                    "possible_canonicals": possible_canonicals,
-                    "private": True,
-                },
-                request=request,
-            ),
-            status=HTTP_300_MULTIPLE_CHOICES,
+        return TemplateResponse(
+            request,
+            "citation_redirect_info_page.html",
+            {
+                "too_many_reporter_variations": True,
+                "reporter": reporter,
+                "possible_canonicals": possible_canonicals,
+                "private": True,
+            },
+            status=HTTPStatus.MULTIPLE_CHOICES,
         )
     else:
         return HttpResponse(status=500)
@@ -1175,35 +1117,11 @@ async def citation_redirector(
     This uses the same infrastructure as the thing that identifies citations in
     the text of opinions.
     """
-    # "reporter" can be a reporter or a full citation.  If it is a full
-    # citation then we will get the reporter, volume, and page from
-    # eyecite.
-    #
-    # By adding this extra test we can keep the rest of the logic untouched
-    #
-    if not volume and not page:
-        citations = eyecite.get_citations(reporter)
-        if citations:
-            c = citations[0]
-            # We slugify reporter so that the test further down will
-            # pass.
-            reporter = slugify(c.groups["reporter"])
-            volume = c.groups["volume"]
-            page = c.groups["page"]
-
     reporter_slug = slugify(reporter)
 
     if reporter != reporter_slug:
         # Reporter provided in non-slugified form. Redirect to slugified
         # version.
-        r = reverse(
-            "citation_redirector",
-            kwargs=make_citation_url_dict(
-                reporter_slug,
-                volume,
-                page,
-            ),
-        )
         return HttpResponseRedirect(
             reverse(
                 "citation_redirector",
@@ -1216,8 +1134,7 @@ async def citation_redirector(
         )
 
     # Look up the slugified reporter to get its proper version (so-2d -> So. 2d)
-    slugified_editions = {str(slugify(item)): item for item in EDITIONS.keys()}
-    proper_reporter = slugified_editions.get(reporter, None)
+    proper_reporter = SLUGIFIED_EDITIONS.get(reporter, None)
     if not proper_reporter:
         return await attempt_reporter_variation(
             request, reporter, volume, page
@@ -1244,11 +1161,19 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
         if await sync_to_async(form.is_valid)():
             # Redirect to the page as a GET instead of a POST
             cd = form.cleaned_data
-            kwargs = {"reporter": cd["reporter"]}
-            if cd["volume"]:
-                kwargs["volume"] = cd["volume"]
-            if cd["page"]:
-                kwargs["page"] = cd["page"]
+            citations = eyecite.get_citations(
+                cd["reporter"], tokenizer=HYPERSCAN_TOKENIZER
+            )
+            case_law_citations = filter_out_non_case_law_citations(citations)
+            if not case_law_citations:
+                return TemplateResponse(
+                    request,
+                    "volumes_for_reporter.html",
+                    {"no_citation_found": True, "private": False},
+                    status=HTTPStatus.BAD_REQUEST,
+                )
+
+            kwargs = make_citation_url_dict(**case_law_citations[0].groups)
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=kwargs)
             )
@@ -1284,7 +1209,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
 
         if obj_type not in ["docket", "cluster"]:
             return HttpResponseBadRequest(
-                f"This view can not handle the provided type"
+                "This view can not handle the provided type"
             )
 
         cluster = None

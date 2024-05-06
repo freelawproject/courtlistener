@@ -22,6 +22,10 @@ class SimpleSitemap(sitemaps.Sitemap):
             # API
             make_url_dict("api_index", priority=0.7),
             make_url_dict("rest_docs", priority=0.6),
+            make_url_dict("alert_api_help", priority=0.5),
+            make_url_dict("financial_disclosures_api_help", priority=0.5),
+            make_url_dict("search_api_help", priority=0.5),
+            make_url_dict("citation_lookup_api", priority=0.5),
             make_url_dict("bulk_data_index", priority=0.6),
             make_url_dict("replication_docs", priority=0.6),
             # Donation
@@ -36,6 +40,7 @@ class SimpleSitemap(sitemaps.Sitemap):
                 "coverage_opinions", priority=0.4, changefreq="daily"
             ),
             make_url_dict("coverage_fds", priority=0.4),
+            make_url_dict("coverage_recap", priority=0.4),
             make_url_dict("feeds_info", priority=0.4, changefreq="never"),
             make_url_dict("podcasts", priority=0.6, changefreq="never"),
             make_url_dict("contribute", priority=0.6, changefreq="never"),

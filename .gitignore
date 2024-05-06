@@ -33,6 +33,9 @@ cl/assets/static-global/js/react
 # IntelliJ IDEA files
 .idea
 
+# Hyperscan db
+.hyperscan/
+
 # Dev personal stuff - never check in these things with keys or codes!
 cl/settings/*private.py
 cl/settings/google_auth.json
@@ -40,6 +43,7 @@ cl/settings/google_auth.json
 .dir-locals.el
 /.env.dev
 /.env
+
 
 .vscode/*
 

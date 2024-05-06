@@ -522,10 +522,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     email["to"],
                 )
                 async_to_sync(tally_stat)("user.created")
-                get_str = "?next=%s&email=%s" % (
-                    urlencode(redirect_to),
-                    urlencode(user.email),
-                )
+                get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
                 return HttpResponseRedirect(
                     reverse("register_success") + get_str
                 )
