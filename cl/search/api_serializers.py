@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from datetime import timezone
 
 from drf_dynamic_fields import DynamicFieldsMixin
 from rest_framework import serializers
@@ -8,14 +9,22 @@ from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.extras import get_highlight
 from cl.lib.document_serializer import (
+    CoerceDateField,
     DocumentSerializer,
+    HighlightedField,
     NullableListField,
     TimeStampField,
 )
 from cl.people_db.models import PartyType, Person
 from cl.recap.api_serializers import FjcIntegratedDatabaseSerializer
 from cl.search.constants import o_type_index_map
-from cl.search.documents import AudioDocument, OpinionDocument, PersonDocument
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    ESRECAPDocument,
+    OpinionDocument,
+    PersonDocument,
+)
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     Citation,
@@ -310,8 +319,12 @@ class SearchResultSerializer(serializers.Serializer):
 class OAESResultSerializer(DocumentSerializer):
     """The serializer for Oral argument results."""
 
-    snippet = serializers.CharField(read_only=True)
+    snippet = serializers.SerializerMethodField(read_only=True)
     panel_ids = serializers.ListField(read_only=True)
+
+    def get_snippet(self, obj):
+        # If the snippet has not yet been set upstream, set it here.
+        return get_highlight(obj, "text")
 
     class Meta:
         document = AudioDocument
@@ -338,7 +351,7 @@ class PersonESResultSerializer(DocumentSerializer):
 class ExtendedPersonESSerializer(PersonESResultSerializer):
     """Extends the Person serializer with all the field we get from the db"""
 
-    snippet = serializers.CharField(read_only=True)
+    snippet = serializers.SerializerMethodField(read_only=True)
     appointer = serializers.ListField(read_only=True)
     court = serializers.ListField(read_only=True)
     court_exact = serializers.ListField(read_only=True)
@@ -362,6 +375,10 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
     selection_method = serializers.ListField(read_only=True)
     selection_method_id = serializers.ListField(read_only=True)
     termination_reason = serializers.ListField(read_only=True)
+
+    def get_snippet(self, obj):
+        # If the snippet has not yet been set upstream, set it here.
+        return get_highlight(obj, "text")
 
 
 class OpinionESResultSerializer(DocumentSerializer):
@@ -394,8 +411,6 @@ class OpinionESResultSerializer(DocumentSerializer):
 
     def get_snippet(self, obj):
         # If the snippet has not yet been set upstream, set it here.
-        if hasattr(obj, "snippet"):
-            return obj.snippet
         return get_highlight(obj, "text")
 
     class Meta:
@@ -414,3 +429,92 @@ class OpinionESResultSerializer(DocumentSerializer):
             "panel_names",
             "sha1",
         )
+
+
+class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
+    """The base serializer class for RECAP_DOCUMENT search type results."""
+
+    # Fields from the RECAPDocument
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    description = HighlightedField(read_only=True)
+    short_description = HighlightedField(read_only=True)
+    snippet = HighlightedField(read_only=True, source="plain_text")
+
+    class Meta:
+        document = ESRECAPDocument
+        exclude = (
+            "caseName",
+            "case_name_full",
+            "docketNumber",
+            "suitNature",
+            "cause",
+            "juryDemand",
+            "jurisdictionType",
+            "dateArgued",
+            "dateFiled",
+            "dateTerminated",
+            "assignedTo",
+            "assigned_to_id",
+            "referredTo",
+            "referred_to_id",
+            "court",
+            "court_id",
+            "court_citation_string",
+            "chapter",
+            "trustee_str",
+            "date_created",
+            "pacer_case_id",
+            "plain_text",
+        )
+
+
+class RECAPDocumentESResultSerializer(BaseRECAPDocumentESResultSerializer):
+    """The serializer for RECAP search type results."""
+
+    class Meta(BaseRECAPDocumentESResultSerializer.Meta):
+        exclude = BaseRECAPDocumentESResultSerializer.Meta.exclude + (
+            "docket_id",
+        )
+
+
+class DocketESResultSerializer(DocumentSerializer):
+    """The serializer class for DOCKETS Search type results."""
+
+    # Fields from the Docket.
+    referred_to_id = serializers.IntegerField(read_only=True)
+    assigned_to_id = serializers.IntegerField(read_only=True)
+    pacer_case_id = serializers.IntegerField(read_only=True)
+    dateArgued = CoerceDateField(read_only=True)
+    dateFiled = CoerceDateField(read_only=True)
+    dateTerminated = CoerceDateField(read_only=True)
+    date_created = serializers.DateTimeField(
+        read_only=True, default_timezone=timezone.utc
+    )
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    assignedTo = HighlightedField(read_only=True)
+    caseName = HighlightedField(read_only=True)
+    cause = HighlightedField(read_only=True)
+    court_citation_string = HighlightedField(read_only=True)
+    docketNumber = HighlightedField(read_only=True)
+    juryDemand = HighlightedField(read_only=True)
+    referredTo = HighlightedField(read_only=True)
+    suitNature = HighlightedField(read_only=True)
+
+    class Meta:
+        document = DocketDocument
+        exclude = (
+            "_related_instance_to_ignore",
+            "docket_child",
+            "docket_slug",
+        )
+
+
+class RECAPESResultSerializer(DocketESResultSerializer):
+    """The serializer class for RECAP search type results."""
+
+    recap_documents = RECAPDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+    more_docs = serializers.BooleanField(
+        read_only=True, source="child_remaining"
+    )
