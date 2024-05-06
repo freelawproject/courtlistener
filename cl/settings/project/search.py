@@ -70,6 +70,7 @@ SEARCH_PAGE_SIZE = 20
 RECAP_SEARCH_PAGE_SIZE = 10
 CHILD_HITS_PER_RESULT = 5
 VIEW_MORE_CHILD_HITS = 99
+SEARCH_API_PAGE_SIZE = 20
 # The amount of text to return from the beginning of the field if there are no
 # matching fragments to highlight.
 NO_MATCH_HL_SIZE = 500

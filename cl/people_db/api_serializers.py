@@ -213,11 +213,13 @@ class CriminalComplaintSerializer(serializers.ModelSerializer):
 class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
     criminal_counts = CriminalCountSerializer(many=True)
     criminal_complaints = CriminalComplaintSerializer(many=True)
+    docket_id = serializers.ReadOnlyField()
 
     class Meta:
         model = PartyType
         fields = (
             "docket",
+            "docket_id",
             "name",
             "date_terminated",
             "extra_info",
@@ -230,10 +232,19 @@ class PartyTypeSerializer(serializers.HyperlinkedModelSerializer):
 
 class AttorneyRoleSerializer(serializers.HyperlinkedModelSerializer):
     role = serializers.ChoiceField(choices=Role.ATTORNEY_ROLES)
+    attorney_id = serializers.ReadOnlyField()
+    docket_id = serializers.ReadOnlyField()
 
     class Meta:
         model = Role
-        fields = ("role", "docket", "attorney", "date_action")
+        fields = (
+            "attorney",
+            "attorney_id",
+            "date_action",
+            "docket",
+            "docket_id",
+            "role",
+        )
 
 
 class PartyRoleSerializer(serializers.HyperlinkedModelSerializer):
