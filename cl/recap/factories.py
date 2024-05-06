@@ -115,4 +115,5 @@ class DocketDataFactory(DictFactory):
     case_name = Faker("case_name")
     docket_entries = List([SubFactory(MinuteDocketEntryDataFactory)])
     docket_number = Faker("federal_district_docket_number")
+    date_filed = Faker("date_object")
     ordered_by = "date_filed"

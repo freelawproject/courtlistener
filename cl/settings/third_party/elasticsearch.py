@@ -216,7 +216,7 @@ ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 ###################################################
 # The maximum number of scheduled hits per alert. #
 ###################################################
-SCHEDULED_ALERT_HITS_LIMIT = 30
+SCHEDULED_ALERT_HITS_LIMIT = 20
 
 ################################
 # ES bulk indexing batch size #
@@ -248,3 +248,6 @@ ELASTICSEARCH_SWEEP_INDEXER_CHUNK_SIZE = env(
 ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL = env(
     "ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL", default=10
 )
+
+ELASTICSEARCH_MAX_RESULT_COUNT = 10_000
+ELASTICSEARCH_CARDINALITY_PRECISION = 2000

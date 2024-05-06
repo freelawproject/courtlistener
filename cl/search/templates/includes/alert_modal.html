@@ -80,12 +80,12 @@
             {% endif %}
             {% if search_form.type.value == SEARCH_TYPES.OPINION %}
               <p class="gray v-offset-above-2">Some jurisdictions do not yet support alerts. Check
-                <a href="{% url "coverage" %}#scraped-jurisdictions">our list</a> to be sure your query is supported.
+                <a href="{% url "coverage_opinions" %}">our list</a> to be sure your query is supported.
               </p>
             {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
               {# No need for statement here. All OA jurisdictions are scraped. #}
             {% elif search_form.type.value == SEARCH_TYPES.RECAP or search_form.type.value == SEARCH_TYPES.DOCKETS %}
-              <p class="gray v-offset-above-2">RECAP alerts will only be triggered when there is a new responsive document added to the RECAP Archive. Check out <a href="{% url "coverage" %}#recap-archive">how RECAP content is acquired</a> to learn more.
+              <p class="gray v-offset-above-2">RECAP alerts will only be triggered when there is a new responsive document added to the RECAP Archive. Check out <a href="{% url "coverage_recap" %}">how RECAP content is acquired</a> to learn more.
               </p>
             {% endif %}
             <div class="row v-offset-above-2">

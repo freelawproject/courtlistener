@@ -118,8 +118,7 @@ class DupChecker(dict):
 
         if exists:
             logger.info(
-                "Duplicate found on date: %s, with lookup value: %s"
-                % (current_date, lookup_value)
+                f"Duplicate found on date: {current_date}, with lookup value: {lookup_value}"
             )
             self._increment(current_date)
 
@@ -145,8 +144,7 @@ class DupChecker(dict):
                         return False
                 elif self.dup_count >= self.dup_threshold:
                     logger.info(
-                        "Found %s duplicates in a row. Court is up to date."
-                        % self.dup_count
+                        f"Found {self.dup_count} duplicates in a row. Court is up to date."
                     )
                     self.emulate_break = True
                     return False

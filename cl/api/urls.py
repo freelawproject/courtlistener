@@ -5,6 +5,7 @@ from rest_framework.routers import DefaultRouter
 from cl.alerts import api_views as alert_views
 from cl.api import views
 from cl.audio import api_views as audio_views
+from cl.citations import api_views as citations_views
 from cl.disclosures import api_views as disclosure_views
 from cl.donate import api_views as donate_views
 from cl.favorites import api_views as favorite_views
@@ -143,7 +144,19 @@ router.register(
     basename="membership-webhooks",
 )
 
+# Citation lookups
+router.register(
+    r"citation-lookup",
+    citations_views.CitationLookupViewSet,
+    basename="citation-lookup",
+)
+
 API_TITLE = "CourtListener Legal Data API"
+
+
+# Version 4 Router
+router_v4 = DefaultRouter()
+router_v4.register(r"search", search_views.SearchV4ViewSet, basename="search")
 
 
 urlpatterns = [
@@ -152,6 +165,7 @@ urlpatterns = [
         include("rest_framework.urls", namespace="rest_framework"),
     ),
     re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
+    re_path(r"^api/rest/(?P<version>[v4]+)/", include(router_v4.urls)),
     # Documentation
     path("help/api/", views.api_index, name="api_index"),
     path("help/api/jurisdictions/", views.court_index, name="court_index"),
@@ -159,6 +173,26 @@ urlpatterns = [
         r"^help/api/rest/(?P<version>v[123])?/?$",
         views.rest_docs,
         name="rest_docs",
+    ),
+    path(
+        "help/api/rest/v3/citation-lookup/",
+        views.citation_lookup_api,
+        name="citation_lookup_api",
+    ),
+    path(
+        "help/api/rest/v3/financial-disclosures/",
+        views.financial_disclosures_api_help_help,
+        name="financial_disclosures_api_help",
+    ),
+    path(
+        "help/api/rest/v3/search/",
+        views.search_api_help,
+        name="search_api_help",
+    ),
+    path(
+        "help/api/rest/v3/alerts/",
+        views.alert_api_help,
+        name="alert_api_help",
     ),
     path(
         "help/api/rest/changes/",

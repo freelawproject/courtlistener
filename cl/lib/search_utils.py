@@ -10,6 +10,7 @@ from django.core.paginator import Page
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from eyecite.tokenizers import HyperscanTokenizer
 from requests import Session
 from scorched.response import SolrResponse
 
@@ -38,6 +39,8 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def get_solr_interface(
@@ -96,7 +99,7 @@ def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
     """
     if not cd.get("q"):
         return None
-    citations = get_citations(cd["q"])
+    citations = get_citations(cd["q"], tokenizer=HYPERSCAN_TOKENIZER)
 
     citations = [c for c in citations if isinstance(c, FullCaseCitation)]
 

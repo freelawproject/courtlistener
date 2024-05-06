@@ -406,6 +406,7 @@ o_field_mapping = {
                 "syllabus": ["syllabus"],
                 "scdb_id": ["scdb_id"],
                 "citation_count": ["citeCount"],
+                "slug": ["absolute_url"],
             }
         },
         Opinion: {

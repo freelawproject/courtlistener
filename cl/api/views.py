@@ -22,7 +22,7 @@ from cl.lib.search_utils import (
 )
 from cl.search.documents import AudioDocument
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
+from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
 from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 
@@ -78,7 +78,7 @@ async def court_index(request: HttpRequest) -> HttpResponse:
 
 async def rest_docs(request, version=None):
     """Show the correct version of the rest docs"""
-    courts = await make_court_variable()
+    courts = []  # await make_court_variable()
     court_count = len(courts)
     context = {"court_count": court_count, "courts": courts, "private": False}
     return TemplateResponse(
@@ -108,6 +108,77 @@ async def bulk_data_index(request: HttpRequest) -> HttpResponse:
         request,
         "bulk-data.html",
         disclosure_coverage,
+    )
+
+
+def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
+    """
+    Parses a throttle rate string and returns a tuple containing the number of
+    citations allowed and the throttling duration in a format suitable for
+    templates.
+
+    Args:
+        rate (str): A string representing the throttle rate
+
+    Returns:
+        A tuple containing a two elements:
+            - The number of citations allowed (int).
+            - The throttling duration (str).
+    """
+    if not rate:
+        return None
+    duration_as_str = {"s": "second", "m": "minute", "h": "hour", "d": "day"}
+    num, period = rate.split("/")
+    return int(num), duration_as_str[period[0]]
+
+
+async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
+    cite_count = await Citation.objects.acount()
+    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
+    default_throttle_rate = parse_throttle_rate_for_template(rate)
+    custom_throttle_rate = None
+    if request.user and request.user.is_authenticated:
+        rate = settings.REST_FRAMEWORK[  # type: ignore
+            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
+        ].get(request.user.username, None)
+        custom_throttle_rate = parse_throttle_rate_for_template(rate)
+
+    return TemplateResponse(
+        request,
+        "citation-lookup-api.html",
+        {
+            "cite_count": cite_count,
+            "default_throttle_rate": default_throttle_rate,
+            "custom_throttle_rate": custom_throttle_rate,
+            "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
+            "private": False,
+        },
+    )
+
+
+async def alert_api_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "alert-api-docs-vlatest.html",
+        {"private": False},
+    )
+
+
+async def financial_disclosures_api_help_help(
+    request: HttpRequest,
+) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "financial-disclosure-docs-vlatest.html",
+        {"private": False},
+    )
+
+
+async def search_api_help(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(
+        request,
+        "search-api-docs-vlatest.html",
+        {"private": False},
     )
 
 

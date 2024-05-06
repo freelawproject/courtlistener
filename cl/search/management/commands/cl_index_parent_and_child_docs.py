@@ -127,7 +127,7 @@ def get_unique_oldest_history_rows(
                     pgh_id__gte=pk_offset,
                     pgh_created_at__gte=start_date,
                     pgh_created_at__lte=end_date,
-                    source__in=Docket.RECAP_SOURCES,
+                    source__in=Docket.RECAP_SOURCES(),
                 )
                 .order_by("id", "pgh_created_at")
                 .distinct("id")
@@ -312,17 +312,17 @@ class Command(VerboseCommand):
             type=str,
             required=False,
             choices=["parent", "child"],
-            help=f"The document type to index, only 'parent' or 'child' documents. "
-            f"If not provided, parent and child documents will be indexed.",
+            help="The document type to index, only 'parent' or 'child' documents. "
+            "If not provided, parent and child documents will be indexed.",
         )
         parser.add_argument(
             "--update-from-event-tables",
             type=str,
             required=False,
             choices=[member for member in EventTable],
-            help=f"The document type to update from event history tables. "
-            f"'search.Docket' for dockets, 'search.DocketEntry' for docket "
-            f"entries or 'search.RECAPDocument' for RECAP Documents.",
+            help="The document type to update from event history tables. "
+            "'search.Docket' for dockets, 'search.DocketEntry' for docket "
+            "entries or 'search.RECAPDocument' for RECAP Documents.",
             default="",
         )
         parser.add_argument(
@@ -399,7 +399,8 @@ class Command(VerboseCommand):
                 else:
                     queryset = (
                         Docket.objects.filter(
-                            pk__gte=pk_offset, source__in=Docket.RECAP_SOURCES
+                            pk__gte=pk_offset,
+                            source__in=Docket.RECAP_SOURCES(),
                         )
                         .order_by("pk")
                         .values_list("pk", flat=True)

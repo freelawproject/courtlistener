@@ -19,7 +19,7 @@ def compose_redis_key_remove_content() -> str:
     """Compose a Redis key for storing the removal action status.
     :return: A Redis key as a string.
     """
-    return f"es_remove_content_from_es:log"
+    return "es_remove_content_from_es:log"
 
 
 def get_last_parent_document_id_processed() -> int:
@@ -129,7 +129,7 @@ class Command(VerboseCommand):
                 # Dockets that don't belong to RECAP_SOURCES.
                 queryset = (
                     Docket.objects.filter(pk__gte=pk_offset)
-                    .exclude(source__in=Docket.RECAP_SOURCES)
+                    .exclude(source__in=Docket.RECAP_SOURCES())
                     .order_by("pk")
                     .values_list("pk", flat=True)
                 )

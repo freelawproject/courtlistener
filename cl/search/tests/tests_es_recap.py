@@ -5,18 +5,27 @@ import unittest
 from http import HTTPStatus
 from unittest import mock
 
+import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 
 from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import IndexedSolrTestCase, RECAPSearchTestCase
+from cl.lib.test_helpers import (
+    IndexedSolrTestCase,
+    RECAPSearchTestCase,
+    docket_v4_api_keys,
+    rd_type_v4_api_keys,
+    recap_document_v4_api_keys,
+    skip_if_common_tests_skipped,
+)
 from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
     AttorneyFactory,
@@ -89,24 +98,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             got,
             expected_count,
             msg="Did not get the right number of search results in Frontend with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
-        )
-        return r
-
-    async def _test_api_results_count(
-        self, params, expected_count, field_name
-    ):
-        r = await self.async_client.get(
-            reverse("search-list", kwargs={"version": "v3"}), params
-        )
-        got = len(r.data["results"])
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of search results in API with %s "
             "filter applied.\n"
             "Expected: %s\n"
             "     Got: %s\n\n"
@@ -1820,10 +1811,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Confirm phrase search are properly highlighted.
         self.assertIn(
-            f"<mark>this was finished, this unwieldy process</mark>",
+            "<mark>this was finished, this unwieldy process</mark>",
             r.content.decode(),
         )
-        self.assertIn(f"<mark>ipsum</mark>", r.content.decode())
+        self.assertIn("<mark>ipsum</mark>", r.content.decode())
 
         with self.captureOnCommitCallbacks(execute=True):
             rd_1.delete()
@@ -2131,23 +2122,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             await docket.adelete()
 
 
-class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
-    """
-    RECAP Search API V3 Tests
-    """
+class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
-    tests_running_over_solr = True
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-    def setUp(self) -> None:
-        add_docket_to_solr_by_rds(
-            [self.rd.pk, self.rd_att.pk], force_commit=True
-        )
-        add_docket_to_solr_by_rds([self.rd_2.pk], force_commit=True)
-        super().setUp()
+    version_api = "v3"
+    skip_common_tests = True
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -2167,6 +2145,7 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         )
         return r
 
+    @skip_if_common_tests_skipped
     async def test_case_name_filter(self) -> None:
         """Confirm case_name filter works properly"""
         params = {
@@ -2177,43 +2156,58 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         # API, 2 result expected since RECAPDocuments are not grouped.
         await self._test_api_results_count(params, 1, "case_name")
 
+    @skip_if_common_tests_skipped
     async def test_court_filter(self) -> None:
         """Confirm court filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "court": "canb"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "court")
+        # Double the results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(params, expected_results, "court")
 
+    @skip_if_common_tests_skipped
     async def test_document_description_filter(self) -> None:
         """Confirm description filter works properly"""
         params = {
             "type": SEARCH_TYPES.RECAP,
             "description": "MOTION for Leave to File Amicus Curiae Lorem",
         }
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "description")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "description"
+        )
 
+    @skip_if_common_tests_skipped
     async def test_docket_number_filter(self) -> None:
         """Confirm docket_number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "docket_number")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "docket_number"
+        )
 
+    @skip_if_common_tests_skipped
     async def test_attachment_number_filter(self) -> None:
         """Confirm attachment number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "attachment_number": 2}
 
-        # API
         await self._test_api_results_count(params, 1, "attachment_number")
 
+    @skip_if_common_tests_skipped
     async def test_assigned_to_judge_filter(self) -> None:
         """Confirm assigned_to filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "assigned_to": "Thalassa Miller"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "assigned_to")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "assigned_to"
+        )
 
+    @skip_if_common_tests_skipped
     async def test_referred_to_judge_filter(self) -> None:
         """Confirm referred_to_judge filter works properly"""
         params = {
@@ -2221,37 +2215,49 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
             "referred_to": "Persephone Sinclair",
         }
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "referred_to")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "referred_to"
+        )
 
+    @skip_if_common_tests_skipped
     async def test_nature_of_suit_filter(self) -> None:
         """Confirm nature_of_suit filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "nature_of_suit": "440"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "nature_of_suit")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "nature_of_suit"
+        )
 
+    @skip_if_common_tests_skipped
     async def test_filed_after_filter(self) -> None:
         """Confirm filed_after filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "filed_after": "2016-08-16"}
 
-        # API
         await self._test_api_results_count(params, 1, "filed_after")
 
+    @skip_if_common_tests_skipped
     async def test_filed_before_filter(self) -> None:
         """Confirm filed_before filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "filed_before": "2015-08-17"}
 
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "filed_before")
+        # # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "filed_before"
+        )
 
+    @skip_if_common_tests_skipped
     async def test_document_number_filter(self) -> None:
         """Confirm document number filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "document_number": "3"}
 
-        # API
         await self._test_api_results_count(params, 1, "document_number")
 
+    @skip_if_common_tests_skipped
     async def test_available_only_field(self) -> None:
         """Confirm available only filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "available_only": True}
@@ -2259,38 +2265,17 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         # API
         await self._test_api_results_count(params, 1, "available_only")
 
-    @unittest.skipIf(
-        tests_running_over_solr,
-        "Skip in SOlR due to we stopped indexing parties",
-    )
-    async def test_party_name_filter(self) -> None:
-        """Confirm party_name filter works properly"""
-        params = {
-            "type": SEARCH_TYPES.RECAP,
-            "party_name": "Defendant Jane Roe",
-        }
-
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "party_name")
-
-    @unittest.skipIf(
-        tests_running_over_solr,
-        "Skip in SOlR due to we stopped indexing parties",
-    )
-    async def test_atty_name_filter(self) -> None:
-        """Confirm atty_name filter works properly"""
-        params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
-
-        # API, 2 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 2, "atty_name")
-
+    @skip_if_common_tests_skipped
     async def test_combine_filters(self) -> None:
         """Confirm that combining filters works properly"""
         # Get results for a broad filter
         params = {"type": SEARCH_TYPES.RECAP, "case_name": "SUBPOENAS SERVED"}
 
-        # API, 3 result expected since RECAPDocuments are not grouped.
-        await self._test_api_results_count(params, 3, "case_name")
+        # More results expected in v3 since the results are not grouped.
+        expected_results = 3 if self.version_api == "v3" else 2
+        await self._test_api_results_count(
+            params, expected_results, "case_name"
+        )
 
         # Constraint results by adding document number filter.
         params["docket_number"] = "12-1235"
@@ -2318,6 +2303,83 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         }
         # API
         await self._test_api_results_count(params, 1, "filter + text query")
+
+    @skip_if_common_tests_skipped
+    async def test_text_queries(self) -> None:
+        """Confirm text queries works properly"""
+        # Text query case name.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "SUBPOENAS SERVED OFF"}
+        # API
+        await self._test_api_results_count(params, 1, "text query case name")
+
+        # Text query description.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Amicus Curiae Lorem"}
+
+        # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "text query description"
+        )
+
+        # Text query text.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "PACER Document Franklin"}
+
+        # API
+        await self._test_api_results_count(params, 1, "text query text")
+
+        # Text query text judge.
+        params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
+
+        # More results expected in v3 since the results are not grouped.
+        expected_results = 2 if self.version_api == "v3" else 1
+        await self._test_api_results_count(
+            params, expected_results, "text query judge"
+        )
+
+
+class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
+    """
+    RECAP Search API V3 Tests
+    """
+
+    tests_running_over_solr = True
+    skip_common_tests = False
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+    def setUp(self) -> None:
+        add_docket_to_solr_by_rds(
+            [self.rd.pk, self.rd_att.pk], force_commit=True
+        )
+        add_docket_to_solr_by_rds([self.rd_2.pk], force_commit=True)
+        super().setUp()
+
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
+    async def test_party_name_filter(self) -> None:
+        """Confirm party_name filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Defendant Jane Roe",
+        }
+
+        # API, 2 result expected since RECAPDocuments are not grouped.
+        await self._test_api_results_count(params, 2, "party_name")
+
+    @unittest.skipIf(
+        tests_running_over_solr,
+        "Skip in SOlR due to we stopped indexing parties",
+    )
+    async def test_atty_name_filter(self) -> None:
+        """Confirm atty_name filter works properly"""
+        params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
+
+        # API, 2 result expected since RECAPDocuments are not grouped.
+        await self._test_api_results_count(params, 2, "atty_name")
 
     async def test_docket_child_documents(self) -> None:
         """Confirm results contain the right number of child documents"""
@@ -2410,31 +2472,6 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
         await self._test_api_results_count(
             params, 2, '"SUBPOENAS SERVED" NOT "OFF"'
         )
-
-    async def test_text_queries(self) -> None:
-        """Confirm text queries works properly"""
-        # Text query case name.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "SUBPOENAS SERVED OFF"}
-        # API
-        await self._test_api_results_count(params, 1, "text query case name")
-
-        # Text query description.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "Amicus Curiae Lorem"}
-
-        # API
-        await self._test_api_results_count(params, 2, "text query description")
-
-        # Text query text.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "PACER Document Franklin"}
-
-        # API
-        await self._test_api_results_count(params, 1, "text query text")
-
-        # Text query text judge.
-        params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
-
-        # API
-        await self._test_api_results_count(params, 2, "text query judge")
 
     async def test_results_api_fields(self) -> None:
         """Confirm fields in RECAP Search API results."""
@@ -2582,6 +2619,1325 @@ class RECAPSearchAPIV3Test(RECAPSearchTestCase, IndexedSolrTestCase):
             < r.content.decode().index("12-1235"),
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by asc.",
         )
+
+
+class RECAPSearchAPIV4Test(
+    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase
+):
+    """
+    RECAP Search API V4 Tests
+    """
+
+    version_api = "v4"
+    skip_common_tests = False
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        cls.rebuild_index("search.Docket")
+        super().setUpTestData()
+
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            cls.judge_api = PersonFactory.create(
+                name_first="George", name_last="Doe", name_suffix="2"
+            )
+            cls.court_api = CourtFactory(
+                id="ca9", jurisdiction="F", citation_string="Appeals. CA9."
+            )
+            cls.de_api = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=cls.court_api,
+                    case_name="America vs API Lorem",
+                    case_name_full="America vs API Lorem vs. Bank",
+                    date_filed=datetime.date(2016, 4, 16),
+                    date_argued=datetime.date(2022, 5, 20),
+                    date_reargued=datetime.date(2023, 5, 21),
+                    date_terminated=datetime.date(2023, 7, 21),
+                    docket_number="1:24-bk-0000",
+                    assigned_to=cls.judge_api,
+                    referred_to=cls.judge_api,
+                    nature_of_suit="569",
+                    source=Docket.RECAP,
+                    cause="401 Civil",
+                    jury_demand="Plaintiff",
+                    jurisdiction_type="U.S. Government Defendant",
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2020, 8, 19),
+                description="MOTION for Leave Lorem vs America",
+            )
+            cls.firm_api = AttorneyOrganizationFactory(
+                name="Associates America", lookup_key="firm_api"
+            )
+            cls.attorney_api = AttorneyFactory(
+                name="John Doe",
+                organizations=[cls.firm_api],
+                docket=cls.de_api.docket,
+            )
+            cls.party_type = PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Defendant John Doe",
+                    docket=cls.de_api.docket,
+                    attorneys=[cls.attorney_api],
+                ),
+                docket=cls.de_api.docket,
+            )
+            cls.rd_api = RECAPDocumentFactory(
+                docket_entry=cls.de_api,
+                description="Order Letter",
+                document_number="2",
+                is_available=False,
+                page_count=100,
+                pacer_doc_id="019036000435",
+                plain_text="This a plain text to be shown in the API",
+            )
+            OpinionsCitedByRECAPDocument.objects.create(
+                citing_document=cls.rd_api,
+                cited_opinion=cls.opinion,
+                depth=1,
+            )
+            BankruptcyInformationFactory(docket=cls.de_api.docket)
+
+            cls.de_empty_fields_api = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=cls.court_api,
+                    date_reargued=None,
+                    source=Docket.RECAP_AND_SCRAPER,
+                ),
+                description="",
+            )
+            cls.rd_empty_fields_api = RECAPDocumentFactory(
+                docket_entry=cls.de_empty_fields_api,
+                description="empty fields",
+                pacer_doc_id="",
+            )
+
+            cls.empty_docket_api = DocketFactory(
+                court=cls.court_api,
+                date_argued=None,
+                source=Docket.RECAP,
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
+            # Index parties in ES.
+            index_docket_parties_in_es.delay(cls.de_api.docket.pk)
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in API with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    async def _test_api_fields_content(
+        self, api_response, content_to_compare, fields_to_compare
+    ):
+        for (
+            field,
+            get_expected_value,
+        ) in fields_to_compare.items():
+            with self.subTest(field=field):
+                actual_value = api_response.data["results"][0].get(field)
+                if field == "recap_documents":
+                    for child_field, child_value in actual_value[0].items():
+                        with self.subTest(child_field=child_field):
+                            get_child_expected_value = (
+                                recap_document_v4_api_keys.get(child_field)
+                            )
+                            child_expected_value = await sync_to_async(
+                                get_child_expected_value
+                            )(content_to_compare)
+                            self.assertEqual(
+                                child_value,
+                                child_expected_value,
+                                f"Child field '{field}' does not match.",
+                            )
+                else:
+                    expected_value = await sync_to_async(get_expected_value)(
+                        content_to_compare
+                    )
+                    self.assertEqual(
+                        actual_value,
+                        expected_value,
+                        f"Parent field '{field}' does not match.",
+                    )
+
+    def _test_results_ordering(self, test, field):
+        """Ensure dockets appear in the response in a specific order."""
+
+        with self.subTest(test=test, msg=f'{test["name"]}'):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}),
+                test["search_params"],
+            )
+            self.assertEqual(len(r.data["results"]), test["expected_results"])
+            # Note that dockets where the date_field is null are sent to the bottom
+            # of the results
+            actual_order = [result[field] for result in r.data["results"]]
+            self.assertEqual(
+                actual_order,
+                test["expected_order"],
+                msg=f'Expected order {test["expected_order"]}, but got {actual_order}',
+            )
+
+    def _test_page_variables(
+        self, response, test_case, current_page, search_type
+    ):
+        """Ensure the page variables are the correct ones according to the
+        current page."""
+
+        # Test page
+        self.assertEqual(
+            len(response.data["results"]),
+            test_case["results"],
+            msg="Results in page didn't match.",
+        )
+        self.assertEqual(
+            response.data["count"],
+            test_case["count_exact"],
+            msg="Results count didn't match.",
+        )
+        if search_type == SEARCH_TYPES.RECAP:
+            self.assertEqual(
+                response.data["document_count"],
+                test_case["document_count"],
+                msg="Document count didn't match.",
+            )
+        else:
+            self.assertNotIn(
+                "document_count",
+                response.data,
+                msg="Document count should not be present.",
+            )
+
+        next_page = response.data["next"]
+        expected_next_page = test_case["next"]
+        if expected_next_page:
+            self.assertTrue(next_page, msg="Next page value didn't match")
+            current_page = next_page
+        else:
+            self.assertFalse(next_page, msg="Next page value didn't match")
+
+        previous_page = response.data["previous"]
+        expected_previous_page = test_case["previous"]
+        if expected_previous_page:
+            self.assertTrue(
+                previous_page,
+                msg="Previous page value didn't match",
+            )
+        else:
+            self.assertFalse(
+                previous_page,
+                msg="Previous page value didn't match",
+            )
+        return next_page, previous_page, current_page
+
+    async def test_case_name_filter(self) -> None:
+        """Confirm case_name filter works properly"""
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "SUBPOENAS SERVED OFF",
+        }
+        # API, 2 result expected since RECAPDocuments are not grouped.
+        await self._test_api_results_count(params, 1, "case_name")
+
+    async def test_results_api_fields(self) -> None:
+        """Confirm fields in V4 RECAP Search API results."""
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_api.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(docket_v4_api_keys))
+        rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
+        self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
+        content_to_compare = {"result": self.rd_api}
+        await self._test_api_fields_content(
+            r, content_to_compare, docket_v4_api_keys
+        )
+
+    async def test_results_api_empty_fields(self) -> None:
+        """Confirm empty fields values in V4 RECAP Search API results."""
+
+        # Confirm expected values for empty fields.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_empty_fields_api.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(docket_v4_api_keys))
+        rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
+        self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
+        content_to_compare = {"result": self.rd_empty_fields_api}
+        await self._test_api_fields_content(
+            r, content_to_compare, docket_v4_api_keys
+        )
+
+        # Query a docket with no filings.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"docket_id:{self.empty_docket_api.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(docket_v4_api_keys))
+        recap_documents = r.data["results"][0].get("recap_documents")
+        self.assertEqual(recap_documents, [])
+
+    async def test_results_api_highlighted_fields(self) -> None:
+        """Confirm highlighted fields in V4 RECAP Search API results."""
+        # API HL disabled.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_api.pk} cause:(401 Civil) court_citation_string:Appeals juryDemand:Plaintiff short_description:(Order Letter) plain_text:(shown in the API)",
+            "assigned_to": "George",
+            "referred_to": "George",
+            "case_name": "America vs API",
+            "docket_number": "1:24-bk-0000",
+            "nature_of_suit": "569",
+            "description": "MOTION for Leave",
+        }
+
+        # RECAP Search type HL disabled.
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(docket_v4_api_keys))
+        rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
+        self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
+        content_to_compare = {
+            "result": self.rd_api,
+        }
+        await self._test_api_fields_content(
+            r, content_to_compare, docket_v4_api_keys
+        )
+
+        # RECAP_DOCUMENT Search type HL disabled.
+        search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        await self._test_api_fields_content(
+            r, content_to_compare, recap_document_v4_api_keys
+        )
+
+        # RECAP Search type HL enabled.
+        search_params["type"] = SEARCH_TYPES.RECAP
+        search_params["highlight"] = True
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        content_to_compare = {
+            "result": self.rd_api,
+            "assignedTo": "<mark>George</mark> Doe II",
+            "caseName": "<mark>America</mark> <mark>vs</mark> <mark>API</mark> Lorem",
+            "cause": "<mark>401</mark> <mark>Civil</mark>",
+            "court_citation_string": "<mark>Appeals</mark>. CA9.",
+            "docketNumber": "<mark>1:24-bk-0000</mark>",
+            "juryDemand": "<mark>Plaintiff</mark>",
+            "referredTo": "<mark>George</mark> Doe II",
+            "suitNature": "<mark>569</mark>",
+            "description": "<mark>MOTION</mark> <mark>for</mark> <mark>Leave</mark> Lorem vs America",
+            "short_description": "<mark>Order Letter</mark>",
+            "snippet": "This a plain text to be <mark>shown in the API</mark>",
+        }
+        await self._test_api_fields_content(
+            r, content_to_compare, docket_v4_api_keys
+        )
+
+        # RECAP_DOCUMENT Search type HL enabled.
+        search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        await self._test_api_fields_content(
+            r, content_to_compare, recap_document_v4_api_keys
+        )
+
+    def test_date_filed_sorting_function_score(self) -> None:
+        """Test if the function score used for the dateFiled sorting in the V4
+        of the RECAP Search API works as expected."""
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            docket_recent = DocketFactory(
+                case_name="SUBPOENAS SERVED NEW",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+            docket_old = DocketFactory(
+                case_name="SUBPOENAS SERVED OLD",
+                source=Docket.RECAP,
+                date_filed=datetime.date(1732, 2, 23),
+            )
+            docket_null_date_filed = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED NULL",
+                source=Docket.RECAP,
+            )
+
+        # Query string, order by dateFiled desc
+        search_params = {
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": False,
+        }
+
+        params_date_filed_asc = search_params.copy()
+        params_date_filed_asc["order_by"] = "dateFiled asc"
+
+        params_match_all_date_filed_desc = search_params.copy()
+        del params_match_all_date_filed_desc["q"]
+        params_match_all_date_filed_desc["order_by"] = "dateFiled desc"
+
+        params_match_all_date_filed_asc = search_params.copy()
+        del params_match_all_date_filed_asc["q"]
+        params_match_all_date_filed_asc["order_by"] = "dateFiled asc"
+        test_cases = [
+            {
+                "name": "Query string, order by dateFiled desc",
+                "search_params": search_params,
+                "expected_results": 5,
+                "expected_order": [
+                    docket_recent.pk,
+                    self.de_1.docket.pk,
+                    self.de.docket.pk,
+                    docket_old.pk,
+                    docket_null_date_filed.pk,
+                ],
+            },
+            {
+                "name": "Query string, order by dateFiled asc",
+                "search_params": params_date_filed_asc,
+                "expected_results": 5,
+                "expected_order": [
+                    docket_old.pk,
+                    self.de.docket.pk,
+                    self.de_1.docket.pk,
+                    docket_recent.pk,
+                    docket_null_date_filed.pk,
+                ],
+            },
+            {
+                "name": "Match all query, order by dateFiled desc",
+                "search_params": params_match_all_date_filed_desc,
+                "expected_results": 8,
+                "expected_order": [
+                    docket_recent.pk,  # 2024/2/23
+                    self.de_1.docket.pk,  # 2016/8/16
+                    self.de_api.docket.pk,  # 2016/4/16
+                    self.de.docket.pk,  # 2015/8/16
+                    docket_old.pk,  # 1732/2/23
+                    docket_null_date_filed.pk,  # Null date_filed, pk 3
+                    self.empty_docket_api.pk,  # Null date_filed, pk 2
+                    self.de_empty_fields_api.docket.pk,  # Null date_filed, pk 1
+                ],
+            },
+            {
+                "name": "Match all query, order by dateFiled asc",
+                "search_params": params_match_all_date_filed_asc,
+                "expected_results": 8,
+                "expected_order": [
+                    docket_old.pk,  # 1732/2/23
+                    self.de.docket.pk,  # 2015/8/16
+                    self.de_api.docket.pk,  # 2016/4/16
+                    self.de_1.docket.pk,  # 2016/8/16
+                    docket_recent.pk,  # 2024/2/23
+                    docket_null_date_filed.pk,  # Null date_filed, pk 3
+                    self.empty_docket_api.pk,  # Null date_filed, pk 2
+                    self.de_empty_fields_api.docket.pk,  # Null date_filed, pk 1
+                ],
+            },
+        ]
+
+        search_types = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        for search_type in search_types:
+            for test in test_cases:
+                test["search_params"]["type"] = search_type
+                self._test_results_ordering(test, "docket_id")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_recent.delete()
+            docket_old.delete()
+            docket_null_date_filed.delete()
+
+    @override_settings(SEARCH_API_PAGE_SIZE=6)
+    def test_recap_results_cursor_api_pagination_for_r_type(self) -> None:
+        """Test cursor pagination for V4 RECAP Search API."""
+
+        created_dockets = []
+        dockets_to_create = 20
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            for _ in range(dockets_to_create):
+                docket_entry = DocketEntryWithParentsFactory(
+                    docket__source=Docket.RECAP,
+                )
+                RECAPDocumentFactory(
+                    docket_entry=docket_entry,
+                )
+                created_dockets.append(docket_entry.docket)
+
+        total_dockets = Docket.objects.all().count()
+        total_rds = RECAPDocument.objects.all().count()
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        tests = [
+            {
+                "results": 6,
+                "count_exact": total_dockets,
+                "document_count": total_rds,
+                "next": True,
+                "previous": False,
+            },
+            {
+                "results": 6,
+                "count_exact": total_dockets,
+                "document_count": total_rds,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 6,
+                "count_exact": total_dockets,
+                "document_count": total_rds,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 6,
+                "count_exact": total_dockets,
+                "document_count": total_rds,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 1,
+                "count_exact": total_dockets,
+                "document_count": total_rds,
+                "next": False,
+                "previous": True,
+            },
+        ]
+        order_types = [
+            "score desc",
+            "dateFiled desc",
+            "dateFiled asc",
+            "entry_date_filed asc",
+            "entry_date_filed desc",
+        ]
+        for order_type in order_types:
+            # Test forward pagination.
+            next_page = None
+            all_document_ids = []
+            ids_per_page = []
+            current_page = None
+            with self.subTest(order_type=order_type, msg="Sorting order."):
+                search_params["order_by"] = order_type
+                for test in tests:
+                    with self.subTest(test=test, msg="forward pagination"):
+                        if not next_page:
+                            r = self.client.get(
+                                reverse(
+                                    "search-list", kwargs={"version": "v4"}
+                                ),
+                                search_params,
+                            )
+                        else:
+                            r = self.client.get(next_page)
+                        # Test page variables.
+                        next_page, _, current_page = self._test_page_variables(
+                            r, test, current_page, search_params["type"]
+                        )
+                        ids_in_page = set()
+                        for result in r.data["results"]:
+                            all_document_ids.append(result["docket_id"])
+                            ids_in_page.add(result["docket_id"])
+                        ids_per_page.append(ids_in_page)
+
+                # Confirm all the documents were shown when paginating forwards.
+                self.assertEqual(
+                    len(all_document_ids),
+                    total_dockets,
+                    msg="Wrong number of dockets.",
+                )
+
+                # Test backward pagination.
+                tests_backward = tests.copy()
+                tests_backward.reverse()
+                previous_page = None
+                all_ids_prev = []
+                for test in tests_backward:
+                    with self.subTest(test=test, msg="backward pagination"):
+                        if not previous_page:
+                            r = self.client.get(current_page)
+                        else:
+                            r = self.client.get(previous_page)
+
+                        # Test page variables.
+                        _, previous_page, current_page = (
+                            self._test_page_variables(
+                                r, test, current_page, search_params["type"]
+                            )
+                        )
+                        ids_in_page_got = set()
+                        for result in r.data["results"]:
+                            all_ids_prev.append(result["docket_id"])
+                            ids_in_page_got.add(result["docket_id"])
+                        current_page_ids_prev = ids_per_page.pop()
+                        # Check if IDs obtained with forward pagination match
+                        # the IDs obtained when paginating backwards.
+                        self.assertEqual(
+                            current_page_ids_prev,
+                            ids_in_page_got,
+                            msg="Wrong dockets.",
+                        )
+
+                # Confirm all the documents were shown when paginating backwards.
+                self.assertEqual(
+                    len(all_ids_prev),
+                    total_dockets,
+                    msg="Wrong number of dockets.",
+                )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            # Remove Docket objects to avoid affecting other tests.
+            for created_docket in created_dockets:
+                created_docket.delete()
+
+    def test_recap_cursor_api_pagination_count(self) -> None:
+        """Test cursor pagination count for V4 RECAP Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_dockets = Docket.objects.all().count()
+        total_rds = RECAPDocument.objects.all().count()
+
+        ## Get count from cardinality.
+        with override_settings(
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets - 1
+        ):
+            # RECAP Search request, count dockets.
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_dockets,
+                msg="Results count didn't match.",
+            )
+            self.assertEqual(
+                r.data["document_count"],
+                total_rds,
+                msg="Document count didn't match.",
+            )
+
+            # DOCKETS Search request, count dockets.
+            search_params["type"] = SEARCH_TYPES.DOCKETS
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_dockets,
+                msg="Results count didn't match.",
+            )
+            self.assertNotIn(
+                "document_count",
+                r.data,
+                msg="Document count should not be present.",
+            )
+
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds - 1):
+            # RECAP_DOCUMENT Search request, count RDs.
+            search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_rds,
+                msg="Results count didn't match.",
+            )
+            self.assertNotIn(
+                "document_count",
+                r.data,
+                msg="Document count should not be present.",
+            )
+
+        ## Get count from main query.
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets):
+            # RECAP Search request, count dockets.
+            search_params["type"] = SEARCH_TYPES.RECAP
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_dockets,
+                msg="Results count didn't match.",
+            )
+            # Document count is always retrieved from a cardinality query.
+            self.assertEqual(
+                r.data["document_count"],
+                total_rds,
+                msg="Document count didn't match.",
+            )
+
+            # DOCKETS Search request, count dockets.
+            search_params["type"] = SEARCH_TYPES.DOCKETS
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_dockets,
+                msg="Results count didn't match.",
+            )
+            self.assertNotIn(
+                "document_count",
+                r.data,
+                msg="Document count should not be present.",
+            )
+
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds):
+            # RECAP_DOCUMENT Search request, count RDs.
+            search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_rds,
+                msg="Results count didn't match.",
+            )
+            self.assertNotIn(
+                "document_count",
+                r.data,
+                msg="Document count should not be present.",
+            )
+
+    def test_recap_cursor_api_pagination_next_and_previous_page(self) -> None:
+        """Test cursor pagination previous_page for V4 RECAP Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_dockets = Docket.objects.all().count()
+
+        # Fewer results than page_size, no next page, no previous page.
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets + 1):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertIsNone(r.data["next"], msg="Next page doesn't match")
+            self.assertIsNone(
+                r.data["previous"], msg="Next page doesn't match"
+            )
+
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets - 1):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            # No previous page link since we're in the first page, but next.
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+            next_page = r.data["next"]
+            self.assertTrue(next_page, msg="Next page doesn't macht")
+
+            # Go to next page, not next page but previous.
+            r = self.client.get(next_page)
+            self.assertIsNone(r.data["next"], msg="Next page doesn't macht")
+            previous_page = r.data["previous"]
+            self.assertTrue(previous_page, msg="Previous page doesn't macht")
+
+            # Go back to previous page, first page no previous page but next.
+            r = self.client.get(previous_page)
+            self.assertTrue(r.data["next"], msg="Next page doesn't macht")
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+
+    def test_recap_cursor_results_equals_page_size(self) -> None:
+        """Test cursor pagination previous and next page when the number of
+        equals the page_size."""
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            docket = DocketFactory(source=Docket.RECAP)
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_dockets = Docket.objects.all().count()
+        page_size = int(total_dockets / 2)
+        with override_settings(SEARCH_API_PAGE_SIZE=page_size):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            # No previous page link since we're in the first page, but next.
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+            next_page = r.data["next"]
+            self.assertTrue(next_page, msg="Next page doesn't macht")
+
+            # Go to next page, previous page but no next since results in page
+            # are equal to page_size.
+            r = self.client.get(next_page)
+            previous_page = r.data["previous"]
+            self.assertTrue(previous_page, msg="Previous page doesn't macht")
+            self.assertEqual(len(r.data["results"]), page_size)
+            self.assertIsNone(r.data["next"], msg="Next page doesn't macht")
+
+            # Go back previous page, next page but no previous since results in
+            # page are equal to page_size.
+            r = self.client.get(previous_page)
+            self.assertIsNone(
+                r.data["previous"], msg="Previous page doesn't macht"
+            )
+            self.assertEqual(len(r.data["results"]), page_size)
+            self.assertTrue(r.data["next"], msg="Next page doesn't macht")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+
+    @override_settings(SEARCH_API_PAGE_SIZE=2)
+    def test_recap_cursor_results_consistency(self) -> None:
+        """Test cursor pagination results consistency when documents are indexed
+        or removed."""
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 1",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2023, 2, 23),
+            )
+            docket_1 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 2",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2022, 2, 23),
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": False,
+        }
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 4)
+        self.assertEqual(r.data["document_count"], 3)
+        next_page = r.data["next"]
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 0",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2024, 2, 23),
+            )
+
+        ids_in_previous_page = {docket.pk, docket_1.pk, docket_0.pk}
+        r = self.client.get(next_page)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+
+        current_page_ids = set()
+        for result in r.data["results"]:
+            current_page_ids.add(result["docket_id"])
+
+        # No Dockets from the previous page are shown in the next page.
+        self.assertFalse(ids_in_previous_page & current_page_ids)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_0.delete()
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 4)
+        self.assertEqual(r.data["document_count"], 3)
+        next_page = r.data["next"]
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_3 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED 3",
+                source=Docket.RECAP,
+                date_filed=datetime.date(2017, 2, 23),
+            )
+
+        r = self.client.get(next_page)
+        self.assertEqual(len(r.data["results"]), 2)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertTrue(r.data["next"])
+
+        current_page_ids = set()
+        for result in r.data["results"]:
+            current_page_ids.add(result["docket_id"])
+
+        expected_ids = {docket_3.pk, self.de_1.docket.pk}
+        # No Dockets from the previous page are shown in the next page.
+        self.assertEqual(expected_ids, current_page_ids)
+
+        next_page = r.data["next"]
+        r = self.client.get(next_page)
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["count"], 5)
+        self.assertEqual(r.data["document_count"], 3)
+        self.assertIsNone(r.data["next"])
+        self.assertEqual(r.data["results"][0]["docket_id"], self.de.docket.pk)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.delete()
+            docket_1.delete()
+            docket_3.delete()
+
+    @override_settings(SEARCH_API_PAGE_SIZE=6)
+    def test_recap_results_more_docs_field(self) -> None:
+        """Test the more_docs fields to be shown properly when a docket has
+        more than 5 RECAPDocuments matched."""
+
+        rds_to_create = settings.CHILD_HITS_PER_RESULT + 1
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_entry = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+            )
+            for i in range(rds_to_create):
+                RECAPDocumentFactory(
+                    docket_entry=docket_entry,
+                    document_number=i,
+                )
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+            "q": f"docket_id:{docket_entry.docket.pk}",
+        }
+
+        test_cases = [
+            {
+                "expected_results": settings.CHILD_HITS_PER_RESULT,
+                "more_docs": True,
+            },
+            {
+                "expected_results": settings.CHILD_HITS_PER_RESULT,
+                "more_docs": False,
+            },
+            {
+                "expected_results": settings.CHILD_HITS_PER_RESULT - 1,
+                "more_docs": False,
+            },
+        ]
+
+        for test_case in test_cases:
+            with self.subTest(test_case=test_case, msg="More docs test."):
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                self.assertEqual(len(r.data["results"]), 1)
+                self.assertEqual(
+                    len(r.data["results"][0]["recap_documents"]),
+                    test_case["expected_results"],
+                )
+                self.assertEqual(
+                    r.data["results"][0]["more_docs"], test_case["more_docs"]
+                )
+
+                with self.captureOnCommitCallbacks(execute=True):
+                    RECAPDocument.objects.filter(
+                        docket_entry__docket=docket_entry.docket
+                    ).first().delete()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_entry.docket.delete()
+
+    async def test_results_fields_for_d_type(self) -> None:
+        """Confirm fields in V4 RECAP Search API results for the d type."""
+
+        search_params = {
+            "type": SEARCH_TYPES.DOCKETS,
+            "q": f"docket_id:{self.rd_api.docket_entry.docket.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+
+        d_type_v4_api_keys = docket_v4_api_keys.copy()
+        del d_type_v4_api_keys["recap_documents"]
+        del d_type_v4_api_keys["more_docs"]
+        self.assertEqual(keys_count, len(d_type_v4_api_keys))
+
+        content_to_compare = {"result": self.rd_api}
+        await self._test_api_fields_content(
+            r, content_to_compare, d_type_v4_api_keys
+        )
+
+    async def test_results_fields_for_rd_type(self) -> None:
+        """Confirm fields in V4 RECAP Search API results for the rd type."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP_DOCUMENT,
+            "q": f"id:{self.rd_api.pk}",
+            "order_by": "score desc",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(rd_type_v4_api_keys))
+
+        content_to_compare = {"result": self.rd_api}
+        await self._test_api_fields_content(
+            r, content_to_compare, rd_type_v4_api_keys
+        )
+
+    def test_dates_sorting_function_score_for_rd_type(self) -> None:
+        """Test if the function score used for the dateFiled and entry_date_filed
+        sorting in the V4 of the RECAP Search API works as expected for the RD type.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            latest_null_date_filed = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_api,
+                    date_reargued=None,
+                    source=Docket.RECAP_AND_SCRAPER,
+                ),
+                description="",
+            )
+            rd_null_date_filed = RECAPDocumentFactory(
+                docket_entry=latest_null_date_filed,
+                description="latest null rd",
+                pacer_doc_id="",
+            )
+
+        search_params = {
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled desc",
+            "highlight": False,
+            "type": SEARCH_TYPES.RECAP_DOCUMENT,
+        }
+
+        params_match_all = search_params.copy()
+        del params_match_all["q"]
+
+        test_cases = [
+            # dateFiled test cases for RECAP_DOCUMENT type. RDs are sorted
+            # based on their docket dateFiled.
+            {
+                "name": "Query string, order by dateFiled desc",
+                "order_by": "dateFiled desc",
+                "search_params": search_params,
+                "expected_results": 3,
+                "expected_order": [
+                    self.rd_2.pk,  # 2016/08/16
+                    self.rd_att.pk,  # 2015/08/16 pk 2
+                    self.rd.pk,  # 2015/08/16 pk 1
+                ],
+            },
+            {
+                "name": "Query string, order by dateFiled asc",
+                "order_by": "dateFiled asc",
+                "search_params": search_params,
+                "expected_results": 3,
+                "expected_order": [
+                    self.rd_att.pk,  # 2015/08/16 pk 2
+                    self.rd.pk,  # 2015/08/16 pk 1
+                    self.rd_2.pk,  # 2016/08/16
+                ],
+            },
+            {
+                "name": "Match all query, order by dateFiled desc",
+                "order_by": "dateFiled desc",
+                "search_params": params_match_all,
+                "expected_results": 6,
+                "expected_order": [
+                    self.rd_2.pk,  # 2016/08/16
+                    self.rd_api.pk,  # 2016/04/16
+                    self.rd_att.pk,  # 2015/08/16 pk 2
+                    self.rd.pk,  # 2015/08/16 pk 1
+                    rd_null_date_filed.pk,  # None pk 4
+                    self.rd_empty_fields_api.pk,  # None pk 3
+                ],
+            },
+            {
+                "name": "Match all query, order by dateFiled asc",
+                "order_by": "dateFiled asc",
+                "search_params": params_match_all,
+                "expected_results": 6,
+                "expected_order": [
+                    self.rd_att.pk,  # 2015/08/16 pk 2
+                    self.rd.pk,  # 2015/08/16 pk 1
+                    self.rd_api.pk,  # 2016/04/16
+                    self.rd_2.pk,  # 2016/08/16
+                    rd_null_date_filed.pk,  # None pk 4
+                    self.rd_empty_fields_api.pk,  # None pk 3
+                ],
+            },
+            # entry_date_filed test cases for RECAP_DOCUMENT type. RDs are
+            # sorted based on their entry_date_filed.
+            {
+                "name": "Query string, order by entry_date_filed desc",
+                "order_by": "entry_date_filed desc",
+                "search_params": search_params,
+                "expected_results": 3,
+                "expected_order": [
+                    self.rd_att.pk,  # 2015/08/19 pk 2
+                    self.rd.pk,  # 2015/08/19 pk 1
+                    self.rd_2.pk,  # 2014/07/19
+                ],
+            },
+            {
+                "name": "Query string, order by entry_date_filed asc",
+                "order_by": "entry_date_filed asc",
+                "search_params": search_params,
+                "expected_results": 3,
+                "expected_order": [
+                    self.rd_2.pk,  # 2014/07/19
+                    self.rd_att.pk,  # 2015/08/19 pk 2
+                    self.rd.pk,  # 2015/08/19 pk 1
+                ],
+            },
+            {
+                "name": "Match all query, order by entry_date_filed desc",
+                "order_by": "entry_date_filed desc",
+                "search_params": params_match_all,
+                "expected_results": 6,
+                "expected_order": [
+                    self.rd_api.pk,  # 2020/08/19
+                    self.rd_att.pk,  # 2015/08/19 pk 2
+                    self.rd.pk,  # 2015/08/19 pk 1
+                    self.rd_2.pk,  # 2014/07/19
+                    rd_null_date_filed.pk,  # None pk 4
+                    self.rd_empty_fields_api.pk,  # None pk 3
+                ],
+            },
+            {
+                "name": "Match all query, order by entry_date_filed asc",
+                "order_by": "entry_date_filed asc",
+                "search_params": params_match_all,
+                "expected_results": 6,
+                "expected_order": [
+                    self.rd_2.pk,  # 2014/07/19
+                    self.rd_att.pk,  # 2015/08/19 pk 2
+                    self.rd.pk,  # 2015/08/19 pk 1
+                    self.rd_api.pk,  # 2020/08/19
+                    rd_null_date_filed.pk,  # None pk 4
+                    self.rd_empty_fields_api.pk,  # None pk 3
+                ],
+            },
+        ]
+        for test in test_cases:
+            test["search_params"]["order_by"] = test["order_by"]
+            self._test_results_ordering(test, "id")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            latest_null_date_filed.docket.delete()
+
+    @override_settings(SEARCH_API_PAGE_SIZE=4)
+    def test_recap_results_cursor_api_pagination_rd(self) -> None:
+        """Test cursor pagination for V4 RECAP Search API."""
+
+        created_dockets = []
+        dockets_to_create = 10
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            for _ in range(dockets_to_create):
+                docket_entry = DocketEntryWithParentsFactory(
+                    docket__source=Docket.RECAP,
+                )
+                RECAPDocumentFactory(
+                    docket_entry=docket_entry,
+                )
+                created_dockets.append(docket_entry.docket)
+
+        total_rds = RECAPDocument.objects.all().count()
+        search_params = {
+            "type": SEARCH_TYPES.RECAP_DOCUMENT,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        tests = [
+            {
+                "results": 4,
+                "count_exact": total_rds,
+                "next": True,
+                "previous": False,
+            },
+            {
+                "results": 4,
+                "count_exact": total_rds,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 4,
+                "count_exact": total_rds,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 3,
+                "count_exact": total_rds,
+                "next": False,
+                "previous": True,
+            },
+        ]
+        order_types = [
+            "score desc",
+            "dateFiled desc",
+            "dateFiled asc",
+            "entry_date_filed asc",
+            "entry_date_filed desc",
+        ]
+        for order_type in order_types:
+            # Test forward pagination.
+            next_page = None
+            all_document_ids = []
+            ids_per_page = []
+            current_page = None
+            with self.subTest(order_type=order_type, msg="Sorting order."):
+                search_params["order_by"] = order_type
+                for test in tests:
+                    with self.subTest(test=test, msg="forward pagination"):
+                        if not next_page:
+                            r = self.client.get(
+                                reverse(
+                                    "search-list", kwargs={"version": "v4"}
+                                ),
+                                search_params,
+                            )
+                        else:
+                            r = self.client.get(next_page)
+                        # Test page variables.
+                        next_page, _, current_page = self._test_page_variables(
+                            r, test, current_page, search_params["type"]
+                        )
+                        ids_in_page = set()
+                        for result in r.data["results"]:
+                            all_document_ids.append(result["id"])
+                            ids_in_page.add(result["id"])
+                        ids_per_page.append(ids_in_page)
+
+                # Confirm all the documents were shown when paginating forwards.
+                self.assertEqual(
+                    len(all_document_ids),
+                    total_rds,
+                    msg="Wrong number of dockets.",
+                )
+
+                # Test backward pagination.
+                tests_backward = tests.copy()
+                tests_backward.reverse()
+                previous_page = None
+                all_ids_prev = []
+                for test in tests_backward:
+                    with self.subTest(test=test, msg="backward pagination"):
+                        if not previous_page:
+                            r = self.client.get(current_page)
+                        else:
+                            r = self.client.get(previous_page)
+
+                        # Test page variables.
+                        _, previous_page, current_page = (
+                            self._test_page_variables(
+                                r, test, current_page, search_params["type"]
+                            )
+                        )
+                        ids_in_page_got = set()
+                        for result in r.data["results"]:
+                            all_ids_prev.append(result["id"])
+                            ids_in_page_got.add(result["id"])
+                        current_page_ids_prev = ids_per_page.pop()
+                        # Check if IDs obtained with forward pagination match
+                        # the IDs obtained when paginating backwards.
+                        self.assertEqual(
+                            current_page_ids_prev,
+                            ids_in_page_got,
+                            msg="Wrong dockets.",
+                        )
+
+                # Confirm all the documents were shown when paginating backwards.
+                self.assertEqual(
+                    len(all_ids_prev),
+                    total_rds,
+                    msg="Wrong number of dockets.",
+                )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            # Remove Docket objects to avoid affecting other tests.
+            for created_docket in created_dockets:
+                created_docket.delete()
+
+    def test_invalid_pagination_cursor(self) -> None:
+        """Test to confirm that an invalid cursor error message is sent when
+        an invalid cursor or incompatible search type to the cursor is
+        requested in the V4 RECAP Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "score desc",
+            "highlight": False,
+            "cursor": "x-invalid_cursor-y",
+        }
+        total_dockets = Docket.objects.all().count()
+        # Invalid cursor string.
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        self.assertEqual(r.data["detail"], "Invalid cursor")
+
+        # If a cursor is generated for an initial search type and then the search
+        # type is changed without restarting the whole request, the cursor
+        # will be incompatible with the new search type. Raise an Invalid Cursor
+        # Error.
+        del search_params["cursor"]
+        with override_settings(SEARCH_API_PAGE_SIZE=total_dockets - 1):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            next = r.data["next"].replace(
+                "type=r", f"type={SEARCH_TYPES.DOCKETS}"
+            )
+            r = self.client.get(next)
+            self.assertEqual(r.data["detail"], "Invalid cursor")
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):

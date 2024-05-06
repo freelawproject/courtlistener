@@ -14,6 +14,7 @@ from django.conf import settings
 from django.core.cache import caches
 from django.core.paginator import EmptyPage, Page
 from django.db.models import QuerySet
+from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http import HttpRequest
 from django.http.request import QueryDict
@@ -21,7 +22,6 @@ from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import A, MultiSearch, Q
 from elasticsearch_dsl import Search as SearchDSL
-from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrDict
@@ -59,6 +59,7 @@ from cl.search.constants import (
     SEARCH_ORAL_ARGUMENT_QUERY_FIELDS,
     SEARCH_PEOPLE_CHILD_QUERY_FIELDS,
     SEARCH_PEOPLE_PARENT_QUERY_FIELDS,
+    SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
@@ -76,6 +77,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     Court,
     OpinionCluster,
+    RECAPDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -93,23 +95,6 @@ def elasticsearch_enabled(func: Callable) -> Callable:
             func(*args, **kwargs)
 
     return wrapper_func
-
-
-def es_index_exists(index_name: str) -> bool:
-    """Confirm if the Elasticsearch index exists in the default instance.
-    :param index_name: The index name to check.
-    :return: True if the index exists, otherwise False.
-    """
-    try:
-        es = connections.get_connection()
-        index_exists = es.indices.exists(index=index_name)
-    except (TransportError, ConnectionError) as e:
-        logger.warning(
-            f"Error in ES connection when checking index existence: {index_name}"
-        )
-        logger.warning(f"Error was: {e}")
-        index_exists = False
-    return index_exists
 
 
 def build_numeric_range_query(
@@ -221,6 +206,7 @@ def add_fields_boosting(
     if cd["type"] in [
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
     ]:
         qf = BOOSTS["es"][cd["type"]].copy()
 
@@ -228,6 +214,7 @@ def add_fields_boosting(
         SEARCH_TYPES.ORAL_ARGUMENT,
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
         SEARCH_TYPES.OPINION,
     ]:
         # Give a boost on the case_name field if it's obviously a case_name
@@ -450,21 +437,66 @@ def build_text_filter(field: str, value: str) -> List:
     return []
 
 
-def build_sort_results(cd: CleanData) -> Dict:
+def toggle_sort_order(
+    order_by: str | None, toggle_sorting: bool
+) -> str | None:
+    """Toggle the sorting order of the given "order_by" string from ascending
+    to descending, or vice versa. This is used for changing the sort direction
+    in queries, useful to perform backward pagination for the V4 Search API.
+
+    :param order_by: A string specifying the fields and sort directions,
+    separated by commas, e.g., "score asc, score desc".
+    :param toggle_sorting: A boolean flag that indicates whether the sorting
+    order should be toggled. If False, the original "order_by" is returned.
+    :return: A modified "order_by" string with toggled sort directions.
+    """
+
+    if not toggle_sorting or order_by is None:
+        return order_by
+
+    sort_components = order_by.split(",")
+    toggle_sort_components = []
+    for component in sort_components:
+        component = component.strip()
+        if "desc" in component:
+            toggle_sort_components.append(component.replace("desc", "asc"))
+        elif "asc" in component:
+            toggle_sort_components.append(component.replace("asc", "desc"))
+        else:
+            toggle_sort_components.append(component)
+
+    return ", ".join(toggle_sort_components)
+
+
+def build_sort_results(
+    cd: CleanData,
+    toggle_sorting: bool = False,
+    api_version: Literal["v3", "v4"] | None = None,
+) -> Dict:
     """Given cleaned data, find order_by value and return dict to use with
     ElasticSearch sort
 
     :param cd: The user input CleanedData
+    :param toggle_sorting: Whether to toggle the sorting order to perform backward
+    pagination for the V4 Search API.
+    :param api_version: Optional, the request API version.
     :return: The short dict.
     """
 
+    order_by = cd.get("order_by")
+    order_by = toggle_sort_order(order_by, toggle_sorting)
     order_by_map = {
         "score desc": {"_score": {"order": "desc"}},
+        "score asc": {"_score": {"order": "asc"}},
         "dateArgued desc": {"dateArgued": {"order": "desc"}},
         "dateArgued asc": {"dateArgued": {"order": "asc"}},
         "random_ desc": {"random_": {"order": "desc"}},
         "random_ asc": {"random_": {"order": "asc"}},
         "name_reverse asc": {"name_reverse": {"order": "asc"}},
+        "docket_id asc": {"docket_id": {"order": "asc"}},
+        "docket_id desc": {"docket_id": {"order": "desc"}},
+        "id asc": {"id": {"order": "asc"}},
+        "id desc": {"id": {"order": "desc"}},
         "dob desc,name_reverse asc": {
             "dob": {"order": "desc"},
             "name_reverse": {"order": "asc"},
@@ -488,17 +520,35 @@ def build_sort_results(cd: CleanData) -> Dict:
         "citeCount asc": {"citeCount": {"order": "asc"}},
     }
 
+    if api_version == "v4":
+        # Override dateFiled sorting keys in V4 API to work alongside the custom
+        # function score for sorting by dateFiled.
+        order_by_map["dateFiled desc"] = {"_score": {"order": "desc"}}
+        order_by_map["dateFiled asc"] = {"_score": {"order": "desc"}}
+
+    if toggle_sorting and api_version == "v4":
+        # Override the sorting keys in the V4 API when toggle_sorting is True
+        # for backward cursor pagination based on fields that use a custom
+        # function score.
+        order_by_map["entry_date_filed asc"] = {"_score": {"order": "asc"}}
+        order_by_map["entry_date_filed desc"] = {"_score": {"order": "asc"}}
+        order_by_map["dateFiled desc"] = {"_score": {"order": "asc"}}
+        order_by_map["dateFiled asc"] = {"_score": {"order": "asc"}}
+
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
         order_by_map["score desc"] = {"score": {"order": "desc"}}
 
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    ]:
         random_order_field_id = "docket_id"
     elif cd["type"] in [SEARCH_TYPES.OPINION]:
         random_order_field_id = "cluster_id"
     else:
         random_order_field_id = "id"
 
-    order_by = cd.get("order_by")
     if order_by and "random_" in order_by:
         # Return random sorting if available.
         # Define the random seed using the value defined in random_{seed}
@@ -528,17 +578,27 @@ def build_sort_results(cd: CleanData) -> Dict:
     return order_by_map[order_by]
 
 
-def get_child_sorting_key(cd: CleanData) -> tuple[str, str]:
+def get_child_sorting_key(
+    cd: CleanData, api_version: Literal["v3", "v4"] | None = None
+) -> tuple[str, str]:
     """Given cleaned data, find order_by value and return a key to use within
     a has_child query.
 
     :param cd: The user input CleanedData
+    :param api_version: Optional, the request API version.
     :return: A two tuple containing the short key and the order (asc or desc).
     """
     order_by_map_child = {
         "entry_date_filed asc": ("entry_date_filed", "asc"),
         "entry_date_filed desc": ("entry_date_filed", "desc"),
     }
+    if api_version == "v4":
+        order_by_map_child.update(
+            {
+                "dateFiled desc": ("dateFiled", "desc"),
+                "dateFiled asc": ("dateFiled", "asc"),
+            }
+        )
     order_by = cd.get("order_by", "")
     return order_by_map_child.get(order_by, ("", ""))
 
@@ -616,81 +676,21 @@ def build_es_filters(cd: CleanData) -> List:
     return queries_list
 
 
-def build_has_child_query(
-    query: QueryString | str,
-    child_type: str,
-    child_hits_limit: int,
-    highlighting_fields: dict[str, int] | None = None,
-    order_by: tuple[str, str] | None = None,
-) -> QueryString:
-    """Build a 'has_child' query.
+def build_highlights_dict(
+    highlighting_fields: dict[str, int] | None,
+    hl_tag: str,
+    child_highlighting: bool = True,
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Builds a dictionary for ES highlighting options and a list of fields to
+    exclude from the _source.
 
-    :param query: The Elasticsearch query string or QueryString object.
-    :param child_type: The type of the child document.
-    :param child_hits_limit: The maximum number of child hits to be returned.
-    :param highlighting_fields: List of fields to highlight in child docs.
-    :param order_by: If provided the field to use to compute score for sorting
-    results based on a child document field.
-    :return: The 'has_child' query.
+    :param highlighting_fields: A dictionary of fields to highlight in child docs.
+    :param hl_tag: The HTML tag to use for highlighting matched fragments.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :return: A tuple containing, a dictionary with the configuration for
+    highlighting each field and aa list of field names to exclude from the
+    _source results to avoid data redundancy.
     """
-
-    if order_by and all(order_by) and child_type == "recap_document":
-        sort_field, order = order_by
-        # Define the function score for sorting, based on the child sort_field.
-        # When the order is 'entry_date_filed desc', the 'date_filed_time'
-        # value, adjusted by washington_bd_offset, is used as the score,
-        # sorting newer documents first. In 'asc' order, the score is the
-        # difference between 'current_time' (also adjusted by the
-        # washington_bd_offset) and 'date_filed_time', prioritizing older
-        # documents. If a document does not have a 'date_filed' set, the
-        # function returns 1. This ensures that dockets containing documents
-        # without a 'date_filed' are displayed before dockets without filings,
-        # which have a default score of 0. washington_bd_offset is based
-        # on George Washington's birthday (February 22, 1732), ensuring all
-        # epoch millisecond values are positive and compatible with ES scoring
-        # system. This approach allows for handling dates in our system both
-        # before and after January 1, 1970 (epoch time), within a positive
-        # scoring range.
-
-        query = Q(
-            "function_score",
-            query=query,
-            script_score={
-                "script": {
-                    "source": f"""
-                    // Check if the document has a value for the 'sort_field'
-                    if (doc['{sort_field}'].size() == 0) {{
-                        return 1;  // If not, return 1 as the score
-                    }} else {{
-                        // Offset based on the postive epoch time for Washington's birthday to ensure positive scores.
-                        // (February 22, 1732)
-                        long washington_bd_offset = 7506086400000L;
-                        // Get the current time in milliseconds, include the washington_bd_offset to work with positive epoch times.
-                        long current_time = new Date().getTime() + washington_bd_offset;
-
-                        // Convert the 'sort_field' value to epoch milliseconds, adjusting by the same offset.
-                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli() + washington_bd_offset;
-
-                        // If the order is 'desc', return the 'date_filed_time' as the score
-                        if (params.order.equals('desc')) {{
-                            return date_filed_time;
-                        }} else {{
-                            // Otherwise, calculate the difference between current time and 'date_filed_time'
-                            // in order to boost older documents if the order is asc.
-                            long diff = current_time - date_filed_time;
-
-                            // Return the difference if it's non-negative, otherwise return 1
-                            return diff >= 0 ? diff : 1;
-                        }}
-                    }}
-                    """,
-                    # Parameters passed to the script
-                    "params": {"order": order},
-                },
-            },
-            # Replace the original score with the one computed by the script
-            boost_mode="replace",
-        )
 
     if highlighting_fields is None:
         highlighting_fields = {}
@@ -709,15 +709,128 @@ def build_has_child_query(
             # The original field is excluded from the response to avoid
             # returning the entire field from the index.
             fields_to_exclude.append(field)
+            if not child_highlighting:
+                # If highlighting is not enabled in child documents, return
+                # only the fields to exclude.
+                continue
+
         highlight_options["fields"][field] = {
             "type": settings.ES_HIGHLIGHTER,
             "matched_fields": [field, f"{field}.exact"],
             "fragment_size": fragment_size,
             "no_match_size": no_match_size,
             "number_of_fragments": number_of_fragments,
-            "pre_tags": ["<mark>"],
-            "post_tags": ["</mark>"],
+            "pre_tags": [f"<{hl_tag}>"],
+            "post_tags": [f"</{hl_tag}>"],
         }
+
+    return highlight_options, fields_to_exclude
+
+
+def build_custom_function_score_for_date(
+    query: QueryString | str, order_by: tuple[str, str], default_score: int
+) -> QueryString:
+    """Build a custom function score query for sorting based on a date field.
+
+    Define the function score for sorting, based on the child sort_field. When
+    the order is 'entry_date_filed desc', the 'date_filed_time' value, adjusted
+    by washington_bd_offset, is used as the score, sorting newer documents
+    first. In 'asc' order, the score is the difference between 'current_time'
+    (also adjusted by the washington_bd_offset) and 'date_filed_time',
+    prioritizing older documents. If a document does not have a 'date_filed'
+    set, the function returns 1. This ensures that dockets containing documents
+    without a 'date_filed' are displayed before dockets without filings, which
+    have a default score of 0. washington_bd_offset is based on George
+    Washington's birthday (February 22, 1732), ensuring all epoch millisecond
+    values are positive and compatible with ES scoring system. This approach
+    allows for handling dates in our system both before and after January 1, 1970 (epoch time),
+    within a positive scoring range.
+
+    :param query: The Elasticsearch query string or QueryString object.
+    :param order_by: If provided the field to use to compute score for sorting
+    results based on a child document field.
+    :param default_score: The default score to return when the document lacks
+    the sort field.
+    :return: The modified QueryString object with applied function score.
+    """
+
+    sort_field, order = order_by
+    query = Q(
+        "function_score",
+        query=query,
+        script_score={
+            "script": {
+                "source": f"""
+                    // Check if the document has a value for the 'sort_field'
+                    if (doc['{sort_field}'].size() == 0) {{
+                        return {default_score};  // If not, return 'default_score' as the score
+                    }} else {{
+                        // Offset based on the positive epoch time for Washington's birthday to ensure positive scores.
+                        // (February 22, 1732)
+                        long washington_bd_offset = 7506086400000L;
+                        // Get the current time in milliseconds, include the washington_bd_offset to work with positive epoch times.
+                        long current_time = new Date().getTime() + washington_bd_offset;
+
+                        // Convert the 'sort_field' value to epoch milliseconds, adjusting by the same offset.
+                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli() + washington_bd_offset;
+
+                        // If the order is 'desc', return the 'date_filed_time' as the score
+                        if (params.order.equals('desc')) {{
+                            return date_filed_time;
+                        }} else {{
+                            // Otherwise, calculate the difference between current time and 'date_filed_time'
+                            // in order to boost older documents if the order is asc.
+                            long diff = current_time - date_filed_time;
+
+                            // Return the difference if it's non-negative, otherwise return 'default_score'
+                            return diff >= 0 ? diff : {default_score};
+                        }}
+                    }}
+                        """,
+                # Parameters passed to the script
+                "params": {"order": order, "default_score": default_score},
+            },
+        },
+        # Replace the original score with the one computed by the script
+        boost_mode="replace",
+    )
+
+    return query
+
+
+def build_has_child_query(
+    query: QueryString | str,
+    child_type: str,
+    child_hits_limit: int,
+    highlighting_fields: dict[str, int] | None = None,
+    order_by: tuple[str, str] | None = None,
+    child_highlighting: bool = True,
+    api_version: Literal["v3", "v4"] | None = None,
+) -> QueryString:
+    """Build a 'has_child' query.
+
+    :param query: The Elasticsearch query string or QueryString object.
+    :param child_type: The type of the child document.
+    :param child_hits_limit: The maximum number of child hits to be returned.
+    :param highlighting_fields: List of fields to highlight in child docs.
+    :param order_by: If provided the field to use to compute score for sorting
+    results based on a child document field.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :param api_version: Optional, the request API version.
+    :return: The 'has_child' query.
+    """
+
+    if order_by and all(order_by) and child_type == "recap_document":
+        if api_version == "v4":
+            query = nullify_query_score(query)
+        else:
+            query = build_custom_function_score_for_date(
+                query, order_by, default_score=1
+            )
+
+    highlight_options, fields_to_exclude = build_highlights_dict(
+        highlighting_fields, SEARCH_HL_TAG, child_highlighting
+    )
 
     inner_hits = {
         "name": f"filter_query_inner_{child_type}",
@@ -726,7 +839,7 @@ def build_has_child_query(
             "excludes": fields_to_exclude,
         },
     }
-    if highlight_options:
+    if highlight_options and child_highlighting:
         inner_hits["highlight"] = highlight_options
 
     return Q(
@@ -743,6 +856,7 @@ def get_search_query(
     search_query: Search,
     filters: list,
     string_query: QueryString,
+    api_version: Literal["v3", "v4"] | None = None,
 ) -> Search:
     """Get the appropriate search query based on the given parameters.
 
@@ -750,6 +864,7 @@ def get_search_query(
     :param search_query: Elasticsearch DSL Search object
     :param filters: A list of filter objects to be applied.
     :param string_query: An Elasticsearch QueryString object.
+    :param api_version: Optional, the request API version.
     :return: The modified Search object based on the given conditions.
     """
     if not any([filters, string_query]):
@@ -765,10 +880,11 @@ def get_search_query(
                     "recap_document",
                     query_hits_limit,
                     SEARCH_RECAP_CHILD_HL_FIELDS,
-                    get_child_sorting_key(cd),
+                    get_child_sorting_key(cd, api_version),
+                    api_version=api_version,
                 )
-                match_all_parent_query = nullify_parent_score_on_child_sorting(
-                    cd, Q("match", docket_child="docket")
+                match_all_parent_query = apply_custom_score_to_parent_query(
+                    cd, Q("match", docket_child="docket"), api_version
                 )
                 return search_query.query(
                     Q(
@@ -785,7 +901,7 @@ def get_search_query(
                         score_mode="max",
                         query=Q("match_all"),
                         inner_hits={
-                            "name": f"text_query_inner_opinion",
+                            "name": "text_query_inner_opinion",
                             "size": 10,
                         },
                     ),
@@ -807,13 +923,18 @@ def get_search_query(
 
 
 def build_es_base_query(
-    search_query: Search, cd: CleanData
+    search_query: Search,
+    cd: CleanData,
+    child_highlighting: bool = True,
+    api_version: Literal["v3", "v4"] | None = None,
 ) -> tuple[Search, QueryString | None]:
     """Builds filters and fulltext_query based on the given cleaned
      data and returns an elasticsearch query.
 
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :param api_version: Optional, the request API version.
     :return: A two-tuple, the Elasticsearch search query object and an ES
     QueryString for child documents, or None if there is no need to query
     child documents.
@@ -868,7 +989,11 @@ def build_es_base_query(
                 parent_query_fields,
                 cd.get("q", ""),
             )
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
             child_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
             child_fields.extend(
                 add_fields_boosting(
@@ -893,7 +1018,11 @@ def build_es_base_query(
                 )
             )
             string_query, join_query = build_full_join_es_queries(
-                cd, child_query_fields, parent_query_fields
+                cd,
+                child_query_fields,
+                parent_query_fields,
+                child_highlighting=child_highlighting,
+                api_version=api_version,
             )
         case SEARCH_TYPES.OPINION:
             str_query = cd.get("q", "")
@@ -927,10 +1056,15 @@ def build_es_base_query(
                 )
             )
             string_query, join_query = build_full_join_es_queries(
-                cd, child_query_fields, parent_query_fields, mlt_query
+                cd,
+                child_query_fields,
+                parent_query_fields,
+                mlt_query,
             )
 
-    search_query = get_search_query(cd, search_query, filters, string_query)
+    search_query = get_search_query(
+        cd, search_query, filters, string_query, api_version
+    )
     return search_query, join_query
 
 
@@ -1244,6 +1378,7 @@ def set_results_highlights(results: Page | Response, search_type: str) -> None:
             # Merge child document highlights
             if not hasattr(result, "child_docs"):
                 continue
+
             for child_doc in result.child_docs:
                 if hasattr(child_doc, "highlight"):
                     highlights = child_doc.highlight.to_dict()
@@ -1413,9 +1548,10 @@ def fill_position_mapping(
 
 
 def merge_unavailable_fields_on_parent_document(
-    results: Page | dict,
+    results: Page | dict | Response,
     search_type: str,
     request_type: Literal["frontend", "api"] = "frontend",
+    highlight: bool = True,
 ) -> None:
     """Merges unavailable fields on parent document from the database into
     search results, not all fields are required in frontend, so that fields are
@@ -1424,35 +1560,73 @@ def merge_unavailable_fields_on_parent_document(
     :param results: A Page object containing the search results to be modified.
     :param search_type: The search type to perform.
     :param request_type: The request type, frontend or api.
+    :param highlight: Whether highlighting is enabled.
     :return: None, the function modifies the search results object in place.
     """
 
-    if search_type != SEARCH_TYPES.PEOPLE:
-        return
+    match search_type:
+        case SEARCH_TYPES.PEOPLE:
+            # Merge positions courts.
+            person_ids = [d["id"] for d in results]
+            positions_in_page = Position.objects.filter(
+                person_id__in=person_ids
+            ).select_related(
+                "person",
+                "court",
+                "appointer",
+                "appointer__person",
+                "supervisor",
+                "predecessor",
+            )
+            position_db_mapping = fill_position_mapping(
+                positions_in_page, request_type
+            )
 
-    # Merge positions courts.
-    person_ids = [d["id"] for d in results]
-    positions_in_page = Position.objects.filter(
-        person_id__in=person_ids
-    ).select_related(
-        "person",
-        "court",
-        "appointer",
-        "appointer__person",
-        "supervisor",
-        "predecessor",
-    )
-    position_db_mapping = fill_position_mapping(
-        positions_in_page, request_type
-    )
+            for result in results:
+                person_id = result["id"]
+                for field in fields(position_db_mapping):
+                    position_dict = getattr(position_db_mapping, field.name)
+                    value = position_dict.get(person_id)
+                    cleaned_name = re.sub("_dict", "", field.name)
+                    result[cleaned_name] = value
+        case (
+            SEARCH_TYPES.RECAP | SEARCH_TYPES.RECAP_DOCUMENT
+        ) if request_type == "api" and not highlight:
+            # Retrieves the plain_text from the DB to fill the snippet when
+            # highlighting is disabled.
 
-    for result in results:
-        person_id = result["id"]
-        for field in fields(position_db_mapping):
-            position_dict = getattr(position_db_mapping, field.name)
-            value = position_dict.get(person_id)
-            cleaned_name = re.sub("_dict", "", field.name)
-            result[cleaned_name] = value
+            if search_type == SEARCH_TYPES.RECAP:
+                rd_ids = {
+                    doc["_source"]["id"]
+                    for entry in results
+                    for doc in entry["child_docs"]
+                }
+            else:
+                rd_ids = {entry["id"] for entry in results}
+
+            recap_docs = (
+                RECAPDocument.objects.filter(pk__in=rd_ids)
+                .annotate(
+                    plain_text_short=Substr(
+                        "plain_text", 1, settings.NO_MATCH_HL_SIZE
+                    )
+                )
+                .values("id", "plain_text_short")
+            )
+            recap_docs_dict = {
+                doc["id"]: doc["plain_text_short"] for doc in recap_docs
+            }
+            for result in results:
+                if search_type == SEARCH_TYPES.RECAP:
+                    for rd in result["child_docs"]:
+                        rd["_source"]["plain_text"] = recap_docs_dict[
+                            rd["_source"]["id"]
+                        ]
+                else:
+                    result["plain_text"] = recap_docs_dict[result["id"]]
+
+        case _:
+            return
 
 
 def clean_count_query(search_query: Search) -> SearchDSL:
@@ -1662,7 +1836,11 @@ def build_has_child_filters(
             if appointer:
                 queries_list.extend(build_text_filter("appointer", appointer))
 
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    ]:
         if child_type == "recap_document":
             available_only = cd.get("available_only", "")
             description = cd.get("description", "")
@@ -1733,7 +1911,11 @@ def build_join_es_filters(cd: CleanData) -> List:
         # Build position has child filter:
         queries_list.extend(build_has_child_filters("position", cd))
 
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+    if cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    ]:
         queries_list.extend(
             [
                 *build_term_query(
@@ -1804,6 +1986,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                     "judge",
                     cd.get("judge", ""),
                 ),
+                *build_term_query("id", cd.get("id", "").split()),
             ]
         )
 
@@ -1905,38 +2088,70 @@ def do_es_feed_query(
     return response
 
 
-def nullify_parent_score_on_child_sorting(
-    cd: CleanData, query: Query
-) -> Query:
-    """Nullify the parent score in child document sorting.
+def nullify_query_score(query: Query) -> Query:
+    """Nullify the scoring of a query.
+    This function modifies the scoring of the given query to always return zero,
+    which is useful for prioritizing a score set upstream or downstream.
 
-    It applies a function score to the parent query to nullify the parent score
-    (sets it to 0) to prioritize child documents sorting criteria.
-    This will ensure that dockets without documents come last on results.
+    :param query: The ES Query object to be modified.
+    :return: The modified Query object with a script score that always
+    returns zero.
+    """
+
+    query = Q(
+        "function_score",
+        query=query,
+        script_score={
+            "script": {
+                "source": """ return 0; """,
+            },
+        },
+        # Replace the original score with the one computed by the script
+        boost_mode="replace",
+    )
+    return query
+
+
+def apply_custom_score_to_parent_query(
+    cd: CleanData, query: Query, api_version: Literal["v3", "v4"] | None = None
+) -> Query:
+    """Apply a custom function score to a main document.
 
     :param cd: The query CleanedData
     :param query: The ES Query object to be modified.
+    :param api_version: Optional, the request API version.
     :return: The function_score query contains the base query, applied when
     child_order is used.
     """
-    child_order_by = get_child_sorting_key(cd)
-    if (
-        child_order_by
-        and all(child_order_by)
-        and cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
-    ):
-        query = Q(
-            "function_score",
-            query=query,
-            script_score={
-                "script": {
-                    "source": f""" return 0; """,
-                },
-            },
-            # Replace the original score with the one computed by the script
-            boost_mode="replace",
-        )
-
+    child_order_by = get_child_sorting_key(cd, api_version)
+    valid_child_order_by = child_order_by and all(child_order_by)
+    match cd["type"]:
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if valid_child_order_by:
+            sort_field, order = child_order_by
+            if sort_field == "entry_date_filed":
+                # It applies a function score to the parent query to nullify
+                # the parent score (sets it to 0) to prioritize child documents
+                # sorting criteria. This will ensure that dockets without
+                # documents come last on results.
+                query = nullify_query_score(query)
+            elif sort_field == "dateFiled" and api_version:
+                # Applies a custom function score to sort Dockets based on
+                # their dateFiled field. This serves as a workaround to enable
+                # the use of the  search_after cursor for pagination on
+                # documents with a None dateFiled.
+                query = build_custom_function_score_for_date(
+                    query, child_order_by, default_score=0
+                )
+        case SEARCH_TYPES.RECAP_DOCUMENT if valid_child_order_by:
+            sort_field, order = child_order_by
+            if sort_field in ["dateFiled", "entry_date_filed"] and api_version:
+                # Applies a custom function score to sort RECAPDocuments based
+                # on their docket dateFiled or entry_date_filed field. This
+                # serves as a workaround to enable the use of the  search_after
+                # cursor for pagination on documents with a None dateFiled.
+                query = build_custom_function_score_for_date(
+                    query, child_order_by, default_score=0
+                )
     return query
 
 
@@ -1945,6 +2160,8 @@ def build_full_join_es_queries(
     child_query_fields: dict[str, list[str]],
     parent_query_fields: list[str],
     mlt_query: Query | None = None,
+    child_highlighting: bool = True,
+    api_version: Literal["v3", "v4"] | None = None,
 ) -> tuple[QueryString | list, QueryString | None]:
     """Build a complete Elasticsearch query with both parent and child document
       conditions.
@@ -1953,12 +2170,18 @@ def build_full_join_es_queries(
     :param child_query_fields: A dictionary mapping child fields document type.
     :param parent_query_fields: A list of fields for the parent document.
     :param mlt_query: the More Like This Query object.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :param api_version: Optional, the request API version.
     :return: An Elasticsearch QueryString object.
     """
 
     q_should = []
     match cd["type"]:
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
             child_type = "recap_document"
         case SEARCH_TYPES.OPINION:
             child_type = "opinion"
@@ -1967,6 +2190,7 @@ def build_full_join_es_queries(
     if cd["type"] in [
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
         SEARCH_TYPES.OPINION,
     ]:
         # Build child filters.
@@ -2039,16 +2263,22 @@ def build_full_join_es_queries(
         has_child_query = None
         if child_text_query or child_filters:
             hl_fields = (
-                SEARCH_OPINION_CHILD_HL_FIELDS
-                if cd["type"] == SEARCH_TYPES.OPINION
-                else SEARCH_RECAP_CHILD_HL_FIELDS
+                (
+                    SEARCH_OPINION_CHILD_HL_FIELDS
+                    if cd["type"] == SEARCH_TYPES.OPINION
+                    else SEARCH_RECAP_CHILD_HL_FIELDS
+                )
+                if child_highlighting
+                else SEARCH_RECAP_CHILD_EXCLUDE_FIELDS
             )
             has_child_query = build_has_child_query(
                 join_query,
                 child_type,
                 query_hits_limit,
                 hl_fields,
-                get_child_sorting_key(cd),
+                get_child_sorting_key(cd, api_version),
+                child_highlighting=child_highlighting,
+                api_version=api_version,
             )
 
         if parties_filters and not has_child_query:
@@ -2061,7 +2291,8 @@ def build_full_join_es_queries(
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
-                get_child_sorting_key(cd),
+                get_child_sorting_key(cd, api_version),
+                api_version=api_version,
             )
 
         if has_child_query:
@@ -2114,8 +2345,8 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
         if parent_query:
-            parent_query = nullify_parent_score_on_child_sorting(
-                cd, parent_query
+            parent_query = apply_custom_score_to_parent_query(
+                cd, parent_query, api_version
             )
             q_should.append(parent_query)
 
@@ -2148,7 +2379,11 @@ def limit_inner_hits(
     match search_type:
         case SEARCH_TYPES.OPINION:
             child_type = "opinion"
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
             child_type = "recap_document"
         case _:
             return
@@ -2411,3 +2646,136 @@ def fetch_all_search_results(
             else:
                 search_after = response.hits[-1].meta.sort
     return all_search_hits
+
+
+def do_es_api_query(
+    search_query: Search,
+    cd: CleanData,
+    highlighting_fields: dict[str, int],
+    hl_tag: str,
+    api_version: Literal["v3", "v4"],
+) -> tuple[Search, Query | None]:
+    """Build an ES query for its use in the Search API and Webhooks.
+
+    :param search_query: Elasticsearch DSL Search object.
+    :param cd: The query CleanedData
+    :param highlighting_fields: A dictionary mapping field names to fragment
+    sizes for highlighting.
+    :param hl_tag: The HTML tag to use for highlighting matched fragments.
+    :param api_version: The request API version.
+    :return: A two-tuple, the Elasticsearch search query object and an ES
+    Query for child documents, or None if there is no need to query
+    child documents.
+    """
+
+    child_docs_query = None
+    s, join_query = build_es_base_query(
+        search_query, cd, cd["highlight"], api_version
+    )
+    extra_options: dict[str, dict[str, Any]] = {}
+    if api_version == "v3":
+        # Build query parameters for the ES V3 Search API endpoints.
+        # V3 endpoints display child documents. Here, the child documents query
+        # is retrieved, and extra parameters like highlighting, field exclusion,
+        # and sorting are set.
+        s = build_child_docs_query(
+            join_query,
+            cd=cd,
+        )
+        main_query = search_query.query(s)
+        highlight_options, fields_to_exclude = build_highlights_dict(
+            highlighting_fields, hl_tag
+        )
+        main_query = main_query.source(excludes=fields_to_exclude)
+        extra_options["highlight"] = highlight_options
+        if cd["type"] == SEARCH_TYPES.OPINION:
+            extra_options.update(
+                {
+                    "collapse": {
+                        "field": "cluster_id",
+                    }
+                }
+            )
+        main_query = main_query.extra(**extra_options)
+        main_query = main_query.sort(
+            build_sort_results(cd, api_version=api_version)
+        )
+    else:
+        child_docs_query = build_child_docs_query(
+            join_query,
+            cd=cd,
+        )
+        # Build query params for the ES V4 Search API endpoints.
+        if cd["type"] == SEARCH_TYPES.RECAP_DOCUMENT:
+            # The RECAP_DOCUMENT search type returns only child documents.
+            # Here, the child documents query is retrieved, highlighting and
+            # field exclusion are set.
+
+            s = apply_custom_score_to_parent_query(
+                cd, child_docs_query, api_version
+            )
+            main_query = search_query.query(s)
+            highlight_options, fields_to_exclude = build_highlights_dict(
+                SEARCH_RECAP_CHILD_HL_FIELDS, hl_tag
+            )
+            main_query = main_query.source(excludes=fields_to_exclude)
+            if cd["highlight"]:
+                extra_options["highlight"] = highlight_options
+                main_query = main_query.extra(**extra_options)
+        else:
+            # DOCKETS and RECAP search types. Use the same query parameters as
+            # in the frontend. Only switch highlighting according to the user
+            # request.
+            main_query = add_es_highlighting(s, cd) if cd["highlight"] else s
+    return main_query, child_docs_query
+
+
+def build_cardinality_count(
+    base_query: Search, query: Query, unique_field: str
+) -> Search:
+    """Build an Elasticsearch cardinality aggregation.
+    This aggregation estimates the count of unique documents based on the
+    specified unique field. The precision_threshold, set by
+    ELASTICSEARCH_CARDINALITY_PRECISION, determines the point at which the
+    count begins to trade accuracy for performance.
+
+    :param base_query: The Elasticsearch DSL Search object.
+    :param query: The ES Query object to perform the count query.
+    :param unique_field: The field name on which the cardinality aggregation
+    will be based to estimate uniqueness.
+
+    :return: The ES cardinality aggregation query.
+    """
+
+    search_query = base_query.query(query)
+    search_query.aggs.bucket(
+        "unique_documents",
+        "cardinality",
+        field=unique_field,
+        precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
+    )
+    return search_query.extra(size=0, track_total_hits=True)
+
+
+def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
+    """Execute an Elasticsearch count query for queries that uses collapse.
+    Uses a query with aggregation to determine the number of unique opinions
+    based on the 'cluster_id' field.
+
+    :param main_query: The Elasticsearch DSL Search object.
+    :param query: The ES Query object to perform the count query.
+    :return: The results count.
+    """
+
+    search_query = build_cardinality_count(main_query, query, "cluster_id")
+    try:
+        total_results = (
+            search_query.execute().aggregations.unique_documents.value
+        )
+    except (TransportError, ConnectionError, RequestError) as e:
+        logger.warning(
+            f"Error on count query request: {search_query.to_dict()}"
+        )
+        logger.warning(f"Error was: {e}")
+        total_results = None
+    return total_results
