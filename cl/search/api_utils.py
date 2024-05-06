@@ -297,6 +297,12 @@ class CursorESList:
     well as the pagination logic for cursor-based pagination.
     """
 
+    cardinality_query = {
+        SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
+        SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
+        SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
+    }
+
     def __init__(
         self,
         main_query,
@@ -312,21 +318,16 @@ class CursorESList:
         self.search_after = search_after
         self.clean_data = clean_data
         self.version = version
-        self._item_cache = []
-        self.results = None
-        self.reverse = None
         self.cursor = None
-        self.cardinality_query = {
-            SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
-            SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
-            SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
-        }
+        self.results = None
+        self.reverse = False
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
 
         self.cursor = cursor
         if self.cursor is not None:
-            (self.search_after, self.reverse, _) = self.cursor
+            self.reverse = self.cursor.reverse
+            self.search_after = self.cursor.search_after
 
         # Return one extra document beyond the page size, so we're able to
         # determine if there are more documents and decide whether to display a
@@ -460,9 +461,8 @@ class CursorESList:
         """
 
         # Toggle the original sorting key to handle backward pagination
-        toggle_sort = True if self.reverse else False
         default_sorting = build_sort_results(
-            self.clean_data, toggle_sort, "v4"
+            self.clean_data, self.reverse, "v4"
         )
         default_unique_order = {
             "type": self.clean_data["type"],
@@ -486,7 +486,7 @@ class CursorESList:
                 )
 
         unique_sorting = build_sort_results(
-            default_unique_order, toggle_sort, "v4"
+            default_unique_order, self.reverse, "v4"
         )
         return default_sorting, unique_sorting
 
@@ -509,7 +509,7 @@ class ESResultObject(ResultObject):
 
 
 def limit_api_results_to_page(
-    results: Response | AttrList, cursor: ESCursor
+    results: Response | AttrList, cursor: ESCursor | None
 ) -> Response | AttrList:
     """In ES Cursor pagination, an additional document is returned in each
     query response to determine whether to display the next page or previous
@@ -524,12 +524,11 @@ def limit_api_results_to_page(
     specified by the SEARCH_API_PAGE_SIZE.
     """
 
-    reverse = False
-    if cursor is not None:
-        search_after, reverse, _ = cursor
+    reverse = cursor.reverse if cursor else False
     if reverse:
         # Limit results in page starting from the last item.
         return results[-settings.SEARCH_API_PAGE_SIZE :]
-    else:
-        # Limit results in page starting from the first item.
-        return results[: settings.SEARCH_API_PAGE_SIZE]
+
+    # First page or going forward, limit results on the page starting from the
+    # first item.
+    return results[: settings.SEARCH_API_PAGE_SIZE]
