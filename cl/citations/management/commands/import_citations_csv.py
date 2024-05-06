@@ -9,6 +9,7 @@ How to run the command:
 manage.py import_citations_csv --csv /opt/courtlistener/cl/assets/media/wl_citations_1.csv
 
 """
+
 import os.path
 from typing import Optional
 
