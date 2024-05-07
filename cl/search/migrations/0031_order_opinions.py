@@ -7,7 +7,7 @@ import pgtrigger.migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("search", "0026_drop_docket_unique_together_and_more"),
+        ("search", "0030_recapdocument_pacer_doc_id_idx"),
     ]
 
     operations = [
