@@ -1,5 +1,7 @@
 import datetime
 import json
+import unittest
+from functools import wraps
 from typing import Sized, cast
 
 import scorched
@@ -7,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
+from django.utils import timezone
 from lxml import etree
 from requests import Session
 
@@ -25,6 +28,8 @@ from cl.people_db.factories import (
     SchoolFactory,
 )
 from cl.people_db.models import Person, Race
+from cl.search.docket_sources import DocketSources
+from cl.search.documents import DocketDocument
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -36,7 +41,9 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
+    Citation,
     Court,
+    Docket,
     Opinion,
     OpinionsCitedByRECAPDocument,
     RECAPDocument,
@@ -44,6 +51,303 @@ from cl.search.models import (
 from cl.search.tasks import add_items_to_solr
 from cl.tests.cases import SimpleTestCase, TestCase
 from cl.users.factories import UserProfileWithParentsFactory
+
+
+def midnight_pt_test(d: datetime.date) -> datetime.datetime:
+    """Cast a naive date object to midnight Pacific Time, either PST or PDT,
+    according to the date. This method also considers historical timezone
+    offsets, similar to how they are handled in DRF.
+    """
+    time_zone = timezone.get_current_timezone()
+    d = datetime.datetime.combine(d, datetime.time())
+    return timezone.make_aware(d, time_zone)
+
+
+opinion_search_api_keys = {
+    "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
+    "attorney": lambda x: x["result"].cluster.attorneys,
+    "author_id": lambda x: x["result"].author_id,
+    "caseName": lambda x: x["result"].cluster.case_name,
+    "citation": lambda x: [
+        str(cite) for cite in x["result"].cluster.citations.all()
+    ],
+    "citeCount": lambda x: x["result"].cluster.citation_count,
+    "cites": lambda x: (
+        list(
+            x["result"]
+            .cited_opinions.all()
+            .values_list("cited_opinion_id", flat=True)
+        )
+        if x["result"]
+        .cited_opinions.all()
+        .values_list("cited_opinion_id", flat=True)
+        else None
+    ),
+    "court": lambda x: x["result"].cluster.docket.court.full_name,
+    "court_citation_string": lambda x: x[
+        "result"
+    ].cluster.docket.court.citation_string,
+    "court_exact": lambda x: x["result"].cluster.docket.court_id,
+    "court_id": lambda x: x["result"].cluster.docket.court_id,
+    "cluster_id": lambda x: x["result"].cluster_id,
+    "dateArgued": lambda x: (
+        midnight_pt_test(x["result"].cluster.docket.date_argued).isoformat()
+        if x["result"].cluster.docket.date_argued
+        else None
+    ),
+    "dateFiled": lambda x: (
+        midnight_pt_test(x["result"].cluster.date_filed).isoformat()
+        if x["result"].cluster.date_filed
+        else None
+    ),
+    "dateReargued": lambda x: (
+        midnight_pt_test(x["result"].cluster.docket.date_reargued).isoformat()
+        if x["result"].cluster.docket.date_reargued
+        else None
+    ),
+    "dateReargumentDenied": lambda x: (
+        midnight_pt_test(
+            x["result"].cluster.docket.date_reargument_denied
+        ).isoformat()
+        if x["result"].cluster.docket.date_reargument_denied
+        else None
+    ),
+    "docketNumber": lambda x: x["result"].cluster.docket.docket_number,
+    "docket_id": lambda x: x["result"].cluster.docket_id,
+    "download_url": lambda x: x["result"].download_url,
+    "id": lambda x: x["result"].pk,
+    "joined_by_ids": lambda x: (
+        list(x["result"].joined_by.all().values_list("id", flat=True))
+        if x["result"].joined_by.all()
+        else None
+    ),
+    "panel_ids": lambda x: (
+        list(x["result"].cluster.panel.all().values_list("id", flat=True))
+        if x["result"].cluster.panel.all()
+        else None
+    ),
+    "type": lambda x: x["result"].type,
+    "judge": lambda x: x["result"].cluster.judges,
+    "lexisCite": lambda x: (
+        str(x["result"].cluster.citations.filter(type=Citation.LEXIS)[0])
+        if x["result"].cluster.citations.filter(type=Citation.LEXIS)
+        else ""
+    ),
+    "neutralCite": lambda x: (
+        str(x["result"].cluster.citations.filter(type=Citation.NEUTRAL)[0])
+        if x["result"].cluster.citations.filter(type=Citation.NEUTRAL)
+        else ""
+    ),
+    "local_path": lambda x: (
+        x["result"].local_path if x["result"].local_path else None
+    ),
+    "per_curiam": lambda x: x["result"].per_curiam,
+    "scdb_id": lambda x: x["result"].cluster.scdb_id,
+    "sibling_ids": lambda x: list(
+        x["result"].cluster.sub_opinions.all().values_list("id", flat=True)
+    ),
+    "status": lambda x: x["result"].cluster.get_precedential_status_display(),
+    "snippet": lambda x: x["snippet"],
+    "suitNature": lambda x: x["result"].cluster.nature_of_suit,
+    "date_created": lambda x: timezone.localtime(
+        x["result"].cluster.date_created
+    ).isoformat(),
+    "timestamp": lambda x: timezone.localtime(
+        x["result"].cluster.date_created
+    ).isoformat(),
+}
+
+
+docket_v4_api_keys_base = {
+    "assignedTo": lambda x: (
+        x["assignedTo"]
+        if x.get("assignedTo")
+        else (
+            x["result"].docket_entry.docket.assigned_to.name_full
+            if x["result"].docket_entry.docket.assigned_to
+            else None
+        )
+    ),
+    "assigned_to_id": lambda x: (
+        x["result"].docket_entry.docket.assigned_to.pk
+        if x["result"].docket_entry.docket.assigned_to
+        else None
+    ),
+    "attorney": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "attorney"
+        ]
+    ),
+    "attorney_id": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "attorney_id"
+        ]
+    ),
+    "caseName": lambda x: (
+        x["caseName"]
+        if x.get("caseName")
+        else x["result"].docket_entry.docket.case_name
+    ),
+    "case_name_full": lambda x: x["result"].docket_entry.docket.case_name_full,
+    "cause": lambda x: (
+        x["cause"] if x.get("cause") else x["result"].docket_entry.docket.cause
+    ),
+    "chapter": lambda x: (
+        x["result"].docket_entry.docket.bankruptcy_information.chapter
+        if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
+        else None
+    ),
+    "court": lambda x: x["result"].docket_entry.docket.court.full_name,
+    "court_citation_string": lambda x: (
+        x["court_citation_string"]
+        if x.get("court_citation_string")
+        else x["result"].docket_entry.docket.court.citation_string
+    ),
+    "court_exact": lambda x: x["result"].docket_entry.docket.court.pk,
+    "court_id": lambda x: x["result"].docket_entry.docket.court.pk,
+    "dateArgued": lambda x: (
+        x["result"].docket_entry.docket.date_argued.isoformat()
+        if x["result"].docket_entry.docket.date_argued
+        else None
+    ),
+    "dateFiled": lambda x: (
+        x["result"].docket_entry.docket.date_filed.isoformat()
+        if x["result"].docket_entry.docket.date_filed
+        else None
+    ),
+    "dateTerminated": lambda x: (
+        x["result"].docket_entry.docket.date_terminated.isoformat()
+        if x["result"].docket_entry.docket.date_terminated
+        else None
+    ),
+    "date_created": lambda x: x["result"]
+    .docket_entry.docket.date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "docketNumber": lambda x: (
+        x["docketNumber"]
+        if x.get("docketNumber")
+        else x["result"].docket_entry.docket.docket_number
+    ),
+    "docket_absolute_url": lambda x: x[
+        "result"
+    ].docket_entry.docket.get_absolute_url(),
+    "docket_id": lambda x: x["result"].docket_entry.docket_id,
+    "firm": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "firm"
+        ]
+    ),
+    "firm_id": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "firm_id"
+        ]
+    ),
+    "jurisdictionType": lambda x: x[
+        "result"
+    ].docket_entry.docket.jurisdiction_type,
+    "juryDemand": lambda x: (
+        x["juryDemand"]
+        if x.get("juryDemand")
+        else x["result"].docket_entry.docket.jury_demand
+    ),
+    "pacer_case_id": lambda x: x["result"].docket_entry.docket.pacer_case_id,
+    "party": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "party"
+        ]
+    ),
+    "party_id": lambda x: list(
+        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+            "party_id"
+        ]
+    ),
+    "referredTo": lambda x: (
+        x["referredTo"]
+        if x.get("referredTo")
+        else (
+            x["result"].docket_entry.docket.referred_to.name_full
+            if x["result"].docket_entry.docket.referred_to
+            else None
+        )
+    ),
+    "referred_to_id": lambda x: (
+        x["result"].docket_entry.docket.referred_to.pk
+        if x["result"].docket_entry.docket.referred_to
+        else None
+    ),
+    "suitNature": lambda x: (
+        x["suitNature"]
+        if x.get("suitNature")
+        else x["result"].docket_entry.docket.nature_of_suit
+    ),
+    "timestamp": lambda x: x["result"]
+    .docket_entry.docket.date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "trustee_str": lambda x: (
+        x["result"].docket_entry.docket.bankruptcy_information.trustee_str
+        if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
+        else None
+    ),
+}
+
+docket_v4_api_keys = docket_v4_api_keys_base.copy()
+docket_v4_api_keys.update(
+    {
+        "more_docs": lambda x: False,
+        "recap_documents": [],  # type: ignore
+    }
+)
+
+recap_document_v4_api_keys = {
+    "id": lambda x: x["result"].pk,
+    "docket_entry_id": lambda x: x["result"].docket_entry.pk,
+    "description": lambda x: (
+        x["description"]
+        if x.get("description")
+        else x["result"].docket_entry.description
+    ),
+    "entry_number": lambda x: x["result"].docket_entry.entry_number,
+    "entry_date_filed": lambda x: (
+        x["result"].docket_entry.date_filed.isoformat()
+        if x["result"].docket_entry.date_filed
+        else None
+    ),
+    "short_description": lambda x: (
+        x["short_description"]
+        if x.get("short_description")
+        else x["result"].description
+    ),
+    "document_type": lambda x: x["result"].get_document_type_display(),
+    "document_number": lambda x: (
+        int(x["result"].document_number)
+        if x["result"].document_number
+        else None
+    ),
+    "pacer_doc_id": lambda x: x["result"].pacer_doc_id or "",
+    "snippet": lambda x: (
+        x["snippet"] if x.get("snippet") else x["result"].plain_text or ""
+    ),
+    "attachment_number": lambda x: x["result"].attachment_number or None,
+    "is_available": lambda x: x["result"].is_available,
+    "page_count": lambda x: x["result"].page_count or None,
+    "filepath_local": lambda x: x["result"].filepath_local.name or None,
+    "absolute_url": lambda x: x["result"].get_absolute_url(),
+    "cites": lambda x: list(
+        x["result"]
+        .cited_opinions.all()
+        .values_list("cited_opinion_id", flat=True)
+    ),
+    "timestamp": lambda x: x["result"]
+    .date_created.isoformat()
+    .replace("+00:00", "Z"),
+}
+
+rd_type_v4_api_keys = recap_document_v4_api_keys.copy()
+rd_type_v4_api_keys.update(
+    {
+        "docket_id": lambda x: x["result"].docket_entry.docket_id,
+    }
+)
 
 
 class CourtTestCase(SimpleTestCase):
@@ -73,8 +377,8 @@ class PeopleTestCase(SimpleTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.w_race = Race.objects.get(race="w")
-        cls.b_race = Race.objects.get(race="b")
+        cls.w_race, _ = Race.objects.get_or_create(race="w")
+        cls.b_race, _ = Race.objects.get_or_create(race="b")
         cls.person_1 = PersonFactory.create(
             gender="m",
             name_first="Bill",
@@ -439,6 +743,10 @@ class RECAPSearchTestCase(SimpleTestCase):
                 assigned_to=cls.judge,
                 referred_to=cls.judge_2,
                 nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="401 Civil",
+                jurisdiction_type="'U.S. Government Defendant",
+                jury_demand="1,000,000",
             ),
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
@@ -507,6 +815,7 @@ class RECAPSearchTestCase(SimpleTestCase):
                 date_argued=datetime.date(2012, 6, 23),
                 assigned_to=cls.judge_3,
                 referred_to=cls.judge_4,
+                source=Docket.COLUMBIA_AND_RECAP,
             ),
             entry_number=3,
             date_filed=datetime.date(2014, 7, 19),
@@ -523,7 +832,7 @@ class RECAPSearchTestCase(SimpleTestCase):
         super().setUpTestData()
 
 
-class SerializeSolrTestMixin(SerializeMixin):
+class SerializeLockFileTestMixin(SerializeMixin):
     lockfile = __file__
 
 
@@ -545,7 +854,7 @@ class SimpleUserDataMixin:
     SOLR_URLS=settings.SOLR_TEST_URLS,
     ELASTICSEARCH_DISABLED=True,
 )
-class EmptySolrTestCase(SerializeSolrTestMixin, TestCase):
+class EmptySolrTestCase(SerializeLockFileTestMixin, TestCase):
     """Sets up an empty Solr index for tests that need to set up data manually.
 
     Other Solr test classes subclass this one, adding additional content or
@@ -819,3 +1128,49 @@ class AudioESTestCase(SimpleTestCase):
             judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
+
+
+def skip_if_common_tests_skipped(method):
+    """Decorator to skip common tests based on the skip_common_tests attribute."""
+
+    @wraps(method)
+    async def wrapper_func(self, *args, **kwargs):
+        if getattr(self, "skip_common_tests", False):
+            raise unittest.SkipTest("Skip common tests within the class.")
+        return await method(self, *args, **kwargs)
+
+    return wrapper_func
+
+
+def generate_docket_target_sources(
+    initial_sources: list[int], incoming_source: int
+) -> dict[str, str]:
+    """Generates a mapping for testing of docket target sources based on
+    initial sources and an incoming source.
+
+    :param initial_sources: A list of integers representing the initial source
+     values.
+    :param incoming_source: An integer representing the incoming source value
+    to be added to each of the initial sources.
+    :return: A dict mapping from initial source names to target source names,
+    based on the sum of the initial source value and the incoming source value.
+    e.g: {"RECAP": "COLUMBIA_AND_RECAP"}
+    """
+    inverse_sources = {
+        value: key
+        for key, value in DocketSources.__dict__.items()
+        if not key.startswith("__") and isinstance(value, int)
+    }
+
+    target_sources = {}
+    for source in initial_sources:
+        target_source = source + incoming_source
+        if incoming_source == Docket.RECAP and source == Docket.DEFAULT:
+            # Exception for  DEFAULT + RECAP source assignation.
+            target_sources[inverse_sources[source]] = "RECAP_AND_SCRAPER"
+        else:
+            target_sources[inverse_sources[source]] = inverse_sources[
+                target_source
+            ]
+
+    return target_sources

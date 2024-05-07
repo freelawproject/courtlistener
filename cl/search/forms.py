@@ -428,6 +428,15 @@ class SearchForm(forms.Form):
     )
     political_affiliation.as_str_types = [SEARCH_TYPES.PEOPLE]
 
+    highlight = forms.BooleanField(
+        label="Whether to enable highlighting in the Search API.",
+        label_suffix="",
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={"class": "external-input form-control left"}
+        ),
+    )
+
     def get_date_field_names(self):
         return {
             f_name.split("_")[0]
@@ -476,7 +485,7 @@ class SearchForm(forms.Form):
             else:
                 initial = False
             new_field = forms.BooleanField(
-                label=status[1],
+                label=status[status_index],
                 required=False,
                 initial=initial,
                 widget=forms.CheckboxInput(attrs=attrs),

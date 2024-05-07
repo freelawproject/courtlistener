@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Financial Disclosures API – CourtListener.com{% endblock %}
+{% block og_title %}Financial Disclosures API – CourtListener.com{% endblock %}
+
+{% block description %}We collected millions of disclosure records from thousands of federal judges. Use these APIs to query and study this immense dataset.{% endblock %}
+{% block og_description %}We collected millions of disclosure records from thousands of federal judges. Use these APIs to query and study this immense dataset.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#apis">Available APIs</a></li>
+      <ul>
+        <li><a href="#disclosure-api">Disclosures</a></li>
+        <li><a href="#investment-api">Investments</a></li>
+        <li><a href="#position-api">Positions</a></li>
+        <li><a href="#agreement-api">Agreements</a></li>
+        <li><a href="#non-investment-api">Non-Investment Income</a></li>
+        <li><a href="#spouse-non-investment-income-api">Spousal Non-Investment Income</a></li>
+        <li><a href="#reimbursement-api">Reimbursements</a></li>
+        <li><a href="#gift-api">Gifts</a></li>
+        <li><a href="#debt-api">Debts</a></li>
+      </ul>
+      <li><a href="#fields">Fields</a></li>
+      <ul>
+        <li><a href="#understanding">Understanding the Fields</a></li>
+        <li><a href="#redactions">Redactions</a></li>
+        <li><a href="#value-codes">Value Codes</a></li>
+        <li><a href="#inferred-values">Inferred Values</a></li>
+      </ul>
+      <li><a href="#examples">API Examples</a></li>
+      <li><a href="#more">Learn More</a>
+      <li><a href="#security">Security</a>
+    </ul>
+  </div>
+</div>
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Financial Disclosures&nbsp;API</h1>
+  <p class="lead v-offset-above-3">Use these APIs to work with financial disclosure records of current and former federal judges.</p>
+  <p>This data was collected from senate records and information requests we sent to the federal judiciary. You can learn more about which disclosures are included and the limitations of these APIs on <a href="{% url "coverage_fds" %}">our coverage page for financial disclosures</a>.
+  </p>
+  <p>Judicial officers and certain judicial employees in the United States are required to file financial disclosure reports by <a href="https://www.law.cornell.edu/uscode/text/5a/compiledact-95-521/title-I">Title I of the Ethics in Government Act of 1978</a>. The Act requires that designated federal officials publicly disclose their personal financial interests to ensure confidence in the integrity of the federal government by demonstrating that they are able to carry out their duties without compromising the public trust.
+  </p>
+  <p>This data is updated in partnership with organizations using it. Please <a href="{% url "contact" %}">get in touch</a> if you would like to work together to process and ingest the latest disclosure records.
+  </p>
+
+  <h2 id="apis">Available APIs</h2>
+  <p>The Ethics in Government Act details the types of information required, and prescribes the general format and procedures for the reports themselves.</p>
+  <p>The APIs described below mirror the Act's language, with APIs corresponding to each required disclosure type.</p>
+  <h3 id="disclosure-api">Disclosures <small>— <code>{% url "financialdisclosure-list" version="v3" %}</code></small></h3>
+  <p>This API contains information about the main document itself and is the link between the other financial disclosure endpoints and the judges in our system.
+  </p>
+  <h3 id="investment-api">Investments <small>— <code>{% url "investment-list" version="v3" %}</code></small></h3>
+  <p>This API lists the source and type of investment income held by a judge, including dividends, rents, interest, capital gains, or income from qualified or excepted trusts.</p>
+  <h3 id="position-api">Positions <small>— <code>{% url "disclosureposition-list" version="v3" %}</code></small></h3>
+  <p>This API lists the positions held as an officer, director, trustee, general partner, proprietor, representative, executor, employee, or consultant of any corporation, company, firm, partnership, trust, or other business enterprise, any nonprofit organization, any labor organization, or any educational or other institution other than the United States.
+  </p>
+  <h3 id="agreement-api">Agreements <small>— <code>{% url "agreement-list" version="v3" %}</code></small></h3>
+  <p>This API lists any agreements or arrangements of the filer in existence at any time during the reporting period.</p>
+  <h3 id="non-investment-api">Non-Investment Income<br><small><code>{% url "noninvestmentincome-list" version="v3" %}</code></small></h3>
+  <p>This API lists the source, type, and the amount or value of earned or other non-investment income aggregating $200 or more from any one source that is received during the reporting period.</p>
+  <h3 id="spouse-non-investment-income-api">Non-Investment Income (Spouse)<br><small><code>{% url "spouseincome-list" version="v3" %}</code></small></h3>
+  <p>This API lists the source and type earned of non-investment income from the spouse of the filer.</p>
+  <h3 id="reimbursement-api">Reimbursements <small>— <code>{% url "reimbursement-list" version="v3" %}</code></small>
+</h3>
+  <p>This API lists the source identity and description (including travel locations, dates, and nature of expenses provided) of any travel-related reimbursements aggregating more than $415 in value that are received by the filer from one source during the reporting period.
+  </p>
+  <h3 id="gift-api">Gifts <small>— <code>{% url "gift-list" version="v3" %}</code></small></h3>
+  <p>This API lists the source, a brief description, and the value of all gifts aggregating more than $415 in value that are received by the filer during the reporting period from any one source.</p>
+  <h3 id="debt-api">Debts <small>— <code>{% url "debt-list" version="v3" %}</code></small></h3>
+  <p>All liabilities specified by that section that are owed during the period beginning on January 1 of the preceding calendar year and ending fewer than 31 days before the date on which the report is filed.</p>
+
+  <h2 id="fields">Fields</h2>
+  <h3 id="understanding">Understanding the Fields</h3>
+  <p>Like most of our APIs, field definitions can be obtained by sending an HTTP <code>OPTIONS</code> request to any of the APIs. For example, this request, piped through <a href="https://github.com/jqlang/jq"><code>jq</code></a>, shows you the fields of the Gifts API:
+  </p>
+  <pre class="pre-scrollable">curl -X OPTIONS "{% get_full_host %}{% url "gift-list" version="v3" %}" \
+    | jq '.actions.POST'
+
+{
+  "resource_uri": {
+    "type": "field",
+    "required": false,
+    "read_only": true,
+    "label": "Resource uri"
+  },
+  "id": {
+    "type": "field",
+    "required": false,
+    "read_only": true,
+    "label": "Id"
+  },
+  "date_created": {
+    "type": "datetime",
+    "required": false,
+    "read_only": true,
+    "label": "Date created",
+    "help_text": "The moment when the item was created."
+  },
+  "date_modified": {
+    "type": "datetime",
+    "required": false,
+    "read_only": true,
+    "label": "Date modified",
+    "help_text": "The last moment when the item was modified. A value in year 1750 indicates the value is unknown"
+  },
+  "source": {
+    "type": "string",
+    "required": false,
+    "read_only": false,
+    "label": "Source",
+    "help_text": "Source of the judicial gift. (ex. Alta Ski Area)."
+  },
+  "description": {
+    "type": "string",
+    "required": false,
+    "read_only": false,
+    "label": "Description",
+    "help_text": "Description of the gift (ex. Season Pass)."
+  },
+  "value": {
+    "type": "string",
+    "required": false,
+    "read_only": false,
+    "label": "Value",
+    "help_text": "Value of the judicial gift, (ex. $1,199.00)"
+  },
+  "redacted": {
+    "type": "boolean",
+    "required": false,
+    "read_only": false,
+    "label": "Redacted",
+    "help_text": "Does the gift row contain redaction(s)?"
+  },
+  "financial_disclosure": {
+    "type": "field",
+    "required": true,
+    "read_only": false,
+    "label": "Financial disclosure",
+    "help_text": "The financial disclosure associated with this gift."
+  }
+}</pre>
+  <p>Note that each field has the following attributes:</p>
+  <ul>
+    <li><strong><code>type</code></strong>: Indicating the object type for the field.</li>
+    <li><strong><code>required</code></strong>: Indicating whether the field can have null values. Note that string fields will be blank instead of null.</li>
+    <li><strong><code>read_only</code></strong>: Indicates whether the field can be updated by users (this does not apply to read-only APIs like the financial disclosure APIs).</li>
+    <li><strong><code>label</code></strong>: This is a human-readable form for the field's name.</li>
+    <li><strong><code>help_text</code></strong>: This explains the meaning of the field.</li>
+  </ul>
+
+  <h3 id="redactions">Redactions</h3>
+  <p>For security reasons, filers can redact information on their disclosure forms. When a line in a disclosure contains a redaction, we will attempt to set the <code>redacted</code> field on that row to <code>True</code>. This is your hint that you may want to investigate that row more carefully.
+  </p>
+  <p>This field can be used as a filter. For example, here are all the investments with redacted information:
+  </p>
+  <pre class="pre-scrollable">curl "{% get_full_host %}{% url "investment-list" version="v3" %}?redacted=True" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
+{
+  "count": 27404,
+  "next": "https://www.courtlistener.com/api/rest/v3/investments/?page=2&redacted=True",
+  "previous": null,
+  "results": [
+    {
+      "resource_uri": "https://www.courtlistener.com/api/rest/v3/investments/5385644/",
+      "id": 5385644,
+      "date_created": "2023-04-17T11:03:22.404170-07:00",
+      "date_modified": "2023-04-17T11:03:22.404185-07:00",
+      "page_number": 4,
+      "description": "Common Stock",
+      "redacted": true,
+      "income_during_reporting_period_code": "G",
+      "income_during_reporting_period_type": "Dividend",
+      "gross_value_code": "P2",
+      "gross_value_method": "T",
+      "transaction_during_reporting_period": "",
+      "transaction_date_raw": "",
+      "transaction_date": null,
+      "transaction_value_code": "",
+      "transaction_gain_code": "",
+      "transaction_partner": "",
+      "has_inferred_values": false,
+      "financial_disclosure": "https://www.courtlistener.com/api/rest/v3/financial-disclosures/34187/"
+    },
+...</pre>
+
+  <h3 id="value-codes">Value Codes</h3>
+  <p>Several APIs, including <code>Investments</code>, <code>Debts</code>,and <code>Gifts</code> use form-based value codes to indicate monetary ranges instead of exact values. For example, the letter "J" indicates a value of $1–15,000.
+  </p>
+  <p>Place an <code>OPTIONS</code> request to these endpoints to learn the values of those fields or look in a PDF filing to see the key.
+  </p>
+  <p>Regrettably, these fields have not been updated by the judiciary in many years, so the highest value code only goes up to $50,000,000. For some judges, this may not be enough to accurately reflect their wealth.
+  </p>
+
+  <h3 id="inferred-values">Inferred Values</h3>
+  <p><code>Investment</code> objects contain the field <code>has_inferred_values</code>. This field indicates that we inferred information about an investment based on the layout of the data in the disclosure form.
+  </p>
+  <p>For example, an investment could have been bought in Q1, while a dividend was paid out in Q2 before being sold in Q4. Often, after the first entry of the investment, later rows in the table are mostly blank. In this instance, we infer the values.
+  </p>
+  <p>The table below gives a brief example where we would infer that the blank cell below the cell for <code>AAPL</code> also refers to <code>AAPL</code>:</p>
+  <table class="table">
+    <tr>
+      <th>Description</th>
+      <th>Date</th>
+      <th>Type</th>
+    </tr>
+    <tr>
+      <td>AAPL</td>
+      <td>2020-01-01</td>
+      <td>Bought</td>
+    </tr>
+    <tr>
+      <td>&mdash;</td>
+      <td>2020-02-01</td>
+      <td>Sold</td>
+    </tr>
+  </table>
+  <p>In this (slightly contrived) example our database would have two rows in the <code>Investment</code> table. The first would be for the purchase of the <code>AAPL</code> stock, and the second would be for the sale of it.
+  </p>
+
+  <h2 id="examples">API Examples</h2>
+  <p>You can query for investments by stock name, transaction dates and even gross values. For example, the following query is for financial disclosures with individual investments valued above $50,000,000.00. Note that this uses a value code as explained in the general notes above:
+  </p>
+  <pre class="pre-scrollable">curl "{% get_full_host %}{% url "investment-list" version="v3" %}?gross_value_code=P4&fields=investments" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
+  <p>Additionally, you could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a href="{% url "view_person" 1213 "ruth-bader-ginsberg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
+  <pre class="pre-scrollable">curl "{% get_full_host %}{% url "financialdisclosure-list" version="v3" %}?person=1213&fields=gifts" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
+  <p>In 2024, we presented these APIs at the NICAR conference and created <a href="https://github.com/freelawproject/talks/tree/main/talks/2024/march/NICAR/cracking_the_courts_panel/examples">many more examples</a> you can explore.</p>
+
+  <h3 id="more">Learn More</h3>
+  <p>The following references may help you learn more about these forms:</p>
+  <ol>
+    <li><a href="https://www.uscourts.gov/sites/default/files/guide-vol02d.pdf">The official policies guiding financial disclosures</a></li>
+    <li><a href="https://free.law/pdf/disclosure-filing-instructions-2021.pdf">The filing instructions given to judges and judicial employees</a></li>
+    <li><a href="https://www.gao.gov/assets/gao-18-406.pdf">A GAO report on disclosures</a></li>
+    <li><a href="https://www.govtrack.us/congress/bills/95/s555">The Ethics in Government Act establishing disclosure rules</a></li>
+  </ol>
+
+  <h3 id="security">Security</h3>
+  <p>Please report any security or privacy concerns to <a href="mailto:security@free.law">security@free.law</a>.</p>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

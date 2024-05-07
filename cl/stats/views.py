@@ -4,7 +4,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 
 from cl.celery_init import fail_task
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.stats.utils import (
     check_postgresql,
     check_redis,
@@ -44,7 +44,7 @@ def replication_status(request: HttpRequest) -> HttpResponse:
 
 def redis_writes(request: HttpRequest) -> HttpResponse:
     """Just return 200 OK if we can write to redis. Else return 500 Error."""
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
 
     # Increment a counter. If it's "high" reset it. No need to do fancy try/
     # except work here to log or display the error. If there's an error, it'll

@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import datetime, timedelta
+from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock, patch
@@ -24,13 +25,6 @@ from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode
 from django.utils.timezone import now
 from django_ses import signals
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_204_NO_CONTENT,
-    HTTP_404_NOT_FOUND,
-    HTTP_500_INTERNAL_SERVER_ERROR,
-)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -46,7 +40,7 @@ from cl.favorites.models import (
     UserTagEvent,
 )
 from cl.lib.email_backends import get_email_count
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.search.factories import DocketFactory
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -103,7 +97,7 @@ class UserTest(LiveServerTestCase):
             r = await self.async_client.get(path)
             self.assertEqual(
                 r.status_code,
-                HTTP_200_OK,
+                HTTPStatus.OK,
                 msg="Got wrong status code for page at: {path}. "
                 "Status Code: {code}".format(path=path, code=r.status_code),
             )
@@ -286,7 +280,7 @@ class ProfileTest(SimpleUserDataMixin, TestCase):
 
         # Now get the API page
         r = await self.async_client.get(reverse("view_api"))
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_deleting_your_account(self) -> None:
         """Can we delete an account properly?"""
@@ -2120,7 +2114,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
             )
             email.send()
 
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         self.assertEqual(int(r.get("test-email-counter:temp_counter")), 3)
         self.assertEqual(r.zcard("test-email-counter:delivery_attempts"), 4)
         email_counter = get_email_count(r)
@@ -2151,7 +2145,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 5)
 
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         email_counter = get_email_count(r)
         self.assertEqual(email_counter, 5)
 
@@ -2195,7 +2189,7 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(len(mail.outbox), 5)
         stored_email = EmailSent.objects.all()
         self.assertEqual(stored_email.count(), 5)
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         email_counter = get_email_count(r)
         self.assertEqual(email_counter, 5)
 
@@ -3121,7 +3115,7 @@ class WebhooksHTMXTests(APITestCase):
         webhooks = Webhook.objects.all()
         response = await self.make_a_webhook(self.client)
         self.assertEqual(await webhooks.acount(), 1)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
         # New or updated webhook notification for admins should go out
         self.assertEqual(len(mail.outbox), 1)
@@ -3138,7 +3132,7 @@ class WebhooksHTMXTests(APITestCase):
         )
         # No webhook should be created since we don't allow HTTP endpoints.
         self.assertEqual(await webhooks.acount(), 0)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
     async def test_list_users_webhooks(self) -> None:
         """Can we list user's own webhooks?"""
@@ -3152,7 +3146,7 @@ class WebhooksHTMXTests(APITestCase):
         )
         # Get the webhooks for user_1
         response = await self.client.get(webhook_path_list)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
     async def test_delete_webhook(self) -> None:
         """Can we delete a webhook?
@@ -3178,7 +3172,7 @@ class WebhooksHTMXTests(APITestCase):
 
         # Delete the webhook for user_1
         response = await self.client.delete(webhook_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
         self.assertEqual(await webhooks.acount(), 1)
 
         webhooks_first = await webhooks.afirst()
@@ -3189,7 +3183,7 @@ class WebhooksHTMXTests(APITestCase):
 
         # user_2 tries to delete a user_1 webhook, it should fail
         response = await self.client_2.delete(webhook_2_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
         self.assertEqual(await webhooks.acount(), 1)
 
     async def test_webhook_detail(self) -> None:
@@ -3209,11 +3203,11 @@ class WebhooksHTMXTests(APITestCase):
 
         # Get the webhook detail for user_1
         response = await self.client.get(webhook_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
         # user_2 tries to get user_1 webhook, it should fail
         response = await self.client_2.get(webhook_1_path_detail)
-        self.assertEqual(response.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_webhook_update(self) -> None:
         """Can we update a webhook?"""
@@ -3243,7 +3237,7 @@ class WebhooksHTMXTests(APITestCase):
         response = await self.client.put(webhook_1_path_detail, data_updated)
 
         # Check that the webhook was updated
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         webhooks_first = await webhooks.afirst()
         self.assertEqual(webhooks_first.url, "https://example.com/updated")
 
@@ -3273,10 +3267,10 @@ class WebhooksHTMXTests(APITestCase):
         ):
             response = await self.client.post(webhook_1_path_test, {})
         # Compare the test webhook event data.
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         webhook_event = WebhookEvent.objects.all().order_by("date_created")
         webhook_event_first = await webhook_event.afirst()
-        self.assertEqual(webhook_event_first.status_code, HTTP_200_OK)
+        self.assertEqual(webhook_event_first.status_code, HTTPStatus.OK)
         self.assertEqual(webhook_event_first.debug, True)
         self.assertEqual(
             webhook_event_first.content["payload"]["results"][0]["id"],
@@ -3296,7 +3290,7 @@ class WebhooksHTMXTests(APITestCase):
             "webhook"
         ).alast()
         self.assertEqual(
-            webhook_event_last.status_code, HTTP_500_INTERNAL_SERVER_ERROR
+            webhook_event_last.status_code, HTTPStatus.INTERNAL_SERVER_ERROR
         )
         self.assertEqual(webhook_event_last.debug, True)
         self.assertEqual(
@@ -3329,7 +3323,7 @@ class WebhooksHTMXTests(APITestCase):
 
         # Get the webhooks for user_1
         response = await self.client.get(webhook_event_path_list)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         # There shouldn't be results for user_1
         self.assertEqual(response.content, b"\n\n")
 
@@ -3347,7 +3341,7 @@ class WebhooksHTMXTests(APITestCase):
 
         # Get the webhooks for user_1
         response = await self.client.get(webhook_event_path_list)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         # There should be results for user_1
         self.assertNotEqual(response.content, b"\n\n")
 
@@ -3388,7 +3382,7 @@ class NeonAccountCreationTest(TestCase):
 
         self.assertIn(f"'{up.user.email}'", mail.outbox[-1].body)
         self.assertIn(
-            f"https://www.courtlistener.com/admin/user/{up.user.pk}",
+            f"https://www.courtlistener.com/admin/auth/user/{up.user.pk}/change/",
             mail.outbox[-1].body,
         )
         self.assertIn(
@@ -3486,7 +3480,7 @@ class NeonAccountUpdateTest(TestCase):
             follow=True,
         )
 
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         update_account_mock.delay.assert_called_once_with(self.up.user.pk)
         create_account_mock.delay.assert_not_called()
 
@@ -3505,6 +3499,6 @@ class NeonAccountUpdateTest(TestCase):
             follow=True,
         )
 
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         create_account_mock.delay.assert_called_once_with(self.up.user.pk)
         update_account_mock.delay.assert_not_called()

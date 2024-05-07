@@ -75,6 +75,9 @@ WORKDIR /opt/courtlistener
 ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
 
 USER root
+## Creates a directory for Hyperscan db
+RUN mkdir /opt/courtlistener/.hyperscan \
+    && chown -R www-data:www-data /opt/courtlistener/.hyperscan
 RUN chmod +x /opt/courtlistener/docker/django/docker-entrypoint.sh
 RUN chown www-data:www-data /opt/courtlistener/docker/django/docker-entrypoint.sh
 

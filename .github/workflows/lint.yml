@@ -84,8 +84,6 @@ jobs:
           cl/api/utils.py \
           cl/api/views.py \
           cl/api/webhooks.py \
-          cl/donate/management/commands/charge_monthly_donors.py \
-          cl/donate/utils.py \
           cl/tests/utils.py \
           cl/users/email_handlers.py \
           cl/users/forms.py \
@@ -94,7 +92,8 @@ jobs:
           cl/users/management/commands/cl_retry_failed_email.py \
           cl/users/tasks.py \
           cl/recap/management/commands/remove_appellate_entries_with_long_numbers.py \
-          cl/search/management/commands/cl_index_parent_and_child_docs.py
+          cl/search/management/commands/cl_index_parent_and_child_docs.py \
+          cl/search/management/commands/sweep_indexer.py
 
 
 

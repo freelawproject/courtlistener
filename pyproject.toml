@@ -27,14 +27,13 @@ cl-manage = "manage:main"
 
 [tool.poetry.dependencies]
 argparse = "*"
-asgiref = {git = "https://github.com/django/asgiref.git", rev = "8108512196b0831962eb923b7c3f5c5935b1fde1"}
 beautifulsoup4 = "==4.12.*"
 boto3 = "^1.34.17"
 celery = "^5.3.6"
 certifi = "^2024.2.2"
 courts-db = "*"
 disposable-email-domains = "*"
-Django = "^5.0.2"
+Django = { git = "https://github.com/django/django.git", rev = "2e6ae1e96a405fc2ac318325956ce276cfb9830c" }
 django-cache-memoize = "==0.*"
 django-cors-headers = "^4.3.1"
 django-csp = "^3.7.0"
@@ -75,13 +74,12 @@ pyyaml = "^6.0.1"
 redis = "^5.0.1"
 requests = "^2.31.0"
 simplejson = "^3.19.2"
-stripe = "^5.2.0"
 timeout-decorator = "*"
 unidecode = "*"
 usaddress = "^0.5.10"
 scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
-gunicorn = "^21.2.0"
+gunicorn = "^22.0.0"
 django-hCaptcha = "^0.2.0"
 reporters-db = "*"
 django-waffle = "^4.1.0"
@@ -110,13 +108,15 @@ daphne = "^4.1.0"
 psycopg = {extras = ["binary"], version = "^3.1.17"}
 httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.3.1"
-juriscraper = "*"
 django-permissions-policy = "^4.19.0"
+juriscraper = "^2.6.0"
+tiktoken = "^0.6.0"
+hyperscan = "^0.7.7"
 django-ordered-model = "^3.7.4"
 
 
 [tool.poetry.group.dev.dependencies]
-pre-commit = "^3.6.0"
+pre-commit = "^3.7.0"
 types-redis = "^4.6.0.20240106"
 pylint = "^3.0.3"
 pytest = "^8.0.0"

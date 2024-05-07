@@ -496,6 +496,10 @@ a.black-link:focus {
   cursor: hand;
 }
 
+.open_buy_acms_modal.cursor{
+  cursor: pointer;
+}
+
 .cursor-help {
   cursor: help;
 }
@@ -1594,4 +1598,8 @@ textarea {
 rect.series-segment {
   fill: rgb(49, 54, 149) !important;
   fill-opacity: 1.0 !important;
+}
+
+.ml-1 {
+  margin-left: 0.25rem !important;
 }

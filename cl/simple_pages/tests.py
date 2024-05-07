@@ -1,10 +1,10 @@
+from http import HTTPStatus
 from typing import Any, Dict, List, cast
 from unittest.mock import MagicMock, patch
 
 from django.core import mail
 from django.urls import reverse
 from lxml.html import fromstring
-from rest_framework.status import HTTP_200_OK, HTTP_302_FOUND
 
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.cases import TestCase
@@ -52,7 +52,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         response = await self.async_client.post(
             reverse("contact"), self.test_msg
         )
-        self.assertEqual(response.status_code, HTTP_302_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
     async def test_contact_logged_out(self, mock: MagicMock) -> None:
@@ -60,7 +60,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         response = await self.async_client.post(
             reverse("contact"), self.test_msg
         )
-        self.assertEqual(response.status_code, HTTP_302_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
     async def test_contact_unicode(self, mock: MagicMock) -> None:
@@ -73,7 +73,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
             "thoughts with comparatively few words. — John Wesley Powell"
         )
         response = await self.async_client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, HTTP_302_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
     async def test_spam_message_is_rejected(self, mock: MagicMock) -> None:
@@ -86,13 +86,13 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         msg = self.test_msg.copy()
         msg["phone_number"] = "909-576-4123"
         response = await self.async_client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, HTTP_302_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 0)
 
         # Number in middle of subject is OK!
         msg["phone_number"] = "asdf 909 asdf"
         response = await self.async_client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, HTTP_302_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
     async def test_removals_require_http(self, mock: MagicMock) -> None:
@@ -103,25 +103,25 @@ class ContactTest(SimpleUserDataMixin, TestCase):
         msg["phone_number"] = "Removal request"
         msg["message"] = "test in message with lots of long words"
         response = await self.async_client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(len(mail.outbox), 0)
 
         msg["phone_number"] = "Please remove link!"
         msg["message"] = "test in message with lots of long words"
         response = await self.async_client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(len(mail.outbox), 0)
 
         # Test regex matching on removals fails
         msg["phone_number"] = "take down request"
         response = await self.async_client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(len(mail.outbox), 0)
 
         # Removal subject with link is OK!
         msg["message"] = "test http in message"
         response = await self.async_client.post(reverse("contact"), msg)
-        self.assertEqual(response.status_code, HTTP_302_FOUND)
+        self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(len(mail.outbox), 1)
 
 
@@ -155,7 +155,7 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         r = await self.async_client.get(path)
         self.assertEqual(
             r.status_code,
-            HTTP_200_OK,
+            HTTPStatus.OK,
             msg="Got wrong status code for page at: {path}\n  args: "
             "{args}\n  kwargs: {kwargs}\n  Status Code: {code}".format(
                 path=path,
@@ -172,26 +172,38 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: List[Dict[str, Any]] = [
-            {"viewname": "faq"},
+            # Coverage
             {"viewname": "coverage"},
             {"viewname": "coverage_fds"},
+            {"viewname": "coverage_recap"},
+            {"viewname": "coverage_oa"},
+            # Info pages
+            {"viewname": "faq"},
             {"viewname": "feeds_info"},
             {"viewname": "contribute"},
+            {"viewname": "replication_docs"},
+            {"viewname": "terms"},
+            {"viewname": "robots"},
+            # Contact
             {"viewname": "contact"},
             {"viewname": "contact_thanks"},
+            # Help pages
+            {"viewname": "help_home"},
             {"viewname": "alert_help"},
             {"viewname": "delete_help"},
             {"viewname": "markdown_help"},
             {"viewname": "advanced_search"},
-            {"viewname": "webhooks_getting_started"},
-            {"viewname": "replication_docs"},
-            {"viewname": "webhooks_docs"},
-            {"viewname": "old_terms", "args": ["1"]},
-            {"viewname": "old_terms", "args": ["2"]},
-            {"viewname": "terms"},
-            {"viewname": "robots"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
+            # API help pages
+            {"viewname": "webhooks_docs"},
+            {"viewname": "webhooks_getting_started"},
+            {"viewname": "citation_lookup_api"},
+            {"viewname": "alert_api_help"},
+            {"viewname": "financial_disclosures_api_help"},
+            {"viewname": "search_api_help"},
+            {"viewname": "old_terms", "args": ["1"]},
+            {"viewname": "old_terms", "args": ["2"]},
         ]
         for reverse_param in reverse_params:
             with self.subTest(

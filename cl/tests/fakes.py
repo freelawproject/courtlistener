@@ -1,6 +1,8 @@
 from datetime import date
 from unittest.mock import MagicMock
 
+from cl.corpus_importer.factories import FreeOpinionRowDataFactory
+
 DOCKET_NUMBER = "5:18-cr-00227"
 CASE_NAME = "United States v. Maldonado-Passage"
 
@@ -78,3 +80,14 @@ class FakeFreeOpinionReport:
 
     def download_pdf(self, *args, **kwargs) -> tuple[MagicMock, str]:
         return MagicMock(content=b""), ""
+
+    def query(self, *args, **kwargs):
+        pass
+
+    @property
+    def data(self, *args, **kwargs):
+        return [
+            FreeOpinionRowDataFactory(
+                court_id="cand", docket_number="5:18-ap-07075"
+            )
+        ]
