@@ -693,7 +693,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     try:
         note = await Note.objects.aget(
             cluster_id=cluster.pk,
-            user=await request.auser(),
+            user=await request.auser(),  # type: ignore[attr-defined]
             # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
