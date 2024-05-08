@@ -5,7 +5,7 @@ import time
 import traceback
 from copy import deepcopy
 from dataclasses import fields
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
@@ -2780,3 +2780,33 @@ def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
         logger.warning(f"Error was: {e}")
         total_results = None
     return total_results
+
+
+def do_es_alert_estimation_query(
+    search_query: Search, cd: CleanData, day_count: int
+) -> int:
+    """Builds an ES alert estimation query based on the provided search query,
+     clean data, and day count.
+
+    :param search_query: The Elasticsearch search query object.
+    :param cd: The cleaned data object containing the query and filters.
+    :param day_count: The number of days to subtract from today's date to set
+    the date range filter.
+    :return: An integer representing the alert estimation.
+    """
+
+    match cd["type"]:
+        case SEARCH_TYPES.OPINION:
+            after_field = "filed_after"
+            before_field = "filed_before"
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            after_field = "argued_after"
+            before_field = "argued_before"
+        case _:
+            raise NotImplementedError
+
+    cd[after_field] = date.today() - timedelta(days=int(day_count))
+    cd[before_field] = None
+    estimation_query, _ = build_es_base_query(search_query, cd)
+
+    return estimation_query.count()
