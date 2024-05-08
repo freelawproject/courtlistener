@@ -240,7 +240,7 @@ class CourtUploadForm(forms.Form):
     summary = forms.CharField(
         label="Summary",
         required=False,
-        widget=forms.Textarea(attrs={"class": "form-control"})
+        widget=forms.Textarea(attrs={"class": "form-control"}),
     )
     pdf_upload = forms.FileField(
         label="Opinion PDF",
@@ -265,15 +265,15 @@ class CourtUploadForm(forms.Form):
             q_judges = (
                 Person.objects.filter(
                     (
-                            (
-                                    Q(positions__position_type="c-jus")
-                                    | Q(positions__position_type="ass-jus")
-                                    | Q(positions__position_type="ret-act-jus")
-                            )
-                            & (
-                                    Q(positions__date_termination__isnull=True)
-                                    & Q(positions__date_retirement__isnull=True)
-                            )
+                        (
+                            Q(positions__position_type="c-jus")
+                            | Q(positions__position_type="ass-jus")
+                            | Q(positions__position_type="ret-act-jus")
+                        )
+                        & (
+                            Q(positions__date_termination__isnull=True)
+                            & Q(positions__date_retirement__isnull=True)
+                        )
                     ),
                     positions__court_id="me",
                     is_alias_of=None,
@@ -294,7 +294,9 @@ class CourtUploadForm(forms.Form):
                 .order_by("custom_order", "positions__date_start")
             )
             self.drop_fields(
-                ["summary", ]
+                [
+                    "summary",
+                ]
             )
         else:
             q_judges = Person.objects.filter(
@@ -309,7 +311,8 @@ class CourtUploadForm(forms.Form):
         ]:
             self.fields[field_name].queryset = q_judges  # type: ignore[attr-defined]
             self.fields[
-                field_name].label_from_instance = self.person_label  # type: ignore[attr-defined]
+                field_name
+            ].label_from_instance = self.person_label  # type: ignore[attr-defined]
 
         if self.pk == "tennworkcompcl":
             self.fields["cite_reporter"].widget = forms.Select(
@@ -339,12 +342,7 @@ class CourtUploadForm(forms.Form):
                 attrs={"class": "form-control"},
             )
             self.drop_fields(
-                [
-                    "date_argued",
-                    "date_reargued",
-                    "panel",
-                    "summary"
-                ]
+                ["date_argued", "date_reargued", "panel", "summary"]
             )
         elif self.pk == "mass":
             self.non_required_fields(["lead_author"])
@@ -358,7 +356,7 @@ class CourtUploadForm(forms.Form):
                     "summary",
                     "second_judge",
                     "third_judge",
-                    "panel"
+                    "panel",
                 ]
             )
         elif self.pk == "massappct":
@@ -373,7 +371,7 @@ class CourtUploadForm(forms.Form):
                     "summary",
                     "second_judge",
                     "third_judge",
-                    "panel"
+                    "panel",
                 ]
             )
         elif self.pk == "miss":
@@ -387,7 +385,7 @@ class CourtUploadForm(forms.Form):
                     "cite_page",
                     "second_judge",
                     "third_judge",
-                    "panel"
+                    "panel",
                 ]
             )
         elif self.pk == "missctapp":
@@ -401,7 +399,7 @@ class CourtUploadForm(forms.Form):
                     "cite_page",
                     "second_judge",
                     "third_judge",
-                    "panel"
+                    "panel",
                 ]
             )
         else:
@@ -450,7 +448,10 @@ class CourtUploadForm(forms.Form):
                     ValidationError(
                         format_html(
                             'Citation already in database. See: <a href="%s">%s</a>'
-                            % (cite.get_absolute_url(), cite.cluster.case_name),
+                            % (
+                                cite.get_absolute_url(),
+                                cite.cluster.case_name,
+                            ),
                         )
                     ),
                 )
@@ -505,7 +506,8 @@ class CourtUploadForm(forms.Form):
             self.cleaned_data["panel"] = self.cleaned_data.get("panel")
         else:
             if not self.cleaned_data.get("panel") and self.cleaned_data.get(
-                    "lead_author"):
+                "lead_author"
+            ):
                 # No panel field or no panel field data, use lead author
                 self.cleaned_data["panel"] = [self.cleaned_data["lead_author"]]
             else:
@@ -562,7 +564,8 @@ class CourtUploadForm(forms.Form):
 
         if not citations:
             logger.warning(
-                f"Citation not found for court id: {self.cleaned_data.get('court_str')} form")
+                f"Citation not found for court id: {self.cleaned_data.get('court_str')} form"
+            )
 
         save_everything(
             items={
