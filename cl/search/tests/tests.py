@@ -2376,7 +2376,7 @@ class SweepIndexerCommandTest(
         # Log last status to simulate a resume from "search.Docket"
         log_indexer_last_status(
             "search.Docket",
-            self.de_1.docket.pk,
+            self.de.docket.pk,
             0,
         )
 
@@ -2392,7 +2392,7 @@ class SweepIndexerCommandTest(
                 "people_db.Person": 0,
                 "search.OpinionCluster": 0,
                 "search.Opinion": 0,
-                "search.Docket": 1,
+                "search.Docket": 2,
                 "search.RECAPDocument": 3,
             }
             # Only Docket and RECAPDocument should be indexed.

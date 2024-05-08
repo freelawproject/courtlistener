@@ -4471,9 +4471,10 @@ class IndexDocketRECAPDocumentsCommandTest(
             s.count(), 1, msg="Wrong number of RECAPDocuments returned."
         )
 
-    def test_index_missing_parent_docs_when_indexing_only_child_docs(self):
-        """Confirm the command can properly index missing dockets when indexing
-        only RECAPDocuments.
+    def test_index_only_child_docs_when_parent_docs_are_missed(self):
+        """Confirm that the command can index only RECAP Documents when the
+        parent Docket is missed. Afterward, when the Docket is indexed, the
+        RDs are properly linked to the Docket.
         """
 
         s = DocketDocument.search().query("match_all")
@@ -4487,11 +4488,12 @@ class IndexDocketRECAPDocumentsCommandTest(
             document_type="child",
         )
 
-        # Dockets and the RECAPDocuments should be indexed.
+        # Dockets are not indexed yet.
         s = DocketDocument.search()
         s = s.query(Q("match", docket_child="docket"))
-        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        self.assertEqual(s.count(), 0, msg="Wrong number of Dockets returned.")
 
+        # RECAPDocuments should be indexed.
         s = DocketDocument.search()
         s = s.query(Q("match", docket_child="recap_document"))
         self.assertEqual(
@@ -4509,7 +4511,6 @@ class IndexDocketRECAPDocumentsCommandTest(
                 ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
             )
 
-        # Confirm parent-child relation.
         s = DocketDocument.search()
         s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
         self.assertEqual(
@@ -4520,6 +4521,28 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(
             s.count(), 1, msg="Wrong number of RECAPDocuments returned."
         )
+
+        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="parent",
+        )
+
+        # Confirm parent-child relation.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"docket_id:{self.de.docket.pk}",
+        }
+        r = self.client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        article = tree.xpath("//article")
+        parent_count = len(article)
+        self.assertEqual(1, parent_count)
+        child_count = len(article[0].xpath(".//h4"))
+        self.assertEqual(2, child_count)
 
 
 class RECAPIndexingTest(
