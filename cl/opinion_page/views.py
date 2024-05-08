@@ -96,8 +96,8 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
         "tennworkcompcl",
         "tennworkcompapp",
         "me",
-        "mass",
-        "massappct",
+        "mo",
+        "moctapp",
         "miss",
         "missctapp",
     ]:
@@ -113,12 +113,12 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     if pk == "tennworkcompapp" or pk == "tennworkcompcl":
         courts = ["tennworkcompcl", "tennworkcompapp"]
         template = "tn-court.html"
-    elif pk == "massappct":
+    elif pk == "moctapp":
         courts = [pk]
-        template = "massappct-court.html"
-    elif pk == "mass":
+        template = "moctapp-court.html"
+    elif pk == "mo":
         courts = [pk]
-        template = "mass-court.html"
+        template = "mo-court.html"
     elif pk == "missctapp":
         courts = [pk]
         template = "missctapp-court.html"
@@ -155,8 +155,8 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     "uploaders_tennworkcompcl",
     "uploaders_tennworkcompapp",
     "uploaders_me",
-    "uploaders_mass",
-    "uploaders_massappct",
+    "uploaders_mo",
+    "uploaders_moctapp",
     "uploaders_miss",
     "uploaders_missctapp",
 )
@@ -171,13 +171,15 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
         "tennworkcompcl",
         "tennworkcompapp",
         "me",
-        "mass",
-        "massappct",
+        "mo",
+        "moctapp",
         "miss",
         "missctapp",
     ]:
         raise Http404(
-            "Court pages only implemented for Tennessee Worker Comp Courts and Maine SJC."
+            "Court pages only implemented for Tennessee Worker Comp Courts, "
+            "Maine SJC, Missouri Supreme Court, Missouri Court of Appeals, "
+            "Mississippi Supreme Court and Mississippi Court of Appeals."
         )
     # Validate the user has permission
     user = await request.auser()  # type: ignore[attr-defined]
