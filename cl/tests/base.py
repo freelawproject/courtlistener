@@ -94,7 +94,9 @@ class BaseSeleniumTest(
 
     def tearDown(self) -> None:
         if self.screenshot:
-            filename = f"{type(self).__name__}-{self._testMethodName}-selenium.png"
+            filename = (
+                f"{type(self).__name__}-{self._testMethodName}-selenium.png"
+            )
             print(f"\nSaving screenshot in docker image at: /tmp/{filename}")
             self.browser.save_screenshot(f"/tmp/{filename}")
 

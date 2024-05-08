@@ -1,5 +1,5 @@
 import logging
-from datetime import date, timedelta
+from datetime import date
 from http import HTTPStatus
 from typing import Optional
 
@@ -12,7 +12,7 @@ from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
 from requests import Session
 
-from cl.lib.elasticsearch_utils import build_es_base_query
+from cl.lib.elasticsearch_utils import do_es_alert_estimation_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_alert_estimation_query,
@@ -20,7 +20,7 @@ from cl.lib.search_utils import (
     build_coverage_query,
     get_solr_interface,
 )
-from cl.search.documents import AudioDocument
+from cl.search.documents import AudioDocument, OpinionClusterDocument
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
 from cl.simple_pages.coverage_utils import build_chart_data
@@ -295,7 +295,16 @@ async def get_result_count(request, version, day_count):
     period.
     """
 
-    search_form = await sync_to_async(SearchForm)(request.GET.copy())
+    es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
+        request, "oa-es-active"
+    )
+    es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
+        request, "o-es-active"
+    )
+    is_es_form = es_flag_for_oa or es_flag_for_o
+    search_form = await sync_to_async(SearchForm)(
+        request.GET.copy(), is_es_form=is_es_form
+    )
     if not search_form.is_valid():
         return JsonResponse(
             {"error": "Invalid SearchForm"},
@@ -304,39 +313,40 @@ async def get_result_count(request, version, day_count):
         )
     cd = search_form.cleaned_data
     search_type = cd["type"]
-    es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
-        request, "oa-es-active"
-    )
-    if (
-        search_type == SEARCH_TYPES.ORAL_ARGUMENT and es_flag_for_oa
-    ):  # Elasticsearch version for OA
-        document_type = AudioDocument
-        cd["argued_after"] = date.today() - timedelta(days=int(day_count))
-        cd["argued_before"] = None
-        search_query = document_type.search()
-        s, _ = await sync_to_async(build_es_base_query)(search_query, cd)
-        total_query_results = s.count()
-    else:
+    match search_type:
+        case SEARCH_TYPES.ORAL_ARGUMENT if es_flag_for_oa:
+            # Elasticsearch version for OA
+            search_query = AudioDocument.search()
+            total_query_results = await sync_to_async(
+                do_es_alert_estimation_query
+            )(search_query, cd, day_count)
+        case SEARCH_TYPES.OPINION if es_flag_for_o:
+            # Elasticsearch version for O
+            search_query = OpinionClusterDocument.search()
+            total_query_results = await sync_to_async(
+                do_es_alert_estimation_query
+            )(search_query, cd, day_count)
+        case _:
 
-        @sync_to_async
-        def get_total_query_results(cleaned_data, dc):
-            with Session() as session:
-                try:
-                    si = get_solr_interface(
-                        cleaned_data, http_connection=session
-                    )
-                except NotImplementedError:
-                    logger.error(
-                        "Tried getting solr connection for %s, but it's not "
-                        "implemented yet",
-                        cleaned_data["type"],
-                    )
-                    raise
-                extra = build_alert_estimation_query(cleaned_data, int(dc))
-                response = si.query().add_extra(**extra).execute()
-                return response.result.numFound
+            @sync_to_async
+            def get_total_query_results(cleaned_data, dc):
+                with Session() as session:
+                    try:
+                        si = get_solr_interface(
+                            cleaned_data, http_connection=session
+                        )
+                    except NotImplementedError:
+                        logger.error(
+                            "Tried getting solr connection for %s, but it's not "
+                            "implemented yet",
+                            cleaned_data["type"],
+                        )
+                        raise
+                    extra = build_alert_estimation_query(cleaned_data, int(dc))
+                    response = si.query().add_extra(**extra).execute()
+                    return response.result.numFound
 
-        total_query_results = await get_total_query_results(cd, day_count)
+            total_query_results = await get_total_query_results(cd, day_count)
     return JsonResponse({"count": total_query_results}, safe=True)
 
 
