@@ -2709,6 +2709,8 @@ class RECAPSearchAPIV4Test(
                     date_reargued=None,
                     source=Docket.RECAP_AND_SCRAPER,
                     pacer_case_id=None,
+                    case_name="",
+                    case_name_full="",
                 ),
                 description="",
             )
