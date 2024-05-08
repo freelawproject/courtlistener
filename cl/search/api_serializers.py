@@ -12,6 +12,7 @@ from cl.lib.document_serializer import (
     CoerceDateField,
     DocumentSerializer,
     HighlightedField,
+    NoneToListField,
     NullableListField,
     TimeStampField,
 )
@@ -436,6 +437,7 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
 
     # Fields from the RECAPDocument
     timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    cites = NoneToListField(read_only=True, required=False)
     description = HighlightedField(read_only=True)
     short_description = HighlightedField(read_only=True)
     snippet = HighlightedField(read_only=True, source="plain_text")

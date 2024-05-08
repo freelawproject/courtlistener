@@ -36,6 +36,23 @@ from cl.search.types import ESCursor
 logger = logging.getLogger(__name__)
 
 
+class ResultObject:
+    def __init__(self, initial=None):
+        self.__dict__["_data"] = initial or {}
+
+    def __getattr__(self, key):
+        return self._data.get(key, None)
+
+    def to_dict(self):
+        return self._data
+
+
+class ESResultObject(ResultObject):
+
+    def __getattr__(self, key):
+        return getattr(self._data, key, None)
+
+
 def get_object_list(request, cd, paginator):
     """Perform the Solr work"""
     # Set the offset value
@@ -334,9 +351,16 @@ class CursorESList:
         # next or previous page link.
         self.page_size = page_size + 1
 
-    def get_paginated_results(self) -> tuple[Response, Response, Response]:
+    def get_paginated_results(
+        self,
+    ) -> tuple[list[ESResultObject], int, Response, Response | None]:
         """Executes the search query with pagination settings and processes
         the results.
+
+        :return: A four-tuple containing a list of ESResultObjects, the number
+        of hits returned by the main query, a response object related to the
+        main query's cardinality count, and a response object related to the
+        child query's cardinality count, if available.
         """
         if self.search_after:
             self.main_query = self.main_query.extra(
@@ -392,8 +416,14 @@ class CursorESList:
                 logger.error("Multi-search API Error: %s", e)
                 raise ElasticServerError()
         self.process_results(self.results)
+
+        main_query_hits = self.results.hits.total.value
+        es_results_items = [
+            ESResultObject(initial=result) for result in self.results
+        ]
         return (
-            self.results,
+            es_results_items,
+            main_query_hits,
             cardinality_count_response,
             child_cardinality_count_response,
         )
@@ -489,23 +519,6 @@ class CursorESList:
             default_unique_order, self.reverse, "v4"
         )
         return default_sorting, unique_sorting
-
-
-class ResultObject:
-    def __init__(self, initial=None):
-        self.__dict__["_data"] = initial or {}
-
-    def __getattr__(self, key):
-        return self._data.get(key, None)
-
-    def to_dict(self):
-        return self._data
-
-
-class ESResultObject(ResultObject):
-
-    def __getattr__(self, key):
-        return getattr(self._data, key, None)
 
 
 def limit_api_results_to_page(

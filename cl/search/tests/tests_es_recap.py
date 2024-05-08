@@ -3629,6 +3629,52 @@ class RECAPSearchAPIV4Test(
             r, content_to_compare, rd_type_v4_api_keys
         )
 
+    def test_render_missing_fields_from_es_document(self) -> None:
+        """Confirm that missing fields from an ES document can be properly
+        rendered in the API response.
+
+        This can occur when fields are added to the document mapping but have
+        not yet been indexed in the document because a document reindex is
+        required.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de_no_cites = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_api,
+                    date_reargued=None,
+                    source=Docket.RECAP_AND_SCRAPER,
+                ),
+                description="",
+            )
+
+        rd_no_cites = RECAPDocumentFactory(
+            docket_entry=de_no_cites,
+            description="latest null rd",
+            pacer_doc_id="",
+        )
+
+        doc = ESRECAPDocument().prepare(rd_no_cites)
+        doc_id = ES_CHILD_ID(rd_no_cites.pk).OPINION
+        es_args = {"_routing": de_no_cites.docket.pk, "meta": {"id": doc_id}}
+        doc.pop("cites")
+        ESRECAPDocument(**es_args, **doc).save(
+            skip_empty=False,
+            return_doc_meta=True,
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+        )
+        search_params = {
+            "type": SEARCH_TYPES.RECAP_DOCUMENT,
+            "q": f"id:{rd_no_cites.pk}",
+            "order_by": "score desc",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["results"][0]["cites"], [])
+
     def test_dates_sorting_function_score_for_rd_type(self) -> None:
         """Test if the function score used for the dateFiled and entry_date_filed
         sorting in the V4 of the RECAP Search API works as expected for the RD type.

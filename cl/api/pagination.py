@@ -3,14 +3,13 @@ from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.paginator import InvalidPage
-from elasticsearch_dsl.response import Response as ESResponse
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import BasePagination, PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
 
-from cl.search.api_utils import CursorESList
+from cl.search.api_utils import CursorESList, ESResultObject
 from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESCursor
 
@@ -95,7 +94,7 @@ class ESCursorPagination(BasePagination):
 
     def paginate_queryset(
         self, es_list_instance: CursorESList, request: Request, view=None
-    ) -> ESResponse:
+    ) -> list[ESResultObject]:
         """Paginate the Elasticsearch query and retrieve the results."""
 
         self.base_url = request.build_absolute_uri()
@@ -106,12 +105,12 @@ class ESCursorPagination(BasePagination):
         self.es_list_instance.set_pagination(
             self.cursor, settings.SEARCH_API_PAGE_SIZE
         )
-        results, cardinality_count, child_cardinality_count = (
+        results, main_hits, cardinality_count, child_cardinality_count = (
             self.es_list_instance.get_paginated_results()
         )
         self.results_in_page = len(results)
         self.results_count_approximate = cardinality_count
-        self.results_count_exact = results.hits.total.value
+        self.results_count_exact = main_hits
         self.child_results_count = child_cardinality_count
         return results
 
