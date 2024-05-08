@@ -223,7 +223,7 @@ class ESCursorPagination(BasePagination):
         return (
             self.results_count_exact
             if self.results_count_exact
-            <= settings.ELASTICSEARCH_MAX_RESULT_COUNT
+            < settings.ELASTICSEARCH_MAX_RESULT_COUNT
             else approximate_count
         )
 

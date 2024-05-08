@@ -1619,12 +1619,13 @@ def merge_unavailable_fields_on_parent_document(
             for result in results:
                 if search_type == SEARCH_TYPES.RECAP:
                     for rd in result["child_docs"]:
-                        rd["_source"]["plain_text"] = recap_docs_dict[
-                            rd["_source"]["id"]
-                        ]
+                        rd["_source"]["plain_text"] = recap_docs_dict.get(
+                            rd["_source"]["id"], ""
+                        )
                 else:
-                    result["plain_text"] = recap_docs_dict[result["id"]]
-
+                    result["plain_text"] = recap_docs_dict.get(
+                        result["id"], ""
+                    )
         case _:
             return
 

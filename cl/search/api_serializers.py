@@ -485,7 +485,6 @@ class DocketESResultSerializer(DocumentSerializer):
     # Fields from the Docket.
     referred_to_id = serializers.IntegerField(read_only=True)
     assigned_to_id = serializers.IntegerField(read_only=True)
-    pacer_case_id = serializers.IntegerField(read_only=True)
     dateArgued = CoerceDateField(read_only=True)
     dateFiled = CoerceDateField(read_only=True)
     dateTerminated = CoerceDateField(read_only=True)
