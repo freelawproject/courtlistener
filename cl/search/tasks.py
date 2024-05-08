@@ -1087,43 +1087,27 @@ def index_parent_or_child_docs(
 
     parent_instances = QuerySet()
     child_instances = QuerySet()
-    parent_ids = []
     match search_type:
         case SEARCH_TYPES.RECAP:
             parent_es_document = DocketDocument
             child_es_document = ESRECAPDocument
             child_id_property = "RECAP"
-            parent_model = Docket
             if document_type == "parent":
                 parent_instances = Docket.objects.filter(pk__in=instance_ids)
             elif document_type == "child":
                 child_instances = RECAPDocument.objects.filter(
                     pk__in=instance_ids
                 )
-                # Get unique parent_ids for RECAPDocuments
-                parent_ids = list(
-                    RECAPDocument.objects.filter(pk__in=instance_ids)
-                    .values_list("docket_entry__docket_id", flat=True)
-                    .order_by("docket_entry__docket_id")
-                    .distinct("docket_entry__docket_id")
-                )
         case SEARCH_TYPES.OPINION:
             parent_es_document = OpinionClusterDocument
             child_es_document = OpinionDocument
             child_id_property = "OPINION"
-            parent_model = OpinionCluster
             if document_type == "parent":
                 parent_instances = OpinionCluster.objects.filter(
                     pk__in=instance_ids
                 )
             elif document_type == "child":
                 child_instances = Opinion.objects.filter(pk__in=instance_ids)
-                # Get unique parent_ids for Opinions
-                parent_ids = list(
-                    Opinion.objects.filter(pk__in=instance_ids)
-                    .values_list("cluster_id", flat=True)
-                    .distinct()
-                )
         case SEARCH_TYPES.ORAL_ARGUMENT:
             parent_es_document = AudioDocument
             if document_type == "parent":
@@ -1136,34 +1120,6 @@ def index_parent_or_child_docs(
         "_index": parent_es_document._index._name,
     }
     if document_type == "child":
-        # Index only child documents.
-        parent_ids_to_index = []
-        for parent_id in parent_ids:
-            # Confirm all the child's parent documents are already indexed.
-            # Otherwise, index them.
-            if not parent_es_document.exists(parent_id):
-                parent_ids_to_index.append(parent_id)
-
-        missing_parent_instances = parent_model.objects.filter(
-            pk__in=parent_ids_to_index
-        )
-        if parent_ids_to_index:
-            # Index missing parent documents in bulk.
-            failed_docs = index_documents_in_bulk_from_queryset(
-                missing_parent_instances,
-                parent_es_document,
-                base_doc,
-                testing_mode=testing_mode,
-            )
-            if failed_docs:
-                model_label = (
-                    parent_es_document.Django.model.__name__.capitalize()
-                )
-                logger.error(
-                    f"Error indexing documents from {model_label}, "
-                    f"Failed Doc IDs are: {failed_docs}"
-                )
-
         # Then index only child documents in bulk.
         failed_docs = index_documents_in_bulk_from_queryset(
             child_instances,
