@@ -463,6 +463,8 @@ class CourtUploadForm(forms.Form):
                 self.cleaned_data["second_judge"],
                 self.cleaned_data["third_judge"],
             ]
+            # Remove None when judges are optional
+            judges = [judge for judge in judges if judge is not None]
             flag = len(set(judges)) == len(judges)
             if not flag:
                 self.add_error(

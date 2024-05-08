@@ -103,19 +103,19 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
         "court": render_court.full_name,
     }
 
-    if "tennworkcomp" in pk:
+    if pk == "tennworkcompapp" or pk == "tennworkcompcl":
         courts = ["tennworkcompcl", "tennworkcompapp"]
         template = "tn-court.html"
-    elif "massappct" in pk:
+    elif pk == "massappct":
         courts = [pk]
         template = "massappct-court.html"
-    elif "mass" in pk:
+    elif pk == "mass":
         courts = [pk]
         template = "mass-court.html"
-    elif "missctapp" in pk:
+    elif pk == "missctapp":
         courts = [pk]
         template = "missctapp-court.html"
-    elif "miss" in pk:
+    elif pk == "miss":
         courts = [pk]
         template = "miss-court.html"
     else:
