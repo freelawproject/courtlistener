@@ -1520,14 +1520,37 @@ class IndexOpinionDocumentsCommandTest(
         for pk in opinions_pks:
             self.assertTrue(OpinionDocument.exists(id=ES_CHILD_ID(pk).OPINION))
 
-    def test_index_missing_parent_docs_when_indexing_only_child_docs(self):
+    def test_index_parent_or_child_docs(self):
         """Confirm the command can properly index missing clusters when
         indexing only Opinions.
         """
 
         s = OpinionClusterDocument.search().query("match_all")
         self.assertEqual(s.count(), 0)
-        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        # Call cl_index_parent_and_child_docs command for OpinionCluster.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="parent",
+            testing_mode=True,
+        )
+
+        # Confirm clusters are indexed but child documents not yet.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Clusters returned."
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_1.pk)
+        self.assertEqual(
+            s.count(), 0, msg="Wrong number of Opinions returned."
+        )
+
+        # Call cl_index_parent_and_child_docs command for Opinion.
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.OPINION,
@@ -1535,13 +1558,6 @@ class IndexOpinionDocumentsCommandTest(
             pk_offset=0,
             document_type="child",
             testing_mode=True,
-        )
-
-        # Confirm clusters are indexed.
-        s = OpinionClusterDocument.search()
-        s = s.query(Q("match", cluster_child="opinion_cluster"))
-        self.assertEqual(
-            s.count(), 3, msg="Wrong number of Clusters returned."
         )
 
         # Confirm Opinions are indexed.
@@ -1572,7 +1588,6 @@ class IndexOpinionDocumentsCommandTest(
             search_type=SEARCH_TYPES.OPINION,
             queue="celery",
             pk_offset=0,
-            document_type="child",
             testing_mode=True,
         )
 
@@ -1605,6 +1620,15 @@ class IndexOpinionDocumentsCommandTest(
             queue="celery",
             pk_offset=0,
             document_type="child",
+            missing=True,
+            testing_mode=True,
+        )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            document_type="parent",
             missing=True,
             testing_mode=True,
         )
