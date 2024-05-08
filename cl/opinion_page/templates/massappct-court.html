@@ -35,11 +35,6 @@
 				<h1>Decisions of the {{ court }}
 				</h1>
 				<div class="lead gray">
-					<p>The Supreme Judicial Court of Maine has partnered with the
-						non-profit organization, Free Law Project, to host its court
-						decisions on CourtListener.com. Free Law Project is proud to
-						support this partnership and makes the decisions available
-						online as they are released by the court.</p>
 				</div>
 			</div>
 		</div>
@@ -81,8 +76,9 @@
 				{% if request.user|in_group:"uploaders_{{ pk }}" %}
 					<p><a href="{% url "court_publish_page" pk=pk %}"
 						  class="btn btn-default"><i
-							class="fa fa-upload"></i>&nbsp;Upload New {{ court }}
-						Decision</a></p>
+							class="fa fa-upload"></i>&nbsp; Upload New {{ court }}
+						Decision</a>
+					</p>
 				{% endif %}
 				{% if results.paginator.count > 0 %}
 					{% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
@@ -98,22 +94,16 @@
 			</div>
 			<div class="col-xs-4">
 				<h3>About the Court</h3>
-				<p>The Supreme Judicial Court of Maine is the highest court in the state
-					of Maine. It is made up of a chief justice and six associate
-					justices who are appointed by the governor and confirmed by the
-					Maine Senate. The court has general appellate jurisdiction and is
-					responsible for interpreting the state's laws and constitution. It
-					also has the power to issue advisory opinions on matters of law to
-					the governor and the state's legislature.</p>
+				<p>The Appeals Court is the Commonwealth's intermediate appellate court.
+					The Appeals Court is a court of general appellate jurisdiction,
+					which means that the justices review decisions that the trial judges
+					from the several Departments of the Trial Court have already made in
+					many different kinds of cases. The Appeals Court also has
+					jurisdiction over appeals from final decisions of three State
+					agencies: the Appellate Tax Board, the Industrial Accident Board and
+					the Commonwealth Employment Relations Board. The Appeals Court
+					consists of a chief justice and twenty-four associate justices.</p>
 				<hr>
-				<h3>Neutral Citations</h3>
-				<p>Supreme Judicial Court of Maine court uses neutral citations to cite
-					its opinions.</p>
-				<p>Citations to the {{ court }} take the form:</p>
-				<pre>[YEAR] ME [#]</pre>
-				<p>In this cases, the format begins with the year, then an abbreviation
-					for the court (ME), and finishes with a serial number indicating the
-					decision number.</p>
 			</div>
 		</div>
 	</div>

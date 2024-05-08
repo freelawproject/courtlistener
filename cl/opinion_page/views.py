@@ -92,7 +92,8 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     """Individual Court Home Pages"""
-    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+    if pk not in ["tennworkcompcl", "tennworkcompapp", "me", "mass", "massappct",
+                  "miss", "missctapp"]:
         raise Http404("Court pages only implemented for select courts.")
 
     render_court = await Court.objects.aget(pk=pk)
@@ -105,6 +106,18 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     if "tennworkcomp" in pk:
         courts = ["tennworkcompcl", "tennworkcompapp"]
         template = "tn-court.html"
+    elif "massappct" in pk:
+        courts = [pk]
+        template = "massappct-court.html"
+    elif "mass" in pk:
+        courts = [pk]
+        template = "mass-court.html"
+    elif "missctapp" in pk:
+        courts = [pk]
+        template = "missctapp-court.html"
+    elif "miss" in pk:
+        courts = [pk]
+        template = "miss-court.html"
     else:
         courts = [pk]
         template = "court.html"
@@ -118,7 +131,7 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
             request.GET.copy(),
             override_params={
                 "filed_after": (
-                    datetime.datetime.today() - datetime.timedelta(days=28)
+                        datetime.datetime.today() - datetime.timedelta(days=28)
                 ),
                 "order_by": "dateFiled desc",
                 "court": court,
@@ -135,6 +148,10 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     "uploaders_tennworkcompcl",
     "uploaders_tennworkcompapp",
     "uploaders_me",
+    "uploaders_mass",
+    "uploaders_massappct",
+    "uploaders_miss",
+    "uploaders_missctapp",
 )
 @async_to_sync
 async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
@@ -143,7 +160,8 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
     :param request: A GET or POST request for the page
     :param pk: The CL Court ID for each court
     """
-    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+    if pk not in ["tennworkcompcl", "tennworkcompapp", "me", "mass", "massappct",
+                  "miss", "missctapp"]:
         raise Http404(
             "Court pages only implemented for Tennessee Worker Comp Courts and Maine SJC."
         )
@@ -151,7 +169,7 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
     user = await request.auser()  # type: ignore[attr-defined]
     if not user.is_staff and not user.is_superuser:
         if not await user.groups.filter(  # type: ignore
-            name__in=[f"uploaders_{pk}"]
+                name__in=[f"uploaders_{pk}"]
         ).aexists():
             raise PermissionDenied(
                 "You do not have permission to access this page."
@@ -176,7 +194,8 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
                 request, "Error submitting form, please review below."
             )
     return TemplateResponse(
-        request, "publish.html", {"form": form, "private": True, "pk": pk}
+        request, "publish.html",
+        {"court_image": f"img/{pk}-court.jpg", "form": form, "private": True, "pk": pk}
     )
 
 
@@ -212,9 +231,9 @@ async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
 
 
 async def redirect_docket_recap(
-    request: HttpRequest,
-    court: Court,
-    pacer_case_id: str,
+        request: HttpRequest,
+        court: Court,
+        pacer_case_id: str,
 ) -> HttpResponseRedirect:
     docket = await aget_object_or_404(
         Docket, pacer_case_id=pacer_case_id, court=court
@@ -225,7 +244,7 @@ async def redirect_docket_recap(
 
 
 async def view_docket(
-    request: HttpRequest, pk: int, slug: str
+        request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, pk)
     await increment_view_count(docket, request)
@@ -280,15 +299,15 @@ async def view_docket(
 
 @cache_page(60)
 async def view_docket_feed(
-    request: HttpRequest, docket_id: int
+        request: HttpRequest, docket_id: int
 ) -> HttpResponse:
     return await sync_to_async(DocketFeed())(request, docket_id=docket_id)
 
 
 async def view_parties(
-    request: HttpRequest,
-    docket_id: int,
-    slug: str,
+        request: HttpRequest,
+        docket_id: int,
+        slug: str,
 ) -> HttpResponse:
     """Show the parties and attorneys tab on the docket with pagination."""
 
@@ -353,9 +372,9 @@ async def view_parties(
 
 
 async def docket_idb_data(
-    request: HttpRequest,
-    docket_id: int,
-    slug: str,
+        request: HttpRequest,
+        docket_id: int,
+        slug: str,
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, docket_id)
     try:
@@ -392,9 +411,9 @@ async def docket_idb_data(
 
 
 async def docket_authorities(
-    request: HttpRequest,
-    docket_id: int,
-    slug: str,
+        request: HttpRequest,
+        docket_id: int,
+        slug: str,
 ) -> HttpResponse:
     docket, context = await core_docket_data(request, docket_id)
     if not await docket.ahas_authorities():
@@ -430,8 +449,8 @@ async def make_rd_title(rd: RECAPDocument) -> str:
 
 
 async def make_thumb_if_needed(
-    request: HttpRequest,
-    rd: RECAPDocument,
+        request: HttpRequest,
+        rd: RECAPDocument,
 ) -> RECAPDocument:
     """Make a thumbnail for a RECAP Document, if needed
 
@@ -452,12 +471,12 @@ async def make_thumb_if_needed(
 
 
 async def view_recap_document(
-    request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: int | None = None,
-    att_num: int | None = None,
-    slug: str = "",
-    is_og_bot: bool = False,
+        request: HttpRequest,
+        docket_id: int | None = None,
+        doc_num: int | None = None,
+        att_num: int | None = None,
+        slug: str = "",
+        is_og_bot: bool = False,
 ) -> HttpResponse:
     """This view can either load an attachment or a regular document,
     depending on the URL pattern that is matched.
@@ -567,12 +586,12 @@ async def view_recap_document(
 
 
 async def view_recap_authorities(
-    request: HttpRequest,
-    docket_id: int | None = None,
-    doc_num: int | None = None,
-    att_num: int | None = None,
-    slug: str = "",
-    is_og_bot: bool = False,
+        request: HttpRequest,
+        docket_id: int | None = None,
+        doc_num: int | None = None,
+        att_num: int | None = None,
+        slug: str = "",
+        is_og_bot: bool = False,
 ) -> HttpResponse:
     """This view can display authorities of an attachment or a regular
     document, depending on the URL pattern that is matched.
@@ -638,9 +657,9 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         [
             s
             for s in [
-                trunc(best_case_name(cluster), 100, ellipsis="..."),
-                await cluster.acitation_string(),
-            ]
+            trunc(best_case_name(cluster), 100, ellipsis="..."),
+            await cluster.acitation_string(),
+        ]
             if s.strip()
         ]
     )
@@ -653,7 +672,8 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 
     try:
         note = await Note.objects.aget(
-            cluster_id=cluster.pk, user=await request.auser()  # type: ignore[attr-defined]
+            cluster_id=cluster.pk, user=await request.auser()
+            # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not note or anonymous user
@@ -703,8 +723,8 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     # Identify opinions updated/added in partnership with v|lex for 3 years
     sponsored = False
     if (
-        cluster.date_created.date() > datetime.datetime(2022, 6, 1).date()
-        and cluster.filepath_json_harvard
+            cluster.date_created.date() > datetime.datetime(2022, 6, 1).date()
+            and cluster.filepath_json_harvard
     ):
         sponsored = True
 
@@ -750,7 +770,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 
 
 async def view_summaries(
-    request: HttpRequest, pk: int, slug: str
+        request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     cluster = await aget_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
@@ -783,7 +803,7 @@ async def view_summaries(
 
 
 async def view_authorities(
-    request: HttpRequest, pk: int, slug: str, doc_type=0
+        request: HttpRequest, pk: int, slug: str, doc_type=0
 ) -> HttpResponse:
     cluster = await aget_object_or_404(OpinionCluster, pk=pk)
 
@@ -795,14 +815,14 @@ async def view_authorities(
             "caption": await cluster.acaption(),
             "cluster": cluster,
             "private": cluster.blocked
-            or await cluster.ahas_private_authority(),
+                       or await cluster.ahas_private_authority(),
             "authorities_with_data": await cluster.aauthorities_with_data(),
         },
     )
 
 
 async def cluster_visualizations(
-    request: HttpRequest, pk: int, slug: str
+        request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
     cluster = await aget_object_or_404(OpinionCluster, pk=pk)
     return TemplateResponse(
@@ -813,7 +833,7 @@ async def cluster_visualizations(
             "caption": await cluster.acaption(),
             "cluster": cluster,
             "private": cluster.blocked
-            or await cluster.ahas_private_authority(),
+                       or await cluster.ahas_private_authority(),
         },
     )
 
@@ -850,7 +870,7 @@ async def get_prev_next_volumes(reporter: str, volume: str) -> tuple[int, int]:
 
 
 async def reporter_or_volume_handler(
-    request: HttpRequest, reporter: str, volume: str | None = None
+        request: HttpRequest, reporter: str, volume: str | None = None
 ) -> HttpResponse:
     """Show all the volumes for a given reporter abbreviation or all the cases
     for a reporter-volume dyad.
@@ -983,10 +1003,10 @@ async def make_reporter_dict() -> Dict:
 
 
 async def citation_handler(
-    request: HttpRequest,
-    reporter: str,
-    volume: str,
-    page: str,
+        request: HttpRequest,
+        reporter: str,
+        volume: str,
+        page: str,
 ) -> HttpResponse:
     """Load the page when somebody looks up a complete citation"""
 
@@ -1031,7 +1051,7 @@ async def citation_handler(
 
 
 def make_citation_url_dict(
-    reporter: str, volume: str | None, page: str | None
+        reporter: str, volume: str | None, page: str | None
 ) -> dict[str, str]:
     """Make a dict of the volume/reporter/page, but only if truthy."""
     d = {"reporter": reporter}
@@ -1043,10 +1063,10 @@ def make_citation_url_dict(
 
 
 async def attempt_reporter_variation(
-    request: HttpRequest,
-    reporter: str,
-    volume: str | None,
-    page: str | None,
+        request: HttpRequest,
+        reporter: str,
+        volume: str | None,
+        page: str | None,
 ) -> HttpResponse:
     """Try to disambiguate an unknown reporter using the variations dict.
 
@@ -1106,10 +1126,10 @@ async def attempt_reporter_variation(
 
 
 async def citation_redirector(
-    request: HttpRequest,
-    reporter: str,
-    volume: str | None = None,
-    page: str | None = None,
+        request: HttpRequest,
+        reporter: str,
+        volume: str | None = None,
+        page: str | None = None,
 ) -> HttpResponse:
     """Take a citation URL and use it to redirect the user to the canonical
     page for that citation.

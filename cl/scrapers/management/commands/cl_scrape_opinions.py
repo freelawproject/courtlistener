@@ -114,6 +114,7 @@ def make_objects(
         source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
         nature_of_suit=item.get("nature_of_suit", ""),
+        summary=item.get("summary", ""),
         blocked=blocked,
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
