@@ -1046,13 +1046,13 @@ files = [
 
 [[package]]
 name = "django-model-utils"
-version = "4.3.1"
+version = "4.5.1"
 description = "Django model mixins and utilities"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "django-model-utils-4.3.1.tar.gz", hash = "sha256:2e2e4f13e4f14613134a9777db7ad4265f59a1d8f1384107bcaa3028fe3c87c1"},
-    {file = "django_model_utils-4.3.1-py3-none-any.whl", hash = "sha256:8c0b0177bab909a8635b602d960daa67e80607aa5469217857271a60726d7a4b"},
+    {file = "django_model_utils-4.5.1-py3-none-any.whl", hash = "sha256:f1141fc71796242edeffed5ad53a8cc57f00d345eb5a3a63e3f69401cd562ee2"},
+    {file = "django_model_utils-4.5.1.tar.gz", hash = "sha256:1220f22d9a467d53a1e0f4cda4857df0b2f757edf9a29955c42461988caa648a"},
 ]
 
 [package.dependencies]
@@ -5254,4 +5254,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "4f677c26cdb417b3ca8597a25599b9d78d7e482e67feff993b6dbd4c0640e946"
+content-hash = "8c9b4c623d883fdd0b2e665ef38dcdf2fe81e353e5d3b9c422e63637becee23a"
