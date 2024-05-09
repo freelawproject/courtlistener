@@ -344,7 +344,7 @@ class CourtUploadForm(forms.Form):
             self.drop_fields(
                 ["date_argued", "date_reargued", "panel", "summary"]
             )
-        elif self.pk == "mass":
+        elif self.pk == "mo":
             self.non_required_fields(["lead_author"])
             self.drop_fields(
                 [
@@ -359,7 +359,7 @@ class CourtUploadForm(forms.Form):
                     "panel",
                 ]
             )
-        elif self.pk == "massappct":
+        elif self.pk == "moctapp":
             self.non_required_fields(["lead_author"])
             self.drop_fields(
                 [
