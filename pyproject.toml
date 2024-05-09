@@ -107,7 +107,7 @@ uvicorn = {extras = ["standard"], version = "^0.27.1"}
 daphne = "^4.1.0"
 psycopg = {extras = ["binary"], version = "^3.1.17"}
 httpx = {extras = ["http2"], version = "^0.26.0"}
-django-model-utils = "^4.3.1"
+django-model-utils = "^4.5.1"
 django-permissions-policy = "^4.19.0"
 juriscraper = "^2.6.0"
 tiktoken = "^0.6.0"
