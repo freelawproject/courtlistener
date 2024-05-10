@@ -447,8 +447,7 @@ class OpinionV3APISearchTest(
                 main_query=main_query,
                 offset=offset,
                 page_size=page_size,
-                clean_data=cd,
-                version="v3",
+                type=cd["type"],
             )
             for result in hits:
                 ids_in_results.add(result.id)

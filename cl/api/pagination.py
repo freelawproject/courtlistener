@@ -1,5 +1,6 @@
 import datetime
 from base64 import b64decode, b64encode
+from collections import defaultdict
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
@@ -10,7 +11,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
 
-from cl.search.api_utils import CursorESList, ESResultObject
+from cl.search.api_utils import CursorESList
 from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESCursor
 
@@ -111,7 +112,7 @@ class ESCursorPagination(BasePagination):
 
     def paginate_queryset(
         self, es_list_instance: CursorESList, request: Request, view=None
-    ) -> list[ESResultObject]:
+    ) -> list[defaultdict]:
         """Paginate the Elasticsearch query and retrieve the results."""
 
         self.es_list_instance = es_list_instance
