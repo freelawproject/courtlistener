@@ -1,3 +1,4 @@
+import datetime
 import logging
 import operator
 import re
@@ -5,7 +6,6 @@ import time
 import traceback
 from copy import deepcopy
 from dataclasses import fields
-from datetime import date, datetime, timedelta
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
@@ -127,8 +127,8 @@ def build_numeric_range_query(
 
 def build_daterange_query(
     field: str,
-    before: date,
-    after: date,
+    before: datetime.date,
+    after: datetime.date,
     relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
     """Given field name and date range limits returns ElasticSearch range query or None
@@ -728,7 +728,10 @@ def build_highlights_dict(
 
 
 def build_custom_function_score_for_date(
-    query: QueryString | str, order_by: tuple[str, str], default_score: int
+    query: QueryString | str,
+    order_by: tuple[str, str],
+    default_score: int,
+    default_current_date: datetime.date | None = None,
 ) -> QueryString:
     """Build a custom function score query for sorting based on a date field.
 
@@ -751,9 +754,21 @@ def build_custom_function_score_for_date(
     results based on a child document field.
     :param default_score: The default score to return when the document lacks
     the sort field.
+    :param default_current_date: The default current date to use for computing
+     a stable date score across pagination in the V4 Search API.
     :return: The modified QueryString object with applied function score.
     """
 
+    midnight_current_date = (
+        datetime.datetime.combine(default_current_date, datetime.time())
+        if default_current_date
+        else None
+    )
+    default_current_time = (
+        int(midnight_current_date.timestamp() * 1000)
+        if midnight_current_date
+        else None
+    )
     sort_field, order = order_by
     query = Q(
         "function_score",
@@ -761,6 +776,12 @@ def build_custom_function_score_for_date(
         script_score={
             "script": {
                 "source": f"""
+                    long current_time;
+                    if (params.default_current_time != null) {{
+                            current_time = params.default_current_time;  // Use 'default_current_time' if provided
+                        }} else {{
+                           current_time = new Date().getTime();
+                        }}
                     // Check if the document has a value for the 'sort_field'
                     if (doc['{sort_field}'].size() == 0) {{
                         return {default_score};  // If not, return 'default_score' as the score
@@ -769,7 +790,7 @@ def build_custom_function_score_for_date(
                         // (February 22, 1732)
                         long washington_bd_offset = 7506086400000L;
                         // Get the current time in milliseconds, include the washington_bd_offset to work with positive epoch times.
-                        long current_time = new Date().getTime() + washington_bd_offset;
+                        current_time = current_time + washington_bd_offset;
 
                         // Convert the 'sort_field' value to epoch milliseconds, adjusting by the same offset.
                         long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli() + washington_bd_offset;
@@ -788,7 +809,11 @@ def build_custom_function_score_for_date(
                     }}
                         """,
                 # Parameters passed to the script
-                "params": {"order": order, "default_score": default_score},
+                "params": {
+                    "order": order,
+                    "default_score": default_score,
+                    "default_current_time": default_current_time,
+                },
             },
         },
         # Replace the original score with the one computed by the script
@@ -805,7 +830,7 @@ def build_has_child_query(
     highlighting_fields: dict[str, int] | None = None,
     order_by: tuple[str, str] | None = None,
     child_highlighting: bool = True,
-    api_version: Literal["v3", "v4"] | None = None,
+    default_current_date: datetime.date | None = None,
 ) -> QueryString:
     """Build a 'has_child' query.
 
@@ -816,17 +841,23 @@ def build_has_child_query(
     :param order_by: If provided the field to use to compute score for sorting
     results based on a child document field.
     :param child_highlighting: Whether highlighting should be enabled in child docs.
-    :param api_version: Optional, the request API version.
+    :param default_current_date: The default current date to use for computing
+     a stable date score across pagination in the V4 Search API.
     :return: The 'has_child' query.
     """
 
-    if order_by and all(order_by) and child_type == "recap_document":
-        if api_version == "v4":
-            query = nullify_query_score(query)
-        else:
-            query = build_custom_function_score_for_date(
-                query, order_by, default_score=1
-            )
+    if (
+        order_by
+        and all(order_by)
+        and child_type == "recap_document"
+        and order_by[0] == "entry_date_filed"
+    ):
+        query = build_custom_function_score_for_date(
+            query,
+            order_by,
+            default_score=1,
+            default_current_date=default_current_date,
+        )
 
     highlight_options, fields_to_exclude = build_highlights_dict(
         highlighting_fields, SEARCH_HL_TAG, child_highlighting
@@ -881,17 +912,20 @@ def get_search_query(
                     query_hits_limit,
                     SEARCH_RECAP_CHILD_HL_FIELDS,
                     get_child_sorting_key(cd, api_version),
-                    api_version=api_version,
+                    default_current_date=cd.get("request_date"),
                 )
-                match_all_parent_query = apply_custom_score_to_parent_query(
-                    cd, Q("match", docket_child="docket"), api_version
+                match_all_parent_query = Q("match", docket_child="docket")
+                match_all_parent_query = nullify_query_score(
+                    match_all_parent_query
                 )
-                return search_query.query(
-                    Q(
-                        "bool",
-                        should=[match_all_child_query, match_all_parent_query],
-                    )
+                final_match_all_query = Q(
+                    "bool",
+                    should=[match_all_child_query, match_all_parent_query],
                 )
+                final_match_all_query = apply_custom_score_to_parent_query(
+                    cd, final_match_all_query, api_version
+                )
+                return search_query.query(final_match_all_query)
             case SEARCH_TYPES.OPINION:
                 # Only return Opinion clusters.
                 q_should = [
@@ -1469,7 +1503,7 @@ def convert_str_date_fields_to_date_objects(
             top_hits = result.grouped_by_opinion_cluster_id.hits.hits
             for hit in top_hits:
                 date_str = hit["_source"][date_field_name]
-                date_obj = date.fromisoformat(date_str)
+                date_obj = datetime.date.fromisoformat(date_str)
                 hit["_source"][date_field_name] = date_obj
 
 
@@ -1539,7 +1573,9 @@ def fill_position_mapping(
 
                 if callable(field_value):
                     field_value = field_value()
-                elif isinstance(field_value, (datetime, date)):
+                elif isinstance(
+                    field_value, (datetime.datetime, datetime.date)
+                ):
                     field_value = midnight_pt(field_value)
 
                 mapping_dict[person_id].append(field_value)
@@ -2129,29 +2165,33 @@ def apply_custom_score_to_parent_query(
     match cd["type"]:
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if valid_child_order_by:
             sort_field, order = child_order_by
-            if sort_field == "entry_date_filed":
-                # It applies a function score to the parent query to nullify
-                # the parent score (sets it to 0) to prioritize child documents
-                # sorting criteria. This will ensure that dockets without
-                # documents come last on results.
-                query = nullify_query_score(query)
-            elif sort_field == "dateFiled" and api_version:
+            if sort_field == "dateFiled" and api_version == "v4":
                 # Applies a custom function score to sort Dockets based on
                 # their dateFiled field. This serves as a workaround to enable
                 # the use of the  search_after cursor for pagination on
                 # documents with a None dateFiled.
                 query = build_custom_function_score_for_date(
-                    query, child_order_by, default_score=0
+                    query,
+                    child_order_by,
+                    default_score=0,
+                    default_current_date=cd["request_date"],
                 )
+
         case SEARCH_TYPES.RECAP_DOCUMENT if valid_child_order_by:
             sort_field, order = child_order_by
-            if sort_field in ["dateFiled", "entry_date_filed"] and api_version:
+            if (
+                sort_field in ["dateFiled", "entry_date_filed"]
+                and api_version == "v4"
+            ):
                 # Applies a custom function score to sort RECAPDocuments based
                 # on their docket dateFiled or entry_date_filed field. This
                 # serves as a workaround to enable the use of the  search_after
                 # cursor for pagination on documents with a None dateFiled.
                 query = build_custom_function_score_for_date(
-                    query, child_order_by, default_score=0
+                    query,
+                    child_order_by,
+                    default_score=0,
+                    default_current_date=cd["request_date"],
                 )
     return query
 
@@ -2279,7 +2319,7 @@ def build_full_join_es_queries(
                 hl_fields,
                 get_child_sorting_key(cd, api_version),
                 child_highlighting=child_highlighting,
-                api_version=api_version,
+                default_current_date=cd.get("request_date"),
             )
 
         if parties_filters and not has_child_query:
@@ -2293,7 +2333,7 @@ def build_full_join_es_queries(
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
                 get_child_sorting_key(cd, api_version),
-                api_version=api_version,
+                default_current_date=cd.get("request_date"),
             )
 
         if has_child_query:
@@ -2346,19 +2386,21 @@ def build_full_join_es_queries(
                     minimum_should_match=1,
                 )
         if parent_query:
-            parent_query = apply_custom_score_to_parent_query(
-                cd, parent_query, api_version
-            )
             q_should.append(parent_query)
 
     if not q_should:
         return [], join_query
 
-    return (
+    final_query = apply_custom_score_to_parent_query(
+        cd,
         Q(
             "bool",
             should=q_should,
         ),
+        api_version,
+    )
+    return (
+        final_query,
         join_query,
     )
 
@@ -2805,7 +2847,9 @@ def do_es_alert_estimation_query(
         case _:
             raise NotImplementedError
 
-    cd[after_field] = date.today() - timedelta(days=int(day_count))
+    cd[after_field] = datetime.date.today() - datetime.timedelta(
+        days=int(day_count)
+    )
     cd[before_field] = None
     estimation_query, _ = build_es_base_query(search_query, cd)
 

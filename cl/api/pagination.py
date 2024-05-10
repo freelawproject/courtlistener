@@ -1,3 +1,4 @@
+import datetime
 from base64 import b64decode, b64encode
 from urllib.parse import parse_qs, urlencode
 
@@ -91,17 +92,29 @@ class ESCursorPagination(BasePagination):
     search_type = None
     cursor_query_param = "cursor"
     invalid_cursor_message = "Invalid cursor"
+    request_date = None
+
+    def set_page_request(self, request, search_type) -> datetime.date:
+        self.base_url = request.build_absolute_uri()
+        self.request = request
+        self.search_type = search_type
+        self.cursor = self.decode_cursor(request)
+
+        # Set the request date from the cursor or provide an initial one if
+        # this is the first page request.
+        self.request_date = (
+            self.cursor.request_date
+            if self.cursor
+            else datetime.datetime.now().date()
+        )
+        return self.request_date
 
     def paginate_queryset(
         self, es_list_instance: CursorESList, request: Request, view=None
     ) -> list[ESResultObject]:
         """Paginate the Elasticsearch query and retrieve the results."""
 
-        self.base_url = request.build_absolute_uri()
-        self.request = request
         self.es_list_instance = es_list_instance
-        self.search_type = self.es_list_instance.clean_data["type"]
-        self.cursor = self.decode_cursor(request)
         self.es_list_instance.set_pagination(
             self.cursor, settings.SEARCH_API_PAGE_SIZE
         )
@@ -148,6 +161,7 @@ class ESCursorPagination(BasePagination):
             search_after=search_after_sort_key,
             reverse=False,
             search_type=self.search_type,
+            request_date=self.request_date,
         )
         return self.encode_cursor(cursor)
 
@@ -165,6 +179,7 @@ class ESCursorPagination(BasePagination):
             search_after=reverse_search_after_sort_key,
             reverse=True,
             search_type=self.search_type,
+            request_date=self.request_date,
         )
         return self.encode_cursor(cursor)
 
@@ -178,9 +193,9 @@ class ESCursorPagination(BasePagination):
             querystring = b64decode(encoded.encode("ascii")).decode("ascii")
             tokens = parse_qs(querystring, keep_blank_values=True)
             search_after = tokens.get("s", None)
-            reverse = tokens.get("r", ["0"])[0]
-            reverse = bool(int(reverse))
+            reverse = bool(int(tokens.get("r", ["0"])[0]))
             search_type = tokens.get("t", [None])[0]
+            request_date = tokens.get("d", [None])[0]
         except (TypeError, ValueError):
             raise NotFound(self.invalid_cursor_message)
 
@@ -189,9 +204,17 @@ class ESCursorPagination(BasePagination):
             # in the cursor doesn't match, raise an invalid cursor error to
             # avoid pagination inconsistencies.
             raise NotFound(self.invalid_cursor_message)
-        return ESCursor(
-            search_after=search_after, reverse=reverse, search_type=search_type
+
+        request_date = (
+            datetime.date.fromisoformat(request_date) if request_date else None
         )
+        self.cursor = ESCursor(
+            search_after=search_after,
+            reverse=reverse,
+            search_type=search_type,
+            request_date=request_date,
+        )
+        return self.cursor
 
     def encode_cursor(self, cursor: ESCursor) -> str:
         """Given a ESCursor instance, return an url with encoded cursor."""
@@ -202,6 +225,8 @@ class ESCursorPagination(BasePagination):
             tokens["r"] = "1"
         if cursor.search_type:
             tokens["t"] = self.search_type
+        if cursor.request_date:
+            tokens["d"] = cursor.request_date
 
         querystring = urlencode(tokens, doseq=True)
         encoded = b64encode(querystring.encode("ascii")).decode("ascii")

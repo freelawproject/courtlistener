@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 from typing import Any, Literal, Type, Union
 
@@ -115,3 +116,4 @@ class ESCursor:
     search_after: AttrList | None
     reverse: bool
     search_type: str
+    request_date: date | None
