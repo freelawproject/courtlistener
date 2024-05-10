@@ -15,12 +15,13 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
-from rest_framework.serializers import SerializerMethodField
+from rest_framework.serializers import CharField
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
+    set_results_highlights,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -2636,11 +2637,7 @@ class DocketESResultSerializerTest(DocketESResultSerializer):
     date_score field for testing purposes.
     """
 
-    date_score = SerializerMethodField(read_only=True)
-
-    def get_date_score(self, obj):
-        if hasattr(obj.meta, "sort"):
-            return obj.meta.sort[0]
+    date_score = CharField(read_only=True)
 
 
 class BaseRECAPDocumentESResultSerializerTest(
@@ -2650,11 +2647,7 @@ class BaseRECAPDocumentESResultSerializerTest(
     Includes a date_score field for testing purposes.
     """
 
-    date_score = SerializerMethodField(read_only=True)
-
-    def get_date_score(self, obj):
-        if hasattr(obj.meta, "sort"):
-            return obj.meta.sort[0]
+    date_score = CharField(read_only=True)
 
 
 class RECAPESResultSerializerTest(RECAPESResultSerializer):
@@ -2662,11 +2655,7 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
     date_score field for testing purposes.
     """
 
-    date_score = SerializerMethodField(read_only=True)
-
-    def get_date_score(self, obj):
-        if hasattr(obj.meta, "sort"):
-            return obj.meta.sort[0]
+    date_score = CharField(read_only=True)
 
 
 class RECAPSearchAPIV4Test(
@@ -2788,6 +2777,16 @@ class RECAPSearchAPIV4Test(
         rd = RECAPDocument.objects.get(pacer_doc_id="rd_to_delete")
         rd.delete()
         return merge_unavailable_fields_on_parent_document(*args, **kwargs)
+
+    @staticmethod
+    def mock_set_results_highlights(results, search_type):
+        """Intercepts set_results_highlights as a helper to append the
+        date_score for testing purposes.
+        """
+        set_results_highlights(results, search_type)
+        for result in results:
+            if hasattr(result.meta, "sort"):
+                result["date_score"] = result.meta.sort[0]
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -3194,7 +3193,13 @@ class RECAPSearchAPIV4Test(
         "cl.search.api_views.RECAPESResultSerializer",
         new=RECAPESResultSerializerTest,
     )
-    def test_stable_scores_date_sort(self) -> None:
+    @mock.patch(
+        "cl.search.api_utils.set_results_highlights",
+        side_effect=mock_set_results_highlights,
+    )
+    def test_stable_scores_date_sort(
+        self, mock_set_results_highlights
+    ) -> None:
         """Test if the function's score remains stable when used for sorting by
         dateFiled asc and entry_date_filed asc across pagination, avoiding
         the impact of time running on the scores.
