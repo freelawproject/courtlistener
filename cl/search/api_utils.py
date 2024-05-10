@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 import waffle
 from django.conf import settings
@@ -45,12 +46,6 @@ class ResultObject:
 
     def to_dict(self):
         return self._data
-
-
-class ESResultObject(ResultObject):
-
-    def __getattr__(self, key):
-        return getattr(self._data, key, None)
 
 
 def get_object_list(request, cd, paginator):
@@ -124,7 +119,6 @@ def get_object_list(request, cd, paginator):
             offset=offset,
             page_size=page_size,
             clean_data=cd,
-            version=request.version,
         )
     else:
         sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
@@ -144,7 +138,6 @@ class ESList:
         page_size,
         clean_data,
         length=None,
-        version="v3",
     ):
         super().__init__()
         self.main_query = main_query
@@ -153,7 +146,6 @@ class ESList:
         self.clean_data = clean_data
         self._item_cache = []
         self._length = length
-        self._version = version
 
     def __len__(self):
         if self._length is None:
@@ -181,30 +173,15 @@ class ESList:
         ]
         results = self.main_query.execute()
 
-        if self._version == "v4":
-            limit_inner_hits({}, results, self.clean_data["type"])
-            set_results_highlights(results, self.clean_data["type"])
-
         # Merge unavailable fields in ES by pulling data from the DB to make
-        # the API backwards compatible or retrieves the snippet from the DB
-        # when highlighting is disabled.
+        # the API backwards compatible for People.
         merge_unavailable_fields_on_parent_document(
             results,
             self.clean_data["type"],
             "api",
             self.clean_data["highlight"],
         )
-
         for result in results:
-            child_result_objects = []
-            if hasattr(result, "child_docs"):
-                for child_doc in result.child_docs:
-                    child_result_objects.append(
-                        ESResultObject(initial=child_doc["_source"])
-                    )
-                result["child_docs"] = child_result_objects
-
-            # Send the object instead the JSON.
             self._item_cache.append(result)
 
         # Now, assuming our _item_cache is all set, we just get the item.
@@ -353,7 +330,7 @@ class CursorESList:
 
     def get_paginated_results(
         self,
-    ) -> tuple[list[ESResultObject], int, Response, Response | None]:
+    ) -> tuple[list[defaultdict], int, Response, Response | None]:
         """Executes the search query with pagination settings and processes
         the results.
 
@@ -419,7 +396,8 @@ class CursorESList:
 
         main_query_hits = self.results.hits.total.value
         es_results_items = [
-            ESResultObject(initial=result) for result in self.results
+            defaultdict(lambda: None, result.to_dict(skip_empty=False))
+            for result in self.results
         ]
         return (
             es_results_items,
@@ -446,7 +424,9 @@ class CursorESList:
             if hasattr(result, "child_docs"):
                 for child_doc in result.child_docs:
                     child_result_objects.append(
-                        ESResultObject(initial=child_doc["_source"])
+                        defaultdict(
+                            lambda: None, child_doc["_source"].to_dict()
+                        )
                     )
                 result["child_docs"] = child_result_objects
 
