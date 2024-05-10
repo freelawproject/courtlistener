@@ -37,17 +37,6 @@ from cl.search.types import ESCursor
 logger = logging.getLogger(__name__)
 
 
-class ResultObject:
-    def __init__(self, initial=None):
-        self.__dict__["_data"] = initial or {}
-
-    def __getattr__(self, key):
-        return self._data.get(key, None)
-
-    def to_dict(self):
-        return self._data
-
-
 def get_object_list(request, cd, paginator):
     """Perform the Solr work"""
     # Set the offset value
@@ -490,6 +479,17 @@ class CursorESList:
             default_unique_order, self.reverse, "v4"
         )
         return default_sorting, unique_sorting
+
+
+class ResultObject:
+    def __init__(self, initial=None):
+        self.__dict__["_data"] = initial or {}
+
+    def __getattr__(self, key):
+        return self._data.get(key, None)
+
+    def to_dict(self):
+        return self._data
 
 
 def limit_api_results_to_page(
