@@ -314,10 +314,10 @@ class CursorESList:
         """Executes the search query with pagination settings and processes
         the results.
 
-        :return: A four-tuple containing a list of ESResultObjects, the number
-        of hits returned by the main query, a response object related to the
-        main query's cardinality count, and a response object related to the
-        child query's cardinality count, if available.
+        :return: A four-tuple containing a list of defaultdicts with the results,
+        the number of hits returned by the main query, a response object
+        related to the main query's cardinality count, and a response object
+        related to the child query's cardinality count, if available.
         """
         if self.search_after:
             self.main_query = self.main_query.extra(
