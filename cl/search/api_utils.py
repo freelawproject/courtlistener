@@ -92,8 +92,7 @@ def get_object_list(request, cd, paginator):
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
     elif search_query and is_opinion_active:
-        if request.version == "v3":
-            cd["highlight"] = True
+        cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
             highlighting_fields = {"text": 500}
@@ -110,7 +109,7 @@ def get_object_list(request, cd, paginator):
         )
         main_query["caller"] = "api_search"
 
-    if cd["type"] == SEARCH_TYPES.RECAP and request.version == "v3":
+    if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
     if is_oral_argument_active or is_people_active or is_opinion_active:
@@ -118,7 +117,7 @@ def get_object_list(request, cd, paginator):
             main_query=main_query,
             offset=offset,
             page_size=page_size,
-            clean_data=cd,
+            type=cd["type"],
         )
     else:
         sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
@@ -131,25 +130,18 @@ class ESList:
     as they are queried.
     """
 
-    def __init__(
-        self,
-        main_query,
-        offset,
-        page_size,
-        clean_data,
-        length=None,
-    ):
+    def __init__(self, main_query, offset, page_size, type, length=None):
         super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
-        self.clean_data = clean_data
+        self.type = type
         self._item_cache = []
         self._length = length
 
     def __len__(self):
         if self._length is None:
-            if self.clean_data["type"] == SEARCH_TYPES.OPINION:
+            if self.type == SEARCH_TYPES.OPINION:
                 query = Q(self.main_query.to_dict(count=True)["query"])
                 self._length = do_collapse_count_query(self.main_query, query)
             else:
@@ -177,9 +169,8 @@ class ESList:
         # the API backwards compatible for People.
         merge_unavailable_fields_on_parent_document(
             results,
-            self.clean_data["type"],
+            self.type,
             "api",
-            self.clean_data["highlight"],
         )
         for result in results:
             self._item_cache.append(result)
