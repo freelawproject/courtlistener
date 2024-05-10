@@ -250,7 +250,11 @@ docket_v4_api_keys_base = {
         if x.get("juryDemand")
         else x["result"].docket_entry.docket.jury_demand
     ),
-    "pacer_case_id": lambda x: x["result"].docket_entry.docket.pacer_case_id,
+    "pacer_case_id": lambda x: (
+        str(x["result"].docket_entry.docket.pacer_case_id)
+        if x["result"].docket_entry.docket.pacer_case_id
+        else ""
+    ),
     "party": lambda x: list(
         DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
             "party"

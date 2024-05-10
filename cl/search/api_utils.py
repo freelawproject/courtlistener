@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 import waffle
 from django.conf import settings
@@ -80,8 +81,7 @@ def get_object_list(request, cd, paginator):
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
     elif search_query and is_opinion_active:
-        if request.version == "v3":
-            cd["highlight"] = True
+        cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
             highlighting_fields = {"text": 500}
@@ -98,7 +98,7 @@ def get_object_list(request, cd, paginator):
         )
         main_query["caller"] = "api_search"
 
-    if cd["type"] == SEARCH_TYPES.RECAP and request.version == "v3":
+    if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
     if is_oral_argument_active or is_people_active or is_opinion_active:
@@ -106,8 +106,7 @@ def get_object_list(request, cd, paginator):
             main_query=main_query,
             offset=offset,
             page_size=page_size,
-            clean_data=cd,
-            version=request.version,
+            type=cd["type"],
         )
     else:
         sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
@@ -120,27 +119,18 @@ class ESList:
     as they are queried.
     """
 
-    def __init__(
-        self,
-        main_query,
-        offset,
-        page_size,
-        clean_data,
-        length=None,
-        version="v3",
-    ):
+    def __init__(self, main_query, offset, page_size, type, length=None):
         super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
-        self.clean_data = clean_data
+        self.type = type
         self._item_cache = []
         self._length = length
-        self._version = version
 
     def __len__(self):
         if self._length is None:
-            if self.clean_data["type"] == SEARCH_TYPES.OPINION:
+            if self.type == SEARCH_TYPES.OPINION:
                 query = Q(self.main_query.to_dict(count=True)["query"])
                 self._length = do_collapse_count_query(self.main_query, query)
             else:
@@ -164,30 +154,14 @@ class ESList:
         ]
         results = self.main_query.execute()
 
-        if self._version == "v4":
-            limit_inner_hits({}, results, self.clean_data["type"])
-            set_results_highlights(results, self.clean_data["type"])
-
         # Merge unavailable fields in ES by pulling data from the DB to make
-        # the API backwards compatible or retrieves the snippet from the DB
-        # when highlighting is disabled.
+        # the API backwards compatible for People.
         merge_unavailable_fields_on_parent_document(
             results,
-            self.clean_data["type"],
+            self.type,
             "api",
-            self.clean_data["highlight"],
         )
-
         for result in results:
-            child_result_objects = []
-            if hasattr(result, "child_docs"):
-                for child_doc in result.child_docs:
-                    child_result_objects.append(
-                        ESResultObject(initial=child_doc["_source"])
-                    )
-                result["child_docs"] = child_result_objects
-
-            # Send the object instead the JSON.
             self._item_cache.append(result)
 
         # Now, assuming our _item_cache is all set, we just get the item.
@@ -334,9 +308,16 @@ class CursorESList:
         # next or previous page link.
         self.page_size = page_size + 1
 
-    def get_paginated_results(self) -> tuple[Response, Response, Response]:
+    def get_paginated_results(
+        self,
+    ) -> tuple[list[defaultdict], int, Response, Response | None]:
         """Executes the search query with pagination settings and processes
         the results.
+
+        :return: A four-tuple containing a list of defaultdicts with the results,
+        the number of hits returned by the main query, a response object
+        related to the main query's cardinality count, and a response object
+        related to the child query's cardinality count, if available.
         """
         if self.search_after:
             self.main_query = self.main_query.extra(
@@ -392,8 +373,15 @@ class CursorESList:
                 logger.error("Multi-search API Error: %s", e)
                 raise ElasticServerError()
         self.process_results(self.results)
+
+        main_query_hits = self.results.hits.total.value
+        es_results_items = [
+            defaultdict(lambda: None, result.to_dict(skip_empty=False))
+            for result in self.results
+        ]
         return (
-            self.results,
+            es_results_items,
+            main_query_hits,
             cardinality_count_response,
             child_cardinality_count_response,
         )
@@ -416,7 +404,9 @@ class CursorESList:
             if hasattr(result, "child_docs"):
                 for child_doc in result.child_docs:
                     child_result_objects.append(
-                        ESResultObject(initial=child_doc["_source"])
+                        defaultdict(
+                            lambda: None, child_doc["_source"].to_dict()
+                        )
                     )
                 result["child_docs"] = child_result_objects
 
@@ -500,12 +490,6 @@ class ResultObject:
 
     def to_dict(self):
         return self._data
-
-
-class ESResultObject(ResultObject):
-
-    def __getattr__(self, key):
-        return getattr(self._data, key, None)
 
 
 def limit_api_results_to_page(
