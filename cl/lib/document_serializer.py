@@ -90,6 +90,18 @@ class HighlightedField(serializers.Field):
         return render_string_or_list(value)
 
 
+class NoneToListField(serializers.ListField):
+    """A custom ListField that returns an empty list when the original value is
+    None; otherwise, it returns the original value."""
+
+    def get_attribute(self, instance):
+        value = super().get_attribute(instance)
+        # Convert None to empty list explicitly here.
+        if value is None:
+            return []
+        return value
+
+
 class DocumentSerializer(serializers.Serializer):
     """A dynamic DocumentSerializer class."""
 
