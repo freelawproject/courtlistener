@@ -1573,7 +1573,6 @@ def merge_unavailable_fields_on_parent_document(
     search_type: str,
     request_type: Literal["frontend", "api"] = "frontend",
     highlight: bool = True,
-    api_version: Literal["v3", "v4"] = "v3",
 ) -> None:
     """Merges unavailable fields on parent document from the database into
     search results, not all fields are required in frontend, so that fields are
@@ -1583,7 +1582,6 @@ def merge_unavailable_fields_on_parent_document(
     :param search_type: The search type to perform.
     :param request_type: The request type, frontend or api.
     :param highlight: Whether highlighting is enabled.
-     :param api_version: The request API version.
     :return: None, the function modifies the search results object in place.
     """
 
@@ -1614,7 +1612,7 @@ def merge_unavailable_fields_on_parent_document(
                     result[cleaned_name] = value
         case (
             SEARCH_TYPES.RECAP | SEARCH_TYPES.RECAP_DOCUMENT
-        ) if request_type == "api" and api_version == "v4" and not highlight:
+        ) if request_type == "api" and not highlight:
             # Retrieves the plain_text from the DB to fill the snippet when
             # highlighting is disabled.
 
@@ -1650,9 +1648,7 @@ def merge_unavailable_fields_on_parent_document(
                         result["id"], ""
                     )
 
-        case (
-            SEARCH_TYPES.OPINION
-        ) if request_type == "api" and api_version == "v4" and not highlight:
+        case SEARCH_TYPES.OPINION if request_type == "api" and not highlight:
             # Retrieves the Opinion plain_text from the DB to fill the snippet
             # when highlighting is disabled. Considering the same prioritization
             # as in the OpinionDocument indexing into ES.
@@ -2823,7 +2819,7 @@ def do_es_api_query(
                 main_query = main_query.extra(**extra_options)
         else:
             # DOCKETS, RECAP and OPINION search types. Use the same query
-            # parameters as in the frontend. Only switch highlighting according 
+            # parameters as in the frontend. Only switch highlighting according
             # to the user request.
             main_query = add_es_highlighting(s, cd) if cd["highlight"] else s
     return main_query, child_docs_query

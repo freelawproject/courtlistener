@@ -276,6 +276,7 @@ class CursorESList:
         SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
         SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
         SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
+        SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
     }
 
     def __init__(
@@ -332,7 +333,7 @@ class CursorESList:
 
         # Cardinality query parameters
         query = Q(self.main_query.to_dict(count=True)["query"])
-        unique_field, search_document = self.unique_field_query[
+        unique_field, search_document = self.cardinality_query[
             self.clean_data["type"]
         ]
         base_search = search_document.search()
@@ -344,7 +345,7 @@ class CursorESList:
         child_cardinality_query = None
         child_cardinality_count_response = None
         if self.child_docs_query:
-            child_unique_field, _ = self.unique_field_query[
+            child_unique_field, _ = self.cardinality_query[
                 SEARCH_TYPES.RECAP_DOCUMENT
             ]
             child_cardinality_query = build_cardinality_count(
@@ -399,7 +400,6 @@ class CursorESList:
             self.clean_data["type"],
             "api",
             self.clean_data["highlight"],
-            self.version,
         )
         for result in results:
             child_result_objects = []
@@ -460,7 +460,7 @@ class CursorESList:
             "type": self.clean_data["type"],
         }
 
-        unique_field, _ = self.unique_field_query[self.clean_data["type"]]
+        unique_field, _ = self.cardinality_query[self.clean_data["type"]]
         # Use a document unique field as a unique sorting key for the current
         # search type.
         default_unique_order.update(

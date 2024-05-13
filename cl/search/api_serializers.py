@@ -552,10 +552,10 @@ class OpinionClusterESResultSerializer(DocumentSerializer):
     opinions = OpinionDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
-    dateArgued = DateField(read_only=True)
-    dateFiled = DateField(read_only=True)
-    dateReargued = DateField(read_only=True)
-    dateReargumentDenied = DateField(read_only=True)
+    dateArgued = CoerceDateField(read_only=True)
+    dateFiled = CoerceDateField(read_only=True)
+    dateReargued = CoerceDateField(read_only=True)
+    dateReargumentDenied = CoerceDateField(read_only=True)
     date_created = serializers.DateTimeField(
         read_only=True, default_timezone=timezone.utc
     )
