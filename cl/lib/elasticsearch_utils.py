@@ -67,9 +67,12 @@ from cl.search.constants import (
 )
 from cl.search.exception import (
     BadProximityQuery,
+    BadProximityQueryAPIError,
     QueryType,
     UnbalancedParenthesesQuery,
+    UnbalancedParenthesesQueryAPIError,
     UnbalancedQuotesQuery,
+    UnbalancedQuotesQueryAPIError,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -300,17 +303,11 @@ def validate_query_syntax(value: str, query_type: QueryType) -> None:
     """
 
     if check_unbalanced_parenthesis(value):
-        raise UnbalancedParenthesesQuery(
-            "The query contains unbalanced parentheses.", query_type
-        )
+        raise UnbalancedParenthesesQuery(query_type)
     if check_unbalanced_quotes(value):
-        raise UnbalancedQuotesQuery(
-            "The query contains unbalanced quotes.", query_type
-        )
+        raise UnbalancedQuotesQuery(query_type)
     if check_for_proximity_tokens(value):
-        raise BadProximityQuery(
-            "The query contains an unrecognized proximity token.", query_type
-        )
+        raise BadProximityQuery(query_type)
 
 
 def build_fulltext_query(
@@ -2670,9 +2667,18 @@ def do_es_api_query(
     """
 
     child_docs_query = None
-    s, join_query = build_es_base_query(
-        search_query, cd, cd["highlight"], api_version
-    )
+
+    try:
+        s, join_query = build_es_base_query(
+            search_query, cd, cd["highlight"], api_version
+        )
+    except UnbalancedParenthesesQuery:
+        raise UnbalancedParenthesesQueryAPIError()
+    except UnbalancedQuotesQuery:
+        raise UnbalancedQuotesQueryAPIError()
+    except BadProximityQuery:
+        raise BadProximityQueryAPIError()
+
     extra_options: dict[str, dict[str, Any]] = {}
     if api_version == "v3":
         # Build query parameters for the ES V3 Search API endpoints.
