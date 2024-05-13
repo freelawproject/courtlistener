@@ -432,7 +432,7 @@ class OpinionESResultSerializer(DocumentSerializer):
         )
 
 
-class BaseV4MetaSerializer(serializers.Serializer):
+class NestedMetaSerializer(serializers.Serializer):
     """The base meta serializer V4 Search API."""
 
     timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
@@ -441,15 +441,29 @@ class BaseV4MetaSerializer(serializers.Serializer):
     )
 
 
-class RECAPMetaSerializer(BaseV4MetaSerializer):
-    """The base meta serializer V4 RECAP Search API."""
+class RECAPTypeNestedMetaSerializer(NestedMetaSerializer):
+    """The meta serializer for the RECAP search type includes the additional
+    more_docs field.
+    """
 
     more_docs = serializers.BooleanField(
         read_only=True, source="child_remaining"
     )
 
 
-class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
+class MetaMixin(serializers.Serializer):
+    """Mixin to add nested metadata serializer."""
+
+    meta = NestedMetaSerializer(source="*", read_only=True)
+
+
+class RECAPTypeMetaMixin(serializers.Serializer):
+    """Mixin to add nested metadata serializer for the RECAP search type."""
+
+    meta = RECAPTypeNestedMetaSerializer(source="*", read_only=True)
+
+
+class BaseRECAPDocumentESResultSerializer(MetaMixin, DocumentSerializer):
     """The base serializer class for RECAP_DOCUMENT search type results."""
 
     # Fields from the RECAPDocument
@@ -457,11 +471,6 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
     description = HighlightedField(read_only=True)
     short_description = HighlightedField(read_only=True)
     snippet = HighlightedField(read_only=True, source="plain_text")
-    meta = serializers.SerializerMethodField()
-
-    def get_meta(self, instance):
-        serializer = BaseV4MetaSerializer(instance, context=self.context)
-        return serializer.data
 
     class Meta:
         document = ESRECAPDocument
@@ -489,14 +498,6 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
             "timestamp",
             "pacer_case_id",
             "plain_text",
-        )
-
-
-class RECAPDocumentESResultSerializer(BaseRECAPDocumentESResultSerializer):
-    """The serializer for RECAP search type results."""
-
-    class Meta(BaseRECAPDocumentESResultSerializer.Meta):
-        exclude = BaseRECAPDocumentESResultSerializer.Meta.exclude + (
             "docket_id",
         )
 
@@ -531,24 +532,21 @@ class BaseDocketESResultSerializer(DocumentSerializer):
         )
 
 
-class DocketESResultSerializer(BaseDocketESResultSerializer):
+class RECAPDocumentESResultSerializer(BaseRECAPDocumentESResultSerializer):
+    """The serializer for RECAP_DOCUMENT search type results."""
+
+    docket_id = serializers.IntegerField(read_only=True)
+
+
+class DocketESResultSerializer(MetaMixin, BaseDocketESResultSerializer):
     """The serializer class for DOCKETS Search type results."""
 
-    meta = serializers.SerializerMethodField()
 
-    def get_meta(self, instance):
-        serializer = BaseV4MetaSerializer(instance, context=self.context)
-        return serializer.data
-
-
-class RECAPESResultSerializer(BaseDocketESResultSerializer):
+class RECAPESResultSerializer(
+    RECAPTypeMetaMixin, BaseDocketESResultSerializer
+):
     """The serializer class for RECAP search type results."""
 
-    recap_documents = RECAPDocumentESResultSerializer(
+    recap_documents = BaseRECAPDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
-    meta = serializers.SerializerMethodField()
-
-    def get_meta(self, instance):
-        serializer = RECAPMetaSerializer(instance, context=self.context)
-        return serializer.data

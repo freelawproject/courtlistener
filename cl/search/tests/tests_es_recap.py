@@ -43,8 +43,8 @@ from cl.people_db.factories import (
     PersonFactory,
 )
 from cl.search.api_serializers import (
-    BaseRECAPDocumentESResultSerializer,
     DocketESResultSerializer,
+    RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
@@ -2642,9 +2642,7 @@ class DocketESResultSerializerTest(DocketESResultSerializer):
     date_score = CharField(read_only=True)
 
 
-class BaseRECAPDocumentESResultSerializerTest(
-    BaseRECAPDocumentESResultSerializer
-):
+class RECAPDocumentESResultSerializerTest(RECAPDocumentESResultSerializer):
     """The serializer class for testing RECAP_DOCUMENT search type results.
     Includes a date_score field for testing purposes.
     """
@@ -3226,8 +3224,8 @@ class RECAPSearchAPIV4Test(
         new=DocketESResultSerializerTest,
     )
     @mock.patch(
-        "cl.search.api_views.BaseRECAPDocumentESResultSerializer",
-        new=BaseRECAPDocumentESResultSerializerTest,
+        "cl.search.api_views.RECAPDocumentESResultSerializer",
+        new=RECAPDocumentESResultSerializerTest,
     )
     @mock.patch(
         "cl.search.api_views.RECAPESResultSerializer",
