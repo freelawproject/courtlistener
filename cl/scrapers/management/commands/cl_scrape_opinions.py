@@ -346,9 +346,9 @@ class Command(VerboseCommand):
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
 
-    def parse_and_scrape_site(self, mod, full_crawl):
+    def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site().parse()
-        self.scrape_court(site, full_crawl)
+        self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -384,7 +384,7 @@ class Command(VerboseCommand):
                 i += 1
                 continue
             try:
-                self.parse_and_scrape_site(mod, options["full_crawl"])
+                self.parse_and_scrape_site(mod, options)
             except Exception as e:
                 capture_exception(
                     e, fingerprint=[module_string, "{{ default }}"]

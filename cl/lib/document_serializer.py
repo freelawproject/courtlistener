@@ -68,14 +68,15 @@ class DateOrDateTimeField(serializers.Field):
             return value
 
 
-class DateField(serializers.Field):
-    """Handles date objects."""
+class CoerceDateField(serializers.Field):
+    """Coerces datetime-like inputs into a date representation. If the input
+    is not a datetime, it returns the date directly.
+    """
 
     def to_representation(self, value):
         if isinstance(value, datetime.datetime):
             return serializers.DateField().to_representation(value.date())
-        else:
-            return serializers.DateField().to_representation(value)
+        return serializers.DateField().to_representation(value)
 
 
 class NullableListField(serializers.ListField):
@@ -97,6 +98,18 @@ class HighlightedField(serializers.Field):
 
     def to_representation(self, value):
         return render_string_or_list(value)
+
+
+class NoneToListField(serializers.ListField):
+    """A custom ListField that returns an empty list when the original value is
+    None; otherwise, it returns the original value."""
+
+    def get_attribute(self, instance):
+        value = super().get_attribute(instance)
+        # Convert None to empty list explicitly here.
+        if value is None:
+            return []
+        return value
 
 
 class DocumentSerializer(serializers.Serializer):

@@ -1,9 +1,9 @@
 from base64 import b64decode, b64encode
+from collections import defaultdict
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.paginator import InvalidPage
-from elasticsearch_dsl.response import Response as ESResponse
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import BasePagination, PageNumberPagination
 from rest_framework.request import Request
@@ -81,23 +81,21 @@ class ESCursorPagination(BasePagination):
     search_after param.
     """
 
-    def __init__(self):
-        self.page_size = settings.SEARCH_API_PAGE_SIZE
-        self.request = None
-        self.es_list_instance = None
-        self.results_count_exact = None
-        self.results_count_approximate = None
-        self.child_results_count = None
-        self.results_in_page = None
-        self.base_url = None
-        self.cursor = None
-        self.search_type = None
-        self.cursor_query_param = "cursor"
-        self.invalid_cursor_message = "Invalid cursor"
+    request = None
+    es_list_instance = None
+    results_count_exact = None
+    results_count_approximate = None
+    child_results_count = None
+    results_in_page = None
+    base_url = None
+    cursor = None
+    search_type = None
+    cursor_query_param = "cursor"
+    invalid_cursor_message = "Invalid cursor"
 
     def paginate_queryset(
         self, es_list_instance: CursorESList, request: Request, view=None
-    ) -> ESResponse:
+    ) -> list[defaultdict]:
         """Paginate the Elasticsearch query and retrieve the results."""
 
         self.base_url = request.build_absolute_uri()
@@ -105,13 +103,15 @@ class ESCursorPagination(BasePagination):
         self.es_list_instance = es_list_instance
         self.search_type = self.es_list_instance.clean_data["type"]
         self.cursor = self.decode_cursor(request)
-        self.es_list_instance.set_pagination(self.cursor, self.page_size)
-        results, cardinality_count, child_cardinality_count = (
+        self.es_list_instance.set_pagination(
+            self.cursor, settings.SEARCH_API_PAGE_SIZE
+        )
+        results, main_hits, cardinality_count, child_cardinality_count = (
             self.es_list_instance.get_paginated_results()
         )
         self.results_in_page = len(results)
         self.results_count_approximate = cardinality_count
-        self.results_count_exact = results.hits.total.value
+        self.results_count_exact = main_hits
         self.child_results_count = child_cardinality_count
         return results
 
@@ -224,7 +224,7 @@ class ESCursorPagination(BasePagination):
         return (
             self.results_count_exact
             if self.results_count_exact
-            <= settings.ELASTICSEARCH_MAX_RESULT_COUNT
+            < settings.ELASTICSEARCH_MAX_RESULT_COUNT
             else approximate_count
         )
 
@@ -244,7 +244,7 @@ class ESCursorPagination(BasePagination):
             # If this is the first page or if going forward, check if the
             # number of results on the page exceeds the page size.
             # This indicates that there is a next page.
-            return self.results_in_page > self.page_size
+            return self.results_in_page > settings.SEARCH_API_PAGE_SIZE
 
         # If going backward, it indicates that there was a next page.
         return True
@@ -261,7 +261,7 @@ class ESCursorPagination(BasePagination):
             # If going backwards, check if the results contains more items than
             # the page size. This indicates that there is a previous page to
             # display.
-            return self.results_in_page > self.page_size
+            return self.results_in_page > settings.SEARCH_API_PAGE_SIZE
 
         # If going forward, it indicates that there was a previous page.
         return True

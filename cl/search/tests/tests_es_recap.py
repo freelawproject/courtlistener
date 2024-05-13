@@ -16,7 +16,11 @@ from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 
-from cl.lib.elasticsearch_utils import build_es_main_query, fetch_es_results
+from cl.lib.elasticsearch_utils import (
+    build_es_main_query,
+    fetch_es_results,
+    merge_unavailable_fields_on_parent_document,
+)
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     IndexedSolrTestCase,
@@ -2705,6 +2709,9 @@ class RECAPSearchAPIV4Test(
                     court=cls.court_api,
                     date_reargued=None,
                     source=Docket.RECAP_AND_SCRAPER,
+                    pacer_case_id=None,
+                    case_name="",
+                    case_name_full="",
                 ),
                 description="",
             )
@@ -2728,6 +2735,16 @@ class RECAPSearchAPIV4Test(
             )
             # Index parties in ES.
             index_docket_parties_in_es.delay(cls.de_api.docket.pk)
+
+    @staticmethod
+    def mock_merge_unavailable_fields_on_parent_document(*args, **kwargs):
+        """Mock function that first deletes a specific RECAPDocument
+        and then calls the original merge function with the provided arguments.
+        """
+
+        rd = RECAPDocument.objects.get(pacer_doc_id="rd_to_delete")
+        rd.delete()
+        return merge_unavailable_fields_on_parent_document(*args, **kwargs)
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -3151,9 +3168,7 @@ class RECAPSearchAPIV4Test(
         total_rds = RECAPDocument.objects.all().count()
 
         ## Get count from cardinality.
-        with override_settings(
-            ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets - 1
-        ):
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets):
             # RECAP Search request, count dockets.
             r = self.client.get(
                 reverse("search-list", kwargs={"version": "v4"}), search_params
@@ -3185,7 +3200,7 @@ class RECAPSearchAPIV4Test(
                 msg="Document count should not be present.",
             )
 
-        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds - 1):
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds):
             # RECAP_DOCUMENT Search request, count RDs.
             search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
             r = self.client.get(
@@ -3203,7 +3218,9 @@ class RECAPSearchAPIV4Test(
             )
 
         ## Get count from main query.
-        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets):
+        with override_settings(
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_dockets + 1
+        ):
             # RECAP Search request, count dockets.
             search_params["type"] = SEARCH_TYPES.RECAP
             r = self.client.get(
@@ -3237,7 +3254,7 @@ class RECAPSearchAPIV4Test(
                 msg="Document count should not be present.",
             )
 
-        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds):
+        with override_settings(ELASTICSEARCH_MAX_RESULT_COUNT=total_rds + 1):
             # RECAP_DOCUMENT Search request, count RDs.
             search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
             r = self.client.get(
@@ -3550,6 +3567,92 @@ class RECAPSearchAPIV4Test(
             rd_type_v4_api_keys,
             recap_document_v4_api_keys,
         )
+
+    def test_render_missing_fields_from_es_document(self) -> None:
+        """Confirm that missing fields from an ES document can be properly
+        rendered in the API response.
+
+        This can occur when fields are added to the document mapping but have
+        not yet been indexed in the document because a document reindex is
+        required.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de_no_cites = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_api,
+                    date_reargued=None,
+                    source=Docket.RECAP_AND_SCRAPER,
+                ),
+                description="",
+            )
+
+        rd_no_cites = RECAPDocumentFactory(
+            docket_entry=de_no_cites,
+            description="latest null rd",
+            pacer_doc_id="",
+        )
+
+        doc = ESRECAPDocument().prepare(rd_no_cites)
+        doc_id = ES_CHILD_ID(rd_no_cites.pk).OPINION
+        es_args = {"_routing": de_no_cites.docket.pk, "meta": {"id": doc_id}}
+        doc.pop("cites")
+        ESRECAPDocument(**es_args, **doc).save(
+            skip_empty=False,
+            return_doc_meta=True,
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
+        )
+        search_params = {
+            "type": SEARCH_TYPES.RECAP_DOCUMENT,
+            "q": f"id:{rd_no_cites.pk}",
+            "order_by": "score desc",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}),
+            search_params,
+        )
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(r.data["results"][0]["cites"], [])
+
+    def test_handle_missing_documents_merging_values_from_db(self) -> None:
+        """Confirm that we can gracefully handle documents returned by ES on a
+        page that have been removed from the DB.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_entry = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_api,
+                    source=Docket.RECAP_AND_SCRAPER,
+                ),
+                description="",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=docket_entry,
+                pacer_doc_id="rd_to_delete",
+                plain_text="Lorem ipsum",
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{rd.pk}",
+            "order_by": "score desc",
+        }
+
+        with mock.patch(
+            "cl.search.api_utils.merge_unavailable_fields_on_parent_document",
+            side_effect=self.mock_merge_unavailable_fields_on_parent_document,
+        ):
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}),
+                search_params,
+            )
+        self.assertEqual(len(r.data["results"]), 1)
+        self.assertEqual(
+            r.data["results"][0]["recap_documents"][0]["snippet"], ""
+        )
+
+        docket_entry.docket.delete()
 
     def test_dates_sorting_function_score_for_rd_type(self) -> None:
         """Test if the function score used for the dateFiled and entry_date_filed
@@ -4393,9 +4496,10 @@ class IndexDocketRECAPDocumentsCommandTest(
             s.count(), 1, msg="Wrong number of RECAPDocuments returned."
         )
 
-    def test_index_missing_parent_docs_when_indexing_only_child_docs(self):
-        """Confirm the command can properly index missing dockets when indexing
-        only RECAPDocuments.
+    def test_index_only_child_docs_when_parent_docs_are_missed(self):
+        """Confirm that the command can index only RECAP Documents when the
+        parent Docket is missed. Afterward, when the Docket is indexed, the
+        RDs are properly linked to the Docket.
         """
 
         s = DocketDocument.search().query("match_all")
@@ -4409,11 +4513,12 @@ class IndexDocketRECAPDocumentsCommandTest(
             document_type="child",
         )
 
-        # Dockets and the RECAPDocuments should be indexed.
+        # Dockets are not indexed yet.
         s = DocketDocument.search()
         s = s.query(Q("match", docket_child="docket"))
-        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        self.assertEqual(s.count(), 0, msg="Wrong number of Dockets returned.")
 
+        # RECAPDocuments should be indexed.
         s = DocketDocument.search()
         s = s.query(Q("match", docket_child="recap_document"))
         self.assertEqual(
@@ -4431,7 +4536,6 @@ class IndexDocketRECAPDocumentsCommandTest(
                 ESRECAPDocument.exists(id=ES_CHILD_ID(rd_pk).RECAP)
             )
 
-        # Confirm parent-child relation.
         s = DocketDocument.search()
         s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
         self.assertEqual(
@@ -4442,6 +4546,28 @@ class IndexDocketRECAPDocumentsCommandTest(
         self.assertEqual(
             s.count(), 1, msg="Wrong number of RECAPDocuments returned."
         )
+
+        # Call cl_index_parent_and_child_docs command for RECAPDocuments.
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            document_type="parent",
+        )
+
+        # Confirm parent-child relation.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"docket_id:{self.de.docket.pk}",
+        }
+        r = self.client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        article = tree.xpath("//article")
+        parent_count = len(article)
+        self.assertEqual(1, parent_count)
+        child_count = len(article[0].xpath(".//h4"))
+        self.assertEqual(2, child_count)
 
 
 class RECAPIndexingTest(

@@ -172,28 +172,38 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
     async def test_simple_pages(self) -> None:
         """Do all the simple pages load properly?"""
         reverse_params: List[Dict[str, Any]] = [
-            {"viewname": "faq"},
+            # Coverage
             {"viewname": "coverage"},
             {"viewname": "coverage_fds"},
             {"viewname": "coverage_recap"},
             {"viewname": "coverage_oa"},
+            # Info pages
+            {"viewname": "faq"},
             {"viewname": "feeds_info"},
             {"viewname": "contribute"},
+            {"viewname": "replication_docs"},
+            {"viewname": "terms"},
+            {"viewname": "robots"},
+            # Contact
             {"viewname": "contact"},
             {"viewname": "contact_thanks"},
+            # Help pages
+            {"viewname": "help_home"},
             {"viewname": "alert_help"},
             {"viewname": "delete_help"},
             {"viewname": "markdown_help"},
             {"viewname": "advanced_search"},
-            {"viewname": "webhooks_getting_started"},
-            {"viewname": "replication_docs"},
-            {"viewname": "webhooks_docs"},
-            {"viewname": "old_terms", "args": ["1"]},
-            {"viewname": "old_terms", "args": ["2"]},
-            {"viewname": "terms"},
-            {"viewname": "robots"},
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
+            # API help pages
+            {"viewname": "webhooks_docs"},
+            {"viewname": "webhooks_getting_started"},
+            {"viewname": "citation_lookup_api"},
+            {"viewname": "alert_api_help"},
+            {"viewname": "financial_disclosures_api_help"},
+            {"viewname": "search_api_help"},
+            {"viewname": "old_terms", "args": ["1"]},
+            {"viewname": "old_terms", "args": ["2"]},
         ]
         for reverse_param in reverse_params:
             with self.subTest(

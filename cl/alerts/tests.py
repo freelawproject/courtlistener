@@ -968,13 +968,6 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             RealTimeQueue.objects.create(
                 item_type=SEARCH_TYPES.OPINION, item_pk=rt_opinion.pk
             )
-            add_items_to_solr(
-                [
-                    rt_opinion.pk,
-                ],
-                "search.Opinion",
-                force_commit=True,
-            )
 
         webhooks_enabled = Webhook.objects.filter(enabled=True)
         self.assertEqual(len(webhooks_enabled), 3)
@@ -1061,6 +1054,44 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                         rate,
                     )
             webhook_events.delete()
+
+        rt_opinion.cluster.delete()
+
+    def test_alert_frequency_estimation(self):
+        """Test alert frequency ES API endpoint for Opinion Alerts."""
+
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Frequency Test O",
+        }
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "3", "day_count": "100"}
+            ),
+            search_params,
+        )
+        self.assertEqual(r.json()["count"], 0)
+
+        mock_date = now().replace(day=1, hour=5)
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            frequency_o = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__case_name="Frequency Test O",
+                cluster__date_filed=now().date(),
+                plain_text="Lorem dolor",
+            )
+
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "3", "day_count": "100"}
+            ),
+            search_params,
+        )
+        self.assertEqual(r.json()["count"], 1)
+
+        frequency_o.cluster.delete()
 
 
 class DocketAlertAPITests(APITestCase):

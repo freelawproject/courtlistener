@@ -10,9 +10,10 @@ from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_serializers import (
-    BaseDocketESResultSerializer,
+    BaseRECAPDocumentESResultSerializer,
     CourtSerializer,
     DocketEntrySerializer,
+    DocketESResultSerializer,
     DocketSerializer,
     ExtendedPersonESSerializer,
     OAESResultSerializer,
@@ -21,7 +22,6 @@ from cl.search.api_serializers import (
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
-    RECAPDocumentESResultSerializerBase,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
     SearchResultSerializer,
@@ -276,11 +276,11 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                         results_page, many=True
                     )
                 case SEARCH_TYPES.DOCKETS:
-                    serializer = BaseDocketESResultSerializer(
+                    serializer = DocketESResultSerializer(
                         results_page, many=True
                     )
                 case SEARCH_TYPES.RECAP_DOCUMENT:
-                    serializer = RECAPDocumentESResultSerializerBase(
+                    serializer = BaseRECAPDocumentESResultSerializer(
                         results_page, many=True
                     )
                 case SEARCH_TYPES.OPINION:

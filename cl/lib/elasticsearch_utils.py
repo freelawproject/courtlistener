@@ -5,7 +5,7 @@ import time
 import traceback
 from copy import deepcopy
 from dataclasses import fields
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
@@ -455,21 +455,21 @@ def toggle_sort_order(
     :return: A modified "order_by" string with toggled sort directions.
     """
 
-    if toggle_sorting and order_by:
-        sort_components = order_by.split(",")
-        toggle_sort_components = []
-        for component in sort_components:
-            component = component.strip()
-            if "desc" in component:
-                toggle_sort_components.append(component.replace("desc", "asc"))
-            elif "asc" in component:
-                toggle_sort_components.append(component.replace("asc", "desc"))
-            else:
-                toggle_sort_components.append(component)
+    if not toggle_sorting or order_by is None:
+        return order_by
 
-        return ", ".join(toggle_sort_components)
+    sort_components = order_by.split(",")
+    toggle_sort_components = []
+    for component in sort_components:
+        component = component.strip()
+        if "desc" in component:
+            toggle_sort_components.append(component.replace("desc", "asc"))
+        elif "asc" in component:
+            toggle_sort_components.append(component.replace("asc", "desc"))
+        else:
+            toggle_sort_components.append(component)
 
-    return order_by
+    return ", ".join(toggle_sort_components)
 
 
 def build_sort_results(
@@ -749,7 +749,7 @@ def build_highlights_dict(
 def build_custom_function_score_for_date(
     query: QueryString | str, order_by: tuple[str, str], default_score: int
 ) -> QueryString:
-    """Build a custom function score query for based on a date field.
+    """Build a custom function score query for sorting based on a date field.
 
     Define the function score for sorting, based on the child sort_field. When
     the order is 'entry_date_filed desc', the 'date_filed_time' value, adjusted
@@ -2823,11 +2823,9 @@ def do_es_api_query(
                 main_query = main_query.extra(**extra_options)
         else:
             # DOCKETS, RECAP and OPINION search types. Use the same query
-            # parameters as in the frontend. Only switch highlighting according
+            # parameters as in the frontend. Only switch highlighting according 
             # to the user request.
-            main_query = s
-            if cd["highlight"]:
-                main_query = add_es_highlighting(s, cd)
+            main_query = add_es_highlighting(s, cd) if cd["highlight"] else s
     return main_query, child_docs_query
 
 
@@ -2880,3 +2878,33 @@ def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
         logger.warning(f"Error was: {e}")
         total_results = None
     return total_results
+
+
+def do_es_alert_estimation_query(
+    search_query: Search, cd: CleanData, day_count: int
+) -> int:
+    """Builds an ES alert estimation query based on the provided search query,
+     clean data, and day count.
+
+    :param search_query: The Elasticsearch search query object.
+    :param cd: The cleaned data object containing the query and filters.
+    :param day_count: The number of days to subtract from today's date to set
+    the date range filter.
+    :return: An integer representing the alert estimation.
+    """
+
+    match cd["type"]:
+        case SEARCH_TYPES.OPINION:
+            after_field = "filed_after"
+            before_field = "filed_before"
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            after_field = "argued_after"
+            before_field = "argued_before"
+        case _:
+            raise NotImplementedError
+
+    cd[after_field] = date.today() - timedelta(days=int(day_count))
+    cd[before_field] = None
+    estimation_query, _ = build_es_base_query(search_query, cd)
+
+    return estimation_query.count()

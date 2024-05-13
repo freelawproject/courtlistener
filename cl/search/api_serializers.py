@@ -9,9 +9,10 @@ from cl.api.utils import HyperlinkedModelSerializerWithId
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.extras import get_highlight
 from cl.lib.document_serializer import (
-    DateField,
+    CoerceDateField,
     DocumentSerializer,
     HighlightedField,
+    NoneToListField,
     NullableListField,
     TimeStampField,
 )
@@ -432,11 +433,12 @@ class V3OpinionESResultSerializer(DocumentSerializer):
         )
 
 
-class RECAPDocumentESResultSerializerBase(DocumentSerializer):
-    """The serializer for RECAPDocument results."""
+class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
+    """The base serializer class for RECAP_DOCUMENT search type results."""
 
     # Fields from the RECAPDocument
     timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    cites = NoneToListField(read_only=True, required=False)
     description = HighlightedField(read_only=True)
     short_description = HighlightedField(read_only=True)
     snippet = HighlightedField(read_only=True, source="plain_text")
@@ -469,25 +471,24 @@ class RECAPDocumentESResultSerializerBase(DocumentSerializer):
         )
 
 
-class RECAPDocumentESResultSerializer(RECAPDocumentESResultSerializerBase):
-    """The serializer for RECAPDocument results."""
+class RECAPDocumentESResultSerializer(BaseRECAPDocumentESResultSerializer):
+    """The serializer for RECAP search type results."""
 
-    class Meta(RECAPDocumentESResultSerializerBase.Meta):
-        exclude = RECAPDocumentESResultSerializerBase.Meta.exclude + (
+    class Meta(BaseRECAPDocumentESResultSerializer.Meta):
+        exclude = BaseRECAPDocumentESResultSerializer.Meta.exclude + (
             "docket_id",
         )
 
 
-class BaseDocketESResultSerializer(DocumentSerializer):
-    """The base serializer for Docket results."""
+class DocketESResultSerializer(DocumentSerializer):
+    """The serializer class for DOCKETS Search type results."""
 
     # Fields from the Docket.
     referred_to_id = serializers.IntegerField(read_only=True)
     assigned_to_id = serializers.IntegerField(read_only=True)
-    pacer_case_id = serializers.IntegerField(read_only=True)
-    dateArgued = DateField(read_only=True)
-    dateFiled = DateField(read_only=True)
-    dateTerminated = DateField(read_only=True)
+    dateArgued = CoerceDateField(read_only=True)
+    dateFiled = CoerceDateField(read_only=True)
+    dateTerminated = CoerceDateField(read_only=True)
     date_created = serializers.DateTimeField(
         read_only=True, default_timezone=timezone.utc
     )
@@ -510,8 +511,8 @@ class BaseDocketESResultSerializer(DocumentSerializer):
         )
 
 
-class RECAPESResultSerializer(BaseDocketESResultSerializer):
-    """The serializer for RECAP Search results."""
+class RECAPESResultSerializer(DocketESResultSerializer):
+    """The serializer class for RECAP search type results."""
 
     recap_documents = RECAPDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
