@@ -58,12 +58,6 @@ from cl.search.documents import (
     PersonDocument,
     PositionDocument,
 )
-from cl.search.exception import (
-    bad_proximity_query_error_msg,
-    default_bad_request_error_msg,
-    unbalanced_parentheses_error_msg,
-    unbalanced_quotes_error_msg,
-)
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -932,10 +926,13 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
             reverse("search-list", kwargs={"version": "v4"}), params
         )
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.data["detail"], default_bad_request_error_msg)
+        self.assertEqual(
+            r.data["detail"],
+            "Elasticsearch Bad request error. Please review your query.",
+        )
 
     async def test_es_bad_syntax_proximity_tokens(self) -> None:
-        """Can we properly raise the BadProximityQueryAPIError exception?"""
+        """Can we properly raise the BadProximityQuery exception?"""
 
         params = {
             "type": SEARCH_TYPES.RECAP,
@@ -945,20 +942,25 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
             reverse("search-list", kwargs={"version": "v4"}), params
         )
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.data["detail"], bad_proximity_query_error_msg)
+        self.assertEqual(
+            r.data["detail"],
+            "The query contains an unrecognized proximity token.",
+        )
 
     async def test_es_unbalanced_quotes(self) -> None:
-        """Can we properly raise the UnbalancedQuotesQueryAPIError exception?"""
+        """Can we properly raise the UnbalancedQuotesQuery exception?"""
 
         params = {"type": SEARCH_TYPES.RECAP, "q": 'Test query with "quotes'}
         r = await self.async_client.get(
             reverse("search-list", kwargs={"version": "v4"}), params
         )
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.data["detail"], unbalanced_quotes_error_msg)
+        self.assertEqual(
+            r.data["detail"], "The query contains unbalanced quotes."
+        )
 
     async def test_handle_unbalanced_parentheses(self) -> None:
-        """Can we properly raise the UnbalancedParenthesesQueryAPIError
+        """Can we properly raise the UnbalancedParenthesesQuery
         exception?
         """
 
@@ -970,7 +972,9 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
             reverse("search-list", kwargs={"version": "v4"}), params
         )
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(r.data["detail"], unbalanced_parentheses_error_msg)
+        self.assertEqual(
+            r.data["detail"], "The query contains unbalanced parentheses."
+        )
 
 
 class PagerankTest(TestCase):

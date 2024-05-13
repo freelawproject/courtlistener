@@ -67,12 +67,10 @@ from cl.search.constants import (
 )
 from cl.search.exception import (
     BadProximityQuery,
-    BadProximityQueryAPIError,
+    ElasticBadRequestError,
     QueryType,
     UnbalancedParenthesesQuery,
-    UnbalancedParenthesesQueryAPIError,
     UnbalancedQuotesQuery,
-    UnbalancedQuotesQueryAPIError,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -2672,12 +2670,12 @@ def do_es_api_query(
         s, join_query = build_es_base_query(
             search_query, cd, cd["highlight"], api_version
         )
-    except UnbalancedParenthesesQuery:
-        raise UnbalancedParenthesesQueryAPIError()
-    except UnbalancedQuotesQuery:
-        raise UnbalancedQuotesQueryAPIError()
-    except BadProximityQuery:
-        raise BadProximityQueryAPIError()
+    except (
+        UnbalancedParenthesesQuery,
+        UnbalancedQuotesQuery,
+        BadProximityQuery,
+    ) as e:
+        raise ElasticBadRequestError(detail=e.message)
 
     extra_options: dict[str, dict[str, Any]] = {}
     if api_version == "v3":
