@@ -617,8 +617,8 @@ class PositionESResultSerializer(DocumentSerializer):
 class PersonESResultSerializer(DocumentSerializer):
     """The serializer for Person Search results."""
 
-    dob = DateField(read_only=True)
-    dod = DateField(read_only=True)
+    dob = CoerceDateField(read_only=True)
+    dod = CoerceDateField(read_only=True)
     date_created = serializers.DateTimeField(
         read_only=True, default_timezone=timezone.utc
     )
