@@ -432,11 +432,41 @@ class OpinionESResultSerializer(DocumentSerializer):
         )
 
 
-class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
+class MetaDataSerializer(serializers.Serializer):
+    """The metadata serializer V4 Search API."""
+
+    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
+    date_created = TimeStampField(
+        read_only=True, default_timezone=timezone.utc
+    )
+
+
+class RECAPMetaDataSerializer(MetaDataSerializer):
+    """The metadata serializer for the RECAP search type includes the
+    additional more_docs field.
+    """
+
+    more_docs = serializers.BooleanField(
+        read_only=True, source="child_remaining"
+    )
+
+
+class MetaMixin(serializers.Serializer):
+    """Mixin to add nested metadata serializer."""
+
+    meta = MetaDataSerializer(source="*", read_only=True)
+
+
+class RECAPMetaMixin(serializers.Serializer):
+    """Mixin to add nested metadata serializer for the RECAP search type."""
+
+    meta = RECAPMetaDataSerializer(source="*", read_only=True)
+
+
+class BaseRECAPDocumentESResultSerializer(MetaMixin, DocumentSerializer):
     """The base serializer class for RECAP_DOCUMENT search type results."""
 
     # Fields from the RECAPDocument
-    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
     cites = NoneToListField(read_only=True, required=False)
     description = HighlightedField(read_only=True)
     short_description = HighlightedField(read_only=True)
@@ -465,21 +495,14 @@ class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
             "chapter",
             "trustee_str",
             "date_created",
+            "timestamp",
             "pacer_case_id",
             "plain_text",
-        )
-
-
-class RECAPDocumentESResultSerializer(BaseRECAPDocumentESResultSerializer):
-    """The serializer for RECAP search type results."""
-
-    class Meta(BaseRECAPDocumentESResultSerializer.Meta):
-        exclude = BaseRECAPDocumentESResultSerializer.Meta.exclude + (
             "docket_id",
         )
 
 
-class DocketESResultSerializer(DocumentSerializer):
+class BaseDocketESResultSerializer(DocumentSerializer):
     """The serializer class for DOCKETS Search type results."""
 
     # Fields from the Docket.
@@ -488,10 +511,6 @@ class DocketESResultSerializer(DocumentSerializer):
     dateArgued = CoerceDateField(read_only=True)
     dateFiled = CoerceDateField(read_only=True)
     dateTerminated = CoerceDateField(read_only=True)
-    date_created = serializers.DateTimeField(
-        read_only=True, default_timezone=timezone.utc
-    )
-    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
     assignedTo = HighlightedField(read_only=True)
     caseName = HighlightedField(read_only=True)
     cause = HighlightedField(read_only=True)
@@ -507,15 +526,25 @@ class DocketESResultSerializer(DocumentSerializer):
             "_related_instance_to_ignore",
             "docket_child",
             "docket_slug",
+            "court_exact",
+            "timestamp",
+            "date_created",
         )
 
 
-class RECAPESResultSerializer(DocketESResultSerializer):
+class RECAPDocumentESResultSerializer(BaseRECAPDocumentESResultSerializer):
+    """The serializer for RECAP_DOCUMENT search type results."""
+
+    docket_id = serializers.IntegerField(read_only=True)
+
+
+class DocketESResultSerializer(MetaMixin, BaseDocketESResultSerializer):
+    """The serializer class for DOCKETS Search type results."""
+
+
+class RECAPESResultSerializer(RECAPMetaMixin, BaseDocketESResultSerializer):
     """The serializer class for RECAP search type results."""
 
-    recap_documents = RECAPDocumentESResultSerializer(
+    recap_documents = BaseRECAPDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
-    )
-    more_docs = serializers.BooleanField(
-        read_only=True, source="child_remaining"
     )
