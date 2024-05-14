@@ -304,7 +304,8 @@ def check_for_proximity_tokens(query: str) -> bool:
     Otherwise False
     """
 
-    return "/s" in query or "/p" in query
+    pattern = r"/s(?!\w)|/p(?!\w)"
+    return bool(re.search(pattern, query))
 
 
 def check_unbalanced_parenthesis(query: str) -> bool:
