@@ -67,6 +67,7 @@ from cl.search.constants import (
 )
 from cl.search.exception import (
     BadProximityQuery,
+    ElasticBadRequestError,
     QueryType,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
@@ -300,17 +301,11 @@ def validate_query_syntax(value: str, query_type: QueryType) -> None:
     """
 
     if check_unbalanced_parenthesis(value):
-        raise UnbalancedParenthesesQuery(
-            "The query contains unbalanced parentheses.", query_type
-        )
+        raise UnbalancedParenthesesQuery(query_type)
     if check_unbalanced_quotes(value):
-        raise UnbalancedQuotesQuery(
-            "The query contains unbalanced quotes.", query_type
-        )
+        raise UnbalancedQuotesQuery(query_type)
     if check_for_proximity_tokens(value):
-        raise BadProximityQuery(
-            "The query contains an unrecognized proximity token.", query_type
-        )
+        raise BadProximityQuery(query_type)
 
 
 def build_fulltext_query(
@@ -759,16 +754,13 @@ def build_custom_function_score_for_date(
     :return: The modified QueryString object with applied function score.
     """
 
-    midnight_current_date = (
-        datetime.datetime.combine(default_current_date, datetime.time())
-        if default_current_date
-        else None
-    )
-    default_current_time = (
-        int(midnight_current_date.timestamp() * 1000)
-        if midnight_current_date
-        else None
-    )
+    default_current_time = None
+    if default_current_date:
+        midnight_current_date = datetime.datetime.combine(
+            default_current_date, datetime.time()
+        )
+        default_current_time = int(midnight_current_date.timestamp() * 1000)
+
     sort_field, order = order_by
     query = Q(
         "function_score",
@@ -2712,9 +2704,18 @@ def do_es_api_query(
     """
 
     child_docs_query = None
-    s, join_query = build_es_base_query(
-        search_query, cd, cd["highlight"], api_version
-    )
+
+    try:
+        s, join_query = build_es_base_query(
+            search_query, cd, cd["highlight"], api_version
+        )
+    except (
+        UnbalancedParenthesesQuery,
+        UnbalancedQuotesQuery,
+        BadProximityQuery,
+    ) as e:
+        raise ElasticBadRequestError(detail=e.message)
+
     extra_options: dict[str, dict[str, Any]] = {}
     if api_version == "v3":
         # Build query parameters for the ES V3 Search API endpoints.

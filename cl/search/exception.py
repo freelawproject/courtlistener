@@ -14,21 +14,26 @@ class SyntaxQueryError(SerializationError):
     QUERY_STRING = QueryType.QUERY_STRING
     FILTER = QueryType.QUERY_STRING.FILTER
 
-    def __init__(self, message, error_type):
-        super().__init__(message)
+    def __init__(self, error_type):
         self.error_type = error_type
 
 
 class UnbalancedParenthesesQuery(SyntaxQueryError):
     """Data passed in has unbalanced parentheses"""
 
+    message = "The query contains unbalanced parentheses."
+
 
 class UnbalancedQuotesQuery(SyntaxQueryError):
     """Data passed in has unbalanced quotes"""
 
+    message = "The query contains unbalanced quotes."
+
 
 class BadProximityQuery(SyntaxQueryError):
     """Data passed in has contains a not supported search proximity token"""
+
+    message = "The query contains an unrecognized proximity token."
 
 
 class ElasticServerError(APIException):
