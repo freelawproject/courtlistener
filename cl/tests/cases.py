@@ -237,32 +237,69 @@ class CountESTasksTestCase(SimpleTestCase):
 class V4SearchAPIAssertions(SimpleTestCase):
     """Common assertions for V4 Search API tests."""
 
+    async def _compare_field(
+        self,
+        meta_field,
+        meta_value,
+        meta_fields_to_compare,
+        content_to_compare,
+    ):
+        get_meta_expected_value = meta_fields_to_compare.get(meta_field)
+        meta_expected_value = await sync_to_async(get_meta_expected_value)(
+            content_to_compare
+        )
+        self.assertEqual(
+            meta_value,
+            meta_expected_value,
+            f"The field '{meta_field}' does not match.",
+        )
+
     async def _test_api_fields_content(
         self,
         api_response,
         content_to_compare,
         fields_to_compare,
         child_document_keys,
+        meta_fields_to_compare,
     ):
         for (
             field,
             get_expected_value,
         ) in fields_to_compare.items():
             with self.subTest(field=field):
-                actual_value = api_response.data["results"][0].get(field)
+                parent_document = api_response.data["results"][0]
+                actual_value = parent_document.get(field)
                 if field in ["recap_documents", "opinions", "positions"]:
-                    for child_field, child_value in actual_value[0].items():
+                    child_document = actual_value[0]
+                    for child_field, child_value in child_document.items():
                         with self.subTest(child_field=child_field):
-                            get_child_expected_value = child_document_keys.get(
-                                child_field
-                            )
-                            child_expected_value = await sync_to_async(
-                                get_child_expected_value
-                            )(content_to_compare)
-                            self.assertEqual(
-                                child_value,
-                                child_expected_value,
-                                f"Child field '{field}' does not match.",
+                            if child_field == "meta":
+                                for (
+                                    meta_field,
+                                    meta_value,
+                                ) in child_value.items():
+                                    with self.subTest(meta_field=meta_field):
+                                        await self._compare_field(
+                                            meta_field,
+                                            meta_value,
+                                            meta_fields_to_compare,
+                                            content_to_compare,
+                                        )
+                            else:
+                                await self._compare_field(
+                                    child_field,
+                                    child_value,
+                                    child_document_keys,
+                                    content_to_compare,
+                                )
+                elif field == "meta":
+                    for meta_field, meta_value in actual_value.items():
+                        with self.subTest(meta_field=meta_field):
+                            await self._compare_field(
+                                meta_field,
+                                meta_value,
+                                meta_fields_to_compare,
+                                content_to_compare,
                             )
                 else:
                     expected_value = await sync_to_async(get_expected_value)(
