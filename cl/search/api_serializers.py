@@ -441,7 +441,7 @@ class MetaDataSerializer(serializers.Serializer):
     )
 
 
-class RECAPTypeNestedMetaSerializer(MetaDataSerializer):
+class RECAPMetaDataSerializer(MetaDataSerializer):
     """The metadata serializer for the RECAP search type includes the
     additional more_docs field.
     """
@@ -457,10 +457,10 @@ class MetaMixin(serializers.Serializer):
     meta = MetaDataSerializer(source="*", read_only=True)
 
 
-class RECAPTypeMetaMixin(serializers.Serializer):
+class RECAPMetaMixin(serializers.Serializer):
     """Mixin to add nested metadata serializer for the RECAP search type."""
 
-    meta = RECAPTypeNestedMetaSerializer(source="*", read_only=True)
+    meta = RECAPMetaDataSerializer(source="*", read_only=True)
 
 
 class BaseRECAPDocumentESResultSerializer(MetaMixin, DocumentSerializer):
@@ -542,9 +542,7 @@ class DocketESResultSerializer(MetaMixin, BaseDocketESResultSerializer):
     """The serializer class for DOCKETS Search type results."""
 
 
-class RECAPESResultSerializer(
-    RECAPTypeMetaMixin, BaseDocketESResultSerializer
-):
+class RECAPESResultSerializer(RECAPMetaMixin, BaseDocketESResultSerializer):
     """The serializer class for RECAP search type results."""
 
     recap_documents = BaseRECAPDocumentESResultSerializer(
