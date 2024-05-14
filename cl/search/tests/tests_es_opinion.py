@@ -469,8 +469,10 @@ class OpinionV3APISearchTest(
         created_opinions = []
         opinions_to_create = 20
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            for _ in range(opinions_to_create):
-                opinion = OpinionWithParentsFactory()
+            for i in range(opinions_to_create):
+                opinion = OpinionWithParentsFactory(
+                    cluster__date_filed=datetime.date(2000, 6, i + 1)
+                )
                 created_opinions.append(opinion)
 
         page_size = 20
@@ -479,7 +481,7 @@ class OpinionV3APISearchTest(
         ids_in_results = set()
         cd = {
             "type": SEARCH_TYPES.OPINION,
-            "order_by": "score desc",
+            "order_by": "date_filed desc",
             "highlight": False,
         }
         for page in range(1, total_pages + 1):
