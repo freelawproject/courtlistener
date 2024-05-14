@@ -15,11 +15,13 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
+from rest_framework.serializers import CharField
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
+    set_results_highlights,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -37,6 +39,11 @@ from cl.people_db.factories import (
     PartyFactory,
     PartyTypeFactory,
     PersonFactory,
+)
+from cl.search.api_serializers import (
+    BaseRECAPDocumentESResultSerializer,
+    DocketESResultSerializer,
+    RECAPESResultSerializer,
 )
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
@@ -2626,6 +2633,32 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         )
 
 
+class DocketESResultSerializerTest(DocketESResultSerializer):
+    """The serializer class for testing DOCKETS search type results. Includes a
+    date_score field for testing purposes.
+    """
+
+    date_score = CharField(read_only=True)
+
+
+class BaseRECAPDocumentESResultSerializerTest(
+    BaseRECAPDocumentESResultSerializer
+):
+    """The serializer class for testing RECAP_DOCUMENT search type results.
+    Includes a date_score field for testing purposes.
+    """
+
+    date_score = CharField(read_only=True)
+
+
+class RECAPESResultSerializerTest(RECAPESResultSerializer):
+    """The serializer class for resting RECAP search type results. Includes a
+    date_score field for testing purposes.
+    """
+
+    date_score = CharField(read_only=True)
+
+
 class RECAPSearchAPIV4Test(
     RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
 ):
@@ -2724,7 +2757,7 @@ class RECAPSearchAPIV4Test(
             cls.empty_docket_api = DocketFactory(
                 court=cls.court_api,
                 date_argued=None,
-                source=Docket.RECAP,
+                source=Docket.RECAP_AND_IDB,
             )
             call_command(
                 "cl_index_parent_and_child_docs",
@@ -2745,6 +2778,16 @@ class RECAPSearchAPIV4Test(
         rd = RECAPDocument.objects.get(pacer_doc_id="rd_to_delete")
         rd.delete()
         return merge_unavailable_fields_on_parent_document(*args, **kwargs)
+
+    @staticmethod
+    def mock_set_results_highlights(results, search_type):
+        """Intercepts set_results_highlights as a helper to append the
+        date_score for testing purposes.
+        """
+        set_results_highlights(results, search_type)
+        for result in results:
+            if hasattr(result.meta, "sort"):
+                result["date_score"] = result.meta.sort[0]
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -2909,10 +2952,16 @@ class RECAPSearchAPIV4Test(
         of the RECAP Search API works as expected."""
 
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            docket_recent = DocketFactory(
-                case_name="SUBPOENAS SERVED NEW",
-                source=Docket.RECAP,
-                date_filed=datetime.date(2024, 2, 23),
+            # This Docket will be matched only by its RECAPDocument.
+            docket_entry_recent = DocketEntryWithParentsFactory(
+                docket__source=Docket.RECAP,
+                docket__case_name="Lorem Ipsum",
+                docket__date_filed=datetime.date(2024, 2, 23),
+                date_filed=datetime.date(2022, 2, 23),
+            )
+            RECAPDocumentFactory(
+                docket_entry=docket_entry_recent,
+                description="SUBPOENAS SERVED NEW",
             )
             docket_old = DocketFactory(
                 case_name="SUBPOENAS SERVED OLD",
@@ -2935,6 +2984,9 @@ class RECAPSearchAPIV4Test(
         params_date_filed_asc = search_params.copy()
         params_date_filed_asc["order_by"] = "dateFiled asc"
 
+        params_entry_date_filed_asc = search_params.copy()
+        params_entry_date_filed_asc["order_by"] = "entry_date_filed asc"
+
         params_match_all_date_filed_desc = search_params.copy()
         del params_match_all_date_filed_desc["q"]
         params_match_all_date_filed_desc["order_by"] = "dateFiled desc"
@@ -2942,17 +2994,24 @@ class RECAPSearchAPIV4Test(
         params_match_all_date_filed_asc = search_params.copy()
         del params_match_all_date_filed_asc["q"]
         params_match_all_date_filed_asc["order_by"] = "dateFiled asc"
+
+        params_match_all_entry_date_filed_asc = search_params.copy()
+        del params_match_all_entry_date_filed_asc["q"]
+        params_match_all_entry_date_filed_asc["order_by"] = (
+            "entry_date_filed asc"
+        )
+
         test_cases = [
             {
                 "name": "Query string, order by dateFiled desc",
                 "search_params": search_params,
                 "expected_results": 5,
                 "expected_order": [
-                    docket_recent.pk,
-                    self.de_1.docket.pk,
-                    self.de.docket.pk,
-                    docket_old.pk,
-                    docket_null_date_filed.pk,
+                    docket_entry_recent.docket.pk,  # 2024/02/23
+                    self.de_1.docket.pk,  # 2016/08/16
+                    self.de.docket.pk,  # 2015/8/16
+                    docket_old.pk,  # 1732/2/23
+                    docket_null_date_filed.pk,  # Null date_filed, pk 1
                 ],
             },
             {
@@ -2960,11 +3019,11 @@ class RECAPSearchAPIV4Test(
                 "search_params": params_date_filed_asc,
                 "expected_results": 5,
                 "expected_order": [
-                    docket_old.pk,
-                    self.de.docket.pk,
-                    self.de_1.docket.pk,
-                    docket_recent.pk,
-                    docket_null_date_filed.pk,
+                    docket_old.pk,  # 1732/2/23
+                    self.de.docket.pk,  # 2015/8/16
+                    self.de_1.docket.pk,  # 2016/08/16
+                    docket_entry_recent.docket.pk,  # 2024/02/23
+                    docket_null_date_filed.pk,  # Null date_filed, pk 1
                 ],
             },
             {
@@ -2972,7 +3031,7 @@ class RECAPSearchAPIV4Test(
                 "search_params": params_match_all_date_filed_desc,
                 "expected_results": 8,
                 "expected_order": [
-                    docket_recent.pk,  # 2024/2/23
+                    docket_entry_recent.docket.pk,  # 2024/2/23
                     self.de_1.docket.pk,  # 2016/8/16
                     self.de_api.docket.pk,  # 2016/4/16
                     self.de.docket.pk,  # 2015/8/16
@@ -2991,10 +3050,37 @@ class RECAPSearchAPIV4Test(
                     self.de.docket.pk,  # 2015/8/16
                     self.de_api.docket.pk,  # 2016/4/16
                     self.de_1.docket.pk,  # 2016/8/16
-                    docket_recent.pk,  # 2024/2/23
+                    docket_entry_recent.docket.pk,  # 2024/2/23
                     docket_null_date_filed.pk,  # Null date_filed, pk 3
                     self.empty_docket_api.pk,  # Null date_filed, pk 2
                     self.de_empty_fields_api.docket.pk,  # Null date_filed, pk 1
+                ],
+            },
+            {
+                "name": "Query string, order by entry_date_filed asc",
+                "search_params": params_entry_date_filed_asc,
+                "expected_results": 5,
+                "expected_order": [
+                    self.de_1.docket.pk,  # 2014/7/19
+                    self.de.docket.pk,  # 2015/8/16
+                    docket_entry_recent.docket.pk,  # 2022/2/23
+                    docket_null_date_filed.pk,  # Null date_filed, pk 3
+                    docket_old.pk,  # 1732/2/23 No RD, pk 2
+                ],
+            },
+            {
+                "name": "Match all query, order by  entry_date_filed asc",
+                "search_params": params_match_all_entry_date_filed_asc,
+                "expected_results": 8,
+                "expected_order": [
+                    self.de_1.docket.pk,  # 2014/7/19
+                    self.de.docket.pk,  # 2015/8/16
+                    self.de_api.docket.pk,  # 2020/8/19
+                    docket_entry_recent.docket.pk,  # 2022/2/23
+                    self.de_empty_fields_api.docket.pk,  # Null entry_date_filed but RD document, pk 1
+                    docket_null_date_filed.pk,  # No RD, pk 4 *
+                    docket_old.pk,  # No RD, pk 3 *
+                    self.empty_docket_api.pk,  # Null entry_date_filed, pk 2 *
                 ],
             },
         ]
@@ -3006,9 +3092,137 @@ class RECAPSearchAPIV4Test(
                 self._test_results_ordering(test, "docket_id")
 
         with self.captureOnCommitCallbacks(execute=True):
-            docket_recent.delete()
+            docket_entry_recent.docket.delete()
             docket_old.delete()
             docket_null_date_filed.delete()
+
+    @override_settings(SEARCH_API_PAGE_SIZE=1)
+    @mock.patch(
+        "cl.search.api_views.DocketESResultSerializer",
+        new=DocketESResultSerializerTest,
+    )
+    @mock.patch(
+        "cl.search.api_views.BaseRECAPDocumentESResultSerializer",
+        new=BaseRECAPDocumentESResultSerializerTest,
+    )
+    @mock.patch(
+        "cl.search.api_views.RECAPESResultSerializer",
+        new=RECAPESResultSerializerTest,
+    )
+    @mock.patch(
+        "cl.search.api_utils.set_results_highlights",
+        side_effect=mock_set_results_highlights,
+    )
+    def test_stable_scores_date_sort(
+        self, mock_set_results_highlights
+    ) -> None:
+        """Test if the function's score remains stable when used for sorting by
+        dateFiled asc and entry_date_filed asc across pagination, avoiding
+        the impact of time running on the scores.
+        """
+
+        # Query string, order by dateFiled desc
+        search_params = {
+            "q": "SUBPOENAS SERVED",
+            "order_by": "dateFiled asc",
+            "highlight": False,
+        }
+
+        # string query date_filed asc
+        date_filed_asc_string_query = search_params
+        # match_all query date_filed asc
+        date_filed_asc_match_all = search_params.copy()
+        del date_filed_asc_match_all["q"]
+        # string query entry_date_filed asc
+        entry_filed_asc_string_query = search_params.copy()
+        entry_filed_asc_string_query["order_by"] = "entry_date_filed asc"
+        # match_all query entry_date_filed asc
+        entry_filed_asc_match_all = entry_filed_asc_string_query.copy()
+        del entry_filed_asc_match_all["q"]
+
+        tests_params = [
+            date_filed_asc_string_query,
+            date_filed_asc_match_all,
+            entry_filed_asc_string_query,
+            entry_filed_asc_match_all,
+        ]
+        # Generate tests for all the search types.
+        all_tests = []
+
+        for test_param in tests_params:
+            for search_type in [
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+                SEARCH_TYPES.RECAP_DOCUMENT,
+            ]:
+                test_param_copy = test_param.copy()
+                test_param_copy["type"] = search_type
+                all_tests.append(test_param_copy)
+
+        original_datetime = now().replace(day=1, hour=5, minute=0)
+        for search_params in all_tests:
+            with self.subTest(
+                search_params=search_params, msg="Test stable scores."
+            ), time_machine.travel(original_datetime, tick=False) as traveler:
+                # Two first-page requests (no cursor) made on the same day will
+                # now have consistent scores because scores are now computed
+                # based on the same day's date.
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                date_score_1 = r.data["results"][0]["date_score"]
+
+                traveler.shift(datetime.timedelta(minutes=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                date_score_2 = r.data["results"][0]["date_score"]
+                self.assertEqual(date_score_1, date_score_2)
+
+                # Two first-page requests (no cursor) made on different days
+                # will present scores variations, due to it being a different
+                # day and date_filed and entry_date_filed are day granular.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                date_score_1 = r.data["results"][0]["date_score"]
+
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                date_score_2 = r.data["results"][0]["date_score"]
+
+                self.assertNotEqual(date_score_2, date_score_1)
+
+                # Two next_page requests preserve the same scores even thought
+                # they are executed on different days. Since scores are computed
+                # base on the cursor context date.
+                next_page = r.data["next"]
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(next_page)
+                date_score_next_1 = r.data["results"][0]["date_score"]
+
+                # Two next_page requests preserve the same scores even though
+                # they are executed on different days. Since scores are computed
+                # based on the cursor context date.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(next_page)
+                date_score_next_2 = r.data["results"][0]["date_score"]
+                previous_page = r.data["previous"]
+                self.assertEqual(date_score_next_1, date_score_next_2)
+
+                # Now, going to the previous page, the score should be the same
+                # as the first request that showed the document.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(previous_page)
+                date_score_previous_2 = r.data["results"][0]["date_score"]
+                self.assertEqual(date_score_2, date_score_previous_2)
 
     @override_settings(SEARCH_API_PAGE_SIZE=6)
     def test_recap_results_cursor_api_pagination_for_r_type(self) -> None:

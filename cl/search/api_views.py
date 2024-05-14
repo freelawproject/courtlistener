@@ -243,6 +243,10 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             cd = search_form.cleaned_data
             search_type = cd["type"]
             search_query = self.document_search_classes[search_type].search()
+            paginator = ESCursorPagination()
+            cd["request_date"] = paginator.initialize_context_from_request(
+                request, search_type
+            )
             highlighting_fields = {}
             main_query, child_docs_query = do_es_api_query(
                 search_query,
@@ -251,7 +255,6 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                 SEARCH_HL_TAG,
                 request.version,
             )
-            paginator = ESCursorPagination()
             es_list_instance = api_utils.CursorESList(
                 main_query,
                 child_docs_query,
