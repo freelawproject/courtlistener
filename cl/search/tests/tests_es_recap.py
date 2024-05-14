@@ -31,6 +31,8 @@ from cl.lib.test_helpers import (
     rd_type_v4_api_keys,
     recap_document_v4_api_keys,
     skip_if_common_tests_skipped,
+    v4_meta_keys,
+    v4_recap_meta_keys,
 )
 from cl.lib.view_utils import increment_view_count
 from cl.people_db.factories import (
@@ -41,8 +43,8 @@ from cl.people_db.factories import (
     PersonFactory,
 )
 from cl.search.api_serializers import (
-    BaseRECAPDocumentESResultSerializer,
     DocketESResultSerializer,
+    RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
@@ -2641,9 +2643,7 @@ class DocketESResultSerializerTest(DocketESResultSerializer):
     date_score = CharField(read_only=True)
 
 
-class BaseRECAPDocumentESResultSerializerTest(
-    BaseRECAPDocumentESResultSerializer
-):
+class RECAPDocumentESResultSerializerTest(RECAPDocumentESResultSerializer):
     """The serializer class for testing RECAP_DOCUMENT search type results.
     Includes a date_score field for testing purposes.
     """
@@ -2824,17 +2824,13 @@ class RECAPSearchAPIV4Test(
         }
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
-
         keys_count = len(r.data["results"][0])
         self.assertEqual(keys_count, len(docket_v4_api_keys))
         rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            docket_v4_api_keys,
-            recap_document_v4_api_keys,
+            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
         )
 
     async def test_results_api_empty_fields(self) -> None:
@@ -2854,10 +2850,7 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {"result": self.rd_empty_fields_api}
         await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            docket_v4_api_keys,
-            recap_document_v4_api_keys,
+            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
         )
 
         # Query a docket with no filings.
@@ -2896,20 +2889,14 @@ class RECAPSearchAPIV4Test(
             "result": self.rd_api,
         }
         await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            docket_v4_api_keys,
-            recap_document_v4_api_keys,
+            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
         )
 
         # RECAP_DOCUMENT Search type HL disabled.
         search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
         r = await self._test_api_results_count(search_params, 1, "API fields")
         await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            recap_document_v4_api_keys,
-            recap_document_v4_api_keys,
+            r, content_to_compare, recap_document_v4_api_keys, v4_meta_keys
         )
 
         # RECAP Search type HL enabled.
@@ -2931,20 +2918,14 @@ class RECAPSearchAPIV4Test(
             "snippet": "This a plain text to be <mark>shown in the API</mark>",
         }
         await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            docket_v4_api_keys,
-            recap_document_v4_api_keys,
+            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
         )
 
         # RECAP_DOCUMENT Search type HL enabled.
         search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
         r = await self._test_api_results_count(search_params, 1, "API fields")
         await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            recap_document_v4_api_keys,
-            recap_document_v4_api_keys,
+            r, content_to_compare, recap_document_v4_api_keys, v4_meta_keys
         )
 
     def test_date_filed_sorting_function_score(self) -> None:
@@ -3102,8 +3083,8 @@ class RECAPSearchAPIV4Test(
         new=DocketESResultSerializerTest,
     )
     @mock.patch(
-        "cl.search.api_views.BaseRECAPDocumentESResultSerializer",
-        new=BaseRECAPDocumentESResultSerializerTest,
+        "cl.search.api_views.RECAPDocumentESResultSerializer",
+        new=RECAPDocumentESResultSerializerTest,
     )
     @mock.patch(
         "cl.search.api_views.RECAPESResultSerializer",
@@ -3726,7 +3707,8 @@ class RECAPSearchAPIV4Test(
                     test_case["expected_results"],
                 )
                 self.assertEqual(
-                    r.data["results"][0]["more_docs"], test_case["more_docs"]
+                    r.data["results"][0]["meta"]["more_docs"],
+                    test_case["more_docs"],
                 )
 
                 with self.captureOnCommitCallbacks(execute=True):
@@ -3750,15 +3732,11 @@ class RECAPSearchAPIV4Test(
 
         d_type_v4_api_keys = docket_v4_api_keys.copy()
         del d_type_v4_api_keys["recap_documents"]
-        del d_type_v4_api_keys["more_docs"]
         self.assertEqual(keys_count, len(d_type_v4_api_keys))
 
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            d_type_v4_api_keys,
-            recap_document_v4_api_keys,
+            r, content_to_compare, d_type_v4_api_keys, v4_meta_keys
         )
 
     async def test_results_fields_for_rd_type(self) -> None:
@@ -3776,10 +3754,7 @@ class RECAPSearchAPIV4Test(
 
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            rd_type_v4_api_keys,
-            recap_document_v4_api_keys,
+            r, content_to_compare, rd_type_v4_api_keys, v4_meta_keys
         )
 
     def test_render_missing_fields_from_es_document(self) -> None:
