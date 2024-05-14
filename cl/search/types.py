@@ -1,8 +1,9 @@
-from collections import namedtuple
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal, Type, Union
 
 from elasticsearch_dsl.response import Hit
+from elasticsearch_dsl.utils import AttrList
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
@@ -109,4 +110,8 @@ class EventTable(StrEnum):
     UNDEFINED = ""
 
 
-ESCursor = namedtuple("ESCursor", ["search_after", "reverse", "search_type"])
+@dataclass(frozen=True)
+class ESCursor:
+    search_after: AttrList | None
+    reverse: bool
+    search_type: str

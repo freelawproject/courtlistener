@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 import waffle
 from django.conf import settings
@@ -81,8 +82,7 @@ def get_object_list(request, cd, paginator):
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
     elif search_query and is_opinion_active:
-        if request.version == "v3":
-            cd["highlight"] = True
+        cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
             highlighting_fields = {"text": 500}
@@ -99,7 +99,7 @@ def get_object_list(request, cd, paginator):
         )
         main_query["caller"] = "api_search"
 
-    if cd["type"] == SEARCH_TYPES.RECAP and request.version == "v3":
+    if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
     if is_oral_argument_active or is_people_active or is_opinion_active:
@@ -107,8 +107,7 @@ def get_object_list(request, cd, paginator):
             main_query=main_query,
             offset=offset,
             page_size=page_size,
-            clean_data=cd,
-            version=request.version,
+            type=cd["type"],
         )
     else:
         sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
@@ -121,27 +120,18 @@ class ESList:
     as they are queried.
     """
 
-    def __init__(
-        self,
-        main_query,
-        offset,
-        page_size,
-        clean_data,
-        length=None,
-        version="v3",
-    ):
+    def __init__(self, main_query, offset, page_size, type, length=None):
         super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
-        self.clean_data = clean_data
+        self.type = type
         self._item_cache = []
         self._length = length
-        self._version = version
 
     def __len__(self):
         if self._length is None:
-            if self.clean_data["type"] == SEARCH_TYPES.OPINION:
+            if self.type == SEARCH_TYPES.OPINION:
                 query = Q(self.main_query.to_dict(count=True)["query"])
                 self._length = do_collapse_count_query(self.main_query, query)
             else:
@@ -165,31 +155,14 @@ class ESList:
         ]
         results = self.main_query.execute()
 
-        if self._version == "v4":
-            limit_inner_hits({}, results, self.clean_data["type"])
-            set_results_highlights(results, self.clean_data["type"])
-
         # Merge unavailable fields in ES by pulling data from the DB to make
-        # the API backwards compatible or retrieves the snippet from the DB
-        # when highlighting is disabled.
+        # the API backwards compatible for People.
         merge_unavailable_fields_on_parent_document(
             results,
-            self.clean_data["type"],
+            self.type,
             "api",
-            self.clean_data["highlight"],
-            self._version,
         )
-
         for result in results:
-            child_result_objects = []
-            if hasattr(result, "child_docs"):
-                for child_doc in result.child_docs:
-                    child_result_objects.append(
-                        ESResultObject(initial=child_doc["_source"])
-                    )
-                result["child_docs"] = child_result_objects
-
-            # Send the object instead the JSON.
             self._item_cache.append(result)
 
         # Now, assuming our _item_cache is all set, we just get the item.
@@ -299,6 +272,14 @@ class CursorESList:
     well as the pagination logic for cursor-based pagination.
     """
 
+    cardinality_query = {
+        SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
+        SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
+        SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
+        SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
+        SEARCH_TYPES.PEOPLE: ("id", PersonDocument),
+    }
+
     def __init__(
         self,
         main_query,
@@ -314,32 +295,32 @@ class CursorESList:
         self.search_after = search_after
         self.clean_data = clean_data
         self.version = version
-        self._item_cache = []
-        self.results = None
-        self.reverse = None
         self.cursor = None
-        self.unique_field_query = {
-            SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
-            SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
-            SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
-            SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
-            SEARCH_TYPES.PEOPLE: ("id", PersonDocument),
-        }
+        self.results = None
+        self.reverse = False
 
     def set_pagination(self, cursor: ESCursor | None, page_size: int) -> None:
 
         self.cursor = cursor
         if self.cursor is not None:
-            (self.search_after, self.reverse, _) = self.cursor
+            self.reverse = self.cursor.reverse
+            self.search_after = self.cursor.search_after
 
         # Return one extra document beyond the page size, so we're able to
         # determine if there are more documents and decide whether to display a
         # next or previous page link.
         self.page_size = page_size + 1
 
-    def get_paginated_results(self) -> tuple[Response, Response, Response]:
+    def get_paginated_results(
+        self,
+    ) -> tuple[list[defaultdict], int, Response, Response | None]:
         """Executes the search query with pagination settings and processes
         the results.
+
+        :return: A four-tuple containing a list of defaultdicts with the results,
+        the number of hits returned by the main query, a response object
+        related to the main query's cardinality count, and a response object
+        related to the child query's cardinality count, if available.
         """
         if self.search_after:
             self.main_query = self.main_query.extra(
@@ -353,7 +334,7 @@ class CursorESList:
 
         # Cardinality query parameters
         query = Q(self.main_query.to_dict(count=True)["query"])
-        unique_field, search_document = self.unique_field_query[
+        unique_field, search_document = self.cardinality_query[
             self.clean_data["type"]
         ]
         base_search = search_document.search()
@@ -365,7 +346,7 @@ class CursorESList:
         child_cardinality_query = None
         child_cardinality_count_response = None
         if self.child_docs_query:
-            child_unique_field, _ = self.unique_field_query[
+            child_unique_field, _ = self.cardinality_query[
                 SEARCH_TYPES.RECAP_DOCUMENT
             ]
             child_cardinality_query = build_cardinality_count(
@@ -395,8 +376,15 @@ class CursorESList:
                 logger.error("Multi-search API Error: %s", e)
                 raise ElasticServerError()
         self.process_results(self.results)
+
+        main_query_hits = self.results.hits.total.value
+        es_results_items = [
+            defaultdict(lambda: None, result.to_dict(skip_empty=False))
+            for result in self.results
+        ]
         return (
-            self.results,
+            es_results_items,
+            main_query_hits,
             cardinality_count_response,
             child_cardinality_count_response,
         )
@@ -413,14 +401,15 @@ class CursorESList:
             self.clean_data["type"],
             "api",
             self.clean_data["highlight"],
-            self.version,
         )
         for result in results:
             child_result_objects = []
             if hasattr(result, "child_docs"):
                 for child_doc in result.child_docs:
                     child_result_objects.append(
-                        ESResultObject(initial=child_doc["_source"])
+                        defaultdict(
+                            lambda: None, child_doc["_source"].to_dict()
+                        )
                     )
                 result["child_docs"] = child_result_objects
 
@@ -465,15 +454,14 @@ class CursorESList:
         """
 
         # Toggle the original sorting key to handle backward pagination
-        toggle_sort = True if self.reverse else False
         default_sorting = build_sort_results(
-            self.clean_data, toggle_sort, "v4"
+            self.clean_data, self.reverse, "v4"
         )
         default_unique_order = {
             "type": self.clean_data["type"],
         }
 
-        unique_field, _ = self.unique_field_query[self.clean_data["type"]]
+        unique_field, _ = self.cardinality_query[self.clean_data["type"]]
         # Use a document unique field as a unique sorting key for the current
         # search type.
         default_unique_order.update(
@@ -483,7 +471,7 @@ class CursorESList:
         )
 
         unique_sorting = build_sort_results(
-            default_unique_order, toggle_sort, "v4"
+            default_unique_order, self.reverse, "v4"
         )
         return default_sorting, unique_sorting
 
@@ -499,14 +487,8 @@ class ResultObject:
         return self._data
 
 
-class ESResultObject(ResultObject):
-
-    def __getattr__(self, key):
-        return getattr(self._data, key, None)
-
-
 def limit_api_results_to_page(
-    results: Response | AttrList, cursor: ESCursor
+    results: Response | AttrList, cursor: ESCursor | None
 ) -> Response | AttrList:
     """In ES Cursor pagination, an additional document is returned in each
     query response to determine whether to display the next page or previous
@@ -521,12 +503,11 @@ def limit_api_results_to_page(
     specified by the SEARCH_API_PAGE_SIZE.
     """
 
-    reverse = False
-    if cursor is not None:
-        search_after, reverse, _ = cursor
+    reverse = cursor.reverse if cursor else False
     if reverse:
         # Limit results in page starting from the last item.
         return results[-settings.SEARCH_API_PAGE_SIZE :]
-    else:
-        # Limit results in page starting from the first item.
-        return results[: settings.SEARCH_API_PAGE_SIZE]
+
+    # First page or going forward, limit results on the page starting from the
+    # first item.
+    return results[: settings.SEARCH_API_PAGE_SIZE]

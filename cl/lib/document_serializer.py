@@ -68,14 +68,15 @@ class DateOrDateTimeField(serializers.Field):
             return value
 
 
-class DateField(serializers.Field):
-    """Handles date objects."""
+class CoerceDateField(serializers.Field):
+    """Coerces datetime-like inputs into a date representation. If the input
+    is not a datetime, it returns the date directly.
+    """
 
     def to_representation(self, value):
         if isinstance(value, datetime.datetime):
             return serializers.DateField().to_representation(value.date())
-        else:
-            return serializers.DateField().to_representation(value)
+        return serializers.DateField().to_representation(value)
 
 
 class NullableListField(serializers.ListField):
