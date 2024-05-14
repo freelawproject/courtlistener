@@ -162,16 +162,6 @@ opinion_cluster_v3_v4_common_fields = {
         if x["result"].cluster.docket.date_reargument_denied
         else None
     ),
-    "date_created": lambda x: (
-        x["result"].date_created.isoformat().replace("+00:00", "Z")
-        if x.get("V4")
-        else timezone.localtime(x["result"].cluster.date_created).isoformat()
-    ),
-    "timestamp": lambda x: (
-        x["result"].date_created.isoformat().replace("+00:00", "Z")
-        if x.get("V4")
-        else timezone.localtime(x["result"].cluster.date_created).isoformat()
-    ),
 }
 
 opinion_document_v3_v4_common_fields = {
@@ -213,6 +203,16 @@ opinion_document_v3_fields = opinion_document_v3_v4_common_fields.copy()
 
 opinion_v3_search_api_keys = {
     "court_exact": lambda x: x["result"].cluster.docket.court_id,
+    "date_created": lambda x: (
+        x["result"].date_created.isoformat().replace("+00:00", "Z")
+        if x.get("V4")
+        else timezone.localtime(x["result"].cluster.date_created).isoformat()
+    ),
+    "timestamp": lambda x: (
+        x["result"].date_created.isoformat().replace("+00:00", "Z")
+        if x.get("V4")
+        else timezone.localtime(x["result"].cluster.date_created).isoformat()
+    ),
 }
 opinion_v3_search_api_keys.update(opinion_cluster_v3_fields)
 opinion_v3_search_api_keys.update(opinion_document_v3_fields)
@@ -242,12 +242,6 @@ opinion_v4_search_api_keys.update(opinion_cluster_v4_common_fields)
 
 opinion_document_v4_api_keys = {
     "sha1": lambda x: x["result"].sha1,
-    "date_created": lambda x: x["result"]
-    .date_created.isoformat()
-    .replace("+00:00", "Z"),
-    "timestamp": lambda x: x["result"]
-    .date_created.isoformat()
-    .replace("+00:00", "Z"),
     "meta": [],
 }
 opinion_document_v4_api_keys.update(opinion_document_v3_v4_common_fields)
