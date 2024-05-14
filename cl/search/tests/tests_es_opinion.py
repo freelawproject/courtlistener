@@ -31,6 +31,7 @@ from cl.lib.test_helpers import (
     opinion_v3_search_api_keys,
     opinion_v4_search_api_keys,
     skip_if_common_tests_skipped,
+    v4_meta_keys,
 )
 from cl.people_db.factories import PersonFactory
 from cl.search.api_utils import ESList
@@ -612,6 +613,7 @@ class OpinionV4APISearchTest(
             content_to_compare,
             opinion_v4_search_api_keys,
             opinion_document_v4_api_keys,
+            v4_meta_keys,
         )
 
     def test_extract_snippet_from_db_highlight_disabled(self) -> None:
@@ -732,6 +734,7 @@ class OpinionV4APISearchTest(
             content_to_compare,
             opinion_v4_search_api_keys,
             opinion_document_v4_api_keys,
+            v4_meta_keys,
         )
 
         # Opinion Search type HL enabled.
@@ -756,6 +759,7 @@ class OpinionV4APISearchTest(
             content_to_compare,
             opinion_v4_search_api_keys,
             opinion_document_v4_api_keys,
+            v4_meta_keys,
         )
 
     @override_settings(SEARCH_API_PAGE_SIZE=3)
@@ -959,6 +963,7 @@ class OpinionV4APISearchTest(
             content_to_compare,
             opinion_v4_search_api_keys,
             opinion_document_v4_api_keys,
+            v4_meta_keys,
         )
 
     @override_settings(OPINION_HITS_PER_RESULT=6)

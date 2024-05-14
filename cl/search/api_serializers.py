@@ -551,7 +551,7 @@ class RECAPESResultSerializer(RECAPMetaMixin, BaseDocketESResultSerializer):
     )
 
 
-class OpinionDocumentESResultSerializer(DocumentSerializer):
+class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
     """The serializer for OpinionDocument results."""
 
     snippet = HighlightedField(read_only=True, source="text")
@@ -575,7 +575,7 @@ class OpinionDocumentESResultSerializer(DocumentSerializer):
         )
 
 
-class OpinionClusterESResultSerializer(DocumentSerializer):
+class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
     """The serializer for OpinionCluster Search results."""
 
     opinions = OpinionDocumentESResultSerializer(

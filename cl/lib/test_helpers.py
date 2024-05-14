@@ -234,6 +234,7 @@ opinion_v4_search_api_keys = {
     "posture": lambda x: x["result"].cluster.posture,
     "syllabus": lambda x: x["result"].cluster.syllabus,
     "opinions": [],  # type: ignore
+    "meta": [],
 }
 
 opinion_cluster_v4_common_fields = opinion_cluster_v3_v4_common_fields.copy()
@@ -247,6 +248,7 @@ opinion_document_v4_api_keys = {
     "timestamp": lambda x: x["result"]
     .date_created.isoformat()
     .replace("+00:00", "Z"),
+    "meta": [],
 }
 opinion_document_v4_api_keys.update(opinion_document_v3_v4_common_fields)
 
@@ -439,7 +441,7 @@ rd_type_v4_api_keys.update(
 
 v4_meta_keys = {
     "date_created": lambda x: x["result"]
-    .docket_entry.docket.date_created.isoformat()
+    .date_created.isoformat()
     .replace("+00:00", "Z"),
     "timestamp": lambda x: x["result"]
     .date_created.isoformat()

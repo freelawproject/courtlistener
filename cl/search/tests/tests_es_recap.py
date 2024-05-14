@@ -2830,7 +2830,11 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
         )
 
     async def test_results_api_empty_fields(self) -> None:
@@ -2850,7 +2854,11 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {"result": self.rd_empty_fields_api}
         await self._test_api_fields_content(
-            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
         )
 
         # Query a docket with no filings.
@@ -2889,14 +2897,22 @@ class RECAPSearchAPIV4Test(
             "result": self.rd_api,
         }
         await self._test_api_fields_content(
-            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
         )
 
         # RECAP_DOCUMENT Search type HL disabled.
         search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
         r = await self._test_api_results_count(search_params, 1, "API fields")
         await self._test_api_fields_content(
-            r, content_to_compare, recap_document_v4_api_keys, v4_meta_keys
+            r,
+            content_to_compare,
+            recap_document_v4_api_keys,
+            None,
+            v4_meta_keys,
         )
 
         # RECAP Search type HL enabled.
@@ -2918,14 +2934,22 @@ class RECAPSearchAPIV4Test(
             "snippet": "This a plain text to be <mark>shown in the API</mark>",
         }
         await self._test_api_fields_content(
-            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
         )
 
         # RECAP_DOCUMENT Search type HL enabled.
         search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
         r = await self._test_api_results_count(search_params, 1, "API fields")
         await self._test_api_fields_content(
-            r, content_to_compare, recap_document_v4_api_keys, v4_meta_keys
+            r,
+            content_to_compare,
+            recap_document_v4_api_keys,
+            None,
+            v4_meta_keys,
         )
 
     def test_date_filed_sorting_function_score(self) -> None:
@@ -3736,7 +3760,7 @@ class RECAPSearchAPIV4Test(
 
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r, content_to_compare, d_type_v4_api_keys, v4_meta_keys
+            r, content_to_compare, d_type_v4_api_keys, None, v4_meta_keys
         )
 
     async def test_results_fields_for_rd_type(self) -> None:
@@ -3754,7 +3778,7 @@ class RECAPSearchAPIV4Test(
 
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r, content_to_compare, rd_type_v4_api_keys, v4_meta_keys
+            r, content_to_compare, rd_type_v4_api_keys, None, v4_meta_keys
         )
 
     def test_render_missing_fields_from_es_document(self) -> None:
