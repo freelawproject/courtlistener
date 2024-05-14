@@ -432,8 +432,8 @@ class OpinionESResultSerializer(DocumentSerializer):
         )
 
 
-class NestedMetaSerializer(serializers.Serializer):
-    """The base meta serializer V4 Search API."""
+class MetaDataSerializer(serializers.Serializer):
+    """The metadata serializer V4 Search API."""
 
     timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
     date_created = TimeStampField(
@@ -441,9 +441,9 @@ class NestedMetaSerializer(serializers.Serializer):
     )
 
 
-class RECAPTypeNestedMetaSerializer(NestedMetaSerializer):
-    """The meta serializer for the RECAP search type includes the additional
-    more_docs field.
+class RECAPTypeNestedMetaSerializer(MetaDataSerializer):
+    """The metadata serializer for the RECAP search type includes the
+    additional more_docs field.
     """
 
     more_docs = serializers.BooleanField(
@@ -454,7 +454,7 @@ class RECAPTypeNestedMetaSerializer(NestedMetaSerializer):
 class MetaMixin(serializers.Serializer):
     """Mixin to add nested metadata serializer."""
 
-    meta = NestedMetaSerializer(source="*", read_only=True)
+    meta = MetaDataSerializer(source="*", read_only=True)
 
 
 class RECAPTypeMetaMixin(serializers.Serializer):
