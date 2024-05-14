@@ -556,10 +556,6 @@ class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
     """The serializer for OpinionDocument results."""
 
     snippet = HighlightedField(read_only=True, source="text")
-    date_created = TimeStampField(
-        read_only=True, default_timezone=timezone.utc
-    )
-    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
 
     class Meta:
         document = OpinionDocument
@@ -586,11 +582,6 @@ class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
     dateFiled = CoerceDateField(read_only=True)
     dateReargued = CoerceDateField(read_only=True)
     dateReargumentDenied = CoerceDateField(read_only=True)
-    date_created = serializers.DateTimeField(
-        read_only=True, default_timezone=timezone.utc
-    )
-    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
-
     caseName = HighlightedField(read_only=True)
     court_citation_string = HighlightedField(read_only=True)
     docketNumber = HighlightedField(read_only=True)
@@ -602,6 +593,8 @@ class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
             "court_exact",
             "_related_instance_to_ignore",
             "cluster_child",
+            "date_created",
+            "timestamp",
         )
 
 
