@@ -759,16 +759,13 @@ def build_custom_function_score_for_date(
     :return: The modified QueryString object with applied function score.
     """
 
-    midnight_current_date = (
-        datetime.datetime.combine(default_current_date, datetime.time())
-        if default_current_date
-        else None
-    )
-    default_current_time = (
-        int(midnight_current_date.timestamp() * 1000)
-        if midnight_current_date
-        else None
-    )
+    default_current_time = None
+    if default_current_date:
+        midnight_current_date = datetime.datetime.combine(
+            default_current_date, datetime.time()
+        )
+        default_current_time = int(midnight_current_date.timestamp() * 1000)
+
     sort_field, order = order_by
     query = Q(
         "function_score",

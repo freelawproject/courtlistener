@@ -233,7 +233,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             cd = search_form.cleaned_data
             search_type = cd["type"]
             paginator = ESCursorPagination()
-            cd["request_date"] = paginator.set_page_request(
+            cd["request_date"] = paginator.initialize_context_from_request(
                 request, search_type
             )
             search_query = DocketDocument.search()

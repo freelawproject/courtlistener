@@ -95,7 +95,9 @@ class ESCursorPagination(BasePagination):
     invalid_cursor_message = "Invalid cursor"
     request_date = None
 
-    def set_page_request(self, request, search_type) -> datetime.date:
+    def initialize_context_from_request(
+        self, request, search_type
+    ) -> datetime.date:
         self.base_url = request.build_absolute_uri()
         self.request = request
         self.search_type = search_type

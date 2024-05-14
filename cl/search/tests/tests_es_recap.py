@@ -3232,6 +3232,7 @@ class RECAPSearchAPIV4Test(
         ]
         # Generate tests for all the search types.
         all_tests = []
+
         for test_param in tests_params:
             for search_type in [
                 SEARCH_TYPES.RECAP,
@@ -3242,84 +3243,68 @@ class RECAPSearchAPIV4Test(
                 test_param_copy["type"] = search_type
                 all_tests.append(test_param_copy)
 
+        original_datetime = now().replace(day=1, hour=5, minute=0)
         for search_params in all_tests:
             with self.subTest(
                 search_params=search_params, msg="Test stable scores."
-            ):
-                original_datetime = now().replace(day=1, hour=5, minute=0)
-                # Two first-page requests (no cursor) made on the same day will now
-                # have consistent scores because scores are now computed based on the
-                # same day's date.
-                with time_machine.travel(original_datetime, tick=False):
-                    r = self.client.get(
-                        reverse("search-list", kwargs={"version": "v4"}),
-                        search_params,
-                    )
-                    date_score_1 = r.data["results"][0]["date_score"]
+            ), time_machine.travel(original_datetime, tick=False) as traveler:
+                # Two first-page requests (no cursor) made on the same day will
+                # now have consistent scores because scores are now computed
+                # based on the same day's date.
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                date_score_1 = r.data["results"][0]["date_score"]
 
-                with time_machine.travel(
-                    original_datetime + datetime.timedelta(minutes=1),
-                    tick=False,
-                ):
-                    r = self.client.get(
-                        reverse("search-list", kwargs={"version": "v4"}),
-                        search_params,
-                    )
-                    date_score_2 = r.data["results"][0]["date_score"]
-
+                traveler.shift(datetime.timedelta(minutes=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                date_score_2 = r.data["results"][0]["date_score"]
                 self.assertEqual(date_score_1, date_score_2)
 
-                # Two first-page requests (no cursor) made on different days will
-                # present scores variations, due to it being a different day and
-                # date_filed and entry_date_filed are day granular.
-                with time_machine.travel(
-                    original_datetime + datetime.timedelta(days=1), tick=False
-                ):
-                    r = self.client.get(
-                        reverse("search-list", kwargs={"version": "v4"}),
-                        search_params,
-                    )
-                    date_score_1 = r.data["results"][0]["date_score"]
+                # Two first-page requests (no cursor) made on different days
+                # will present scores variations, due to it being a different
+                # day and date_filed and entry_date_filed are day granular.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                date_score_1 = r.data["results"][0]["date_score"]
 
-                with time_machine.travel(
-                    original_datetime + datetime.timedelta(days=2), tick=False
-                ):
-                    r = self.client.get(
-                        reverse("search-list", kwargs={"version": "v4"}),
-                        search_params,
-                    )
-                    date_score_2 = r.data["results"][0]["date_score"]
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    search_params,
+                )
+                date_score_2 = r.data["results"][0]["date_score"]
 
                 self.assertNotEqual(date_score_2, date_score_1)
 
-                # Two next_page requests preserver the same scores even thought they
-                # are executed on different days. Since scores are computed base on the
-                # cursor context date.
+                # Two next_page requests preserve the same scores even thought
+                # they are executed on different days. Since scores are computed
+                # base on the cursor context date.
                 next_page = r.data["next"]
-                with time_machine.travel(
-                    original_datetime + datetime.timedelta(days=3), tick=False
-                ):
-                    r = self.client.get(next_page)
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(next_page)
                 date_score_next_1 = r.data["results"][0]["date_score"]
 
-                # Two next_page requests preserve the same scores even though they are
-                # executed on different days. Since scores are computed based on the
-                # cursor context date.
-                with time_machine.travel(
-                    original_datetime + datetime.timedelta(days=4), tick=False
-                ):
-                    r = self.client.get(next_page)
+                # Two next_page requests preserve the same scores even though
+                # they are executed on different days. Since scores are computed
+                # based on the cursor context date.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(next_page)
                 date_score_next_2 = r.data["results"][0]["date_score"]
                 previous_page = r.data["previous"]
                 self.assertEqual(date_score_next_1, date_score_next_2)
 
-                # Now, going to the previous day, the score should be the same as the
-                # first request that showed the document.
-                with time_machine.travel(
-                    original_datetime + datetime.timedelta(days=4), tick=False
-                ):
-                    r = self.client.get(previous_page)
-
+                # Now, going to the previous page, the score should be the same
+                # as the first request that showed the document.
+                traveler.shift(datetime.timedelta(days=1))
+                r = self.client.get(previous_page)
                 date_score_previous_2 = r.data["results"][0]["date_score"]
                 self.assertEqual(date_score_2, date_score_previous_2)
 
