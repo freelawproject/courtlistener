@@ -474,7 +474,9 @@ people_v4_fields = {
         else []
     ),
     "fjc_id": lambda x: str(x["result"].person.fjc_id),
-    "name": lambda x: x["result"].person.name_full,
+    "name": lambda x: (
+        x["name"] if x.get("name") else x["result"].person.name_full
+    ),
     "gender": lambda x: x["result"].person.get_gender_display(),
     "religion": lambda x: x["result"].person.religion,
     "alias": lambda x: (
@@ -482,18 +484,36 @@ people_v4_fields = {
         if x["result"].person.aliases.all()
         else []
     ),
-    "dob": lambda x: x["result"].person.date_dob.isoformat(),
-    "dod": lambda x: x["result"].person.date_dod.isoformat(),
-    "dob_city": lambda x: x["result"].person.dob_city,
+    "dob": lambda x: (
+        x["result"].person.date_dob.isoformat()
+        if x["result"].person.date_dob
+        else None
+    ),
+    "dod": lambda x: (
+        x["result"].person.date_dod.isoformat()
+        if x["result"].person.date_dod
+        else None
+    ),
+    "dob_city": lambda x: (
+        x["dob_city"] if x.get("dob_city") else x["result"].person.dob_city
+    ),
     "dob_state": lambda x: x["result"].person.get_dob_state_display(),
-    "dob_state_id": lambda x: x["result"].person.dob_state,
+    "dob_state_id": lambda x: (
+        x["dob_state_id"]
+        if x.get("dob_state_id")
+        else x["result"].person.dob_state
+    ),
     "political_affiliation": lambda x: (
-        [
-            pa.get_political_party_display()
-            for pa in x["result"].person.political_affiliations.all()
-        ]
-        if x["result"].person.political_affiliations.all()
-        else []
+        x["political_affiliation"]
+        if x.get("political_affiliation")
+        else (
+            [
+                pa.get_political_party_display()
+                for pa in x["result"].person.political_affiliations.all()
+            ]
+            if x["result"].person.political_affiliations.all()
+            else []
+        )
     ),
     "positions": [],  # type: ignore
     "aba_rating": lambda x: (
@@ -502,23 +522,30 @@ people_v4_fields = {
         else []
     ),
     "school": lambda x: (
-        [e.school.name for e in x["result"].person.educations.all()]
-        if x["result"].person.educations.all()
-        else []
+        x["school"]
+        if x.get("school")
+        else (
+            [e.school.name for e in x["result"].person.educations.all()]
+            if x["result"].person.educations.all()
+            else []
+        )
     ),
-    "timestamp": lambda x: x["result"]
-    .person.date_created.isoformat()
-    .replace("+00:00", "Z"),
-    "date_created": lambda x: x["result"]
-    .person.date_created.isoformat()
-    .replace("+00:00", "Z"),
+    "meta": [],
 }
 
 position_v4_fields = {
-    "court": lambda x: x["result"].court.short_name,
-    "court_full_name": lambda x: x["result"].court.full_name,
-    "court_exact": lambda x: x["result"].court.pk,
-    "court_citation_string": lambda x: x["result"].court.citation_string,
+    "court": lambda x: (
+        x["result"].court.short_name if x["result"].court else None
+    ),
+    "court_full_name": lambda x: (
+        x["result"].court.full_name if x["result"].court else None
+    ),
+    "court_exact": lambda x: (
+        x["result"].court.pk if x["result"].court else None
+    ),
+    "court_citation_string": lambda x: (
+        x["result"].court.citation_string if x["result"].court else None
+    ),
     "organization_name": lambda x: x["result"].organization_name,
     "job_title": lambda x: x["result"].job_title,
     "position_type": lambda x: x["result"].get_position_type_display(),
@@ -600,12 +627,7 @@ position_v4_fields = {
     "termination_reason": lambda x: x[
         "result"
     ].get_termination_reason_display(),
-    "timestamp": lambda x: x["result"]
-    .person.date_created.isoformat()
-    .replace("+00:00", "Z"),
-    "date_created": lambda x: x["result"]
-    .person.date_created.isoformat()
-    .replace("+00:00", "Z"),
+    "meta": [],
 }
 
 
@@ -649,6 +671,7 @@ class PeopleTestCase(SimpleTestCase):
             gender="f",
             name_first="Judith",
             name_last="Sheindlin",
+            name_suffix="2",
             date_dob=datetime.date(1942, 10, 21),
             date_dod=datetime.date(2020, 11, 25),
             date_granularity_dob="%Y-%m-%d",
@@ -656,6 +679,7 @@ class PeopleTestCase(SimpleTestCase):
             name_middle="Susan",
             dob_city="Brookyln",
             dob_state="NY",
+            fjc_id=19832,
         )
         cls.person_2.race.add(cls.w_race)
         cls.person_2.race.add(cls.b_race)
@@ -694,6 +718,14 @@ class PeopleTestCase(SimpleTestCase):
             how_selected="e_part",
             nomination_process="fed_senate",
             date_elected=datetime.date(2015, 11, 12),
+            date_confirmation=datetime.date(2015, 11, 14),
+            date_termination=datetime.date(2018, 10, 14),
+            date_granularity_termination="%Y-%m-%d",
+            date_hearing=datetime.date(2021, 10, 14),
+            date_judicial_committee_action=datetime.date(2022, 10, 14),
+            date_recess_appointment=datetime.date(2013, 10, 14),
+            date_referred_to_judicial_committee=datetime.date(2010, 10, 14),
+            date_retirement=datetime.date(2023, 10, 14),
         )
         cls.position_3 = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",

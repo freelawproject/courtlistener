@@ -267,7 +267,6 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                 None,
                 None,
                 cd,
-                version=request.version,
             )
             results_page = paginator.paginate_queryset(
                 es_list_instance, request

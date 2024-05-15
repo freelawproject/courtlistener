@@ -160,7 +160,7 @@ class ESList:
         merge_unavailable_fields_on_parent_document(
             results,
             self.type,
-            "api",
+            "v3",
         )
         for result in results:
             self._item_cache.append(result)
@@ -287,14 +287,12 @@ class CursorESList:
         page_size,
         search_after,
         clean_data,
-        version="v3",
     ):
         self.main_query = main_query
         self.child_docs_query = child_docs_query
         self.page_size = page_size
         self.search_after = search_after
         self.clean_data = clean_data
-        self.version = version
         self.cursor = None
         self.results = None
         self.reverse = False
@@ -399,7 +397,7 @@ class CursorESList:
         merge_unavailable_fields_on_parent_document(
             results,
             self.clean_data["type"],
-            "api",
+            "v4",
             self.clean_data["highlight"],
         )
         for result in results:

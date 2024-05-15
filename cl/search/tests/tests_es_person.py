@@ -3,6 +3,7 @@ from collections import Counter
 from unittest import mock
 
 import time_machine
+from asgiref.sync import async_to_sync
 from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
@@ -18,6 +19,7 @@ from cl.lib.test_helpers import (
     people_v4_fields,
     position_v4_fields,
     skip_if_common_tests_skipped,
+    v4_meta_keys,
 )
 from cl.people_db.factories import (
     ABARatingFactory,
@@ -28,7 +30,7 @@ from cl.people_db.factories import (
     RaceFactory,
     SchoolFactory,
 )
-from cl.people_db.models import Race
+from cl.people_db.models import Person, Race
 from cl.search.documents import ES_CHILD_ID, PersonDocument, PositionDocument
 from cl.search.factories import CourtFactory
 from cl.search.models import SEARCH_TYPES
@@ -516,7 +518,12 @@ class PeopleV3APISearchTest(
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_granularity_termination"]),
-            Counter([position_6.date_granularity_termination]),
+            Counter(
+                [
+                    position_6.date_granularity_termination,
+                    self.position_2.date_granularity_termination,
+                ]
+            ),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["judicial_committee_action"]),
@@ -630,9 +637,59 @@ class PeopleV4APISearchTest(
             content_to_compare,
             people_v4_fields,
             position_v4_fields,
+            v4_meta_keys,
         )
 
-    @override_settings(PEOPLE_HITS_PER_RESULT=4)
+    def test_results_api_empty_fields(self) -> None:
+        """Confirm  empty fields values in V4 People Search API results."""
+
+        mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            person = PersonFactory(
+                name_first="John",
+                name_suffix="",
+                dob_city="",
+                dob_state="",
+                gender="",
+            )
+            position = PositionFactory(
+                position_type="c-jud",
+                person=person,
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": f"id:{person.pk}",
+        }
+        # API
+        r = async_to_sync(self._test_api_results_count)(
+            search_params, 1, "API fields"
+        )
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(
+            keys_count,
+            len(people_v4_fields),
+            msg="Parent fields count didn't match.",
+        )
+        position_keys_count = len(r.data["results"][0]["positions"][0])
+        self.assertEqual(
+            position_keys_count,
+            len(position_v4_fields),
+            msg="Child fields count didn't match.",
+        )
+        content_to_compare = {"result": position, "V4": True}
+        async_to_sync(self._test_api_fields_content)(
+            r,
+            content_to_compare,
+            people_v4_fields,
+            position_v4_fields,
+            v4_meta_keys,
+        )
+        person.delete()
+
+    @override_settings(PEOPLE_HITS_PER_RESULT=5)
     def test_match_positions_by_parent_and_child_field(self) -> None:
         """Confirm positions can be matched properly by different combinations
         of queries in V4 People Search API results."""
@@ -694,11 +751,11 @@ class PeopleV4APISearchTest(
         )
         self.assertEqual(
             len(r.data["results"][0]["positions"]),
-            4,
+            5,
             msg="Positions didn't match.",
         )
 
-        # Query by child field
+        # Query by child field, only positions that matched are returned.
         search_params["q"] = "termination_reason:(Voluntary Retirement)"
         r = self.client.get(
             reverse("search-list", kwargs={"version": "v4"}), search_params
@@ -726,16 +783,17 @@ class PeopleV4APISearchTest(
         )
         for result in r.data["results"]:
             if result["id"] == person.pk:
-                self.assertEqual(len(result["positions"]), 4)
+                self.assertEqual(len(result["positions"]), 5)
 
         person.delete()
 
     def test_verify_empty_lists_type_fields_after_partial_update(self):
         """Verify that list fields related to foreign keys are returned as
         empty lists after a partial update that removes the related instance
-        and empties the list field. Due to a bug in ES DSL, partial updates
-        convert list fields to None. At serialization time, we correct this
-        value to maintain consistent field type and return an empty list."""
+        and empties the list field. Due to a bug in ES DSL partial updates
+        convert list fields to None. https://github.com/elastic/elasticsearch-dsl-py/issues/1819
+        At serialization time, we correct this value to maintain consistent
+        field type and return an empty list."""
         with self.captureOnCommitCallbacks(execute=True):
             person = PersonFactory.create(
                 name_first="John American",
@@ -802,6 +860,372 @@ class PeopleV4APISearchTest(
         for field in fields_to_tests:
             with self.subTest(field=field, msg="List fields test."):
                 self.assertEqual(r.data["results"][0][field], [])
+
+    async def test_results_api_highlighted_fields(self) -> None:
+        """Confirm highlighted fields in V4 People Search API results."""
+        # API HL disabled.
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": f"id:{self.person_2.pk} name:Sheindlin dob_city:Brookyln nomination_process:(U.S. Senate) political_affiliation:Democratic",
+            "school": "New York Law School",
+            "dob_state": "NY",
+        }
+
+        # Judged Search type HL disabled.
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        content_to_compare = {"result": self.position_2, "V4": True}
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            people_v4_fields,
+            position_v4_fields,
+            v4_meta_keys,
+        )
+
+        # Judged Search type HL enabled.
+        search_params["highlight"] = True
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        content_to_compare = {
+            "result": self.position_2,
+            "name": "Judith Susan <mark>Sheindlin</mark> II",
+            "dob_city": "<mark>Brookyln</mark>",
+            "dob_state_id": "<mark>NY</mark>",
+            "school": [
+                "<mark>New</mark> <mark>York</mark> <mark>Law</mark> <mark>School</mark>"
+            ],
+            "political_affiliation": ["<mark>Democratic</mark>"],
+            "V4": True,
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            people_v4_fields,
+            position_v4_fields,
+            v4_meta_keys,
+        )
+
+    def test_people_specific_sorting_keys(self) -> None:
+        """Test if the dob and dod sorting keys work properly in
+        the V4 People Search API."""
+        with self.captureOnCommitCallbacks(execute=True):
+            person_4 = PersonFactory.create(
+                name_first="John",
+                name_last="American",
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+                date_dob=datetime.date(1942, 10, 21),
+                date_dod=datetime.date(2019, 11, 25),
+            )
+            PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(1990, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_vol",
+                position_type="c-jud",
+                person=person_4,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+            person_5 = PersonFactory.create(
+                name_first="Robert", name_last="Harrison"
+            )
+            PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(1990, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_vol",
+                position_type="c-jud",
+                person=person_5,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+
+        # Query string, order by name_reverse asc
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "name_reverse asc",
+            "highlight": False,
+        }
+
+        params_dob_desc = search_params.copy()
+        params_dob_desc["order_by"] = "dob desc,name_reverse asc"
+
+        params_dob_asc = search_params.copy()
+        params_dob_asc["order_by"] = "dob asc,name_reverse asc"
+
+        params_dod_desc = search_params.copy()
+        params_dod_desc["order_by"] = "dod desc,name_reverse asc"
+
+        base_test_cases = [
+            {
+                "name": "Query order by name_reverse asc",
+                "search_params": search_params,
+                "expected_results": 4,
+                "expected_order": [
+                    person_4.pk,  # American
+                    person_5.pk,  # Harrison
+                    self.person_3.pk,  # Judith
+                    self.person_2.pk,  # Sheindlin
+                ],
+            },
+            {
+                "name": "Query order by 'dob desc,name_reverse asc'",
+                "search_params": params_dob_desc,
+                "expected_results": 4,
+                "expected_order": [
+                    self.person_3.pk,  # Judith - dob: 1945-11-20
+                    person_4.pk,  # American - dob: 1942-10-21
+                    self.person_2.pk,  # Sheindlin - dob: 1942-10-21
+                    person_5.pk,  # Harrison - dob: None
+                ],
+            },
+            {
+                "name": "Query order by 'dob asc,name_reverse asc'",
+                "search_params": params_dob_asc,
+                "expected_results": 4,
+                "expected_order": [
+                    person_4.pk,  # American - dob:1942-10-21
+                    self.person_2.pk,  # Sheindlin - dob: 1942-10-21
+                    self.person_3.pk,  # Judith - dob: 1945-11-20
+                    person_5.pk,  # Harrison - dob: None
+                ],
+            },
+            {
+                "name": "Query order by 'dod desc,name_reverse asc'",
+                "search_params": params_dod_desc,
+                "expected_results": 4,
+                "expected_order": [
+                    self.person_2.pk,  # Sheindlin - dod: 2020-11-25
+                    person_4.pk,  # American - dod: 2019-11-25
+                    person_5.pk,  # Harrison - dod:None
+                    self.person_3.pk,  # Judith - dod:None
+                ],
+            },
+        ]
+
+        # Extend test cases to include a Query string and a Match all query.
+        test_cases = [
+            {
+                **test_param,
+                "search_params": {**test_param["search_params"], **query_type},
+            }
+            for test_param in base_test_cases
+            for query_type in [{"q": "*"}, {}]
+        ]
+
+        for test in test_cases:
+            self._test_results_ordering(test, "id")
+
+        person_4.delete()
+        person_5.delete()
+
+    @override_settings(SEARCH_API_PAGE_SIZE=3)
+    def test_opinion_results_cursor_api_pagination(self) -> None:
+        """Test cursor pagination for V4 People Search API."""
+
+        created_persons = []
+        persons_to_create = 7
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            person_4 = PersonFactory.create(
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+                date_dob=datetime.date(1942, 10, 21),
+                date_dod=datetime.date(2019, 11, 25),
+            )
+            created_persons.append(person_4)
+            PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(1990, 12, 14),
+                predecessor=self.person_3,
+                appointer=self.position_1,
+                judicial_committee_action="no_rep",
+                termination_reason="retire_vol",
+                position_type="c-jud",
+                person=person_4,
+                how_selected="e_part",
+                nomination_process="fed_senate",
+            )
+
+            for _ in range(persons_to_create):
+                person_5 = PersonFactory.create(name_first="Robert")
+                PositionFactory.create(
+                    date_granularity_start="%Y-%m-%d",
+                    court=self.court_1,
+                    date_start=datetime.date(1990, 12, 14),
+                    predecessor=self.person_3,
+                    appointer=self.position_1,
+                    judicial_committee_action="no_rep",
+                    termination_reason="retire_vol",
+                    position_type="c-jud",
+                    person=person_5,
+                    how_selected="e_part",
+                    nomination_process="fed_senate",
+                )
+                created_persons.append(person_5)
+
+        queryset = Person.objects.filter(is_alias_of=None)
+        total_judges = len([item for item in queryset if item.is_judge])
+
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        tests = [
+            {
+                "results": 3,
+                "count_exact": total_judges,
+                "next": True,
+                "previous": False,
+            },
+            {
+                "results": 3,
+                "count_exact": total_judges,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 3,
+                "count_exact": total_judges,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 1,
+                "count_exact": total_judges,
+                "next": False,
+                "previous": True,
+            },
+        ]
+
+        order_types = [
+            "score desc",
+            "name_reverse asc",
+            "dob desc,name_reverse asc",
+            "dob asc,name_reverse asc",
+            "dod desc,name_reverse asc",
+        ]
+        for order_type in order_types:
+            # Test forward pagination.
+            next_page = None
+            all_document_ids = []
+            ids_per_page = []
+            current_page = None
+            with self.subTest(order_type=order_type, msg="Sorting order."):
+                search_params["order_by"] = order_type
+                for test in tests:
+                    with self.subTest(test=test, msg="forward pagination"):
+                        if not next_page:
+                            r = self.client.get(
+                                reverse(
+                                    "search-list", kwargs={"version": "v4"}
+                                ),
+                                search_params,
+                            )
+                        else:
+                            r = self.client.get(next_page)
+                        # Test page variables.
+                        next_page, _, current_page = self._test_page_variables(
+                            r, test, current_page, search_params["type"]
+                        )
+                        ids_in_page = set()
+                        for result in r.data["results"]:
+                            all_document_ids.append(result["id"])
+                            ids_in_page.add(result["id"])
+                        ids_per_page.append(ids_in_page)
+
+            # Confirm all the documents were shown when paginating forwards.
+            self.assertEqual(
+                len(all_document_ids),
+                total_judges,
+                msg="Wrong number of judges.",
+            )
+
+        # Test backward pagination.
+        tests_backward = tests.copy()
+        tests_backward.reverse()
+        previous_page = None
+        all_ids_prev = []
+        for test in tests_backward:
+            with self.subTest(test=test, msg="backward pagination"):
+                if not previous_page:
+                    r = self.client.get(current_page)
+                else:
+                    r = self.client.get(previous_page)
+
+                # Test page variables.
+                _, previous_page, current_page = self._test_page_variables(
+                    r, test, current_page, search_params["type"]
+                )
+                ids_in_page_got = set()
+                for result in r.data["results"]:
+                    all_ids_prev.append(result["id"])
+                    ids_in_page_got.add(result["id"])
+                current_page_ids_prev = ids_per_page.pop()
+                # Check if IDs obtained with forward pagination match
+                # the IDs obtained when paginating backwards.
+                self.assertEqual(
+                    current_page_ids_prev,
+                    ids_in_page_got,
+                    msg="Wrong judges in page.",
+                )
+
+        # Confirm all the documents were shown when paginating backwards.
+        self.assertEqual(
+            len(all_ids_prev),
+            total_judges,
+            msg="Wrong number of judges.",
+        )
+
+        # Remove Person objects to avoid affecting other tests.
+        for created_person in created_persons:
+            created_person.delete()
+
+    def test_people_cursor_api_pagination_count(self) -> None:
+        """Test cursor pagination count for V4 People Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        queryset = Person.objects.filter(is_alias_of=None)
+        total_judges = len([item for item in queryset if item.is_judge])
+
+        ## Get count from cardinality.
+        with override_settings(
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_judges - 1
+        ):
+            # People Search request, count Persons.
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_judges,
+                msg="Results cardinality count didn't match.",
+            )
+
+        ## Get count from main query.
+        with override_settings(
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_judges + 1
+        ):
+            # People Search request, count Persons.
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_judges,
+                msg="Results main query count didn't match.",
+            )
 
 
 class PeopleSearchTestElasticSearch(

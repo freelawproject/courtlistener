@@ -902,7 +902,7 @@ class OpinionV4APISearchTest(
         for created_cluster in created_clusters:
             created_cluster.delete()
 
-    def test_recap_cursor_api_pagination_count(self) -> None:
+    def test_opinion_cursor_api_pagination_count(self) -> None:
         """Test cursor pagination count for V4 Opinion Search API."""
 
         search_params = {

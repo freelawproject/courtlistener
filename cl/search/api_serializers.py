@@ -598,13 +598,8 @@ class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class PositionESResultSerializer(DocumentSerializer):
+class PositionESResultSerializer(MetaMixin, DocumentSerializer):
     """The serializer for Positions Search results."""
-
-    date_created = TimeStampField(
-        read_only=True, default_timezone=timezone.utc
-    )
-    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
 
     class Meta:
         document = PositionDocument
@@ -633,17 +628,19 @@ class PositionESResultSerializer(DocumentSerializer):
             "school",
             "_related_instance_to_ignore",
             "person_child",
+            "date_created",
+            "timestamp",
         )
 
 
-class PersonESResultSerializer(DocumentSerializer):
+class PersonESResultSerializer(MetaMixin, DocumentSerializer):
     """The serializer for Person Search results."""
 
+    name = HighlightedField(read_only=True)
+    dob_city = HighlightedField(read_only=True)
+    dob_state_id = HighlightedField(read_only=True)
     dob = CoerceDateField(read_only=True)
     dod = CoerceDateField(read_only=True)
-    date_created = serializers.DateTimeField(
-        read_only=True, default_timezone=timezone.utc
-    )
     political_affiliation = NoneToListField(read_only=True, required=False)
     political_affiliation_id = NoneToListField(read_only=True, required=False)
     aba_rating = NoneToListField(read_only=True, required=False)
@@ -651,7 +648,6 @@ class PersonESResultSerializer(DocumentSerializer):
     races = NoneToListField(read_only=True, required=False)
     alias = NoneToListField(read_only=True, required=False)
     alias_ids = NoneToListField(read_only=True, required=False)
-    timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
     positions = PositionESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
@@ -662,4 +658,6 @@ class PersonESResultSerializer(DocumentSerializer):
             "_related_instance_to_ignore",
             "person_child",
             "name_reverse",
+            "date_created",
+            "timestamp",
         )
