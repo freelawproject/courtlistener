@@ -22,7 +22,8 @@ class TimeStampField(serializers.Field):
         super().__init__(**kwargs)
 
     def to_representation(self, value):
-        if isinstance(value, datetime.datetime) and timezone.is_naive(value):
+
+        if isinstance(value, datetime.datetime):
             if self.timezone:
                 return serializers.DateTimeField(
                     default_timezone=self.timezone
@@ -35,8 +36,18 @@ class TimeStampField(serializers.Field):
                     timezone.localtime(date_time_aware)
                 )
         if isinstance(value, str):
-            format_string = "%Y-%m-%dT%H:%M:%S.%f"
-            parsed_datetime = datetime.datetime.strptime(value, format_string)
+            try:
+                format_string = "%Y-%m-%dT%H:%M:%S.%f"
+                parsed_datetime = datetime.datetime.strptime(
+                    value, format_string
+                )
+            except ValueError:
+                # If the above format fails, try parsing with timezone
+                # information
+                format_string = "%Y-%m-%dT%H:%M:%S.%f%z"
+                parsed_datetime = datetime.datetime.strptime(
+                    value, format_string
+                )
             return serializers.DateTimeField(
                 default_timezone=self.timezone
             ).to_representation(parsed_datetime)
