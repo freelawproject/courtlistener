@@ -203,7 +203,6 @@ docket_v4_api_keys_base = {
         if x.get("court_citation_string")
         else x["result"].docket_entry.docket.court.citation_string
     ),
-    "court_exact": lambda x: x["result"].docket_entry.docket.court.pk,
     "court_id": lambda x: x["result"].docket_entry.docket.court.pk,
     "dateArgued": lambda x: (
         x["result"].docket_entry.docket.date_argued.isoformat()
@@ -220,9 +219,6 @@ docket_v4_api_keys_base = {
         if x["result"].docket_entry.docket.date_terminated
         else None
     ),
-    "date_created": lambda x: x["result"]
-    .docket_entry.docket.date_created.isoformat()
-    .replace("+00:00", "Z"),
     "docketNumber": lambda x: (
         x["docketNumber"]
         if x.get("docketNumber")
@@ -250,7 +246,11 @@ docket_v4_api_keys_base = {
         if x.get("juryDemand")
         else x["result"].docket_entry.docket.jury_demand
     ),
-    "pacer_case_id": lambda x: x["result"].docket_entry.docket.pacer_case_id,
+    "pacer_case_id": lambda x: (
+        str(x["result"].docket_entry.docket.pacer_case_id)
+        if x["result"].docket_entry.docket.pacer_case_id
+        else ""
+    ),
     "party": lambda x: list(
         DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
             "party"
@@ -280,20 +280,17 @@ docket_v4_api_keys_base = {
         if x.get("suitNature")
         else x["result"].docket_entry.docket.nature_of_suit
     ),
-    "timestamp": lambda x: x["result"]
-    .docket_entry.docket.date_created.isoformat()
-    .replace("+00:00", "Z"),
     "trustee_str": lambda x: (
         x["result"].docket_entry.docket.bankruptcy_information.trustee_str
         if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
         else None
     ),
+    "meta": [],
 }
 
 docket_v4_api_keys = docket_v4_api_keys_base.copy()
 docket_v4_api_keys.update(
     {
-        "more_docs": lambda x: False,
         "recap_documents": [],  # type: ignore
     }
 )
@@ -337,15 +334,29 @@ recap_document_v4_api_keys = {
         .cited_opinions.all()
         .values_list("cited_opinion_id", flat=True)
     ),
-    "timestamp": lambda x: x["result"]
-    .date_created.isoformat()
-    .replace("+00:00", "Z"),
+    "meta": [],
 }
 
 rd_type_v4_api_keys = recap_document_v4_api_keys.copy()
 rd_type_v4_api_keys.update(
     {
         "docket_id": lambda x: x["result"].docket_entry.docket_id,
+    }
+)
+
+v4_meta_keys = {
+    "date_created": lambda x: x["result"]
+    .docket_entry.docket.date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "timestamp": lambda x: x["result"]
+    .date_created.isoformat()
+    .replace("+00:00", "Z"),
+}
+
+v4_recap_meta_keys = v4_meta_keys.copy()
+v4_recap_meta_keys.update(
+    {
+        "more_docs": lambda x: False,
     }
 )
 

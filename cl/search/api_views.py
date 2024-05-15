@@ -10,7 +10,6 @@ from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_serializers import (
-    BaseRECAPDocumentESResultSerializer,
     CourtSerializer,
     DocketEntrySerializer,
     DocketESResultSerializer,
@@ -22,6 +21,7 @@ from cl.search.api_serializers import (
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
+    RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
     SearchResultSerializer,
@@ -232,6 +232,10 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
+            paginator = ESCursorPagination()
+            cd["request_date"] = paginator.initialize_context_from_request(
+                request, search_type
+            )
             search_query = DocketDocument.search()
             highlighting_fields = {}
             main_query, child_docs_query = do_es_api_query(
@@ -241,7 +245,6 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                 SEARCH_HL_TAG,
                 request.version,
             )
-            paginator = ESCursorPagination()
             es_list_instance = api_utils.CursorESList(
                 main_query,
                 child_docs_query,
@@ -264,7 +267,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             elif search_type == SEARCH_TYPES.DOCKETS:
                 serializer = DocketESResultSerializer(results_page, many=True)
             elif search_type == SEARCH_TYPES.RECAP_DOCUMENT:
-                serializer = BaseRECAPDocumentESResultSerializer(
+                serializer = RECAPDocumentESResultSerializer(
                     results_page, many=True
                 )
             else:
