@@ -37,16 +37,8 @@
 		<div class="row">
 			<div class="col-xs-1"></div>
 			<div class="col-xs-2">
-				{% if form.initial.court.id == "me" %}
-					<img src="{% static "img/me.png" %}" class="img-responsive"
-						 height=128 width="128"/>
-				{% elif form.initial.court.id == "tennworkcompcl" or form.initial.court.id == "tennworkcompapp" %}
-					<img src="{% static "img/tn-court.jpg" %}" class="img-responsive"
-						 width="359" height="359">
-				{% else %}
-					<img src="{% static court_image %}" class="img-responsive"
-						 width="359" height="359">
-				{% endif %}
+				<img src="{% static court_image %}" class="img-responsive"
+					 width="128" height="128">
 			</div>
 			<div class="col-xs-8">
 				<h1>

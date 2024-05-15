@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import F, IntegerField, Prefetch
+from django.db.models import IntegerField, Prefetch
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import (
@@ -20,7 +20,6 @@ from django.http.response import (
     HttpResponseNotAllowed,
 )
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
-from django.template import loader
 from django.template.defaultfilters import slugify
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -62,8 +61,14 @@ from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
-    CourtUploadForm,
     DocketEntryFilterForm,
+    MeCourtUploadForm,
+    MissCourtUploadForm,
+    MissCtAppCourtUploadForm,
+    MoCourtUploadForm,
+    MoCtAppCourtUploadForm,
+    TennWorkCompAppUploadForm,
+    TennWorkCompClUploadForm,
 )
 from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
@@ -113,18 +118,6 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     if pk == "tennworkcompapp" or pk == "tennworkcompcl":
         courts = ["tennworkcompcl", "tennworkcompapp"]
         template = "tn-court.html"
-    elif pk == "moctapp":
-        courts = [pk]
-        template = "moctapp-court.html"
-    elif pk == "mo":
-        courts = [pk]
-        template = "mo-court.html"
-    elif pk == "missctapp":
-        courts = [pk]
-        template = "missctapp-court.html"
-    elif pk == "miss":
-        courts = [pk]
-        template = "miss-court.html"
     else:
         courts = [pk]
         template = "court.html"
@@ -191,9 +184,24 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
                 "You do not have permission to access this page."
             )
 
-    form = await sync_to_async(CourtUploadForm)(pk=pk)
+    if pk == "tennworkcompcl":
+        upload_form = TennWorkCompClUploadForm
+    elif pk == "tennworkcompapp":
+        upload_form = TennWorkCompAppUploadForm
+    elif pk == "me":
+        upload_form = MeCourtUploadForm
+    elif pk == "mo":
+        upload_form = MoCourtUploadForm
+    elif pk == "moctapp":
+        upload_form = MoCtAppCourtUploadForm
+    elif pk == "miss":
+        upload_form = MissCourtUploadForm
+    else:
+        upload_form = MissCtAppCourtUploadForm
+
+    form = await sync_to_async(upload_form)(pk=pk)
     if request.method == "POST":
-        form = await sync_to_async(CourtUploadForm)(
+        form = await sync_to_async(upload_form)(
             request.POST, request.FILES, pk=pk
         )
         if await sync_to_async(form.is_valid)():
@@ -213,7 +221,7 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
         request,
         "publish.html",
         {
-            "court_image": f"img/{pk}-court.jpg",
+            "court_image": f"img/{pk}.jpg",
             "form": form,
             "private": True,
             "pk": pk,

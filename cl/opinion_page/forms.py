@@ -4,7 +4,7 @@ from typing import Any, MutableMapping
 
 from django import forms
 from django.core.exceptions import ValidationError
-from django.core.validators import FileExtensionValidator
+from django.core.validators import FileExtensionValidator, URLValidator
 from django.db.models import Case, IntegerField, Q, Value, When
 from django.utils.encoding import force_bytes
 from django.utils.html import format_html
@@ -25,6 +25,7 @@ from cl.search.models import (
     Docket,
     Opinion,
     OpinionCluster,
+    OriginatingCourtInformation,
 )
 
 
@@ -121,7 +122,13 @@ class DocketEntryFilterForm(forms.Form):
         return data
 
 
-class CourtUploadForm(forms.Form):
+class BaseCourtUploadForm(forms.Form):
+    """Base form to be used with court uploads
+
+    Here we define all possible form fields and some shared methods, in case of require
+    something special those can be redefined on each court form.
+    """
+
     initial: MutableMapping[str, Any]
 
     court_str = forms.CharField(required=True, widget=forms.HiddenInput())
@@ -215,6 +222,19 @@ class CourtUploadForm(forms.Form):
             }
         ),
     )
+
+    judges = forms.CharField(
+        label="Judges / Lead author",
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Judges / Lead author string",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
     cite_volume = forms.IntegerField(
         label="Cite Year",
         required=True,
@@ -237,11 +257,70 @@ class CourtUploadForm(forms.Form):
             }
         ),
     )
+
+    disposition = forms.CharField(
+        label="Disposition",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+            }
+        ),
+    )
+
     summary = forms.CharField(
         label="Summary",
         required=False,
         widget=forms.Textarea(attrs={"class": "form-control"}),
     )
+
+    # TODO this could be a select field with hardcoded options for a specific court
+    lower_court_str = forms.CharField(
+        label="Lower Court",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Lower court name",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    lower_court_docket_number = forms.CharField(
+        label="Lower Court docket number",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Lower court docket number",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    download_url = forms.URLField(
+        validators=[URLValidator()],
+        label="Download Url",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "The URL where the document is originally located",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    opinion_type = forms.CharField(
+        label="Opinion Type",
+        required=True,
+        initial=Opinion.LEAD,
+        widget=forms.Select(
+            choices=Opinion.OPINION_TYPES, attrs={"class": "form-control"}
+        ),
+    )
+
     pdf_upload = forms.FileField(
         label="Opinion PDF",
         required=True,
@@ -254,159 +333,6 @@ class CourtUploadForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
-
-        if self.pk == "me":
-            # The court requested the order of the panel match the seniority
-            # of the judges, in order or date joined after sorting by pos type
-            # Chief, Associate, Retired Active
-            # Additionally, we only want active justices so remove them if
-            # terminated or retired, without a new role being created as an
-            # retired active justice
-            q_judges = (
-                Person.objects.filter(
-                    (
-                        (
-                            Q(positions__position_type="c-jus")
-                            | Q(positions__position_type="ass-jus")
-                            | Q(positions__position_type="ret-act-jus")
-                        )
-                        & (
-                            Q(positions__date_termination__isnull=True)
-                            & Q(positions__date_retirement__isnull=True)
-                        )
-                    ),
-                    positions__court_id="me",
-                    is_alias_of=None,
-                )
-                .annotate(
-                    custom_order=Case(
-                        When(positions__position_type="c-jus", then=Value(1)),
-                        When(
-                            positions__position_type="ass-jus", then=Value(2)
-                        ),
-                        When(
-                            positions__position_type="ret-act-jus",
-                            then=Value(3),
-                        ),
-                        output_field=IntegerField(),
-                    )
-                )
-                .order_by("custom_order", "positions__date_start")
-            )
-            self.drop_fields(
-                [
-                    "summary",
-                ]
-            )
-        else:
-            q_judges = Person.objects.filter(
-                positions__court_id=self.pk, is_alias_of=None
-            ).order_by("name_first")
-
-        for field_name in [
-            "lead_author",
-            "second_judge",
-            "third_judge",
-            "panel",
-        ]:
-            self.fields[field_name].queryset = q_judges  # type: ignore[attr-defined]
-            self.fields[
-                field_name
-            ].label_from_instance = self.person_label  # type: ignore[attr-defined]
-
-        if self.pk == "tennworkcompcl":
-            self.fields["cite_reporter"].widget = forms.Select(
-                choices=[("TN WC", "TN WC")],
-                attrs={"class": "form-control"},
-            )
-            self.drop_fields(
-                [
-                    "date_argued",
-                    "date_reargued",
-                    "panel",
-                    "second_judge",
-                    "third_judge",
-                    "summary",
-                ]
-            )
-
-        elif self.pk == "me":
-            self.fields["cite_reporter"].widget = forms.Select(
-                choices=[("ME", "ME")],
-                attrs={"class": "form-control"},
-            )
-            self.drop_fields(["lead_author", "second_judge", "third_judge"])
-        elif self.pk == "tennworkcompapp":
-            self.fields["cite_reporter"].widget = forms.Select(
-                choices=[("TN WC App.", "TN WC App.")],
-                attrs={"class": "form-control"},
-            )
-            self.drop_fields(
-                ["date_argued", "date_reargued", "panel", "summary"]
-            )
-        elif self.pk == "mo":
-            self.non_required_fields(["lead_author"])
-            self.drop_fields(
-                [
-                    "date_argued",
-                    "date_reargued",
-                    "cite_volume",
-                    "cite_reporter",
-                    "cite_page",
-                    "summary",
-                    "second_judge",
-                    "third_judge",
-                    "panel",
-                ]
-            )
-        elif self.pk == "moctapp":
-            self.non_required_fields(["lead_author"])
-            self.drop_fields(
-                [
-                    "date_argued",
-                    "date_reargued",
-                    "cite_volume",
-                    "cite_reporter",
-                    "cite_page",
-                    "summary",
-                    "second_judge",
-                    "third_judge",
-                    "panel",
-                ]
-            )
-        elif self.pk == "miss":
-            self.non_required_fields(["lead_author"])
-            self.drop_fields(
-                [
-                    "date_argued",
-                    "date_reargued",
-                    "cite_volume",
-                    "cite_reporter",
-                    "cite_page",
-                    "second_judge",
-                    "third_judge",
-                    "panel",
-                ]
-            )
-        elif self.pk == "missctapp":
-            self.non_required_fields(["lead_author"])
-            self.drop_fields(
-                [
-                    "date_argued",
-                    "date_reargued",
-                    "cite_volume",
-                    "cite_reporter",
-                    "cite_page",
-                    "second_judge",
-                    "third_judge",
-                    "panel",
-                ]
-            )
-        else:
-            raise BaseException
-
-        if "cite_reporter" in self.fields:
-            self.fields["cite_reporter"].widget.attrs["readonly"] = True
 
     def non_required_fields(self, fields: list[str]) -> None:
         """Set fields as optional
@@ -430,9 +356,61 @@ class CourtUploadForm(forms.Form):
 
     @staticmethod
     def person_label(obj) -> str:
+        """Get person full name
+
+        :param obj: Person object
+        :return: person full name
+        """
         return obj.name_full
 
+    def make_panel(self) -> None:
+        """Build panel from lead_author and panel field
+
+        :return: None
+        """
+
+        if not self.cleaned_data.get("panel") and self.cleaned_data.get(
+            "lead_author"
+        ):
+            # No panel field or no panel field data, use lead author
+            self.cleaned_data["panel"] = [self.cleaned_data["lead_author"]]
+        else:
+            self.cleaned_data["panel"] = self.cleaned_data.get("panel", [])
+
+    def get_judges_qs(self):
+        """Get judges from specific court
+
+        :return: list of judges from specific court
+        """
+        return Person.objects.filter(
+            positions__court_id=self.pk, is_alias_of=None
+        ).order_by("name_first")
+
+    def set_judges_qs(self, judges_qs) -> None:
+        """Set Person queryset for panel/judge fields
+
+        :param judges_qs: Person queryset
+        :return: None
+        """
+        for field_name in [
+            "lead_author",
+            "second_judge",
+            "third_judge",
+            "panel",
+        ]:
+            if field_name in self.fields:
+                self.fields[
+                    field_name
+                ].queryset = judges_qs  # type: ignore[attr-defined]
+                self.fields[
+                    field_name
+                ].label_from_instance = self.person_label  # type: ignore[attr-defined]
+
     def validate_neutral_citation(self) -> None:
+        """Validate if we already have the neutral citation in the system
+
+        :return: None
+        """
         volume = self.cleaned_data.get("cite_volume")
         reporter = self.cleaned_data.get("cite_reporter")
         page = self.cleaned_data.get("cite_page")
@@ -458,22 +436,13 @@ class CourtUploadForm(forms.Form):
             self.cleaned_data["citations"] = f"{volume} {reporter} {page}"
 
     def verify_unique_judges(self) -> None:
-        if self.pk == "tennworkcompapp":
-            judges = [
-                self.cleaned_data["lead_author"],
-                self.cleaned_data["second_judge"],
-                self.cleaned_data["third_judge"],
-            ]
-            # Remove None when judges are optional
-            judges = [judge for judge in judges if judge is not None]
-            flag = len(set(judges)) == len(judges)
-            if not flag:
-                self.add_error(
-                    "lead_author",
-                    ValidationError("Please select each judge only once."),
-                )
+        return
 
     def clean_pdf_upload(self) -> bytes:
+        """Check if we already have the pdf in the system
+
+        :return: pdf data
+        """
         pdf_data = self.cleaned_data["pdf_upload"].read()
         sha1_hash = sha1(force_bytes(pdf_data))
         ops = Opinion.objects.filter(sha1=sha1_hash)
@@ -490,29 +459,6 @@ class CourtUploadForm(forms.Form):
             )
         return pdf_data
 
-    def make_panel(self) -> None:
-        if self.pk == "tennworkcompapp":
-            self.cleaned_data["panel"] = list(
-                filter(
-                    None,
-                    [
-                        self.cleaned_data["lead_author"],
-                        self.cleaned_data.get("second_judge"),
-                        self.cleaned_data.get("third_judge"),
-                    ],
-                )
-            )
-        elif self.pk == "me":
-            self.cleaned_data["panel"] = self.cleaned_data.get("panel")
-        else:
-            if not self.cleaned_data.get("panel") and self.cleaned_data.get(
-                "lead_author"
-            ):
-                # No panel field or no panel field data, use lead author
-                self.cleaned_data["panel"] = [self.cleaned_data["lead_author"]]
-            else:
-                self.cleaned_data["panel"] = self.cleaned_data.get("panel", [])
-
     def make_item_dict(self) -> None:
         """Make item dictionary for adding to our DB
 
@@ -522,20 +468,27 @@ class CourtUploadForm(forms.Form):
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
             "cluster_source": SOURCES.DIRECT_COURT_INPUT,
+            "cluster_disposition": self.cleaned_data.get("disposition"),
             "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data.get("publication_date"),
             "precedential_statuses": "Published",
             "docket_numbers": self.cleaned_data.get("docket_number"),
             "judges": ", ".join(
                 [j.name_full for j in self.cleaned_data.get("panel", []) if j]
-            ),
+            )
+            or self.cleaned_data.get("judges"),
             "author_id": lead_author.id if lead_author else None,
             "author": lead_author,
             "date_filed_is_approximate": False,
             "blocked_statuses": False,
             "citations": self.cleaned_data.get("citations", ""),
             "summary": self.cleaned_data.get("summary", ""),
-            "download_urls": "",
+            "download_urls": self.cleaned_data.get("download_url"),
+            "opinion_type": self.cleaned_data.get("opinion_type"),
+            "lower_court_str": self.cleaned_data.get("lower_court_str", ""),
+            "lower_court_docket_number": self.cleaned_data.get(
+                "lower_court_docket_number"
+            ),
         }
 
     def clean(self) -> dict[str, Any]:
@@ -547,7 +500,7 @@ class CourtUploadForm(forms.Form):
         return self.cleaned_data
 
     def save(self) -> OpinionCluster:
-        """Save uploaded Tennessee Workers Comp/Appeal to db.
+        """Save court decision data to db.
 
         :return: Cluster
         """
@@ -577,6 +530,15 @@ class CourtUploadForm(forms.Form):
             index=False,
         )
 
+        if self.cleaned_data.get("lower_court_docket_number"):
+            originating_court = OriginatingCourtInformation.objects.create(
+                docket_number=self.cleaned_data.get(
+                    "lower_court_docket_number"
+                )
+            )
+            docket.originating_court_information = originating_court
+            docket.save()
+
         extract_doc_content.delay(
             opinion.pk, ocr_available=True, citation_jitter=True
         )
@@ -586,3 +548,252 @@ class CourtUploadForm(forms.Form):
         )
 
         return cluster
+
+
+class MeCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Supreme Judicial Court of Maine (me) Upload Portal
+    """
+
+    def get_judges_qs(self):
+        return (
+            Person.objects.filter(
+                (
+                    (
+                        Q(positions__position_type="c-jus")
+                        | Q(positions__position_type="ass-jus")
+                        | Q(positions__position_type="ret-act-jus")
+                    )
+                    & (
+                        Q(positions__date_termination__isnull=True)
+                        & Q(positions__date_retirement__isnull=True)
+                    )
+                ),
+                positions__court_id="me",
+                is_alias_of=None,
+            )
+            .annotate(
+                custom_order=Case(
+                    When(positions__position_type="c-jus", then=Value(1)),
+                    When(positions__position_type="ass-jus", then=Value(2)),
+                    When(
+                        positions__position_type="ret-act-jus",
+                        then=Value(3),
+                    ),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("custom_order", "positions__date_start")
+        )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.drop_fields(
+            [
+                "lead_author",
+                "second_judge",
+                "third_judge",
+                "summary",
+                "judges",
+                "lower_court_str",
+                "lower_court_docket_number",
+                "disposition",
+                "download_url",
+                "opinion_type",
+            ]
+        )
+
+        # The court requested the order of the panel match the seniority
+        # of the judges, in order or date joined after sorting by pos type
+        # Chief, Associate, Retired Active
+        # Additionally, we only want active justices so remove them if
+        # terminated or retired, without a new role being created as an
+        # retired active justice
+        q_judges = self.get_judges_qs()
+        self.set_judges_qs(q_judges)
+
+        self.fields["cite_reporter"].widget = forms.Select(
+            choices=[("ME", "ME")],
+            attrs={"class": "form-control", "readonly": "readonly"},
+        )
+
+
+class MoCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Supreme Court of Missouri (mo) Upload Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.non_required_fields(["lead_author"])
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
+                "summary",
+                "second_judge",
+                "third_judge",
+                "panel",
+                "lower_court_str",
+                "lower_court_docket_number",
+            ]
+        )
+
+
+class MoCtAppCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Missouri Court of Appeals (moctapp) Upload Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.non_required_fields(["lead_author"])
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
+                "summary",
+                "second_judge",
+                "third_judge",
+                "panel",
+                "lower_court_str",
+                "lower_court_docket_number",
+            ]
+        )
+
+
+class MissCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Mississippi Supreme Court (miss) Upload Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.non_required_fields(["lead_author"])
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
+                "second_judge",
+                "third_judge",
+                "panel",
+            ]
+        )
+
+
+class MissCtAppCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Court of Appeals of Mississippi (missctapp) Upload Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.non_required_fields(["lead_author"])
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
+                "second_judge",
+                "third_judge",
+                "panel",
+            ]
+        )
+
+
+class TennWorkCompClUploadForm(BaseCourtUploadForm):
+    """
+    Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl) Upload
+    Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["cite_reporter"].widget = forms.Select(
+            choices=[("TN WC", "TN WC")],
+            attrs={"class": "form-control", "readonly": "readonly"},
+        )
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "panel",
+                "second_judge",
+                "third_judge",
+                "summary",
+                "lower_court_str",
+                "lower_court_docket_number",
+                "disposition",
+                "judges",
+                "opinion_type",
+                "download_url",
+            ]
+        )
+
+
+class TennWorkCompAppUploadForm(BaseCourtUploadForm):
+    """
+    Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp) Upload
+    Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["cite_reporter"].widget = forms.Select(
+            choices=[("TN WC App.", "TN WC App.")],
+            attrs={"class": "form-control", "readonly": "readonly"},
+        )
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "panel",
+                "summary",
+                "lower_court_str",
+                "lower_court_docket_number",
+                "disposition",
+                "judges",
+                "opinion_type",
+                "download_url",
+            ]
+        )
+
+    def verify_unique_judges(self) -> None:
+        judges = [
+            self.cleaned_data["lead_author"],
+            self.cleaned_data["second_judge"],
+            self.cleaned_data["third_judge"],
+        ]
+        # Remove None when judges are optional
+        judges = [judge for judge in judges if judge is not None]
+        flag = len(set(judges)) == len(judges)
+        if not flag:
+            self.add_error(
+                "lead_author",
+                ValidationError("Please select each judge only once."),
+            )
+
+    def make_panel(self) -> None:
+        self.cleaned_data["panel"] = list(
+            filter(
+                None,
+                [
+                    self.cleaned_data["lead_author"],
+                    self.cleaned_data.get("second_judge"),
+                    self.cleaned_data.get("third_judge"),
+                ],
+            )
+        )

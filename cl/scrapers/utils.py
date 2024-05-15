@@ -295,6 +295,7 @@ def update_or_create_docket(
     date_blocked: date | None = None,
     date_argued: date | None = None,
     ia_needs_upload: bool | None = None,
+    appeal_from_str: str = "",
 ) -> Docket:
     """Look for an existing Docket and update it or create a new one if it's
     not found.
@@ -309,6 +310,7 @@ def update_or_create_docket(
     :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
+    :param appeal_from_str: The docket lower court
     :return: The docket.
     """
 
@@ -320,6 +322,7 @@ def update_or_create_docket(
         "date_blocked": date_blocked,
         "date_argued": date_argued,
         "ia_needs_upload": ia_needs_upload,
+        "appeal_from_str": appeal_from_str,
     }
 
     docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
