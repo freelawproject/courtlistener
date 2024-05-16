@@ -23,6 +23,7 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
 )
@@ -382,8 +383,8 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
         return get_highlight(obj, "text")
 
 
-class OpinionESResultSerializer(DocumentSerializer):
-    """The serializer for Opinion results."""
+class V3OpinionESResultSerializer(DocumentSerializer):
+    """The serializer for V3 Opinion Search API results."""
 
     cluster_id = serializers.IntegerField(read_only=True)
 
@@ -519,6 +520,12 @@ class BaseDocketESResultSerializer(DocumentSerializer):
     juryDemand = HighlightedField(read_only=True)
     referredTo = HighlightedField(read_only=True)
     suitNature = HighlightedField(read_only=True)
+    party_id = NoneToListField(read_only=True, required=False)
+    party = NoneToListField(read_only=True, required=False)
+    attorney_id = NoneToListField(read_only=True, required=False)
+    attorney = NoneToListField(read_only=True, required=False)
+    firm_id = NoneToListField(read_only=True, required=False)
+    firm = NoneToListField(read_only=True, required=False)
 
     class Meta:
         document = DocketDocument
@@ -548,3 +555,53 @@ class RECAPESResultSerializer(RECAPMetaMixin, BaseDocketESResultSerializer):
     recap_documents = BaseRECAPDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
+
+
+class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for OpinionDocument results."""
+
+    snippet = HighlightedField(read_only=True, source="text")
+    joined_by_ids = NoneToListField(read_only=True, required=False)
+
+    class Meta:
+        document = OpinionDocument
+        fields = (
+            "id",
+            "author_id",
+            "type",
+            "per_curiam",
+            "download_url",
+            "local_path",
+            "sha1",
+            "cites",
+        )
+
+
+class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for OpinionCluster Search results."""
+
+    opinions = OpinionDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+    dateArgued = CoerceDateField(read_only=True)
+    dateFiled = CoerceDateField(read_only=True)
+    dateReargued = CoerceDateField(read_only=True)
+    dateReargumentDenied = CoerceDateField(read_only=True)
+    caseName = HighlightedField(read_only=True)
+    court_citation_string = HighlightedField(read_only=True)
+    docketNumber = HighlightedField(read_only=True)
+    suitNature = HighlightedField(read_only=True)
+    panel_names = NoneToListField(read_only=True, required=False)
+    citation = NoneToListField(read_only=True, required=False)
+    sibling_ids = NoneToListField(read_only=True, required=False)
+    panel_ids = NoneToListField(read_only=True, required=False)
+
+    class Meta:
+        document = OpinionClusterDocument
+        exclude = (
+            "court_exact",
+            "_related_instance_to_ignore",
+            "cluster_child",
+            "date_created",
+            "timestamp",
+        )

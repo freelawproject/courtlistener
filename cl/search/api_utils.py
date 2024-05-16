@@ -27,6 +27,7 @@ from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
 )
@@ -275,6 +276,7 @@ class CursorESList:
         SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
         SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
         SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
+        SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
     }
 
     def __init__(
@@ -457,23 +459,15 @@ class CursorESList:
         default_unique_order = {
             "type": self.clean_data["type"],
         }
-        match self.clean_data["type"]:
-            case SEARCH_TYPES.RECAP_DOCUMENT:
-                # Use the 'id' field as a unique sorting key for the 'rd'
-                # search type.
-                default_unique_order.update(
-                    {
-                        "order_by": "id desc",
-                    }
-                )
-            case _:
-                # Use the 'docket_id' field as a unique sorting key for the
-                # 'd' and 'r' search type.
-                default_unique_order.update(
-                    {
-                        "order_by": "docket_id desc",
-                    }
-                )
+
+        unique_field, _ = self.cardinality_query[self.clean_data["type"]]
+        # Use a document unique field as a unique sorting key for the current
+        # search type.
+        default_unique_order.update(
+            {
+                "order_by": f"{unique_field} desc",
+            }
+        )
 
         unique_sorting = build_sort_results(
             default_unique_order, self.reverse, "v4"
@@ -493,8 +487,8 @@ class ResultObject:
 
 
 def limit_api_results_to_page(
-    results: Response | AttrList, cursor: ESCursor | None
-) -> Response | AttrList:
+    results: list[defaultdict], cursor: ESCursor | None
+) -> list[defaultdict]:
     """In ES Cursor pagination, an additional document is returned in each
     query response to determine whether to display the next page or previous
     pages. Here we limit the API results to the number defined in

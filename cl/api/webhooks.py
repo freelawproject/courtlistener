@@ -22,8 +22,8 @@ from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.search.api_serializers import (
-    OpinionESResultSerializer,
     SearchResultSerializer,
+    V3OpinionESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
 
@@ -191,7 +191,7 @@ def send_search_alert_webhook(
         ).data
     else:
         # ES results serialization
-        serialized_results = OpinionESResultSerializer(
+        serialized_results = V3OpinionESResultSerializer(
             results,
             many=True,
         ).data
