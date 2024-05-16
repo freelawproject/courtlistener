@@ -47,6 +47,7 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
+from cl.search.api_views import SearchV4ViewSet
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -3102,17 +3103,29 @@ class RECAPSearchAPIV4Test(
             docket_null_date_filed.delete()
 
     @override_settings(SEARCH_API_PAGE_SIZE=1)
-    @mock.patch(
-        "cl.search.api_views.DocketESResultSerializer",
-        new=DocketESResultSerializerTest,
-    )
-    @mock.patch(
-        "cl.search.api_views.RECAPDocumentESResultSerializer",
-        new=RECAPDocumentESResultSerializerTest,
-    )
-    @mock.patch(
-        "cl.search.api_views.RECAPESResultSerializer",
-        new=RECAPESResultSerializerTest,
+    @mock.patch.object(
+        SearchV4ViewSet,
+        "supported_search_types",
+        {
+            SEARCH_TYPES.RECAP: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.RECAP
+                ]["document_class"],
+                "serializer_class": RECAPESResultSerializerTest,
+            },
+            SEARCH_TYPES.DOCKETS: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.DOCKETS
+                ]["document_class"],
+                "serializer_class": DocketESResultSerializerTest,
+            },
+            SEARCH_TYPES.RECAP_DOCUMENT: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.RECAP_DOCUMENT
+                ]["document_class"],
+                "serializer_class": RECAPDocumentESResultSerializerTest,
+            },
+        },
     )
     @mock.patch(
         "cl.search.api_utils.set_results_highlights",

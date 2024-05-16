@@ -235,12 +235,27 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     # but folks will need to log in to get past the thresholds.
     permission_classes = (permissions.AllowAny,)
 
-    document_search_classes = {
-        SEARCH_TYPES.RECAP: DocketDocument,
-        SEARCH_TYPES.DOCKETS: DocketDocument,
-        SEARCH_TYPES.RECAP_DOCUMENT: DocketDocument,
-        SEARCH_TYPES.OPINION: OpinionClusterDocument,
-        SEARCH_TYPES.PEOPLE: PersonDocument,
+    supported_search_types = {
+        SEARCH_TYPES.RECAP: {
+            "document_class": DocketDocument,
+            "serializer_class": RECAPESResultSerializer,
+        },
+        SEARCH_TYPES.DOCKETS: {
+            "document_class": DocketDocument,
+            "serializer_class": DocketESResultSerializer,
+        },
+        SEARCH_TYPES.RECAP_DOCUMENT: {
+            "document_class": DocketDocument,
+            "serializer_class": RECAPDocumentESResultSerializer,
+        },
+        SEARCH_TYPES.OPINION: {
+            "document_class": OpinionClusterDocument,
+            "serializer_class": OpinionClusterESResultSerializer,
+        },
+        SEARCH_TYPES.PEOPLE: {
+            "document_class": PersonDocument,
+            "serializer_class": PersonESResultSerializer,
+        }
     }
 
     def list(self, request, *args, **kwargs):
@@ -248,7 +263,16 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
-            search_query = self.document_search_classes[search_type].search()
+
+            supported_search_type = self.supported_search_types.get(
+                search_type
+            )
+            if not supported_search_type:
+                raise NotFound(
+                    detail="Search type not found or not supported."
+                )
+            search_query = supported_search_type["document_class"].search()
+
             paginator = ESCursorPagination()
             cd["request_date"] = paginator.initialize_context_from_request(
                 request, search_type
@@ -278,32 +302,8 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                 results_page, paginator.cursor
             )
 
-            match search_type:
-                case SEARCH_TYPES.RECAP:
-                    serializer = RECAPESResultSerializer(
-                        results_page, many=True
-                    )
-                case SEARCH_TYPES.DOCKETS:
-                    serializer = DocketESResultSerializer(
-                        results_page, many=True
-                    )
-                case SEARCH_TYPES.RECAP_DOCUMENT:
-                    serializer = RECAPDocumentESResultSerializer(
-                        results_page, many=True
-                    )
-                case SEARCH_TYPES.OPINION:
-                    serializer = OpinionClusterESResultSerializer(
-                        results_page, many=True
-                    )
-                case SEARCH_TYPES.PEOPLE:
-                    serializer = PersonESResultSerializer(
-                        results_page, many=True
-                    )
-                case _:
-                    # Not found error
-                    raise NotFound(
-                        detail="Search type not found or not supported."
-                    )
+            serializer_class = supported_search_type["serializer_class"]
+            serializer = serializer_class(results_page, many=True)
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(

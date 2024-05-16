@@ -521,17 +521,18 @@ def build_sort_results(
         "citeCount asc": {"citeCount": {"order": "asc"}},
     }
 
-    if api_version == "v4" and cd["type"] in [
+    require_v4_function_score = cd["type"] in [
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
         SEARCH_TYPES.PEOPLE,
-    ]:
+    ]
+
+    if api_version == "v4" and require_v4_function_score:
         # Override dateFiled sorting keys in V4 RECAP Search API to work
         # alongside the custom function score for sorting by dateFiled.
         order_by_map["dateFiled desc"] = {"_score": {"order": "desc"}}
         order_by_map["dateFiled asc"] = {"_score": {"order": "desc"}}
-
         order_by_map["dob desc,name_reverse asc"] = {
             "_score": {"order": "desc"},
             "name_reverse": {"order": "asc"},
@@ -545,17 +546,7 @@ def build_sort_results(
             "name_reverse": {"order": "asc"},
         }
 
-    if (
-        toggle_sorting
-        and api_version == "v4"
-        and cd["type"]
-        in [
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.DOCKETS,
-            SEARCH_TYPES.RECAP_DOCUMENT,
-            SEARCH_TYPES.PEOPLE,
-        ]
-    ):
+    if toggle_sorting and api_version == "v4" and require_v4_function_score:
         # Override the sorting keys in V4 RECAP Search API when toggle_sorting
         # is True for backward cursor pagination based on fields that use a custom
         # function score.
@@ -1749,31 +1740,31 @@ def merge_unavailable_fields_on_parent_document(
                 .annotate(
                     text_to_show=Case(
                         When(
-                            ~QObject(html_columbia__exact=""),
+                            ~QObject(html_columbia=""),
                             then=Substr(
                                 "html_columbia", 1, settings.NO_MATCH_HL_SIZE
                             ),
                         ),
                         When(
-                            ~QObject(html_lawbox__exact=""),
+                            ~QObject(html_lawbox=""),
                             then=Substr(
                                 "html_lawbox", 1, settings.NO_MATCH_HL_SIZE
                             ),
                         ),
                         When(
-                            ~QObject(xml_harvard__exact=""),
+                            ~QObject(xml_harvard=""),
                             then=Substr(
                                 "xml_harvard", 1, settings.NO_MATCH_HL_SIZE
                             ),
                         ),
                         When(
-                            ~QObject(html_anon_2020__exact=""),
+                            ~QObject(html_anon_2020=""),
                             then=Substr(
                                 "html_anon_2020", 1, settings.NO_MATCH_HL_SIZE
                             ),
                         ),
                         When(
-                            ~QObject(html__exact=""),
+                            ~QObject(html=""),
                             then=Substr("html", 1, settings.NO_MATCH_HL_SIZE),
                         ),
                         default=Substr(
@@ -2544,11 +2535,14 @@ def get_child_top_hits_limit(
         else child_limit + 1
     )
 
-    if search_type not in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        return display_hits_limit, query_hits_limit
-
-    if search_type == SEARCH_TYPES.DOCKETS:
-        display_hits_limit = 1
+    match search_type:
+        case SEARCH_TYPES.RECAP:
+            pass
+        case SEARCH_TYPES.DOCKETS:
+            # For the DOCKETS type, show only one RECAP document per docket
+            display_hits_limit = 1
+        case _:
+            return display_hits_limit, query_hits_limit
 
     docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
     if docket_id_query:

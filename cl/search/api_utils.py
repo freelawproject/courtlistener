@@ -486,8 +486,8 @@ class ResultObject:
 
 
 def limit_api_results_to_page(
-    results: Response | AttrList, cursor: ESCursor | None
-) -> Response | AttrList:
+    results: list[defaultdict], cursor: ESCursor | None
+) -> list[defaultdict]:
     """In ES Cursor pagination, an additional document is returned in each
     query response to determine whether to display the next page or previous
     pages. Here we limit the API results to the number defined in
