@@ -255,7 +255,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         SEARCH_TYPES.PEOPLE: {
             "document_class": PersonDocument,
             "serializer_class": PersonESResultSerializer,
-        }
+        },
     }
 
     def list(self, request, *args, **kwargs):
