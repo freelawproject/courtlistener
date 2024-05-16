@@ -4190,6 +4190,63 @@ class RECAPSearchAPIV4Test(
             r = self.client.get(next)
             self.assertEqual(r.data["detail"], "Invalid cursor")
 
+    def test_verify_empty_lists_type_fields_after_partial_update(self):
+        """Verify that list fields related to foreign keys are returned as
+        empty lists after a partial update that removes the related instance
+        and empties the list field.
+        """
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            d = DocketFactory(court=self.court, source=Docket.RECAP)
+            firm = AttorneyOrganizationFactory(
+                lookup_key="00kingofprussiaroadradnorkesslertopazmeltze87437",
+                name="Law Firm LLP",
+            )
+            attorney = AttorneyFactory(
+                name="Emily Green",
+                organizations=[firm],
+                docket=d,
+            )
+            party_type = PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Mary Williams Corp.",
+                    docket=d,
+                    attorneys=[attorney],
+                ),
+                docket=d,
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.DOCKETS,
+            "q": f"docket_id:{d.pk}",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+
+        fields_to_tests = [
+            "party_id",
+            "party",
+            "attorney_id",
+            "attorney",
+            "firm_id",
+            "firm",
+        ]
+
+        firm.delete()
+        attorney.delete()
+        party_type.delete()
+        index_docket_parties_in_es.delay(d.pk)
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        # Lists fields should return []
+        for field in fields_to_tests:
+            with self.subTest(field=field, msg="List fields test."):
+                self.assertEqual(r.data["results"][0][field], [])
+
+        d.delete()
+
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     """Tests for RECAP Search Feed"""
