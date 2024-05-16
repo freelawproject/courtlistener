@@ -521,6 +521,12 @@ class BaseDocketESResultSerializer(DocumentSerializer):
     juryDemand = HighlightedField(read_only=True)
     referredTo = HighlightedField(read_only=True)
     suitNature = HighlightedField(read_only=True)
+    party_id = NoneToListField(read_only=True, required=False)
+    party = NoneToListField(read_only=True, required=False)
+    attorney_id = NoneToListField(read_only=True, required=False)
+    attorney = NoneToListField(read_only=True, required=False)
+    firm_id = NoneToListField(read_only=True, required=False)
+    firm = NoneToListField(read_only=True, required=False)
 
     class Meta:
         document = DocketDocument
@@ -556,6 +562,7 @@ class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
     """The serializer for OpinionDocument results."""
 
     snippet = HighlightedField(read_only=True, source="text")
+    joined_by_ids = NoneToListField(read_only=True, required=False)
 
     class Meta:
         document = OpinionDocument
@@ -568,7 +575,6 @@ class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
             "local_path",
             "sha1",
             "cites",
-            "joined_by_ids",
         )
 
 
@@ -586,6 +592,10 @@ class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
     court_citation_string = HighlightedField(read_only=True)
     docketNumber = HighlightedField(read_only=True)
     suitNature = HighlightedField(read_only=True)
+    panel_names = NoneToListField(read_only=True, required=False)
+    citation = NoneToListField(read_only=True, required=False)
+    sibling_ids = NoneToListField(read_only=True, required=False)
+    panel_ids = NoneToListField(read_only=True, required=False)
 
     class Meta:
         document = OpinionClusterDocument

@@ -482,7 +482,7 @@ class OpinionV3APISearchTest(
         ids_in_results = set()
         cd = {
             "type": SEARCH_TYPES.OPINION,
-            "order_by": "date_filed desc",
+            "order_by": "dateFiled desc",
             "highlight": False,
         }
         for page in range(1, total_pages + 1):
@@ -1069,6 +1069,81 @@ class OpinionV4APISearchTest(
         ]
         for test in test_cases:
             self._test_results_ordering(test, "cluster_id")
+
+    def test_verify_empty_lists_type_fields_after_partial_update(self):
+        """Verify that list fields related to foreign keys are returned as
+        empty lists after a partial update that removes the related instance
+        and empties the list field.
+        """
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            person = PersonFactory.create(
+                gender="m",
+                name_first="Bill",
+            )
+            opinion_cluster = OpinionClusterFactory.create(
+                case_name_full="Paul test v. Franklin",
+                case_name_short="Debbas",
+                syllabus="some rando syllabus",
+                date_filed=datetime.date(2015, 8, 14),
+                procedural_history="some rando history",
+                source="C",
+                case_name="Debbas v. Franklin",
+                attorneys="a bunch of crooks!",
+                slug="case-name-cluster",
+                precedential_status="Published",
+                citation_count=4,
+                docket=self.docket_1,
+            )
+            opinion_cluster.panel.add(person)
+            citation_1 = CitationWithParentsFactory.create(
+                volume=33,
+                reporter="state",
+                page="1",
+                type=1,
+                cluster=opinion_cluster,
+            )
+            opinion = OpinionFactory.create(
+                extracted_by_ocr=False,
+                plain_text="my plain text secret word for queries",
+                cluster=opinion_cluster,
+                local_path="test/search/opinion_doc.doc",
+                per_curiam=False,
+                type="020lead",
+            )
+            opinion.joined_by.add(person)
+
+            person.delete()
+
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"cluster_id:{opinion_cluster.pk}",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+
+        self.assertEqual(
+            r.data["results"][0]["opinions"][0]["joined_by_ids"], []
+        )
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            citation_1.delete()
+            opinion.delete()
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+
+        fields_to_tests = [
+            "panel_names",
+            "citation",
+            "sibling_ids",
+            "panel_ids",
+        ]
+        # Lists fields should return []
+        for field in fields_to_tests:
+            with self.subTest(field=field, msg="List fields test."):
+                self.assertEqual(r.data["results"][0][field], [])
 
 
 class OpinionsESSearchTest(
