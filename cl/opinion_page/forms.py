@@ -225,11 +225,12 @@ class BaseCourtUploadForm(forms.Form):
 
     judges = forms.CharField(
         label="Judges / Lead author",
-        required=True,
+        required=False,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
-                "placeholder": "Judges / Lead author string",
+                "placeholder": "Judges / Lead author string, use this in case you can't "
+                "find the name(s) in the list(s) above",
                 "autocomplete": "off",
             }
         ),
@@ -333,6 +334,9 @@ class BaseCourtUploadForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
+
+        q_judges = self.get_judges_qs()
+        self.set_judges_qs(q_judges)
 
     def non_required_fields(self, fields: list[str]) -> None:
         """Set fields as optional
@@ -465,18 +469,23 @@ class BaseCourtUploadForm(forms.Form):
         :return: None
         """
         lead_author = self.cleaned_data.get("lead_author")
+
+        judges_list = [
+            j.name_full for j in self.cleaned_data.get("panel", []) if j
+        ]
+        if self.cleaned_data.get("judges"):
+            # We can have additional judges from charfield that are not in the system
+            judges_list.append(self.cleaned_data.get("judges"))
+
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
             "cluster_source": SOURCES.DIRECT_COURT_INPUT,
-            "cluster_disposition": self.cleaned_data.get("disposition"),
+            "cluster_disposition": self.cleaned_data.get("disposition", ""),
             "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data.get("publication_date"),
             "precedential_statuses": "Published",
             "docket_numbers": self.cleaned_data.get("docket_number"),
-            "judges": ", ".join(
-                [j.name_full for j in self.cleaned_data.get("panel", []) if j]
-            )
-            or self.cleaned_data.get("judges"),
+            "judges": ", ".join(list(set(judges_list))),
             "author_id": lead_author.id if lead_author else None,
             "author": lead_author,
             "date_filed_is_approximate": False,

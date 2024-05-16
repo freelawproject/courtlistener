@@ -1,7 +1,7 @@
 import datetime
 from collections import OrderedDict, defaultdict
 from http import HTTPStatus
-from typing import Dict, Union
+from typing import Any, Dict, Union
 from urllib.parse import urlencode
 
 import eyecite
@@ -183,6 +183,9 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
             raise PermissionDenied(
                 "You do not have permission to access this page."
             )
+
+    # Fix mypy errors
+    upload_form: Any
 
     if pk == "tennworkcompcl":
         upload_form = TennWorkCompClUploadForm

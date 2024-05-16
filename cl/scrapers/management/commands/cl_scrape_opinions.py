@@ -119,7 +119,7 @@ def make_objects(
         blocked=blocked,
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
-        disposition=item.get("cluster_disposition", ""),
+        disposition=item.get("cluster_disposition") or "",
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
@@ -134,7 +134,7 @@ def make_objects(
         url = ""
 
     opinion = Opinion(
-        type=item.get("opinion_type", Opinion.COMBINED),
+        type=item.get("opinion_type") or Opinion.COMBINED,
         sha1=sha1_hash,
         download_url=url,
     )
