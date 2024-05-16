@@ -54,7 +54,7 @@ from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
-from cl.lib.test_helpers import SimpleUserDataMixin, opinion_search_api_keys
+from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
@@ -925,13 +925,15 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                     # Assert the number of keys in the Opinions Search Webhook
                     # payload
                     keys_count = len(content["payload"]["results"][0])
-                    self.assertEqual(keys_count, len(opinion_search_api_keys))
+                    self.assertEqual(
+                        keys_count, len(opinion_v3_search_api_keys)
+                    )
 
                     # Iterate through all the opinion fields and compare them.
                     for (
                         field,
                         get_expected_value,
-                    ) in opinion_search_api_keys.items():
+                    ) in opinion_v3_search_api_keys.items():
                         with self.subTest(field=field):
                             expected_value = get_expected_value(
                                 alert_data_compare

@@ -13,11 +13,14 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import caches
 from django.core.paginator import EmptyPage, Page
-from django.db.models import QuerySet
+from django.db.models import Case
+from django.db.models import Q as QObject
+from django.db.models import QuerySet, TextField, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http import HttpRequest
 from django.http.request import QueryDict
+from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import A, MultiSearch, Q
@@ -26,6 +29,7 @@ from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrDict
 
+from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.bot_detector import is_bot
 from cl.lib.date_time import midnight_pt
 from cl.lib.paginators import ESPaginator
@@ -52,18 +56,17 @@ from cl.search.constants import (
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
-    SEARCH_OPINION_CHILD_HL_FIELDS,
     SEARCH_OPINION_HL_FIELDS,
     SEARCH_OPINION_QUERY_FIELDS,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_ORAL_ARGUMENT_QUERY_FIELDS,
     SEARCH_PEOPLE_CHILD_QUERY_FIELDS,
     SEARCH_PEOPLE_PARENT_QUERY_FIELDS,
-    SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
+    api_child_highlight_map,
 )
 from cl.search.exception import (
     BadProximityQuery,
@@ -77,6 +80,7 @@ from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Court,
+    Opinion,
     OpinionCluster,
     RECAPDocument,
 )
@@ -490,6 +494,8 @@ def build_sort_results(
         "name_reverse asc": {"name_reverse": {"order": "asc"}},
         "docket_id asc": {"docket_id": {"order": "asc"}},
         "docket_id desc": {"docket_id": {"order": "desc"}},
+        "cluster_id asc": {"cluster_id": {"order": "asc"}},
+        "cluster_id desc": {"cluster_id": {"order": "desc"}},
         "id asc": {"id": {"order": "asc"}},
         "id desc": {"id": {"order": "desc"}},
         "dob desc,name_reverse asc": {
@@ -515,15 +521,21 @@ def build_sort_results(
         "citeCount asc": {"citeCount": {"order": "asc"}},
     }
 
-    if api_version == "v4":
-        # Override dateFiled sorting keys in V4 API to work alongside the custom
-        # function score for sorting by dateFiled.
+    require_v4_function_score = cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+        SEARCH_TYPES.RECAP_DOCUMENT,
+    ]
+
+    if api_version == "v4" and require_v4_function_score:
+        # Override dateFiled sorting keys in V4 RECAP Search API to work
+        # alongside the custom function score for sorting by dateFiled.
         order_by_map["dateFiled desc"] = {"_score": {"order": "desc"}}
         order_by_map["dateFiled asc"] = {"_score": {"order": "desc"}}
 
-    if toggle_sorting and api_version == "v4":
-        # Override the sorting keys in the V4 API when toggle_sorting is True
-        # for backward cursor pagination based on fields that use a custom
+    if toggle_sorting and api_version == "v4" and require_v4_function_score:
+        # Override the sorting keys in V4 RECAP Search API when toggle_sorting
+        # is True for backward cursor pagination based on fields that use a custom
         # function score.
         order_by_map["entry_date_filed asc"] = {"_score": {"order": "asc"}}
         order_by_map["entry_date_filed desc"] = {"_score": {"order": "asc"}}
@@ -927,8 +939,8 @@ def get_search_query(
                         score_mode="max",
                         query=Q("match_all"),
                         inner_hits={
-                            "name": "text_query_inner_opinion",
-                            "size": 10,
+                            "name": "filter_query_inner_opinion",
+                            "size": settings.OPINION_HITS_PER_RESULT,
                         },
                     ),
                     Q("match", cluster_child="opinion_cluster"),
@@ -1086,6 +1098,8 @@ def build_es_base_query(
                 child_query_fields,
                 parent_query_fields,
                 mlt_query,
+                child_highlighting=child_highlighting,
+                api_version=api_version,
             )
 
     search_query = get_search_query(
@@ -1654,6 +1668,68 @@ def merge_unavailable_fields_on_parent_document(
                     result["plain_text"] = recap_docs_dict.get(
                         result["id"], ""
                     )
+
+        case SEARCH_TYPES.OPINION if request_type == "api" and not highlight:
+            # Retrieves the Opinion plain_text from the DB to fill the snippet
+            # when highlighting is disabled. Considering the same prioritization
+            # as in the OpinionDocument indexing into ES.
+
+            opinion_ids = {
+                doc["_source"]["id"]
+                for entry in results
+                for doc in entry["child_docs"]
+            }
+            opinions = (
+                Opinion.objects.filter(pk__in=opinion_ids)
+                .annotate(
+                    text_to_show=Case(
+                        When(
+                            ~QObject(html_columbia=""),
+                            then=Substr(
+                                "html_columbia", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(html_lawbox=""),
+                            then=Substr(
+                                "html_lawbox", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(xml_harvard=""),
+                            then=Substr(
+                                "xml_harvard", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(html_anon_2020=""),
+                            then=Substr(
+                                "html_anon_2020", 1, settings.NO_MATCH_HL_SIZE
+                            ),
+                        ),
+                        When(
+                            ~QObject(html=""),
+                            then=Substr("html", 1, settings.NO_MATCH_HL_SIZE),
+                        ),
+                        default=Substr(
+                            "plain_text", 1, settings.NO_MATCH_HL_SIZE
+                        ),
+                        output_field=TextField(),
+                    )
+                )
+                .values("id", "text_to_show")
+            )
+            opinion_docs_dict = {
+                doc["id"]: doc["text_to_show"] for doc in opinions
+            }
+            for result in results:
+                for op in result["child_docs"]:
+                    op["_source"]["text"] = html_decode(
+                        strip_tags(
+                            opinion_docs_dict.get(op["_source"]["id"], "")
+                        )
+                    )
+
         case _:
             return
 
@@ -2295,15 +2371,9 @@ def build_full_join_es_queries(
         _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
         has_child_query = None
         if child_text_query or child_filters:
-            hl_fields = (
-                (
-                    SEARCH_OPINION_CHILD_HL_FIELDS
-                    if cd["type"] == SEARCH_TYPES.OPINION
-                    else SEARCH_RECAP_CHILD_HL_FIELDS
-                )
-                if child_highlighting
-                else SEARCH_RECAP_CHILD_EXCLUDE_FIELDS
-            )
+            hl_fields = api_child_highlight_map[
+                (child_highlighting, cd["type"])
+            ]
             has_child_query = build_has_child_query(
                 join_query,
                 child_type,
@@ -2461,24 +2531,39 @@ def get_child_top_hits_limit(
      query hits.
     """
 
-    frontend_hits_limit = settings.CHILD_HITS_PER_RESULT
-    # Increase the CHILD_HITS_PER_RESULT value by 1. This is done to determine
-    # whether there are more than CHILD_HITS_PER_RESULT results, which would
+    match search_type:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
+            child_limit = settings.RECAP_CHILD_HITS_PER_RESULT
+        case SEARCH_TYPES.OPINION:
+            child_limit = settings.OPINION_HITS_PER_RESULT
+        case _:
+            child_limit = 0
+
+    display_hits_limit = child_limit
+    # Increase the RECAP_CHILD_HITS_PER_RESULT value by 1. This is done to determine
+    # whether there are more than RECAP_CHILD_HITS_PER_RESULT results, which would
     # trigger the "View Additional Results" button on the frontend.
-    query_hits_limit = settings.CHILD_HITS_PER_RESULT + 1
+    query_hits_limit = child_limit + 1
 
-    if search_type not in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        return frontend_hits_limit, query_hits_limit
-
-    if search_type == SEARCH_TYPES.DOCKETS:
-        frontend_hits_limit = 1
+    match search_type:
+        case SEARCH_TYPES.RECAP:
+            pass
+        case SEARCH_TYPES.DOCKETS:
+            # For the DOCKETS type, show only one RECAP document per docket
+            display_hits_limit = 1
+        case _:
+            return display_hits_limit, query_hits_limit
 
     docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
     if docket_id_query:
-        frontend_hits_limit = settings.VIEW_MORE_CHILD_HITS
+        display_hits_limit = settings.VIEW_MORE_CHILD_HITS
         query_hits_limit = settings.VIEW_MORE_CHILD_HITS + 1
 
-    return frontend_hits_limit, query_hits_limit
+    return display_hits_limit, query_hits_limit
 
 
 def do_count_query(
@@ -2722,6 +2807,8 @@ def do_es_api_query(
         # V3 endpoints display child documents. Here, the child documents query
         # is retrieved, and extra parameters like highlighting, field exclusion,
         # and sorting are set.
+        # Note that in V3 Case Law Search, opinions are collapsed by cluster_id
+        # meaning that only one result per cluster is shown.
         s = build_child_docs_query(
             join_query,
             cd=cd,
@@ -2767,9 +2854,9 @@ def do_es_api_query(
                 extra_options["highlight"] = highlight_options
                 main_query = main_query.extra(**extra_options)
         else:
-            # DOCKETS and RECAP search types. Use the same query parameters as
-            # in the frontend. Only switch highlighting according to the user
-            # request.
+            # DOCKETS, RECAP and OPINION search types. Use the same query
+            # parameters as in the frontend. Only switch highlighting according
+            # to the user request.
             main_query = add_es_highlighting(s, cd) if cd["highlight"] else s
     return main_query, child_docs_query
 

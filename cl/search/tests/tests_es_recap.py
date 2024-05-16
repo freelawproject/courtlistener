@@ -47,6 +47,7 @@ from cl.search.api_serializers import (
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
 )
+from cl.search.api_views import SearchV4ViewSet
 from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
@@ -80,6 +81,7 @@ from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
     TransactionTestCase,
+    V4SearchAPIAssertions,
 )
 
 
@@ -2659,7 +2661,7 @@ class RECAPESResultSerializerTest(RECAPESResultSerializer):
 
 
 class RECAPSearchAPIV4Test(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase
+    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
 ):
     """
     RECAP Search API V4 Tests
@@ -2806,148 +2808,6 @@ class RECAPSearchAPIV4Test(
         )
         return r
 
-    async def _compare_field(
-        self,
-        meta_field,
-        meta_value,
-        meta_fields_to_compare,
-        content_to_compare,
-    ):
-        get_meta_expected_value = meta_fields_to_compare.get(meta_field)
-        meta_expected_value = await sync_to_async(get_meta_expected_value)(
-            content_to_compare
-        )
-        self.assertEqual(
-            meta_value,
-            meta_expected_value,
-            f"The field '{meta_field}' does not match.",
-        )
-
-    async def _test_api_fields_content(
-        self,
-        api_response,
-        content_to_compare,
-        fields_to_compare,
-        meta_fields_to_compare,
-    ):
-        for (
-            field,
-            get_expected_value,
-        ) in fields_to_compare.items():
-            with self.subTest(field=field):
-                actual_value = api_response.data["results"][0].get(field)
-                if field == "recap_documents":
-                    for child_field, child_value in actual_value[0].items():
-                        with self.subTest(child_field=child_field):
-                            if child_field == "meta":
-                                for (
-                                    meta_field,
-                                    meta_value,
-                                ) in child_value.items():
-                                    with self.subTest(meta_field=meta_field):
-                                        await self._compare_field(
-                                            meta_field,
-                                            meta_value,
-                                            meta_fields_to_compare,
-                                            content_to_compare,
-                                        )
-
-                            else:
-                                await self._compare_field(
-                                    child_field,
-                                    child_value,
-                                    recap_document_v4_api_keys,
-                                    content_to_compare,
-                                )
-                elif field == "meta":
-                    for meta_field, meta_value in actual_value.items():
-                        with self.subTest(meta_field=meta_field):
-                            await self._compare_field(
-                                meta_field,
-                                meta_value,
-                                meta_fields_to_compare,
-                                content_to_compare,
-                            )
-                else:
-                    expected_value = await sync_to_async(get_expected_value)(
-                        content_to_compare
-                    )
-                    self.assertEqual(
-                        actual_value,
-                        expected_value,
-                        f"Parent field '{field}' does not match.",
-                    )
-
-    def _test_results_ordering(self, test, field):
-        """Ensure dockets appear in the response in a specific order."""
-
-        with self.subTest(test=test, msg=f'{test["name"]}'):
-            r = self.client.get(
-                reverse("search-list", kwargs={"version": "v4"}),
-                test["search_params"],
-            )
-            self.assertEqual(len(r.data["results"]), test["expected_results"])
-            # Note that dockets where the date_field is null are sent to the bottom
-            # of the results
-            actual_order = [result[field] for result in r.data["results"]]
-            self.assertEqual(
-                actual_order,
-                test["expected_order"],
-                msg=f'Expected order {test["expected_order"]}, but got {actual_order}',
-            )
-
-    def _test_page_variables(
-        self, response, test_case, current_page, search_type
-    ):
-        """Ensure the page variables are the correct ones according to the
-        current page."""
-
-        # Test page
-        self.assertEqual(
-            len(response.data["results"]),
-            test_case["results"],
-            msg="Results in page didn't match.",
-        )
-        self.assertEqual(
-            response.data["count"],
-            test_case["count_exact"],
-            msg="Results count didn't match.",
-        )
-        if search_type == SEARCH_TYPES.RECAP:
-            self.assertEqual(
-                response.data["document_count"],
-                test_case["document_count"],
-                msg="Document count didn't match.",
-            )
-        else:
-            self.assertNotIn(
-                "document_count",
-                response.data,
-                msg="Document count should not be present.",
-            )
-
-        next_page = response.data["next"]
-        expected_next_page = test_case["next"]
-        if expected_next_page:
-            self.assertTrue(next_page, msg="Next page value didn't match")
-            current_page = next_page
-        else:
-            self.assertFalse(next_page, msg="Next page value didn't match")
-
-        previous_page = response.data["previous"]
-        expected_previous_page = test_case["previous"]
-        if expected_previous_page:
-            self.assertTrue(
-                previous_page,
-                msg="Previous page value didn't match",
-            )
-        else:
-            self.assertFalse(
-                previous_page,
-                msg="Previous page value didn't match",
-            )
-        return next_page, previous_page, current_page
-
     async def test_case_name_filter(self) -> None:
         """Confirm case_name filter works properly"""
         params = {
@@ -2971,7 +2831,11 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
         )
 
     async def test_results_api_empty_fields(self) -> None:
@@ -2991,7 +2855,11 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
         content_to_compare = {"result": self.rd_empty_fields_api}
         await self._test_api_fields_content(
-            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
         )
 
         # Query a docket with no filings.
@@ -3030,14 +2898,22 @@ class RECAPSearchAPIV4Test(
             "result": self.rd_api,
         }
         await self._test_api_fields_content(
-            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
         )
 
         # RECAP_DOCUMENT Search type HL disabled.
         search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
         r = await self._test_api_results_count(search_params, 1, "API fields")
         await self._test_api_fields_content(
-            r, content_to_compare, recap_document_v4_api_keys, v4_meta_keys
+            r,
+            content_to_compare,
+            recap_document_v4_api_keys,
+            None,
+            v4_meta_keys,
         )
 
         # RECAP Search type HL enabled.
@@ -3059,14 +2935,22 @@ class RECAPSearchAPIV4Test(
             "snippet": "This a plain text to be <mark>shown in the API</mark>",
         }
         await self._test_api_fields_content(
-            r, content_to_compare, docket_v4_api_keys, v4_recap_meta_keys
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
         )
 
         # RECAP_DOCUMENT Search type HL enabled.
         search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
         r = await self._test_api_results_count(search_params, 1, "API fields")
         await self._test_api_fields_content(
-            r, content_to_compare, recap_document_v4_api_keys, v4_meta_keys
+            r,
+            content_to_compare,
+            recap_document_v4_api_keys,
+            None,
+            v4_meta_keys,
         )
 
     def test_date_filed_sorting_function_score(self) -> None:
@@ -3219,17 +3103,29 @@ class RECAPSearchAPIV4Test(
             docket_null_date_filed.delete()
 
     @override_settings(SEARCH_API_PAGE_SIZE=1)
-    @mock.patch(
-        "cl.search.api_views.DocketESResultSerializer",
-        new=DocketESResultSerializerTest,
-    )
-    @mock.patch(
-        "cl.search.api_views.RECAPDocumentESResultSerializer",
-        new=RECAPDocumentESResultSerializerTest,
-    )
-    @mock.patch(
-        "cl.search.api_views.RECAPESResultSerializer",
-        new=RECAPESResultSerializerTest,
+    @mock.patch.object(
+        SearchV4ViewSet,
+        "supported_search_types",
+        {
+            SEARCH_TYPES.RECAP: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.RECAP
+                ]["document_class"],
+                "serializer_class": RECAPESResultSerializerTest,
+            },
+            SEARCH_TYPES.DOCKETS: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.DOCKETS
+                ]["document_class"],
+                "serializer_class": DocketESResultSerializerTest,
+            },
+            SEARCH_TYPES.RECAP_DOCUMENT: {
+                "document_class": SearchV4ViewSet.supported_search_types[
+                    SEARCH_TYPES.RECAP_DOCUMENT
+                ]["document_class"],
+                "serializer_class": RECAPDocumentESResultSerializerTest,
+            },
+        },
     )
     @mock.patch(
         "cl.search.api_utils.set_results_highlights",
@@ -3803,7 +3699,7 @@ class RECAPSearchAPIV4Test(
         """Test the more_docs fields to be shown properly when a docket has
         more than 5 RECAPDocuments matched."""
 
-        rds_to_create = settings.CHILD_HITS_PER_RESULT + 1
+        rds_to_create = settings.RECAP_CHILD_HITS_PER_RESULT + 1
         with self.captureOnCommitCallbacks(execute=True):
             docket_entry = DocketEntryWithParentsFactory(
                 docket__source=Docket.RECAP,
@@ -3823,15 +3719,15 @@ class RECAPSearchAPIV4Test(
 
         test_cases = [
             {
-                "expected_results": settings.CHILD_HITS_PER_RESULT,
+                "expected_results": settings.RECAP_CHILD_HITS_PER_RESULT,
                 "more_docs": True,
             },
             {
-                "expected_results": settings.CHILD_HITS_PER_RESULT,
+                "expected_results": settings.RECAP_CHILD_HITS_PER_RESULT,
                 "more_docs": False,
             },
             {
-                "expected_results": settings.CHILD_HITS_PER_RESULT - 1,
+                "expected_results": settings.RECAP_CHILD_HITS_PER_RESULT - 1,
                 "more_docs": False,
             },
         ]
@@ -3877,7 +3773,7 @@ class RECAPSearchAPIV4Test(
 
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r, content_to_compare, d_type_v4_api_keys, v4_meta_keys
+            r, content_to_compare, d_type_v4_api_keys, None, v4_meta_keys
         )
 
     async def test_results_fields_for_rd_type(self) -> None:
@@ -3895,7 +3791,7 @@ class RECAPSearchAPIV4Test(
 
         content_to_compare = {"result": self.rd_api}
         await self._test_api_fields_content(
-            r, content_to_compare, rd_type_v4_api_keys, v4_meta_keys
+            r, content_to_compare, rd_type_v4_api_keys, None, v4_meta_keys
         )
 
     def test_render_missing_fields_from_es_document(self) -> None:
@@ -4293,6 +4189,63 @@ class RECAPSearchAPIV4Test(
             )
             r = self.client.get(next)
             self.assertEqual(r.data["detail"], "Invalid cursor")
+
+    def test_verify_empty_lists_type_fields_after_partial_update(self):
+        """Verify that list fields related to foreign keys are returned as
+        empty lists after a partial update that removes the related instance
+        and empties the list field.
+        """
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            d = DocketFactory(court=self.court, source=Docket.RECAP)
+            firm = AttorneyOrganizationFactory(
+                lookup_key="00kingofprussiaroadradnorkesslertopazmeltze87437",
+                name="Law Firm LLP",
+            )
+            attorney = AttorneyFactory(
+                name="Emily Green",
+                organizations=[firm],
+                docket=d,
+            )
+            party_type = PartyTypeFactory.create(
+                party=PartyFactory(
+                    name="Mary Williams Corp.",
+                    docket=d,
+                    attorneys=[attorney],
+                ),
+                docket=d,
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.DOCKETS,
+            "q": f"docket_id:{d.pk}",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+
+        fields_to_tests = [
+            "party_id",
+            "party",
+            "attorney_id",
+            "attorney",
+            "firm_id",
+            "firm",
+        ]
+
+        firm.delete()
+        attorney.delete()
+        party_type.delete()
+        index_docket_parties_in_es.delay(d.pk)
+
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        # Lists fields should return []
+        for field in fields_to_tests:
+            with self.subTest(field=field, msg="List fields test."):
+                self.assertEqual(r.data["results"][0][field], [])
+
+        d.delete()
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
