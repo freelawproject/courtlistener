@@ -329,7 +329,7 @@ class CursorESList:
         self.main_query = self.main_query[: self.page_size]
         default_sorting, unique_sorting = self.get_api_query_sorting()
         self.main_query = self.main_query.sort(default_sorting, unique_sorting)
-
+        
         # Cardinality query parameters
         query = Q(self.main_query.to_dict(count=True)["query"])
         unique_field, search_document = self.cardinality_query[
