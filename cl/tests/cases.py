@@ -269,7 +269,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
             with self.subTest(field=field):
                 parent_document = api_response.data["results"][0]
                 actual_value = parent_document.get(field)
-                if field in ["recap_documents", "opinions"]:
+                if field in ["recap_documents", "opinions", "positions"]:
                     child_document = actual_value[0]
                     for child_field, child_value in child_document.items():
                         with self.subTest(child_field=child_field):

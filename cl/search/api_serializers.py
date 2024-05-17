@@ -26,6 +26,7 @@ from cl.search.documents import (
     OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
+    PositionDocument,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -342,7 +343,7 @@ class OAESResultSerializer(DocumentSerializer):
         )
 
 
-class PersonESResultSerializer(DocumentSerializer):
+class V3PersonESResultSerializer(DocumentSerializer):
     """The serializer for Person results."""
 
     class Meta:
@@ -350,7 +351,7 @@ class PersonESResultSerializer(DocumentSerializer):
         exclude = ("text", "person_child")
 
 
-class ExtendedPersonESSerializer(PersonESResultSerializer):
+class ExtendedPersonESSerializer(V3PersonESResultSerializer):
     """Extends the Person serializer with all the field we get from the db"""
 
     snippet = serializers.SerializerMethodField(read_only=True)
@@ -602,6 +603,71 @@ class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
             "court_exact",
             "_related_instance_to_ignore",
             "cluster_child",
+            "date_created",
+            "timestamp",
+        )
+
+
+class PositionESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for Positions Search results."""
+
+    class Meta:
+        document = PositionDocument
+        exclude = (
+            "absolute_url",
+            "absolute_url",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "id",
+            "alias_ids",
+            "races",
+            "political_affiliation_id",
+            "fjc_id",
+            "name",
+            "gender",
+            "religion",
+            "alias",
+            "dob",
+            "dod",
+            "dob_city",
+            "dob_state",
+            "dob_state_id",
+            "political_affiliation",
+            "positions",
+            "aba_rating",
+            "school",
+            "_related_instance_to_ignore",
+            "person_child",
+            "date_created",
+            "timestamp",
+        )
+
+
+class PersonESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for Person Search results."""
+
+    name = HighlightedField(read_only=True)
+    dob_city = HighlightedField(read_only=True)
+    dob_state_id = HighlightedField(read_only=True)
+    dob = CoerceDateField(read_only=True)
+    dod = CoerceDateField(read_only=True)
+    political_affiliation = NoneToListField(read_only=True, required=False)
+    political_affiliation_id = NoneToListField(read_only=True, required=False)
+    aba_rating = NoneToListField(read_only=True, required=False)
+    school = NoneToListField(read_only=True, required=False)
+    races = NoneToListField(read_only=True, required=False)
+    alias = NoneToListField(read_only=True, required=False)
+    alias_ids = NoneToListField(read_only=True, required=False)
+    positions = PositionESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+
+    class Meta:
+        document = PersonDocument
+        exclude = (
+            "_related_instance_to_ignore",
+            "person_child",
+            "name_reverse",
             "date_created",
             "timestamp",
         )

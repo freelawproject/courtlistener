@@ -32,6 +32,7 @@ people_db_index.settings(
     number_of_shards=settings.ELASTICSEARCH_PEOPLE_NUMBER_OF_SHARDS,
     number_of_replicas=settings.ELASTICSEARCH_PEOPLE_NUMBER_OF_REPLICAS,
     analysis=settings.ELASTICSEARCH_DSL["analysis"],
+    max_inner_result_window=settings.PEOPLE_HITS_PER_RESULT + 1,
 )
 
 
