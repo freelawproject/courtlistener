@@ -921,6 +921,7 @@ def get_search_query(
     filters: list,
     string_query: QueryString,
     api_version: Literal["v3", "v4"] | None = None,
+    child_highlighting: bool = True,
 ) -> Search:
     """Get the appropriate search query based on the given parameters.
 
@@ -929,26 +930,29 @@ def get_search_query(
     :param filters: A list of filter objects to be applied.
     :param string_query: An Elasticsearch QueryString object.
     :param api_version: Optional, the request API version.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
     :return: The modified Search object based on the given conditions.
     """
+
     if not any([filters, string_query]):
+        _, query_hits_limit = get_child_top_hits_limit(
+            cd, cd["type"], api_version=api_version
+        )
+        hl_fields = api_child_highlight_map.get(
+            (child_highlighting, cd["type"]), {}
+        )
         match cd["type"]:
             case SEARCH_TYPES.PEOPLE:
+                match_all_child_query = build_has_child_query(
+                    "match_all",
+                    "position",
+                    query_hits_limit,
+                    hl_fields,
+                    None,
+                    child_highlighting=child_highlighting,
+                )
                 q_should = [
-                    Q(
-                        "has_child",
-                        type="position",
-                        score_mode="max",
-                        query=Q("match_all"),
-                        inner_hits={
-                            "name": "filter_query_inner_position",
-                            "size": (
-                                settings.PEOPLE_HITS_PER_RESULT
-                                if api_version == "v4"
-                                else 0
-                            ),
-                        },
-                    ),
+                    match_all_child_query,
                     Q("match", person_child="person"),
                 ]
                 final_match_all_query = Q(
@@ -962,15 +966,13 @@ def get_search_query(
             case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
                 # Match all query for RECAP and Dockets, it'll return dockets
                 # with child documents and also empty dockets.
-                _, query_hits_limit = get_child_top_hits_limit(
-                    cd, cd["type"], api_version=api_version
-                )
                 match_all_child_query = build_has_child_query(
                     "match_all",
                     "recap_document",
                     query_hits_limit,
-                    SEARCH_RECAP_CHILD_HL_FIELDS,
+                    hl_fields,
                     get_child_sorting_key(cd, api_version),
+                    child_highlighting=child_highlighting,
                     default_current_date=cd.get("request_date"),
                 )
                 match_all_parent_query = Q("match", docket_child="docket")
@@ -987,17 +989,16 @@ def get_search_query(
                 return search_query.query(final_match_all_query)
             case SEARCH_TYPES.OPINION:
                 # Only return Opinion clusters.
+                match_all_child_query = build_has_child_query(
+                    "match_all",
+                    "opinion",
+                    query_hits_limit,
+                    hl_fields,
+                    None,
+                    child_highlighting=child_highlighting,
+                )
                 q_should = [
-                    Q(
-                        "has_child",
-                        type="opinion",
-                        score_mode="max",
-                        query=Q("match_all"),
-                        inner_hits={
-                            "name": "filter_query_inner_opinion",
-                            "size": settings.OPINION_HITS_PER_RESULT,
-                        },
-                    ),
+                    match_all_child_query,
                     Q("match", cluster_child="opinion_cluster"),
                 ]
                 search_query = search_query.query(
@@ -1159,8 +1160,14 @@ def build_es_base_query(
             )
 
     search_query = get_search_query(
-        cd, search_query, filters, string_query, api_version
+        cd,
+        search_query,
+        filters,
+        string_query,
+        api_version,
+        child_highlighting,
     )
+
     return search_query, join_query
 
 
@@ -1197,7 +1204,9 @@ def build_child_docs_query(
 ) -> QueryString:
     """Build a query for counting child documents in Elasticsearch, using the
     has_child query filters and queries. And append a match filter to only
-    retrieve RECAPDocuments.
+    retrieve RECAPDocuments or OpinionDocuments. Utilized when it is required
+    to retrieve child documents directly, such as in the Opinions Feed,
+    RECAP Feed, RECAP Documents count query, and V4 RECAP_DOCUMENT Search API.
 
     :param join_query: Existing Elasticsearch QueryString object or None
     :param cd: The user input CleanedData
@@ -2459,11 +2468,7 @@ def limit_inner_hits(
     match search_type:
         case SEARCH_TYPES.OPINION:
             child_type = "opinion"
-        case (
-            SEARCH_TYPES.RECAP
-            | SEARCH_TYPES.DOCKETS
-            | SEARCH_TYPES.RECAP_DOCUMENT
-        ):
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_type = "recap_document"
         case SEARCH_TYPES.PEOPLE:
             child_type = "position"
@@ -2507,25 +2512,30 @@ def get_child_top_hits_limit(
     search parameters.
     :param search_type: Elasticsearch DSL Search object
     :param api_version: Optional, the request API version.
-    :return: A two tuple containing the limit for frontend hits, the limit for
-     query hits.
+    :return: A two-tuple containing the limit for child hits to display and the
+    limit for child query hits
     """
 
+    docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
+    if docket_id_query and search_type in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    ]:
+        return settings.VIEW_MORE_CHILD_HITS, settings.VIEW_MORE_CHILD_HITS + 1
+
     match search_type:
-        case (
-            SEARCH_TYPES.RECAP
-            | SEARCH_TYPES.DOCKETS
-            | SEARCH_TYPES.RECAP_DOCUMENT
-        ):
+        case SEARCH_TYPES.RECAP:
             child_limit = settings.RECAP_CHILD_HITS_PER_RESULT
+        case SEARCH_TYPES.DOCKETS:
+            # For the DOCKETS type, show only one RECAP document per docket
+            child_limit = 1
         case SEARCH_TYPES.OPINION:
             child_limit = settings.OPINION_HITS_PER_RESULT
         case SEARCH_TYPES.PEOPLE:
             child_limit = settings.PEOPLE_HITS_PER_RESULT
         case _:
-            child_limit = 0
+            return 0, 1
 
-    display_hits_limit = child_limit
     # Increase the RECAP_CHILD_HITS_PER_RESULT value by 1. This is done to determine
     # whether there are more than RECAP_CHILD_HITS_PER_RESULT results, which would
     # trigger the "View Additional Results" button on the frontend.
@@ -2534,22 +2544,7 @@ def get_child_top_hits_limit(
         if (search_type == SEARCH_TYPES.PEOPLE and not api_version == "v4")
         else child_limit + 1
     )
-
-    match search_type:
-        case SEARCH_TYPES.RECAP:
-            pass
-        case SEARCH_TYPES.DOCKETS:
-            # For the DOCKETS type, show only one RECAP document per docket
-            display_hits_limit = 1
-        case _:
-            return display_hits_limit, query_hits_limit
-
-    docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
-    if docket_id_query:
-        display_hits_limit = settings.VIEW_MORE_CHILD_HITS
-        query_hits_limit = settings.VIEW_MORE_CHILD_HITS + 1
-
-    return display_hits_limit, query_hits_limit
+    return child_limit, query_hits_limit
 
 
 def do_count_query(
