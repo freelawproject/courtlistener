@@ -38,6 +38,14 @@ SEARCH_ORAL_ARGUMENT_QUERY_FIELDS = [
     "sha1",
 ]
 SEARCH_PEOPLE_CHILD_QUERY_FIELDS = [
+    "gender",
+    "alias",
+    "dob_city",
+    "political_affiliation",
+    "religion",
+    "fjc_id",
+    "aba_rating",
+    "school",
     "position_type",
     "nomination_process",
     "judicial_committee_action",
