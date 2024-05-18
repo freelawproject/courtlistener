@@ -2,10 +2,13 @@ import datetime
 import math
 from unittest import mock
 
+import time_machine
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.cache import cache
+from django.test import override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 from elasticsearch_dsl import connections
 from lxml import html
 
@@ -18,7 +21,12 @@ from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     fetch_es_results,
 )
-from cl.lib.test_helpers import AudioESTestCase, skip_if_common_tests_skipped
+from cl.lib.test_helpers import (
+    AudioESTestCase,
+    audio_v4_fields,
+    skip_if_common_tests_skipped,
+    v4_meta_keys,
+)
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import CourtFactory, DocketFactory, PersonFactory
 from cl.search.models import SEARCH_TYPES, Docket
@@ -28,7 +36,9 @@ from cl.tests.cases import (
     ESIndexTestCase,
     TestCase,
     TransactionTestCase,
+    V4SearchAPIAssertions,
 )
+
 
 class OASearchAPICommonTests(AudioESTestCase):
     version_api = "v3"
@@ -56,7 +66,9 @@ class OASearchAPICommonTests(AudioESTestCase):
     @skip_if_common_tests_skipped
     async def test_oa_results_basic(self) -> None:
         # API
-        r = await self._test_api_results_count({"type": SEARCH_TYPES.ORAL_ARGUMENT}, 5, "match_all")
+        r = await self._test_api_results_count(
+            {"type": SEARCH_TYPES.ORAL_ARGUMENT}, 5, "match_all"
+        )
         self.assertIn("Jose", r.content.decode())
 
     @skip_if_common_tests_skipped
@@ -94,7 +106,9 @@ class OASearchAPICommonTests(AudioESTestCase):
             "order_by": "score desc",
         }
         # API
-        r = await self._test_api_results_count(search_params,  3, "Query String")
+        r = await self._test_api_results_count(
+            search_params, 3, "Query String"
+        )
         self.assertTrue(
             r.content.decode().index("Jose")
             > r.content.decode().index("Hong Liu"),
@@ -110,7 +124,9 @@ class OASearchAPICommonTests(AudioESTestCase):
             "order_by": "score desc",
         }
         # API
-        r = await self._test_api_results_count(search_params,  2, "docket_number")
+        r = await self._test_api_results_count(
+            search_params, 2, "docket_number"
+        )
         self.assertTrue(
             r.content.decode().index("Lorem")
             < r.content.decode().index("Yang"),
@@ -125,7 +141,7 @@ class OASearchAPICommonTests(AudioESTestCase):
             "case_name": "jose",
         }
         # API
-        r = await self._test_api_results_count(search_params,  1, "case_name")
+        r = await self._test_api_results_count(search_params, 1, "case_name")
 
     @skip_if_common_tests_skipped
     async def test_oa_docket_number_filtering(self) -> None:
@@ -135,7 +151,9 @@ class OASearchAPICommonTests(AudioESTestCase):
             "docket_number": f"{self.docket_1.docket_number}",
         }
         # API
-        r = await self._test_api_results_count(search_params,  1, "docket_number")
+        r = await self._test_api_results_count(
+            search_params, 1, "docket_number"
+        )
         self.assertIn("SEC", r.content.decode())
 
     @skip_if_common_tests_skipped
@@ -146,7 +164,7 @@ class OASearchAPICommonTests(AudioESTestCase):
             "court": f"{self.docket_3.court_id}",
         }
         # API
-        r = await self._test_api_results_count(search_params,  2, "court")
+        r = await self._test_api_results_count(search_params, 2, "court")
 
     @skip_if_common_tests_skipped
     async def test_oa_date_argued_filtering(self) -> None:
@@ -156,7 +174,9 @@ class OASearchAPICommonTests(AudioESTestCase):
             "argued_after": "2015-08-16",
         }
         # API
-        r = await self._test_api_results_count(search_params,  1, "argued_after")
+        r = await self._test_api_results_count(
+            search_params, 1, "argued_after"
+        )
         self.assertIn(
             "SEC v. Frank J. Information, WikiLeaks",
             r.content.decode(),
@@ -174,7 +194,9 @@ class OASearchAPICommonTests(AudioESTestCase):
         }
 
         # API
-        r = await self._test_api_results_count(search_params,  2, "case_name + query")
+        r = await self._test_api_results_count(
+            search_params, 2, "case_name + query"
+        )
 
         # Text query filtered by case_name and judge
         search_params = {
@@ -184,7 +206,9 @@ class OASearchAPICommonTests(AudioESTestCase):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         # API
-        r = await self._test_api_results_count(search_params,  1, "case_name + judge + query")
+        r = await self._test_api_results_count(
+            search_params, 1, "case_name + judge + query"
+        )
 
     @skip_if_common_tests_skipped
     async def test_oa_advanced_search_and_query(self) -> None:
@@ -195,7 +219,9 @@ class OASearchAPICommonTests(AudioESTestCase):
         }
 
         # API
-        r = await self._test_api_results_count(search_params,  1, "advance query string")
+        r = await self._test_api_results_count(
+            search_params, 1, "advance query string"
+        )
         self.assertIn("Hong Liu Lorem v. Lynch", r.content.decode())
         self.assertIn("John Smith", r.content.decode())
 
@@ -208,7 +234,9 @@ class OASearchAPICommonTests(AudioESTestCase):
             "order_by": "score desc",
         }
         # API
-        r = await self._test_api_results_count(search_params,  3, "relevance sorting")
+        r = await self._test_api_results_count(
+            search_params, 3, "relevance sorting"
+        )
         self.assertTrue(
             r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang")
@@ -223,7 +251,9 @@ class OASearchAPICommonTests(AudioESTestCase):
             "order_by": "score desc",
         }
         # API
-        r = await self._test_api_results_count(search_params,  3, "relevance sorting")
+        r = await self._test_api_results_count(
+            search_params, 3, "relevance sorting"
+        )
         self.assertTrue(
             r.content.decode().index("Jose")
             > r.content.decode().index("Hong Liu Lorem")
@@ -239,23 +269,10 @@ class OASearchAPICommonTests(AudioESTestCase):
             "q": "⚖️",
         }
         # API
-        r = await self._test_api_results_count(search_params,  1, "emoji searchable")
-        self.assertIn("Wallace", r.content.decode())
-
-    @skip_if_common_tests_skipped
-    async def test_search_transcript(self) -> None:
-        """Test search transcript."""
-
-        search_params = {
-            "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "This is the best transcript",
-        }
-        # API
-        r = await self._test_api_results_count(search_params,  1, "match transcript")
-        # Transcript highlights
-        self.assertIn(
-            "<mark>This is the best transcript</mark>", r.content.decode()
+        r = await self._test_api_results_count(
+            search_params, 1, "emoji searchable"
         )
+        self.assertIn("Wallace", r.content.decode())
 
 
 class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
@@ -269,6 +286,21 @@ class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
         cls.rebuild_index("audio.Audio")
         cls.rebuild_index("alerts.Alert")
 
+    async def test_search_transcript(self) -> None:
+        """Test search transcript."""
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "This is the best transcript",
+        }
+        # API
+        r = await self._test_api_results_count(
+            search_params, 1, "match transcript"
+        )
+        # Transcript highlights
+        self.assertIn(
+            "<mark>This is the best transcript</mark>", r.content.decode()
+        )
 
     @mock.patch(
         "cl.lib.es_signal_processor.allow_es_audio_indexing",
@@ -288,8 +320,9 @@ class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
         }
         # API
-        r = async_to_sync(self._test_api_results_count)(search_params, 20,
-                                               "api pagination")
+        r = async_to_sync(self._test_api_results_count)(
+            search_params, 20, "api pagination"
+        )
         self.assertEqual(25, r.data["count"])
         self.assertIn("page=2", r.data["next"])
 
@@ -298,8 +331,9 @@ class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
             "page": 2,
         }
-        r = async_to_sync(self._test_api_results_count)(search_params, 5,
-                                               "api pagination")
+        r = async_to_sync(self._test_api_results_count)(
+            search_params, 5, "api pagination"
+        )
         self.assertEqual(25, r.data["count"])
         self.assertEqual(None, r.data["next"])
 
@@ -319,8 +353,9 @@ class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
             "order_by": "random_123 desc",
         }
         # API
-        r = await self._test_api_results_count(search_params,  2, "random sorting")
-
+        r = await self._test_api_results_count(
+            search_params, 2, "random sorting"
+        )
 
     def test_oa_results_highlights(self) -> None:
         # HL snippet in V3?
@@ -333,7 +368,7 @@ class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
         }
 
         # API
-        r = await self._test_api_results_count(search_params,  1, "api fields")
+        r = await self._test_api_results_count(search_params, 1, "api fields")
         keys_to_check = [
             "absolute_url",
             "caseName",
@@ -368,6 +403,441 @@ class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
                 msg=f"Key {key} not found in the result object.",
             )
 
+
+class OAV4SearchAPITests(
+    OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+):
+    version_api = "v4"
+    skip_common_tests = False
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            cls.rebuild_index("alerts.Alert")
+            super().setUpTestData()
+            cls.rebuild_index("audio.Audio")
+            cls.rebuild_index("alerts.Alert")
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+        """Get the result count in a API query response"""
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        got = len(r.data["results"])
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in API with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    async def test_results_api_fields(self) -> None:
+        """Confirm fields in V4 Oral Arguments Search API results."""
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"id:{self.audio_1.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(
+            keys_count,
+            len(audio_v4_fields),
+            msg="Document fields count didn't match.",
+        )
+        content_to_compare = {"result": self.audio_1, "V4": True}
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            audio_v4_fields,
+            None,
+            v4_meta_keys,
+        )
+
+    def test_results_api_empty_fields(self) -> None:
+        """Confirm  empty fields values in V4 OA Search API results."""
+
+        mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory.create(
+                docket_number="",
+                court_id=self.court_1.pk,
+                date_argued=datetime.date(2015, 8, 16),
+                source=Docket.DEFAULT,
+                pacer_case_id="",
+            )
+            empty_fields_audio = AudioFactory(
+                docket=docket,
+                duration=653,
+                source="",
+                case_name="",
+                download_url="",
+                local_path_mp3=None,
+            )
+            empty_fields_audio.processing_complete = True
+            empty_fields_audio.save(
+                update_fields=[
+                    "duration",
+                    "local_path_mp3",
+                    "processing_complete",
+                ]
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"id:{empty_fields_audio.pk}",
+        }
+        # API
+        r = async_to_sync(self._test_api_results_count)(
+            search_params, 1, "API fields"
+        )
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(
+            keys_count,
+            len(audio_v4_fields),
+            msg="Document fields count didn't match.",
+        )
+        content_to_compare = {"result": empty_fields_audio, "V4": True}
+        async_to_sync(self._test_api_fields_content)(
+            r,
+            content_to_compare,
+            audio_v4_fields,
+            None,
+            v4_meta_keys,
+        )
+
+    async def test_results_api_highlighted_fields(self) -> None:
+        """Confirm highlighted fields in V4 OA Search API results."""
+        # API HL disabled.
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"id:{self.audio_1.pk} court_citation_string:Cal text:best",
+            "case_name": "Information",
+            "judge": "Mary",
+            "docket_number": "1:21-bk-1234",
+        }
+        # OA Search type HL disabled.
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        content_to_compare = {"result": self.audio_1, "V4": True}
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            audio_v4_fields,
+            None,
+            v4_meta_keys,
+        )
+        # OA Search type HL enabled.
+        search_params["highlight"] = True
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        content_to_compare = {
+            "result": self.audio_1,
+            "caseName": "SEC v. Frank J. <mark>Information</mark>, WikiLeaks",
+            "judge": "<mark>Mary</mark> Deposit Learning rd Administrative procedures act",
+            "docketNumber": "<mark>1:21-bk-1234</mark>",
+            "court_citation_string": "Bankr. C.D. <mark>Cal</mark>.",
+            "snippet": "This is the <mark>best</mark> transcript.",
+            "V4": True,
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            audio_v4_fields,
+            None,
+            v4_meta_keys,
+        )
+
+    @override_settings(SEARCH_API_PAGE_SIZE=3)
+    def test_opinion_results_cursor_api_pagination(self) -> None:
+        """Test cursor pagination for V4 OA Search API."""
+
+        created_audios = []
+        audios_to_create = 4
+
+        docket = DocketFactory.create(
+            docket_number="12-23232",
+            court_id=self.court_1.pk,
+            date_argued=datetime.date(2024, 8, 16),
+            source=Docket.DEFAULT,
+            pacer_case_id="323232",
+        )
+        docket_date_argued_none = DocketFactory.create(
+            docket_number="12-43562",
+            court_id=self.court_1.pk,
+            date_argued=None,
+            source=Docket.DEFAULT,
+            pacer_case_id="545462",
+        )
+        audio = AudioFactory(
+            docket=docket,
+            duration=653,
+            case_name="Audio test",
+        )
+        created_audios.append(audio)
+        for _ in range(audios_to_create):
+            audio_2 = AudioFactory(
+                docket=docket_date_argued_none,
+                duration=653,
+                case_name="Audio test 2",
+                local_path_mp3=None,
+                local_path_original_file=None,
+            )
+            created_audios.append(audio_2)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            for audio_created in created_audios:
+                audio_created.processing_complete = True
+                audio_created.save(
+                    update_fields=[
+                        "duration",
+                        "local_path_mp3",
+                        "processing_complete",
+                    ]
+                )
+
+        total_audios = Audio.objects.all().count()
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+
+        tests = [
+            {
+                "results": 3,
+                "count_exact": total_audios,
+                "next": True,
+                "previous": False,
+            },
+            {
+                "results": 3,
+                "count_exact": total_audios,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 3,
+                "count_exact": total_audios,
+                "next": True,
+                "previous": True,
+            },
+            {
+                "results": 1,
+                "count_exact": total_audios,
+                "next": False,
+                "previous": True,
+            },
+        ]
+
+        order_types = [
+            "score desc",
+            "dateArgued desc",
+            "dateArgued asc",
+        ]
+        for order_type in order_types:
+            # Test forward pagination.
+            next_page = None
+            all_document_ids = []
+            ids_per_page = []
+            current_page = None
+            with self.subTest(order_type=order_type, msg="Sorting order."):
+                search_params["order_by"] = order_type
+                for test in tests:
+                    with self.subTest(test=test, msg="forward pagination"):
+                        if not next_page:
+                            r = self.client.get(
+                                reverse(
+                                    "search-list", kwargs={"version": "v4"}
+                                ),
+                                search_params,
+                            )
+                        else:
+                            r = self.client.get(next_page)
+                        # Test page variables.
+                        next_page, _, current_page = self._test_page_variables(
+                            r, test, current_page, search_params["type"]
+                        )
+                        ids_in_page = set()
+                        for result in r.data["results"]:
+                            all_document_ids.append(result["id"])
+                            ids_in_page.add(result["id"])
+                        ids_per_page.append(ids_in_page)
+
+            # Confirm all the documents were shown when paginating forwards.
+            self.assertEqual(
+                len(all_document_ids),
+                total_audios,
+                msg="Wrong number of Audios.",
+            )
+
+        # Test backward pagination.
+        tests_backward = tests.copy()
+        tests_backward.reverse()
+        previous_page = None
+        all_ids_prev = []
+        for test in tests_backward:
+            with self.subTest(test=test, msg="backward pagination"):
+                if not previous_page:
+                    r = self.client.get(current_page)
+                else:
+                    r = self.client.get(previous_page)
+
+                # Test page variables.
+                _, previous_page, current_page = self._test_page_variables(
+                    r, test, current_page, search_params["type"]
+                )
+                ids_in_page_got = set()
+                for result in r.data["results"]:
+                    all_ids_prev.append(result["id"])
+                    ids_in_page_got.add(result["id"])
+                current_page_ids_prev = ids_per_page.pop()
+                # Check if IDs obtained with forward pagination match
+                # the IDs obtained when paginating backwards.
+                self.assertEqual(
+                    current_page_ids_prev,
+                    ids_in_page_got,
+                    msg="Wrong audios in page.",
+                )
+
+        # Confirm all the documents were shown when paginating backwards.
+        self.assertEqual(
+            len(all_ids_prev),
+            total_audios,
+            msg="Wrong number of audios.",
+        )
+
+        # Remove Audio objects to avoid affecting other tests.
+        for created_audio in created_audios:
+            created_audio.delete()
+
+    def test_audio_specific_sorting_keys(self) -> None:
+        """Test if the dateArgued sorting keys work properly in
+        the V4 OA Search API."""
+
+        docket_date_argued_none = DocketFactory.create(
+            docket_number="12-43562",
+            court_id=self.court_1.pk,
+            date_argued=None,
+            source=Docket.DEFAULT,
+            pacer_case_id="545462",
+        )
+        audio_none = AudioFactory(
+            docket=docket_date_argued_none,
+            duration=653,
+            case_name="Audio test",
+            local_path_mp3=None,
+            local_path_original_file=None,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            audio_none.processing_complete = True
+            audio_none.save(
+                update_fields=[
+                    "duration",
+                    "local_path_mp3",
+                    "processing_complete",
+                ]
+            )
+
+        # Query string, order by name_reverse asc
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "order_by": "dateArgued asc",
+            "highlight": False,
+        }
+
+        params_date_argued_desc = search_params.copy()
+        params_date_argued_desc["order_by"] = "dateArgued desc"
+
+        base_test_cases = [
+            {
+                "name": "Query order by dateArgued asc",
+                "search_params": search_params,
+                "expected_results": 6,
+                "expected_order": [
+                    self.audio_5.pk,  # 2013, 8, 14
+                    self.audio_4.pk,  # 2015, 8, 14 id: 4
+                    self.audio_3.pk,  # 2015, 8, 14 id: 3
+                    self.audio_2.pk,  # 2015, 8, 15
+                    self.audio_1.pk,  # 2015, 8, 16
+                    audio_none.pk,  # None
+                ],
+            },
+            {
+                "name": "Query order by dateArgued desc",
+                "search_params": params_date_argued_desc,
+                "expected_results": 6,
+                "expected_order": [
+                    self.audio_1.pk,  # 2015, 8, 16
+                    self.audio_2.pk,  # 2015, 8, 15
+                    self.audio_4.pk,  # 2015, 8, 14 id: 4
+                    self.audio_3.pk,  # 2015, 8, 14 id: 3
+                    self.audio_5.pk,  # 2013, 8, 14
+                    audio_none.pk,  # None
+                ],
+            },
+        ]
+
+        # Extend test cases to include a Query string and a Match all query.
+        test_cases = [
+            {
+                **test_param,
+                "search_params": {**test_param["search_params"], **query_type},
+            }
+            for test_param in base_test_cases
+            for query_type in [{"q": "*"}, {}]
+        ]
+
+        for test in test_cases:
+            self._test_results_ordering(test, "id")
+
+        audio_none.delete()
+
+    def test_audio_cursor_api_pagination_count(self) -> None:
+        """Test cursor pagination count for V4 OA Search API."""
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "order_by": "score desc",
+            "highlight": False,
+        }
+        total_audios = Audio.objects.all().count()
+        ## Get count from cardinality.
+        with override_settings(
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_audios - 1
+        ):
+            # OralArgument Search request, count Audios.
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_audios,
+                msg="Results cardinality count didn't match.",
+            )
+
+        ## Get count from main query.
+        with override_settings(
+            ELASTICSEARCH_MAX_RESULT_COUNT=total_audios + 1
+        ):
+            # Oral Argument Search request, count Audios.
+            r = self.client.get(
+                reverse("search-list", kwargs={"version": "v4"}), search_params
+            )
+            self.assertEqual(
+                r.data["count"],
+                total_audios,
+                msg="Results main query count didn't match.",
+            )
 
 
 class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
@@ -900,7 +1370,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Query by panel_ids advanced field
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": f"panel_ids:{self.author.pk}",
+            "q": f"id:{self.audio_4.pk} AND panel_ids:{self.author.pk}",
         }
         # Frontend
         r = self.client.get(

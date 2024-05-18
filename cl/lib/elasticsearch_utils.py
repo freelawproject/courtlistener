@@ -526,6 +526,7 @@ def build_sort_results(
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
         SEARCH_TYPES.PEOPLE,
+        SEARCH_TYPES.ORAL_ARGUMENT,
     ]
 
     if api_version == "v4" and require_v4_function_score:
@@ -545,6 +546,9 @@ def build_sort_results(
             "_score": {"order": "desc"},
             "name_reverse": {"order": "asc"},
         }
+
+        order_by_map["dateArgued desc"] = {"_score": {"order": "desc"}}
+        order_by_map["dateArgued asc"] = {"_score": {"order": "desc"}}
 
     if toggle_sorting and api_version == "v4" and require_v4_function_score:
         # Override the sorting keys in V4 RECAP Search API when toggle_sorting
@@ -567,6 +571,9 @@ def build_sort_results(
             "_score": {"order": "asc"},
             "name_reverse": {"order": "desc"},
         }
+
+        order_by_map["dateArgued desc"] = {"_score": {"order": "asc"}}
+        order_by_map["dateArgued asc"] = {"_score": {"order": "asc"}}
 
     if cd["type"] == SEARCH_TYPES.PARENTHETICAL:
         order_by_map["score desc"] = {"score": {"order": "desc"}}
@@ -633,6 +640,8 @@ def get_child_sorting_key(
                 "dob desc,name_reverse asc": ("dob", "desc"),
                 "dob asc,name_reverse asc": ("dob", "asc"),
                 "dod desc,name_reverse asc": ("dod", "desc"),
+                "dateArgued desc": ("dateArgued", "desc"),
+                "dateArgued asc": ("dateArgued", "asc"),
             }
         )
     order_by = cd.get("order_by", "")
@@ -1004,15 +1013,27 @@ def get_search_query(
                     Q("bool", should=q_should, minimum_should_match=1)
                 )
             case _:
-                return search_query.query("match_all")
+                # No string_query or filters in plain search types like OA and
+                # Parentheticals. Use a match_all query.
+                match_all_query = Q("match_all")
+                match_all_query = apply_custom_score_to_parent_query(
+                    cd, match_all_query, api_version
+                )
+                return search_query.query(match_all_query)
 
+    final_query = Q("bool")
     if string_query:
-        search_query = search_query.query(string_query)
+        final_query = Q(string_query)
 
     if filters:
-        search_query = search_query.filter(reduce(operator.iand, filters))
+        final_query.filter = reduce(operator.iand, filters)
 
-    return search_query
+    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
+        # Apply custom score for dateArgued sorting in the V4 API.
+        final_query = apply_custom_score_to_parent_query(
+            cd, final_query, api_version
+        )
+    return search_query.query(final_query)
 
 
 def build_es_base_query(
@@ -1370,7 +1391,6 @@ def add_es_highlighting(
     :param alerts: If highlighting is being applied to search Alerts hits.
     :return: The modified Elasticsearch search query object with highlights set
     """
-    fields_to_exclude = []
     highlighting_fields = []
     highlighting_keyword_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
@@ -1381,7 +1401,6 @@ def add_es_highlighting(
                 if alerts
                 else SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS
             )
-            fields_to_exclude = ["sha1"]
         case SEARCH_TYPES.PEOPLE:
             highlighting_fields = PEOPLE_ES_HL_FIELDS
             highlighting_keyword_fields = PEOPLE_ES_HL_KEYWORD_FIELDS
@@ -1390,7 +1409,6 @@ def add_es_highlighting(
         case SEARCH_TYPES.OPINION:
             highlighting_fields = SEARCH_OPINION_HL_FIELDS
 
-    search_query = search_query.source(excludes=fields_to_exclude)
     # Use FVH in testing and documents that already support FVH.
     for field in highlighting_fields:
         search_query = search_query.highlight(
@@ -2212,11 +2230,20 @@ def apply_custom_score_to_parent_query(
                 )
 
         case (
-            SEARCH_TYPES.RECAP_DOCUMENT | SEARCH_TYPES.PEOPLE
+            SEARCH_TYPES.RECAP_DOCUMENT
+            | SEARCH_TYPES.PEOPLE
+            | SEARCH_TYPES.ORAL_ARGUMENT
         ) if valid_child_order_by:
             sort_field, order = child_order_by
             if (
-                sort_field in ["dateFiled", "entry_date_filed", "dob", "dod"]
+                sort_field
+                in [
+                    "dateFiled",
+                    "entry_date_filed",
+                    "dob",
+                    "dod",
+                    "dateArgued",
+                ]
                 and api_version == "v4"
             ):
                 # Applies a custom function score to sort RECAPDocuments or
@@ -2840,7 +2867,7 @@ def do_es_api_query(
                 extra_options["highlight"] = highlight_options
                 main_query = main_query.extra(**extra_options)
         else:
-            # DOCKETS, RECAP, OPINION and PEOPLE search types. Use the same query
+            # DOCKETS, RECAP, OPINION, PEOPLE and ORAL_ARGUMENT search types. Use the same query
             # parameters as in the frontend. Only switch highlighting according
             # to the user request.
             main_query = add_es_highlighting(s, cd) if cd["highlight"] else s

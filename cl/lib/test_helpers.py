@@ -7,6 +7,7 @@ from typing import Sized, cast
 import scorched
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from django.utils import timezone
@@ -15,6 +16,7 @@ from requests import Session
 
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
+from cl.lib.utils import deepgetattr
 from cl.people_db.factories import (
     ABARatingFactory,
     AttorneyFactory,
@@ -627,6 +629,74 @@ position_v4_fields = {
     "termination_reason": lambda x: x[
         "result"
     ].get_termination_reason_display(),
+    "meta": [],
+}
+
+audio_v4_fields = {
+    "absolute_url": lambda x: x["result"].get_absolute_url(),
+    "caseName": lambda x: (
+        x["caseName"] if x.get("caseName") else x["result"].case_name
+    ),
+    "case_name_full": lambda x: x["result"].case_name_full,
+    "court": lambda x: x["result"].docket.court.full_name,
+    "court_id": lambda x: x["result"].docket.court.pk,
+    "court_citation_string": lambda x: (
+        x["court_citation_string"]
+        if x.get("court_citation_string")
+        else x["result"].docket.court.citation_string
+    ),
+    "docket_id": lambda x: x["result"].docket.pk,
+    "dateArgued": lambda x: (
+        x["result"].docket.date_argued.isoformat()
+        if x["result"].docket.date_argued
+        else None
+    ),
+    "dateReargued": lambda x: (
+        x["result"].docket.date_reargued.isoformat()
+        if x["result"].docket.date_reargued
+        else None
+    ),
+    "dateReargumentDenied": lambda x: (
+        x["result"].docket.date_reargument_denied.isoformat()
+        if x["result"].docket.date_reargument_denied
+        else None
+    ),
+    "docketNumber": lambda x: (
+        x["docketNumber"]
+        if x.get("docketNumber")
+        else x["result"].docket.docket_number
+    ),
+    "duration": lambda x: x["result"].duration,
+    "download_url": lambda x: x["result"].download_url,
+    "file_size_mp3": lambda x: (
+        deepgetattr(x["result"], "local_path_mp3.size", None)
+        if x["result"].local_path_mp3
+        else None
+    ),
+    "id": lambda x: x["result"].pk,
+    "judge": lambda x: (
+        x["judge"]
+        if x.get("judge")
+        else x["result"].judges if x["result"].judges else ""
+    ),
+    "local_path": lambda x: (
+        deepgetattr(x["result"], "local_path_mp3.name", None)
+        if x["result"].local_path_mp3
+        else None
+    ),
+    "pacer_case_id": lambda x: x["result"].docket.pacer_case_id,
+    "panel_ids": lambda x: (
+        list(x["result"].panel.all().values_list("id", flat=True))
+        if x["result"].panel.all()
+        else []
+    ),
+    "sha1": lambda x: x["result"].sha1,
+    "source": lambda x: x["result"].source,
+    "snippet": lambda x: (
+        x["snippet"]
+        if x.get("snippet")
+        else x["result"].transcript if x["result"].stt_google_response else ""
+    ),
     "meta": [],
 }
 
@@ -1335,6 +1405,8 @@ class AudioESTestCase(SimpleTestCase):
             docket_number="1:21-bk-1234",
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2015, 8, 16),
+            date_reargued=datetime.date(2016, 9, 16),
+            date_reargument_denied=datetime.date(2017, 10, 16),
         )
         cls.docket_2 = DocketFactory.create(
             docket_number="19-5734",
@@ -1370,13 +1442,17 @@ class AudioESTestCase(SimpleTestCase):
             }
         }
         json_transcript = json.dumps(transcript_response)
+        filepath_local = SimpleUploadedFile(
+            "sec_frank.mp3", b"mp3 binary content", content_type="audio/mpeg"
+        )
         cls.audio_1 = AudioFactory.create(
             case_name="SEC v. Frank J. Information, WikiLeaks",
+            case_name_full="a_random_title",
             docket_id=cls.docket_1.pk,
             duration=420,
             judges="Mary Deposit Learning rd Administrative procedures act",
             local_path_original_file="test/audio/ander_v._leo.mp3",
-            local_path_mp3="test/audio/2.mp3",
+            local_path_mp3=filepath_local,
             source="C",
             blocked=False,
             sha1="a49ada009774496ac01fb49818837e2296705c97",
@@ -1419,6 +1495,7 @@ class AudioESTestCase(SimpleTestCase):
             judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
+        cls.audio_1.panel.add(cls.author)
 
 
 def skip_if_common_tests_skipped(method):

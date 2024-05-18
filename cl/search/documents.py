@@ -240,12 +240,10 @@ class AudioDocumentBase(Document):
     file_size_mp3 = fields.IntegerField(index=False)
     id = fields.IntegerField(attr="pk")
     judge = fields.TextField(
-        attr="judges",
         analyzer="text_en_splitting_cl",
         term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
-                attr="judges",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
                 term_vector="with_positions_offsets",
@@ -315,9 +313,15 @@ class AudioDocument(AudioDocumentBase):
                 return None
             return deepgetattr(instance, "local_path_mp3.name", None)
 
+    def prepare_judge(self, instance):
+        if instance.judges:
+            return instance.judges
+        return ""
+
     def prepare_text(self, instance):
         if instance.stt_status == Audio.STT_COMPLETE:
             return instance.transcript
+        return ""
 
     def prepare_dateArgued_text(self, instance):
         if instance.docket.date_argued:
