@@ -453,6 +453,7 @@ class OAV4SearchAPITests(
         )
         return r
 
+    @override_settings(NO_MATCH_HL_SIZE=50)
     async def test_results_api_fields(self) -> None:
         """Confirm fields in V4 Oral Arguments Search API results."""
         search_params = {
@@ -467,7 +468,11 @@ class OAV4SearchAPITests(
             len(audio_v4_fields),
             msg="Document fields count didn't match.",
         )
-        content_to_compare = {"result": self.audio_1, "V4": True}
+        content_to_compare = {
+            "result": self.audio_1,
+            "snippet": "This is the best transcript. Nunc egestas sem sed",
+            "V4": True,
+        }
         await self._test_api_fields_content(
             r,
             content_to_compare,
@@ -530,6 +535,7 @@ class OAV4SearchAPITests(
             v4_meta_keys,
         )
 
+    @override_settings(NO_MATCH_HL_SIZE=50)
     async def test_results_api_highlighted_fields(self) -> None:
         """Confirm highlighted fields in V4 OA Search API results."""
         # API HL disabled.
@@ -542,7 +548,11 @@ class OAV4SearchAPITests(
         }
         # OA Search type HL disabled.
         r = await self._test_api_results_count(search_params, 1, "API fields")
-        content_to_compare = {"result": self.audio_1, "V4": True}
+        content_to_compare = {
+            "result": self.audio_1,
+            "snippet": "This is the best transcript. Nunc egestas sem sed",
+            "V4": True,
+        }
         await self._test_api_fields_content(
             r,
             content_to_compare,
@@ -559,7 +569,7 @@ class OAV4SearchAPITests(
             "judge": "<mark>Mary</mark> Deposit Learning rd Administrative procedures act",
             "docketNumber": "<mark>1:21-bk-1234</mark>",
             "court_citation_string": "Bankr. C.D. <mark>Cal</mark>.",
-            "snippet": "This is the <mark>best</mark> transcript.",
+            "snippet": "This is the <mark>best</mark> transcript. Nunc egestas sem sed libero feugiat, at interdum quam viverra. Pellentesque",
             "V4": True,
         }
         await self._test_api_fields_content(

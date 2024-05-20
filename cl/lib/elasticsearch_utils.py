@@ -29,10 +29,12 @@ from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Hit, Response
 from elasticsearch_dsl.utils import AttrDict
 
+from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
 from cl.lib.bot_detector import is_bot
 from cl.lib.date_time import midnight_pt
 from cl.lib.paginators import ESPaginator
+from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
     BasePositionMapping,
@@ -618,11 +620,11 @@ def build_sort_results(
     return order_by_map[order_by]
 
 
-def get_child_sorting_key(
+def get_function_score_sorting_key(
     cd: CleanData, api_version: Literal["v3", "v4"] | None = None
 ) -> tuple[str, str]:
-    """Given cleaned data, find order_by value and return a key to use within
-    a has_child query.
+    """Given cleaned data, find the order_by value and return a key to use for
+    computing a custom score within build_custom_function_score_for_date.
 
     :param cd: The user input CleanedData
     :param api_version: Optional, the request API version.
@@ -724,14 +726,14 @@ def build_es_plain_filters(cd: CleanData) -> List:
 def build_highlights_dict(
     highlighting_fields: dict[str, int] | None,
     hl_tag: str,
-    child_highlighting: bool = True,
+    highlighting: bool = True,
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """Builds a dictionary for ES highlighting options and a list of fields to
     exclude from the _source.
 
     :param highlighting_fields: A dictionary of fields to highlight in child docs.
     :param hl_tag: The HTML tag to use for highlighting matched fragments.
-    :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :param highlighting: Whether highlighting should be enabled in docs.
     :return: A tuple containing, a dictionary with the configuration for
     highlighting each field and aa list of field names to exclude from the
     _source results to avoid data redundancy.
@@ -754,10 +756,11 @@ def build_highlights_dict(
             # The original field is excluded from the response to avoid
             # returning the entire field from the index.
             fields_to_exclude.append(field)
-            if not child_highlighting:
-                # If highlighting is not enabled in child documents, return
-                # only the fields to exclude.
-                continue
+
+        if not highlighting:
+            # If highlighting is not enabled, return
+            # only the fields to exclude.
+            continue
 
         highlight_options["fields"][field] = {
             "type": settings.ES_HIGHLIGHTER,
@@ -1003,7 +1006,7 @@ def get_match_all_query(
                 "recap_document",
                 query_hits_limit,
                 hl_fields,
-                get_child_sorting_key(cd, api_version),
+                get_function_score_sorting_key(cd, api_version),
                 child_highlighting=child_highlighting,
                 default_current_date=cd.get("request_date"),
             )
@@ -1412,16 +1415,20 @@ def build_es_main_query(
 
 
 def add_es_highlighting(
-    search_query: Search, cd: CleanData, alerts: bool = False
+    search_query: Search,
+    cd: CleanData,
+    alerts: bool = False,
+    highlighting: bool = True,
 ) -> Search:
-    """Add elasticsearch highlighting to the search query.
+    """Add elasticsearch highlighting to the main search query.
 
     :param search_query: The Elasticsearch search query object.
     :param cd: The user input CleanedData
     :param alerts: If highlighting is being applied to search Alerts hits.
+    :param highlighting: Whether highlighting should be enabled in docs.
     :return: The modified Elasticsearch search query object with highlights set
     """
-    highlighting_fields = []
+    highlighting_fields = {}
     highlighting_keyword_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
     match cd["type"]:
@@ -1440,28 +1447,25 @@ def add_es_highlighting(
             highlighting_fields = SEARCH_OPINION_HL_FIELDS
 
     # Use FVH in testing and documents that already support FVH.
-    for field in highlighting_fields:
-        search_query = search_query.highlight(
-            field,
-            type=settings.ES_HIGHLIGHTER,
-            matched_fields=[field, f"{field}.exact"],
-            number_of_fragments=0,
-            pre_tags=[f"<{hl_tag}>"],
-            post_tags=[f"</{hl_tag}>"],
-        )
+    highlight_options, fields_to_exclude = build_highlights_dict(
+        highlighting_fields, SEARCH_HL_TAG, highlighting=highlighting
+    )
+
     # Keyword fields do not support term_vector indexing; thus, FVH is not
     # supported either. Use plain text in this case. Keyword fields don't
     # have an exact version, so no HL merging is required either.
-    if highlighting_keyword_fields:
+    if highlighting_keyword_fields and highlighting:
         for field in highlighting_keyword_fields:
-            search_query = search_query.highlight(
-                field,
-                type="plain",
-                number_of_fragments=0,
-                pre_tags=[f"<{hl_tag}>"],
-                post_tags=[f"</{hl_tag}>"],
-            )
+            highlight_options["fields"][field] = {
+                "type": "plain",
+                "number_of_fragments": 0,
+                "pre_tags": [f"<{hl_tag}>"],
+                "post_tags": [f"</{hl_tag}>"],
+            }
 
+    extra_options = {"highlight": highlight_options}
+    search_query = search_query.extra(**extra_options)
+    search_query = search_query.source(excludes=fields_to_exclude)
     return search_query
 
 
@@ -1833,6 +1837,29 @@ def merge_unavailable_fields_on_parent_document(
                             opinion_docs_dict.get(op["_source"]["id"], "")
                         )
                     )
+        case (
+            SEARCH_TYPES.ORAL_ARGUMENT
+        ) if request_type == "v4" and not highlight:
+            # Retrieves the Audio transcript from the DB to fill the snippet
+            # when highlighting is disabled.
+
+            oa_ids = {entry["id"] for entry in results}
+            oa_docs = Audio.objects.filter(pk__in=oa_ids).only(
+                "id", "stt_google_response", "stt_status"
+            )
+            oa_docs_dict = {
+                doc.id: (
+                    trunc(
+                        doc.transcript,
+                        length=settings.NO_MATCH_HL_SIZE,
+                    )
+                    if doc.stt_status
+                    else ""
+                )
+                for doc in oa_docs
+            }
+            for result in results:
+                result["text"] = oa_docs_dict.get(result["id"], "")
 
         case _:
             return
@@ -2242,7 +2269,7 @@ def apply_custom_score_to_main_query(
     :return: The function_score query contains the base query, applied when
     child_order is used.
     """
-    child_order_by = get_child_sorting_key(cd, api_version)
+    child_order_by = get_function_score_sorting_key(cd, api_version)
     valid_child_order_by = bool(child_order_by and all(child_order_by))
     valid_custom_score_fields = {
         SEARCH_TYPES.RECAP: ["dateFiled"],
@@ -2393,7 +2420,7 @@ def build_full_join_es_queries(
                 child_type,
                 query_hits_limit,
                 hl_fields,
-                get_child_sorting_key(cd, api_version),
+                get_function_score_sorting_key(cd, api_version),
                 child_highlighting=child_highlighting,
                 default_current_date=cd.get("request_date"),
             )
@@ -2408,7 +2435,7 @@ def build_full_join_es_queries(
                 "recap_document",
                 query_hits_limit,
                 SEARCH_RECAP_CHILD_HL_FIELDS,
-                get_child_sorting_key(cd, api_version),
+                get_function_score_sorting_key(cd, api_version),
                 default_current_date=cd.get("request_date"),
             )
 
@@ -2869,7 +2896,10 @@ def do_es_api_query(
             # DOCKETS, RECAP, OPINION, PEOPLE and ORAL_ARGUMENT search types. Use the same query
             # parameters as in the frontend. Only switch highlighting according
             # to the user request.
-            main_query = add_es_highlighting(s, cd) if cd["highlight"] else s
+            main_query = add_es_highlighting(
+                s, cd, highlighting=cd["highlight"]
+            )
+
     return main_query, child_docs_query
 
 
