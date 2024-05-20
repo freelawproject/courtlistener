@@ -939,6 +939,7 @@ def combine_plain_filters_and_queries(
     :param filters: A list of filter objects to be applied.
     :param string_query: An Elasticsearch QueryString object.
     :param api_version: Optional, the request API version.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
     :return: The modified Search object based on the given conditions.
     """
 
@@ -1239,7 +1240,9 @@ def build_child_docs_query(
 ) -> QueryString:
     """Build a query for counting child documents in Elasticsearch, using the
     has_child query filters and queries. And append a match filter to only
-    retrieve RECAPDocuments.
+    retrieve RECAPDocuments or OpinionDocuments. Utilized when it is required
+    to retrieve child documents directly, such as in the Opinions Feed,
+    RECAP Feed, RECAP Documents count query, and V4 RECAP_DOCUMENT Search API.
 
     :param join_query: Existing Elasticsearch QueryString object or None
     :param cd: The user input CleanedData
@@ -2507,11 +2510,7 @@ def limit_inner_hits(
     match search_type:
         case SEARCH_TYPES.OPINION:
             child_type = "opinion"
-        case (
-            SEARCH_TYPES.RECAP
-            | SEARCH_TYPES.DOCKETS
-            | SEARCH_TYPES.RECAP_DOCUMENT
-        ):
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             child_type = "recap_document"
         case SEARCH_TYPES.PEOPLE:
             child_type = "position"
@@ -2555,25 +2554,30 @@ def get_child_top_hits_limit(
     search parameters.
     :param search_type: Elasticsearch DSL Search object
     :param api_version: Optional, the request API version.
-    :return: A two tuple containing the limit for frontend hits, the limit for
-     query hits.
+    :return: A two-tuple containing the limit for child hits to display and the
+    limit for child query hits
     """
 
+    docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
+    if docket_id_query and search_type in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    ]:
+        return settings.VIEW_MORE_CHILD_HITS, settings.VIEW_MORE_CHILD_HITS + 1
+
     match search_type:
-        case (
-            SEARCH_TYPES.RECAP
-            | SEARCH_TYPES.DOCKETS
-            | SEARCH_TYPES.RECAP_DOCUMENT
-        ):
+        case SEARCH_TYPES.RECAP:
             child_limit = settings.RECAP_CHILD_HITS_PER_RESULT
+        case SEARCH_TYPES.DOCKETS:
+            # For the DOCKETS type, show only one RECAP document per docket
+            child_limit = 1
         case SEARCH_TYPES.OPINION:
             child_limit = settings.OPINION_HITS_PER_RESULT
         case SEARCH_TYPES.PEOPLE:
             child_limit = settings.PEOPLE_HITS_PER_RESULT
         case _:
-            child_limit = 0
+            return 0, 1
 
-    display_hits_limit = child_limit
     # Increase the RECAP_CHILD_HITS_PER_RESULT value by 1. This is done to determine
     # whether there are more than RECAP_CHILD_HITS_PER_RESULT results, which would
     # trigger the "View Additional Results" button on the frontend.
@@ -2582,22 +2586,7 @@ def get_child_top_hits_limit(
         if (search_type == SEARCH_TYPES.PEOPLE and not api_version == "v4")
         else child_limit + 1
     )
-
-    match search_type:
-        case SEARCH_TYPES.RECAP:
-            pass
-        case SEARCH_TYPES.DOCKETS:
-            # For the DOCKETS type, show only one RECAP document per docket
-            display_hits_limit = 1
-        case _:
-            return display_hits_limit, query_hits_limit
-
-    docket_id_query = re.search(r"docket_id:\d+", search_params.get("q", ""))
-    if docket_id_query:
-        display_hits_limit = settings.VIEW_MORE_CHILD_HITS
-        query_hits_limit = settings.VIEW_MORE_CHILD_HITS + 1
-
-    return display_hits_limit, query_hits_limit
+    return child_limit, query_hits_limit
 
 
 def do_count_query(

@@ -1570,6 +1570,31 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # to it includes an extra word.
         self.assertEqual(len(cleaned_plain_text), 58)
 
+        # Confirm we can limit the length of the plain_text snippet using the
+        # NO_MATCH_HL_SIZE setting on a match_all query.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "dateFiled desc",
+        }
+
+        r = await self._test_article_count(params, 2, "highlights case name")
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "highlights case name"
+        )
+        self.assertIn("SUBPOENAS SERVED OFF", r.content.decode())
+        tree = html.fromstring(r.content.decode())
+        plain_text = tree.xpath(
+            '(//article)[1]/div[@class="bottom"]/div[@class="col-md-offset-half"]/p/text()'
+        )
+        # Clean the plain_text string.
+        plain_text_string = plain_text[0].strip()
+        cleaned_plain_text = re.sub(r"\s+", " ", plain_text_string)
+        cleaned_plain_text = cleaned_plain_text.replace("…", "")
+        # The actual no_match_size in this test using fvh is a bit longer due
+        # to it includes an extra word.
+        self.assertEqual(len(cleaned_plain_text), 58)
+
         # Highlight assigned_to.
         params = {"type": SEARCH_TYPES.RECAP, "q": "Thalassa Miller"}
 
@@ -2136,6 +2161,15 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             await docket.adelete()
 
+    async def test_fail_rd_type_gracefully_frontend(self) -> None:
+        """Confirm that the rd type fails gracefully in the frontend."""
+
+        params = {"type": SEARCH_TYPES.RECAP_DOCUMENT}
+        # Frontend
+        r = await self.async_client.get("/", params)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("encountered an error", r.content.decode())
+
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
@@ -2674,10 +2708,9 @@ class RECAPSearchAPIV4Test(
     def setUpTestData(cls):
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
-        super().setUpTestData()
-
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
+            super().setUpTestData()
             cls.judge_api = PersonFactory.create(
                 name_first="George", name_last="Doe", name_suffix="2"
             )
@@ -2945,6 +2978,86 @@ class RECAPSearchAPIV4Test(
         # RECAP_DOCUMENT Search type HL enabled.
         search_params["type"] = SEARCH_TYPES.RECAP_DOCUMENT
         r = await self._test_api_results_count(search_params, 1, "API fields")
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            recap_document_v4_api_keys,
+            None,
+            v4_meta_keys,
+        )
+
+        # Match all query RECAP Search type HL disabled, get snippet from DB.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "order_by": "dateFiled desc",
+            "highlight": False,
+        }
+        with override_settings(NO_MATCH_HL_SIZE=50):
+            r = await self._test_api_results_count(
+                search_params, 5, "API fields"
+            )
+        content_to_compare = {
+            "result": self.rd_2,
+            "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, M",
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
+        )
+
+        # Match all query RECAP Search type HL enabled, get snippet from ES.
+        search_params["highlight"] = True
+        with override_settings(NO_MATCH_HL_SIZE=50):
+            r = await self._test_api_results_count(
+                search_params, 5, "API fields"
+            )
+        content_to_compare = {
+            "result": self.rd_2,
+            "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas",
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            docket_v4_api_keys,
+            recap_document_v4_api_keys,
+            v4_recap_meta_keys,
+        )
+
+        # Match all query RECAP_DOCUMENT type HL enabled, get snippet from DB.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP_DOCUMENT,
+            "order_by": "dateFiled desc",
+            "highlight": False,
+        }
+        with override_settings(NO_MATCH_HL_SIZE=50):
+            r = await self._test_api_results_count(
+                search_params, 5, "API fields"
+            )
+        content_to_compare = {
+            "result": self.rd_2,
+            "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, M",
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            recap_document_v4_api_keys,
+            None,
+            v4_meta_keys,
+        )
+
+        # Match all query RECAP_DOCUMENTtype HL enabled, get snippet from ES.
+        search_params["highlight"] = True
+        with override_settings(NO_MATCH_HL_SIZE=50):
+            r = await self._test_api_results_count(
+                search_params, 5, "API fields"
+            )
+        content_to_compare = {
+            "result": self.rd_2,
+            "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas",
+        }
         await self._test_api_fields_content(
             r,
             content_to_compare,
@@ -3820,7 +3933,7 @@ class RECAPSearchAPIV4Test(
         )
 
         doc = ESRECAPDocument().prepare(rd_no_cites)
-        doc_id = ES_CHILD_ID(rd_no_cites.pk).OPINION
+        doc_id = ES_CHILD_ID(rd_no_cites.pk).RECAP
         es_args = {"_routing": de_no_cites.docket.pk, "meta": {"id": doc_id}}
         doc.pop("cites")
         ESRECAPDocument(**es_args, **doc).save(
@@ -3839,6 +3952,9 @@ class RECAPSearchAPIV4Test(
         )
         self.assertEqual(len(r.data["results"]), 1)
         self.assertEqual(r.data["results"][0]["cites"], [])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de_no_cites.docket.delete()
 
     def test_handle_missing_documents_merging_values_from_db(self) -> None:
         """Confirm that we can gracefully handle documents returned by ES on a
@@ -3877,8 +3993,8 @@ class RECAPSearchAPIV4Test(
         self.assertEqual(
             r.data["results"][0]["recap_documents"][0]["snippet"], ""
         )
-
-        docket_entry.docket.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            docket_entry.docket.delete()
 
     def test_dates_sorting_function_score_for_rd_type(self) -> None:
         """Test if the function score used for the dateFiled and entry_date_filed
@@ -4245,7 +4361,8 @@ class RECAPSearchAPIV4Test(
             with self.subTest(field=field, msg="List fields test."):
                 self.assertEqual(r.data["results"][0][field], [])
 
-        d.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            d.delete()
 
 
 class RECAPFeedTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
