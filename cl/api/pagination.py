@@ -1,9 +1,10 @@
+import datetime
 from base64 import b64decode, b64encode
+from collections import defaultdict
 from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.paginator import InvalidPage
-from elasticsearch_dsl.response import Response as ESResponse
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import BasePagination, PageNumberPagination
 from rest_framework.request import Request
@@ -92,26 +93,40 @@ class ESCursorPagination(BasePagination):
     search_type = None
     cursor_query_param = "cursor"
     invalid_cursor_message = "Invalid cursor"
+    request_date = None
+
+    def initialize_context_from_request(
+        self, request, search_type
+    ) -> datetime.date:
+        self.base_url = request.build_absolute_uri()
+        self.request = request
+        self.search_type = search_type
+        self.cursor = self.decode_cursor(request)
+
+        # Set the request date from the cursor or provide an initial one if
+        # this is the first page request.
+        self.request_date = (
+            self.cursor.request_date
+            if self.cursor
+            else datetime.datetime.now().date()
+        )
+        return self.request_date
 
     def paginate_queryset(
         self, es_list_instance: CursorESList, request: Request, view=None
-    ) -> ESResponse:
+    ) -> list[defaultdict]:
         """Paginate the Elasticsearch query and retrieve the results."""
 
-        self.base_url = request.build_absolute_uri()
-        self.request = request
         self.es_list_instance = es_list_instance
-        self.search_type = self.es_list_instance.clean_data["type"]
-        self.cursor = self.decode_cursor(request)
         self.es_list_instance.set_pagination(
             self.cursor, settings.SEARCH_API_PAGE_SIZE
         )
-        results, cardinality_count, child_cardinality_count = (
+        results, main_hits, cardinality_count, child_cardinality_count = (
             self.es_list_instance.get_paginated_results()
         )
         self.results_in_page = len(results)
         self.results_count_approximate = cardinality_count
-        self.results_count_exact = results.hits.total.value
+        self.results_count_exact = main_hits
         self.child_results_count = child_cardinality_count
         return results
 
@@ -149,6 +164,7 @@ class ESCursorPagination(BasePagination):
             search_after=search_after_sort_key,
             reverse=False,
             search_type=self.search_type,
+            request_date=self.request_date,
         )
         return self.encode_cursor(cursor)
 
@@ -166,6 +182,7 @@ class ESCursorPagination(BasePagination):
             search_after=reverse_search_after_sort_key,
             reverse=True,
             search_type=self.search_type,
+            request_date=self.request_date,
         )
         return self.encode_cursor(cursor)
 
@@ -179,9 +196,9 @@ class ESCursorPagination(BasePagination):
             querystring = b64decode(encoded.encode("ascii")).decode("ascii")
             tokens = parse_qs(querystring, keep_blank_values=True)
             search_after = tokens.get("s", None)
-            reverse = tokens.get("r", ["0"])[0]
-            reverse = bool(int(reverse))
+            reverse = bool(int(tokens.get("r", ["0"])[0]))
             search_type = tokens.get("t", [None])[0]
+            request_date = tokens.get("d", [None])[0]
         except (TypeError, ValueError):
             raise NotFound(self.invalid_cursor_message)
 
@@ -190,9 +207,17 @@ class ESCursorPagination(BasePagination):
             # in the cursor doesn't match, raise an invalid cursor error to
             # avoid pagination inconsistencies.
             raise NotFound(self.invalid_cursor_message)
-        return ESCursor(
-            search_after=search_after, reverse=reverse, search_type=search_type
+
+        request_date = (
+            datetime.date.fromisoformat(request_date) if request_date else None
         )
+        self.cursor = ESCursor(
+            search_after=search_after,
+            reverse=reverse,
+            search_type=search_type,
+            request_date=request_date,
+        )
+        return self.cursor
 
     def encode_cursor(self, cursor: ESCursor) -> str:
         """Given a ESCursor instance, return an url with encoded cursor."""
@@ -203,6 +228,8 @@ class ESCursorPagination(BasePagination):
             tokens["r"] = "1"
         if cursor.search_type:
             tokens["t"] = self.search_type
+        if cursor.request_date:
+            tokens["d"] = cursor.request_date
 
         querystring = urlencode(tokens, doseq=True)
         encoded = b64encode(querystring.encode("ascii")).decode("ascii")
@@ -224,7 +251,7 @@ class ESCursorPagination(BasePagination):
         return (
             self.results_count_exact
             if self.results_count_exact
-            <= settings.ELASTICSEARCH_MAX_RESULT_COUNT
+            < settings.ELASTICSEARCH_MAX_RESULT_COUNT
             else approximate_count
         )
 

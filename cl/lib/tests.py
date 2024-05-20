@@ -1010,6 +1010,22 @@ class TestElasticsearchUtils(SimpleTestCase):
                 "input_str": "This is not a range query",
                 "output": False,
             },
+            {
+                "input_str": "This is no proximity /short query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity /parent query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity long/short query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity long/parent query",
+                "output": False,
+            },
         ]
         for test in tests:
             output = check_for_proximity_tokens(
