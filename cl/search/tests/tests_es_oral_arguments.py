@@ -210,6 +210,21 @@ class OASearchAPICommonTests(AudioESTestCase):
             search_params, 1, "case_name + judge + query"
         )
 
+        # Text query filtered by argued_after. Notice that out of two audios
+        # argued_after 2015-08-15, only one is selected by the query string,
+        # which only matches one of them. Thus, this query tests that
+        # minimum_should_match = 1 is properly added when combining a query
+        # string with a filter.
+        search_params = {
+            "q": "Frank",
+            "argued_after": "2015-08-15",
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
+        # API
+        r = await self._test_api_results_count(
+            search_params, 1, "case_name + judge + query"
+        )
+
     @skip_if_common_tests_skipped
     async def test_oa_advanced_search_and_query(self) -> None:
         # AND query
@@ -1261,6 +1276,26 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             reverse("show_results"),
             search_params,
         )
+        actual = self.get_article_count(r)
+        expected = 1
+        self.assertEqual(
+            actual,
+            expected,
+            msg="Did not get expected number of results when filtering by "
+            "case name. Expected %s, but got %s." % (expected, actual),
+        )
+
+        # Text query filtered by argued_after. Notice that out of two audios
+        # argued_after 2015-08-15, only one is selected by the query string,
+        # which only matches one of them. Thus, this query tests that
+        # minimum_should_match = 1 is properly added when combining a query
+        # string with a filter.
+        search_params = {
+            "q": "Frank",
+            "argued_after": "2015-08-15",
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
+        # Frontend
         actual = self.get_article_count(r)
         expected = 1
         self.assertEqual(
