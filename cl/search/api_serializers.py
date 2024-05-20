@@ -23,8 +23,10 @@ from cl.search.documents import (
     AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
+    PositionDocument,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -341,7 +343,7 @@ class OAESResultSerializer(DocumentSerializer):
         )
 
 
-class PersonESResultSerializer(DocumentSerializer):
+class V3PersonESResultSerializer(DocumentSerializer):
     """The serializer for Person results."""
 
     class Meta:
@@ -349,7 +351,7 @@ class PersonESResultSerializer(DocumentSerializer):
         exclude = ("text", "person_child")
 
 
-class ExtendedPersonESSerializer(PersonESResultSerializer):
+class ExtendedPersonESSerializer(V3PersonESResultSerializer):
     """Extends the Person serializer with all the field we get from the db"""
 
     snippet = serializers.SerializerMethodField(read_only=True)
@@ -382,8 +384,8 @@ class ExtendedPersonESSerializer(PersonESResultSerializer):
         return get_highlight(obj, "text")
 
 
-class OpinionESResultSerializer(DocumentSerializer):
-    """The serializer for Opinion results."""
+class V3OpinionESResultSerializer(DocumentSerializer):
+    """The serializer for V3 Opinion Search API results."""
 
     cluster_id = serializers.IntegerField(read_only=True)
 
@@ -519,6 +521,12 @@ class BaseDocketESResultSerializer(DocumentSerializer):
     juryDemand = HighlightedField(read_only=True)
     referredTo = HighlightedField(read_only=True)
     suitNature = HighlightedField(read_only=True)
+    party_id = NoneToListField(read_only=True, required=False)
+    party = NoneToListField(read_only=True, required=False)
+    attorney_id = NoneToListField(read_only=True, required=False)
+    attorney = NoneToListField(read_only=True, required=False)
+    firm_id = NoneToListField(read_only=True, required=False)
+    firm = NoneToListField(read_only=True, required=False)
 
     class Meta:
         document = DocketDocument
@@ -548,3 +556,118 @@ class RECAPESResultSerializer(RECAPMetaMixin, BaseDocketESResultSerializer):
     recap_documents = BaseRECAPDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
+
+
+class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for OpinionDocument results."""
+
+    snippet = HighlightedField(read_only=True, source="text")
+    joined_by_ids = NoneToListField(read_only=True, required=False)
+
+    class Meta:
+        document = OpinionDocument
+        fields = (
+            "id",
+            "author_id",
+            "type",
+            "per_curiam",
+            "download_url",
+            "local_path",
+            "sha1",
+            "cites",
+        )
+
+
+class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for OpinionCluster Search results."""
+
+    opinions = OpinionDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+    dateArgued = CoerceDateField(read_only=True)
+    dateFiled = CoerceDateField(read_only=True)
+    dateReargued = CoerceDateField(read_only=True)
+    dateReargumentDenied = CoerceDateField(read_only=True)
+    caseName = HighlightedField(read_only=True)
+    court_citation_string = HighlightedField(read_only=True)
+    docketNumber = HighlightedField(read_only=True)
+    suitNature = HighlightedField(read_only=True)
+    panel_names = NoneToListField(read_only=True, required=False)
+    citation = NoneToListField(read_only=True, required=False)
+    sibling_ids = NoneToListField(read_only=True, required=False)
+    panel_ids = NoneToListField(read_only=True, required=False)
+
+    class Meta:
+        document = OpinionClusterDocument
+        exclude = (
+            "court_exact",
+            "_related_instance_to_ignore",
+            "cluster_child",
+            "date_created",
+            "timestamp",
+        )
+
+
+class PositionESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for Positions Search results."""
+
+    class Meta:
+        document = PositionDocument
+        exclude = (
+            "absolute_url",
+            "absolute_url",
+            "date_granularity_dob",
+            "date_granularity_dod",
+            "id",
+            "alias_ids",
+            "races",
+            "political_affiliation_id",
+            "fjc_id",
+            "name",
+            "gender",
+            "religion",
+            "alias",
+            "dob",
+            "dod",
+            "dob_city",
+            "dob_state",
+            "dob_state_id",
+            "political_affiliation",
+            "positions",
+            "aba_rating",
+            "school",
+            "_related_instance_to_ignore",
+            "person_child",
+            "date_created",
+            "timestamp",
+        )
+
+
+class PersonESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for Person Search results."""
+
+    name = HighlightedField(read_only=True)
+    dob_city = HighlightedField(read_only=True)
+    dob_state_id = HighlightedField(read_only=True)
+    dob = CoerceDateField(read_only=True)
+    dod = CoerceDateField(read_only=True)
+    political_affiliation = NoneToListField(read_only=True, required=False)
+    political_affiliation_id = NoneToListField(read_only=True, required=False)
+    aba_rating = NoneToListField(read_only=True, required=False)
+    school = NoneToListField(read_only=True, required=False)
+    races = NoneToListField(read_only=True, required=False)
+    alias = NoneToListField(read_only=True, required=False)
+    alias_ids = NoneToListField(read_only=True, required=False)
+    positions = PositionESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+
+    class Meta:
+        document = PersonDocument
+        exclude = (
+            "_related_instance_to_ignore",
+            "person_child",
+            "name_reverse",
+            "date_created",
+            "timestamp",
+        )

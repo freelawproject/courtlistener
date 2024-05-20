@@ -103,7 +103,10 @@ class HighlightedField(serializers.Field):
 
 class NoneToListField(serializers.ListField):
     """A custom ListField that returns an empty list when the original value is
-    None; otherwise, it returns the original value."""
+    None; otherwise, it returns the original value.
+    This can be removed from some fields once a People re-index is done and
+    https://github.com/elastic/elasticsearch-dsl-py/issues/1819 solved.
+    """
 
     def get_attribute(self, instance):
         value = super().get_attribute(instance)
