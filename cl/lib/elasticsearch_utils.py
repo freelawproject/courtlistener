@@ -1448,7 +1448,7 @@ def add_es_highlighting(
 
     # Use FVH in testing and documents that already support FVH.
     highlight_options, fields_to_exclude = build_highlights_dict(
-        highlighting_fields, SEARCH_HL_TAG, highlighting=highlighting
+        highlighting_fields, hl_tag, highlighting=highlighting
     )
 
     # Keyword fields do not support term_vector indexing; thus, FVH is not
