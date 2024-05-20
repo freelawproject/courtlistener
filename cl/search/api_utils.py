@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 import waffle
 from django.conf import settings
@@ -26,6 +27,7 @@ from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
 )
@@ -80,8 +82,7 @@ def get_object_list(request, cd, paginator):
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
     elif search_query and is_opinion_active:
-        if request.version == "v3":
-            cd["highlight"] = True
+        cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
             highlighting_fields = {"text": 500}
@@ -98,7 +99,7 @@ def get_object_list(request, cd, paginator):
         )
         main_query["caller"] = "api_search"
 
-    if cd["type"] == SEARCH_TYPES.RECAP and request.version == "v3":
+    if cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
     if is_oral_argument_active or is_people_active or is_opinion_active:
@@ -106,8 +107,7 @@ def get_object_list(request, cd, paginator):
             main_query=main_query,
             offset=offset,
             page_size=page_size,
-            clean_data=cd,
-            version=request.version,
+            type=cd["type"],
         )
     else:
         sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
@@ -120,27 +120,18 @@ class ESList:
     as they are queried.
     """
 
-    def __init__(
-        self,
-        main_query,
-        offset,
-        page_size,
-        clean_data,
-        length=None,
-        version="v3",
-    ):
+    def __init__(self, main_query, offset, page_size, type, length=None):
         super().__init__()
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
-        self.clean_data = clean_data
+        self.type = type
         self._item_cache = []
         self._length = length
-        self._version = version
 
     def __len__(self):
         if self._length is None:
-            if self.clean_data["type"] == SEARCH_TYPES.OPINION:
+            if self.type == SEARCH_TYPES.OPINION:
                 query = Q(self.main_query.to_dict(count=True)["query"])
                 self._length = do_collapse_count_query(self.main_query, query)
             else:
@@ -164,30 +155,14 @@ class ESList:
         ]
         results = self.main_query.execute()
 
-        if self._version == "v4":
-            limit_inner_hits({}, results, self.clean_data["type"])
-            set_results_highlights(results, self.clean_data["type"])
-
         # Merge unavailable fields in ES by pulling data from the DB to make
-        # the API backwards compatible or retrieves the snippet from the DB
-        # when highlighting is disabled.
+        # the API backwards compatible for People.
         merge_unavailable_fields_on_parent_document(
             results,
-            self.clean_data["type"],
-            "api",
-            self.clean_data["highlight"],
+            self.type,
+            "v3",
         )
-
         for result in results:
-            child_result_objects = []
-            if hasattr(result, "child_docs"):
-                for child_doc in result.child_docs:
-                    child_result_objects.append(
-                        ESResultObject(initial=child_doc["_source"])
-                    )
-                result["child_docs"] = child_result_objects
-
-            # Send the object instead the JSON.
             self._item_cache.append(result)
 
         # Now, assuming our _item_cache is all set, we just get the item.
@@ -301,6 +276,8 @@ class CursorESList:
         SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
         SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
         SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
+        SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
+        SEARCH_TYPES.PEOPLE: ("id", PersonDocument),
     }
 
     def __init__(
@@ -310,14 +287,12 @@ class CursorESList:
         page_size,
         search_after,
         clean_data,
-        version="v3",
     ):
         self.main_query = main_query
         self.child_docs_query = child_docs_query
         self.page_size = page_size
         self.search_after = search_after
         self.clean_data = clean_data
-        self.version = version
         self.cursor = None
         self.results = None
         self.reverse = False
@@ -334,9 +309,16 @@ class CursorESList:
         # next or previous page link.
         self.page_size = page_size + 1
 
-    def get_paginated_results(self) -> tuple[Response, Response, Response]:
+    def get_paginated_results(
+        self,
+    ) -> tuple[list[defaultdict], int, Response, Response | None]:
         """Executes the search query with pagination settings and processes
         the results.
+
+        :return: A four-tuple containing a list of defaultdicts with the results,
+        the number of hits returned by the main query, a response object
+        related to the main query's cardinality count, and a response object
+        related to the child query's cardinality count, if available.
         """
         if self.search_after:
             self.main_query = self.main_query.extra(
@@ -392,8 +374,15 @@ class CursorESList:
                 logger.error("Multi-search API Error: %s", e)
                 raise ElasticServerError()
         self.process_results(self.results)
+
+        main_query_hits = self.results.hits.total.value
+        es_results_items = [
+            defaultdict(lambda: None, result.to_dict(skip_empty=False))
+            for result in self.results
+        ]
         return (
-            self.results,
+            es_results_items,
+            main_query_hits,
             cardinality_count_response,
             child_cardinality_count_response,
         )
@@ -408,7 +397,7 @@ class CursorESList:
         merge_unavailable_fields_on_parent_document(
             results,
             self.clean_data["type"],
-            "api",
+            "v4",
             self.clean_data["highlight"],
         )
         for result in results:
@@ -416,7 +405,9 @@ class CursorESList:
             if hasattr(result, "child_docs"):
                 for child_doc in result.child_docs:
                     child_result_objects.append(
-                        ESResultObject(initial=child_doc["_source"])
+                        defaultdict(
+                            lambda: None, child_doc["_source"].to_dict()
+                        )
                     )
                 result["child_docs"] = child_result_objects
 
@@ -467,23 +458,15 @@ class CursorESList:
         default_unique_order = {
             "type": self.clean_data["type"],
         }
-        match self.clean_data["type"]:
-            case SEARCH_TYPES.RECAP_DOCUMENT:
-                # Use the 'id' field as a unique sorting key for the 'rd'
-                # search type.
-                default_unique_order.update(
-                    {
-                        "order_by": "id desc",
-                    }
-                )
-            case _:
-                # Use the 'docket_id' field as a unique sorting key for the
-                # 'd' and 'r' search type.
-                default_unique_order.update(
-                    {
-                        "order_by": "docket_id desc",
-                    }
-                )
+
+        unique_field, _ = self.cardinality_query[self.clean_data["type"]]
+        # Use a document unique field as a unique sorting key for the current
+        # search type.
+        default_unique_order.update(
+            {
+                "order_by": f"{unique_field} desc",
+            }
+        )
 
         unique_sorting = build_sort_results(
             default_unique_order, self.reverse, "v4"
@@ -502,15 +485,9 @@ class ResultObject:
         return self._data
 
 
-class ESResultObject(ResultObject):
-
-    def __getattr__(self, key):
-        return getattr(self._data, key, None)
-
-
 def limit_api_results_to_page(
-    results: Response | AttrList, cursor: ESCursor | None
-) -> Response | AttrList:
+    results: list[defaultdict], cursor: ESCursor | None
+) -> list[defaultdict]:
     """In ES Cursor pagination, an additional document is returned in each
     query response to determine whether to display the next page or previous
     pages. Here we limit the API results to the number defined in

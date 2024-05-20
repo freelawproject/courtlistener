@@ -38,6 +38,14 @@ SEARCH_ORAL_ARGUMENT_QUERY_FIELDS = [
     "sha1",
 ]
 SEARCH_PEOPLE_CHILD_QUERY_FIELDS = [
+    "gender",
+    "alias",
+    "dob_city",
+    "political_affiliation",
+    "religion",
+    "fjc_id",
+    "aba_rating",
+    "school",
     "position_type",
     "nomination_process",
     "judicial_committee_action",
@@ -179,7 +187,20 @@ SEARCH_OPINION_CHILD_HL_FIELDS = {
 SEARCH_RECAP_CHILD_EXCLUDE_FIELDS = {
     "plain_text": 100,
 }
+SEARCH_OPINION_CHILD_EXCLUDE_FIELDS = {
+    "text": 100,
+}
 
+api_child_highlight_map = {
+    (True, SEARCH_TYPES.OPINION): SEARCH_OPINION_CHILD_HL_FIELDS,
+    (True, SEARCH_TYPES.RECAP): SEARCH_RECAP_CHILD_HL_FIELDS,
+    (True, SEARCH_TYPES.RECAP_DOCUMENT): SEARCH_RECAP_CHILD_HL_FIELDS,
+    (True, SEARCH_TYPES.DOCKETS): SEARCH_RECAP_CHILD_HL_FIELDS,
+    (False, SEARCH_TYPES.OPINION): SEARCH_OPINION_CHILD_EXCLUDE_FIELDS,
+    (False, SEARCH_TYPES.RECAP): SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
+    (False, SEARCH_TYPES.RECAP_DOCUMENT): SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
+    (False, SEARCH_TYPES.DOCKETS): SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
+}
 
 # Search query for related items
 RELATED_PATTERN = re.compile(

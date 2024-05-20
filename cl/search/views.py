@@ -542,6 +542,8 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         render_dict.update(do_es_search(request.GET.copy()))
                     else:
                         render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.RECAP_DOCUMENT:
+                    render_dict.update(do_es_search(request.GET.copy()))
                 case _:
                     render_dict.update(do_search(request.GET.copy()))
 
@@ -713,7 +715,7 @@ def do_es_search(
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
 
-    if search_form.is_valid():
+    if search_form.is_valid() and document_type:
         cd = search_form.cleaned_data
         try:
             # Create necessary filters to execute ES query

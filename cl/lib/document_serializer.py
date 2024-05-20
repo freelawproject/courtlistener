@@ -22,7 +22,8 @@ class TimeStampField(serializers.Field):
         super().__init__(**kwargs)
 
     def to_representation(self, value):
-        if isinstance(value, datetime.datetime) and timezone.is_naive(value):
+
+        if isinstance(value, datetime.datetime):
             if self.timezone:
                 return serializers.DateTimeField(
                     default_timezone=self.timezone
@@ -35,8 +36,18 @@ class TimeStampField(serializers.Field):
                     timezone.localtime(date_time_aware)
                 )
         if isinstance(value, str):
-            format_string = "%Y-%m-%dT%H:%M:%S.%f"
-            parsed_datetime = datetime.datetime.strptime(value, format_string)
+            try:
+                format_string = "%Y-%m-%dT%H:%M:%S.%f"
+                parsed_datetime = datetime.datetime.strptime(
+                    value, format_string
+                )
+            except ValueError:
+                # If the above format fails, try parsing with timezone
+                # information
+                format_string = "%Y-%m-%dT%H:%M:%S.%f%z"
+                parsed_datetime = datetime.datetime.strptime(
+                    value, format_string
+                )
             return serializers.DateTimeField(
                 default_timezone=self.timezone
             ).to_representation(parsed_datetime)
@@ -88,6 +99,21 @@ class HighlightedField(serializers.Field):
 
     def to_representation(self, value):
         return render_string_or_list(value)
+
+
+class NoneToListField(serializers.ListField):
+    """A custom ListField that returns an empty list when the original value is
+    None; otherwise, it returns the original value.
+    This can be removed from some fields once a People re-index is done and
+    https://github.com/elastic/elasticsearch-dsl-py/issues/1819 solved.
+    """
+
+    def get_attribute(self, instance):
+        value = super().get_attribute(instance)
+        # Convert None to empty list explicitly here.
+        if value is None:
+            return []
+        return value
 
 
 class DocumentSerializer(serializers.Serializer):
