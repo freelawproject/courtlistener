@@ -84,7 +84,7 @@ def get_id_from_url(api_url: str) -> str:
     """Get the PK from an API url
 
     :param api_url: api url with a pk
-    :return: list of opinion cluster objects
+    :return: pk from url
     """
     return api_url.split("/")[-2]
 
