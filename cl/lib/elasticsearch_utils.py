@@ -948,7 +948,7 @@ def combine_plain_filters_and_queries(
 
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         # Apply custom score for dateArgued sorting in the V4 API.
-        final_query = apply_custom_score_to_parent_query(
+        final_query = apply_custom_score_to_main_query(
             cd, final_query, api_version
         )
     return final_query
@@ -992,7 +992,7 @@ def get_match_all_query(
             final_match_all_query = Q(
                 "bool", should=q_should, minimum_should_match=1
             )
-            final_match_all_query = apply_custom_score_to_parent_query(
+            final_match_all_query = apply_custom_score_to_main_query(
                 cd, final_match_all_query, api_version
             )
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
@@ -1016,7 +1016,7 @@ def get_match_all_query(
                 should=[match_all_child_query, match_all_parent_query],
                 minimum_should_match=1,
             )
-            final_match_all_query = apply_custom_score_to_parent_query(
+            final_match_all_query = apply_custom_score_to_main_query(
                 cd, final_match_all_query, api_version
             )
         case SEARCH_TYPES.OPINION:
@@ -1040,7 +1040,7 @@ def get_match_all_query(
             # No string_query or filters in plain search types like OA and
             # Parentheticals. Use a match_all query.
             match_all_query = Q("match_all")
-            final_match_all_query = apply_custom_score_to_parent_query(
+            final_match_all_query = apply_custom_score_to_main_query(
                 cd, match_all_query, api_version
             )
 
@@ -2231,10 +2231,10 @@ def nullify_query_score(query: Query) -> Query:
     return query
 
 
-def apply_custom_score_to_parent_query(
+def apply_custom_score_to_main_query(
     cd: CleanData, query: Query, api_version: Literal["v3", "v4"] | None = None
 ) -> Query:
-    """Apply a custom function score to a main document.
+    """Apply a custom function score to the main query.
 
     :param cd: The query CleanedData
     :param query: The ES Query object to be modified.
@@ -2243,49 +2243,32 @@ def apply_custom_score_to_parent_query(
     child_order is used.
     """
     child_order_by = get_child_sorting_key(cd, api_version)
-    valid_child_order_by = child_order_by and all(child_order_by)
-    match cd["type"]:
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS if valid_child_order_by:
-            sort_field, order = child_order_by
-            if sort_field == "dateFiled" and api_version == "v4":
-                # Applies a custom function score to sort Dockets based on
-                # their dateFiled field. This serves as a workaround to enable
-                # the use of the  search_after cursor for pagination on
-                # documents with a None dateFiled.
-                query = build_custom_function_score_for_date(
-                    query,
-                    child_order_by,
-                    default_score=0,
-                    default_current_date=cd["request_date"],
-                )
+    valid_child_order_by = bool(child_order_by and all(child_order_by))
+    valid_custom_score_fields = {
+        SEARCH_TYPES.RECAP: ["dateFiled"],
+        SEARCH_TYPES.DOCKETS: ["dateFiled"],
+        SEARCH_TYPES.RECAP_DOCUMENT: ["dateFiled", "entry_date_filed"],
+        SEARCH_TYPES.PEOPLE: ["dob", "dod"],
+        SEARCH_TYPES.ORAL_ARGUMENT: ["dateArgued"],
+    }
 
-        case (
-            SEARCH_TYPES.RECAP_DOCUMENT
-            | SEARCH_TYPES.PEOPLE
-            | SEARCH_TYPES.ORAL_ARGUMENT
-        ) if valid_child_order_by:
-            sort_field, order = child_order_by
-            if (
-                sort_field
-                in [
-                    "dateFiled",
-                    "entry_date_filed",
-                    "dob",
-                    "dod",
-                    "dateArgued",
-                ]
-                and api_version == "v4"
-            ):
-                # Applies a custom function score to sort RECAPDocuments or
-                # PersonDocument based on a date field. This serves as a
-                # workaround to enable the use of the  search_after cursor for
-                # pagination on documents with a None dateFiled.
-                query = build_custom_function_score_for_date(
-                    query,
-                    child_order_by,
-                    default_score=0,
-                    default_current_date=cd["request_date"],
-                )
+    sort_field, order = child_order_by if valid_child_order_by else ("", None)
+    is_valid_custom_score_field = (
+        sort_field in valid_custom_score_fields.get(cd["type"], [])
+        if sort_field
+        else False
+    )
+
+    if is_valid_custom_score_field and api_version == "v4":
+        # Applies a custom function score to sort Documents based on
+        # a date field. This serves as a workaround to enable the use of the
+        # search_after cursor for pagination on documents with a None dates.
+        query = build_custom_function_score_for_date(
+            query,
+            child_order_by,
+            default_score=0,
+            default_current_date=cd["request_date"],
+        )
 
     return query
 
@@ -2485,7 +2468,7 @@ def build_full_join_es_queries(
     if not q_should:
         return [], join_query
 
-    final_query = apply_custom_score_to_parent_query(
+    final_query = apply_custom_score_to_main_query(
         cd,
         Q(
             "bool",
@@ -2871,7 +2854,7 @@ def do_es_api_query(
             # Here, the child documents query is retrieved, highlighting and
             # field exclusion are set.
 
-            s = apply_custom_score_to_parent_query(
+            s = apply_custom_score_to_main_query(
                 cd, child_docs_query, api_version
             )
             main_query = search_query.query(s)
