@@ -926,7 +926,6 @@ def build_has_child_query(
 
 def combine_plain_filters_and_queries(
     cd: CleanData,
-    search_query: Search,
     filters: list,
     string_query: QueryString,
     api_version: Literal["v3", "v4"] | None = None,
@@ -935,11 +934,9 @@ def combine_plain_filters_and_queries(
     and Parentheticals.
 
     :param cd: The query CleanedData
-    :param search_query: Elasticsearch DSL Search object
     :param filters: A list of filter objects to be applied.
     :param string_query: An Elasticsearch QueryString object.
     :param api_version: Optional, the request API version.
-    :param child_highlighting: Whether highlighting should be enabled in child docs.
     :return: The modified Search object based on the given conditions.
     """
 
@@ -961,31 +958,35 @@ def get_match_all_query(
     cd: CleanData,
     search_query: Search,
     api_version: Literal["v3", "v4"] | None = None,
+    child_highlighting: bool = True,
 ) -> Search:
     """Build and return a match-all query for each type of document.
 
     :param cd: The query CleanedData
     :param search_query: Elasticsearch DSL Search object
     :param api_version: Optional, the request API version.
+    :param child_highlighting: Whether highlighting should be enabled in child docs.
     :return: The modified Search object based on the given conditions.
     """
+
+    _, query_hits_limit = get_child_top_hits_limit(
+        cd, cd["type"], api_version=api_version
+    )
+    hl_fields = api_child_highlight_map.get(
+        (child_highlighting, cd["type"]), {}
+    )
     match cd["type"]:
         case SEARCH_TYPES.PEOPLE:
+            match_all_child_query = build_has_child_query(
+                "match_all",
+                "position",
+                query_hits_limit,
+                hl_fields,
+                None,
+                child_highlighting=child_highlighting,
+            )
             q_should = [
-                Q(
-                    "has_child",
-                    type="position",
-                    score_mode="max",
-                    query=Q("match_all"),
-                    inner_hits={
-                        "name": "filter_query_inner_position",
-                        "size": (
-                            settings.PEOPLE_HITS_PER_RESULT
-                            if api_version == "v4"
-                            else 0
-                        ),
-                    },
-                ),
+                match_all_child_query,
                 Q("match", person_child="person"),
             ]
             final_match_all_query = Q(
@@ -997,15 +998,13 @@ def get_match_all_query(
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             # Match all query for RECAP and Dockets, it'll return dockets
             # with child documents and also empty dockets.
-            _, query_hits_limit = get_child_top_hits_limit(
-                cd, cd["type"], api_version=api_version
-            )
             match_all_child_query = build_has_child_query(
                 "match_all",
                 "recap_document",
                 query_hits_limit,
-                SEARCH_RECAP_CHILD_HL_FIELDS,
+                hl_fields,
                 get_child_sorting_key(cd, api_version),
+                child_highlighting=child_highlighting,
                 default_current_date=cd.get("request_date"),
             )
             match_all_parent_query = Q("match", docket_child="docket")
@@ -1015,27 +1014,27 @@ def get_match_all_query(
             final_match_all_query = Q(
                 "bool",
                 should=[match_all_child_query, match_all_parent_query],
+                minimum_should_match=1,
             )
             final_match_all_query = apply_custom_score_to_parent_query(
                 cd, final_match_all_query, api_version
             )
         case SEARCH_TYPES.OPINION:
             # Only return Opinion clusters.
+            match_all_child_query = build_has_child_query(
+                "match_all",
+                "opinion",
+                query_hits_limit,
+                hl_fields,
+                None,
+                child_highlighting=child_highlighting,
+            )
             q_should = [
-                Q(
-                    "has_child",
-                    type="opinion",
-                    score_mode="max",
-                    query=Q("match_all"),
-                    inner_hits={
-                        "name": "filter_query_inner_opinion",
-                        "size": settings.OPINION_HITS_PER_RESULT,
-                    },
-                ),
+                match_all_child_query,
                 Q("match", cluster_child="opinion_cluster"),
             ]
-            final_match_all_query = search_query.query(
-                Q("bool", should=q_should, minimum_should_match=1)
+            final_match_all_query = Q(
+                "bool", should=q_should, minimum_should_match=1
             )
         case _:
             # No string_query or filters in plain search types like OA and
@@ -1067,13 +1066,14 @@ def build_es_base_query(
     """
 
     main_query = None
+    string_query = None
     join_query = None
     filters = []
     plain_doc = False
     match cd["type"]:
         case SEARCH_TYPES.PARENTHETICAL:
             filters = build_es_plain_filters(cd)
-            main_query = build_fulltext_query(
+            string_query = build_fulltext_query(
                 ["representative_text"], cd.get("q", "")
             )
             plain_doc = True
@@ -1081,7 +1081,7 @@ def build_es_base_query(
             filters = build_es_plain_filters(cd)
             fields = SEARCH_ORAL_ARGUMENT_QUERY_FIELDS.copy()
             fields.extend(add_fields_boosting(cd))
-            main_query = build_fulltext_query(
+            string_query = build_fulltext_query(
                 fields,
                 cd.get("q", ""),
             )
@@ -1195,13 +1195,19 @@ def build_es_base_query(
                 api_version=api_version,
             )
 
-    if not any([filters, main_query]):
-        match_all_query = get_match_all_query(cd, search_query, api_version)
+    if not any([filters, string_query, main_query]):
+        # No filters, string_query or main_query provided by the user, return a
+        # match_all query
+        match_all_query = get_match_all_query(
+            cd, search_query, api_version, child_highlighting
+        )
         return match_all_query, join_query
 
     if plain_doc:
+        # Combine the filters and string query for plain documents like Oral
+        # arguments and parentheticals
         main_query = combine_plain_filters_and_queries(
-            cd, search_query, filters, main_query, api_version
+            cd, filters, string_query, api_version
         )
 
     return search_query.query(main_query), join_query
