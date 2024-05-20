@@ -103,6 +103,7 @@ def make_objects(
         item.get("source") or Docket.SCRAPER,
         blocked=blocked,
         date_blocked=date_blocked,
+        appeal_from_str=item.get("lower_courts", ""),
     )
 
     cluster = OpinionCluster(
@@ -117,6 +118,7 @@ def make_objects(
         blocked=blocked,
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
+        disposition=item.get("dispositions", ""),
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
@@ -131,9 +133,12 @@ def make_objects(
         url = ""
 
     opinion = Opinion(
-        type=Opinion.COMBINED,
+        type=item.get("types", Opinion.COMBINED),
         sha1=sha1_hash,
         download_url=url,
+        author_str=item.get("authors", ""),
+        joined_by_str=item.get("joined_by", ""),
+        per_curiam=item.get("per_curiam", False),
     )
 
     cf = ContentFile(content)
