@@ -632,12 +632,11 @@ position_v4_fields = {
     "meta": [],
 }
 
-audio_v4_fields = {
+audio_common_fields = {
     "absolute_url": lambda x: x["result"].get_absolute_url(),
     "caseName": lambda x: (
         x["caseName"] if x.get("caseName") else x["result"].case_name
     ),
-    "case_name_full": lambda x: x["result"].case_name_full,
     "court": lambda x: x["result"].docket.court.full_name,
     "court_id": lambda x: x["result"].docket.court.pk,
     "court_citation_string": lambda x: (
@@ -647,17 +646,31 @@ audio_v4_fields = {
     ),
     "docket_id": lambda x: x["result"].docket.pk,
     "dateArgued": lambda x: (
-        x["result"].docket.date_argued.isoformat()
+        (
+            x["result"].docket.date_argued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(x["result"].docket.date_argued).isoformat()
+        )
         if x["result"].docket.date_argued
         else None
     ),
     "dateReargued": lambda x: (
-        x["result"].docket.date_reargued.isoformat()
+        (
+            x["result"].docket.date_reargued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(x["result"].docket.date_reargued).isoformat()
+        )
         if x["result"].docket.date_reargued
         else None
     ),
     "dateReargumentDenied": lambda x: (
-        x["result"].docket.date_reargument_denied.isoformat()
+        (
+            x["result"].docket.date_reargument_denied.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].docket.date_reargument_denied
+            ).isoformat()
+        )
         if x["result"].docket.date_reargument_denied
         else None
     ),
@@ -688,7 +701,7 @@ audio_v4_fields = {
     "panel_ids": lambda x: (
         list(x["result"].panel.all().values_list("id", flat=True))
         if x["result"].panel.all()
-        else []
+        else [] if x.get("V4") else None
     ),
     "sha1": lambda x: x["result"].sha1,
     "source": lambda x: x["result"].source,
@@ -697,8 +710,30 @@ audio_v4_fields = {
         if x.get("snippet")
         else x["result"].transcript if x["result"].stt_google_response else ""
     ),
-    "meta": [],
 }
+
+
+audio_v3_fields = audio_common_fields.copy()
+audio_v3_fields.update(
+    {
+        "court_exact": lambda x: x["result"].docket.court.pk,
+        "date_created": lambda x: timezone.localtime(
+            x["result"].date_created
+        ).isoformat(),
+        "timestamp": lambda x: timezone.localtime(
+            x["result"].date_created
+        ).isoformat(),
+    }
+)
+
+
+audio_v4_fields = audio_common_fields.copy()
+audio_v4_fields.update(
+    {
+        "case_name_full": lambda x: x["result"].case_name_full,
+        "meta": [],
+    }
+)
 
 
 class CourtTestCase(SimpleTestCase):
@@ -1423,7 +1458,7 @@ class AudioESTestCase(SimpleTestCase):
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2013, 8, 14),
         )
-        transcript_response = {
+        cls.transcript_response = {
             "response": {
                 "results": [
                     {
@@ -1441,8 +1476,8 @@ class AudioESTestCase(SimpleTestCase):
                 ]
             }
         }
-        json_transcript = json.dumps(transcript_response)
-        filepath_local = SimpleUploadedFile(
+        cls.json_transcript = json.dumps(cls.transcript_response)
+        cls.filepath_local = SimpleUploadedFile(
             "sec_frank.mp3", b"mp3 binary content", content_type="audio/mpeg"
         )
         cls.audio_1 = AudioFactory.create(
@@ -1452,12 +1487,12 @@ class AudioESTestCase(SimpleTestCase):
             duration=420,
             judges="Mary Deposit Learning rd Administrative procedures act",
             local_path_original_file="test/audio/ander_v._leo.mp3",
-            local_path_mp3=filepath_local,
+            local_path_mp3=cls.filepath_local,
             source="C",
             blocked=False,
             sha1="a49ada009774496ac01fb49818837e2296705c97",
             stt_status=Audio.STT_COMPLETE,
-            stt_google_response=json_transcript,
+            stt_google_response=cls.json_transcript,
         )
         cls.audio_2 = AudioFactory.create(
             case_name="Jose A. Dominguez v. Loretta E. Lynch",

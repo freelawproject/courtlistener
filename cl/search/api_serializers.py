@@ -323,7 +323,8 @@ class V3OAESResultSerializer(DocumentSerializer):
     """The serializer for Oral argument results."""
 
     snippet = serializers.SerializerMethodField(read_only=True)
-    panel_ids = serializers.ListField(read_only=True)
+    panel_ids = NullableListField(read_only=True)
+    timestamp = TimeStampField(read_only=True)
 
     def get_snippet(self, obj):
         # If the snippet has not yet been set upstream, set it here.
