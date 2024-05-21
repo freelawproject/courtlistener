@@ -1,6 +1,10 @@
-from typing import Any, Type, Union
+from dataclasses import dataclass
+from datetime import date
+from enum import StrEnum
+from typing import Any, Literal, Type, Union
 
 from elasticsearch_dsl.response import Hit
+from elasticsearch_dsl.utils import AttrList
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
@@ -10,6 +14,8 @@ from cl.search.documents import (
     AudioPercolator,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
+    OpinionDocument,
     ParentheticalGroupDocument,
     PersonDocument,
     PositionDocument,
@@ -17,6 +23,7 @@ from cl.search.documents import (
 from cl.search.models import (
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     Parenthetical,
@@ -35,11 +42,13 @@ ESModelType = Union[
     Person,
     Position,
     Education,
+    RECAPDocument,
 ]
 
 ESModelClassType = Union[
     Type[Citation],
     Type[Docket],
+    Type[DocketEntry],
     Type[Opinion],
     Type[OpinionCluster],
     Type[Parenthetical],
@@ -58,6 +67,8 @@ ESDocumentInstanceType = Union[
     PersonDocument,
     PositionDocument,
     ESRECAPDocument,
+    OpinionDocument,
+    OpinionClusterDocument,
 ]
 
 ESDocumentClassType = Union[
@@ -67,8 +78,22 @@ ESDocumentClassType = Union[
     Type[PersonDocument],
     Type[PositionDocument],
     Type[DocketDocument],
+    Type[OpinionDocument],
+    Type[OpinionClusterDocument],
+    Type[ESRECAPDocument],
 ]
 
+ESDocumentNameType = Literal[
+    "AudioDocument",
+    "ParentheticalGroupDocument",
+    "AudioPercolator",
+    "PersonDocument",
+    "PositionDocument",
+    "DocketDocument",
+    "OpinionDocument",
+    "OpinionClusterDocument",
+    "ESRECAPDocument",
+]
 
 ESDictDocument = dict[str, Any]
 
@@ -77,3 +102,18 @@ PercolatorResponseType = tuple[list[Hit], ESDictDocument]
 SaveDocumentResponseType = tuple[str, ESDictDocument]
 
 SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
+
+
+class EventTable(StrEnum):
+    DOCKET = "search.Docket"
+    DOCKET_ENTRY = "search.DocketEntry"
+    RECAP_DOCUMENT = "search.RECAPDocument"
+    UNDEFINED = ""
+
+
+@dataclass(frozen=True)
+class ESCursor:
+    search_after: AttrList | None
+    reverse: bool
+    search_type: str
+    request_date: date | None

@@ -14,7 +14,7 @@
     {% endif %}
   </ul>
   {% if type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS or type_override == SEARCH_TYPES.RECAP or type_override == SEARCH_TYPES.DOCKETS %}
-     <p>The RECAP Archive does not contain everything in PACER. To learn more about what we have and how to add content to the RECAP Archive, please see <a href="{% url "coverage" %}">our coverage page</a>.</p>
+     <p>The RECAP Archive does not contain everything in PACER. To learn more about what we have and how to add content to the RECAP Archive, please see <a href="{% url "coverage_recap" %}">our coverage page</a>.</p>
   {% else %}
     <p>Our <a href="{% url "coverage" %}">coverage page</a> details which jurisdictions we support.
     </p>
@@ -24,48 +24,66 @@
 {% else %}
   <h2 class="alt">
     Your search
-    {% if request.GET.q %}
-        &mdash; <strong>{{ request.GET.q }}</strong> &mdash;
+    {% if search_summary_str %}
+        &mdash; <strong>{{ search_summary_str }}</strong> &mdash;
     {% endif %}
     {% if error_message %}
-    {{error_message}}
+      has incorrect syntax.
+      {% if error_message == "unbalanced_parentheses" %}
+        Did you forget to close one or more parentheses?
+      {% elif error_message == "unbalanced_quotes" %}
+        Did you forget to close one or more quotes?
+      {% endif %}
     {% else %}
-    encountered an error.
+      encountered an error.
     {% endif %}
   </h2>
-  {% if suggested_query %}
-  <div class="flex">
-    <h4 class="text-danger" >Did you mean:&nbsp;<a href="{% url 'show_results' %}?q={{suggested_query}}&type={{request.GET.type}}">{{suggested_query}}</a></h4>
-  </div>
-  <p>Search tips:</p>
-  <ul>
-    <li>Make sure all the words are spelled correctly.</li>
-    <li>Check your punctuation marks.</li>
-    <li>Try different keywords.</li>
-  </ul>
-  <p>Please double check your query and if you still have issues, please <a href="{% url "contact" %}">get in touch for assistance</a>.
-  </p>
-  {% else %}
+  {% if error_message %}
+    {% if suggested_query == "proximity_query" %}
+      <h4 class="text-danger" >Are you attempting to perform a proximity search?</h4>
+      <p>Try using this format: <code>term~</code> or <code>term~2</code>. For more details, visit our <a href="{% url "advanced_search" %}#proximity">advance search documentation</a>.</p>
+    {% elif suggested_query == "proximity_filter" %}
+      <h4 class="text-danger" >Are you attempting to perform a proximity search within a filter?</h4>
+      <p>Proximity queries do not work in filters. Consider using the main search box. For more details, visit our <a href="{% url "advanced_search" %}#proximity">advance search documentation</a>.</p>
+    {% elif suggested_query %}
+      <div class="flex">
+        <h4 class="text-danger" >Did you mean:&nbsp;<a href="{% url 'show_results' %}?q={{suggested_query}}{% if request.GET.type %}&type={{request.GET.type}}{% endif %}">{{suggested_query}}</a></h4>
+      </div>
+    {% endif %}
 
-  <p>This could be because:</p>
-  {% if search_form.errors %}
+    <p>Search tips:</p>
     <ul>
+      <li>Make sure all the words are spelled correctly.</li>
+      <li>Check your punctuation marks.</li>
+      <li>Try different keywords.</li>
+    </ul>
+    <p>Please double check your query and if you still have issues, please <a href="{% url "contact" %}">get in touch for assistance</a>.
+    </p>
+
+  {% else %}
+    <p>This could be because:</p>
+    {% if search_form.errors %}
+      <ul>
         <li>A date field could not be understood as a date.</li>
         <li>A numeric field (like a citation count) couldn't be understood as a number.</li>
         <li>A similar error with your input.</li>
-    </ul>
-    <p>Please double check your query and filters and if you still have issues, please <a href="{% url "contact" %}">get in touch for assistance</a>.
-    </p>
-  {% else %}
-    <ul>
+      </ul>
+      <p>Please double check your query and filters and if you still have issues, please <a href="{% url "contact" %}">get in touch for assistance</a>.
+      </p>
+    {% else %}
+      <ul>
         <li>CourtListener couldn't make sense of your query.</li>
+        <li>Ensure you are not incorrectly using <code>:</code> <code>[</code> <code>]</code> outside a fielded or range query context.<br>
+          Avoid using slashes <code>/</code> in a query. When searching for dates as text or other values that includes <code>/</code>, enclose the term in quotes, like <code>"01/05/24"</code>. If you are searching for a date in a date field, consider using a Date Query.<br>
+          For more details, visit our <a href="{% url "advanced_search" %}">advance search documentation.</a>
+        </li>
         <li>Our system is down and can't respond.</li>
         <li>Some other reason.</li>
-    </ul>
-    <p>We log these errors and work to resolve them, but if you think we can
-        benefit from your experience, don't hesitate to <a
-                href="{% url "contact" %}">let us know</a>! We value your
-        feedback.</p>
-  {% endif %}
+      </ul>
+      <p>We log these errors and work to resolve them, but if you think we can
+          benefit from your experience, don't hesitate to <a
+                  href="{% url "contact" %}">let us know</a>! We value your
+          feedback.</p>
+    {% endif %}
   {% endif %}
 {% endif %}

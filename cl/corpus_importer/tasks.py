@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 from datetime import date
+from http import HTTPStatus
 from io import BytesIO
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
@@ -34,6 +35,7 @@ from juriscraper.pacer import (
     PossibleCaseNumberApi,
     ShowCaseDocApi,
 )
+from juriscraper.pacer.reports import BaseReport
 from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
@@ -44,14 +46,8 @@ from requests.exceptions import (
     ReadTimeout,
     RequestException,
 )
-from requests.packages.urllib3.exceptions import ReadTimeoutError
 from rest_framework.renderers import JSONRenderer
-from rest_framework.status import (
-    HTTP_400_BAD_REQUEST,
-    HTTP_403_FORBIDDEN,
-    HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_504_GATEWAY_TIMEOUT,
-)
+from urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
@@ -79,7 +75,7 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
-from cl.lib.redis_utils import delete_redis_semaphore, make_redis_interface
+from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -382,17 +378,17 @@ def get_and_save_free_document_report(
     document_rows_to_create = []
     for row in results:
         document_row = PACERFreeDocumentRow(
-            court_id=row.court_id,
-            pacer_case_id=row.pacer_case_id,
-            docket_number=row.docket_number,
-            case_name=row.case_name,
-            date_filed=row.date_filed,
-            pacer_doc_id=row.pacer_doc_id,
-            pacer_seq_no=row.pacer_seq_no,
-            document_number=row.document_number,
-            description=row.description,
-            nature_of_suit=row.nature_of_suit,
-            cause=row.cause,
+            court_id=row["court_id"],
+            pacer_case_id=row["pacer_case_id"],
+            docket_number=row["docket_number"],
+            case_name=row["case_name"],
+            date_filed=row["date_filed"],
+            pacer_doc_id=row["pacer_doc_id"],
+            pacer_seq_no=row["pacer_seq_no"],
+            document_number=row["document_number"],
+            description=row["description"],
+            nature_of_suit=row["nature_of_suit"],
+            cause=row["cause"],
         )
         document_rows_to_create.append(document_row)
 
@@ -597,12 +593,12 @@ def get_and_process_free_pdf(
             rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies
         )
     except HTTPError as exc:
-        if exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+        if exc.response and exc.response.status_code in [
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
             msg = (
-                f"Ran into HTTPError while getting PDF: "
+                "Ran into HTTPError while getting PDF: "
                 f"{exc.response.status_code}."
             )
             if self.request.retries == self.max_retries:
@@ -611,10 +607,18 @@ def get_and_process_free_pdf(
                 return None
             logger.info(f"{msg} Retrying.")
             raise self.retry(exc=exc)
+        elif exc.response:
+            msg = (
+                "Ran into unknown HTTPError while getting PDF: "
+                f"{exc.response.status_code}. Aborting."
+            )
+            logger.error(msg)
+            self.request.chain = None
+            return None
         else:
             msg = (
-                f"Ran into unknown HTTPError while getting PDF: "
-                f"{exc.response.status_code}. Aborting."
+                "Ran into unknown HTTPError while getting PDF: "
+                f"{exc}. Aborting."
             )
             logger.error(msg)
             self.request.chain = None
@@ -806,9 +810,9 @@ def upload_to_ia(
             return None
         raise self.retry(exc=exc)
     except HTTPError as exc:
-        if exc.response.status_code in [
-            HTTP_403_FORBIDDEN,  # Can't access bucket, typically.
-            HTTP_400_BAD_REQUEST,  # Corrupt PDF, typically.
+        if exc.response and exc.response.status_code in [
+            HTTPStatus.FORBIDDEN,  # Can't access bucket, typically.
+            HTTPStatus.BAD_REQUEST,  # Corrupt PDF, typically.
         ]:
             return [exc.response]
         if self.request.retries == self.max_retries:
@@ -828,7 +832,7 @@ def upload_to_ia(
             # Give up for now. It'll get done next time cron is run.
             return None
         raise self.retry(exc=exc)
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         # For some reason the file path is populated but no good. No point in
         # retrying. Just abort.
         return None
@@ -1181,7 +1185,7 @@ def make_docket_by_iquery(
             return None
         raise self.retry(exc=exc)
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     if not report.data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
@@ -1447,17 +1451,22 @@ def get_attachment_page_by_rd(
     try:
         att_report = get_att_report_by_rd(rd, cookies)
     except HTTPError as exc:
-        if exc.response.status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+        if exc.response and exc.response.status_code in [
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
             logger.warning(
                 "Ran into HTTPError: %s. Retrying.", exc.response.status_code
             )
             raise self.retry(exc)
-        else:
+        elif exc.response:
             msg = "Ran into unknown HTTPError. %s. Aborting."
             logger.error(msg, exc.response.status_code)
+            self.request.chain = None
+            return None
+        else:
+            msg = "Ran into unknown HTTPError. %s. Aborting."
+            logger.error(msg, str(exc))
             self.request.chain = None
             return None
     except requests.RequestException as exc:
@@ -1743,6 +1752,33 @@ def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
     if data == {}:
         return True
     return False
+
+
+def is_docket_entry_sealed(
+    court_id: str, case_id: str, doc_id: str | None
+) -> bool:
+    """Check if a docket entry is sealed, querying the download confirmation
+    page in PACER. If a receipt is returned the docket entry is not sealed,
+    otherwise is sealed.
+
+    :param court_id: A CourtListener court ID to query the confirmation page.
+    :param case_id: The pacer_case_id to use to look up the case:
+    :param doc_id: The pacer_doc_id to query the confirmation page.
+    :return: True if the entry is sealed on PACER, False otherwise.
+    """
+
+    # If doc_id is None, it’s probably a minute entry.
+    if not doc_id:
+        return False
+
+    recap_email_user = User.objects.get(username="recap-email")
+    cookies = get_or_cache_pacer_cookies(
+        recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
+    )
+
+    s = PacerSession(cookies=cookies)
+    report = BaseReport(court_id, s)
+    return report.is_entry_sealed(case_id, doc_id)
 
 
 def update_rd_metadata(
@@ -2040,11 +2076,11 @@ def get_pacer_doc_id_with_show_case_doc_url(
         logger.info(f"{msg} Retrying.", rd)
         raise self.retry(exc=exc)
     except HTTPError as exc:
-        status_code = exc.response.status_code
-        if status_code in [
-            HTTP_500_INTERNAL_SERVER_ERROR,
-            HTTP_504_GATEWAY_TIMEOUT,
+        if exc.response and exc.response.status_code in [
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+            HTTPStatus.GATEWAY_TIMEOUT,
         ]:
+            status_code = exc.response.status_code
             msg = "Got HTTPError with status code %s."
             if last_try:
                 logger.error(f"{msg} Aborting.", status_code)
@@ -2052,9 +2088,14 @@ def get_pacer_doc_id_with_show_case_doc_url(
 
             logger.info(f"{msg} Retrying", status_code)
             raise self.retry(exc)
-        else:
+        elif exc.response:
+            status_code = exc.response.status_code
             msg = "Ran into unknown HTTPError. %s. Aborting."
             logger.error(msg, status_code)
+            return
+        else:
+            msg = "Ran into unknown HTTPError. %s. Aborting."
+            logger.error(msg, str(exc))
             return
     try:
         pacer_doc_id = report.data

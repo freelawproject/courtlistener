@@ -10,7 +10,7 @@ from cl.corpus_importer.tasks import upload_pdf_to_ia, upload_recap_json
 from cl.corpus_importer.utils import get_start_of_quarter
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import Docket, RECAPDocument
 
 
@@ -18,7 +18,7 @@ def upload_non_free_pdfs_to_internet_archive(options):
     upload_pdfs_to_internet_archive(options, do_non_free=True)
 
 
-def upload_pdfs_to_internet_archive(options, do_non_free=False):
+def upload_pdfs_to_internet_archive(options, do_non_free: bool = False):
     """Upload items to the Internet Archive."""
     q = options["queue"]
     rds = (
@@ -72,7 +72,7 @@ def upload_recap_data(options):
     """Upload RECAP data to Internet Archive."""
     q = options["queue"]
     database = options["database"]
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     redis_key = "recap-docket-last-id"
     last_pk = r.getset(redis_key, 0)
     ds = (
@@ -80,7 +80,7 @@ def upload_recap_data(options):
             Q(ia_upload_failure_count__lte=3)
             | Q(ia_upload_failure_count=None),
             ia_needs_upload=True,
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             pk__gt=last_pk,
         )
         .order_by("pk")
@@ -187,7 +187,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         options["action"](options)
 
     VALID_ACTIONS = {

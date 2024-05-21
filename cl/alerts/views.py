@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -5,16 +7,20 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
+    HttpResponseNotFound,
     HttpResponseRedirect,
 )
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_list_or_404, get_object_or_404, render
+from django.template.response import TemplateResponse
 from django.urls import reverse
-from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 
 from cl.alerts.forms import DocketAlertConfirmForm
 from cl.alerts.models import Alert, DocketAlert
 from cl.alerts.tasks import send_unsubscription_confirmation
 from cl.lib.http import is_ajax
+from cl.lib.ratelimiter import ratelimiter_unsafe_3_per_m
 from cl.lib.types import AuthenticatedHttpRequest
 from cl.opinion_page.utils import make_docket_title, user_has_alert
 from cl.search.models import Docket
@@ -59,16 +65,116 @@ def delete_alert_confirm(request, pk):
     )
 
 
-def disable_alert(request, secret_key):
+@csrf_exempt
+@require_http_methods(["POST"])
+@ratelimiter_unsafe_3_per_m
+def one_click_disable_alert(request: HttpRequest, secret_key: str):
     """Disable an alert based on a secret key."""
     alert = get_object_or_404(Alert, secret_key=secret_key)
-    prev_rate = alert.rate
     alert.rate = Alert.OFF
     alert.save()
+    # Mail clients send POSTs; an ugly response is OK.
+    return HttpResponse("You have been successfully unsubscribed!")
+
+
+@require_http_methods(["POST"])
+@ratelimiter_unsafe_3_per_m
+def htmx_disable_alert(request: HttpRequest, secret_key: str):
+    """Disables a specified alert within an HTMX-powered page."""
+    if not request.META.get("HTTP_HX_REQUEST"):
+        return HttpResponseNotFound(
+            "Your attempt to disable the alert was unsuccessful."
+        )
+
+    alert = get_object_or_404(Alert, secret_key=secret_key)
+    alert.rate = Alert.OFF
+    alert.save()
+
+    return TemplateResponse(
+        request,
+        "includes/search_alerts/table_row.html",
+        {"alert": alert, "hx_swap": True},
+    )
+
+
+@ratelimiter_unsafe_3_per_m
+def disable_alert(request: HttpRequest, secret_key: str):
+    """Display a confirmation or success page whenever a user
+    chooses to disable their search alerts.
+
+    :param request: The HttpRequest from the client
+    :param secret_key: The secret key for the search alert
+    :return: The HttpResponse to send to the client
+    """
+    alert = get_object_or_404(Alert, secret_key=secret_key)
+
+    # Handle confirmation form POST requests
+    if request.method == "POST":
+        form = DocketAlertConfirmForm(request.POST)
+        if form.is_valid():
+            prev_rate = alert.rate
+            alert.rate = Alert.OFF
+            alert.save()
+            return render(
+                request,
+                "disable_alert.html",
+                {"alert": alert, "prev_rate": prev_rate, "private": True},
+            )
+        # If the form is invalid, show the form errors.
+        return render(
+            request,
+            "search_alert_confirmation.html",
+            {
+                "alert": alert,
+                "form": form,
+                "private": True,
+                "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
+            },
+        )
+
+    if request.user.is_authenticated:
+        # If the user is logged in, disable the search alert. No confirmation page
+        # required
+        prev_rate = alert.rate
+        alert.rate = Alert.OFF
+        alert.save()
+        return render(
+            request,
+            "disable_alert.html",
+            {"alert": alert, "prev_rate": prev_rate, "private": True},
+        )
+
+    form = DocketAlertConfirmForm()
     return render(
         request,
-        "disable_alert.html",
-        {"alert": alert, "prev_rate": prev_rate, "private": True},
+        "search_alert_confirmation.html",
+        {
+            "alert": alert,
+            "form": form,
+            "private": True,
+            "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
+        },
+    )
+
+
+@require_http_methods(["GET"])
+def disable_alert_list(request: HttpRequest):
+    """Renders a list of search alerts associated with a user's email,
+    allowing them to disable alerts selectively.
+
+    :param request: The incoming HTTP request, containing the private
+    keys as query string parameters.
+    """
+    private_keys = request.GET.getlist("keys")
+    alerts = get_list_or_404(Alert, secret_key__in=private_keys)
+
+    return TemplateResponse(
+        request,
+        "manage_search_alerts.html",
+        {
+            "alerts": alerts,
+            "private": True,
+        },
     )
 
 
@@ -132,12 +238,12 @@ def toggle_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
         )
 
 
-def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
+async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
     """Allow users to create docket alerts based on case and court ID"""
     pacer_case_id = request.GET.get("pacer_case_id")
     court_id = request.GET.get("court_id")
     if not pacer_case_id or not court_id:
-        return render(
+        return TemplateResponse(
             request,
             "docket_alert_new.html",
             {
@@ -145,14 +251,14 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
                 "title": "400: Invalid request creating docket alert",
                 "private": True,
             },
-            status=HTTP_400_BAD_REQUEST,
+            status=HTTPStatus.BAD_REQUEST,
         )
     try:
-        docket = Docket.objects.get(
+        docket = await Docket.objects.aget(
             pacer_case_id=pacer_case_id, court_id=court_id
         )
     except Docket.DoesNotExist:
-        return render(
+        return TemplateResponse(
             request,
             "docket_alert_new.html",
             {
@@ -160,16 +266,16 @@ def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
                 "title": "New Docket Alert for Unknown Case",
                 "private": True,
             },
-            status=HTTP_404_NOT_FOUND,
+            status=HTTPStatus.NOT_FOUND,
         )
-    except Docket.MultipleObjectsReturned as exc:
-        docket = Docket.objects.filter(
+    except Docket.MultipleObjectsReturned:
+        docket = await Docket.objects.filter(
             pacer_case_id=pacer_case_id, court_id=court_id
-        ).earliest("date_created")
+        ).aearliest("date_created")
 
     title = f"New Docket Alert for {make_docket_title(docket)}"
-    has_alert = user_has_alert(request.user, docket)
-    return render(
+    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[attr-defined]
+    return TemplateResponse(
         request,
         "docket_alert_new.html",
         {
@@ -200,6 +306,7 @@ def set_docket_alert_state(
         send_unsubscription_confirmation.delay(docket_alert.pk)
 
 
+@ratelimiter_unsafe_3_per_m
 def toggle_docket_alert_confirmation(
     request: HttpRequest,
     route_prefix: str,
@@ -227,7 +334,7 @@ def toggle_docket_alert_confirmation(
                 "private": True,
                 "target_state": target_state,
             },
-            status=HTTP_404_NOT_FOUND,
+            status=HTTPStatus.NOT_FOUND,
         )
     # Handle confirmation form POST requests
     if request.method == "POST":
@@ -284,3 +391,28 @@ def toggle_docket_alert_confirmation(
             "h_captcha_site_key": settings.HCAPTCHA_SITEKEY,
         },
     )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@ratelimiter_unsafe_3_per_m
+def one_click_docket_alert_unsubscribe(
+    request: HttpRequest,
+    secret_key: str,
+) -> HttpResponse:
+    """Unsubscribes a user from docket alerts for a specific docket.
+
+    :param request: The HttpRequest from the client
+    :param secret_key: The secret key for the docket alert
+    :return: The HttpResponse to send to the client
+    """
+    try:
+        docket_alert = DocketAlert.objects.get(secret_key=secret_key)
+    except DocketAlert.DoesNotExist:
+        return HttpResponseNotFound(
+            "Your attempt to unsubscribe was unsuccessful."
+        )
+
+    set_docket_alert_state(docket_alert, DocketAlert.UNSUBSCRIPTION)
+
+    return HttpResponse("You have been successfully unsubscribed!")

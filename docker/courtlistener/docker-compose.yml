@@ -1,4 +1,4 @@
-# Run using `docker-compose up`
+# Run using `docker compose up`
 version: "3.7"
 
 networks:
@@ -61,7 +61,7 @@ services:
     env_file:
       - ../../.env.dev
     working_dir: /opt/courtlistener/cl
-    command: sh -c 'npm install && npx webpack --progress --watch --mode=development'
+    command: sh -c 'npm install && exec npx webpack --progress --watch --mode=development'
 
   # Task Server
   cl-celery:
@@ -71,7 +71,7 @@ services:
       dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
-      target: celery
+    command: celery
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -84,6 +84,10 @@ services:
       - cl_net_overlay
     env_file:
       - ../../.env.dev
+    environment:
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
 
   cl-django:
     container_name: cl-django
@@ -92,7 +96,7 @@ services:
       dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
-      target: web-dev
+    command: web-dev
     depends_on:
       - cl-postgresql
       - cl-redis
@@ -113,6 +117,10 @@ services:
       - cl_net_overlay
     env_file:
       - ../../.env.dev
+    environment:
+        - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
 
   cl-selenium:
     container_name: cl-selenium

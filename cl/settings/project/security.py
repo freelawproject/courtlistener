@@ -76,18 +76,23 @@ CORS_ALLOW_METHODS = (
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# PERMISSIONS_POLICY
+# Dictionary to disable many potentially privacy-invading and annoying features
+# for all scripts:
+PERMISSIONS_POLICY: dict[str, list[str]] = {
+    "browsing-topics": [],
+}
+
 # CSP
 # Components:
 # - hCaptcha: https://docs.hcaptcha.com/#content-security-policy-settings
 # - Plausible: https://github.com/plausible/docs/issues/20
-# - Stripe: https://stripe.com/docs/security/guide#content-security-policy
 CSP_CONNECT_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
     "https://hcaptcha.com/",
     "https://*.hcaptcha.com/",
     "https://plausible.io/",
-    "https://api.stripe.com/",
 )
 CSP_FONT_SRC = (
     "'self'",
@@ -99,15 +104,12 @@ CSP_FRAME_SRC = (
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
     "https://hcaptcha.com/",
     "https://*.hcaptcha.com/",
-    "https://js.stripe.com/",
-    "https://hooks.stripe.com/",
 )
 CSP_IMG_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
     "https://portraits.free.law/",
     "data:",  # @tailwindcss/forms uses data URIs for images.
-    "https://*.stripe.com/",
 )
 CSP_MEDIA_SRC = (
     "'self'",
@@ -125,7 +127,6 @@ CSP_SCRIPT_SRC = (
     "https://hcaptcha.com/",
     "https://*.hcaptcha.com/",
     "https://plausible.io/",
-    "https://js.stripe.com/",
 )
 CSP_STYLE_SRC = (
     "'self'",

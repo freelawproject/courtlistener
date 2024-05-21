@@ -1,11 +1,17 @@
 from juriscraper.AbstractSite import logger
 
 from cl.scrapers.models import UrlHash
+from cl.search.models import Court
 
 
 class DupChecker(dict):
     def __init__(
-        self, court, full_crawl=False, dup_threshold=5, *args, **kwargs
+        self,
+        court: Court,
+        full_crawl: bool = False,
+        dup_threshold: int = 5,
+        *args,
+        **kwargs,
     ):
         self.full_crawl = full_crawl
         self.court = court
@@ -14,7 +20,7 @@ class DupChecker(dict):
         self.dup_count = 0
         self.last_found_date = None
         self.emulate_break = False
-        super(DupChecker, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _increment(self, current_date):
         """Increments the dup_count and sets the correct date for the latest
@@ -112,8 +118,7 @@ class DupChecker(dict):
 
         if exists:
             logger.info(
-                "Duplicate found on date: %s, with lookup value: %s"
-                % (current_date, lookup_value)
+                f"Duplicate found on date: {current_date}, with lookup value: {lookup_value}"
             )
             self._increment(current_date)
 
@@ -139,8 +144,7 @@ class DupChecker(dict):
                         return False
                 elif self.dup_count >= self.dup_threshold:
                     logger.info(
-                        "Found %s duplicates in a row. Court is up to date."
-                        % self.dup_count
+                        f"Found {self.dup_count} duplicates in a row. Court is up to date."
                     )
                     self.emulate_break = True
                     return False

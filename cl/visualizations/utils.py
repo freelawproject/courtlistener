@@ -10,7 +10,7 @@ from cl.visualizations.exceptions import TooManyNodes
 from cl.visualizations.models import JSONVersion
 
 
-def build_visualization(viz):
+async def build_visualization(viz):
     """Use the start and end points to generate a visualization
 
     :param viz: A Visualization object to work on
@@ -24,29 +24,29 @@ def build_visualization(viz):
     }
     t1 = time.time()
     try:
-        g = viz.build_nx_digraph(**build_kwargs)
+        g = await viz.build_nx_digraph(**build_kwargs)
     except TooManyNodes:
         try:
             # Try with fewer hops.
             build_kwargs["max_hops"] = 2
-            g = viz.build_nx_digraph(**build_kwargs)
+            g = await viz.build_nx_digraph(**build_kwargs)
         except TooManyNodes:
             # Still too many hops. Abort.
-            tally_stat("visualization.too_many_nodes_failure")
+            await tally_stat("visualization.too_many_nodes_failure")
             return "too_many_nodes", viz
 
     if len(g.edges()) == 0:
-        tally_stat("visualization.too_few_nodes_failure")
+        await tally_stat("visualization.too_few_nodes_failure")
         return "too_few_nodes", viz
 
     t2 = time.time()
     viz.generation_time = t2 - t1
 
-    viz.save()
-    viz.add_clusters(g)
-    j = viz.to_json(g)
+    await viz.asave()
+    await viz.add_clusters(g)
+    j = await viz.to_json(g)
     jv = JSONVersion(map=viz, json_data=j)
-    jv.save()
+    await jv.asave()
     return "success", viz
 
 

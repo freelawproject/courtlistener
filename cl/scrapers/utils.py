@@ -5,28 +5,85 @@ from datetime import date
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
+import httpx
 import requests
 from asgiref.sync import async_to_sync
+from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
 from django.db.models import QuerySet
+from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 from requests import Response, Session
-from requests.cookies import RequestsCookieJar
 
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.recap.mergers import find_docket_object
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import Court, Docket, RECAPDocument
+
+
+def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
+    """Get Court object from "child_courts" scraped string
+
+    Ensure that the Court object found has the same parent court id has the
+    Court object got from the scraper
+
+    :param item: scraped court's name
+    :param court_id: court id got from the Site scraper object
+
+    :return: Court object for the child_court string if it exists and is valid
+    """
+    if not child_court_name:
+        return None
+
+    parent_court = find_court_by_id(court_id)[0]
+
+    child_court_ids = find_court_ids_by_name(
+        child_court_name,
+        bankruptcy=parent_court["type"] == "bankruptcy",
+        location=parent_court["location"],
+        allow_partial_matches=False,
+    )
+
+    if not child_court_ids:
+        logger.error(
+            "Could not get child court id from name '%s'",
+            child_court_name,
+            extra={"fingerprint": [f"{court_id}-no-child-in-reportersdb"]},
+        )
+        return None
+
+    if not (child_courts := Court.objects.filter(pk=child_court_ids[0])):
+        logger.error(
+            "Court object does not exist for '%s'",
+            child_court_ids[0],
+            extra={"fingerprint": [f"{court_id}-no-child-in-db"]},
+        )
+        return None
+
+    child_court = child_courts[0]
+    parent_id = child_court.parent_court.id if child_court.parent_court else ""
+    if parent_id != court_id:
+        logger.error(
+            "Child court found from name '%s' with id '%s' has parent court id different from expected. Expected: '%s' Found: '%s'",
+            child_court_name,
+            child_court_ids[0],
+            court_id,
+            parent_id,
+            extra={"fingerprint": [f"{court_id}-child-found-no-parent-match"]},
+        )
+        return None
+
+    return child_court
 
 
 @retry(
     (
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.TimeoutException,
     ),
     tries=3,
     delay=5,
@@ -79,8 +136,8 @@ def follow_redirections(r: Response, s: Session) -> Response:
 
 @retry(
     (
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.TimeoutException,
     ),
     tries=3,
     delay=5,
@@ -97,7 +154,7 @@ def get_extension(content: bytes) -> str:
 
 def get_binary_content(
     download_url: str,
-    cookies: RequestsCookieJar,
+    site: AbstractSite,
     headers: dict,
     method: str = "GET",
 ) -> Tuple[str, Optional[Response]]:
@@ -105,7 +162,7 @@ def get_binary_content(
     certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
-    :param cookies: Cookies that might be necessary to download the item.
+    :param site: Site object used to download data
     :param headers: Headers that might be necessary to download the item.
     :param method: The HTTP method used to get the item, or "LOCAL" to get an
     item during testing
@@ -127,13 +184,16 @@ def get_binary_content(
     else:
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
-        s = requests.session()
-
+        s = (
+            site.request["session"]
+            if hasattr(site, "cipher")
+            else requests.session()
+        )
         r = s.get(
             download_url,
             verify=False,  # WA has a certificate we don't understand
             headers=headers,
-            cookies=cookies,
+            cookies=site.cookies,
             timeout=300,
         )
 
@@ -141,6 +201,24 @@ def get_binary_content(
         if len(r.content) == 0:
             msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
             return msg, None
+
+        # test for expected content type (thanks mont for nil)
+        if site.expected_content_types:
+            # Clean up content types like "application/pdf;charset=utf-8"
+            # and 'application/octet-stream; charset=UTF-8'
+            content_type = (
+                r.headers.get("Content-Type").lower().split(";")[0].strip()
+            )
+            m = any(
+                content_type in mime.lower()
+                for mime in site.expected_content_types
+            )
+            if not m:
+                msg = (
+                    f"UnexpectedContentTypeError: {download_url}\n"
+                    f'\'"{content_type}" not in {site.expected_content_types}'
+                )
+                return msg, None
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)
@@ -231,29 +309,32 @@ def update_or_create_docket(
     :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
-    :return: The docket docket.
+    :return: The docket.
     """
+
+    docket_fields = {
+        "case_name": case_name,
+        "case_name_short": case_name_short,
+        "case_name_full": case_name_full,
+        "blocked": blocked,
+        "date_blocked": date_blocked,
+        "date_argued": date_argued,
+        "ia_needs_upload": ia_needs_upload,
+    }
+
     docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
     if docket.pk:
-        docket.case_name = case_name
-        docket.case_name_short = case_name_short
-        docket.case_name_full = case_name_full
-        docket.source = source
-        docket.blocked = blocked
-        docket.date_blocked = date_blocked
-        docket.date_argued = date_argued
-        docket.ia_needs_upload = ia_needs_upload
+        # Update the existing docket with the new values
+        docket.add_opinions_source(source)
+        for field, value in docket_fields.items():
+            setattr(docket, field, value)
     else:
+        # Create a new docket with docket_fields and additional fields
         docket = Docket(
-            case_name=case_name,
-            case_name_short=case_name_short,
-            case_name_full=case_name_full,
+            **docket_fields,
+            source=source,
             docket_number=docket_number,
             court_id=court_id,
-            source=source,
-            blocked=blocked,
-            date_blocked=date_blocked,
-            date_argued=date_argued,
-            ia_needs_upload=ia_needs_upload,
         )
+
     return docket

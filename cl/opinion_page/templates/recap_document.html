@@ -73,6 +73,7 @@
               class="no-underline black-link">{{ rd.docket_entry.docket|best_case_name|safe|v_wrapper }}</a></h2>
       {% include "includes/notes_modal.html" %}
       {% include "includes/buy_pacer_modal.html" %}
+      {% include "includes/buy_acms_modal.html" %}
       {% if redirect_to_pacer_modal %}
         {% include "includes/redirect_to_pacer_modal.html" %}
       {% endif %}
@@ -89,7 +90,7 @@
 
         {% if rd.is_available %}
           <ul class="nav nav-tabs v-offset-below-1" role="tablist">
-            <li role="presentation" class="active">
+            <li role="presentation" class="{% block nav-pdf %}active{% endblock %}">
               <a href="#pdf"
                  aria-controls="home"
                  role="tab"
@@ -100,9 +101,16 @@
                  aria-controls="profile"
                  role="tab"
                  data-toggle="tab">Text</a></li>
+          {% if authorities %}
+            <li class="{% block nav-authorities %}inactive{% endblock %}" role="presentation">
+              <a href="{{ rd.get_authorities_url }}">
+                Authorities
+              </a>
+            </li>
+          {% endif %}
           </ul>
           <div class="tab-content">
-            <div role="tabpanel" class="tab-pane active" id="pdf">
+            <div role="tabpanel" class="tab-pane {% block content-pdf %}active{% endblock %}" id="pdf">
               <div class="embed-responsive embed-responsive-8by11">
                 <object data="{{ rd.filepath_local.url }}?no-og=true"
                         type="application/pdf"
@@ -154,6 +162,10 @@
                 </div>
               </div>
             </div>
+
+            {% block tab-content %}{% endblock %}
+        </li>
+
           </div>
         {% else %}
 

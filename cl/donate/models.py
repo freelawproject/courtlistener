@@ -1,20 +1,23 @@
 import pghistory
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
+from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 
-class PAYMENT_TYPES(object):
+class PAYMENT_TYPES:
     DONATION = "donation"
     PAYMENT = "payment"
     BADGE_SIGNUP = "badge_signup"
 
 
-class FREQUENCIES(object):
+class FREQUENCIES:
     ONCE = "once"
     MONTHLY = "monthly"
     NAMES = (
@@ -23,7 +26,7 @@ class FREQUENCIES(object):
     )
 
 
-class PROVIDERS(object):
+class PROVIDERS:
     DWOLLA = "dwolla"
     PAYPAL = "paypal"
     CREDIT_CARD = "cc"
@@ -164,3 +167,84 @@ class MonthlyDonation(AbstractDateTimeModel):
             self.monthly_donation_amount,
             self.get_payment_provider_display(),
         )
+
+
+class NeonWebhookEvent(AbstractDateTimeModel):
+    MEMBERSHIP_CREATION = 1
+    MEMBERSHIP_EDIT = 2
+    MEMBERSHIP_DELETE = 3
+    MEMBERSHIP_UPDATE = 4
+    TYPES = (
+        (MEMBERSHIP_CREATION, "createMembership"),
+        (MEMBERSHIP_EDIT, "editMembership"),
+        (MEMBERSHIP_DELETE, "deleteMembership"),
+        (MEMBERSHIP_UPDATE, "updateMembership"),
+    )
+    trigger = models.PositiveSmallIntegerField(
+        help_text="Specifies the action that initiated this webhook event",
+        choices=TYPES,
+    )
+    account_id = models.CharField(
+        help_text="Unique identifier assigned by Neon CRM to a customer record",
+        blank=True,
+    )
+    membership_id = models.CharField(
+        help_text="Unique identifier assigned by Neon CRM to a membership record",
+        blank=True,
+    )
+    content = models.JSONField(  # type: ignore
+        encoder=DjangoJSONEncoder,
+        help_text="The content of the payload of the POST request.",
+    )
+
+
+@pghistory.track(AfterUpdateOrDeleteSnapshot())
+class NeonMembership(AbstractDateTimeModel):
+    BASIC = 1
+    LEGACY = 2
+    TIER_1 = 3
+    TIER_2 = 4
+    TIER_3 = 5
+    TIER_4 = 6
+    TIER_5 = 7
+    PLATINUM = 8
+    EDU = 9
+    TYPES = (
+        (BASIC, "CL Membership - Basic"),
+        (LEGACY, "CL Legacy Membership"),
+        (TIER_1, "CL Membership - Tier 1"),
+        (TIER_2, "CL Membership - Tier 2"),
+        (TIER_3, "CL Membership - Tier 3"),
+        (TIER_4, "CL Membership - Tier 4"),
+        (TIER_5, "CL Membership - Tier 5"),
+        (PLATINUM, "CL Platinum Membership"),
+        (EDU, "EDU Membership"),
+    )
+    TYPES_INVERTED = invert_choices_group_lookup(TYPES)
+    user = models.OneToOneField(
+        User,
+        related_name="membership",
+        verbose_name="the user linked to the membership",
+        on_delete=models.CASCADE,
+        unique=True,
+    )
+    neon_id = models.CharField(
+        help_text="Unique identifier assigned by Neon CRM to a membership record",
+        blank=True,
+    )
+    level = models.PositiveSmallIntegerField(
+        help_text="The current membership tier of a user within Neon CRM",
+        choices=TYPES,
+    )
+    termination_date = models.DateTimeField(
+        help_text="The date a user's Neon membership will be terminated",
+        blank=True,
+        null=True,
+    )
+
+    @property
+    def is_active(self) -> bool:
+        if not self.termination_date:
+            return True
+
+        return self.termination_date > timezone.now()

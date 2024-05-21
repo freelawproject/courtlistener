@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %} Confirm your Search Alert unsubscription – CourtListener.com{% endblock %}
+
+{% block footer-scripts %}
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
+    function onSubmit(token) {
+      document.getElementById('confirmation').submit();
+    }
+  </script>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-sm-2"></div>
+  <div class="col-sm-8">
+    <div class="text-center">
+      <h1> Please confirm your unsubscription </h1>
+      <h3 class="gray alt">&mdash; from &mdash;</h3>
+      <h3>Your {{alert.get_rate_display|lower}} {% if alert.alert_type == 'o' %}opinion{% elif alert.alert_type == 'oa' %}oral argument{% endif %} alert &mdash; <span class="gray">"{{ alert.name }}"</span></h3>
+      <form id="confirmation" action="" method="post">{% csrf_token %}
+        <div class="form-group">
+          {{ form.hcaptcha }}
+          {% if form.hcaptcha.errors %}
+            <p class="help-block">
+              {% for error in form.hcaptcha.errors %}
+                {{ error|escape }}
+              {% endfor %}
+            </p>
+          {% endif %}
+        </div>
+        <button class="h-captcha btn btn-primary btn-lg"
+                data-sitekey="{{ h_captcha_site_key }}"
+                data-callback="onSubmit"
+                type="submit"
+                >Unsubscribe</button>
+      </form>
+    </div>
+    {% include "includes/docket_alert_donation.html" %}
+  </div>
+{% endblock %}

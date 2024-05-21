@@ -3,7 +3,7 @@
 import environ
 from django.http import UnreadablePostError
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
@@ -14,7 +14,7 @@ def skip_unreadable_post(record):
         exc_value = record.exc_info[1]
         if isinstance(exc_value, UnreadablePostError):
             cache_key = "settings.unreadable_post_error"
-            r = make_redis_interface("CACHE")
+            r = get_redis_interface("CACHE")
             if r.get(cache_key) is not None:
                 # We've seen this recently; let it through; hitting it a lot
                 # might mean something.

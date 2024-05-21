@@ -6,6 +6,7 @@ from typing import Set
 import pytz
 import requests
 from django.conf import settings
+from django.db.models import Q
 from requests import RequestException
 from simplejson import JSONDecodeError
 
@@ -21,7 +22,7 @@ def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
     return set(
         Docket.objects.filter(
             date_filed__isnull=True,
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             court__jurisdiction__in=[
                 Court.FEDERAL_DISTRICT,
                 Court.FEDERAL_BANKRUPTCY,
@@ -85,7 +86,7 @@ def get_docket_ids() -> Set[int]:
         ) as e:
             logger.warning(
                 "iQuery scraper was unable to get results from Plausible. Got "
-                "exception: %s" % e
+                f"exception: {e}"
             )
         else:
             # Filter to docket pages with some amount of traffic
@@ -103,9 +104,18 @@ def get_docket_ids() -> Set[int]:
                     docket_ids.add(match.group(1))
 
     # Add in docket IDs that have docket alerts, tags, or notes
-    docket_ids.update(DocketAlert.objects.values_list("docket", flat=True))
+    docket_ids.update(
+        DocketAlert.objects.values_list("docket", flat=True)
+        .filter(alert_type=DocketAlert.SUBSCRIPTION)
+        .distinct("docket")
+    )
+    one_year_ago = datetime.today() - timedelta(days=365)
     docket_ids.update(
         Note.objects.exclude(docket_id=None)
+        .filter(
+            Q(date_created__gt=one_year_ago)
+            | Q(date_modified__gt=one_year_ago)
+        )
         .distinct("docket_id")
         .values_list("docket_id", flat=True)
     )
@@ -114,10 +124,13 @@ def get_docket_ids() -> Set[int]:
             "docket_id", flat=True
         )
     )
+    one_week_ago = datetime.today() - timedelta(days=7)
     docket_ids.update(
         Docket.objects.filter(
-            case_name__isnull=True,
-            source__in=Docket.RECAP_SOURCES,
+            Q(date_created__gt=one_week_ago)
+            | Q(date_modified__gt=one_week_ago),
+            case_name="",
+            source__in=Docket.RECAP_SOURCES(),
             court__jurisdiction__in=[
                 Court.FEDERAL_DISTRICT,
                 Court.FEDERAL_BANKRUPTCY,
@@ -154,7 +167,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         do_missing_date_filed = options["do_missing_date_filed"]
         if do_missing_date_filed:
             docket_ids = get_docket_ids_missing_info(do_missing_date_filed)
@@ -167,12 +180,13 @@ class Command(VerboseCommand):
         )
         # Shuffle the dockets to make sure we don't hit one district all at
         # once.
-        random.shuffle(list(docket_ids))
+        docket_ids_list = list(docket_ids)
+        random.shuffle(docket_ids_list)
         queue = options["queue"]
         throttle = CeleryThrottle(queue_name=queue)
         now = datetime.now().date()
         include_old_terminated = options["include_old_terminated"]
-        for i, docket_id in enumerate(docket_ids):
+        for i, docket_id in enumerate(docket_ids_list):
             throttle.maybe_wait()
 
             if i % 500 == 0:

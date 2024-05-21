@@ -10,9 +10,11 @@ from unittest.mock import patch
 import eyecite
 import pytest
 from asgiref.sync import async_to_sync
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, now
+from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from juriscraper.lib.string_utils import harmonize, titlecase
 
@@ -25,32 +27,28 @@ from cl.corpus_importer.factories import (
     RssDocketDataFactory,
     RssDocketEntryDataFactory,
 )
+from cl.corpus_importer.import_columbia.columbia_utils import fix_xml_tags
 from cl.corpus_importer.import_columbia.parse_opinions import (
     get_state_court_object,
 )
 from cl.corpus_importer.management.commands.clean_up_mis_matched_dockets import (
     find_and_fix_mis_matched_dockets,
 )
+from cl.corpus_importer.management.commands.columbia_merge import (
+    process_cluster,
+)
 from cl.corpus_importer.management.commands.harvard_merge import (
-    ClusterSourceException,
-    DocketSourceException,
     combine_non_overlapping_data,
     fetch_non_harvard_data,
-    merge_case_names,
     merge_cluster_dates,
-    merge_docket_numbers,
-    merge_judges,
     merge_opinion_clusters,
-    merge_strings,
     update_cluster_source,
     update_docket_source,
 )
 from cl.corpus_importer.management.commands.harvard_opinions import (
     clean_body_content,
-    compare_documents,
     parse_harvard_opinions,
     validate_dt,
-    winnow_case_name,
 )
 from cl.corpus_importer.management.commands.normalize_judges_opinions import (
     normalize_authors_in_opinions,
@@ -61,10 +59,23 @@ from cl.corpus_importer.management.commands.troller_bk import (
     log_added_items_to_redis,
     merge_rss_data,
 )
-from cl.corpus_importer.tasks import generate_ia_json
-from cl.corpus_importer.utils import get_start_of_quarter
+from cl.corpus_importer.tasks import (
+    generate_ia_json,
+    get_and_save_free_document_report,
+)
+from cl.corpus_importer.utils import (
+    ClusterSourceException,
+    DocketSourceException,
+    compare_documents,
+    get_start_of_quarter,
+    merge_case_names,
+    merge_docket_numbers,
+    merge_judges,
+    merge_strings,
+    winnow_case_name,
+)
 from cl.lib.pacer import process_docket_data
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.people_db.factories import PersonWithChildrenFactory, PositionFactory
 from cl.people_db.lookup_utils import (
@@ -75,6 +86,7 @@ from cl.people_db.lookup_utils import (
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
 from cl.recap.models import UPLOAD_TYPE
 from cl.recap_rss.models import RssItemCache
+from cl.scrapers.models import PACERFreeDocumentRow
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
@@ -98,6 +110,9 @@ from cl.search.models import (
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.fakes import FakeFreeOpinionReport
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class JudgeExtractionTest(SimpleTestCase):
@@ -471,6 +486,33 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.city, "Seattle")
         self.assertEqual(godfrey_llp.state, "WA")
 
+    @patch(
+        "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
+        return_value=None,
+    )
+    def test_get_and_save_free_document_report(self, mock_cookies) -> None:
+        """Test the retrieval and storage of free document report data."""
+
+        with patch(
+            "cl.corpus_importer.tasks.FreeOpinionReport",
+            new=FakeFreeOpinionReport,
+        ):
+            get_and_save_free_document_report(
+                "cand", now().date(), now().date()
+            )
+
+        row = PACERFreeDocumentRow.objects.all()
+        self.assertEqual(row.count(), 1)
+        self.assertEqual(row[0].court_id, "cand")
+        self.assertEqual(row[0].docket_number, "5:18-ap-07075")
+        self.assertTrue(row[0].description)
+        self.assertTrue(row[0].date_filed)
+        self.assertTrue(row[0].document_number)
+        self.assertTrue(row[0].nature_of_suit)
+        self.assertTrue(row[0].pacer_case_id)
+        self.assertTrue(row[0].pacer_doc_id)
+        self.assertTrue(row[0].pacer_seq_no)
+
 
 class GetQuarterTest(SimpleTestCase):
     """Can we properly figure out when the quarter that we're currently in
@@ -602,7 +644,9 @@ class HarvardTests(TestCase):
         :param case_law: Case object
         :return: First citation found
         """
-        cites = eyecite.get_citations(case_law["citations"][0]["cite"])
+        cites = eyecite.get_citations(
+            case_law["citations"][0]["cite"], tokenizer=HYPERSCAN_TOKENIZER
+        )
         cite = Citation.objects.get(
             volume=cites[0].groups["volume"],
             reporter=cites[0].groups["reporter"],
@@ -1137,9 +1181,15 @@ class TrollerBKTests(TestCase):
             pacer_case_id="12524",
         )
 
+    @classmethod
+    def restart_troller_log(cls):
+        r = get_redis_interface("STATS")
+        key = r.keys("troller_bk:log")
+        if key:
+            r.delete(*key)
+
     def setUp(self) -> None:
-        self.r = make_redis_interface("STATS")
-        self.r.flushdb()
+        self.restart_troller_log()
 
     def test_merge_district_rss_before_2018(self):
         """1 Test merge district RSS file before 2018-4-20 into an existing
@@ -1801,7 +1851,7 @@ class TrollerBKTests(TestCase):
         self.assertEqual(last_values["total_rds"], 180)
         self.assertEqual(last_values["last_line"], 100)
 
-        self.r.flushdb()
+        self.restart_troller_log()
 
     def test_merge_mapped_court_rss_before_2018(self):
         """Merge a court mapped RSS file before 2018-4-20
@@ -2542,7 +2592,11 @@ class HarvardMergerTests(TestCase):
         """Can we choose the correct docket number"""
         docket = DocketFactory(docket_number="17-3000")
         cluster = OpinionClusterWithParentsFactory(id=4, docket=docket)
-        merge_docket_numbers(cluster, "Master Docket No. 17-3000L")
+        updated_docket_number = merge_docket_numbers(
+            cluster, "Master Docket No. 17-3000L"
+        )
+        docket.docket_number = updated_docket_number
+        docket.save()
         docket.refresh_from_db()
         self.assertEqual(docket.docket_number, "Master Docket 17-3000L")
 
@@ -2861,7 +2915,12 @@ class HarvardMergerTests(TestCase):
                 case_name_full=item[1].get("cl_case_name_full"),
             )
 
-            data_to_update = merge_case_names(cluster, item[0])
+            data_to_update = merge_case_names(
+                cluster,
+                item[0],
+                case_name_key="name_abbreviation",
+                case_name_full_key="name",
+            )
 
             self.assertEqual(
                 data_to_update.get("case_name", ""),
@@ -2907,7 +2966,11 @@ class HarvardMergerTests(TestCase):
         self.assertEqual(docket_1.source, Docket.HARVARD_AND_RECAP)
 
         with self.assertRaises(DocketSourceException):
-            docket_2 = DocketFactory(source=Docket.COLUMBIA_AND_RECAP)
+            # Raise DocketSourceException if the initial source already contains
+            # Harvard.
+            docket_2 = DocketFactory(
+                source=Docket.RECAP_AND_SCRAPER_AND_HARVARD
+            )
             cluster_2 = OpinionClusterWithParentsFactory(docket=docket_2)
             update_docket_source(cluster_2)
             docket_2.refresh_from_db()
@@ -2960,7 +3023,7 @@ class HarvardMergerTests(TestCase):
 
         test_pairs = [
             (
-                # Test if we are tripped up by mulitple judge names in tag
+                # Test if we are tripped up by multiple judge names in tag
                 "ARNOLD, Circuit Judge, with whom BRIGHT, Senior Circuit Judge, and McMILLIAN and MAGILL, Circuit Judges, join,:",
                 "Arnold",
             ),
@@ -3039,7 +3102,7 @@ class HarvardMergerTests(TestCase):
 
         test_pairs = [
             (
-                # Test if we are tripped up by mulitple judge names in tag
+                # Test if we are tripped up by multiple judge names in tag
                 "ARNOLD, Circuit Judge, with whom BRIGHT, Senior Circuit Judge, and McMILLIAN and MAGILL, Circuit Judges, join,:",
                 ["ARNOLD", "BRIGHT", "MAGILL", "McMILLIAN"],
             ),
@@ -3120,3 +3183,149 @@ class HarvardMergerTests(TestCase):
             "solicitor, John A. Boyhin, solicitor-general,. Durwood T. Bye, "
             "contra.",
         )
+
+
+class ColumbiaMergerTests(TestCase):
+    def setUp(self):
+        """Setup columbia merger tests"""
+        self.read_xml_to_soup_patch = patch(
+            "cl.corpus_importer.management.commands.columbia_merge.read_xml_to_soup"
+        )
+        self.read_xml_to_soup_func = self.read_xml_to_soup_patch.start()
+
+    def tearDown(self) -> None:
+        """Tear down patches and remove added objects"""
+        Docket.objects.all().delete()
+        self.read_xml_to_soup_patch.stop()
+
+    def test_merger(self):
+        """Can we identify opinions correctly even when they are slightly
+        different"""
+
+        # Xml content with bad tags </footnote_body></block_quote> instead of
+        # </block_quote></footnote_body> and unpublished opinion
+        case_xml = """<opinion unpublished=true>
+<reporter_caption>
+<center>
+MENDOZA v. STATE,
+<citation>61 S.W.3d 498</citation>
+(Tex.App.-San Antonio [4th Dist.] 2001)
+</center>
+</reporter_caption>
+<caption>
+<center>PIOQUINTO MENDOZA, III, Appellant, v. THE STATE OF TEXAS, Appellee.</center>
+</caption>
+<docket>
+<center>No. 04-00-00521-CR.</center>
+</docket>
+<court>
+<center>Court of Appeals of Texas, Fourth District, San Antonio.</center>
+</court>
+<date>
+<center>Delivered and Filed: July 25, 2001.</center>
+<center>Rehearing Overruled August 21, 2001.</center>
+<center>Discretionary Review Granted February 13, 2002.</center>
+</date>
+<posture>
+Appeal from the 49th Judicial District Court, Webb County, Texas, Trial Court No. 99-CRN3-0088-DI, Honorable Manuel Flores, Judge Presiding
+<footnote_reference>[fn1]</footnote_reference>
+.
+<footnote_body>
+<footnote_number>[fn1]</footnote_number>
+Judge Flores presided over the pre-trial hearings. The Honorable Peter Michael Curry, Visiting Judge, presided over the trial on the merits.
+</footnote_body>
+<page_number>Page 499</page_number>
+</posture>
+<opinion_text>
+[EDITORS' NOTE: THIS PAGE CONTAINS HEADNOTES. HEADNOTES ARE NOT AN OFFICIAL PRODUCT OF THE COURT, THEREFORE THEY ARE NOT DISPLAYED.]
+<page_number>Page 500</page_number>
+</opinion_text>
+<attorneys> Fernando Sanchez, Law Offices of Fernando Sanchez, Laredo, for appellant. Oscar J. Hale, Assistant District Attorney, Laredo, for appellee. </attorneys>
+<panel> Sitting: TOM RICKHOFF, ALMA L. LOPEZ, and SARAH B. DUNCAN, Justices. </panel>
+<opinion_byline> Opinion by ALMA L. LOPEZ, Justice. </opinion_byline>
+<opinion_text>
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed dui interdum feugiat.
+<footnote_body>
+<footnote_number>[fn1]</footnote_number>
+<block_quote>Footnote sample
+</footnote_body></block_quote>
+</opinion_text>
+</opinion>
+        """
+
+        fixed_case_xml = fix_xml_tags(case_xml)
+
+        self.read_xml_to_soup_func.return_value = BeautifulSoup(
+            fixed_case_xml, "lxml"
+        )
+
+        # Factory create cluster, data from cluster id: 1589121
+        cluster = OpinionClusterFactoryMultipleOpinions(
+            case_name="Mendoza v. State",
+            case_name_full="Pioquinto MENDOZA, III, Appellant, v. the STATE of Texas, "
+            "Appellee",
+            date_filed=date(2002, 2, 13),
+            attorneys="Fernando Sanchez, Law Offices of Fernando Sanchez, Laredo, "
+            "for appellant., Oscar J. Hale, Assistant District Attorney, Laredo, "
+            "for appellee.",
+            other_dates="Rehearing Overruled Aug. 21, 2001., Discretionary Review "
+            "Granted Feb. 13, 2002.",
+            posture="",
+            judges="Alma, Duncan, Lopez, Rickhoff, Sarah, Tom",
+            source=SOURCES.LAWBOX_M_HARVARD,
+            docket=DocketFactory(source=Docket.HARVARD),
+            sub_opinions__data=[
+                {
+                    "type": "010combined",
+                    "xml_harvard": "<p>Lorem ipsum dolor sit amet, consectetur "
+                    "adipiscing elit. Nullam quis elit sed dui "
+                    "interdum feugiat.</p>",
+                    "html_columbia": "",
+                    "author_str": "Lopez",
+                },
+            ],
+        )
+
+        # cluster posture is empty
+        self.assertEqual(cluster.posture, "")
+
+        # html_columbia is empty
+        self.assertEqual(cluster.sub_opinions.all().first().html_columbia, "")
+
+        # Merge cluster
+        process_cluster(cluster.id, "/columbia/fake_filepath.xml")
+
+        # Reload the object
+        cluster.refresh_from_db()
+
+        # Check if merged metadata is updated correctly
+        self.assertEqual(
+            cluster.posture,
+            "Appeal from the 49th Judicial District Court, Webb County, Texas, "
+            "Trial Court No. 99-CRN3-0088-DI, Honorable Manuel Flores, "
+            "Judge Presiding [fn1] . [fn1] Judge Flores presided over the pre-trial "
+            "hearings. The Honorable Peter Michael Curry, Visiting Judge, presided "
+            "over the trial on the merits. Page 499",
+        )
+        # check if we saved opinion content in html_columbia field
+        self.assertEqual(
+            cluster.sub_opinions.all().first().html_columbia,
+            """<p>[EDITORS' NOTE: THIS PAGE CONTAINS HEADNOTES. HEADNOTES ARE NOT AN OFFICIAL PRODUCT OF THE COURT, THEREFORE THEY ARE NOT DISPLAYED.]
+ <span class="star-pagination">*Page 500</span> </p>
+<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed dui interdum feugiat.
+<footnote_body>
+<sup id="op0-fn1"><a href="#op0-ref-fn1">1</a></sup>
+<blockquote>Footnote sample
+</blockquote></footnote_body></p>""",
+        )
+
+        # Ensure the cluster is not merged again if it has already been merged
+        # and the COLUMBIA source was assigned.
+        with patch(
+            "cl.corpus_importer.management.commands.columbia_merge.logger"
+        ) as mock_logger:
+            # Merge cluster
+            process_cluster(cluster.id, "/columbia/fake_filepath.xml")
+            mock_logger.info.assert_called_with(
+                f"Cluster id: {cluster.id} already merged"
+            )

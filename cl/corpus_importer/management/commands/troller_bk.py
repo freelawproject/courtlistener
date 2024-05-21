@@ -24,7 +24,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import map_pacer_to_cl_id
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import S3PrivateUUIDStorage
 from cl.lib.string_utils import trunc
 from cl.lib.timezone_helpers import localize_date_and_time
@@ -266,9 +266,9 @@ async def merge_rss_data(
     dockets_to_create: list[Docket] = []
     unique_dockets: dict[str, Any] = {}
     des_to_add_existing_docket: list[tuple[int, dict[str, Any]]] = []
-    des_to_add_no_existing_docket: DefaultDict[
-        str, list[dict[str, Any]]
-    ] = defaultdict(list)
+    des_to_add_no_existing_docket: DefaultDict[str, list[dict[str, Any]]] = (
+        defaultdict(list)
+    )
     for docket in feed_data:
         skip_or_break = await check_for_early_termination(court_id, docket)
         if skip_or_break == "continue":
@@ -343,10 +343,10 @@ async def merge_rss_data(
             try:
                 await d.asave(update_fields=["source"])
                 await sync_to_async(add_bankruptcy_data_to_docket)(d, docket)
-            except (DataError, IntegrityError) as exc:
+            except (DataError, IntegrityError):
                 # Trouble. Log and move on
                 logger.warn(
-                    f"Got DataError or IntegrityError while saving docket."
+                    "Got DataError or IntegrityError while saving docket."
                 )
 
     rds_created_pks, dockets_created = await sync_to_async(do_bulk_additions)(
@@ -440,7 +440,7 @@ def log_added_items_to_redis(
     :return: The data logged to redis.
     """
 
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
     log_key = "troller_bk:log"
     pipe.hgetall(log_key)
@@ -663,7 +663,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         if not options["file"]:
             raise argparse.ArgumentError(
                 "The 'file' argument is required for that action."

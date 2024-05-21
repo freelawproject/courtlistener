@@ -1,4 +1,4 @@
-def convert_size_to_bytes(size_str):
+def convert_size_to_bytes(size_str: str) -> int:
     """Convert human filesizes to bytes.
 
     Special cases:

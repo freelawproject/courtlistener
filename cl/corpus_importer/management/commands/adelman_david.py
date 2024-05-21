@@ -136,6 +136,6 @@ class Command(VerboseCommand, CommandUtils):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.ensure_file_ok(options["input_file"])
         download_dockets(options)

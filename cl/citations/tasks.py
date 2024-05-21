@@ -6,6 +6,7 @@ from django.db.models import F
 from django.db.models.query import QuerySet
 from eyecite import get_citations
 from eyecite.models import CitationBase
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.celery_init import app
 from cl.citations.annotate_citations import (
@@ -21,22 +22,23 @@ from cl.citations.match_citations import (
     do_resolve_citations,
 )
 from cl.citations.parenthetical_utils import create_parenthetical_groups
+from cl.citations.recap_citations import store_recap_citations
 from cl.citations.score_parentheticals import parenthetical_score
-from cl.lib.types import MatchedResourceType, SupportedCitationType
+from cl.citations.types import MatchedResourceType, SupportedCitationType
 from cl.search.models import (
     Opinion,
     OpinionCluster,
     OpinionsCited,
-    OpinionsCitedByRECAPDocument,
     Parenthetical,
     RECAPDocument,
 )
-from cl.search.tasks import add_items_to_solr
+from cl.search.tasks import add_items_to_solr, index_related_cites_fields
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
 # "22 U.S. 44, 46 (13 Atl. 33)" would have a distance of 6.
 PARALLEL_DISTANCE = 6
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 @app.task
@@ -145,7 +147,9 @@ def store_opinion_citations_and_update_parentheticals(
     get_and_clean_opinion_text(opinion)
 
     # Extract the citations from the opinion's text
-    citations: List[CitationBase] = get_citations(opinion.cleaned_text)
+    citations: List[CitationBase] = get_citations(
+        opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+    )
 
     # If no citations are found, then there is nothing else to do for now.
     if not citations:
@@ -174,13 +178,11 @@ def store_opinion_citations_and_update_parentheticals(
         "pk", flat=True
     )
 
-    opinion_ids_to_update = set(
-        [
-            o.pk
-            for o in citation_resolutions.keys()
-            if o.pk not in currently_cited_opinions
-        ]
-    )
+    opinion_ids_to_update = {
+        o.pk
+        for o in citation_resolutions.keys()
+        if o.pk not in currently_cited_opinions
+    }
 
     clusters_to_update_par_groups_for = set()
     parentheticals: List[Parenthetical] = []
@@ -252,49 +254,10 @@ def store_opinion_citations_and_update_parentheticals(
         # Save all the changes to the citing opinion (send to solr later)
         opinion.save(index=False)
 
-
-def store_recap_citations(document: RECAPDocument) -> None:
-    """
-    Identify citations from federal filings to opinions.
-
-    :param document: A search.RECAPDocument object.
-
-    :return: None
-    """
-
-    get_and_clean_opinion_text(
-        document
-    )  # even though this function assumes the input is an opinion, it will work for RECAP documents.
-
-    # Extract the citations from the document's text
-    citations: List[CitationBase] = get_citations(document.cleaned_text)
-
-    # If no citations are found, then there is nothing else to do for now.
-    if not citations:
-        return
-
-    # Resolve all those different citation objects to Opinion objects,
-    # using a variety of heuristics.
-    citation_resolutions: Dict[
-        MatchedResourceType, List[SupportedCitationType]
-    ] = do_resolve_citations(citations, document)
-
-    # Delete the unmatched citations
-    citation_resolutions.pop(NO_MATCH_RESOURCE, None)
-
-    with transaction.atomic():
-        # delete existing citation entries
-        OpinionsCitedByRECAPDocument.objects.filter(
-            citing_document=document.pk
-        ).delete()
-
-        objects_to_create = [
-            OpinionsCitedByRECAPDocument(
-                citing_document_id=document.pk,
-                cited_opinion_id=opinion_object.pk,
-                depth=len(cits),
-            )
-            for opinion_object, cits in citation_resolutions.items()
-        ]
-
-        OpinionsCitedByRECAPDocument.objects.bulk_create(objects_to_create)
+    # Update changes in ES.
+    cluster_ids_to_update = list(
+        opinion_clusters_to_update.values_list("id", flat=True)
+    )
+    index_related_cites_fields.delay(
+        OpinionsCited.__name__, opinion.pk, cluster_ids_to_update
+    )

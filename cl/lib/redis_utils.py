@@ -4,11 +4,11 @@ from django.conf import settings
 from redis import Redis
 
 
-def make_redis_interface(
+def get_redis_interface(
     db_name: str,
     decode_responses: bool = True,
 ) -> Redis:
-    """Create a redis connection object
+    """Pick an existing redis connection from the global object.
 
     :param db_name: The name of the database to use, as defined in our settings
     :param decode_responses: Whether to decode responses with utf-8. If you're
@@ -16,12 +16,7 @@ def make_redis_interface(
     it.
     :return Redis interface using django settings
     """
-    return Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=cast(int, settings.REDIS_DATABASES[db_name]),  # type: ignore
-        decode_responses=decode_responses,
-    )
+    return settings.REDIS_CLIENTS[f"{db_name}-{decode_responses}"]
 
 
 def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
@@ -42,13 +37,13 @@ def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
     possibility of a race condition.
 
     :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to make_redis_interface.
+    can be handed off to get_redis_interface.
     :param key: The key to create
     :param ttl: How long the key should live
     :return: True if the key was created else False
     """
     if isinstance(r, str):
-        r = make_redis_interface(r)
+        r = get_redis_interface(r)
 
     currently_enqueued = bool(r.get(key))
     if currently_enqueued:
@@ -69,10 +64,10 @@ def delete_redis_semaphore(r: Union[str, Redis], key: str) -> None:
     """Delete a redis key
 
     :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to make_redis_interface.
+    can be handed off to get_redis_interface.
     :param key: The key to delete
     :return: None
     """
     if isinstance(r, str):
-        r = make_redis_interface(r)
+        r = get_redis_interface(r)
     r.delete(key)

@@ -3,6 +3,9 @@ set -e
 
 echo "Installing utilities"
 
+# Make sure the sudo package is installed
+apt install -y sudo
+
 # Set up Sentry
 curl -sL https://sentry.io/get-cli/ | bash
 eval "$(sentry-cli bash-hook)"
@@ -11,7 +14,7 @@ eval "$(sentry-cli bash-hook)"
 apt install -y awscli gnupg
 
 # Install latest version of pg_dump (else we get an error about version mismatch
-echo "deb http://apt.postgresql.org/pub/repos/apt bullseye-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+echo "deb http://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 curl --silent 'https://www.postgresql.org/media/keys/ACCC4CF8.asc' |  apt-key add -
 apt-get update
 apt-get install -y postgresql-client

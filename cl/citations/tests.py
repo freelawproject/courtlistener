@@ -1,10 +1,17 @@
 import itertools
+import json
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from http import HTTPStatus
 from typing import List, Tuple
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+import time_machine
+from asgiref.sync import async_to_sync, sync_to_async
+from django.contrib.auth.hashers import make_password
+from django.core.cache import cache as default_cache
 from django.core.management import call_command
+from django.test import override_settings
 from django.urls import reverse
 from eyecite import get_citations
 from eyecite.test_factories import (
@@ -12,9 +19,10 @@ from eyecite.test_factories import (
     id_citation,
     journal_citation,
     law_citation,
-    nonopinion_citation,
     supra_citation,
+    unknown_citation,
 )
+from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
 from lxml import etree
 
@@ -43,11 +51,15 @@ from cl.citations.match_citations import (
 )
 from cl.citations.score_parentheticals import parenthetical_score
 from cl.citations.tasks import (
-    find_citations_and_parantheticals_for_recap_documents,
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
-from cl.lib.test_helpers import IndexedSolrTestCase, TestCase
+from cl.lib.test_helpers import (
+    CourtTestCase,
+    IndexedSolrTestCase,
+    PeopleTestCase,
+    SearchTestCase,
+)
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -58,7 +70,7 @@ from cl.search.factories import (
     RECAPDocumentFactory,
 )
 from cl.search.models import (
-    Citation,
+    SEARCH_TYPES,
     Opinion,
     OpinionCluster,
     OpinionsCited,
@@ -67,7 +79,10 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.tests.cases import SimpleTestCase
+from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
+from cl.users.factories import UserProfileWithParentsFactory
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class CitationTextTest(SimpleTestCase):
@@ -187,7 +202,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -230,8 +247,7 @@ class CitationTextTest(SimpleTestCase):
              'like</p></div>',
              '<div><p>possess any peculiar knowledge of the mere policy of '
              'public measures." <i><span class="citation no-link">Ibid.'
-             '</span></i> Gerry of Massachusetts like</p></div>'
-            ),
+             '</span></i> Gerry of Massachusetts like</p></div>'),
         ]
 
         # fmt: on
@@ -243,7 +259,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(html=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -294,7 +312,9 @@ class CitationTextTest(SimpleTestCase):
             ):
                 opinion = Opinion(plain_text=s)
                 get_and_clean_opinion_text(opinion)
-                citations = get_citations(opinion.cleaned_text)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
 
                 # Stub out fake output from do_resolve_citations(), since the
                 # purpose of this test is not to test that. We just need
@@ -315,10 +335,12 @@ class CitationTextTest(SimpleTestCase):
                 )
 
 
-class RECAPDocumentObjectTest(IndexedSolrTestCase):
+class RECAPDocumentObjectTest(ESIndexTestCase, TestCase):
     # pass
     @classmethod
     def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         cls.recap_doc = RECAPDocumentFactory.create(
             plain_text="In Fisher v. SD Protection Inc., 948 F.3d 593 (2d Cir. 2020), the Second Circuit held that in the context of settlement of FLSA and NYLL cases, which must be approved by the trial court in accordance with Cheeks v. Freeport Pancake House, Inc., 796 F.3d 199 (2d Cir. 2015), the district court abused its discretion in limiting the amount of recoverable fees to a percentage of the recovery by the successful plaintiffs. But also: sdjnfdsjnk. Fisher, 948 F.3d at 597.",
             ocr_status=RECAPDocument.OCR_UNNECESSARY,
@@ -350,8 +372,13 @@ class RECAPDocumentObjectTest(IndexedSolrTestCase):
                 date_filed=date(2015, 1, 1),
             ),
         )
-
-        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
 
     def test_opinionscited_recap_creation(self):
         """
@@ -382,13 +409,15 @@ class RECAPDocumentObjectTest(IndexedSolrTestCase):
                 self.assertEqual(citation_obj.depth, depth)
 
 
-class CitationObjectTest(IndexedSolrTestCase):
+class CitationObjectTest(ESIndexTestCase, TestCase):
     fixtures: List = []
 
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         # Courts
-        court_scotus = CourtFactory(id="scotus")
+        cls.court_scotus = CourtFactory(id="scotus")
         court_ca1 = CourtFactory(id="ca1")
 
         # Citation 1
@@ -397,7 +426,7 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter="U.S.",
             page="1",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Foo v. Bar",
                 date_filed=date(
                     2000, 1, 1
@@ -429,7 +458,7 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter="U.S.",
             page="50",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Lorem v. Ipsum",
             ),
         )
@@ -440,7 +469,7 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter="U.S.",
             page="999",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Abcdef v. Ipsum",
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
@@ -456,15 +485,95 @@ class CitationObjectTest(IndexedSolrTestCase):
             reporter="U.S.",
             page="123",
             cluster=OpinionClusterFactoryWithChildrenAndParents(
-                docket=DocketFactory(court=court_scotus),
+                docket=DocketFactory(court=cls.court_scotus),
                 case_name="Bush v. Gore",
                 date_filed=date.today(),  # Must be later than any cited opinion
                 sub_opinions=RelatedFactory(
                     OpinionWithChildrenFactory,
                     factory_related_name="cluster",
-                    plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
+                    plain_text="America v. Maxwell, Bush v. John, Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah. Asdf asdf Qwerty v. Uiop 2 F.3d 2, 555. Also check out Foo, 1 U.S. at 99 (holding that crime is illegal). Then let's cite Qwerty, supra, at 666 (noting that CourtListener is a great tool and everyone should use it). See also Foo, supra, at 101 as well. Another full citation is Lorem v. Ipsum 1 U. S. 50. Quoting Qwerty, “something something”, 2 F.3d 2, at 59. This case is similar to Fake, supra, and Qwerty supra, as well. This should resolve to the foregoing. Ibid. This should also convert appropriately, see Id., at 57. This should fail to resolve because the reporter and citation is ambiguous, 1 U. S., at 51. However, this should succeed, Lorem, 1 U.S., at 52.",
                 ),
             ),
+        )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    def test_case_name_and_reverse_match_query(self) -> None:
+        """Test refining match by case_name_query and reverse_match if full
+        citations results are > 1
+        """
+        # Create 3 citations that match full_citation
+        for i in range(3):
+            with self.captureOnCommitCallbacks(execute=True):
+                citation = CitationWithParentsFactory.create(
+                    volume="3",
+                    reporter="U.S.",
+                    page="888",
+                    cluster=OpinionClusterFactoryWithChildrenAndParents(
+                        docket=DocketFactory(court=self.court_scotus),
+                        case_name="Obama v. Clinton",
+                        date_filed=date.today(),
+                        # Must be later than any cited opinion
+                        sub_opinions=RelatedFactory(
+                            OpinionWithChildrenFactory,
+                            factory_related_name="cluster",
+                            plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah.",
+                        ),
+                    ),
+                )
+
+        # Create the expected match Citation.
+        with self.captureOnCommitCallbacks(execute=True):
+            match_citation = CitationWithParentsFactory.create(
+                volume="3",
+                reporter="U.S.",
+                page="888",
+                cluster=OpinionClusterFactoryWithChildrenAndParents(
+                    docket=DocketFactory(court=self.court_scotus),
+                    case_name="America v. Maxwell",
+                    date_filed=date.today(),
+                    # Must be later than any cited opinion
+                    sub_opinions=RelatedFactory(
+                        OpinionWithChildrenFactory,
+                        factory_related_name="cluster",
+                        plain_text="Blah blah Foo v. Bar 1 U.S. 1, 77 blah blah.",
+                    ),
+                ),
+            )
+
+        full_citation = case_citation(
+            volume="3",
+            reporter="U.S.",
+            page="888",
+            index=1,
+            reporter_found="U.S.",
+            metadata={
+                "court": "scotus",
+                "defendant": "Maxwell",
+                "plaintiff": "Brown",
+            },
+        )
+        citing_opinion = Opinion.objects.get(
+            cluster__pk=self.citation5.cluster_id
+        )
+        match_opinion = Opinion.objects.get(
+            cluster__pk=match_citation.cluster_id
+        )
+
+        # Compare expected_resolutions.
+        citation_resolutions = do_resolve_citations(
+            [full_citation], citing_opinion
+        )
+        expected_resolutions = {match_opinion: [full_citation]}
+        self.assertEqual(
+            citation_resolutions,
+            expected_resolutions,
+            msg=f"\n{citation_resolutions}\n\n    !=\n\n{expected_resolutions}",
         )
 
     def test_citation_resolution(self) -> None:
@@ -577,7 +686,7 @@ class CitationObjectTest(IndexedSolrTestCase):
         )
 
         id = id_citation(index=1)
-        non = nonopinion_citation(index=1, source_text="§99")
+        unknown = unknown_citation(index=1, source_text="§99")
         journal = journal_citation(reporter="Minn. L. Rev.")
         law = law_citation(
             source_text="1 Stat. 2",
@@ -656,10 +765,10 @@ class CitationObjectTest(IndexedSolrTestCase):
                 {opinion1: [full1], NO_MATCH_RESOURCE: [full_na, id]},
             ),
             # Test resolving an Id. citation when the previous citation is to a
-            # non-opinion document. Since we can't match those documents (yet),
+            # unknown document. Since we can't match those documents (yet),
             # we expect the Id. citation to also not be matched.
             (
-                [full1, non, id],
+                [full1, unknown, id],
                 {opinion1: [full1]},
             ),
             # Test resolving an Id. citation when it is the first citation
@@ -688,7 +797,6 @@ class CitationObjectTest(IndexedSolrTestCase):
                 citation_resolutions = do_resolve_citations(
                     citations, citing_opinion
                 )
-
                 self.assertEqual(
                     citation_resolutions,
                     expected_resolutions,
@@ -699,7 +807,9 @@ class CitationObjectTest(IndexedSolrTestCase):
         """Make sure that a citation like 1 Wheat 9 doesn't match 9 Wheat 1"""
         # citation2a is 9 F. 1, so we expect no results.
         citation_str = "1 F. 9 (1795)"
-        citation = get_citations(citation_str)[0]
+        citation = get_citations(citation_str, tokenizer=HYPERSCAN_TOKENIZER)[
+            0
+        ]
         results = resolve_fullcase_citation(citation)
         self.assertEqual(NO_MATCH_RESOURCE, results)
 
@@ -805,7 +915,21 @@ class CitationObjectTest(IndexedSolrTestCase):
         )
 
 
-class CitationFeedTest(IndexedSolrTestCase):
+class CitationFeedTest(
+    ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
     def _tree_has_content(self, content, expected_count):
         xml_tree = etree.fromstring(content)
         count = len(
@@ -815,9 +939,9 @@ class CitationFeedTest(IndexedSolrTestCase):
         )
         self.assertEqual(count, expected_count)
 
-    def test_basic_cited_by_feed(self) -> None:
+    async def test_basic_cited_by_feed(self) -> None:
         """Can we load the cited-by feed and does it have content?"""
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("search_feed", args=["search"]),
             {"q": f"cites:{self.opinion_1.pk}"},
         )
@@ -826,18 +950,18 @@ class CitationFeedTest(IndexedSolrTestCase):
         expected_count = 1
         self._tree_has_content(r.content, expected_count)
 
-    def test_unicode_content(self) -> None:
+    async def test_unicode_content(self) -> None:
         """Does the citation feed continue working even when we have a unicode
         case name?
         """
         new_case_name = (
             "MAC ARTHUR KAMMUELLER, \u2014 v. LOOMIS, FARGO & " "CO., \u2014"
         )
-        OpinionCluster.objects.filter(pk=self.opinion_cluster_1.pk).update(
-            case_name=new_case_name
-        )
+        await OpinionCluster.objects.filter(
+            pk=self.opinion_cluster_1.pk
+        ).aupdate(case_name=new_case_name)
 
-        r = self.client.get(
+        r = await self.async_client.get(
             reverse("search_feed", args=["search"]),
             {"q": f"cites:{self.opinion_1.pk}"},
         )
@@ -847,13 +971,15 @@ class CitationFeedTest(IndexedSolrTestCase):
         self._tree_has_content(r.content, expected_count)
 
 
-class CitationCommandTest(IndexedSolrTestCase):
+class CitationCommandTest(ESIndexTestCase, TestCase):
     """Test a variety of the ways that find_citations can be called."""
 
     fixtures: List = []
 
     @classmethod
     def setUpTestData(cls) -> None:
+        cls.rebuild_index("search.OpinionCluster")
+        super().setUpTestData()
         # Court
         court_scotus = CourtFactory(id="scotus")
 
@@ -895,6 +1021,14 @@ class CitationCommandTest(IndexedSolrTestCase):
         cls.opinion_id3 = Opinion.objects.get(
             cluster__pk=cls.citation3.cluster_id
         ).pk
+
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
 
     def call_command_and_test_it(self, args):
         call_command("find_citations", *args)
@@ -981,7 +1115,7 @@ class ParallelCitationTest(SimpleTestCase):
                 citation_group_count=citation_group_count,
                 expected_num_parallel_citations=expected_num_parallel_citations,
             ):
-                citations = get_citations(q)
+                citations = get_citations(q, tokenizer=HYPERSCAN_TOKENIZER)
                 citation_groups = identify_parallel_citations(citations)
                 computed_num_citation_groups = len(citation_groups)
                 self.assertEqual(
@@ -1440,7 +1574,7 @@ class GroupParentheticalsTest(SimpleTestCase):
                     [frozenset(pg.parentheticals) for pg in output_groups]
                 )
                 input_sets = frozenset([frozenset(g) for g in groups])
-                self.assertEquals(
+                self.assertEqual(
                     input_sets,
                     output_sets,
                     f"Got incorrect result from get_parenthetical_groups for: {groups}",
@@ -1491,10 +1625,10 @@ class GroupParentheticalsTest(SimpleTestCase):
             representative,
         ) in enumerate(test_pairs):
             with self.subTest(
-                f"Testing that representative connected parenthetical is selected correctly.",
+                "Testing that representative connected parenthetical is selected correctly.",
                 i=i,
             ):
-                self.assertEquals(
+                self.assertEqual(
                     get_representative_parenthetical(
                         parentheticals_to_test, simgraph_to_test
                     ),
@@ -1545,7 +1679,7 @@ class GroupParentheticalsTest(SimpleTestCase):
             with self.subTest(
                 f"Testing {parenthetical_text} is tokenized correctly.", i=i
             ):
-                self.assertEquals(
+                self.assertEqual(
                     get_parenthetical_tokens(parenthetical_text),
                     tokens,
                     f"Got incorrect result from get_parnethetical_tokens for text (expected {tokens}): {parenthetical_text}",
@@ -1607,8 +1741,702 @@ class GroupParentheticalsTest(SimpleTestCase):
             with self.subTest(
                 f"Testing {inputs} connections are recognized correctly.", i=i
             ):
-                self.assertEquals(
+                self.assertEqual(
                     sorted(get_graph_component(*inputs)),
                     sorted(output),
                     f"Got incorrect result from get_graph_component for inputs (expected {output}): {inputs}",
                 )
+
+
+@patch(
+    "cl.api.utils.CitationCountRateThrottle.get_cache_key_for_citations",
+    return_value="citations_tests",
+)
+class CitationLookUpApiTest(
+    CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
+):
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        UserProfileWithParentsFactory.create(
+            user__username="citation-user",
+            user__password=make_password("password"),
+        )
+        super().setUpTestData()
+
+    @async_to_sync
+    async def setUp(self) -> None:
+        await self.async_client.alogin(
+            username="citation-user", password="password"
+        )
+        await default_cache.adelete_many(
+            ["citations_tests", "citation_throttle_test"]
+        )
+
+    async def test_can_handle_requests_with_no_citation_or_reporter(
+        self, cache_key_mock
+    ):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"})
+        )
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "Either 'text' or 'reporter' is required",
+            j["non_field_errors"][0],
+        )
+
+    async def test_can_handle_requests_with_only_reporter(
+        self, cache_key_mock
+    ):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"reporter": "ark"},
+        )
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "This field is required",
+            j["volume"][0],
+        )
+        self.assertIn(
+            "This field is required",
+            j["page"][0],
+        )
+
+    async def test_can_handle_requests_with_big_pieces_of_text(
+        self, cache_key_mock
+    ):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "test" * 17_000},
+        )
+        j = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+        self.assertIn(
+            "Ensure this field has no more than 64000 characters.",
+            j["text"][0],
+        )
+
+    async def test_can_handle_random_text_as_a_citation(self, cache_key_mock):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "this is a text"},
+        )
+        data = json.loads(r.content)
+        # The response should be an empty json object and a success HTTP code.
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+    async def test_can_handle_invalid_text_citations(self, cache_key_mock):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "Maryland Code, Criminal Law § 11-208"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "§ 97-29-63"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+    async def test_can_filter_non_case_law_citations(self, cache_key_mock):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # Journal Citation
+            {
+                "text": (
+                    "The Structural Constitution: Unitary Executive, Plural"
+                    " Judiciary, 105 Harv. L. Rev. 1155, 1158 (1992)."
+                )
+            },
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # two Journal Citations and one opinion citation
+            {
+                "text": (
+                    "Frank H. Easterbrook, Substance and Due Process, 1982 Sup."
+                    " Ct. Rev. 85, 114. Kootenai Env't All., Inc. v. Panhandle"
+                    " Yacht Club, Inc., 671 P.2d 1085 (Idaho 1983). Naomi R."
+                    " Cahn, Civil Images of Battered Women: The Impact of"
+                    " Domestic Violence on Child Custody Decisions, 44 Vand."
+                    " L. Rev. 1041 (1991)."
+                )
+            },
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "671 P.2d 1085")
+
+    async def test_can_filter_out_citation_with_no_volume(
+        self, cache_key_mock
+    ):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "Thomp. Cas., 21"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # two Journal Citations and one opinion citation
+            {
+                "text": (
+                    "Perlman v. Swiss Bank Corp. Comprehensive Disability Prot."
+                    " Plan, 979 F. Supp. 726 (N.D. Ill. 1997). Thomp. Cas., 21"
+                )
+            },
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "979 F. Supp. 726")
+
+    async def test_can_filter_out_citation_with_no_page(self, cache_key_mock):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": "592 U.S. _"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            # two Journal Citations and one opinion citation
+            {"text": "592 U.S. __, 141 S. Ct. 1017"},
+        )
+
+        data = json.loads(r.content)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "141 S. Ct. 1017")
+
+    async def test_can_handle_invalid_reporter(self, cache_key_mock):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {
+                "reporter": "bad-reporter",
+                "volume": "1",
+                "page": "1",
+            },
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "1 bad-reporter 1")
+        self.assertEqual(first_citation["status"], HTTPStatus.BAD_REQUEST)
+        self.assertEqual(
+            first_citation["error_message"],
+            "Unable to find reporter with abbreviation of 'bad-reporter'",
+        )
+        # The normalized citations list is empty because the reporter is invalid
+        self.assertEqual(len(first_citation["normalized_citations"]), 0)
+
+    async def test_can_handle_ambiguous_reporter_variations(
+        self, cache_key_mock
+    ) -> None:
+
+        handy_citation = await sync_to_async(
+            CitationWithParentsFactory.create
+        )(volume=1, reporter="Handy", page="150", type=1)
+        haw_citation = await sync_to_async(CitationWithParentsFactory.create)(
+            volume=1, reporter="Haw.", page="150", type=1
+        )
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {
+                "reporter": "H.",
+                "volume": "1",
+                "page": "150",
+            },
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "1 H. 150")
+        self.assertEqual(first_citation["status"], HTTPStatus.MULTIPLE_CHOICES)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 3)
+        for citation in normalized_citations:
+            self.assertIn(
+                citation,
+                [str(handy_citation), str(haw_citation), "1 Hill 150"],
+            )
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 2)
+        for cluster in clusters:
+            self.assertIn(
+                cluster["absolute_url"],
+                [
+                    handy_citation.cluster.get_absolute_url(),
+                    haw_citation.cluster.get_absolute_url(),
+                ],
+            )
+
+    async def test_can_handle_invalid_page_number(
+        self, cache_key_mock
+    ) -> None:
+        """Do we fail gracefully with invalid page numbers?"""
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {
+                "reporter": "f2d",
+                "volume": "1",
+                "page": "asdf",
+            },
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "1 f2d asdf")
+        self.assertEqual(first_citation["status"], HTTPStatus.NOT_FOUND)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+        self.assertEqual(normalized_citations[0], "1 F.2d asdf")
+        self.assertIn("Citation not found:", first_citation["error_message"])
+
+    async def test_can_match_citation_with_reporter_volume_page(
+        self, cache_key_mock
+    ):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"reporter": "f2d", "volume": "56", "page": "9"},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 f2d 9")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
+            self.opinion_cluster_2.get_absolute_url(),
+        )
+
+        # Here opinion cluster 2 has the citation 56 F.2d 9, but the
+        # HTML with citations contains star pagination for pages 9 and 10.
+        # This tests if we can find opinion cluster 2 with page 9 and 10
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"reporter": "f2d", "volume": "56", "page": "10"},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 f2d 10")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
+            self.opinion_cluster_2.get_absolute_url(),
+        )
+
+    async def test_can_handle_page_as_a_number(self, cache_key_mock):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"reporter": "f2d", "volume": "56", "page": 9},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 f2d 9")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+        self.assertEqual(normalized_citations[0], "56 F.2d 9")
+
+    async def test_can_handle_reporter_typos(self, cache_key_mock):
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"reporter": "F2d", "volume": "56", "page": "9"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 F2d 9")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+        self.assertEqual(normalized_citations[0], "56 F.2d 9")
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
+            self.opinion_cluster_2.get_absolute_url(),
+        )
+
+        # Introduce a space into the reporter
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"reporter": "f 2d", "volume": "56", "page": "9"},
+        )
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "56 f 2d 9")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+
+        normalized_citations = first_citation["normalized_citations"]
+        self.assertEqual(len(normalized_citations), 1)
+        self.assertEqual(normalized_citations[0], "56 F.2d 9")
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
+            self.opinion_cluster_2.get_absolute_url(),
+        )
+
+    async def test_can_handle_full_citation_within_text(
+        self, cache_key_mock
+    ) -> None:
+        """Do we get redirected to the correct URL when we pass in a full
+        citation?"""
+        text_citation = (
+            "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)"
+        )
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": text_citation},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 1)
+
+        first_citation = data[0]
+        self.assertEqual(
+            first_citation["citation"],
+            "56 F.2d 9",
+        )
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+        self.assertEqual(first_citation["start_index"], 30)
+        self.assertEqual(first_citation["end_index"], 39)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"],
+            self.opinion_cluster_2.get_absolute_url(),
+        )
+
+    async def test_can_extract_all_citations_within_text(
+        self, cache_key_mock
+    ) -> None:
+        la_rue_citation = await sync_to_async(
+            CitationWithParentsFactory.create
+        )(volume=139, reporter="U.S.", page="601", type=1)
+
+        text_citation = (
+            "the majority of the court was of opinion that the transfer of the "
+            "Martin device to windmills for the purpose named in the patent "
+            "involved invention within the cases of the Western Electric Co. v. "
+            "La Rue, 139 U.S. 601; Crane v. Price, Webster's Pat. Cases, 393, "
+            "and Potts v. Creager, 155 U.S. 597."
+        )
+
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": text_citation},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        # the response should include two citations ("139 U.S. 601"
+        # and "155 U.S. 597")
+        self.assertEqual(len(data), 2)
+
+        first_citation = data[0]
+        self.assertEqual(first_citation["citation"], "139 U.S. 601")
+        self.assertEqual(first_citation["status"], HTTPStatus.OK)
+        self.assertEqual(first_citation["start_index"], 204)
+        self.assertEqual(first_citation["end_index"], 216)
+
+        clusters = first_citation["clusters"]
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(
+            clusters[0]["absolute_url"], la_rue_citation.get_absolute_url()
+        )
+
+        second_citation = data[1]
+        self.assertEqual(second_citation["citation"], "155 U.S. 597")
+        self.assertEqual(second_citation["status"], HTTPStatus.NOT_FOUND)
+        self.assertEqual(second_citation["start_index"], 283)
+        self.assertEqual(second_citation["end_index"], 295)
+
+        clusters = second_citation["clusters"]
+        self.assertEqual(len(clusters), 0)
+
+    @override_settings(MAX_CITATIONS_PER_REQUEST=10)
+    async def test_can_look_up_max_citations_per_request(
+        self, cache_key_mock
+    ) -> None:
+        ten_citations = "56 F.2d 9, " * 10
+        text_citation = f"{ten_citations} 139 U.S. 601, 155 U.S. 597"
+        r = await self.async_client.post(
+            reverse("citation-lookup-list", kwargs={"version": "v3"}),
+            {"text": text_citation},
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        data = json.loads(r.content)
+        self.assertEqual(len(data), 12)
+
+        # This test limits citations to a maximum of 10 per request.
+        # Citations exceeding this limit will still be included in the response
+        # but will be marked with an error message and a status code of 429
+        # (Too Many Requests).
+        second_to_last_citation = data[-2]
+        self.assertEqual(second_to_last_citation["citation"], "139 U.S. 601")
+        self.assertEqual(
+            second_to_last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS
+        )
+        self.assertEqual(
+            second_to_last_citation["error_message"],
+            "Too many citations requested.",
+        )
+
+        last_citation = data[-1]
+        self.assertEqual(last_citation["citation"], "155 U.S. 597")
+        self.assertEqual(last_citation["status"], HTTPStatus.TOO_MANY_REQUESTS)
+        self.assertEqual(
+            last_citation["error_message"], "Too many citations requested."
+        )
+
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value="20/m",
+    )
+    async def test_can_throttle_user_when_querying_exact_rate_limit(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
+        # Throttle users for 1 minute if they query for the exact number of
+        # citations allowed by the rate limit.
+        test_date = datetime(1970, 1, 1, 0, 0, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False) as traveler:
+            ten_citations = "56 F.2d 9, " * 10
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 10)
+
+            # Ten more citations, This request should be allowed
+            traveler.shift(timedelta(seconds=5))
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 10)
+
+            # This request must not be allowed.
+            # User has reached the maximum number of citations allowed by the
+            # rate limit. Access will be restored one minute after the first
+            # request.
+            traveler.shift(timedelta(seconds=10))
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+
+            expected_time = test_date + timedelta(minutes=1)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value="20/m",
+    )
+    async def test_can_throttle_user_exceeding_citation_limit_by_small_number(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
+        test_date = datetime(1970, 1, 1, 0, 1, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False) as traveler:
+            fifteen_citations = "56 F.2d 9, " * 15
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # fifteen more citations, This request should be allowed but the user
+            # will be throttle after making this request.
+            traveler.shift(timedelta(seconds=5))
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # This request must be rate limited. User has exceeded the lookup
+            # limit of 20 citations per minute with 30 citations. They must
+            # wait for previous requests to expire to free up citations in
+            # history. The first request(oldest one) added 15 citations to
+            # the cache, once this request is expire the user should be allowed
+            # to use the API again.
+            traveler.shift(timedelta(seconds=5))
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            expected_time = test_date + timedelta(minutes=1)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+        test_date = datetime(1970, 1, 1, 0, 2, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False) as traveler:
+            fifteen_citations = "56 F.2d 9, " * 15
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 15)
+
+            # twenty more citations, ten seconds after the first one. This
+            # request should be allowed but the user will be throttle after
+            # making this request.
+            traveler.shift(timedelta(seconds=15))
+            twenty_citations = "56 F.2d 9, " * 20
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": twenty_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 20)
+
+            # This request must be rate limited. User has exceeded the lookup
+            # limit of 20 citations per minute with 35 citations. They must
+            # wait for previous requests to expire to free up citations in
+            # history. The first request(oldest one) added 15 citations to the
+            # cache. However, even if this request expires, it will leave 20
+            # citations in history. This means the user need to wait for the
+            # second request to expire before making further requests.
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": fifteen_citations},
+            )
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            expected_time = (
+                test_date + timedelta(minutes=1) + timedelta(seconds=15)
+            )
+            self.assertEqual(data["wait_until"], expected_time.isoformat())
+
+    @patch(
+        "cl.api.utils.CitationCountRateThrottle.get_citations_rate",
+        return_value="20/m",
+    )
+    async def test_can_throttle_user_exceeding_citation_limit_by_big_margin(
+        self, get_rate_mock, throttle_logic_mock
+    ) -> None:
+        throttle_logic_mock.return_value = "citation_throttle_test"
+        # throttle users that exceeds the max number of citations by a
+        # significant margin.
+        test_date = datetime(1970, 1, 1, 4, 0, tzinfo=timezone.utc)
+        with time_machine.travel(test_date, tick=False):
+            sixty_citations = "56 F.2d 9, " * 60
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": sixty_citations},
+            )
+
+            self.assertEqual(r.status_code, HTTPStatus.OK)
+            data = json.loads(r.content)
+            self.assertEqual(len(data), 60)
+
+            # This test only allows 20 citations per minute, but the last request
+            # had 60. This request must be rate limited.
+            ten_citations = "56 F.2d 9, " * 10
+            r = await self.async_client.post(
+                reverse("citation-lookup-list", kwargs={"version": "v3"}),
+                {"text": ten_citations},
+            )
+
+            self.assertEqual(r.status_code, HTTPStatus.TOO_MANY_REQUESTS)
+            data = json.loads(r.content)
+            self.assertEqual(
+                data["error_message"],
+                "Too many requests (allowed rate: 20/m).",
+            )
+            # User throttled for 3 minutes because the request contained 3
+            # times the allowed number of citations.
+            expected_time = test_date + timedelta(minutes=3)
+            self.assertEqual(data["wait_until"], expected_time.isoformat())

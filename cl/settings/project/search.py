@@ -67,8 +67,12 @@ QUERY_RESULTS_CACHE = 60 * 60 * 6
 #####################
 MAX_SEARCH_PAGINATION_DEPTH = 100
 SEARCH_PAGE_SIZE = 20
-CHILD_HITS_PER_RESULT = 5
+RECAP_SEARCH_PAGE_SIZE = 10
+RECAP_CHILD_HITS_PER_RESULT = 5
+OPINION_HITS_PER_RESULT = 20
+PEOPLE_HITS_PER_RESULT = 999
 VIEW_MORE_CHILD_HITS = 99
+SEARCH_API_PAGE_SIZE = 20
 # The amount of text to return from the beginning of the field if there are no
 # matching fragments to highlight.
 NO_MATCH_HL_SIZE = 500

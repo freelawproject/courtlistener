@@ -101,7 +101,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         main_query = build_main_query_from_query_string(
             QUERY_STRING,

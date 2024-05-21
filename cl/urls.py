@@ -57,7 +57,6 @@ urlpatterns = [
     path("", include("cl.search.urls")),
     path("", include("cl.alerts.urls")),
     path("", include("cl.api.urls")),
-    path("", include("cl.donate.urls")),
     path("", include("cl.visualizations.urls")),
     path("", include("cl.stats.urls")),
     # Sitemaps
@@ -73,6 +72,15 @@ urlpatterns = [
         name="sitemaps",
     ),
     # Redirects
+    path(
+        "donate/",
+        RedirectView.as_view(url="https://free.law/donate/"),
+    ),
+    path(
+        "help/donations/",
+        RedirectView.as_view(url="https://free.law/donate/help/"),
+        name="donation_help",
+    ),
     path(
         "privacy/",
         RedirectView.as_view(url="/terms/#privacy", permanent=True),

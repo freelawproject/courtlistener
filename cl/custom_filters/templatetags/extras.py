@@ -8,6 +8,7 @@ from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
+from elasticsearch_dsl import AttrDict, AttrList
 
 from cl.search.models import Docket, DocketEntry
 
@@ -206,3 +207,41 @@ def contains_highlights(content: str) -> bool:
     pattern = r"<mark>.*?</mark>"
     matches = re.findall(pattern, content)
     return bool(matches)
+
+
+@register.filter
+def render_string_or_list(value: any) -> any:
+    """Filter to render list of strings separated by commas or the original
+    value.
+
+    :param value: The value to be rendered.
+    :return: The original value or comma-separated values.
+    """
+    if isinstance(value, (list, AttrList)):
+        return ", ".join(str(item) for item in value)
+    return value
+
+
+@register.filter
+def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
+    """Returns the highlighted version of the field is present, otherwise,
+    falls back to the original field value.
+
+    :param result: The search result object.
+    :param field: The name of the field for which to retrieve the highlighted
+    version.
+    :return: The highlighted field value if available, otherwise, the original
+    field value.
+    """
+
+    hl_value = None
+    if isinstance(result, AttrDict) and hasattr(result.meta, "highlight"):
+        hl_value = getattr(result.meta.highlight, field, None)
+    elif isinstance(result, dict):
+        hl_value = result.get("meta", {}).get("highlight", {}).get(field)
+
+    return (
+        render_string_or_list(hl_value)
+        if hl_value
+        else getattr(result, field, "")
+    )

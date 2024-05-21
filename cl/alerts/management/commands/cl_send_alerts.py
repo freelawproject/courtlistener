@@ -1,24 +1,31 @@
 import datetime
 import traceback
 import warnings
+from urllib.parse import urlencode
 
 import waffle
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Q
 from django.http import QueryDict
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
+from elasticsearch_dsl import Q as ES_Q
 
 from cl.alerts.models import Alert, RealTimeQueue
-from cl.alerts.utils import InvalidDateError, user_has_donated_enough
+from cl.alerts.utils import InvalidDateError
 from cl.api.models import WebhookEventType
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
+from cl.search.constants import ALERTS_HL_TAG, SEARCH_ALERTS_OPINION_HL_FIELDS
+from cl.search.documents import OpinionDocument
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
@@ -62,10 +69,38 @@ def send_alert(user_profile, hits):
     txt_template = loader.get_template("alert_email.txt")
     html_template = loader.get_template("alert_email.html")
     context = {"hits": hits}
+    if waffle.switch_is_active("o-es-alerts-active"):
+        txt_template = loader.get_template("alert_email_es.txt")
+        html_template = loader.get_template("alert_email_es.html")
+        context = {
+            "hits": hits,
+            "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
+        }
+
+    headers = {}
+    query_string = ""
+    if len(hits) == 1:
+        alert = hits[0][0]
+        unsubscribe_path = reverse(
+            "one_click_disable_alert", args=[alert.secret_key]
+        )
+        headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+    else:
+        params = {"keys": [hit[0].secret_key for hit in hits]}
+        query_string = urlencode(params, doseq=True)
+        unsubscribe_path = reverse("disable_alert_list")
+    headers["List-Unsubscribe"] = (
+        f"<https://www.courtlistener.com{unsubscribe_path}{'?' if query_string else ''}{query_string}>"
+    )
+
     txt = txt_template.render(context)
     html = html_template.render(context)
     msg = EmailMultiAlternatives(
-        subject, txt, settings.DEFAULT_ALERTS_EMAIL, [user_profile.user.email]
+        subject,
+        txt,
+        settings.DEFAULT_ALERTS_EMAIL,
+        [user_profile.user.email],
+        headers=headers,
     )
     msg.attach_alternative(html, "text/html")
     msg.send(fail_silently=False)
@@ -92,6 +127,7 @@ class Command(VerboseCommand):
         }
         self.options = {}
         self.valid_ids = {}
+        self.o_es_alerts = bool(waffle.switch_is_active("o-es-alerts-active"))
 
     def __del__(self):
         for si in self.sis.values():
@@ -106,7 +142,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.options = options
         if options["rate"] == Alert.REAL_TIME:
             self.remove_stale_rt_items()
@@ -119,6 +155,7 @@ class Command(VerboseCommand):
     def run_query(self, alert, rate):
         results = []
         cd = {}
+        main_params = {}
         logger.info(f"Now running the query: {alert.query}\n")
 
         # Make a dict from the query string.
@@ -141,7 +178,7 @@ class Command(VerboseCommand):
                 return query_type, results
 
         logger.info(f"Data sent to SearchForm is: {qd}\n")
-        search_form = SearchForm(qd)
+        search_form = SearchForm(qd, is_es_form=self.o_es_alerts)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 
@@ -154,7 +191,8 @@ class Command(VerboseCommand):
 
             main_params = search_utils.build_main_query(
                 cd,
-                highlight="text",  # Required to show all field as in Search API
+                highlight="text",
+                # Required to show all field as in Search API
                 facet=False,
             )
             main_params.update(
@@ -168,22 +206,46 @@ class Command(VerboseCommand):
             )
 
             if rate == Alert.REAL_TIME:
-                main_params["fq"].append(
-                    f"id:({' OR '.join([str(i) for i in self.valid_ids[query_type]])})"
-                )
+                if self.o_es_alerts:
+                    cd.update(
+                        {
+                            "id": " ".join(
+                                [str(i) for i in self.valid_ids[query_type]]
+                            )
+                        }
+                    )
+                else:
+                    main_params["fq"].append(
+                        f"id:({' OR '.join([str(i) for i in self.valid_ids[query_type]])})"
+                    )
 
-            # Ignore warnings from this bit of code. Otherwise, it complains
-            # about the query URL being too long and having to POST it instead
-            # of being able to GET it.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                results = (
-                    self.sis[query_type]
-                    .query()
-                    .add_extra(**main_params)
-                    .execute()
+            if self.o_es_alerts:
+                search_query = OpinionDocument.search()
+                s, _ = do_es_api_query(
+                    search_query,
+                    cd,
+                    SEARCH_ALERTS_OPINION_HL_FIELDS,
+                    ALERTS_HL_TAG,
+                    "v3",
                 )
-            regroup_snippets(results)
+                s = s.extra(
+                    from_=0,
+                    size=settings.SCHEDULED_ALERT_HITS_LIMIT,
+                )
+                results = s.execute()
+            else:
+                # Ignore warnings from this bit of code. Otherwise, it complains
+                # about the query URL being too long and having to POST it instead
+                # of being able to GET it.
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    results = (
+                        self.sis[query_type]
+                        .query()
+                        .add_extra(**main_params)
+                        .execute()
+                    )
+                regroup_snippets(results)
 
         logger.info(f"There were {len(results)} results.")
         return qd, results
@@ -200,10 +262,7 @@ class Command(VerboseCommand):
             logger.info(f"Running alerts for user '{user}': {alerts}")
 
             if rate == Alert.REAL_TIME:
-                user_donated_enough = user_has_donated_enough(
-                    user, alerts.count()
-                )
-                if not user_donated_enough:
+                if not user.profile.is_member:
                     continue
 
             hits = []
@@ -222,7 +281,12 @@ class Command(VerboseCommand):
                 # [[alert1, [{hit1}, {hit2}, {hit3}]], [alert2, ...]]
                 if len(results) > 0:
                     search_type = qd.get("type", SEARCH_TYPES.OPINION)
-                    hits.append([alert, search_type, results])
+                    if self.o_es_alerts:
+                        hits.append(
+                            [alert, search_type, results, len(results)]
+                        )
+                    else:
+                        hits.append([alert, search_type, results])
                     alert.query_run = qd.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
@@ -241,7 +305,7 @@ class Command(VerboseCommand):
                 alerts_sent_count += 1
                 send_alert(user.profile, hits)
 
-        tally_stat(f"alerts.sent.{rate}", inc=alerts_sent_count)
+        async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
         logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
     def clean_rt_queue(self):
@@ -267,9 +331,9 @@ class Command(VerboseCommand):
 
     def get_new_ids(self):
         """Get an intersection of the items that are new in the DB and those
-        that have made it into Solr.
+        that have made it into Solr or ES.
 
-        For every item that's in the RealTimeQueue, query Solr and see which
+        For every item that's in the RealTimeQueue, query ES/Solr and see which
         have made it to the index. We'll use these to run the alerts.
 
         Returns a dict like so:
@@ -281,7 +345,23 @@ class Command(VerboseCommand):
         valid_ids = {}
         for item_type in SEARCH_TYPES.ALL_TYPES:
             ids = RealTimeQueue.objects.filter(item_type=item_type)
-            if ids:
+            if not ids.exists():
+                valid_ids[item_type] = []
+                continue
+            if self.o_es_alerts:
+                # Get valid RT IDs from ES.
+                search_query = OpinionDocument.search()
+                ids_query = ES_Q("terms", id=[str(i.item_pk) for i in ids])
+                s = search_query.query(ids_query)
+                s = s.source(includes=["id"])
+                s = s.extra(
+                    from_=0,
+                    size=MAX_RT_ITEM_QUERY,
+                )
+                results = s.execute()
+                valid_ids[item_type] = [int(r["id"]) for r in results]
+            else:
+                # Get valid RT IDs from SOLR.
                 main_params = {
                     "q": "*",  # Vital!
                     "caller": f"cl_send_alerts:{item_type}",
@@ -300,6 +380,4 @@ class Command(VerboseCommand):
                 valid_ids[item_type] = [
                     int(r["id"]) for r in results.result.docs
                 ]
-            else:
-                valid_ids[item_type] = []
         return valid_ids
