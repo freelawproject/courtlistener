@@ -259,14 +259,14 @@ class RecapUploadsTest(TestCase):
                 "document_number": "",
             }
         )
-        r = self.async_client.post(self.path, self.data)
+        r = await self.async_client.post(self.path, self.data)
         self.assertEqual(r.status_code, HTTPStatus.CREATED)
 
         j = json.loads(r.content)
         path = reverse(
             "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
         )
-        r = self.async_client.get(path)
+        r = await self.async_client.get(path)
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_numbers_in_docket_uploads_fail(self, mock):
