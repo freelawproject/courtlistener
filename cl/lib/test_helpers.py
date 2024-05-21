@@ -731,7 +731,7 @@ audio_v4_fields = audio_common_fields.copy()
 audio_v4_fields.update(
     {
         "case_name_full": lambda x: x["result"].case_name_full,
-        "meta": [],
+        "meta": [],  # type: ignore
     }
 )
 
