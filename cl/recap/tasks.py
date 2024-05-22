@@ -1287,9 +1287,8 @@ async def process_recap_acms_appellate_attachment(
         )
         return pq_status, msg, []
 
-    pq_status, msg = await mark_pq_successful(
-        pq, d_id=de.docket_id, de_id=de.pk
-    )
+    await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = await mark_pq_successful(pq)
     return pq_status, msg, rds_affected
 
 
