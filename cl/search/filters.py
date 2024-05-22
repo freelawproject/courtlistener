@@ -219,7 +219,6 @@ class RECAPDocumentFilter(NoEmptyFilterSet):
             "date_upload": DATETIME_LOOKUPS,
             "document_type": ["exact"],
             "document_number": ["exact", "gte", "gt", "lte", "lt"],
-            "acms_document_guid": ["exact"],
             # Parameter required in view.
             "pacer_doc_id": ["exact", "in"],
             "is_available": ["exact"],
