@@ -97,6 +97,7 @@ from cl.recap.tasks import (
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
+    process_recap_acms_appellate_attachment,
     process_recap_acms_docket,
     process_recap_appellate_attachment,
     process_recap_appellate_docket,
@@ -124,7 +125,12 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.tests.utils import AsyncAPIClient, MockACMSDocketReport, MockResponse
+from cl.tests.utils import (
+    AsyncAPIClient,
+    MockACMSAttachmentPage,
+    MockACMSDocketReport,
+    MockResponse,
+)
 from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
@@ -687,6 +693,69 @@ class RecapUploadsTest(TestCase):
         de_2 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=2)
         self.assertEqual(de_2.date_filed, date(2023, 10, 2))
         self.assertEqual(de_2.time_filed, time(11, 20, 0))
+
+    def test_processing_an_acms_attachment_page(self, mock_upload):
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.ca2,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+        )
+        de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="7fae3c58-1ced-ee11-904c-001dd83058b7",
+                    document_number=22,
+                )
+            ],
+        )
+        async_to_sync(add_docket_entries)(d, de_data["docket_entries"])
+
+        pq = ProcessingQueue.objects.create(
+            court=self.ca2,
+            uploader=self.user,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+            upload_type=UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        main_rd = recap_documents[0]
+
+        # After adding 1 docket entry, it should only exist its main RD.
+        self.assertEqual(recap_documents.count(), 1)
+        with mock.patch(
+            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+        ):
+            # Process the acms attachment page containing 3 attachments.
+            async_to_sync(process_recap_acms_appellate_attachment)(pq.pk)
+
+        # After adding attachments, it should only exist 3 RD attachments.
+        self.assertEqual(recap_documents.count(), 3)
+
+        # Confirm that the main RD is transformed into an attachment.
+        main_attachment = RECAPDocument.objects.filter(pk=main_rd.pk)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+
+        # Process the attachment page again, no new attachments should be added
+        pq_1 = ProcessingQueue.objects.create(
+            court=self.ca2,
+            uploader=self.user,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+            upload_type=UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+        ):
+            # Process the acms attachment page containing 3 attachments.
+            async_to_sync(process_recap_acms_appellate_attachment)(pq_1.pk)
+
+        self.assertEqual(recap_documents.count(), 3)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
