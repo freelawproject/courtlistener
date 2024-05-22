@@ -10,8 +10,9 @@ michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
 """
 
+import logging
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
@@ -50,6 +51,10 @@ from cl.people_db.lookup_utils import (
 )
 from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
 
+logging.basicConfig(
+    filename=f"columbia_importer_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.txt"
+)
+
 CASE_NAME_TWEAKER = CaseNameTweaker()
 
 
@@ -79,6 +84,8 @@ def find_duplicates(
         cleaned_content = clean_body_content(
             all_opinions_soup.getText(separator=" ", strip=True)
         )
+
+        # We search for matches using exact citation from xml file
         possible_clusters = OpinionCluster.objects.filter(
             citations__reporter=citation.corrected_reporter(),
             citations__volume=citation.groups["volume"],
@@ -97,6 +104,8 @@ def find_duplicates(
         if match:
             return match
 
+        # There could be a match in the system but with a citation from different
+        # reporter
         possible_clusters = (
             OpinionCluster.objects.filter(
                 date_filed=data["date_filed"],
@@ -117,6 +126,8 @@ def find_duplicates(
         if match:
             return match
 
+        # Filing date may vary slightly, we search for possible matches using a date
+        # range based on fill date
         month = timedelta(days=31)
         possible_clusters = (
             OpinionCluster.objects.filter(
@@ -234,17 +245,25 @@ def add_new_case(item: dict) -> None:
         logger.info(f"Created item at: {domain}{cluster.get_absolute_url()}")
 
 
-def import_opinion(filepath: str) -> None:
+def import_opinion(filepath: str, xml_dir: str) -> None:
     """Try to import xml opinion from columbia
 
     :param filepath: specified path to xml file
+    :param xml_dir: absolute path to the directory with columbia xml files
     :return: None
     """
+
+    # filepath example: indiana/court_opinions/documents/2713f39c5a8e8684.xml
+    full_xml_path = os.path.join(xml_dir, filepath)  # type: str
+    if not os.path.exists(full_xml_path):
+        logger.warning(f"No file at: {full_xml_path}")
+        return
+
     try:
-        logger.info(msg=f"Importing case from {filepath}")
-        soup = read_xml_to_soup(filepath)
+        logger.info(msg=f"Importing case from {full_xml_path}")
+        soup = read_xml_to_soup(full_xml_path)
     except UnicodeDecodeError:
-        logger.warning(f"UnicodeDecodeError: {filepath}")
+        logger.warning(f"UnicodeDecodeError: {full_xml_path}")
         return
 
     outer_opinion = soup.find("opinion")
@@ -254,7 +273,7 @@ def import_opinion(filepath: str) -> None:
 
     # Add the same sha1 and path values to every opinion (multiple opinions
     # can come from a single XML file).
-    sha1 = sha1_of_file(filepath)
+    sha1 = sha1_of_file(full_xml_path)
     for opinion in opinions:
         opinion["sha1"] = sha1
         opinion["local_path"] = filepath
@@ -353,9 +372,9 @@ def import_opinion(filepath: str) -> None:
 
     if possible_match:
         # Log a message and abort if we have a possible match, avoid adding
-        # incorrect data, review this manually
+        # incorrect data, review this data manually
         logger.info(
-            f"Match found: {possible_match.pk} for columbia file: {filepath}"
+            f"Match found with cluster id: {possible_match.pk} for columbia file: {filepath}"
         )
         return
 
@@ -381,20 +400,13 @@ def parse_columbia_opinions(options: dict) -> None:
     for index, item in data.iterrows():
         filepath = item["filepath"]
 
+        # Use xml file name to check where to start processing the rows
         if not start and skip_until in filepath:
             start = True
         if not start:
             continue
 
-        # filepath example: indiana/court_opinions/documents/2713f39c5a8e8684.xml
-        xml_path = os.path.join(xml_dir, filepath)  # type: str
-        if not os.path.exists(xml_path):
-            logger.warning(f"No file at: {xml_path}")
-            continue
-
-        import_opinion(
-            filepath=xml_path,
-        )
+        import_opinion(filepath=filepath, xml_dir=xml_dir)
 
         total_processed += 1
 
