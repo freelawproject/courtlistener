@@ -217,6 +217,7 @@ opinion_v3_search_api_keys = {
     ),
 }
 opinion_v3_search_api_keys.update(opinion_cluster_v3_fields)
+opinion_v3_search_api_keys.update(opinion_document_v3_fields)
 
 opinion_v4_search_api_keys = {
     "non_participating_judge_ids": lambda x: (
@@ -345,62 +346,68 @@ docket_api_common_keys = {
     ),
 }
 
-docket_v4_api_keys = {
-    "attorney": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "attorney"
-        ]
-    ),
-    "attorney_id": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "attorney_id"
-        ]
-    ),
-    "case_name_full": lambda x: x["result"].docket_entry.docket.case_name_full,
-    "chapter": lambda x: (
-        x["result"].docket_entry.docket.bankruptcy_information.chapter
-        if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
-        else None
-    ),
-    "docket_absolute_url": lambda x: x[
-        "result"
-    ].docket_entry.docket.get_absolute_url(),
-    "firm": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "firm"
-        ]
-    ),
-    "firm_id": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "firm_id"
-        ]
-    ),
-    "pacer_case_id": lambda x: (
-        str(x["result"].docket_entry.docket.pacer_case_id)
-        if x["result"].docket_entry.docket.pacer_case_id
-        else ""
-    ),
-    "party": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "party"
-        ]
-    ),
-    "party_id": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "party_id"
-        ]
-    ),
-    "trustee_str": lambda x: (
-        x["result"].docket_entry.docket.bankruptcy_information.trustee_str
-        if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
-        else None
-    ),
-    "meta": [],  # type: ignore
-    "recap_documents": [],  # type: ignore
-}
-
 recap_type_v4_api_keys = docket_api_common_keys.copy()
-recap_type_v4_api_keys.update(docket_v4_api_keys)
+recap_type_v4_api_keys.update(
+    {
+        "attorney": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "attorney"
+            ]
+        ),
+        "attorney_id": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "attorney_id"
+            ]
+        ),
+        "case_name_full": lambda x: x[
+            "result"
+        ].docket_entry.docket.case_name_full,
+        "chapter": lambda x: (
+            x["result"].docket_entry.docket.bankruptcy_information.chapter
+            if hasattr(
+                x["result"].docket_entry.docket, "bankruptcy_information"
+            )
+            else None
+        ),
+        "docket_absolute_url": lambda x: x[
+            "result"
+        ].docket_entry.docket.get_absolute_url(),
+        "firm": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "firm"
+            ]
+        ),
+        "firm_id": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "firm_id"
+            ]
+        ),
+        "pacer_case_id": lambda x: (
+            str(x["result"].docket_entry.docket.pacer_case_id)
+            if x["result"].docket_entry.docket.pacer_case_id
+            else ""
+        ),
+        "party": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "party"
+            ]
+        ),
+        "party_id": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "party_id"
+            ]
+        ),
+        "trustee_str": lambda x: (
+            x["result"].docket_entry.docket.bankruptcy_information.trustee_str
+            if hasattr(
+                x["result"].docket_entry.docket, "bankruptcy_information"
+            )
+            else None
+        ),
+        "meta": [],  # type: ignore
+        "recap_documents": [],  # type: ignore
+    }
+)
 
 recap_document_common_api_keys = {
     "id": lambda x: x["result"].pk,
@@ -452,7 +459,7 @@ recap_document_v4_api_keys.update(
             .cited_opinions.all()
             .values_list("cited_opinion_id", flat=True)
         ),
-        "meta": [],
+        "meta": [],  # type: ignore
     }
 )
 
