@@ -945,6 +945,22 @@ class PeopleV4APISearchTest(
                 how_selected="e_part",
                 nomination_process="fed_senate",
             )
+            person_6 = PersonFactory.create(
+                name_first="John",
+                name_last="Gardner",
+                date_granularity_dob="%Y-%m-%d",
+                date_granularity_dod="%Y-%m-%d",
+                date_dob=datetime.date(1697, 9, 17),
+                date_dod=datetime.date(1764, 1, 1),
+            )
+            PositionFactory.create(
+                date_granularity_start="%Y-%m-%d",
+                court=self.court_1,
+                date_start=datetime.date(1720, 12, 14),
+                predecessor=self.person_3,
+                position_type="c-jud",
+                person=person_6,
+            )
 
         # Query string, order by name_reverse asc
         search_params = {
@@ -966,9 +982,10 @@ class PeopleV4APISearchTest(
             {
                 "name": "Query order by name_reverse asc",
                 "search_params": search_params,
-                "expected_results": 4,
+                "expected_results": 5,
                 "expected_order": [
                     person_4.pk,  # American
+                    person_6.pk,  # Gardner
                     person_5.pk,  # Harrison
                     self.person_3.pk,  # Judith
                     self.person_2.pk,  # Sheindlin
@@ -977,19 +994,21 @@ class PeopleV4APISearchTest(
             {
                 "name": "Query order by 'dob desc,name_reverse asc'",
                 "search_params": params_dob_desc,
-                "expected_results": 4,
+                "expected_results": 5,
                 "expected_order": [
                     self.person_3.pk,  # Judith - dob: 1945-11-20
                     person_4.pk,  # American - dob: 1942-10-21
                     self.person_2.pk,  # Sheindlin - dob: 1942-10-21
+                    person_6.pk,  # Gardner - dob: 1697-9-17
                     person_5.pk,  # Harrison - dob: None
                 ],
             },
             {
                 "name": "Query order by 'dob asc,name_reverse asc'",
                 "search_params": params_dob_asc,
-                "expected_results": 4,
+                "expected_results": 5,
                 "expected_order": [
+                    person_6.pk,  # Gardner - dob: 1697-9-17,
                     person_4.pk,  # American - dob:1942-10-21
                     self.person_2.pk,  # Sheindlin - dob: 1942-10-21
                     self.person_3.pk,  # Judith - dob: 1945-11-20
@@ -999,10 +1018,11 @@ class PeopleV4APISearchTest(
             {
                 "name": "Query order by 'dod desc,name_reverse asc'",
                 "search_params": params_dod_desc,
-                "expected_results": 4,
+                "expected_results": 5,
                 "expected_order": [
                     self.person_2.pk,  # Sheindlin - dod: 2020-11-25
                     person_4.pk,  # American - dod: 2019-11-25
+                    person_6.pk,  # Gardner - dod: 1764-1-1
                     person_5.pk,  # Harrison - dod:None
                     self.person_3.pk,  # Judith - dod:None
                 ],
