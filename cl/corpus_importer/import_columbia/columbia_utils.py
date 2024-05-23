@@ -554,7 +554,7 @@ def convert_columbia_html(text: str, opinion_index: int) -> str:
         )
 
         # We use opinion index to ensure that all footnotes are linked to the
-        # corresponding opinion
+        # corresponding opinion (when a case has multiple opinions)
         for ref in foot_references:
             if (match := re.search(r"[*\d]+", ref)) is not None:
                 f_num = match.group()

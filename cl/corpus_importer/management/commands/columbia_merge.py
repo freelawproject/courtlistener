@@ -26,7 +26,6 @@ from typing import Any, Optional
 import pandas as pd
 from bs4 import BeautifulSoup
 from django.db import transaction
-from django.db.models import Q
 from juriscraper.lib.string_utils import titlecase
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
@@ -154,7 +153,7 @@ def update_matching_opinions(
     """Store matching opinion content in html_columbia field from Opinion object
 
     :param matches: dict with matching position from cl and columbia opinions
-    :param cl_cleaned_opinions: list of cl opinions
+    :param cl_cleaned_opinions: list of cl opinions from a single cluster
     :param columbia_opinions: list of columbia opinions
     :param filepath: xml file from which the opinion was extracted
     :return: None
@@ -175,9 +174,10 @@ def update_matching_opinions(
         if op.author_str == "":
             # We have an empty author name
             if author_str:
-                # Store the name extracted from the author tag
+                # Store the name extracted from the author tag of the xml file
                 op.author_str = author_str
         else:
+            # opinion already has an author in cl
             if author_str:
                 if (
                     find_just_name(op.author_str).lower()
@@ -215,7 +215,7 @@ def map_and_merge_opinions(
 ) -> None:
     """Map and merge opinion data
 
-    :param cluster_id: Cluster id
+    :param cluster_id: Cluster id to merge with
     :param columbia_opinions: list of columbia opinions from file
     :param filepath: xml file from which the opinion was extracted
     :return: None
@@ -240,7 +240,8 @@ def map_and_merge_opinions(
             [op.get("opinion") for op in cl_cleaned_opinions],
         )
         if len(matches) == len(columbia_opinions):
-            # We were able to match opinions, add opinions to html_columbia field
+            # We were able to match all opinions, add opinion content to
+            # html_columbia field
             update_matching_opinions(
                 matches, cl_cleaned_opinions, columbia_opinions, filepath
             )
