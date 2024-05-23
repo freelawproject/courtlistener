@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import connections
 from lxml import html
+from waffle.testutils import override_flag
 
 from cl.alerts.models import Alert
 from cl.alerts.utils import percolate_document
@@ -23,6 +24,7 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.test_helpers import (
     AudioESTestCase,
+    audio_v3_fields,
     audio_v4_fields,
     skip_if_common_tests_skipped,
     v4_meta_keys,
@@ -290,13 +292,15 @@ class OASearchAPICommonTests(AudioESTestCase):
         self.assertIn("Wallace", r.content.decode())
 
 
-class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
+@override_flag("oa-es-activate", active=True)
+class OAV3SearchAPITests(
+    OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+):
     version_api = "v3"
     skip_common_tests = False
 
     @classmethod
     def setUpTestData(cls):
-        cls.rebuild_index("alerts.Alert")
         super().setUpTestData()
         cls.rebuild_index("audio.Audio")
         cls.rebuild_index("alerts.Alert")
@@ -372,51 +376,122 @@ class OAV3SearchAPITests(OASearchAPICommonTests, ESIndexTestCase, TestCase):
             search_params, 2, "random sorting"
         )
 
-    def test_oa_results_highlights(self) -> None:
-        # HL snippet in V3?
-        pass
-
-    async def test_oa_results_api_fields_es(self) -> None:
+    async def test_oa_results_highlights(self) -> None:
+        """Confirm snippet is properly highlighted."""
         search_params = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "Hong Liu Lorem v. Lynch-Loretta E.",
+            "q": "This is the best transcript",
         }
-
         # API
-        r = await self._test_api_results_count(search_params, 1, "api fields")
-        keys_to_check = [
-            "absolute_url",
-            "caseName",
-            "court",
-            "court_citation_string",
-            "court_exact",
-            "court_id",
-            "dateArgued",
-            "dateReargued",
-            "dateReargumentDenied",
-            "docketNumber",
-            "docket_id",
-            "download_url",
-            "duration",
-            "file_size_mp3",
-            "id",
-            "judge",
-            "local_path",
-            "pacer_case_id",
-            "panel_ids",
-            "snippet",
-            "source",
-            "sha1",
-            "timestamp",
-            "date_created",
-        ]
-        keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 24)
-        for key in keys_to_check:
-            self.assertTrue(
-                key in r.data["results"][0],
-                msg=f"Key {key} not found in the result object.",
+        r = await self._test_api_results_count(search_params, 1, "HL snippet")
+        self.assertIn(
+            "<mark>This is the best transcript</mark>",
+            r.data["results"][0]["snippet"],
+            msg="Snippet HL doesn't match.",
+        )
+
+    @override_settings(NO_MATCH_HL_SIZE=50)
+    def test_results_api_fields(self) -> None:
+        """Confirm fields in V3 ES Oral Arguments Search API results."""
+        mock_date = now()
+        print("Mock date", mock_date)
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            audio_1 = AudioFactory.create(
+                case_name="United States v. Lee ",
+                case_name_full="a_random_title",
+                docket_id=self.docket_1.pk,
+                duration=420,
+                judges="John American",
+                local_path_original_file="test/audio/ander_v._leo.mp3",
+                local_path_mp3=self.filepath_local,
+                source="C",
+                blocked=False,
+                sha1="a49ada009774496ac01fb49818837e2296705c97",
+                stt_status=Audio.STT_COMPLETE,
+                stt_google_response=self.json_transcript,
             )
+            audio_1.panel.add(self.author)
+            audio_1.processing_complete = True
+            audio_1.save(
+                update_fields=[
+                    "duration",
+                    "local_path_mp3",
+                    "processing_complete",
+                ]
+            )
+
+            docket = DocketFactory.create(
+                docket_number="",
+                court_id=self.court_1.pk,
+                date_argued=datetime.date(2015, 8, 16),
+                source=Docket.DEFAULT,
+                pacer_case_id="",
+            )
+            empty_fields_audio = AudioFactory(
+                docket=docket,
+                duration=653,
+                source="",
+                case_name="",
+                download_url="",
+                local_path_mp3=None,
+            )
+            empty_fields_audio.processing_complete = True
+            empty_fields_audio.save(
+                update_fields=[
+                    "duration",
+                    "local_path_mp3",
+                    "processing_complete",
+                ]
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"id:{audio_1.pk}",
+        }
+        # API
+        r = async_to_sync(self._test_api_results_count)(
+            search_params, 1, "API fields"
+        )
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(
+            keys_count,
+            len(audio_v3_fields),
+            msg="Document fields count didn't match.",
+        )
+        content_to_compare = {
+            "result": audio_1,
+            "snippet": "This is the best transcript. Nunc egestas sem sed libero",
+            "V4": False,
+        }
+        async_to_sync(self._test_api_fields_content)(
+            r, content_to_compare, audio_v3_fields, None, None
+        )
+
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": f"id:{empty_fields_audio.pk}",
+        }
+        # API
+        r = async_to_sync(self._test_api_results_count)(
+            search_params, 1, "Empty API fields"
+        )
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(
+            keys_count,
+            len(audio_v3_fields),
+            msg="Document fields count didn't match.",
+        )
+        content_to_compare = {
+            "result": empty_fields_audio,
+            "V4": False,
+        }
+        async_to_sync(self._test_api_fields_content)(
+            r, content_to_compare, audio_v3_fields, None, None
+        )
+        audio_1.delete()
+        empty_fields_audio.delete()
 
 
 class OAV4SearchAPITests(
