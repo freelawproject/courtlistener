@@ -27,6 +27,7 @@ from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    ESRECAPDocument,
     OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
@@ -65,6 +66,10 @@ def get_object_list(request, cd, paginator):
     is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION and (
         waffle.flag_is_active(request, "o-es-search-api-active")
     )
+    is_recap_active = cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    ] and (waffle.flag_is_active(request, "r-es-search-api-active"))
 
     if is_oral_argument_active:
         search_query = AudioDocument.search()
@@ -72,6 +77,8 @@ def get_object_list(request, cd, paginator):
         search_query = PersonDocument.search()
     elif is_opinion_active:
         search_query = OpinionDocument.search()
+    elif is_recap_active:
+        search_query = ESRECAPDocument.search()
     else:
         search_query = None
 
@@ -81,11 +88,13 @@ def get_object_list(request, cd, paginator):
             child_docs_count_query,
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
-    elif search_query and is_opinion_active:
+    elif search_query and (is_opinion_active or is_recap_active):
         cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
             highlighting_fields = {"text": 500}
+        elif cd["type"] == SEARCH_TYPES.RECAP:
+            highlighting_fields = {"plain_text": 500}
         main_query, _ = do_es_api_query(
             search_query,
             cd,
@@ -99,10 +108,15 @@ def get_object_list(request, cd, paginator):
         )
         main_query["caller"] = "api_search"
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if not is_recap_active and cd["type"] == SEARCH_TYPES.RECAP:
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if is_oral_argument_active or is_people_active or is_opinion_active:
+    if (
+        is_oral_argument_active
+        or is_people_active
+        or is_opinion_active
+        or is_recap_active
+    ):
         sl = ESList(
             main_query=main_query,
             offset=offset,
@@ -131,9 +145,11 @@ class ESList:
 
     def __len__(self):
         if self._length is None:
-            if self.type == SEARCH_TYPES.OPINION:
+            if self.type in [SEARCH_TYPES.OPINION, SEARCH_TYPES.DOCKETS]:
                 query = Q(self.main_query.to_dict(count=True)["query"])
-                self._length = do_collapse_count_query(self.main_query, query)
+                self._length = do_collapse_count_query(
+                    self.type, self.main_query, query
+                )
             else:
                 self._length = do_count_query(self.main_query)
         return self._length
