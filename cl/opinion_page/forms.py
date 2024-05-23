@@ -679,6 +679,81 @@ class MoCtAppCourtUploadForm(BaseCourtUploadForm):
         )
 
 
+class MoCtAppEdCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Missouri Court of Appeals Eastern District (moctapped) Upload Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.non_required_fields(["lead_author"])
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
+                "summary",
+                "second_judge",
+                "third_judge",
+                "panel",
+                "lower_court_str",
+                "lower_court_docket_number",
+            ]
+        )
+
+
+class MoCtAppSdCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Missouri Court of Appeals Southern District (moctappsd) Upload Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.non_required_fields(["lead_author"])
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
+                "summary",
+                "second_judge",
+                "third_judge",
+                "panel",
+                "lower_court_str",
+                "lower_court_docket_number",
+            ]
+        )
+
+
+class MoCtAppWdCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Missouri Court of Appeals Western District (moctappwd) Upload Portal
+    """
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.non_required_fields(["lead_author"])
+        self.drop_fields(
+            [
+                "date_argued",
+                "date_reargued",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
+                "summary",
+                "second_judge",
+                "third_judge",
+                "panel",
+                "lower_court_str",
+                "lower_court_docket_number",
+            ]
+        )
+
+
 class MissCourtUploadForm(BaseCourtUploadForm):
     """
     Form for Mississippi Supreme Court (miss) Upload Portal

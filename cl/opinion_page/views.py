@@ -67,6 +67,9 @@ from cl.opinion_page.forms import (
     MissCtAppCourtUploadForm,
     MoCourtUploadForm,
     MoCtAppCourtUploadForm,
+    MoCtAppEdCourtUploadForm,
+    MoCtAppSdCourtUploadForm,
+    MoCtAppWdCourtUploadForm,
     TennWorkCompAppUploadForm,
     TennWorkCompClUploadForm,
 )
@@ -103,6 +106,9 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
         "me",
         "mo",
         "moctapp",
+        "moctapped",
+        "moctappsd",
+        "moctappwd",
         "miss",
         "missctapp",
     ]:
@@ -150,6 +156,9 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     "uploaders_me",
     "uploaders_mo",
     "uploaders_moctapp",
+    "uploaders_moctapped",
+    "uploaders_moctappsd",
+    "uploaders_moctappwd",
     "uploaders_miss",
     "uploaders_missctapp",
 )
@@ -166,6 +175,9 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
         "me",
         "mo",
         "moctapp",
+        "moctapped",
+        "moctappsd",
+        "moctappwd",
         "miss",
         "missctapp",
     ]:
@@ -197,6 +209,12 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
         upload_form = MoCourtUploadForm
     elif pk == "moctapp":
         upload_form = MoCtAppCourtUploadForm
+    elif pk == "moctapped":
+        upload_form = MoCtAppEdCourtUploadForm
+    elif pk == "moctappsd":
+        upload_form = MoCtAppSdCourtUploadForm
+    elif pk == "moctappwd":
+        upload_form = MoCtAppWdCourtUploadForm
     elif pk == "miss":
         upload_form = MissCourtUploadForm
     else:
