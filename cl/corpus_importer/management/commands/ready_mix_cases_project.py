@@ -104,18 +104,28 @@ def get_district_courts(court_ids: list[str]) -> list[str]:
 
 
 def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
-    """Retrieve a list of district or bankruptcy courts IDS from database.
+    """Retrieve a list of district,  bankruptcy or all courts IDS
+    (district + bankruptcy)  from database.
 
     :param court_type: The court type.
     :param court_ids: A list of court ids or all.
     :return: A list of Court IDs.
     """
 
-    return (
-        get_bankruptcy_courts(court_ids)
-        if court_type == "bankruptcy"
-        else get_district_courts(court_ids)
+    court_ids_to_scrape = (
+        get_bankruptcy_courts(court_ids) + get_district_courts(court_ids)
+        if court_type == "all"
+        else (
+            get_district_courts(court_ids)
+            if court_type == "district"
+            else (
+                get_bankruptcy_courts(court_ids)
+                if court_type == "bankruptcy"
+                else []
+            )
+        )
     )
+    return court_ids_to_scrape
 
 
 def get_latest_pacer_case_id(court_id: str, date_filed: date) -> str | None:
@@ -238,10 +248,6 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
         if court_id in courts_ids_to_scrape
     ]
 
-    for court_id in court_ids:
-        # Restart empty iquery results to 0.
-        r.hset("iquery_empty_results", court_id, 0)
-
     # Create a queue that's a bit longer than the number of courts we're doing
     throttle = CeleryThrottle(queue_name=q, min_items=len(court_ids) * 2)
     iterations_completed = 0
@@ -318,9 +324,9 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--court-type",
             type=str,
-            required=False,
-            choices=["district", "bankruptcy"],
-            help="The court type to scrape, 'district' or 'bankruptcy",
+            required=True,
+            choices=["district", "bankruptcy", "all"],
+            help="The court type to scrape, 'district', 'bankruptcy' or 'all'.",
         )
         parser.add_argument(
             "--courts",

@@ -4824,6 +4824,7 @@ class IndexDocketRECAPDocumentsCommandTest(
         call_command(
             "ready_mix_cases_project",
             task="re-index-dockets",
+            court_type="bankruptcy",
             queue="celery",
         )
 
