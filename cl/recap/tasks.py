@@ -1573,14 +1573,15 @@ def fetch_pacer_doc_by_rd(
         self.request.chain = None
         return
     except PacerLoginException as exc:
+        msg = f"PacerLoginException while getting document for rd: {rd.pk}."
         if self.request.retries == self.max_retries:
-            msg = (
-                f"PacerLoginException while getting document for rd: {rd.pk}."
-            )
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             delete_pacer_cookie_from_cache(fq.user_id)
             self.request.chain = None
             return None
+        mark_fq_status(
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
         raise self.retry(exc=exc)
 
     court_id = rd.docket_entry.docket.court_id
@@ -1679,6 +1680,17 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             return
         logger.info("Ran into a RequestException. Retrying.")
+        raise self.retry(exc=exc)
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting attachment page"
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            delete_pacer_cookie_from_cache(fq.user_id)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
         raise self.retry(exc=exc)
 
     text = r.response.text
