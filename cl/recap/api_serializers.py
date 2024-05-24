@@ -93,13 +93,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.CASE_QUERY_PAGE,
             UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE,
         ]:
-            # These are district court dockets. Is the court valid?
-            district_court_ids = (
-                Court.federal_courts.district_pacer_courts().values_list(
-                    "pk", flat=True
-                )
+            # These are district or bankruptcy court dockets. Is the court valid?
+            court_ids = Court.federal_courts.district_or_bankruptcy_pacer_courts().values_list(
+                "pk", flat=True
             )
-            if attrs["court"].pk not in district_court_ids:
+            if attrs["court"].pk not in court_ids:
                 raise ValidationError(
                     "%s is not a district or bankruptcy court ID. Did you "
                     "mean to use the upload_type for appellate dockets?"
@@ -108,12 +106,12 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
         if attrs["upload_type"] == UPLOAD_TYPE.CLAIMS_REGISTER:
             # Only allowed on bankruptcy courts
-            district_court_ids = (
+            bankruptcy_court_ids = (
                 Court.federal_courts.bankruptcy_pacer_courts().values_list(
                     "pk", flat=True
                 )
             )
-            if attrs["court"].pk not in district_court_ids:
+            if attrs["court"].pk not in bankruptcy_court_ids:
                 raise ValidationError(
                     "%s is not a bankruptcy court ID. Only bankruptcy cases "
                     "should have claims registry pages." % attrs["court"]
@@ -273,12 +271,10 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         # Is it a good court value?
-        district_court_ids = (
-            Court.federal_courts.district_pacer_courts().values_list(
-                "pk", flat=True
-            )
+        court_ids = Court.federal_courts.district_or_bankruptcy_pacer_courts().values_list(
+            "pk", flat=True
         )
-        if attrs.get("court") and attrs["court"].pk not in district_court_ids:
+        if attrs.get("court") and attrs["court"].pk not in court_ids:
             raise ValidationError(f"Invalid court id: {attrs['court'].pk}")
 
         # Docket validations

@@ -10,6 +10,7 @@ from redis import Redis
 from redis.exceptions import ConnectionError
 
 from cl.corpus_importer.tasks import make_docket_by_iquery
+from cl.lib.argparse_types import valid_date_time
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import build_es_base_query
@@ -25,10 +26,11 @@ from cl.search.tasks import index_dockets_in_bulk
 class OptionsType(TypedDict):
     queue: str
     courts: List[str]
+    court_type: str
     iterations: int
     iteration_delay: float
     stop_threshold: int
-    year: int
+    date_filed: date
 
 
 def confirm_es_indexing(options):
@@ -88,20 +90,49 @@ def get_bankruptcy_courts(court_ids: list[str]) -> list[str]:
     return list(bankr_courts.values_list("pk", flat=True))
 
 
-def get_latest_pacer_case_id(court_id: str, year: int) -> str | None:
-    """Fetch the latest pacer_case_id for a specific court and year.
+def get_district_courts(court_ids: list[str]) -> list[str]:
+    """Retrieve a list of district courts IDS from database.
+
+    :param court_ids: A list of court ids or all.
+    :return: A list of Court IDs.
+    """
+    district_courts = Court.objects.district_courts().all().only("pk")
+    if court_ids != ["all"]:
+        district_courts = district_courts.filter(pk__in=court_ids)
+
+    return list(district_courts.values_list("pk", flat=True))
+
+
+def get_courts_to_scrape(court_type: str, court_ids: list[str]) -> list[str]:
+    """Retrieve a list of district or bankruptcy courts IDS from database.
+
+    :param court_type: The court type.
+    :param court_ids: A list of court ids or all.
+    :return: A list of Court IDs.
+    """
+
+    return (
+        get_bankruptcy_courts(court_ids)
+        if court_type == "bankruptcy"
+        else get_district_courts(court_ids)
+    )
+
+
+def get_latest_pacer_case_id(court_id: str, date_filed: date) -> str | None:
+    """Fetch the latest pacer_case_id for a specific court and date_filed.
 
     :param court_id: The court ID.
-    :param year: The year for which to find the latest pacer_case_id.
+    :param date_filed: The date_filed for which to find the latest pacer_case_id.
     :return: The latest pacer_case_id if found, otherwise None.
     """
 
     latest_docket = (
         Docket.objects.filter(
             court_id=court_id,
-            date_filed__year=year,
+            date_filed__lte=date_filed,
             pacer_case_id__isnull=False,
         )
+        .only("date_filed", "pacer_case_id", "court_id")
         .order_by("-date_filed")
         .first()
     )
@@ -112,8 +143,8 @@ def get_latest_pacer_case_id(court_id: str, year: int) -> str | None:
 
 
 def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
-    """Get the starting pacer_case_id based on the provided year and store it
-    in Redis for each court.
+    """Get the starting pacer_case_id based on the provided date_filed and
+    store it in Redis for each court.
 
     :param options: The options from the handle method
     :param r: The Redis DB to connect to as a connection interface or str that
@@ -121,10 +152,10 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
     :return None
     """
 
-    court_ids = get_bankruptcy_courts(options["courts"])
+    court_ids = get_courts_to_scrape(options["court_type"], options["courts"])
     for court_id in court_ids:
         latest_pacer_case_id = get_latest_pacer_case_id(
-            court_id, options["year"]
+            court_id, options["date_filed"]
         )
         if not latest_pacer_case_id:
             r.hdel("iquery_status", court_id)
@@ -196,8 +227,17 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
     stop_threshold = options["stop_threshold"]
     r = get_redis_interface("CACHE")
 
-    # Only process court with a pacer_case_id from the provided year.
-    court_ids = r.hkeys("iquery_status")
+    # Only process court with a pacer_case_id from the provided court type.
+    court_ids_status = r.hkeys("iquery_status")
+    courts_ids_to_scrape = get_courts_to_scrape(
+        options["court_type"], options["courts"]
+    )
+    court_ids = [
+        court_id
+        for court_id in court_ids_status
+        if court_id in courts_ids_to_scrape
+    ]
+
     for court_id in court_ids:
         # Restart empty iquery results to 0.
         r.hset("iquery_empty_results", court_id, 0)
@@ -226,11 +266,11 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
             try:
                 pacer_case_id = r.hget("iquery_status", court_id)
                 if pacer_case_id is None:
-                    # Abort, no pacer_case_id found for the given year
+                    # Abort, no pacer_case_id found for the given date_filed
                     court_ids.remove(court_id)
                     logger.info(
                         f"Aborting court: {court_id}, no pacer_case_id "
-                        f"found in {options['year']}"
+                        f"found in {options['date_filed']}"
                     )
                     continue
 
@@ -276,6 +316,13 @@ class Command(VerboseCommand):
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
+            "--court-type",
+            type=str,
+            required=False,
+            choices=["district", "bankruptcy"],
+            help="The court type to scrape, 'district' or 'bankruptcy",
+        )
+        parser.add_argument(
             "--courts",
             type=str,
             default=["all"],
@@ -314,10 +361,10 @@ class Command(VerboseCommand):
             help="How many empty iquery pages results before stopping the court.",
         )
         parser.add_argument(
-            "--year",
-            type=int,
-            default=2019,
-            help="The year to extract the latest case from.",
+            "--date-filed",
+            default="2021-01-18",
+            type=valid_date_time,
+            help="The date_filed to extract the latest case from.",
         )
         parser.add_argument(
             "--results-size",
