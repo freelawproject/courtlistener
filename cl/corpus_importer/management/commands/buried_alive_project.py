@@ -2,12 +2,12 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from juriscraper.pacer.http import PacerSession
 from requests import Session
 
 from cl.corpus_importer.tasks import get_docket_by_pacer_case_id
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.search.models import Docket
@@ -54,7 +54,7 @@ def get_pacer_dockets(options, docket_pks, tags):
             break
         throttle.maybe_wait()
         if i % 1000 == 0 or pacer_session is None:
-            pacer_session = PacerSession(
+            pacer_session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
