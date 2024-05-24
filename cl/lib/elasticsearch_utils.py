@@ -316,7 +316,7 @@ def validate_query_syntax(value: str, query_type: QueryType) -> None:
 
 def build_fulltext_query(
     fields: list[str], value: str, only_queries=False
-) -> QueryString | List:
+) -> QueryString | list:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
@@ -929,7 +929,7 @@ def build_has_child_query(
 def combine_plain_filters_and_queries(
     cd: CleanData,
     filters: list,
-    string_query: QueryString,
+    string_query: QueryString | list,
     api_version: Literal["v3", "v4"] | None = None,
 ) -> Query:
     """Combine filters and query strings for plain documents, like Oral arguments
@@ -945,8 +945,8 @@ def combine_plain_filters_and_queries(
     final_query = Q(string_query or "bool")
     if filters:
         final_query.filter = reduce(operator.iand, filters)
-        if string_query:
-            final_query.minimum_should_match = 1
+    if filters and string_query:
+        final_query.minimum_should_match = 1
 
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         # Apply custom score for dateArgued sorting in the V4 API.
