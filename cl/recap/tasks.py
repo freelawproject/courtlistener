@@ -31,7 +31,6 @@ from juriscraper.pacer import (
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
-    PacerSession,
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
@@ -60,6 +59,7 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
+    ProxyPacerSession,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
 )
@@ -1813,7 +1813,7 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     try:
         result = fetch_pacer_case_id_and_title(s, fq, court_id)
     except (requests.RequestException, ReadTimeoutError) as exc:
