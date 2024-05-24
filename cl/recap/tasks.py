@@ -60,6 +60,7 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     ProxyPacerSession,
+    delete_pacer_cookie_from_cache,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
 )
@@ -1571,6 +1572,16 @@ def fetch_pacer_doc_by_rd(
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return
+    except PacerLoginException as exc:
+        if self.request.retries == self.max_retries:
+            msg = (
+                f"PacerLoginException while getting document for rd: {rd.pk}."
+            )
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            delete_pacer_cookie_from_cache(fq.user_id)
+            self.request.chain = None
+            return None
+        raise self.retry(exc=exc)
 
     court_id = rd.docket_entry.docket.court_id
 
