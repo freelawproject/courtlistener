@@ -1,5 +1,6 @@
 import pickle
 from typing import Union
+from urllib.parse import urlparse
 
 from django.conf import settings
 from juriscraper.pacer import PacerSession
@@ -55,7 +56,8 @@ class ProxyPacerSession(PacerSession):
         Returns:
             str: The URL with the protocol changed from HTTPS to HTTP.
         """
-        return url.replace("https://", "http://")
+        new_url = urlparse(url)
+        return new_url._replace(scheme="http").geturl()
 
     def _prepare_login_request(self, url, *args, **kwargs):
         return super(PacerSession, self).post(
