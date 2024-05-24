@@ -1,6 +1,7 @@
 import pickle
 from typing import Union
 
+from django.conf import settings
 from juriscraper.pacer import PacerSession
 from redis import Redis
 from requests.cookies import RequestsCookieJar
@@ -8,6 +9,64 @@ from requests.cookies import RequestsCookieJar
 from cl.lib.redis_utils import get_redis_interface
 
 session_key = "session:pacer:cookies:user.%s"
+
+
+class ProxyPacerSession(PacerSession):
+    """
+    This class overrides the _prepare_login_request and post methods of the
+    PacerSession class to achieve the following:
+
+    - Sets the 'X-WhSentry-TLS' header to 'true' for all requests.
+    - Replaces 'https://' with 'http://' in the URL before making the request.
+    - Uses a proxy server for all requests.
+
+    If the post method is called with a 'headers' argument, it merges the
+    provided headers with the 'X-WhSentry-TLS' header set to 'true'. If no headers
+    argument is provided, it adds a new dictionary with the 'X-WhSentry-TLS' header
+    set to 'true' as the 'headers' argument.
+    """
+
+    def __init__(
+        self, cookies=None, username=None, password=None, client_code=None
+    ):
+        super().__init__(cookies, username, password, client_code)
+        self.proxies = {
+            "http": settings.EGRESS_PROXY_HOST,
+        }
+        self.headers["X-WhSentry-TLS"] = "true"
+
+    def _change_protocol(self, url: str) -> str:
+        """Converts a URL from HTTPS to HTTP protocol.
+
+        By default, HTTP clients create a CONNECT tunnel when a proxy is
+        configured and the target URL uses HTTPS. This doesn't provide the
+        security benefits of initiating TLS from the proxy. To address this,
+        Webhook Sentry provides way of proxying to HTTPS targets. We should:
+
+        1. Change the protocol in the URL to HTTP.
+        2. Set the `X-WhSentry-TLS` header in your request to instruct Webhook
+           Sentry to initiate TLS with the target server.
+
+        https://github.com/juggernaut/webhook-sentry?tab=readme-ov-file#https-target
+
+        Args:
+            url (str): The URL to modify.
+
+        Returns:
+            str: The URL with the protocol changed from HTTPS to HTTP.
+        """
+        return url.replace("https://", "http://")
+
+    def _prepare_login_request(self, url, *args, **kwargs):
+        return super(PacerSession, self).post(
+            self._change_protocol(url), **kwargs
+        )
+
+    def post(self, url, *args, **kwargs):
+        return super().post(self._change_protocol(url), **kwargs)
+
+    def get(self, url, *args, **kwargs):
+        return super().get(self._change_protocol(url), **kwargs)
 
 
 def log_into_pacer(
@@ -22,7 +81,7 @@ def log_into_pacer(
     :param client_code: A PACER client_code
     :return: Request.CookieJar
     """
-    s = PacerSession(
+    s = ProxyPacerSession(
         username=username,
         password=password,
         client_code=client_code,
