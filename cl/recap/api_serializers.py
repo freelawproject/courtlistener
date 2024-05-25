@@ -271,11 +271,19 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         # Is it a good court value?
-        court_ids = Court.federal_courts.district_or_bankruptcy_pacer_courts().values_list(
+        valid_court_ids = Court.federal_courts.district_or_bankruptcy_pacer_courts().values_list(
             "pk", flat=True
         )
-        if attrs.get("court") and attrs["court"].pk not in court_ids:
-            raise ValidationError(f"Invalid court id: {attrs['court'].pk}")
+
+        if attrs.get("court") or attrs.get("docket"):
+            # this check ensures the docket is not an appellate record.
+            court_id = (
+                attrs["court"].pk
+                if attrs.get("court")
+                else attrs["docket"].court_id
+            )
+            if court_id not in valid_court_ids:
+                raise ValidationError(f"Invalid court id: {court_id}")
 
         # Docket validations
         if attrs.get("pacer_case_id") and not attrs.get("court"):
