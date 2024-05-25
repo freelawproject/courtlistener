@@ -3,7 +3,6 @@ import csv
 import os
 
 from celery.canvas import chain
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.bulk_utils import (
     get_petitions,
@@ -15,6 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", "UNKNOWN!")
@@ -30,7 +30,7 @@ def get_dockets(options):
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = PacerSession(
+    pacer_session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     pacer_session.login()
@@ -41,7 +41,7 @@ def get_dockets(options):
             break
 
         if i % 1000 == 0:
-            pacer_session = PacerSession(
+            pacer_session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
