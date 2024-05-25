@@ -96,7 +96,7 @@ def get_district_courts(court_ids: list[str]) -> list[str]:
     :param court_ids: A list of court ids or all.
     :return: A list of Court IDs.
     """
-    district_courts = Court.objects.district_courts().all().only("pk")
+    district_courts = Court.federal_courts.district_courts().all().only("pk")
     if court_ids != ["all"]:
         district_courts = district_courts.filter(pk__in=court_ids)
 
@@ -248,6 +248,10 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
         if court_id in courts_ids_to_scrape
     ]
 
+    for court_id in court_ids:
+        # Restart empty iquery results to 0.
+        r.hset("iquery_empty_results", court_id, 0)
+
     # Create a queue that's a bit longer than the number of courts we're doing
     throttle = CeleryThrottle(queue_name=q, min_items=len(court_ids) * 2)
     iterations_completed = 0
@@ -290,6 +294,9 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
                     args=(court_id, pacer_case_id),
                     kwargs={"log_results_redis": True},
                     queue=q,
+                )
+                logger.info(
+                    f"Enqueued task for: {pacer_case_id} from {court_id}"
                 )
             except ConnectionError:
                 logger.info(
