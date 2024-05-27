@@ -28,7 +28,7 @@
   <div class="col-xs-12 col-md-8 col-lg-6">
     <h1>Data Coverage &mdash; What's in CourtListener?</h1>
     <p class="lead">CourtListener is a vast searchable collection of legal information.</p>
-    <p>We have millions of case law records including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|intcomma }} minutes of recordings (and counting).
+    <p>We have millions of case law records including <a href="https://free.law/projects/supreme-court-data/">a detailed collection of SCOTUS opinions</a>, tens of millions of PACER docket entries in the <a href="{% url "advanced_r" %}">RECAP Archive</a>, and <a href="{% url "advanced_oa" %}">the largest collection of oral argument recordings</a> available on the Internet, with {{ oa_duration|floatformat:"0"|intcomma }} minutes of recordings (and counting).
     </p>
     <p>The best way to think about our data is to consider where we get it from. The answer to that question depends on which kind of information you are interested in &mdash; PACER data (the RECAP Archive), case law, oral argument recordings, or financial disclosures.
     </p>
@@ -64,7 +64,7 @@
 
 
     <h2 id="oral-arguments">Oral Argument Recordings</h2>
-    <p>We have the largest collection of oral argument audio recordings on the Internet. Currently our collection contains {{ oa_duration|intcomma }} minutes of recordings.
+    <p>We have the largest collection of oral argument audio recordings on the Internet. Currently our collection contains {{ oa_duration|floatformat:"0"|intcomma }} minutes of recordings.
     </p>
     <p><a href="{% url "coverage_oa" %}" class="btn btn-default btn-lg">Oral Argument Coverage</a></p>
     {% include "includes/donate_footer_plea.html" %}
