@@ -264,15 +264,21 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
             logger.info("Finished all courts. Exiting!")
             break
 
+        updated_court_ids = court_ids.copy()
         for court_id in court_ids:
+            # Create/update the queue throttle equal than the number of courts
+            # we're doing.
+            throttle.update_min_items(len(updated_court_ids))
+            throttle.maybe_wait()
+
             iquery_empty_count = int(r.hget("iquery_empty_results", court_id))
             if iquery_empty_count >= stop_threshold:
                 # Abort for consecutive empty results.
                 # Stop doing this court.
                 court_ids.remove(court_id)
+                updated_court_ids.remove(court_id)
                 continue
 
-            throttle.maybe_wait()
             try:
                 pacer_case_id = r.hget("iquery_status", court_id)
                 if pacer_case_id is None:
