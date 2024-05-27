@@ -3,7 +3,6 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import (
     do_case_query_by_pacer_case_id,
@@ -13,6 +12,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -29,7 +29,9 @@ def download_dockets(options):
     reader = csv.DictReader(f, dialect=dialect)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
     for i, row in enumerate(reader):
         if i < options["offset"]:

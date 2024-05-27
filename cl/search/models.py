@@ -1934,7 +1934,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         ).exclude(pk="scotus")
 
-    def district_pacer_courts(self) -> models.QuerySet:
+    def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             Q(
                 jurisdiction__in=[

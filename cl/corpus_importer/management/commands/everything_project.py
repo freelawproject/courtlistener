@@ -2,7 +2,6 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import (
     filter_docket_by_tags,
@@ -12,6 +11,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.recap.constants import (
     CIVIL_RIGHTS_ACCOMMODATIONS,
     CIVIL_RIGHTS_ADA_EMPLOYMENT,
@@ -113,7 +113,9 @@ def get_dockets(options, items, tags, sample_size=0, doc_num_end=""):
 
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
     for i, row in enumerate(items):
         if i < options["offset"]:
@@ -124,7 +126,7 @@ def get_dockets(options, items, tags, sample_size=0, doc_num_end=""):
         if i % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = PacerSession(
+            session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             session.login()

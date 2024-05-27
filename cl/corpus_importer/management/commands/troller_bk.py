@@ -246,8 +246,8 @@ async def merge_rss_data(
     court = await Court.objects.aget(pk=court_id)
     dockets_created = 0
     all_rds_created: list[int] = []
-    district_court_ids = (
-        Court.federal_courts.district_pacer_courts().values_list(
+    court_ids = (
+        Court.federal_courts.district_or_bankruptcy_pacer_courts().values_list(
             "pk", flat=True
         )
     )
@@ -256,7 +256,7 @@ async def merge_rss_data(
         build_date
         and build_date
         > make_aware(datetime(year=2018, month=4, day=20), timezone.utc)
-        and await district_court_ids.filter(id=court_id).aexists()
+        and await court_ids.filter(id=court_id).aexists()
         and court_id not in courts_exceptions_no_rss
     ):
         # Avoid parsing/adding feeds after we start scraping RSS Feeds for
