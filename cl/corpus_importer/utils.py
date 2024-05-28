@@ -200,7 +200,9 @@ def compare_documents(file_characters: str, cl_characters: str) -> int:
                 found_overlaps.append(subset)
             matched_substring = ""
             start = stop - 1
-    if len(matched_substring) > 5:
+    if len(matched_substring) > 2:
+        # smallest possible opinion is Aff. in
+        # florida/court_opinions/documents/55615439f76c66d3.xml
         subset = make_subset_range(cl_characters, matched_substring)
         found_overlaps.append(subset)
 
@@ -866,6 +868,11 @@ def content_too_different(
     :param docket: The docket number from file/source to compare
     :return: Whether the opinion content is too dissimilar
     """
+
+    if len(file_characters) == len(cl_characters):
+        # the simplest case, both opinions are exactly the same
+        if file_characters == cl_characters:
+            return False
 
     if len(file_characters) > 10000:
         cosine_sim = get_cosine_similarity(file_characters, cl_characters)

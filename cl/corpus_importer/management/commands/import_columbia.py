@@ -12,6 +12,7 @@ michigan/supreme_court_opinions/documents/d5a484f1bad20ba0.xml
 
 import logging
 import os
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -71,13 +72,23 @@ def find_duplicates(
     docket_number = data["docket_number"] or ""
     case_name = data["case_name"] or ""
     case_name_short = data["case_name_short"] or ""
+    sha1 = data["xml_sha1"]
+
+    # Find a match using sha
+    opinions_by_sha = Opinion.objects.filter(sha1=sha1)
+    if opinions_by_sha.exists():
+        return opinions_by_sha.first().cluster
 
     for citation in valid_citations:
         xml_opinions_content = []
         for op in data["opinions"]:
             xml_opinions_content.append(op["opinion"])
 
-        all_opinions_content = " ".join(xml_opinions_content)
+        # Replace new lines, sometimes they cause words to be combined and reduce the
+        # accuracy of the match
+        all_opinions_content = re.sub(
+            r"(\n)+", " ", " ".join(xml_opinions_content)
+        )
         all_opinions_soup = BeautifulSoup(
             all_opinions_content, features="html.parser"
         )
@@ -308,6 +319,7 @@ def import_opinion(filepath: str, xml_dir: str) -> None:
         "court_id": "",
         "syllabus": syllabus,
         "opinions": opinions,
+        "xml_sha1": sha1,
     }
 
     # Add date data into columbia dict
@@ -346,6 +358,7 @@ def import_opinion(filepath: str, xml_dir: str) -> None:
         return
 
     valid_citations = []
+    invalid_citations = []
     for citation in columbia_data["citations"]:
         cites = get_citations(citation)
         if (
@@ -354,10 +367,12 @@ def import_opinion(filepath: str, xml_dir: str) -> None:
             and cites[0].groups.get("volume", False)
         ):
             valid_citations.append(cites[0])
+        else:
+            invalid_citations.append(citation)
 
     if not valid_citations:
         logger.warning(
-            f"Failed to get a valid citation for: {columbia_data['file']}"
+            f"Failed to get a valid citation for: {columbia_data['file']} ({'|'.join(invalid_citations)})"
         )
         return
 
