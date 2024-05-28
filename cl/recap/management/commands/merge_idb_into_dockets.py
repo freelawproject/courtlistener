@@ -3,7 +3,6 @@ import os
 from celery.canvas import chain
 from django.conf import settings
 from juriscraper.lib.string_utils import CaseNameTweaker
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import (
     get_pacer_case_id_and_title,
@@ -11,6 +10,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.lib.utils import chunks
 from cl.recap.constants import CV_2017, CV_2020, CV_2021
 from cl.recap.models import FjcIntegratedDatabase
@@ -116,7 +116,7 @@ class Command(VerboseCommand, CommandUtils):
         ds = Docket.objects.filter(idb_data__isnull=False, pacer_case_id=None)
         q = options["queue"]
         throttle = CeleryThrottle(queue_name=q)
-        session = PacerSession(
+        session = ProxyPacerSession(
             username=PACER_USERNAME, password=PACER_PASSWORD
         )
         session.login()
@@ -129,7 +129,7 @@ class Command(VerboseCommand, CommandUtils):
             if i % 5000 == 0:
                 # Re-authenticate just in case the auto-login mechanism isn't
                 # working.
-                session = PacerSession(
+                session = ProxyPacerSession(
                     username=PACER_USERNAME, password=PACER_PASSWORD
                 )
                 session.login()

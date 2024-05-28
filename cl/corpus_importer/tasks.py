@@ -31,7 +31,6 @@ from juriscraper.pacer import (
     DownloadConfirmationPage,
     FreeOpinionReport,
     ListOfCreditors,
-    PacerSession,
     PossibleCaseNumberApi,
     ShowCaseDocApi,
 )
@@ -67,6 +66,7 @@ from cl.lib.pacer import (
     map_pacer_to_cl_id,
 )
 from cl.lib.pacer_session import (
+    ProxyPacerSession,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
 )
@@ -318,7 +318,7 @@ def get_and_save_free_document_report(
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-    s = PacerSession(
+    s = ProxyPacerSession(
         cookies=cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
@@ -969,7 +969,7 @@ def get_pacer_case_id_and_title(
     if not cookies:
         # Get cookies from Redis if not provided
         cookies = get_pacer_cookie_from_cache(user_pk)  # type: ignore
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
     msg = ""
     try:
@@ -1034,7 +1034,7 @@ def do_case_query_by_pacer_case_id(
     saving it in the DB.
     :return: A dict with the pacer_case_id and docket_pk values.
     """
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
@@ -1142,7 +1142,6 @@ def filter_docket_by_tags(
     interval_step=5 * 60,
     ignore_result=True,
 )
-@throttle_task("1/s", key="court_id")
 def make_docket_by_iquery(
     self,
     court_id: str,
@@ -1168,7 +1167,7 @@ def make_docket_by_iquery(
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-    s = PacerSession(
+    s = ProxyPacerSession(
         cookies=cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
@@ -1283,7 +1282,7 @@ def get_docket_by_pacer_case_id(
 
     logging_id = f"{court_id}.{pacer_case_id}"
     logger.info("Querying docket report %s", logging_id)
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
     try:
         report.query(pacer_case_id, **kwargs)
@@ -1352,7 +1351,7 @@ def get_appellate_docket_by_docket_number(
     DB, if desired.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     """
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     report = AppellateDocketReport(court_id, s)
     logging_id = f"{court_id} - {docket_number}"
     logger.info("Querying docket report %s", logging_id)
@@ -1415,7 +1414,7 @@ def get_att_report_by_rd(
     if not rd.pacer_doc_id:
         return None
 
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     att_report = AttachmentPage(pacer_court_id, s)
     att_report.query(rd.pacer_doc_id)
@@ -1501,7 +1500,7 @@ def get_bankr_claims_registry(
     :param tag_names: A list of tag names that should be stored with the claims
     registry information in the DB.
     """
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     if data is None or data.get("docket_pk") is None:
         logger.warning(
             "Empty data argument or parameter. Terminating chains "
@@ -1619,7 +1618,7 @@ def download_pacer_pdf_by_rd(
 
     rd = RECAPDocument.objects.get(pk=rd_pk)
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     report = FreeOpinionReport(pacer_court_id, s)
 
     r, r_msg = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
@@ -1648,7 +1647,7 @@ def download_pdf_by_magic_number(
     there was one.
     """
 
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     report = FreeOpinionReport(court_id, s)
     r, r_msg = report.download_pdf(
         pacer_case_id, pacer_doc_id, magic_number, appellate
@@ -1670,7 +1669,7 @@ def get_document_number_from_confirmation_page(
     cookies = get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     doc_num_report = DownloadConfirmationPage(court_id, s)
     doc_num_report.query(pacer_doc_id)
     data = doc_num_report.data
@@ -1745,7 +1744,7 @@ def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     receipt_report = DownloadConfirmationPage(court_id, s)
     receipt_report.query(pacer_doc_id)
     data = receipt_report.data
@@ -1776,7 +1775,7 @@ def is_docket_entry_sealed(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     report = BaseReport(court_id, s)
     return report.is_entry_sealed(case_id, doc_id)
 
@@ -2057,7 +2056,7 @@ def get_pacer_doc_id_with_show_case_doc_url(
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     pacer_court_id = map_cl_to_pacer_id(d.court_id)
     report = ShowCaseDocApi(pacer_court_id, s)
     last_try = self.request.retries == self.max_retries
@@ -2170,7 +2169,7 @@ def query_and_save_list_of_creditors(
     :return: None
     """
 
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     try:
         report = ListOfCreditors(court_id, s)
     except AssertionError:
