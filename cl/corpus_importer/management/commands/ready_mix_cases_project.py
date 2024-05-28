@@ -252,8 +252,8 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
         # Restart empty iquery results to 0.
         r.hset("iquery_empty_results", court_id, 0)
 
-    # Create a queue that's a bit longer than the number of courts we're doing
-    throttle = CeleryThrottle(queue_name=q, min_items=len(court_ids) * 2)
+    # Create a queue equal than the number of courts we're doing.
+    throttle = CeleryThrottle(queue_name=q, min_items=len(court_ids))
     iterations_completed = 0
     while (
         options["iterations"] == 0
@@ -264,15 +264,21 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
             logger.info("Finished all courts. Exiting!")
             break
 
+        updated_court_ids = court_ids.copy()
         for court_id in court_ids:
+            # Create/update the queue throttle equal than the number of courts
+            # we're doing.
+            throttle.update_min_items(len(updated_court_ids))
+            throttle.maybe_wait()
+
             iquery_empty_count = int(r.hget("iquery_empty_results", court_id))
             if iquery_empty_count >= stop_threshold:
                 # Abort for consecutive empty results.
                 # Stop doing this court.
                 court_ids.remove(court_id)
+                updated_court_ids.remove(court_id)
                 continue
 
-            throttle.maybe_wait()
             try:
                 pacer_case_id = r.hget("iquery_status", court_id)
                 if pacer_case_id is None:
@@ -290,6 +296,13 @@ def add_bank_cases_to_cl(options: OptionsType, r) -> None:
                     court_ids.remove(court_id)
                     continue
                 pacer_case_id = r.hincrby("iquery_status", court_id, 1)
+
+                if Docket.objects.filter(
+                    court_id=court_id, pacer_case_id=str(pacer_case_id)
+                ).exists():
+                    # Check if we already have the docket. If so, omit it.
+                    continue
+
                 make_docket_by_iquery.apply_async(
                     args=(court_id, pacer_case_id),
                     kwargs={"log_results_redis": True},
