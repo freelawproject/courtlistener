@@ -29,11 +29,10 @@ class TimeStampField(serializers.Field):
                     default_timezone=self.timezone
                 ).to_representation(value)
             else:
-                date_time_aware = timezone.make_aware(
-                    value, datetime.timezone.utc
-                )
+                if timezone.is_naive(value):
+                    value = timezone.make_aware(value, datetime.timezone.utc)
                 return serializers.DateTimeField().to_representation(
-                    timezone.localtime(date_time_aware)
+                    timezone.localtime(value)
                 )
         if isinstance(value, str):
             try:

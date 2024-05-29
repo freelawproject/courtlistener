@@ -880,7 +880,12 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         }
         cls.request = RequestFactory().request()
         cls.request.user = cls.user
-        cls.court = CourtFactory(id="canb", jurisdiction="FB", in_use=True)
+        cls.court = CourtFactory(
+            id="canb", jurisdiction=Court.FEDERAL_DISTRICT, in_use=True
+        )
+        cls.court_appellate = CourtFactory(
+            id="ca11", jurisdiction=Court.FEDERAL_APPELLATE, in_use=True
+        )
 
     def test_simple_request_serialization(self, mock) -> None:
         """Can we serialize a simple request?"""
@@ -909,6 +914,60 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         self.assertIn(
             serialized_fq.errors["non_field_errors"][0],
             "PACER case ID can not contain a single (-); that looks like a docket number.",
+        )
+
+    def test_recap_fetch_validate_court(self, mock):
+        """Can we properly validate the court_id"""
+
+        appellate_docket = DocketFactory(
+            source=Docket.RECAP,
+            court_id="ca11",
+        )
+        # checks the provided docket id is not an appellate record
+        self.fetch_attributes["docket"] = appellate_docket.pk
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertIn(
+            serialized_fq.errors["non_field_errors"][0],
+            "Invalid court id: ca11",
+        )
+
+        # checks the provided court when users send a pacer_case_id-court pair
+        del self.fetch_attributes["docket"]
+        self.fetch_attributes.update(
+            {
+                "pacer_case_id": appellate_docket.pacer_case_id,
+                "court": appellate_docket.court_id,
+            }
+        )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertIn(
+            serialized_fq.errors["non_field_errors"][0],
+            "Invalid court id: ca11",
+        )
+
+        # checks the provided court when users send a docket_number-court pair
+        del self.fetch_attributes["pacer_case_id"]
+        self.fetch_attributes.update(
+            {
+                "docket_number": appellate_docket.docket_number,
+            }
+        )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertIn(
+            serialized_fq.errors["non_field_errors"][0],
+            "Invalid court id: ca11",
         )
 
     def test_key_serialization_with_client_code(self, mock) -> None:

@@ -11,7 +11,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
-from juriscraper.pacer import CaseQuery, PacerSession
+from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
 
 from cl.audio.models import Audio
@@ -24,7 +24,7 @@ from cl.lib.celery_utils import throttle_task
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import get_or_cache_pacer_cookies
+from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
@@ -409,7 +409,7 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-    s = PacerSession(
+    s = ProxyPacerSession(
         cookies=cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,

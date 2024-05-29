@@ -278,6 +278,7 @@ class CursorESList:
         SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
         SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
         SEARCH_TYPES.PEOPLE: ("id", PersonDocument),
+        SEARCH_TYPES.ORAL_ARGUMENT: ("id", AudioDocument),
     }
 
     def __init__(
