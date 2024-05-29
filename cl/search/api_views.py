@@ -27,10 +27,12 @@ from cl.search.api_serializers import (
     RECAPESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
+    V3OAESResultSerializer,
     V3OpinionESResultSerializer,
 )
 from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
+    AudioDocument,
     DocketDocument,
     OpinionClusterDocument,
     PersonDocument,
@@ -208,7 +210,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 search_type == SEARCH_TYPES.ORAL_ARGUMENT
                 and waffle.flag_is_active(request, "oa-es-active")
             ):
-                serializer = OAESResultSerializer(result_page, many=True)
+                serializer = V3OAESResultSerializer(result_page, many=True)
             elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
                 request, "p-es-active"
             ):
@@ -255,6 +257,10 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
         SEARCH_TYPES.PEOPLE: {
             "document_class": PersonDocument,
             "serializer_class": PersonESResultSerializer,
+        },
+        SEARCH_TYPES.ORAL_ARGUMENT: {
+            "document_class": AudioDocument,
+            "serializer_class": OAESResultSerializer,
         },
     }
 
