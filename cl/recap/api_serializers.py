@@ -71,6 +71,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.ACMS_DOCKET_JSON,
             UPLOAD_TYPE.CLAIMS_REGISTER,
         ]:
             # Dockets shouldn't have these fields completed.
@@ -120,6 +121,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         if attrs["upload_type"] in [
             UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE,
             UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+            UPLOAD_TYPE.ACMS_DOCKET_JSON,
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE,
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
         ]:

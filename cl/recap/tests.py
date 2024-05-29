@@ -262,6 +262,7 @@ class RecapUploadsTest(TestCase):
         self.data.update(
             {
                 "upload_type": UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+                "court": self.court_appellate.id,
                 "document_number": "",
             }
         )
@@ -637,6 +638,7 @@ class RecapUploadsTest(TestCase):
                 "upload_type": UPLOAD_TYPE.ACMS_DOCKET_JSON,
                 "document_number": "",
                 "pacer_case_id": "34cacf7f-52d5-4d1f-b4f0-0542b429f674",
+                "court": self.court_appellate.id,
             }
         )
         del self.data["pacer_doc_id"]
