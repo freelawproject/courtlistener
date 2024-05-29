@@ -2651,7 +2651,7 @@ class HarvardMergerTests(TestCase):
             cluster_id=cluster.id
         ).values_list("author_str", flat=True)
 
-        authors = list(author_query)
+        authors = list(sorted(author_query))
 
         self.assertEqual(
             Opinion.objects.filter(cluster_id=cluster.id).count(),
