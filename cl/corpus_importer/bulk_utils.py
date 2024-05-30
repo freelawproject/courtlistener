@@ -1,12 +1,12 @@
 from celery import chain
 from django.conf import settings
 from django.core.paginator import Paginator
-from juriscraper.pacer import PacerSession
 from requests import Session
 
 from cl.corpus_importer.tasks import get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.scrapers.tasks import extract_recap_pdf
@@ -75,7 +75,7 @@ def get_petitions(
     )
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = PacerSession(
+    pacer_session = ProxyPacerSession(
         username=pacer_username, password=pacer_password
     )
     pacer_session.login()
@@ -87,7 +87,7 @@ def get_petitions(
             break
 
         if i % 1000 == 0:
-            pacer_session = PacerSession(
+            pacer_session = ProxyPacerSession(
                 username=pacer_username, password=pacer_password
             )
             pacer_session.login()

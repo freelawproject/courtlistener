@@ -102,7 +102,7 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
     ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED)
 
     cl_court_ids = (
-        Court.federal_courts.district_pacer_courts()
+        Court.federal_courts.district_or_bankruptcy_pacer_courts()
         .filter(
             in_use=True,
             end_date=None,
