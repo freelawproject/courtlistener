@@ -13,6 +13,7 @@ from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.management import call_command
 from django.utils.timezone import make_aware, now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
@@ -110,7 +111,7 @@ from cl.search.models import (
 )
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.tests.fakes import FakeFreeOpinionReport
+from cl.tests.fakes import FakeCaseQueryReport, FakeFreeOpinionReport
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -3329,3 +3330,89 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
             mock_logger.info.assert_called_with(
                 f"Cluster id: {cluster.id} already merged"
             )
+
+
+@patch(
+    "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
+    return_value=None,
+)
+class ScrapeIqueryPagesTest(TestCase):
+    """Tests related to scrape_iquery_pages command."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            case_name="Foo v. Bar",
+            case_name_full="Foo v. Bar",
+            docket_number="2:17-cv-00573",
+            pacer_case_id="1",
+        )
+        DocketFactory(
+            court=cls.court,
+            source=Docket.RECAP,
+            case_name="Lorem v. Bar",
+            case_name_full="Lorem v. Bar",
+            docket_number="2:17-cv-00578",
+            pacer_case_id="8",
+        )
+
+    def setUp(self) -> None:
+        self.r = get_redis_interface("CACHE")
+        keys_to_clean = [
+            "pacer_case_id_init",
+            "pacer_case_id_final",
+            "court_limiter",
+        ]
+        for key_to_clean in keys_to_clean:
+            key = self.r.keys(key_to_clean)
+            if key:
+                self.r.delete(*key)
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_scrape_iquery_pages(self, mock_cookies):
+        """Test scrape_iquery_pages by providing an initial and final
+        pacer_case_ids to scrape."""
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 2)
+        r = get_redis_interface("CACHE")
+        r.hset("pacer_case_id_init", self.court.pk, 1)
+        r.hset("pacer_case_id_final", self.court.pk, 3)
+        call_command(
+            "scrape_iquery_pages",
+            testing_iterations=3,
+        )
+        # 2 additional dockets should exist after complete the scrape.
+        self.assertEqual(
+            dockets.count(), 4, msg="Docket number doesn't match."
+        )
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_scrape_update_pacer_case_id_final(self, mock_cookies):
+        """Test scrape_iquery_pages by getting the final pacer_case_id
+        from DB."""
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 2)
+        r = get_redis_interface("CACHE")
+        # Simulate pacer_case_id_init has reached pacer_case_id_final
+        # pacer_case_id_final will be updated from DB, which is now 8
+        r.hset("pacer_case_id_init", self.court.pk, 5)
+        r.hset("pacer_case_id_final", self.court.pk, 5)
+        call_command(
+            "scrape_iquery_pages",
+            testing_iterations=5,
+        )
+        # Scrape will add 2 more dockets, pacer_case_id 6 and 7.
+        self.assertEqual(
+            dockets.count(), 4, msg="Docket number doesn't match."
+        )

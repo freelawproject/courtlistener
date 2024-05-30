@@ -1,7 +1,10 @@
 from datetime import date
 from unittest.mock import MagicMock
 
-from cl.corpus_importer.factories import FreeOpinionRowDataFactory
+from cl.corpus_importer.factories import (
+    CaseQueryDataFactory,
+    FreeOpinionRowDataFactory,
+)
 
 DOCKET_NUMBER = "5:18-cr-00227"
 CASE_NAME = "United States v. Maldonado-Passage"
@@ -91,3 +94,16 @@ class FakeFreeOpinionReport:
                 court_id="cand", docket_number="5:18-ap-07075"
             )
         ]
+
+
+class FakeCaseQueryReport:
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def query(self, pacer_case_id):
+        pass
+
+    @property
+    def data(self):
+        return CaseQueryDataFactory()

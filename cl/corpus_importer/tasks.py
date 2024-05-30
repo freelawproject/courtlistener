@@ -75,7 +75,11 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
-from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
+from cl.lib.redis_utils import (
+    create_redis_semaphore,
+    delete_redis_semaphore,
+    get_redis_interface,
+)
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -1216,6 +1220,69 @@ def make_docket_by_iquery(
         tag_names,
         add_to_solr=True,
     )
+
+
+def make_iquery_probing_key(court_id: str) -> str:
+    return f"iquery.binary.enqueued:{court_id}"
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
+    max_retries=10,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
+def iquery_pages_probing(
+    self,
+    court_id: str,
+) -> None:
+    """
+    Using the iquery endpoint, to perform forward probing and retrieve the
+    highest watermark we can scrape.
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up.
+    :return: None
+    """
+
+    cookies = get_or_cache_pacer_cookies(
+        "pacer_scraper",
+        settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+    s = ProxyPacerSession(
+        cookies=cookies,
+        username=settings.PACER_USERNAME,
+        password=settings.PACER_PASSWORD,
+    )
+
+    r = get_redis_interface("CACHE")
+    pacer_case_id_final = int(r.hget("pacer_case_id_final", court_id) or 0)
+
+    pacer_case_id = pacer_case_id_final + 256
+
+    report = CaseQuery(map_cl_to_pacer_id(court_id), s)
+    try:
+        report.query(pacer_case_id)
+    except (requests.Timeout, requests.RequestException) as exc:
+        logger.warning(
+            "Timeout or unknown RequestException on iquery crawl. "
+            "Trying again if retries not exceeded."
+        )
+        if self.request.retries == self.max_retries:
+            return None
+        raise self.retry(exc=exc)
+
+    if not report.data:
+        logger.info(
+            "No valid data found in iquery page for %s.%s",
+            court_id,
+            pacer_case_id,
+        )
+
+    delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 
 
 # Retry 10 times. First one after 1m, then again every 5 minutes.
