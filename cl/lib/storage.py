@@ -3,6 +3,7 @@ import os
 import uuid
 from typing import Dict, Optional
 
+from django.conf import settings
 from django.core.files.storage import Storage
 from storages.backends.s3 import S3ManifestStaticStorage, S3Storage
 
@@ -104,7 +105,7 @@ class S3PrivateUUIDStorage(S3Storage):
     """
 
     default_acl = "private"
-    bucket_name = "com-courtlistener-private-storage"
+    bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
     file_overwrite = True
 
     def get_available_name(

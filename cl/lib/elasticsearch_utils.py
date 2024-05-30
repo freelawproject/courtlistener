@@ -316,7 +316,7 @@ def validate_query_syntax(value: str, query_type: QueryType) -> None:
 
 def build_fulltext_query(
     fields: list[str], value: str, only_queries=False
-) -> QueryString | List:
+) -> QueryString | list:
     """Given the cleaned data from a form, return a Elastic Search string query or []
     https://www.elastic.co/guide/en/elasticsearch/reference/current/full-text-queries.html
 
@@ -796,17 +796,17 @@ def build_custom_function_score_for_date(
 
     Define the function score for sorting, based on the child sort_field. When
     the order is 'entry_date_filed desc', the 'date_filed_time' value, adjusted
-    by washington_bd_offset, is used as the score, sorting newer documents
+    by sixteen_hundred_offset, is used as the score, sorting newer documents
     first. In 'asc' order, the score is the difference between 'current_time'
-    (also adjusted by the washington_bd_offset) and 'date_filed_time',
+    (also adjusted by the sixteen_hundred_offset) and 'date_filed_time',
     prioritizing older documents. If a document does not have a 'date_filed'
     set, the function returns 1. This ensures that dockets containing documents
     without a 'date_filed' are displayed before dockets without filings, which
-    have a default score of 0. washington_bd_offset is based on George
-    Washington's birthday (February 22, 1732), ensuring all epoch millisecond
-    values are positive and compatible with ES scoring system. This approach
-    allows for handling dates in our system both before and after January 1, 1970 (epoch time),
-    within a positive scoring range.
+    have a default score of 0. sixteen_hundred_offset is based on 1600-01-01 because we
+    have persons with dates of birth older than 1697. Ensuring all epoch
+    millisecond values are positive and compatible with ES scoring system.
+    This approach allows for handling dates in our system both before and
+    after January 1, 1970 (epoch time), within a positive scoring range.
 
     :param query: The Elasticsearch query string or QueryString object.
     :param order_by: If provided the field to use to compute score for sorting
@@ -842,14 +842,13 @@ def build_custom_function_score_for_date(
                     if (doc['{sort_field}'].size() == 0) {{
                         return {default_score};  // If not, return 'default_score' as the score
                     }} else {{
-                        // Offset based on the positive epoch time for Washington's birthday to ensure positive scores.
-                        // (February 22, 1732)
-                        long washington_bd_offset = 7506086400000L;
-                        // Get the current time in milliseconds, include the washington_bd_offset to work with positive epoch times.
-                        current_time = current_time + washington_bd_offset;
+                        // Offset based on the positive epoch time for 1600-01-01 to ensure positive scores.
+                        long sixteen_hundred_offset = 11676096000000L;
+                        // Get the current time in milliseconds, include the sixteen_hundred_offset to work with positive epoch times.
+                        current_time = current_time + sixteen_hundred_offset;
 
                         // Convert the 'sort_field' value to epoch milliseconds, adjusting by the same offset.
-                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli() + washington_bd_offset;
+                        long date_filed_time = doc['{sort_field}'].value.toInstant().toEpochMilli() + sixteen_hundred_offset;
 
                         // If the order is 'desc', return the 'date_filed_time' as the score
                         if (params.order.equals('desc')) {{
@@ -941,7 +940,7 @@ def build_has_child_query(
 def combine_plain_filters_and_queries(
     cd: CleanData,
     filters: list,
-    string_query: QueryString,
+    string_query: QueryString | list,
     api_version: Literal["v3", "v4"] | None = None,
 ) -> Query:
     """Combine filters and query strings for plain documents, like Oral arguments
@@ -957,8 +956,8 @@ def combine_plain_filters_and_queries(
     final_query = Q(string_query or "bool")
     if filters:
         final_query.filter = reduce(operator.iand, filters)
-        if string_query:
-            final_query.minimum_should_match = 1
+    if filters and string_query:
+        final_query.minimum_should_match = 1
 
     if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
         # Apply custom score for dateArgued sorting in the V4 API.

@@ -2,11 +2,11 @@ import os
 
 from celery import chain
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import get_docket_by_pacer_case_id
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.search.models import Docket
 from cl.search.tasks import add_or_update_recap_docket
 
@@ -20,7 +20,9 @@ def get_dockets(options):
     """Get the dockets by the particular judge."""
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
 
     jackson_id = 1609

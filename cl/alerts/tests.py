@@ -1840,6 +1840,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             jurisdiction="FB",
             citation_string="Bankr. C.D. Cal.",
         )
+        cls.docket = DocketFactory(
+            court=cls.court_1,
+            date_argued=now().date(),
+            docket_number="20-5736",
+        )
         cls.user_profile = UserProfileWithParentsFactory()
         NeonMembership.objects.create(
             level=NeonMembership.LEGACY, user=cls.user_profile.user
@@ -1889,6 +1894,12 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rate=Alert.MONTHLY,
             name="Test Alert OA Monthly",
             query="q=Test+OA&type=oa",
+        )
+        cls.search_alert_7 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA RT Docket ID",
+            query=f"q=docket_id:{cls.docket.pk}&type=oa",
         )
 
     @classmethod
@@ -2047,6 +2058,18 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rt_oral_argument.case_name,
         )
         self.assertEqual(
+            content["payload"]["results"][0]["docketNumber"],
+            rt_oral_argument.docket.docket_number,
+        )
+        self.assertEqual(
+            content["payload"]["results"][0]["snippet"],
+            rt_oral_argument.transcript,
+        )
+        self.assertEqual(
+            content["payload"]["results"][0]["judge"],
+            rt_oral_argument.judges,
+        )
+        self.assertEqual(
             content["payload"]["results"][0]["court"],
             rt_oral_argument.docket.court.full_name,
         )
@@ -2054,8 +2077,74 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             content["payload"]["results"][0]["source"],
             rt_oral_argument.source,
         )
+
+        # Confirm no HL fields are properly displayed.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            mock_date = now().replace(day=1, hour=5)
+            with time_machine.travel(
+                mock_date, tick=False
+            ), self.captureOnCommitCallbacks(execute=True):
+                # When the Audio object is created it should trigger an alert.
+                transcript_response = {
+                    "response": {
+                        "results": [
+                            {
+                                "alternatives": [
+                                    {
+                                        "transcript": "This a different transcript.",
+                                        "confidence": 0.85,
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                }
+                json_transcript = json.dumps(transcript_response)
+                rt_oral_argument_2 = AudioWithParentsFactory.create(
+                    case_name="No HL OA Alert",
+                    docket=self.docket,
+                    stt_status=Audio.STT_COMPLETE,
+                    judges="George Smith",
+                    stt_google_response=json_transcript,
+                )
+
+        self.assertEqual(len(mail.outbox), 3, msg="Wrong number of emails.")
+        text_content = mail.outbox[2].body
+
+        # Confirm all fields are displayed in the plain text version.
+        self.assertIn(rt_oral_argument_2.case_name, text_content)
+        self.assertIn(rt_oral_argument_2.judges, text_content)
+        self.assertIn(rt_oral_argument_2.docket.docket_number, text_content)
+        self.assertIn(rt_oral_argument_2.transcript, text_content)
+        self.assertIn(
+            rt_oral_argument_2.docket.court.citation_string, text_content
+        )
+
+        # Extract HTML version.
+        html_content = None
+        for content, content_type in mail.outbox[2].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        # Confirm all fields are displayed in the HTML version.
+        self.assertIn(rt_oral_argument_2.case_name, html_content)
+        self.assertIn(rt_oral_argument_2.judges, html_content)
+        self.assertIn(rt_oral_argument_2.docket.docket_number, html_content)
+        self.assertIn(rt_oral_argument_2.transcript, html_content)
+        self.assertIn(
+            rt_oral_argument_2.docket.court.citation_string,
+            html_content.replace("&nbsp;", " "),
+        )
+
         webhook_events.delete()
         rt_oral_argument.delete()
+        rt_oral_argument_2.delete()
 
     def test_send_alert_on_document_creation(self, mock_abort_audio):
         """Avoid sending Search Alerts on document updates."""
@@ -2498,7 +2587,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(memberships), 11)
         total_rt_alerts = Alert.objects.filter(rate=Alert.REAL_TIME)
         # 2 created in setUpTestData + 10
-        self.assertEqual(total_rt_alerts.count(), 12)
+        self.assertEqual(total_rt_alerts.count(), 13)
 
         # Clear the outbox
         mail.outbox = []
