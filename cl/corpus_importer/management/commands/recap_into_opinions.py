@@ -51,9 +51,7 @@ def import_opinions_from_recap(court=None, total_count=0):
         for page_number in paginator.page_range:
             chunk = paginator.page(page_number).object_list
             for recap_document in chunk:
-                docket = Docket.objects.get(
-                    docket_entries__recap_documents__id=recap_document.id
-                )
+                docket = recap_document.docket_entry.docket
                 if "-cv-" not in docket.docket_number:
                     logger.info(f"Skipping non civil opinion")
                     continue
