@@ -96,14 +96,32 @@ class FakeFreeOpinionReport:
         ]
 
 
+test_pattern_one = {
+    9: True,
+    10: False,
+    12: True,
+    16: False,
+    24: True,
+    40: True,
+    72: False,
+    136: False,
+    264: False,
+}
+
+
 class FakeCaseQueryReport:
 
     def __init__(self, *args, **kwargs):
-        pass
+        self.pacer_case_id = None
 
     def query(self, pacer_case_id):
-        pass
+        self.pacer_case_id = pacer_case_id
 
     @property
     def data(self):
-        return CaseQueryDataFactory()
+        if self.pacer_case_id < 9:
+            return CaseQueryDataFactory()
+        if test_pattern_one[self.pacer_case_id]:
+            return CaseQueryDataFactory()
+        else:
+            return None

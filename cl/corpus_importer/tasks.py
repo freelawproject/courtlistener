@@ -1,7 +1,9 @@
 import copy
 import logging
 import os
+import random
 import shutil
+import time
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
@@ -56,6 +58,7 @@ from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
+from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import (
     get_blocked_status,
@@ -75,11 +78,7 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
-from cl.lib.redis_utils import (
-    create_redis_semaphore,
-    delete_redis_semaphore,
-    get_redis_interface,
-)
+from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -1226,25 +1225,15 @@ def make_iquery_probing_key(court_id: str) -> str:
     return f"iquery.binary.enqueued:{court_id}"
 
 
-@app.task(
-    bind=True,
-    autoretry_for=(PacerLoginException, RedisConnectionError),
-    max_retries=10,
-    interval_start=1 * 60,
-    interval_step=5 * 60,
-    ignore_result=True,
-)
-def iquery_pages_probing(
-    self,
-    court_id: str,
-) -> None:
-    """
-    Using the iquery endpoint, to perform forward probing and retrieve the
-    highest watermark we can scrape.
+@retry((requests.Timeout, PacerLoginException), tries=3, delay=0.25, backoff=1)
+def query_iquery_page(
+    court_id: str, pacer_case_id: int
+) -> bool | dict[str, Any]:
+    """Query the iquery page for a given PACER case ID.
 
-    :param self: The celery task
     :param court_id: A CL court ID where we'll look things up.
-    :return: None
+    :param pacer_case_id: The Pacer Case ID to lookup.
+    :return: False if not valid report, otherwise the report.data.
     """
 
     cookies = get_or_cache_pacer_cookies(
@@ -1257,30 +1246,153 @@ def iquery_pages_probing(
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-
-    r = get_redis_interface("CACHE")
-    pacer_case_id_final = int(r.hget("pacer_case_id_final", court_id) or 0)
-
-    pacer_case_id = pacer_case_id_final + 256
-
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-    try:
-        report.query(pacer_case_id)
-    except (requests.Timeout, requests.RequestException) as exc:
-        logger.warning(
-            "Timeout or unknown RequestException on iquery crawl. "
-            "Trying again if retries not exceeded."
-        )
-        if self.request.retries == self.max_retries:
-            return None
-        raise self.retry(exc=exc)
-
+    report.query(pacer_case_id)
     if not report.data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
             court_id,
             pacer_case_id,
         )
+        return False
+    return report.data
+
+
+@retry(IntegrityError, tries=3, delay=0.25, backoff=1)
+def process_case_query_report(
+    court_id: str,
+    pacer_case_id: int,
+    report_data: dict[str, Any],
+    add_to_solr: bool,
+) -> None:
+    d = async_to_sync(find_docket_object)(
+        court_id,
+        str(pacer_case_id),
+        report_data["docket_number"],
+        using="default",
+    )
+    d.pacer_case_id = pacer_case_id
+    d.add_recap_source()
+    d = async_to_sync(update_docket_metadata)(d, report_data)
+    d.save()
+    add_bankruptcy_data_to_docket(d, report_data)
+    if add_to_solr:
+        add_items_to_solr([d.pk], "search.Docket")
+    logger.info(f"Created/updated docket: {d}")
+    return None
+
+
+def compute_binary_next_probe(
+    pacer_case_id_final: int,
+    probe_iteration: int,
+    court_probe_iteration: int,
+    probe_threshold: int,
+) -> tuple[int, int]:
+    """Compute the binary next probe target for a given PACER case ID.
+
+    :param pacer_case_id_final: The final PACER case ID.
+    :param probe_iteration: The current probe iteration number.
+    :param court_probe_iteration: The number of court probe iterations performed.
+    :param probe_threshold: The probe threshold value.
+    :return: The updated probe_iteration and the PACER case ID to lookup.
+    """
+
+    jitter = 0
+    probe_iteration += 1
+    if court_probe_iteration > 1:
+        # The previous iquery_pages_probing tasks didn't find a higher
+        # watermark, apply a jitter this time.
+        jitter = random.randint(1, round(probe_threshold * 0.05))
+
+    pacer_case_id_to_lookup = (
+        pacer_case_id_final + (2 ** (probe_iteration - 1)) + jitter
+    )
+
+    return probe_iteration, pacer_case_id_to_lookup
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(RedisConnectionError,),
+    max_retries=3,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
+def iquery_pages_probing(
+    self: Task,
+    court_id: str,
+) -> None:
+    """
+    Using the iquery endpoint, to perform forward probing and retrieve the
+    highest watermark we can scrape.
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up.
+    :return: None
+    """
+
+    r = get_redis_interface("CACHE")
+    probe_iteration = 0
+    latest_match = 0
+    last_iteration_hit = True
+    pacer_case_id_final = int(r.hget("pacer_case_id_final", court_id) or 0)
+    probe_threshold = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
+    court_probe_iteration = r.hincrby("court_probe_iteration", court_id, 1)
+    while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
+        probe_iteration, pacer_case_id_to_lookup = compute_binary_next_probe(
+            pacer_case_id_final,
+            probe_iteration,
+            court_probe_iteration,
+            probe_threshold,
+        )
+        try:
+            report_data = query_iquery_page(court_id, pacer_case_id_to_lookup)
+        except HTTPError:
+            r.setex(
+                f"court_limiter:{court_id}",
+                settings.IQUERY_COURT_BLOCKED_WAIT,
+                1,
+            )
+            logger.warning(
+                "HTTPError occurred when crawling iquery. The court %s website "
+                "is probably down or has blocked us. Abort probing for %s seconds ",
+                court_id,
+                settings.IQUERY_COURT_BLOCKED_WAIT,
+            )
+            delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
+            return None
+
+        except requests.Timeout as exc:
+            logger.warning(
+                "The court website is probably down. Waiting a bit before trying "
+                "the next pacer_case_id."
+            )
+            time.sleep(settings.IQUERY_COURT_TIMEOUT_WAIT)
+            continue
+
+        if report_data:
+            # Find and update/store the Docket.
+            process_case_query_report(
+                court_id,
+                pacer_case_id_to_lookup,
+                report_data,
+                add_to_solr=True,
+            )
+            latest_match = pacer_case_id_to_lookup
+            last_iteration_hit = True
+        else:
+            if last_iteration_hit:
+                # Previous iteration was valid, set this one as invalid and
+                # try the next pacer_case_id
+                last_iteration_hit = False
+                continue
+            else:
+                # Two blank iterations in a row. Terminate the probing loop.
+                break
+
+    if latest_match > pacer_case_id_final:
+        r.hset("pacer_case_id_final", court_id, latest_match)
 
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 

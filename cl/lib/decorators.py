@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def retry(
-    ExceptionToCheck: Type[Exception],
+    ExceptionToCheck: Type[Exception] | tuple[Type[Exception], ...],
     tries: int = 4,
     delay: float = 3,
     backoff: float = 2,

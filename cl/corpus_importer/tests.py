@@ -61,8 +61,10 @@ from cl.corpus_importer.management.commands.troller_bk import (
     merge_rss_data,
 )
 from cl.corpus_importer.tasks import (
+    compute_binary_next_probe,
     generate_ia_json,
     get_and_save_free_document_report,
+    iquery_pages_probing,
 )
 from cl.corpus_importer.utils import (
     ClusterSourceException,
@@ -3415,4 +3417,87 @@ class ScrapeIqueryPagesTest(TestCase):
         # Scrape will add 2 more dockets, pacer_case_id 6 and 7.
         self.assertEqual(
             dockets.count(), 4, msg="Docket number doesn't match."
+        )
+
+    def test_compute_binary_next_probe(self, mock_cookies):
+        """Confirm the method compute_binary_next_probe generates the expected
+        probe pattern based on the initial variables."""
+
+        pacer_case_id_final = 0
+        probe_iteration = 0
+        court_probe_iteration = 1
+        probe_threshold = 256
+        probe_pattern = []
+        for i in range(9):
+            probe_iteration, next_probe = compute_binary_next_probe(
+                pacer_case_id_final,
+                probe_iteration,
+                court_probe_iteration,
+                probe_threshold,
+            )
+            probe_pattern.append(next_probe)
+
+        expected_pattern = [1, 2, 4, 8, 16, 32, 64, 128, 256]
+        self.assertEqual(
+            expected_pattern,
+            probe_pattern,
+            msg="The probe pattern didn't match",
+        )
+
+        # Apply jitter.
+        court_probe_iteration = 2
+        probe_iteration = 0
+        probe_pattern_jitter = []
+        for i in range(9):
+            probe_iteration, next_probe = compute_binary_next_probe(
+                pacer_case_id_final,
+                probe_iteration,
+                court_probe_iteration,
+                probe_threshold,
+            )
+            probe_pattern_jitter.append(next_probe)
+
+        # Each element of probe_pattern_jitter can't deviate more than 13
+        # round(256 * 0.05)
+        deviation_threshold = 13
+        for expected, actual in zip(expected_pattern, probe_pattern_jitter):
+            self.assertTrue(
+                abs(expected - actual) <= deviation_threshold,
+                msg=f"The value {actual} deviates from {expected} by more than {deviation_threshold}",
+            )
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_iquery_pages_probing(self, mock_cookies):
+        """Test iquery_pages_probing."""
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 2)
+        r = get_redis_interface("CACHE")
+        # Simulate a pacer_case_id_final  = 8
+        r.hset("pacer_case_id_final", self.court.pk, 8)
+        # First court_probe_iteration, no jitter
+        r.hset("court_probe_iteration", self.court.pk, 0)
+        # Execute the task
+        iquery_pages_probing.delay("canb")
+
+        # New pacer_case_id_final according to the test patter in cl.tests.fakes.test_pattern_one
+        # test_pattern_one = {
+        #     9:True,
+        #     10:False,
+        #     12:True,
+        #     16:False,
+        #     24:True,
+        #     40:True,
+        #     72:False,
+        #     136:False,
+        #     264:False,
+        # }
+        pacer_case_id_final = r.hget("pacer_case_id_final", self.court.pk)
+        self.assertEqual(int(pacer_case_id_final), 40)
+        # Probing will add 4 more dockets
+        self.assertEqual(
+            dockets.count(), 6, msg="Docket number doesn't match."
         )

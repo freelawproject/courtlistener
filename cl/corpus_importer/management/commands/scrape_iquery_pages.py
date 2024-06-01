@@ -1,10 +1,15 @@
 import time
 
 from django.conf import settings
-from redis import Redis, ConnectionError
-from cl.corpus_importer.tasks import make_docket_by_iquery, iquery_pages_probing, make_iquery_probing_key
+from redis import ConnectionError, Redis
+
+from cl.corpus_importer.tasks import (
+    iquery_pages_probing,
+    make_docket_by_iquery,
+    make_iquery_probing_key,
+)
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.redis_utils import get_redis_interface, create_redis_semaphore
+from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 from cl.search.models import Court, Docket
 
 
@@ -28,7 +33,7 @@ def get_all_pacer_courts() -> list[str]:
             pk__in=["uscfc", "arb", "cit"]
         )
     )
-    return list(courts.values_list('pk', flat=True))
+    return list(courts.values_list("pk", flat=True))
 
 
 def get_latest_pacer_case_id(court_id: str) -> int:
@@ -37,7 +42,9 @@ def get_latest_pacer_case_id(court_id: str) -> int:
     :param court_id: The court ID.
     :return: The latest pacer_case_id if found, otherwise None.
     """
-    latest_docket = Docket.objects.filter(court_id=court_id, pacer_case_id__isnull=False).latest("date_created")
+    latest_docket = Docket.objects.filter(
+        court_id=court_id, pacer_case_id__isnull=False
+    ).latest("pacer_case_id")
     if latest_docket:
         return int(latest_docket.pacer_case_id)
     return 0
@@ -54,7 +61,9 @@ def update_pacer_case_id_final(court_id: str, r: Redis) -> int:
     latest_pacer_case_id = get_latest_pacer_case_id(court_id)
     if latest_pacer_case_id:
         r.hset("pacer_case_id_final", court_id, latest_pacer_case_id)
-        logger.info(f"Updated pacer_case_id_final for court {court_id} to {latest_pacer_case_id}")
+        logger.info(
+            f"Updated pacer_case_id_final for court {court_id} to {latest_pacer_case_id}"
+        )
     return latest_pacer_case_id
 
 
@@ -77,36 +86,42 @@ def process_court(court_id: str, r: Redis) -> None:
         else:
             # It was not possible to get a higher watermark from the DB.
             # Try to obtain it by probing using binary search.
-            newly_enqueued = enqueue_iquery_binary_search(
-                court_id
-            )
+            newly_enqueued = enqueue_iquery_binary_search(court_id)
             if newly_enqueued:
                 # No other binary search is being conducted for the court. Enqueue it.
                 iquery_pages_probing.delay(court_id)
 
             # Create a court limiter with 1 minute expiration.
-            r.setex(f"court_limiter:{court_id}", settings.IQUERY_SCRAPER_LONG_WAIT, 1)
+            r.setex(
+                f"court_limiter:{court_id}",
+                settings.IQUERY_SCRAPER_LONG_WAIT,
+                1,
+            )
             return
-
 
     # pacer_case_id_init has not reached pacer_case_id_final, increase +1 and
     # continue the scrape.
     pacer_case_id_init = r.hincrby("pacer_case_id_init", court_id, 1)
     make_docket_by_iquery.apply_async(
-        args=(court_id, pacer_case_id_init),
-        queue=settings.CELERY_IQUERY_QUEUE
+        args=(court_id, pacer_case_id_init), queue=settings.CELERY_IQUERY_QUEUE
     )
-    logger.info(f"Enqueued task for court {court_id} with pacer_case_id {pacer_case_id_init}")
+    logger.info(
+        f"Enqueued task for court {court_id} with pacer_case_id {pacer_case_id_init}"
+    )
 
     if pacer_case_id_init >= pacer_case_id_final:
         # If after increasing pacer_case_id_init it has reached pacer_case_id_final
         # Wait for IQUERY_SCRAPER_LONG_WAIT seconds before doing a new
         # iteration for the court.
-        r.setex(f"court_limiter:{court_id}", settings.IQUERY_SCRAPER_LONG_WAIT, 1)
+        r.setex(
+            f"court_limiter:{court_id}", settings.IQUERY_SCRAPER_LONG_WAIT, 1
+        )
     else:
         # Otherwise, only wait for IQUERY_SCRAPER_SHORT_WAIT seconds to keep
         # the court scraping rate under control.
-        r.setex(f"court_limiter:{court_id}", settings.IQUERY_SCRAPER_SHORT_WAIT, 1)
+        r.setex(
+            f"court_limiter:{court_id}", settings.IQUERY_SCRAPER_SHORT_WAIT, 1
+        )
 
 
 class Command(VerboseCommand):
@@ -124,7 +139,6 @@ class Command(VerboseCommand):
             required=False,
             help="The number of iterations to run on testing mode.",
         )
-
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -155,9 +169,11 @@ class Command(VerboseCommand):
                     # Avoid waiting in testing mode.
                     r.delete(f"court_limiter:{court_id}")
 
-
             if testing_iterations:
                 iterations_completed += 1
-            if testing_iterations and iterations_completed >= testing_iterations:
+            if (
+                testing_iterations
+                and iterations_completed >= testing_iterations
+            ):
                 # Perform only the indicated iterations for testing purposes.
                 break
