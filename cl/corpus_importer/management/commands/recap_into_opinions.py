@@ -26,7 +26,7 @@ def import_opinions_from_recap(court=None, total_count=0):
     if not court:
         courts = Court.objects.filter(jurisdiction=Court.FEDERAL_DISTRICT)
     else:
-        courts = Court.objects.filter(id=court)
+        courts = Court.objects.filter(pk=court)
     for court in courts:
         logger.info(f"Importing RECAP documents for {court}")
         cluster = (
