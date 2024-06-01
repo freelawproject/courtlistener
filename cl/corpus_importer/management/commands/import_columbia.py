@@ -92,6 +92,13 @@ def find_duplicates(
         all_opinions_soup = BeautifulSoup(
             all_opinions_content, features="html.parser"
         )
+        inner_opinion_tags = all_opinions_soup.find_all()
+        if inner_opinion_tags and inner_opinion_tags[-1].name == "page_number":
+            # sometimes columbia data contains a page number at the end, and usually
+            # we don't have that data in cl, we can remove it safely, it helps in
+            # some cases
+            inner_opinion_tags[-1].decompose()
+
         cleaned_content = clean_body_content(
             all_opinions_soup.getText(separator=" ", strip=True)
         )

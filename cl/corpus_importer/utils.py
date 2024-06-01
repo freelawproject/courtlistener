@@ -882,6 +882,13 @@ def content_too_different(
             return True
 
     percent_match = compare_documents(file_characters, cl_characters)
+
+    if percent_match > 96:
+        # Both are exactly the same or one is exactly inside the other but with some
+        # extra data
+        # e.g. cluster: 5241280 and texas/court_opinions/documents/85b3a250014745a2.xml
+        return False
+
     if percent_match < 60:
         return True
 
