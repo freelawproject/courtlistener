@@ -1,6 +1,5 @@
 from asgiref.sync import async_to_sync
 from django.core.management import BaseCommand
-from django.core.paginator import Paginator
 from django.db import transaction
 
 from cl.lib.command_utils import logger
@@ -31,68 +30,70 @@ def import_opinions_from_recap(court=None, total_count=0):
         logger.info(f"Importing RECAP documents for {court}")
         cluster = (
             OpinionCluster.objects.filter(docket__court=court)
+            .exclude(source=SOURCES.RECAP)
             .order_by("-date_filed")
             .first()
         )
         if not cluster:
-            print("No clusters for this court")
-            logger.info(f"Court {court} has no opinion clusters")
-
+            logger.info(f"No clusters for this {court}")
             continue
+
         documents = RECAPDocument.objects.filter(
             docket_entry__docket__court=court,
-            docket_entry__docket__date_filed__lte=cluster.date_filed,
+            docket_entry__docket__date_filed__gt=cluster.date_filed,
             is_available=True,
             is_free_on_pacer=True,
-        ).order_by("docket_entry__docket__date_filed")
+        )
 
-        chunk_size = 100
-        paginator = Paginator(documents, chunk_size)
-        for page_number in paginator.page_range:
-            chunk = paginator.page(page_number).object_list
-            for recap_document in chunk:
-                docket = recap_document.docket_entry.docket
-                if "cv" not in docket.docket_number.lower():
-                    logger.info(f"Skipping non civil opinion") <---Also include an ID here, right?
-                    continue
+        for recap_document in documents.iterator():
+            docket = Docket.objects.get(
+                docket_entries__recap_documents__id=recap_document.id
+            )
+            if "cv" not in docket.docket_number.lower():
+                logger.info(f"Skipping non civil opinion")
+                continue
 
-                ops = Opinion.objects.filter(sha1=recap_document.sha1)
-                if ops.count() > 0:
-                    print("Skipping previously imported opinion")
-                    continue
-
-                response = async_to_sync(microservice)(
-                    service="recap-extract",
-                    filepath=recap_document.filepath_local,
-                    params={"strip_margin": True},
+            ops = Opinion.objects.filter(sha1=recap_document.sha1)
+            if ops.count() > 0:
+                logger.info(
+                    f"Skipping previously imported opinion: {ops[0].id}"
                 )
-                with transaction.atomic():
-                    cluster = OpinionCluster.objects.create(
-                        case_name_full=docket.case_name_full,
-                        case_name=docket.case_name,
-                        case_name_short=docket.case_name_short,
-                        docket=docket,
-                        date_filed=recap_document.docket_entry.date_filed,
-                        source=SOURCES.RECAP,
-                    )
-                    Opinion.objects.create(
-                        cluster=cluster,
-                        type=Opinion.TRIAL_COURT,
-                        plain_text=response.json()["content"],
-                        page_count=recap_document.page_count,
-                        sha1=recap_document.sha1,
-                        download_url=recap_document.filepath_local,
-                    )
+                continue
 
+            response = async_to_sync(microservice)(
+                service="recap-extract",
+                filepath=recap_document.filepath_local,
+                params={"strip_margin": True},
+            )
+
+            response.raise_for_status()
+            with transaction.atomic():
+                cluster = OpinionCluster.objects.create(
+                    case_name_full=docket.case_name_full,
+                    case_name=docket.case_name,
+                    case_name_short=docket.case_name_short,
+                    docket=docket,
+                    date_filed=recap_document.docket_entry.date_filed,
+                    source=SOURCES.RECAP,
+                )
+                Opinion.objects.create(
+                    cluster=cluster,
+                    type=Opinion.TRIAL_COURT,
+                    plain_text=response.json()["content"],
+                    page_count=recap_document.page_count,
+                    sha1=recap_document.sha1,
+                    download_url=recap_document.filepath_local,
+                )
+
+                logger.info(
+                    f"Sucessfully imported https://www.courtlistener.com/opinion/{cluster.id}/decision/"
+                )
+                count += 1
+                if total_count > 0 and count >= total_count:
                     logger.info(
-                        f"Sucessfully imported https://www.courtlistener.com/opinion/{cluster.id}/decision/"
+                        f"RECAP import completed for {total_count} documents"
                     )
-                    count += 1
-                    if total_count > 0 and count >= total_count:
-                        logger.info(
-                            f"RECAP import completed for {total_count} documents"
-                        )
-                        break
+                    break
 
 
 class Command(BaseCommand):
