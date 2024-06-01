@@ -52,8 +52,8 @@ def import_opinions_from_recap(court=None, total_count=0):
             chunk = paginator.page(page_number).object_list
             for recap_document in chunk:
                 docket = recap_document.docket_entry.docket
-                if "-cv-" not in docket.docket_number:
-                    logger.info(f"Skipping non civil opinion")
+                if "cv" not in docket.docket_number.lower():
+                    logger.info(f"Skipping non civil opinion") <---Also include an ID here, right?
                     continue
 
                 ops = Opinion.objects.filter(sha1=recap_document.sha1)
