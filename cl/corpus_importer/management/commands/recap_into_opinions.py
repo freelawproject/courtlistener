@@ -8,7 +8,6 @@ from cl.lib.microservice_utils import microservice
 from cl.search.models import (
     SOURCES,
     Court,
-    Docket,
     Opinion,
     OpinionCluster,
     RECAPDocument,
@@ -26,7 +25,9 @@ def import_opinions_from_recap(court=None, total_count=0):
     if not court:
         courts = Court.objects.filter(
             jurisdiction=Court.FEDERAL_DISTRICT
-        ).exclude(id="orld")
+        ).exclude(
+            id__in=["orld", "dcd"]
+        )  # orld is historical and we gather dcd opinions from the court
     else:
         courts = Court.objects.filter(pk=court)
     for court in courts:
@@ -46,9 +47,7 @@ def import_opinions_from_recap(court=None, total_count=0):
         )
 
         for recap_document in documents.iterator():
-            docket = Docket.objects.get(
-                docket_entries__recap_documents__id=recap_document.id
-            )
+            docket = recap_document.docket_entry.docket
             if "cv" not in docket.docket_number.lower():
                 logger.info(f"Skipping non civil opinion")
                 continue
