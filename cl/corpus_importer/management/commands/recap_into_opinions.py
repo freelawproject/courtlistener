@@ -2,7 +2,9 @@ import eyecite
 from asgiref.sync import async_to_sync
 from django.core.management import BaseCommand
 from django.db import transaction
+from eyecite.tokenizers import HyperscanTokenizer
 
+from cl.citations.utils import filter_out_non_case_law_citations
 from cl.lib.command_utils import logger
 from cl.lib.microservice_utils import microservice
 from cl.search.models import (
@@ -12,6 +14,8 @@ from cl.search.models import (
     OpinionCluster,
     RECAPDocument,
 )
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def import_opinions_from_recap(court=None, total_count=0):
@@ -66,8 +70,12 @@ def import_opinions_from_recap(court=None, total_count=0):
             )
 
             response.raise_for_status()
-            cites = eyecite.get_citations(response.json()["content"])
-            if len(cites) == 0:
+
+            citations = eyecite.get_citations(
+                response.json()["content"], tokenizer=HYPERSCAN_TOKENIZER
+            )
+            case_law_citations = filter_out_non_case_law_citations(citations)
+            if len(case_law_citations) == 0:
                 logger.info(f"No citation found for rd: {recap_document.id}")
                 continue
 
