@@ -97,7 +97,7 @@ django-ses = {extras = ["events"], version = "^3.5.2"}
 django-environ = "^0.11.2"
 judge-pics = "^2.0.5"
 django-admin-cursor-paginator = "^0.1.5"
-sentry-sdk = {extras = ["celery", "django"], version = "^1.39.2"}
+sentry-sdk = {extras = ["celery", "django"], version = "^2.3.1"}
 selenium = "^4.16.0"
 ipython = "^8.20.0"
 time-machine = "^2.14.1"
