@@ -44,7 +44,7 @@ def import_opinions_from_recap(court=None, total_count=0):
             docket_entry__docket__date_filed__gt=cluster.date_filed,
             is_available=True,
             is_free_on_pacer=True,
-        )
+        ).order_by("id")
 
         for recap_document in documents.iterator():
             docket = recap_document.docket_entry.docket
