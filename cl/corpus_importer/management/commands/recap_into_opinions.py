@@ -62,7 +62,7 @@ def import_opinions_from_recap(court=None, total_count=0):
 
             response = async_to_sync(microservice)(
                 service="recap-extract",
-                filepath=recap_document.filepath_local,
+                item=recap_document,
                 params={"strip_margin": True},
             )
 
