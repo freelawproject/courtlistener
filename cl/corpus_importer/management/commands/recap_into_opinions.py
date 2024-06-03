@@ -1,3 +1,4 @@
+import eyecite
 from asgiref.sync import async_to_sync
 from django.core.management import BaseCommand
 from django.db import transaction
@@ -23,7 +24,9 @@ def import_opinions_from_recap(court=None, total_count=0):
     """
     count = 0
     if not court:
-        courts = Court.objects.filter(jurisdiction=Court.FEDERAL_DISTRICT)
+        courts = Court.objects.filter(
+            jurisdiction=Court.FEDERAL_DISTRICT
+        ).exclude(id="orld")
     else:
         courts = Court.objects.filter(pk=court)
     for court in courts:
@@ -34,9 +37,6 @@ def import_opinions_from_recap(court=None, total_count=0):
             .order_by("-date_filed")
             .first()
         )
-        if not cluster:
-            logger.info(f"No clusters for this {court}")
-            continue
 
         documents = RECAPDocument.objects.filter(
             docket_entry__docket__court=court,
@@ -67,6 +67,11 @@ def import_opinions_from_recap(court=None, total_count=0):
             )
 
             response.raise_for_status()
+            cites = eyecite.get_citations(response.json()["content"])
+            if len(cites) == 0:
+                logger.info(f"No citation found for rd: {recap_document.id}")
+                continue
+
             with transaction.atomic():
                 cluster = OpinionCluster.objects.create(
                     case_name_full=docket.case_name_full,
