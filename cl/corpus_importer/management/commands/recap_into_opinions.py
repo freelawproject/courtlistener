@@ -45,12 +45,13 @@ def import_opinions_from_recap(court=None, total_count=0):
 
         documents = RECAPDocument.objects.filter(
             docket_entry__docket__court=court,
-            docket_entry__docket__date_filed__gt=cluster.date_filed,
+            docket_entry__date_filed__gt=cluster.date_filed,
             is_available=True,
             is_free_on_pacer=True,
         ).order_by("id")
 
         for recap_document in documents.iterator():
+            logger.info(f"Importing recap document {recap_document.id}")
             docket = recap_document.docket_entry.docket
             if "cv" not in docket.docket_number.lower():
                 logger.info(f"Skipping non civil opinion")
@@ -62,7 +63,6 @@ def import_opinions_from_recap(court=None, total_count=0):
                     f"Skipping previously imported opinion: {ops[0].id}"
                 )
                 continue
-
             response = async_to_sync(microservice)(
                 service="recap-extract",
                 item=recap_document,
@@ -71,9 +71,19 @@ def import_opinions_from_recap(court=None, total_count=0):
 
             response.raise_for_status()
 
-            citations = eyecite.get_citations(
-                response.json()["content"], tokenizer=HYPERSCAN_TOKENIZER
-            )
+            try:
+                citations = eyecite.get_citations(
+                    response.json()["content"], tokenizer=HYPERSCAN_TOKENIZER
+                )
+            except AttributeError:
+                # Tokenizer fails with some unicode characters
+                # Ex. 42\u2009U.S.C.\u2009§\u200912131 \u2009 is a small space
+                # fallback to regular citation match
+                logger.warning(
+                    f"Hyperscan failed for {recap_document}, trying w/o tokenizer"
+                )
+                citations = eyecite.get_citations(response.json()["content"])
+
             case_law_citations = filter_out_non_case_law_citations(citations)
             if len(case_law_citations) == 0:
                 logger.info(f"No citation found for rd: {recap_document.id}")
@@ -94,7 +104,7 @@ def import_opinions_from_recap(court=None, total_count=0):
                     plain_text=response.json()["content"],
                     page_count=recap_document.page_count,
                     sha1=recap_document.sha1,
-                    download_url=recap_document.filepath_local,
+                    local_path=recap_document.filepath_local,
                 )
 
                 logger.info(
@@ -105,7 +115,7 @@ def import_opinions_from_recap(court=None, total_count=0):
                     logger.info(
                         f"RECAP import completed for {total_count} documents"
                     )
-                    break
+                    return
 
 
 class Command(BaseCommand):
@@ -126,7 +136,7 @@ class Command(BaseCommand):
             type=int,
             help="Number of files to import - set to 0 to import endlessly",
             default=10,
-            required=True,
+            required=False,
         )
 
     def handle(self, *args, **options):
