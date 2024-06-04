@@ -3622,62 +3622,82 @@ class ScrapeIqueryPagesTest(TestCase):
         creation and if the iquery retrieval is performed properly.
         """
         # Connect handle_update_latest_case_id_and_schedule_iquery_sweep signal
-        # only for this test.
-        post_save.connect(
-            sender=Docket,
-            receiver=handle_update_latest_case_id_and_schedule_iquery_sweep,
+        # with a unique dispatch_uid for this test
+        test_dispatch_uid = (
+            "test_handle_update_latest_case_id_and_schedule_iquery_sweep"
         )
+        post_save.connect(
+            handle_update_latest_case_id_and_schedule_iquery_sweep,
+            sender=Docket,
+            dispatch_uid=test_dispatch_uid,
+        )
+        try:
+            dockets = Docket.objects.filter(court_id=self.court_gand)
+            self.assertEqual(dockets.count(), 0)
 
-        dockets = Docket.objects.filter(court_id=self.court_gand)
-        self.assertEqual(dockets.count(), 0)
+            r = get_redis_interface("CACHE")
+            # Simulate a pacer_case_id_final = 5
+            r.hset("pacer_case_id_final", self.court_gand.pk, 5)
 
-        r = get_redis_interface("CACHE")
-        # Simulate a pacer_case_id_final = 5
-        r.hset("pacer_case_id_final", self.court_gand.pk, 5)
+            # Create a Docket with a pacer_case_id smaller than pacer_case_id_final
+            with patch(
+                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                    *args, **kwargs
+                ),
+            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
+                execute=True
+            ):
+                DocketFactory(
+                    court=self.court_gand,
+                    source=Docket.RECAP,
+                    docket_number="2:20-cv-00600",
+                    pacer_case_id="4",
+                )
 
-        # Create a Docket with a pacer_case_id smaller than pacer_case_id_final
-        with patch(
-            "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-            side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                *args, **kwargs
-            ),
-        ) as mock_iquery_sweep, self.captureOnCommitCallbacks(execute=True):
-            DocketFactory(
-                court=self.court_gand,
-                source=Docket.RECAP,
-                docket_number="2:20-cv-00600",
-                pacer_case_id="4",
+            # update_latest_case_id_and_schedule_iquery_sweep should be called 1 time
+            self.assertEqual(mock_iquery_sweep.call_count, 1)
+
+            # pacer_case_id_final shouldn't have changed.
+            pacer_case_id_final = r.hget(
+                "pacer_case_id_final", self.court_gand.pk
             )
+            self.assertEqual(int(pacer_case_id_final), 5)
+            self.assertEqual(dockets.count(), 1)
 
-        # update_latest_case_id_and_schedule_iquery_sweep should be called 1 time
-        self.assertEqual(mock_iquery_sweep.call_count, 1)
+            # Create a Docket with a pacer_case_id bigger than pacer_case_id_final
+            with patch(
+                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                    *args, **kwargs
+                ),
+            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
+                execute=True
+            ):
+                DocketFactory(
+                    court=self.court_gand,
+                    source=Docket.RECAP,
+                    case_name="New Incoming Docket",
+                    docket_number="2:20-cv-00601",
+                    pacer_case_id="8",
+                )
 
-        # pacer_case_id_final shouldn't have changed.
-        pacer_case_id_final = r.hget("pacer_case_id_final", self.court_gand.pk)
-        self.assertEqual(int(pacer_case_id_final), 5)
-        self.assertEqual(dockets.count(), 1)
+            # update_latest_case_id_and_schedule_iquery_sweep should be called once.
+            # The 2 dockets retrieved by the iquery sweep shouldn't call
+            # update_latest_case_id_and_schedule_iquery_sweep.
+            self.assertEqual(mock_iquery_sweep.call_count, 1)
 
-        # Create a Docket with a pacer_case_id bigger than pacer_case_id_final
-        with patch(
-            "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
-            side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
-                *args, **kwargs
-            ),
-        ) as mock_iquery_sweep, self.captureOnCommitCallbacks(execute=True):
-            DocketFactory(
-                court=self.court_gand,
-                source=Docket.RECAP,
-                case_name="New Incoming Docket",
-                docket_number="2:20-cv-00601",
-                pacer_case_id="8",
+            # Two dockets should have been created.
+            self.assertEqual(dockets.count(), 4)
+            pacer_case_id_final = r.hget(
+                "pacer_case_id_final", self.court_gand.pk
             )
+            self.assertEqual(int(pacer_case_id_final), 8)
 
-        # update_latest_case_id_and_schedule_iquery_sweep should be called once.
-        # The 2 dockets retrieved by the iquery sweep shouldn't call
-        # update_latest_case_id_and_schedule_iquery_sweep.
-        self.assertEqual(mock_iquery_sweep.call_count, 1)
-
-        # Two dockets should have been created.
-        self.assertEqual(dockets.count(), 4)
-        pacer_case_id_final = r.hget("pacer_case_id_final", self.court_gand.pk)
-        self.assertEqual(int(pacer_case_id_final), 8)
+        finally:
+            # Ensure the signal is disconnected after the test
+            post_save.disconnect(
+                handle_update_latest_case_id_and_schedule_iquery_sweep,
+                sender=Docket,
+                dispatch_uid=test_dispatch_uid,
+            )
