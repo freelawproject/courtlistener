@@ -75,6 +75,10 @@ def delete_redis_semaphore(r: Union[str, Redis], key: str) -> None:
     r.delete(key)
 
 
+def make_update_pacer_case_id_key(court_id: str) -> str:
+    return f"update.pacer_case_id:{court_id}"
+
+
 def acquire_atomic_redis_lock(r: Redis, key, ttl: int) -> str:
     """Acquires an atomic lock in Redis.
 

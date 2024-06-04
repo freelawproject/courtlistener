@@ -9,13 +9,10 @@ from cl.corpus_importer.tasks import make_docket_by_iquery
 from cl.lib.redis_utils import (
     acquire_atomic_redis_lock,
     get_redis_interface,
+    make_update_pacer_case_id_key,
     release_atomic_redis_lock,
 )
 from cl.search.models import Docket
-
-
-def make_update_pacer_case_id_key(court_id: str) -> str:
-    return f"update.pacer_case_id:{court_id}"
 
 
 def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
@@ -72,8 +69,14 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
         from_iquery_sweep = instance.from_iquery_sweep
 
     # Only call update_latest_case_id_and_schedule_iquery_sweep if this is a
-    # new docket not added by iquery sweep tasks or iquery_pages_probing.
-    if created and not from_iquery_sweep:
+    # new RECAP docket with pacer_case_id not added by iquery sweep tasks or
+    # iquery_pages_probing.
+    if (
+        created
+        and not from_iquery_sweep
+        and instance.source in Docket.RECAP_SOURCES()
+        and instance.pacer_case_id
+    ):
         transaction.on_commit(
             partial(update_latest_case_id_and_schedule_iquery_sweep, instance)
         )

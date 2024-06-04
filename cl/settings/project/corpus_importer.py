@@ -1,8 +1,6 @@
 import environ
 
 env = environ.FileAwareEnv()
-IQUERY_SCRAPER_SHORT_WAIT = env.int("IQUERY_SHORT_WAIT", default=1)
-IQUERY_SCRAPER_LONG_WAIT = env.int("IQUERY_SCRAPER_LONG_WAIT", default=60)
 IQUERY_PROBE_ITERATIONS = env.int("IQUERY_PROBE_ITERATIONS", default=8)
 IQUERY_PROBE_WAIT = env.int("IQUERY_PROBE_WAIT", default=300)
 IQUERY_COURT_BLOCKED_WAIT = env.int("IQUERY_COURT_BLOCKED_WAIT", default=600)

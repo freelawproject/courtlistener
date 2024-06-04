@@ -102,13 +102,11 @@ test_patterns = {
     "canb": {
         1: True,
         2: True,
-        3: True,
-        4: True,
-        5: True,
-        6: True,
-        7: True,
-        8: True,
-        9: True,
+        4: False,
+        8: False,
+        16: False,
+        32: False,
+        64: False,
     },
     "gand": {
         5: True,
@@ -126,6 +124,7 @@ test_patterns = {
         40: True,
         72: False,
         136: False,
+        137: True,
         264: True,
     },
     "nysd": {
@@ -156,16 +155,12 @@ class FakeCaseQueryReport:
 
     @property
     def data(self):
-        test_pattern = test_patterns.get(self.court_id)
+        test_pattern = test_patterns.get(self.court_id, {})
         if not isinstance(test_pattern, dict) and issubclass(
             test_pattern, Exception
         ):
             raise test_pattern()
 
-        if test_pattern:
-            if test_pattern[self.pacer_case_id]:
-                return CaseQueryDataFactory()
-            else:
-                return None
-        else:
+        if test_pattern and test_pattern.get(self.pacer_case_id):
             return CaseQueryDataFactory()
+        return None

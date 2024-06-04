@@ -3344,93 +3344,30 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
     return_value=None,
 )
 class ScrapeIqueryPagesTest(TestCase):
-    """Tests related to scrape_iquery_pages command."""
+    """Tests related to iquery_pages_probing_daemon command."""
 
     @classmethod
     def setUpTestData(cls):
         Court.objects.all().delete()
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FB")
         cls.court_nysd = CourtFactory(id="nysd", jurisdiction="FB")
         cls.court_gamb = CourtFactory(id="gamb", jurisdiction="FB")
         cls.court_hib = CourtFactory(id="hib", jurisdiction="FB")
-        cls.court_gand = CourtFactory(id="gand", jurisdiction="FB")
-
-        DocketFactory(
-            court=cls.court,
-            source=Docket.RECAP,
-            case_name="Foo v. Bar",
-            case_name_full="Foo v. Bar",
-            docket_number="2:17-cv-00573",
-            pacer_case_id="1",
-        )
-        DocketFactory(
-            court=cls.court,
-            source=Docket.RECAP,
-            case_name="Lorem v. Bar",
-            case_name_full="Lorem v. Bar",
-            docket_number="2:17-cv-00578",
-            pacer_case_id="8",
-        )
+        cls.court_gand = CourtFactory(id="gand", jurisdiction="F")
 
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
         keys_to_clean = [
-            "pacer_case_id_init",
             "pacer_case_id_final",
-            "court_limiter",
+            "court_wait:*",
             "court_probe_cycle_no_hits",
+            "iquery.probing.enqueued:*",
         ]
         for key_to_clean in keys_to_clean:
             key = self.r.keys(key_to_clean)
             if key:
                 self.r.delete(*key)
-
-    @patch(
-        "cl.corpus_importer.tasks.CaseQuery",
-        new=FakeCaseQueryReport,
-    )
-    def test_scrape_iquery_pages(self, mock_cookies):
-        """Test scrape_iquery_pages by providing an initial and final
-        pacer_case_ids to scrape."""
-
-        dockets = Docket.objects.all()
-        self.assertEqual(dockets.count(), 2)
-        r = get_redis_interface("CACHE")
-        r.hset("pacer_case_id_init", self.court.pk, 1)
-        r.hset("pacer_case_id_final", self.court.pk, 3)
-        call_command(
-            "scrape_iquery_pages",
-            testing_iterations=2,
-        )
-        # 2 additional dockets should exist after complete the scrape.
-        self.assertEqual(
-            dockets.count(), 4, msg="Docket number doesn't match."
-        )
-
-    @patch(
-        "cl.corpus_importer.tasks.CaseQuery",
-        new=FakeCaseQueryReport,
-    )
-    def test_scrape_update_pacer_case_id_final(self, mock_cookies):
-        """Test scrape_iquery_pages by getting the final pacer_case_id
-        from DB."""
-
-        dockets = Docket.objects.all()
-        self.assertEqual(dockets.count(), 2)
-        r = get_redis_interface("CACHE")
-        # Simulate pacer_case_id_init has reached pacer_case_id_final
-        # pacer_case_id_final will be updated from DB, which is now 8
-        r.hset("pacer_case_id_init", self.court.pk, 5)
-        r.hset("pacer_case_id_final", self.court.pk, 5)
-        call_command(
-            "scrape_iquery_pages",
-            testing_iterations=4,
-        )
-        # Scrape will add 2 more dockets, pacer_case_id 6 and 7.
-        self.assertEqual(
-            dockets.count(), 4, msg="Docket number doesn't match."
-        )
 
     def test_compute_next_binary_probe(self, mock_cookies):
         """Confirm the method compute_next_binary_probe generates the expected
@@ -3496,8 +3433,9 @@ class ScrapeIqueryPagesTest(TestCase):
         # Execute the task
         iquery_pages_probing.delay(self.court_cand.pk)
 
-        # New pacer_case_id_final according to the test patter in cl.tests.fakes.test_pattern_one
-        # test_pattern_one = {
+        # New pacer_case_id_final according to the test pattern in
+        # cl.tests.fakes.test_pattern_one
+        # {
         #     9: True,
         #     10: False,
         #     12: True,
@@ -3533,9 +3471,9 @@ class ScrapeIqueryPagesTest(TestCase):
         # Execute the task
         iquery_pages_probing.delay(self.court_nysd.pk)
 
-        # New pacer_case_id_final according to the test patter in
+        # New pacer_case_id_final according to the test pattern in
         # cl.tests.fakes.test_patterns
-        # test_pattern_one = {
+        # {
         #     9: True,
         #     10: False,
         #     12: True,
@@ -3579,9 +3517,9 @@ class ScrapeIqueryPagesTest(TestCase):
         # pacer_case_id_final is not updated due to the block.
         pacer_case_id_final = r.hget("pacer_case_id_final", self.court_gamb.pk)
         self.assertEqual(int(pacer_case_id_final), 8)
-        # court_limiter is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
-        court_limiter = r.get(f"court_limiter:{self.court_gamb.pk}")
-        self.assertEqual(int(court_limiter), 2)
+        # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
+        court_wait = r.get(f"court_wait:{self.court_gamb.pk}")
+        self.assertEqual(int(court_wait), 2)
 
     @patch(
         "cl.corpus_importer.tasks.CaseQuery",
@@ -3607,9 +3545,93 @@ class ScrapeIqueryPagesTest(TestCase):
         pacer_case_id_final = r.hget("pacer_case_id_final", self.court_hib.pk)
         self.assertEqual(int(pacer_case_id_final), 8)
 
-        # court_limiter is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
-        court_limiter = r.get(f"court_limiter:{self.court_hib.pk}")
-        self.assertEqual(int(court_limiter), 2)
+        # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
+        court_wait = r.get(f"court_wait:{self.court_hib.pk}")
+        self.assertEqual(int(court_wait), 2)
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_iquery_pages_probing_daemon(self, mock_cookies):
+        """Test iquery_pages_probing_daemon by providing an initial and final
+        pacer_case_ids to scrape."""
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 0)
+        r = get_redis_interface("CACHE")
+        r.hset("pacer_case_id_final", self.court_canb.pk, 0)
+        r.hset("pacer_case_id_final", self.court_cand.pk, 135)
+
+        r.hset("pacer_case_id_final", self.court_nysd.pk, 1000)
+        r.hset("pacer_case_id_final", self.court_gamb.pk, 1000)
+        r.hset("pacer_case_id_final", self.court_hib.pk, 1000)
+        r.hset("pacer_case_id_final", self.court_gand.pk, 1000)
+
+        with patch("cl.corpus_importer.tasks.time.sleep") as mock_sleep:
+            call_command(
+                "iquery_pages_probing_daemon",
+                testing_iterations=1,
+            )
+        # 3 additional dockets should exist after complete the probe.
+        # 2 for canb and 1 for cand
+        self.assertEqual(
+            dockets.count(), 3, msg="Docket number doesn't match."
+        )
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    def test_iquery_pages_probing_daemon_court_down_and_timeout(
+        self, mock_cookies
+    ):
+        """Test iquery_pages_probing_daemon when a court has blocked us or
+        is the requests are timing out.
+        """
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 0)
+        r = get_redis_interface("CACHE")
+        r.hset("pacer_case_id_final", self.court_gamb.pk, 8)
+        r.hset("pacer_case_id_final", self.court_hib.pk, 8)
+
+        court_wait_gamb = r.get(f"court_wait:{self.court_gamb.pk}")
+        self.assertEqual(court_wait_gamb, None)
+        court_wait_hib = r.get(f"court_wait:{self.court_hib.pk}")
+        self.assertEqual(court_wait_hib, None)
+
+        # Set a high pacer_case_id_final that's outside
+        # cl.tests.fakes.test_patterns, so they are aborted.
+        r.hset("pacer_case_id_final", self.court_cand.pk, 1000)
+        r.hset("pacer_case_id_final", self.court_nysd.pk, 1000)
+        r.hset("pacer_case_id_final", self.court_canb.pk, 1000)
+        r.hset("pacer_case_id_final", self.court_gand.pk, 1000)
+
+        with patch("cl.corpus_importer.tasks.time.sleep") as mock_sleep:
+            call_command(
+                "iquery_pages_probing_daemon",
+                testing_iterations=1,
+            )
+
+        # Assertions for court_gamb blocked.
+        # pacer_case_id_final is not updated due to court_gamb block.
+        pacer_case_id_final = r.hget("pacer_case_id_final", self.court_gamb.pk)
+        self.assertEqual(int(pacer_case_id_final), 8)
+        # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
+        court_wait = r.get(f"court_wait:{self.court_gamb.pk}")
+        self.assertEqual(int(court_wait), 2)
+
+        # Assertions for court_hib timeouts.
+        # 9 IQUERY_COURT_TIMEOUT_WAIT sleeps before aborting the task.
+        # 3 iterations * 3 retries each.
+        self.assertEqual(mock_sleep.call_count, 9)
+        # pacer_case_id_final is not updated due to the block.
+        pacer_case_id_final = r.hget("pacer_case_id_final", self.court_hib.pk)
+        self.assertEqual(int(pacer_case_id_final), 8)
+        # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
+        court_wait = r.get(f"court_wait:{self.court_hib.pk}")
+        self.assertEqual(int(court_wait), 2)
 
     @patch(
         "cl.corpus_importer.tasks.CaseQuery",
@@ -3692,6 +3714,30 @@ class ScrapeIqueryPagesTest(TestCase):
             pacer_case_id_final = r.hget(
                 "pacer_case_id_final", self.court_gand.pk
             )
+            self.assertEqual(int(pacer_case_id_final), 8)
+
+            # Create a RECAP docket with no pacer_case_id, it should be ignored
+            with patch(
+                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                    *args, **kwargs
+                ),
+            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
+                execute=True
+            ):
+                DocketFactory(
+                    court=self.court_gand,
+                    source=Docket.RECAP,
+                    docket_number="2:20-cv-00602",
+                    pacer_case_id=None,
+                )
+
+            # One extra docket created by the factory.
+            self.assertEqual(dockets.count(), 5)
+            pacer_case_id_final = r.hget(
+                "pacer_case_id_final", self.court_gand.pk
+            )
+            # pacer_case_id_final should remain the same.
             self.assertEqual(int(pacer_case_id_final), 8)
 
         finally:

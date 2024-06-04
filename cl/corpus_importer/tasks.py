@@ -78,7 +78,13 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
-from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
+from cl.lib.redis_utils import (
+    acquire_atomic_redis_lock,
+    delete_redis_semaphore,
+    get_redis_interface,
+    make_update_pacer_case_id_key,
+    release_atomic_redis_lock,
+)
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -1226,7 +1232,7 @@ def make_docket_by_iquery(
 
 
 def make_iquery_probing_key(court_id: str) -> str:
-    return f"iquery.binary.enqueued:{court_id}"
+    return f"iquery.probing.enqueued:{court_id}"
 
 
 @retry((requests.Timeout, PacerLoginException), tries=3, delay=0.25, backoff=1)
@@ -1282,7 +1288,9 @@ def process_case_query_report(
     add_bankruptcy_data_to_docket(d, report_data)
     if add_to_solr:
         add_items_to_solr([d.pk], "search.Docket")
-    logger.info(f"Created/updated docket: {d}")
+    logger.info(
+        f"Created/updated docket: {d} from court: {court_id} and pacer_case_id {pacer_case_id}"
+    )
     return None
 
 
@@ -1347,9 +1355,9 @@ def iquery_pages_probing(
     latest_iteration_hit = True
     time_out_counter = 0
     pacer_case_id_final = int(r.hget("pacer_case_id_final", court_id) or 0)
+
     # Probe limit e.g: 9 probe iterations -> 256
     probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
-
     court_probe_cycle_no_hits = r.hincrby(
         "court_probe_cycle_no_hits", court_id, 1
     )
@@ -1362,11 +1370,12 @@ def iquery_pages_probing(
                 court_id,
             )
             r.setex(
-                f"court_limiter:{court_id}",
+                f"court_wait:{court_id}",
                 settings.IQUERY_COURT_BLOCKED_WAIT,
                 2,
             )
             break
+
         probe_iteration, pacer_case_id_to_lookup = compute_next_binary_probe(
             pacer_case_id_final,
             probe_iteration,
@@ -1379,7 +1388,7 @@ def iquery_pages_probing(
             # Set expiration accordingly and value to 2 to difference from
             # other waiting times.
             r.setex(
-                f"court_limiter:{court_id}",
+                f"court_wait:{court_id}",
                 settings.IQUERY_COURT_BLOCKED_WAIT,
                 2,
             )
@@ -1422,7 +1431,17 @@ def iquery_pages_probing(
                 break
 
     if latest_match > pacer_case_id_final:
+        # Get the latest pacer_case_id from Redis using a lock to avoid race
+        # conditions when updating it.
+        update_lock_key = make_update_pacer_case_id_key(court_id)
+        lock_value = acquire_atomic_redis_lock(r, update_lock_key, 1000)
         r.hset("pacer_case_id_final", court_id, latest_match)
+        release_atomic_redis_lock(r, update_lock_key, lock_value)
+        # Release the lock once the pacer_case_id_final update process is complete.
+
+        # The latest pacer_case_id_final was found. Restart court_probe_cycle_no_hits
+        r.hset("court_probe_cycle_no_hits", court_id, 0)
+
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 
 
