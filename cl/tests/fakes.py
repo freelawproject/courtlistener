@@ -1,6 +1,8 @@
 from datetime import date
 from unittest.mock import MagicMock
 
+from requests.exceptions import HTTPError, Timeout
+
 from cl.corpus_importer.factories import (
     CaseQueryDataFactory,
     FreeOpinionRowDataFactory,
@@ -96,32 +98,74 @@ class FakeFreeOpinionReport:
         ]
 
 
-test_pattern_one = {
-    9: True,
-    10: False,
-    12: True,
-    16: False,
-    24: True,
-    40: True,
-    72: False,
-    136: False,
-    264: False,
+test_patterns = {
+    "canb": {
+        1: True,
+        2: True,
+        3: True,
+        4: True,
+        5: True,
+        6: True,
+        7: True,
+        8: True,
+        9: True,
+    },
+    "gand": {
+        5: True,
+        6: True,
+        7: True,
+        8: True,
+        9: True,
+    },
+    "cand": {
+        9: True,
+        10: False,
+        12: True,
+        16: False,
+        24: True,
+        40: True,
+        72: False,
+        136: False,
+        264: True,
+    },
+    "nysd": {
+        9: True,
+        10: False,
+        12: True,
+        16: False,
+        24: True,
+        40: True,
+        72: True,
+        136: False,
+        264: True,
+        520: True,
+    },
+    "gamb": HTTPError,
+    "hib": Timeout,
 }
 
 
 class FakeCaseQueryReport:
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, court_id, pacer_session=None):
         self.pacer_case_id = None
+        self.court_id = court_id
 
     def query(self, pacer_case_id):
         self.pacer_case_id = pacer_case_id
 
     @property
     def data(self):
-        if self.pacer_case_id < 9:
-            return CaseQueryDataFactory()
-        if test_pattern_one[self.pacer_case_id]:
-            return CaseQueryDataFactory()
+        test_pattern = test_patterns.get(self.court_id)
+        if not isinstance(test_pattern, dict) and issubclass(
+            test_pattern, Exception
+        ):
+            raise test_pattern()
+
+        if test_pattern:
+            if test_pattern[self.pacer_case_id]:
+                return CaseQueryDataFactory()
+            else:
+                return None
         else:
-            return None
+            return CaseQueryDataFactory()

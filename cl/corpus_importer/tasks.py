@@ -1146,12 +1146,13 @@ def filter_docket_by_tags(
     ignore_result=True,
 )
 def make_docket_by_iquery(
-    self,
+    self: Task,
     court_id: str,
     pacer_case_id: int,
     using: str = "default",
     tag_names: Optional[List[str]] = None,
     log_results_redis: bool = False,
+    from_iquery_sweep: bool = False,
 ) -> Optional[int]:
     """
     Using the iquery endpoint, create or update a docket
@@ -1163,6 +1164,8 @@ def make_docket_by_iquery(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
+    :param from_iquery_sweep: Weather this method was invoked by the iquery
+    sweep task or the iquery probing task.
     :return: None if failed, else the ID of the created/updated docket
     """
     cookies = get_or_cache_pacer_cookies(
@@ -1218,6 +1221,7 @@ def make_docket_by_iquery(
         d,
         tag_names,
         add_to_solr=True,
+        from_iquery_sweep=from_iquery_sweep,
     )
 
 
@@ -1282,27 +1286,32 @@ def process_case_query_report(
     return None
 
 
-def compute_binary_next_probe(
+def compute_next_binary_probe(
     pacer_case_id_final: int,
     probe_iteration: int,
-    court_probe_iteration: int,
-    probe_threshold: int,
+    court_probe_cycle_no_hits: int,
+    probe_limit: int,
 ) -> tuple[int, int]:
-    """Compute the binary next probe target for a given PACER case ID.
+    """Compute the next binary  probe target for a given PACER case ID.
+
+    This computes the next value of a geometric binary sequence (2 ** (N - 1))
+    where N is the current probe iteration. If court_probe_cycle_no_hits is > 1
+    a 5% jitter is added to the next value to ensure probing values are not the
+    same from the previous one and increase the possibility of getting a hit.
 
     :param pacer_case_id_final: The final PACER case ID.
     :param probe_iteration: The current probe iteration number.
-    :param court_probe_iteration: The number of court probe iterations performed.
-    :param probe_threshold: The probe threshold value.
+    :param court_probe_cycle_no_hits: The number of court probe iterations performed.
+    :param probe_limit: The probe threshold value.
     :return: The updated probe_iteration and the PACER case ID to lookup.
     """
 
     jitter = 0
     probe_iteration += 1
-    if court_probe_iteration > 1:
+    if court_probe_cycle_no_hits > 1:
         # The previous iquery_pages_probing tasks didn't find a higher
         # watermark, apply a jitter this time.
-        jitter = random.randint(1, round(probe_threshold * 0.05))
+        jitter = random.randint(1, round(probe_limit * 0.05))
 
     pacer_case_id_to_lookup = (
         pacer_case_id_final + (2 ** (probe_iteration - 1)) + jitter
@@ -1335,24 +1344,44 @@ def iquery_pages_probing(
     r = get_redis_interface("CACHE")
     probe_iteration = 0
     latest_match = 0
-    last_iteration_hit = True
+    latest_iteration_hit = True
+    time_out_counter = 0
     pacer_case_id_final = int(r.hget("pacer_case_id_final", court_id) or 0)
-    probe_threshold = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
-    court_probe_iteration = r.hincrby("court_probe_iteration", court_id, 1)
+    # Probe limit e.g: 9 probe iterations -> 256
+    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
+
+    court_probe_cycle_no_hits = r.hincrby(
+        "court_probe_cycle_no_hits", court_id, 1
+    )
     while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-        probe_iteration, pacer_case_id_to_lookup = compute_binary_next_probe(
+
+        if time_out_counter >= 3:
+            logger.warning(
+                "Aborting probing task for %s after 3 consecutive iterations "
+                "that timed out.",
+                court_id,
+            )
+            r.setex(
+                f"court_limiter:{court_id}",
+                settings.IQUERY_COURT_BLOCKED_WAIT,
+                2,
+            )
+            break
+        probe_iteration, pacer_case_id_to_lookup = compute_next_binary_probe(
             pacer_case_id_final,
             probe_iteration,
-            court_probe_iteration,
-            probe_threshold,
+            court_probe_cycle_no_hits,
+            probe_limit,
         )
         try:
             report_data = query_iquery_page(court_id, pacer_case_id_to_lookup)
         except HTTPError:
+            # Set expiration accordingly and value to 2 to difference from
+            # other waiting times.
             r.setex(
                 f"court_limiter:{court_id}",
                 settings.IQUERY_COURT_BLOCKED_WAIT,
-                1,
+                2,
             )
             logger.warning(
                 "HTTPError occurred when crawling iquery. The court %s website "
@@ -1369,6 +1398,7 @@ def iquery_pages_probing(
                 "the next pacer_case_id."
             )
             time.sleep(settings.IQUERY_COURT_TIMEOUT_WAIT)
+            time_out_counter += 1
             continue
 
         if report_data:
@@ -1380,12 +1410,12 @@ def iquery_pages_probing(
                 add_to_solr=True,
             )
             latest_match = pacer_case_id_to_lookup
-            last_iteration_hit = True
+            latest_iteration_hit = True
         else:
-            if last_iteration_hit:
+            if latest_iteration_hit:
                 # Previous iteration was valid, set this one as invalid and
                 # try the next pacer_case_id
-                last_iteration_hit = False
+                latest_iteration_hit = False
                 continue
             else:
                 # Two blank iterations in a row. Terminate the probing loop.
@@ -1393,7 +1423,6 @@ def iquery_pages_probing(
 
     if latest_match > pacer_case_id_final:
         r.hset("pacer_case_id_final", court_id, latest_match)
-
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 
 

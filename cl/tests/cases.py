@@ -6,13 +6,17 @@ from asgiref.sync import sync_to_async
 from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
+from django.db.models.signals import post_save
 from django.urls import reverse
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree
 from rest_framework.test import APITestCase
 
+from cl.corpus_importer.signals import (
+    handle_update_latest_case_id_and_schedule_iquery_sweep,
+)
 from cl.lib.redis_utils import get_redis_interface
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Docket
 
 
 class OutputBlockerTestMixin:

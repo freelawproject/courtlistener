@@ -42,9 +42,12 @@ def get_latest_pacer_case_id(court_id: str) -> int:
     :param court_id: The court ID.
     :return: The latest pacer_case_id if found, otherwise None.
     """
-    latest_docket = Docket.objects.filter(
-        court_id=court_id, pacer_case_id__isnull=False
-    ).latest("pacer_case_id")
+    try:
+        latest_docket = Docket.objects.filter(
+            court_id=court_id, pacer_case_id__isnull=False
+        ).latest("pacer_case_id")
+    except Docket.DoesNotExist:
+        latest_docket = None
     if latest_docket:
         return int(latest_docket.pacer_case_id)
     return 0
@@ -80,6 +83,7 @@ def process_court(court_id: str, r: Redis) -> None:
         # pacer_case_id_init has reached pacer_case_id_final, try to get a
         # higher watermark from the DB
         pacer_case_id_final = update_pacer_case_id_final(court_id, r)
+
         if pacer_case_id_final and pacer_case_id_final > pacer_case_id_init:
             r.hset("pacer_case_id_final", court_id, pacer_case_id_final)
             return

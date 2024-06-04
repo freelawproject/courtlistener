@@ -1670,6 +1670,7 @@ def save_iquery_to_docket(
     d: Docket,
     tag_names: Optional[List[str]],
     add_to_solr: bool = False,
+    from_iquery_sweep=False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 
@@ -1678,9 +1679,12 @@ def save_iquery_to_docket(
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
     :param add_to_solr: Whether to save the completed docket to solr
+    :param from_iquery_sweep: Weather this method was invoked by the iquery
+    sweep task or the iquery probing task.
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
+    d.from_iquery_sweep = from_iquery_sweep
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)

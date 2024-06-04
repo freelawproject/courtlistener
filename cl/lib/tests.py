@@ -2,10 +2,7 @@ import datetime
 from typing import Tuple, TypedDict, cast
 
 from asgiref.sync import async_to_sync
-from django.contrib.auth.hashers import make_password
 from django.core.files.base import ContentFile
-from django.test import override_settings
-from django.urls import reverse
 
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import append_query_conjunctions
@@ -26,6 +23,11 @@ from cl.lib.pacer import (
 )
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
+from cl.lib.redis_utils import (
+    acquire_atomic_redis_lock,
+    get_redis_interface,
+    release_atomic_redis_lock,
+)
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
@@ -44,7 +46,6 @@ from cl.search.factories import (
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserProfileWithParentsFactory
 
 
 class TestPacerUtils(TestCase):
@@ -1115,3 +1116,18 @@ class TestElasticsearchUtils(SimpleTestCase):
                 test["input_str"]  # type: ignore
             )
             self.assertEqual(output, test["sanitized"])
+
+
+class TestRedisUtils(SimpleTestCase):
+    """Test Redis utils functions."""
+
+    def test_atomic_redis_lock(self) -> None:
+        """Test acquiring and releasing an atomic Redis lock."""
+
+        lock_key = "test_lock"
+        r = get_redis_interface("CACHE")
+        identifier = acquire_atomic_redis_lock(r, lock_key, 2000)
+        self.assertTrue(identifier)
+
+        result = release_atomic_redis_lock(r, lock_key, identifier)
+        self.assertEqual(result, 1)
