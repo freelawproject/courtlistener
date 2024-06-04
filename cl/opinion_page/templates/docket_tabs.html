@@ -428,28 +428,6 @@
   </div>
 
 
-  {% if docket.clusters.count %}
-    <div class="col-xs-6">
-      <h3>Opinions from our Case Law Database</h3>
-      <hr class="top">
-      <ul>
-        {% for cluster in docket.clusters.all %}
-          <li>
-            <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                {{ cluster.caption|safe|v_wrapper }}
-            </a>
-            {% if perms.search.change_document %}
-              <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
-                 class="btn btn-primary btn-xs">Edit</a>
-            {% endif %}
-            <br/>
-            {{ cluster.date_filed }}
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-  {% endif %}
-
   {% if docket.audio_files.count %}
     <div class="col-xs-6">
       <h3>Oral Argument Recordings</h3>
