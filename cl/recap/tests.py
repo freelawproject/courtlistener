@@ -830,7 +830,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
         )
 
     def test_recap_fetch_validate_court(self, mock):
-        """Can we properly validate the court_id"""
+        """Can we properly validate the court_id?"""
 
         appellate_docket = DocketFactory(
             source=Docket.RECAP,
@@ -873,6 +873,28 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
                 "docket_number": appellate_docket.docket_number,
             }
         )
+        serialized_fq = PacerFetchQueueSerializer(
+            data=self.fetch_attributes,
+            context={"request": self.request},
+        )
+        serialized_fq.is_valid()
+        self.assertIn(
+            serialized_fq.errors["non_field_errors"][0],
+            "Invalid court id: ca11",
+        )
+
+    def test_recap_fetch_validate_court_of_rd(self, mock) -> None:
+        """Can we validate the court when fetching a PDF?"""
+        rd = RECAPDocumentFactory.create(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket__court=self.court_appellate
+            ),
+        )
+
+        del self.fetch_attributes["docket_id"]
+        self.fetch_attributes["request_type"] = REQUEST_TYPE.PDF
+        self.fetch_attributes["recap_document"] = rd.pk
+
         serialized_fq = PacerFetchQueueSerializer(
             data=self.fetch_attributes,
             context={"request": self.request},
