@@ -7,10 +7,11 @@ from cl.corpus_importer.tasks import (
     iquery_pages_probing,
     make_iquery_probing_key,
 )
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 from cl.search.models import Court
-from cl.lib.celery_utils import CeleryThrottle
+
 
 def enqueue_iquery_probing(court_id: str) -> bool:
     """Get iquery forward probing semaphore.
@@ -85,7 +86,7 @@ class Command(VerboseCommand):
 
                 if not testing_iterations:
                     # Avoid waiting in testing mode.
-                    time.sleep(settings.IQUERY_PROBE_WAIT/len(court_ids))
+                    time.sleep(settings.IQUERY_PROBE_WAIT / len(court_ids))
 
             if testing_iterations:
                 iterations_completed += 1
