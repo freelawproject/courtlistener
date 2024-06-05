@@ -7,6 +7,7 @@ from httpx import (
     HTTPStatusError,
     NetworkError,
     RemoteProtocolError,
+    Response,
     TimeoutException,
 )
 
@@ -37,7 +38,7 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
     backoff=2,
     logger=logger,
 )
-def extract_recap_document(rd: RECAPDocument) -> dict[str:any]:
+def extract_recap_document(rd: RECAPDocument) -> Response:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
