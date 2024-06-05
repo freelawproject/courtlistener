@@ -54,7 +54,7 @@ from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
 from cl.favorites.factories import NoteFactory, UserTagFactory
-from cl.lib.test_helpers import SimpleUserDataMixin, opinion_search_api_keys
+from cl.lib.test_helpers import SimpleUserDataMixin, opinion_v3_search_api_keys
 from cl.people_db.factories import PersonFactory
 from cl.search.documents import AudioDocument, AudioPercolator
 from cl.search.factories import (
@@ -925,13 +925,15 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                     # Assert the number of keys in the Opinions Search Webhook
                     # payload
                     keys_count = len(content["payload"]["results"][0])
-                    self.assertEqual(keys_count, len(opinion_search_api_keys))
+                    self.assertEqual(
+                        keys_count, len(opinion_v3_search_api_keys)
+                    )
 
                     # Iterate through all the opinion fields and compare them.
                     for (
                         field,
                         get_expected_value,
-                    ) in opinion_search_api_keys.items():
+                    ) in opinion_v3_search_api_keys.items():
                         with self.subTest(field=field):
                             expected_value = get_expected_value(
                                 alert_data_compare
@@ -965,13 +967,6 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             )
             RealTimeQueue.objects.create(
                 item_type=SEARCH_TYPES.OPINION, item_pk=rt_opinion.pk
-            )
-            add_items_to_solr(
-                [
-                    rt_opinion.pk,
-                ],
-                "search.Opinion",
-                force_commit=True,
             )
 
         webhooks_enabled = Webhook.objects.filter(enabled=True)
@@ -1059,6 +1054,44 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                         rate,
                     )
             webhook_events.delete()
+
+        rt_opinion.cluster.delete()
+
+    def test_alert_frequency_estimation(self):
+        """Test alert frequency ES API endpoint for Opinion Alerts."""
+
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Frequency Test O",
+        }
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "3", "day_count": "100"}
+            ),
+            search_params,
+        )
+        self.assertEqual(r.json()["count"], 0)
+
+        mock_date = now().replace(day=1, hour=5)
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            frequency_o = OpinionWithParentsFactory.create(
+                cluster__precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                cluster__case_name="Frequency Test O",
+                cluster__date_filed=now().date(),
+                plain_text="Lorem dolor",
+            )
+
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "3", "day_count": "100"}
+            ),
+            search_params,
+        )
+        self.assertEqual(r.json()["count"], 1)
+
+        frequency_o.cluster.delete()
 
 
 class DocketAlertAPITests(APITestCase):
@@ -1807,6 +1840,11 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             jurisdiction="FB",
             citation_string="Bankr. C.D. Cal.",
         )
+        cls.docket = DocketFactory(
+            court=cls.court_1,
+            date_argued=now().date(),
+            docket_number="20-5736",
+        )
         cls.user_profile = UserProfileWithParentsFactory()
         NeonMembership.objects.create(
             level=NeonMembership.LEGACY, user=cls.user_profile.user
@@ -1856,6 +1894,12 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rate=Alert.MONTHLY,
             name="Test Alert OA Monthly",
             query="q=Test+OA&type=oa",
+        )
+        cls.search_alert_7 = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert OA RT Docket ID",
+            query=f"q=docket_id:{cls.docket.pk}&type=oa",
         )
 
     @classmethod
@@ -2014,6 +2058,18 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rt_oral_argument.case_name,
         )
         self.assertEqual(
+            content["payload"]["results"][0]["docketNumber"],
+            rt_oral_argument.docket.docket_number,
+        )
+        self.assertEqual(
+            content["payload"]["results"][0]["snippet"],
+            rt_oral_argument.transcript,
+        )
+        self.assertEqual(
+            content["payload"]["results"][0]["judge"],
+            rt_oral_argument.judges,
+        )
+        self.assertEqual(
             content["payload"]["results"][0]["court"],
             rt_oral_argument.docket.court.full_name,
         )
@@ -2021,8 +2077,74 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             content["payload"]["results"][0]["source"],
             rt_oral_argument.source,
         )
+
+        # Confirm no HL fields are properly displayed.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            mock_date = now().replace(day=1, hour=5)
+            with time_machine.travel(
+                mock_date, tick=False
+            ), self.captureOnCommitCallbacks(execute=True):
+                # When the Audio object is created it should trigger an alert.
+                transcript_response = {
+                    "response": {
+                        "results": [
+                            {
+                                "alternatives": [
+                                    {
+                                        "transcript": "This a different transcript.",
+                                        "confidence": 0.85,
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                }
+                json_transcript = json.dumps(transcript_response)
+                rt_oral_argument_2 = AudioWithParentsFactory.create(
+                    case_name="No HL OA Alert",
+                    docket=self.docket,
+                    stt_status=Audio.STT_COMPLETE,
+                    judges="George Smith",
+                    stt_google_response=json_transcript,
+                )
+
+        self.assertEqual(len(mail.outbox), 3, msg="Wrong number of emails.")
+        text_content = mail.outbox[2].body
+
+        # Confirm all fields are displayed in the plain text version.
+        self.assertIn(rt_oral_argument_2.case_name, text_content)
+        self.assertIn(rt_oral_argument_2.judges, text_content)
+        self.assertIn(rt_oral_argument_2.docket.docket_number, text_content)
+        self.assertIn(rt_oral_argument_2.transcript, text_content)
+        self.assertIn(
+            rt_oral_argument_2.docket.court.citation_string, text_content
+        )
+
+        # Extract HTML version.
+        html_content = None
+        for content, content_type in mail.outbox[2].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        # Confirm all fields are displayed in the HTML version.
+        self.assertIn(rt_oral_argument_2.case_name, html_content)
+        self.assertIn(rt_oral_argument_2.judges, html_content)
+        self.assertIn(rt_oral_argument_2.docket.docket_number, html_content)
+        self.assertIn(rt_oral_argument_2.transcript, html_content)
+        self.assertIn(
+            rt_oral_argument_2.docket.court.citation_string,
+            html_content.replace("&nbsp;", " "),
+        )
+
         webhook_events.delete()
         rt_oral_argument.delete()
+        rt_oral_argument_2.delete()
 
     def test_send_alert_on_document_creation(self, mock_abort_audio):
         """Avoid sending Search Alerts on document updates."""
@@ -2465,7 +2587,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         self.assertEqual(len(memberships), 11)
         total_rt_alerts = Alert.objects.filter(rate=Alert.REAL_TIME)
         # 2 created in setUpTestData + 10
-        self.assertEqual(total_rt_alerts.count(), 12)
+        self.assertEqual(total_rt_alerts.count(), 13)
 
         # Clear the outbox
         mail.outbox = []

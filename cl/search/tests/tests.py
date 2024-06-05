@@ -975,6 +975,72 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         self.assertNotIn("Did you mean", r.content.decode())
 
 
+class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
+    """Common tests for the Search API V4 endpoints."""
+
+    async def test_es_general_bad_request_error_(self) -> None:
+        """Can we properly raise the ElasticBadRequestError exception?"""
+
+        # Bad syntax due to the / char in the query.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "This query contains long/short proximity token",
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            r.data["detail"],
+            "Elasticsearch Bad request error. Please review your query.",
+        )
+
+    async def test_es_bad_syntax_proximity_tokens(self) -> None:
+        """Can we properly raise the BadProximityQuery exception?"""
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "This query contains /s proximity token",
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            r.data["detail"],
+            "The query contains an unrecognized proximity token.",
+        )
+
+    async def test_es_unbalanced_quotes(self) -> None:
+        """Can we properly raise the UnbalancedQuotesQuery exception?"""
+
+        params = {"type": SEARCH_TYPES.RECAP, "q": 'Test query with "quotes'}
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            r.data["detail"], "The query contains unbalanced quotes."
+        )
+
+    async def test_handle_unbalanced_parentheses(self) -> None:
+        """Can we properly raise the UnbalancedParenthesesQuery
+        exception?
+        """
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "(Loretta OR (SEC) AND Jose",
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            r.data["detail"], "The query contains unbalanced parentheses."
+        )
+
+
 class PagerankTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
 
@@ -2376,7 +2442,7 @@ class SweepIndexerCommandTest(
         # Log last status to simulate a resume from "search.Docket"
         log_indexer_last_status(
             "search.Docket",
-            self.de_1.docket.pk,
+            self.de.docket.pk,
             0,
         )
 
@@ -2392,7 +2458,7 @@ class SweepIndexerCommandTest(
                 "people_db.Person": 0,
                 "search.OpinionCluster": 0,
                 "search.Opinion": 0,
-                "search.Docket": 1,
+                "search.Docket": 2,
                 "search.RECAPDocument": 3,
             }
             # Only Docket and RECAPDocument should be indexed.

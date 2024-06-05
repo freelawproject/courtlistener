@@ -7,6 +7,7 @@ from typing import Sized, cast
 import scorched
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test.testcases import SerializeMixin
 from django.test.utils import override_settings
 from django.utils import timezone
@@ -15,6 +16,7 @@ from requests import Session
 
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
+from cl.lib.utils import deepgetattr
 from cl.people_db.factories import (
     ABARatingFactory,
     AttorneyFactory,
@@ -28,6 +30,7 @@ from cl.people_db.factories import (
     SchoolFactory,
 )
 from cl.people_db.models import Person, Race
+from cl.search.constants import o_type_index_map
 from cl.search.docket_sources import DocketSources
 from cl.search.documents import DocketDocument
 from cl.search.factories import (
@@ -63,70 +66,32 @@ def midnight_pt_test(d: datetime.date) -> datetime.datetime:
     return timezone.make_aware(d, time_zone)
 
 
-opinion_search_api_keys = {
+opinion_cluster_v3_v4_common_fields = {
     "absolute_url": lambda x: x["result"].cluster.get_absolute_url(),
     "attorney": lambda x: x["result"].cluster.attorneys,
-    "author_id": lambda x: x["result"].author_id,
-    "caseName": lambda x: x["result"].cluster.case_name,
-    "citation": lambda x: [
-        str(cite) for cite in x["result"].cluster.citations.all()
-    ],
-    "citeCount": lambda x: x["result"].cluster.citation_count,
-    "cites": lambda x: (
-        list(
-            x["result"]
-            .cited_opinions.all()
-            .values_list("cited_opinion_id", flat=True)
-        )
-        if x["result"]
-        .cited_opinions.all()
-        .values_list("cited_opinion_id", flat=True)
-        else None
+    "caseName": lambda x: (
+        x["caseName"] if x.get("caseName") else x["result"].cluster.case_name
     ),
+    "citation": lambda x: (
+        x["citation"]
+        if x.get("citation")
+        else [str(cite) for cite in x["result"].cluster.citations.all()]
+    ),
+    "citeCount": lambda x: x["result"].cluster.citation_count,
     "court": lambda x: x["result"].cluster.docket.court.full_name,
-    "court_citation_string": lambda x: x[
-        "result"
-    ].cluster.docket.court.citation_string,
-    "court_exact": lambda x: x["result"].cluster.docket.court_id,
+    "court_citation_string": lambda x: (
+        x["court_citation_string"]
+        if x.get("court_citation_string")
+        else x["result"].cluster.docket.court.citation_string
+    ),
     "court_id": lambda x: x["result"].cluster.docket.court_id,
     "cluster_id": lambda x: x["result"].cluster_id,
-    "dateArgued": lambda x: (
-        midnight_pt_test(x["result"].cluster.docket.date_argued).isoformat()
-        if x["result"].cluster.docket.date_argued
-        else None
+    "docketNumber": lambda x: (
+        x["docketNumber"]
+        if x.get("docketNumber")
+        else x["result"].cluster.docket.docket_number
     ),
-    "dateFiled": lambda x: (
-        midnight_pt_test(x["result"].cluster.date_filed).isoformat()
-        if x["result"].cluster.date_filed
-        else None
-    ),
-    "dateReargued": lambda x: (
-        midnight_pt_test(x["result"].cluster.docket.date_reargued).isoformat()
-        if x["result"].cluster.docket.date_reargued
-        else None
-    ),
-    "dateReargumentDenied": lambda x: (
-        midnight_pt_test(
-            x["result"].cluster.docket.date_reargument_denied
-        ).isoformat()
-        if x["result"].cluster.docket.date_reargument_denied
-        else None
-    ),
-    "docketNumber": lambda x: x["result"].cluster.docket.docket_number,
     "docket_id": lambda x: x["result"].cluster.docket_id,
-    "download_url": lambda x: x["result"].download_url,
-    "id": lambda x: x["result"].pk,
-    "joined_by_ids": lambda x: (
-        list(x["result"].joined_by.all().values_list("id", flat=True))
-        if x["result"].joined_by.all()
-        else None
-    ),
-    "panel_ids": lambda x: (
-        list(x["result"].cluster.panel.all().values_list("id", flat=True))
-        if x["result"].cluster.panel.all()
-        else None
-    ),
-    "type": lambda x: x["result"].type,
     "judge": lambda x: x["result"].cluster.judges,
     "lexisCite": lambda x: (
         str(x["result"].cluster.citations.filter(type=Citation.LEXIS)[0])
@@ -138,24 +103,150 @@ opinion_search_api_keys = {
         if x["result"].cluster.citations.filter(type=Citation.NEUTRAL)
         else ""
     ),
-    "local_path": lambda x: (
-        x["result"].local_path if x["result"].local_path else None
-    ),
-    "per_curiam": lambda x: x["result"].per_curiam,
     "scdb_id": lambda x: x["result"].cluster.scdb_id,
     "sibling_ids": lambda x: list(
         x["result"].cluster.sub_opinions.all().values_list("id", flat=True)
     ),
-    "status": lambda x: x["result"].cluster.get_precedential_status_display(),
-    "snippet": lambda x: x["snippet"],
-    "suitNature": lambda x: x["result"].cluster.nature_of_suit,
-    "date_created": lambda x: timezone.localtime(
-        x["result"].cluster.date_created
-    ).isoformat(),
-    "timestamp": lambda x: timezone.localtime(
-        x["result"].cluster.date_created
-    ).isoformat(),
+    "status": lambda x: (
+        x["result"].cluster.precedential_status
+        if x.get("V4")
+        else x["result"].cluster.get_precedential_status_display()
+    ),
+    "suitNature": lambda x: (
+        x["suitNature"]
+        if x.get("suitNature")
+        else x["result"].cluster.nature_of_suit
+    ),
+    "panel_ids": lambda x: (
+        list(x["result"].cluster.panel.all().values_list("id", flat=True))
+        if x["result"].cluster.panel.all()
+        else [] if x.get("V4") else None
+    ),
+    "dateArgued": lambda x: (
+        (
+            x["result"].cluster.docket.date_argued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].cluster.docket.date_argued
+            ).isoformat()
+        )
+        if x["result"].cluster.docket.date_argued
+        else None
+    ),
+    "dateFiled": lambda x: (
+        (
+            x["result"].cluster.date_filed.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(x["result"].cluster.date_filed).isoformat()
+        )
+        if x["result"].cluster.date_filed
+        else None
+    ),
+    "dateReargued": lambda x: (
+        (
+            x["result"].cluster.docket.date_reargued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].cluster.docket.date_reargued
+            ).isoformat()
+        )
+        if x["result"].cluster.docket.date_reargued
+        else None
+    ),
+    "dateReargumentDenied": lambda x: (
+        (
+            x["result"].cluster.docket.date_reargument_denied.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].cluster.docket.date_reargument_denied
+            ).isoformat()
+        )
+        if x["result"].cluster.docket.date_reargument_denied
+        else None
+    ),
 }
+
+opinion_document_v3_v4_common_fields = {
+    "author_id": lambda x: x["result"].author_id,
+    "cites": lambda x: (
+        list(
+            x["result"]
+            .cited_opinions.all()
+            .values_list("cited_opinion_id", flat=True)
+        )
+        if x["result"]
+        .cited_opinions.all()
+        .values_list("cited_opinion_id", flat=True)
+        else [] if x.get("V4") else None
+    ),
+    "download_url": lambda x: x["result"].download_url,
+    "id": lambda x: x["result"].pk,
+    "joined_by_ids": lambda x: (
+        list(x["result"].joined_by.all().values_list("id", flat=True))
+        if x["result"].joined_by.all()
+        else [] if x.get("V4") else None
+    ),
+    "type": lambda x: (
+        o_type_index_map.get(x["result"].type)
+        if x.get("V4")
+        else x["result"].type
+    ),
+    "local_path": lambda x: (
+        x["result"].local_path if x["result"].local_path else None
+    ),
+    "per_curiam": lambda x: x["result"].per_curiam,
+    "snippet": lambda x: (
+        x["snippet"] if x.get("snippet") else x["result"].plain_text or ""
+    ),
+}
+
+opinion_cluster_v3_fields = opinion_cluster_v3_v4_common_fields.copy()
+opinion_document_v3_fields = opinion_document_v3_v4_common_fields.copy()
+
+opinion_v3_search_api_keys = {
+    "court_exact": lambda x: x["result"].cluster.docket.court_id,
+    "date_created": lambda x: (
+        x["result"].date_created.isoformat().replace("+00:00", "Z")
+        if x.get("V4")
+        else timezone.localtime(x["result"].cluster.date_created).isoformat()
+    ),
+    "timestamp": lambda x: (
+        x["result"].date_created.isoformat().replace("+00:00", "Z")
+        if x.get("V4")
+        else timezone.localtime(x["result"].cluster.date_created).isoformat()
+    ),
+}
+opinion_v3_search_api_keys.update(opinion_cluster_v3_fields)
+opinion_v3_search_api_keys.update(opinion_document_v3_fields)
+
+opinion_v4_search_api_keys = {
+    "non_participating_judge_ids": lambda x: (
+        list(
+            x["result"]
+            .cluster.non_participating_judges.all()
+            .values_list("id", flat=True)
+        )
+    ),
+    "source": lambda x: x["result"].cluster.source,
+    "caseNameFull": lambda x: x["result"].cluster.case_name_full,
+    "panel_names": lambda x: [
+        judge.name_full for judge in x["result"].cluster.panel.all()
+    ],
+    "procedural_history": lambda x: x["result"].cluster.procedural_history,
+    "posture": lambda x: x["result"].cluster.posture,
+    "syllabus": lambda x: x["result"].cluster.syllabus,
+    "opinions": [],  # type: ignore
+    "meta": [],
+}
+
+opinion_cluster_v4_common_fields = opinion_cluster_v3_v4_common_fields.copy()
+opinion_v4_search_api_keys.update(opinion_cluster_v4_common_fields)
+
+opinion_document_v4_api_keys = {
+    "sha1": lambda x: x["result"].sha1,
+    "meta": [],
+}
+opinion_document_v4_api_keys.update(opinion_document_v3_v4_common_fields)
 
 
 docket_v4_api_keys_base = {
@@ -203,7 +294,6 @@ docket_v4_api_keys_base = {
         if x.get("court_citation_string")
         else x["result"].docket_entry.docket.court.citation_string
     ),
-    "court_exact": lambda x: x["result"].docket_entry.docket.court.pk,
     "court_id": lambda x: x["result"].docket_entry.docket.court.pk,
     "dateArgued": lambda x: (
         x["result"].docket_entry.docket.date_argued.isoformat()
@@ -220,9 +310,6 @@ docket_v4_api_keys_base = {
         if x["result"].docket_entry.docket.date_terminated
         else None
     ),
-    "date_created": lambda x: x["result"]
-    .docket_entry.docket.date_created.isoformat()
-    .replace("+00:00", "Z"),
     "docketNumber": lambda x: (
         x["docketNumber"]
         if x.get("docketNumber")
@@ -250,7 +337,11 @@ docket_v4_api_keys_base = {
         if x.get("juryDemand")
         else x["result"].docket_entry.docket.jury_demand
     ),
-    "pacer_case_id": lambda x: x["result"].docket_entry.docket.pacer_case_id,
+    "pacer_case_id": lambda x: (
+        str(x["result"].docket_entry.docket.pacer_case_id)
+        if x["result"].docket_entry.docket.pacer_case_id
+        else ""
+    ),
     "party": lambda x: list(
         DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
             "party"
@@ -280,20 +371,17 @@ docket_v4_api_keys_base = {
         if x.get("suitNature")
         else x["result"].docket_entry.docket.nature_of_suit
     ),
-    "timestamp": lambda x: x["result"]
-    .docket_entry.docket.date_created.isoformat()
-    .replace("+00:00", "Z"),
     "trustee_str": lambda x: (
         x["result"].docket_entry.docket.bankruptcy_information.trustee_str
         if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
         else None
     ),
+    "meta": [],
 }
 
 docket_v4_api_keys = docket_v4_api_keys_base.copy()
 docket_v4_api_keys.update(
     {
-        "more_docs": lambda x: False,
         "recap_documents": [],  # type: ignore
     }
 )
@@ -337,15 +425,313 @@ recap_document_v4_api_keys = {
         .cited_opinions.all()
         .values_list("cited_opinion_id", flat=True)
     ),
-    "timestamp": lambda x: x["result"]
-    .date_created.isoformat()
-    .replace("+00:00", "Z"),
+    "meta": [],
 }
 
 rd_type_v4_api_keys = recap_document_v4_api_keys.copy()
 rd_type_v4_api_keys.update(
     {
         "docket_id": lambda x: x["result"].docket_entry.docket_id,
+    }
+)
+
+v4_meta_keys = {
+    "date_created": lambda x: x["result"]
+    .date_created.isoformat()
+    .replace("+00:00", "Z"),
+    "timestamp": lambda x: x["result"]
+    .date_created.isoformat()
+    .replace("+00:00", "Z"),
+}
+
+v4_recap_meta_keys = v4_meta_keys.copy()
+v4_recap_meta_keys.update(
+    {
+        "more_docs": lambda x: False,
+    }
+)
+
+
+people_v4_fields = {
+    "absolute_url": lambda x: x["result"].person.get_absolute_url(),
+    "date_granularity_dob": lambda x: x["result"].person.date_granularity_dob,
+    "date_granularity_dod": lambda x: x["result"].person.date_granularity_dod,
+    "id": lambda x: x["result"].person.pk,
+    "alias_ids": lambda x: (
+        [alias.pk for alias in x["result"].person.aliases.all()]
+        if x["result"].person.aliases.all()
+        else []
+    ),
+    "races": lambda x: (
+        [r.get_race_display() for r in x["result"].person.race.all()]
+        if x["result"].person.race.all()
+        else []
+    ),
+    "political_affiliation_id": lambda x: (
+        [
+            pa.political_party
+            for pa in x["result"].person.political_affiliations.all()
+        ]
+        if x["result"].person.political_affiliations.all()
+        else []
+    ),
+    "fjc_id": lambda x: str(x["result"].person.fjc_id),
+    "name": lambda x: (
+        x["name"] if x.get("name") else x["result"].person.name_full
+    ),
+    "gender": lambda x: x["result"].person.get_gender_display(),
+    "religion": lambda x: x["result"].person.religion,
+    "alias": lambda x: (
+        [r.name_full for r in x["result"].person.aliases.all()]
+        if x["result"].person.aliases.all()
+        else []
+    ),
+    "dob": lambda x: (
+        x["result"].person.date_dob.isoformat()
+        if x["result"].person.date_dob
+        else None
+    ),
+    "dod": lambda x: (
+        x["result"].person.date_dod.isoformat()
+        if x["result"].person.date_dod
+        else None
+    ),
+    "dob_city": lambda x: (
+        x["dob_city"] if x.get("dob_city") else x["result"].person.dob_city
+    ),
+    "dob_state": lambda x: x["result"].person.get_dob_state_display(),
+    "dob_state_id": lambda x: (
+        x["dob_state_id"]
+        if x.get("dob_state_id")
+        else x["result"].person.dob_state
+    ),
+    "political_affiliation": lambda x: (
+        x["political_affiliation"]
+        if x.get("political_affiliation")
+        else (
+            [
+                pa.get_political_party_display()
+                for pa in x["result"].person.political_affiliations.all()
+            ]
+            if x["result"].person.political_affiliations.all()
+            else []
+        )
+    ),
+    "positions": [],  # type: ignore
+    "aba_rating": lambda x: (
+        [r.get_rating_display() for r in x["result"].person.aba_ratings.all()]
+        if x["result"].person.aba_ratings.all()
+        else []
+    ),
+    "school": lambda x: (
+        x["school"]
+        if x.get("school")
+        else (
+            [e.school.name for e in x["result"].person.educations.all()]
+            if x["result"].person.educations.all()
+            else []
+        )
+    ),
+    "meta": [],
+}
+
+position_v4_fields = {
+    "court": lambda x: (
+        x["result"].court.short_name if x["result"].court else None
+    ),
+    "court_full_name": lambda x: (
+        x["result"].court.full_name if x["result"].court else None
+    ),
+    "court_exact": lambda x: (
+        x["result"].court.pk if x["result"].court else None
+    ),
+    "court_citation_string": lambda x: (
+        x["result"].court.citation_string if x["result"].court else None
+    ),
+    "organization_name": lambda x: x["result"].organization_name,
+    "job_title": lambda x: x["result"].job_title,
+    "position_type": lambda x: x["result"].get_position_type_display(),
+    "appointer": lambda x: (
+        x["result"].appointer.person.name_full_reverse
+        if x["result"].appointer and x["result"].appointer.person
+        else None
+    ),
+    "supervisor": lambda x: (
+        x["result"].supervisor.name_full_reverse
+        if x["result"].supervisor
+        else None
+    ),
+    "predecessor": lambda x: (
+        x["result"].predecessor.name_full_reverse
+        if x["result"].predecessor
+        else None
+    ),
+    "date_nominated": lambda x: (
+        x["result"].date_nominated.isoformat()
+        if x["result"].date_nominated
+        else None
+    ),
+    "date_elected": lambda x: (
+        x["result"].date_elected.isoformat()
+        if x["result"].date_elected
+        else None
+    ),
+    "date_recess_appointment": lambda x: (
+        x["result"].date_recess_appointment.isoformat()
+        if x["result"].date_recess_appointment
+        else None
+    ),
+    "date_referred_to_judicial_committee": lambda x: (
+        x["result"].date_referred_to_judicial_committee.isoformat()
+        if x["result"].date_referred_to_judicial_committee
+        else None
+    ),
+    "date_judicial_committee_action": lambda x: (
+        x["result"].date_judicial_committee_action.isoformat()
+        if x["result"].date_judicial_committee_action
+        else None
+    ),
+    "date_hearing": lambda x: (
+        x["result"].date_hearing.isoformat()
+        if x["result"].date_hearing
+        else None
+    ),
+    "date_confirmation": lambda x: (
+        x["result"].date_confirmation.isoformat()
+        if x["result"].date_confirmation
+        else None
+    ),
+    "date_start": lambda x: (
+        x["result"].date_start.isoformat() if x["result"].date_start else None
+    ),
+    "date_granularity_start": lambda x: x["result"].date_granularity_start,
+    "date_retirement": lambda x: (
+        x["result"].date_retirement.isoformat()
+        if x["result"].date_retirement
+        else None
+    ),
+    "date_termination": lambda x: (
+        x["result"].date_termination.isoformat()
+        if x["result"].date_termination
+        else None
+    ),
+    "date_granularity_termination": lambda x: x[
+        "result"
+    ].date_granularity_termination,
+    "judicial_committee_action": lambda x: x[
+        "result"
+    ].get_judicial_committee_action_display(),
+    "nomination_process": lambda x: x[
+        "result"
+    ].get_nomination_process_display(),
+    "selection_method": lambda x: x["result"].get_how_selected_display(),
+    "selection_method_id": lambda x: x["result"].how_selected,
+    "termination_reason": lambda x: x[
+        "result"
+    ].get_termination_reason_display(),
+    "meta": [],
+}
+
+audio_common_fields = {
+    "absolute_url": lambda x: x["result"].get_absolute_url(),
+    "caseName": lambda x: (
+        x["caseName"] if x.get("caseName") else x["result"].case_name
+    ),
+    "court": lambda x: x["result"].docket.court.full_name,
+    "court_id": lambda x: x["result"].docket.court.pk,
+    "court_citation_string": lambda x: (
+        x["court_citation_string"]
+        if x.get("court_citation_string")
+        else x["result"].docket.court.citation_string
+    ),
+    "docket_id": lambda x: x["result"].docket.pk,
+    "dateArgued": lambda x: (
+        (
+            x["result"].docket.date_argued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(x["result"].docket.date_argued).isoformat()
+        )
+        if x["result"].docket.date_argued
+        else None
+    ),
+    "dateReargued": lambda x: (
+        (
+            x["result"].docket.date_reargued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(x["result"].docket.date_reargued).isoformat()
+        )
+        if x["result"].docket.date_reargued
+        else None
+    ),
+    "dateReargumentDenied": lambda x: (
+        (
+            x["result"].docket.date_reargument_denied.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].docket.date_reargument_denied
+            ).isoformat()
+        )
+        if x["result"].docket.date_reargument_denied
+        else None
+    ),
+    "docketNumber": lambda x: (
+        x["docketNumber"]
+        if x.get("docketNumber")
+        else x["result"].docket.docket_number
+    ),
+    "duration": lambda x: x["result"].duration,
+    "download_url": lambda x: x["result"].download_url,
+    "file_size_mp3": lambda x: (
+        deepgetattr(x["result"], "local_path_mp3.size", None)
+        if x["result"].local_path_mp3
+        else None
+    ),
+    "id": lambda x: x["result"].pk,
+    "judge": lambda x: (
+        x["judge"]
+        if x.get("judge")
+        else x["result"].judges if x["result"].judges else ""
+    ),
+    "local_path": lambda x: (
+        deepgetattr(x["result"], "local_path_mp3.name", None)
+        if x["result"].local_path_mp3
+        else None
+    ),
+    "pacer_case_id": lambda x: x["result"].docket.pacer_case_id,
+    "panel_ids": lambda x: (
+        list(x["result"].panel.all().values_list("id", flat=True))
+        if x["result"].panel.all()
+        else [] if x.get("V4") else None
+    ),
+    "sha1": lambda x: x["result"].sha1,
+    "source": lambda x: x["result"].source,
+    "snippet": lambda x: (
+        x["snippet"]
+        if x.get("snippet")
+        else x["result"].transcript if x["result"].stt_google_response else ""
+    ),
+}
+
+
+audio_v3_fields = audio_common_fields.copy()
+audio_v3_fields.update(
+    {
+        "court_exact": lambda x: x["result"].docket.court.pk,
+        "date_created": lambda x: timezone.localtime(
+            x["result"].date_created
+        ).isoformat(),
+        "timestamp": lambda x: timezone.localtime(
+            x["result"].date_created
+        ).isoformat(),
+    }
+)
+
+
+audio_v4_fields = audio_common_fields.copy()
+audio_v4_fields.update(
+    {
+        "case_name_full": lambda x: x["result"].case_name_full,
+        "meta": [],  # type: ignore
     }
 )
 
@@ -390,6 +776,7 @@ class PeopleTestCase(SimpleTestCase):
             gender="f",
             name_first="Judith",
             name_last="Sheindlin",
+            name_suffix="2",
             date_dob=datetime.date(1942, 10, 21),
             date_dod=datetime.date(2020, 11, 25),
             date_granularity_dob="%Y-%m-%d",
@@ -397,6 +784,7 @@ class PeopleTestCase(SimpleTestCase):
             name_middle="Susan",
             dob_city="Brookyln",
             dob_state="NY",
+            fjc_id=19832,
         )
         cls.person_2.race.add(cls.w_race)
         cls.person_2.race.add(cls.b_race)
@@ -435,6 +823,14 @@ class PeopleTestCase(SimpleTestCase):
             how_selected="e_part",
             nomination_process="fed_senate",
             date_elected=datetime.date(2015, 11, 12),
+            date_confirmation=datetime.date(2015, 11, 14),
+            date_termination=datetime.date(2018, 10, 14),
+            date_granularity_termination="%Y-%m-%d",
+            date_hearing=datetime.date(2021, 10, 14),
+            date_judicial_committee_action=datetime.date(2022, 10, 14),
+            date_recess_appointment=datetime.date(2013, 10, 14),
+            date_referred_to_judicial_committee=datetime.date(2010, 10, 14),
+            date_retirement=datetime.date(2023, 10, 14),
         )
         cls.position_3 = PositionFactory.create(
             date_granularity_start="%Y-%m-%d",
@@ -1044,6 +1440,8 @@ class AudioESTestCase(SimpleTestCase):
             docket_number="1:21-bk-1234",
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2015, 8, 16),
+            date_reargued=datetime.date(2016, 9, 16),
+            date_reargument_denied=datetime.date(2017, 10, 16),
         )
         cls.docket_2 = DocketFactory.create(
             docket_number="19-5734",
@@ -1060,13 +1458,13 @@ class AudioESTestCase(SimpleTestCase):
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2013, 8, 14),
         )
-        transcript_response = {
+        cls.transcript_response = {
             "response": {
                 "results": [
                     {
                         "alternatives": [
                             {
-                                "transcript": "This is the best transcript.",
+                                "transcript": "This is the best transcript. Nunc egestas sem sed libero feugiat, at interdum quam viverra. Pellentesque hendrerit ut augue at sagittis. Mauris faucibus fringilla lacus, eget maximus risus. Phasellus id mi at eros fermentum vestibulum nec nec diam. In nec sapien nunc. Ut massa ante, accumsan a erat eget, rhoncus pellentesque felis.",
                                 "confidence": 0.85,
                             },
                             {
@@ -1078,19 +1476,23 @@ class AudioESTestCase(SimpleTestCase):
                 ]
             }
         }
-        json_transcript = json.dumps(transcript_response)
+        cls.json_transcript = json.dumps(cls.transcript_response)
+        cls.filepath_local = SimpleUploadedFile(
+            "sec_frank.mp3", b"mp3 binary content", content_type="audio/mpeg"
+        )
         cls.audio_1 = AudioFactory.create(
             case_name="SEC v. Frank J. Information, WikiLeaks",
+            case_name_full="a_random_title",
             docket_id=cls.docket_1.pk,
             duration=420,
             judges="Mary Deposit Learning rd Administrative procedures act",
             local_path_original_file="test/audio/ander_v._leo.mp3",
-            local_path_mp3="test/audio/2.mp3",
+            local_path_mp3=cls.filepath_local,
             source="C",
             blocked=False,
             sha1="a49ada009774496ac01fb49818837e2296705c97",
             stt_status=Audio.STT_COMPLETE,
-            stt_google_response=json_transcript,
+            stt_google_response=cls.json_transcript,
         )
         cls.audio_2 = AudioFactory.create(
             case_name="Jose A. Dominguez v. Loretta E. Lynch",
@@ -1128,6 +1530,7 @@ class AudioESTestCase(SimpleTestCase):
             judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
+        cls.audio_1.panel.add(cls.author)
 
 
 def skip_if_common_tests_skipped(method):

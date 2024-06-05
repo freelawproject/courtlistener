@@ -7,7 +7,7 @@ import pgtrigger.migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("search", "0030_recapdocument_pacer_doc_id_idx"),
+        ("search", "0031_alter_opinion_type_alter_opinioncluster_source_noop"),
     ]
 
     operations = [

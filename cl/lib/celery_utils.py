@@ -87,17 +87,30 @@ class CeleryThrottle:
         :param min_items: Generally keep the queue longer than this, and
         always shorter than 2× this value.
         """
-        # All these variables are Final, i.e., they're consts. The only
-        # instance variable that changes is the shortage variable below.
-        self.min: Final = min_items
-        self.max: Final = min_items * 2
+
+        # These variables are Final, i.e., they're consts.
         self.poll_interval: Final = poll_interval
         self.queue_name: Final = queue_name
+
+        # The only instances variables that changes is the shortage, min and
+        # max variables below.
+        self.min = min_items
+        self.max = min_items * 2
 
         # `shortage` stores the number of items that the queue is short by, as
         # compared to `self.max`. At init, the queue is empty, so it's short
         # by the full amount. Fill it up.
         self.shortage = self.max
+
+    def update_min_items(self, min_value: int) -> None:
+        """Update the minimum items and adjust related parameters.
+
+        :param min_value: New minimum items value.
+        """
+        self.min = min_value
+        self.max = min_value * 2
+        # Important to update the self.shortage since the max has changed.
+        self.shortage = self.max - get_queue_length(self.queue_name)
 
     def maybe_wait(self) -> None:
         """Make the user wait until the queue is short enough"""
