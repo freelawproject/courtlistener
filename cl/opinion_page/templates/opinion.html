@@ -340,7 +340,7 @@
             {% endif %}
 
             {# Download original? #}
-            {% if 'C' in cluster.source and has_downloads or 'D' in cluster.source%}
+            {% if 'C' in cluster.source and has_downloads or 'D' in cluster.source or "G" in cluster.source %}
                 <div class="btn-group v-offset-below-3 v-offset-above-1">
                     <button type="button"
                             class="btn btn-primary dropdown-toggle"
