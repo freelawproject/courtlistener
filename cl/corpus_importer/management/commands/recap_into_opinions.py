@@ -3,9 +3,16 @@ from asgiref.sync import async_to_sync
 from django.core.management import BaseCommand
 from django.db import transaction
 from eyecite.tokenizers import HyperscanTokenizer
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    RemoteProtocolError,
+    TimeoutException,
+)
 
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.search.models import (
     SOURCES,
@@ -16,6 +23,33 @@ from cl.search.models import (
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+@retry(
+    (
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+    ),
+    tries=3,
+    delay=5,
+    backoff=2,
+    logger=logger,
+)
+def extract_recap_document(rd: RECAPDocument) -> dict[str:any]:
+    """Call recap-extract from doctor with retries
+
+    :param rd: the recap document to extract
+    :return: Response object
+    """
+    response = async_to_sync(microservice)(
+        service="recap-extract",
+        item=rd,
+        params={"strip_margin": True},
+    )
+    response.raise_for_status()
+    return response
 
 
 def import_opinions_from_recap(court=None, total_count=0):
@@ -63,13 +97,7 @@ def import_opinions_from_recap(court=None, total_count=0):
                     f"Skipping previously imported opinion: {ops[0].id}"
                 )
                 continue
-            response = async_to_sync(microservice)(
-                service="recap-extract",
-                item=recap_document,
-                params={"strip_margin": True},
-            )
-
-            response.raise_for_status()
+            response = extract_recap_document(rd=recap_document)
 
             try:
                 citations = eyecite.get_citations(
