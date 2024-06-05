@@ -1,4 +1,5 @@
 import itertools
+import random
 import re
 from datetime import date
 from difflib import SequenceMatcher
@@ -1024,3 +1025,45 @@ def get_court_id(raw_court: str) -> list[str]:
             return found_court
 
     return []
+
+
+def make_iquery_probing_key(court_id: str) -> str:
+    """Small wrapper to centralize iquery probing key semaphore generation.
+    :param court_id: A CL court ID
+    :return: The semaphore iquery probing key
+    """
+    return f"iquery.probing.enqueued:{court_id}"
+
+
+def compute_next_binary_probe(
+    iquery_pacer_case_id_final: int,
+    probe_iteration: int,
+    court_probe_cycle_no_hits: int,
+    probe_limit: int,
+) -> tuple[int, int]:
+    """Compute the next binary  probe target for a given PACER case ID.
+
+    This computes the next value of a geometric binary sequence (2 ** (N - 1))
+    where N is the current probe iteration. If court_probe_cycle_no_hits is > 1
+    a 5% jitter is added to the next value to ensure probing values are not the
+    same from the previous one and increase the possibility of getting a hit.
+
+    :param iquery_pacer_case_id_final: The final PACER case ID.
+    :param probe_iteration: The current probe iteration number.
+    :param court_probe_cycle_no_hits: The number of court probe iterations performed.
+    :param probe_limit: The probe threshold value.
+    :return: The updated probe_iteration and the PACER case ID to lookup.
+    """
+
+    jitter = 0
+    probe_iteration += 1
+    if court_probe_cycle_no_hits > 1:
+        # The previous iquery_pages_probing tasks didn't find a higher
+        # watermark, apply a jitter this time.
+        jitter = random.randint(1, round(probe_limit * 0.05))
+
+    pacer_case_id_to_lookup = (
+        iquery_pacer_case_id_final + (2 ** (probe_iteration - 1)) + jitter
+    )
+
+    return probe_iteration, pacer_case_id_to_lookup

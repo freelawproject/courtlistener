@@ -1,7 +1,6 @@
 import copy
 import logging
 import os
-import random
 import shutil
 import time
 from datetime import date
@@ -54,7 +53,11 @@ from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
-from cl.corpus_importer.utils import mark_ia_upload_needed
+from cl.corpus_importer.utils import (
+    compute_next_binary_probe,
+    make_iquery_probing_key,
+    mark_ia_upload_needed,
+)
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
@@ -78,13 +81,7 @@ from cl.lib.recap_utils import (
     get_docket_filename,
     get_document_filename,
 )
-from cl.lib.redis_utils import (
-    acquire_atomic_redis_lock,
-    delete_redis_semaphore,
-    get_redis_interface,
-    make_update_pacer_case_id_key,
-    release_atomic_redis_lock,
-)
+from cl.lib.redis_utils import delete_redis_semaphore, get_redis_interface
 from cl.lib.types import TaskData
 from cl.people_db.models import Attorney, Role
 from cl.recap.constants import CR_2017, CR_OLD, CV_2017, CV_2020, CV_OLD
@@ -95,6 +92,7 @@ from cl.recap.mergers import (
     find_docket_object,
     make_recap_sequence_number,
     merge_pacer_docket_into_cl_docket,
+    process_case_query_report,
     save_iquery_to_docket,
     update_docket_metadata,
 )
@@ -1158,7 +1156,7 @@ def make_docket_by_iquery(
     using: str = "default",
     tag_names: Optional[List[str]] = None,
     log_results_redis: bool = False,
-    from_iquery_sweep: bool = False,
+    from_iquery_scrape: bool = False,
 ) -> Optional[int]:
     """
     Using the iquery endpoint, create or update a docket
@@ -1170,7 +1168,7 @@ def make_docket_by_iquery(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param from_iquery_sweep: Weather this method was invoked by the iquery
+    :param from_iquery_scrape: Weather this method was invoked by the iquery
     sweep task or the iquery probing task.
     :return: None if failed, else the ID of the created/updated docket
     """
@@ -1227,12 +1225,8 @@ def make_docket_by_iquery(
         d,
         tag_names,
         add_to_solr=True,
-        from_iquery_sweep=from_iquery_sweep,
+        from_iquery_scrape=from_iquery_scrape,
     )
-
-
-def make_iquery_probing_key(court_id: str) -> str:
-    return f"iquery.probing.enqueued:{court_id}"
 
 
 @retry((requests.Timeout, PacerLoginException), tries=3, delay=0.25, backoff=1)
@@ -1268,66 +1262,6 @@ def query_iquery_page(
     return report.data
 
 
-@retry(IntegrityError, tries=3, delay=0.25, backoff=1)
-def process_case_query_report(
-    court_id: str,
-    pacer_case_id: int,
-    report_data: dict[str, Any],
-    add_to_solr: bool,
-) -> None:
-    d = async_to_sync(find_docket_object)(
-        court_id,
-        str(pacer_case_id),
-        report_data["docket_number"],
-        using="default",
-    )
-    d.pacer_case_id = pacer_case_id
-    d.add_recap_source()
-    d = async_to_sync(update_docket_metadata)(d, report_data)
-    d.save()
-    add_bankruptcy_data_to_docket(d, report_data)
-    if add_to_solr:
-        add_items_to_solr([d.pk], "search.Docket")
-    logger.info(
-        f"Created/updated docket: {d} from court: {court_id} and pacer_case_id {pacer_case_id}"
-    )
-    return None
-
-
-def compute_next_binary_probe(
-    pacer_case_id_final: int,
-    probe_iteration: int,
-    court_probe_cycle_no_hits: int,
-    probe_limit: int,
-) -> tuple[int, int]:
-    """Compute the next binary  probe target for a given PACER case ID.
-
-    This computes the next value of a geometric binary sequence (2 ** (N - 1))
-    where N is the current probe iteration. If court_probe_cycle_no_hits is > 1
-    a 5% jitter is added to the next value to ensure probing values are not the
-    same from the previous one and increase the possibility of getting a hit.
-
-    :param pacer_case_id_final: The final PACER case ID.
-    :param probe_iteration: The current probe iteration number.
-    :param court_probe_cycle_no_hits: The number of court probe iterations performed.
-    :param probe_limit: The probe threshold value.
-    :return: The updated probe_iteration and the PACER case ID to lookup.
-    """
-
-    jitter = 0
-    probe_iteration += 1
-    if court_probe_cycle_no_hits > 1:
-        # The previous iquery_pages_probing tasks didn't find a higher
-        # watermark, apply a jitter this time.
-        jitter = random.randint(1, round(probe_limit * 0.05))
-
-    pacer_case_id_to_lookup = (
-        pacer_case_id_final + (2 ** (probe_iteration - 1)) + jitter
-    )
-
-    return probe_iteration, pacer_case_id_to_lookup
-
-
 @app.task(
     bind=True,
     autoretry_for=(RedisConnectionError,),
@@ -1339,6 +1273,7 @@ def compute_next_binary_probe(
 def iquery_pages_probing(
     self: Task,
     court_id: str,
+    testing: bool = False,
 ) -> None:
     """
     Using the iquery endpoint, to perform forward probing and retrieve the
@@ -1346,6 +1281,7 @@ def iquery_pages_probing(
 
     :param self: The celery task
     :param court_id: A CL court ID where we'll look things up.
+    :param testing: A boolean indicating whether this was called from tests.
     :return: None
     """
 
@@ -1354,15 +1290,17 @@ def iquery_pages_probing(
     latest_match = 0
     latest_iteration_hit = True
     time_out_counter = 0
-    pacer_case_id_final = int(r.hget("pacer_case_id_final", court_id) or 0)
+    iquery_pacer_case_id_final = int(
+        r.hget("iquery_pacer_case_id_final", court_id) or 0
+    )
 
     # Probe limit e.g: 9 probe iterations -> 256
     probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
     court_probe_cycle_no_hits = r.hincrby(
         "court_probe_cycle_no_hits", court_id, 1
     )
+    reports_data = []
     while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-
         if time_out_counter >= 3:
             logger.warning(
                 "Aborting probing task for %s after 3 consecutive iterations "
@@ -1377,7 +1315,7 @@ def iquery_pages_probing(
             break
 
         probe_iteration, pacer_case_id_to_lookup = compute_next_binary_probe(
-            pacer_case_id_final,
+            iquery_pacer_case_id_final,
             probe_iteration,
             court_probe_cycle_no_hits,
             probe_limit,
@@ -1412,12 +1350,7 @@ def iquery_pages_probing(
 
         if report_data:
             # Find and update/store the Docket.
-            process_case_query_report(
-                court_id,
-                pacer_case_id_to_lookup,
-                report_data,
-                add_to_solr=True,
-            )
+            reports_data.append((pacer_case_id_to_lookup, report_data))
             latest_match = pacer_case_id_to_lookup
             latest_iteration_hit = True
         else:
@@ -1430,18 +1363,27 @@ def iquery_pages_probing(
                 # Two blank iterations in a row. Terminate the probing loop.
                 break
 
-    if latest_match > pacer_case_id_final:
-        # Get the latest pacer_case_id from Redis using a lock to avoid race
-        # conditions when updating it.
-        update_lock_key = make_update_pacer_case_id_key(court_id)
-        lock_value = acquire_atomic_redis_lock(r, update_lock_key, 1000)
-        r.hset("pacer_case_id_final", court_id, latest_match)
-        release_atomic_redis_lock(r, update_lock_key, lock_value)
-        # Release the lock once the pacer_case_id_final update process is complete.
-
-        # The latest pacer_case_id_final was found. Restart court_probe_cycle_no_hits
+    if latest_match > iquery_pacer_case_id_final:
+        if testing:
+            # For testing purposes update test_iquery_pacer_case_id_final
+            r.hset("test_iquery_pacer_case_id_final", court_id, latest_match)
+        # The latest iquery_pacer_case_id_final was found.
+        # Restart court_probe_cycle_no_hits
         r.hset("court_probe_cycle_no_hits", court_id, 0)
 
+    # Process all the reports retrieved during the probing.
+    # Avoid triggering the iQuery sweep signal except for the latest hit.
+    from_iquery_scrape = True
+    for index, report_data in enumerate(reports_data):
+        if index == len(reports_data) - 1:
+            # Only trigger the sweep signal on the last hit.
+            from_iquery_scrape = False
+        process_case_query_report(
+            court_id,
+            report_data[0],
+            report_data[1],
+            from_iquery_scrape=from_iquery_scrape,
+        )
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 
 

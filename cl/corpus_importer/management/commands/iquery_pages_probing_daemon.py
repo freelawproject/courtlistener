@@ -3,10 +3,8 @@ import time
 from django.conf import settings
 from redis import ConnectionError
 
-from cl.corpus_importer.tasks import (
-    iquery_pages_probing,
-    make_iquery_probing_key,
-)
+from cl.corpus_importer.tasks import iquery_pages_probing
+from cl.corpus_importer.utils import make_iquery_probing_key
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
@@ -63,6 +61,7 @@ class Command(VerboseCommand):
         # Create a queue equal than the number of courts we're doing.
         throttle = CeleryThrottle(queue_name=q, min_items=len(court_ids))
         r = get_redis_interface("CACHE")
+        testing = True if testing_iterations else False
         while True:
             for court_id in court_ids:
                 if r.exists(f"court_wait:{court_id}"):
@@ -73,7 +72,7 @@ class Command(VerboseCommand):
                     if newly_enqueued:
                         # No other probing being conducted for the court.
                         # Enqueue it.
-                        iquery_pages_probing.delay(court_id)
+                        iquery_pages_probing.delay(court_id, testing)
                 except ConnectionError:
                     logger.info(
                         "Failed to connect to redis. Waiting a bit and making "
