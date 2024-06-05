@@ -27,7 +27,7 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 @retry(
-    (
+    ExceptionToCheck=(
         NetworkError,
         TimeoutException,
         RemoteProtocolError,
