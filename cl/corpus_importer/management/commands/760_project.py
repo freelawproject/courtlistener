@@ -4,7 +4,6 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.task_canvases import get_district_attachment_pages
 from cl.corpus_importer.tasks import (
@@ -14,6 +13,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.search.models import Court, RECAPDocument
 from cl.search.tasks import add_or_update_recap_docket
 
@@ -32,7 +32,9 @@ def get_dockets(options):
     q = options["queue"]
     task = options["task"]
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
     for i, row in enumerate(reader):
         if i < options["offset"]:
@@ -98,7 +100,9 @@ def get_att_pages(options):
             Court.FEDERAL_BANKRUPTCY,
         ],
     ).values_list("pk", flat=True)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
     get_district_attachment_pages(
         options=options, rd_pks=rd_pks, tag_names=[TAG], session=session

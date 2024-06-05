@@ -319,11 +319,12 @@ class SearchResultSerializer(serializers.Serializer):
         return fields
 
 
-class OAESResultSerializer(DocumentSerializer):
+class V3OAESResultSerializer(DocumentSerializer):
     """The serializer for Oral argument results."""
 
     snippet = serializers.SerializerMethodField(read_only=True)
-    panel_ids = serializers.ListField(read_only=True)
+    panel_ids = NullableListField(read_only=True)
+    timestamp = TimeStampField(read_only=True)
 
     def get_snippet(self, obj):
         # If the snippet has not yet been set upstream, set it here.
@@ -670,4 +671,33 @@ class PersonESResultSerializer(MetaMixin, DocumentSerializer):
             "name_reverse",
             "date_created",
             "timestamp",
+        )
+
+
+class OAESResultSerializer(MetaMixin, DocumentSerializer):
+    """The serializer for V4 Oral argument results."""
+
+    snippet = HighlightedField(read_only=True, source="text")
+    dateArgued = CoerceDateField(read_only=True)
+    dateReargued = CoerceDateField(read_only=True)
+    dateReargumentDenied = CoerceDateField(read_only=True)
+    panel_ids = NoneToListField(read_only=True)
+    caseName = HighlightedField(read_only=True)
+    judge = HighlightedField(read_only=True)
+    docketNumber = HighlightedField(read_only=True)
+    court_citation_string = HighlightedField(read_only=True)
+
+    class Meta:
+        document = AudioDocument
+        exclude = (
+            "court_exact",
+            "text",
+            "docket_slug",
+            "percolator_query",
+            "dateArgued_text",
+            "dateReargued_text",
+            "dateReargumentDenied_text",
+            "court_id_text",
+            "timestamp",
+            "date_created",
         )
