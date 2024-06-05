@@ -18,7 +18,7 @@ def enqueue_iquery_probing(court_id: str) -> bool:
     :return: A boolean indicating if the semaphore was successfully created.
     """
     key = make_iquery_probing_key(court_id)
-    return create_redis_semaphore("CACHE", key, ttl=60)
+    return create_redis_semaphore("CACHE", key, ttl=60 * 10)
 
 
 def get_all_pacer_courts() -> list[str]:

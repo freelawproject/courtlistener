@@ -27,7 +27,8 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     # Get the latest pacer_case_id from Redis using a lock to avoid race conditions
     # when getting and updating it.
     update_lock_key = make_update_pacer_case_id_key(court_id)
-    lock_value = acquire_atomic_redis_lock(r, update_lock_key, 1000)
+    # ttl one hour.
+    lock_value = acquire_atomic_redis_lock(r, update_lock_key, 60 * 60 * 1000)
 
     current_iquery_pacer_case_id_final = int(
         r.hget("iquery_pacer_case_id_final", court_id) or 0
@@ -43,19 +44,34 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
 
     if updated_pacer_case_id:
         task_scheduled_countdown = 0
+
         while iquery_pacer_case_id_status + 1 < incoming_pacer_case_id:
-            iquery_pacer_case_id_status += 1
-            task_scheduled_countdown += 1
-            make_docket_by_iquery.apply_async(
-                args=(court_id, iquery_pacer_case_id_status),
-                kwargs={"from_iquery_scrape": True},
-                countdown=task_scheduled_countdown,
+            tasks_processed_in_this_batch = 0
+
+            # Schedule tasks in batches of IQUERY_SWEEP_BATCH_SIZE to avoid
+            # a celery runaway scheduling tasks with countdowns larger than
+            # the celery visibility_timeout.
+            while (
+                tasks_processed_in_this_batch
+                < settings.IQUERY_SWEEP_BATCH_SIZE
+                and iquery_pacer_case_id_status + 1 < incoming_pacer_case_id
+            ):
+                iquery_pacer_case_id_status += 1
+                tasks_processed_in_this_batch += 1
+                task_scheduled_countdown += 1
+                # Schedule the next task with a 1-second countdown increment
+                make_docket_by_iquery.apply_async(
+                    args=(court_id, iquery_pacer_case_id_status),
+                    kwargs={"from_iquery_scrape": True},
+                    countdown=task_scheduled_countdown,
+                )
+
+            # Update the status in Redis after each batch
+            r.hset(
+                "iquery_pacer_case_id_status",
+                court_id,
+                iquery_pacer_case_id_status,
             )
-        r.hset(
-            "iquery_pacer_case_id_status",
-            court_id,
-            iquery_pacer_case_id_status,
-        )
 
     # Release the lock once the whole process is complete.
     release_atomic_redis_lock(r, update_lock_key, lock_value)

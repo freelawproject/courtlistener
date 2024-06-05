@@ -41,7 +41,7 @@ def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
     :param r: The Redis DB to connect to as a connection interface or str that
     can be handed off to get_redis_interface.
     :param key: The key to create
-    :param ttl: How long the key should live
+    :param ttl: How long the key should live in seconds.
     :return: True if the key was created else False
     """
     if isinstance(r, str):
