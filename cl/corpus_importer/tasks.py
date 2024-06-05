@@ -1286,10 +1286,10 @@ def iquery_pages_probing(
     """
 
     r = get_redis_interface("CACHE")
-    probe_iteration = 0
+    probe_iteration = 1
     latest_match = 0
-    latest_iteration_hit = True
     time_out_counter = 0
+    consecutive_empty_probes = 0
     iquery_pacer_case_id_final = int(
         r.hget("iquery_pacer_case_id_final", court_id) or 0
     )
@@ -1352,15 +1352,16 @@ def iquery_pages_probing(
             # Find and update/store the Docket.
             reports_data.append((pacer_case_id_to_lookup, report_data))
             latest_match = pacer_case_id_to_lookup
-            latest_iteration_hit = True
+            # Restart consecutive_empty_probes
+            consecutive_empty_probes = 0
         else:
-            if latest_iteration_hit:
-                # Previous iteration was valid, set this one as invalid and
-                # try the next pacer_case_id
-                latest_iteration_hit = False
-                continue
-            else:
-                # Two blank iterations in a row. Terminate the probing loop.
+            consecutive_empty_probes += 1
+            if (
+                consecutive_empty_probes
+                >= settings.IQUERY_PROBE_MAX_CONSECUTIVE_FAILURES
+            ):
+                # Too many consecutive blank probes in a row.
+                # Terminate the probing loop.
                 break
 
     if latest_match > iquery_pacer_case_id_final:

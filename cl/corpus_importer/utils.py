@@ -1056,7 +1056,6 @@ def compute_next_binary_probe(
     """
 
     jitter = 0
-    probe_iteration += 1
     if court_probe_cycle_no_hits > 1:
         # The previous iquery_pages_probing tasks didn't find a higher
         # watermark, apply a jitter this time.
@@ -1065,5 +1064,5 @@ def compute_next_binary_probe(
     pacer_case_id_to_lookup = (
         iquery_pacer_case_id_final + (2 ** (probe_iteration - 1)) + jitter
     )
-
+    probe_iteration += 1
     return probe_iteration, pacer_case_id_to_lookup

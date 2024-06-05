@@ -1,8 +1,11 @@
 import environ
 
 env = environ.FileAwareEnv()
-IQUERY_PROBE_ITERATIONS = env.int("IQUERY_PROBE_ITERATIONS", default=8)
+IQUERY_PROBE_ITERATIONS = env.int("IQUERY_PROBE_ITERATIONS", default=9)
 IQUERY_PROBE_WAIT = env.int("IQUERY_PROBE_WAIT", default=300)
+IQUERY_PROBE_MAX_CONSECUTIVE_FAILURES = env.int(
+    "IQUERY_PROBE_MAX_CONSECUTIVE_FAILURES", default=5
+)
 IQUERY_COURT_BLOCKED_WAIT = env.int("IQUERY_COURT_BLOCKED_WAIT", default=600)
 IQUERY_COURT_TIMEOUT_WAIT = env.int("IQUERY_COURT_TIMEOUT_WAIT", default=10)
 # IQUERY_SWEEP_BATCH_SIZE should be lower than the celery visibility_timeout

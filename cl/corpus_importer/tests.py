@@ -15,6 +15,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db.models.signals import post_save
+from django.test import override_settings
 from django.utils.timezone import make_aware, now
 from eyecite.tokenizers import HyperscanTokenizer
 from factory import RelatedFactory
@@ -3343,6 +3344,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
     "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
     return_value=None,
 )
+@override_settings(IQUERY_PROBE_MAX_CONSECUTIVE_FAILURES=2)
 class ScrapeIqueryPagesTest(TestCase):
     """Tests related to iquery_pages_probing_daemon command."""
 
@@ -3375,7 +3377,7 @@ class ScrapeIqueryPagesTest(TestCase):
         probe pattern based on the initial variables."""
 
         iquery_pacer_case_id_final = 0
-        probe_iteration = 0
+        probe_iteration = 1
         court_probe_cycle_no_hits = 1
         probe_limit = 256
         probe_pattern = []
@@ -3397,7 +3399,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
         # Apply jitter.
         court_probe_cycle_no_hits = 2
-        probe_iteration = 0
+        probe_iteration = 1
         probe_pattern_jitter = []
         for i in range(9):
             probe_iteration, next_probe = compute_next_binary_probe(
