@@ -42,6 +42,9 @@ case "$1" in
 'sweep-indexer')
     exec /opt/courtlistener/manage.py sweep_indexer
     ;;
+'iquery_pages_probing_daemon')
+    exec /opt/courtlistener/manage.py iquery_pages_probing_daemon
+    ;;
 *)
     echo "Unknown command"
     ;;
