@@ -88,7 +88,7 @@ def import_opinions_from_recap(court=None, total_count=0):
             logger.info(f"Importing recap document {recap_document.id}")
             docket = recap_document.docket_entry.docket
             if "cv" not in docket.docket_number.lower():
-                logger.info(f"Skipping non civil opinion")
+                logger.info("Skipping non-civil opinion")
                 continue
 
             ops = Opinion.objects.filter(sha1=recap_document.sha1)
@@ -108,7 +108,9 @@ def import_opinions_from_recap(court=None, total_count=0):
                 # Ex. 42\u2009U.S.C.\u2009§\u200912131 \u2009 is a small space
                 # fallback to regular citation match
                 logger.warning(
-                    f"Hyperscan failed for {recap_document}, trying w/o tokenizer"
+                    "Hyperscan failed for {}, trying w/o tokenizer".format(
+                        recap_document
+                    )
                 )
                 citations = eyecite.get_citations(response.json()["content"])
 
@@ -136,7 +138,9 @@ def import_opinions_from_recap(court=None, total_count=0):
                 )
 
                 logger.info(
-                    f"Sucessfully imported https://www.courtlistener.com/opinion/{cluster.id}/decision/"
+                    "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(
+                        cluster.id
+                    )
                 )
                 count += 1
                 if total_count > 0 and count >= total_count:
