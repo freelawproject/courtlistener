@@ -3,9 +3,17 @@ from asgiref.sync import async_to_sync
 from django.core.management import BaseCommand
 from django.db import transaction
 from eyecite.tokenizers import HyperscanTokenizer
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    RemoteProtocolError,
+    Response,
+    TimeoutException,
+)
 
 from cl.citations.utils import filter_out_non_case_law_citations
 from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.search.models import (
     SOURCES,
@@ -16,6 +24,33 @@ from cl.search.models import (
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+
+@retry(
+    ExceptionToCheck=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+    ),
+    tries=3,
+    delay=5,
+    backoff=2,
+    logger=logger,
+)
+def extract_recap_document(rd: RECAPDocument) -> Response:
+    """Call recap-extract from doctor with retries
+
+    :param rd: the recap document to extract
+    :return: Response object
+    """
+    response = async_to_sync(microservice)(
+        service="recap-extract",
+        item=rd,
+        params={"strip_margin": True},
+    )
+    response.raise_for_status()
+    return response
 
 
 def import_opinions_from_recap(court=None, total_count=0):
@@ -54,7 +89,7 @@ def import_opinions_from_recap(court=None, total_count=0):
             logger.info(f"Importing recap document {recap_document.id}")
             docket = recap_document.docket_entry.docket
             if "cv" not in docket.docket_number.lower():
-                logger.info(f"Skipping non civil opinion")
+                logger.info("Skipping non-civil opinion")
                 continue
 
             ops = Opinion.objects.filter(sha1=recap_document.sha1)
@@ -63,13 +98,7 @@ def import_opinions_from_recap(court=None, total_count=0):
                     f"Skipping previously imported opinion: {ops[0].id}"
                 )
                 continue
-            response = async_to_sync(microservice)(
-                service="recap-extract",
-                item=recap_document,
-                params={"strip_margin": True},
-            )
-
-            response.raise_for_status()
+            response = extract_recap_document(rd=recap_document)
 
             try:
                 citations = eyecite.get_citations(
@@ -80,7 +109,9 @@ def import_opinions_from_recap(court=None, total_count=0):
                 # Ex. 42\u2009U.S.C.\u2009§\u200912131 \u2009 is a small space
                 # fallback to regular citation match
                 logger.warning(
-                    f"Hyperscan failed for {recap_document}, trying w/o tokenizer"
+                    "Hyperscan failed for {}, trying w/o tokenizer".format(
+                        recap_document
+                    )
                 )
                 citations = eyecite.get_citations(response.json()["content"])
 
@@ -108,7 +139,9 @@ def import_opinions_from_recap(court=None, total_count=0):
                 )
 
                 logger.info(
-                    f"Sucessfully imported https://www.courtlistener.com/opinion/{cluster.id}/decision/"
+                    "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(
+                        cluster.id
+                    )
                 )
                 count += 1
                 if total_count > 0 and count >= total_count:

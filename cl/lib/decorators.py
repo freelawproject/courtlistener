@@ -1,13 +1,13 @@
 import logging
 import time
 from functools import wraps
-from typing import Callable, Type
+from typing import Callable, Tuple, Type, Union
 
 logger = logging.getLogger(__name__)
 
 
 def retry(
-    ExceptionToCheck: Type[Exception] | tuple[Type[Exception], ...],
+    ExceptionToCheck: Union[Type[Exception], Tuple[Type[Exception], ...]],
     tries: int = 4,
     delay: float = 3,
     backoff: float = 2,
