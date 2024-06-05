@@ -2771,7 +2771,9 @@ class RECAPSearchAPIV3Test(
         )
 
     async def test_api_results_date_filed_ordering(self) -> None:
-        """Confirm api results date_filed ordering works properly"""
+        """Confirm api results date_filed ordering works properly.
+        In the RECAP search type, the dateFiled sorting is converted to entry_date_filed
+        """
 
         # Order by dateFiled desc
         params = {
@@ -2782,16 +2784,18 @@ class RECAPSearchAPIV3Test(
         # API
         r = await self._test_api_results_count(params, 3, "order")
         self.assertTrue(
-            r.content.decode().index("12-1235")
-            < r.content.decode().index("1:21-bk-1234"),
+            r.content.decode().index("1:21-bk-1234")  # edf: 2015, 8, 19
+            < r.content.decode().index("12-1235"),  # edf: 2014, 7, 19
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by desc.",
         )
 
         params["type"] = SEARCH_TYPES.DOCKETS
         r = await self._test_api_results_count(params, 2, "order")
         self.assertTrue(
-            r.content.decode().index("12-1235")
-            < r.content.decode().index("1:21-bk-1234"),
+            r.content.decode().index("12-1235")  # dateFiled:2016, 8, 16
+            < r.content.decode().index(
+                "1:21-bk-1234"
+            ),  # dateFiled:2015, 8, 16
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by desc.",
         )
 
@@ -2805,16 +2809,16 @@ class RECAPSearchAPIV3Test(
         # API
         r = await self._test_api_results_count(params, 3, "order")
         self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by asc.",
+            r.content.decode().index("12-1235")  # edf: 2014, 7, 19
+            < r.content.decode().index("1:21-bk-1234"),  # edf: 2015, 8, 19
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by asc.",
         )
 
         params["type"] = SEARCH_TYPES.DOCKETS
         r = await self._test_api_results_count(params, 2, "order")
         self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
+            r.content.decode().index("1:21-bk-1234")  # dateFiled:2015, 8, 16
+            < r.content.decode().index("12-1235"),  # dateFiled:2016, 8, 16
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by asc.",
         )
 

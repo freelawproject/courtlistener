@@ -22,7 +22,7 @@ from cl.lib.elasticsearch_utils import (
     set_results_highlights,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib.search_utils import map_to_docket_entry_sorting
+from cl.lib.utils import map_to_docket_entry_sorting
 from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
     AudioDocument,
@@ -109,6 +109,7 @@ def get_object_list(request, cd, paginator):
         main_query["caller"] = "api_search"
 
     if not is_recap_active and cd["type"] == SEARCH_TYPES.RECAP:
+        # Convert the date_filed sorting to a docket entry sorting parameter.
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
     if (

@@ -48,6 +48,7 @@ from cl.lib.utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
     lookup_child_courts,
+    map_to_docket_entry_sorting,
 )
 from cl.people_db.models import Position
 from cl.search.constants import (
@@ -2886,6 +2887,10 @@ def do_es_api_query(
             )
 
         main_query = main_query.extra(**extra_options)
+        if cd["type"] == SEARCH_TYPES.RECAP:
+            # In the RECAP type, the dateFiled sorting param is converted to
+            # entry_date_filed
+            cd["order_by"] = map_to_docket_entry_sorting(cd["order_by"])
         main_query = main_query.sort(
             build_sort_results(cd, api_version=api_version)
         )
