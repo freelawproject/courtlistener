@@ -46,6 +46,7 @@ This is still work in progress, some data is not cloned yet.
 import json
 import os
 import pathlib
+import sys
 
 import requests
 from django.apps import apps
@@ -80,8 +81,29 @@ class CloneException(Exception):
 
 
 def get_id_from_url(api_url: str) -> str:
-    """Get the PK from an API url"""
+    """Get the PK from an API url
+
+    :param api_url: api url with a pk
+    :return: pk from url
+    """
     return api_url.split("/")[-2]
+
+
+def get_json_data(api_url: str, session: Session, timeout: int = 120) -> dict:
+    """Get the JSON data from endpoint
+
+    :param api_url: api url to send get request
+    :param session: a Requests session
+    :param timeout: timeout for get request
+    :return: list of opinion cluster objects
+    """
+    data = session.get(api_url, timeout=timeout)
+
+    if data.status_code == 401:
+        print("Error: Invalid token in CL_API_TOKEN variable.")
+        sys.exit(1)
+
+    return data.json()
 
 
 def clone_opinion_cluster(
@@ -95,6 +117,7 @@ def clone_opinion_cluster(
 ):
     """Download opinion cluster data from courtlistener.com and add it to
     local environment
+
     :param session: a Requests session
     :param cluster_ids: a list of opinion cluster ids
     :param download_cluster_files: True if it should download cluster files
@@ -130,7 +153,7 @@ def clone_opinion_cluster(
             kwargs={"version": "v3", "pk": cluster_id},
         )
         cluster_url = f"{domain}{cluster_path}"
-        cluster_datum = session.get(cluster_url, timeout=120).json()
+        cluster_datum = get_json_data(cluster_url, session)
         docket_id = get_id_from_url(cluster_datum["docket"])
         docket = clone_docket(
             session,
@@ -234,7 +257,7 @@ def clone_opinion_cluster(
 
         for op in sub_opinions_data:
             # Get opinion from api
-            op_data = session.get(op, timeout=120).json()
+            op_data = get_json_data(op, session)
             author = op_data["author"]
 
             # Delete fields with fk or m2m relations or unneeded fields
@@ -326,6 +349,7 @@ def clone_docket(
 ):
     """Download docket data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param docket_ids: a list of docket ids
     :param add_docket_entries: flag to clone docket entries and recap docs
@@ -364,7 +388,7 @@ def clone_docket(
             kwargs={"version": "v3", "pk": docket_id},
         )
         docket_url = f"{domain}{docket_path}"
-        docket_data = session.get(docket_url, timeout=120).json()
+        docket_data = get_json_data(docket_url, session)
 
         # Remove unneeded fields
         for f in [
@@ -444,6 +468,7 @@ def clone_docket_entries(
 ) -> list:
     """Download docket entries data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param docket_id: docket id to clone docket entries
     :param object_type: Docket app name with model name
@@ -478,10 +503,7 @@ def clone_docket_entries(
     docket_entry_next_url = docket_entry_list_data.get("next")
 
     while docket_entry_next_url:
-        docket_entry_list_request = session.get(
-            docket_entry_next_url, timeout=120
-        )
-        docket_entry_list_data = docket_entry_list_request.json()
+        docket_entry_list_data = get_json_data(docket_entry_next_url, session)
         docket_entry_next_url = docket_entry_list_data.get("next")
         docket_entries_data.extend(docket_entry_list_data.get("results", []))
 
@@ -529,6 +551,7 @@ def clone_recap_documents(
 ) -> list:
     """Download recap documents data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param docket_entry_id: docket entry id to assign to recap document
     :param recap_documents_data: list with recap documents data to create
@@ -576,6 +599,7 @@ def clone_tag(
     session: Session, tag_ids: list, object_type="search.Tag"
 ) -> list:
     """Clone tags from docket entries or recap documents
+
     :param session: a Requests session
     :param tag_ids: list of tag ids to clone
     :param object_type: Tag app name with model name
@@ -603,7 +627,7 @@ def clone_tag(
             kwargs={"version": "v3", "pk": tag_id},
         )
         tag_url = f"{domain}{tag_path}"
-        tag_data = session.get(tag_url, timeout=120).json()
+        tag_data = get_json_data(tag_url, session)
 
         del tag_data["resource_uri"]
 
@@ -630,6 +654,7 @@ def clone_position(
     object_type="people_db.Position",
 ):
     """Download position data from courtlistener.com and add it to local environment
+
     :param session: a Requests session
     :param position_ids: a list of position ids
     :param person_id: id of the person the positions belong to
@@ -658,7 +683,7 @@ def clone_position(
             kwargs={"version": "v3", "pk": position_id},
         )
         position_url = f"{domain}{position_path}"
-        position_data = session.get(position_url, timeout=120).json()
+        position_data = get_json_data(position_url, session)
 
         # delete unneeded fields
         for f in [
@@ -754,6 +779,7 @@ def clone_person(
 ):
     """Download person data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param people_ids: a list of person ids
     :param positions: True if we should clone person positions
@@ -786,8 +812,9 @@ def clone_person(
             "person-detail",
             kwargs={"version": "v3", "pk": person_id},
         )
+
         person_url = f"{domain}{people_path}"
-        person_data = session.get(person_url, timeout=120).json()
+        person_data = get_json_data(person_url, session)
         # delete unneeded fields
         for f in [
             "resource_uri",
@@ -853,6 +880,7 @@ def clone_person(
 def clone_court(session: Session, court_ids: list, object_type="search.Court"):
     """Download court data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param court_ids: list of court ids
     :param object_type: Court app name with model name
@@ -883,7 +911,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             kwargs={"version": "v3", "pk": court_id},
         )
         court_url = f"{domain}{court_path}"
-        court_data = session.get(court_url, timeout=120).json()
+        court_data = get_json_data(court_url, session)
         # delete resource_uri value generated by DRF
         del court_data["resource_uri"]
 
@@ -933,7 +961,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
 class Command(BaseCommand):
     help = (
         "Clone data from CourtListener.com into dev environment. It "
-        "requires to set CL_API_TOKEN varible in the env file."
+        "requires to set CL_API_TOKEN varible in the .env file."
     )
 
     def __init__(self, *args, **kwargs):
@@ -1012,8 +1040,15 @@ class Command(BaseCommand):
         self.clone_person_positions = options.get("clone_person_positions")
         self.add_to_solr = options.get("add_to_solr")
 
+        if not os.environ.get("CL_API_TOKEN"):
+            self.stdout.write("Error: CL_API_TOKEN not set in .env file")
+            return
+
         if not settings.DEVELOPMENT:
-            self.stdout.write("Command not enabled for production environment")
+            self.stdout.write(
+                "Error: Command not enabled for production environment"
+            )
+            return
 
         match self.type:
             case "search.OpinionCluster":

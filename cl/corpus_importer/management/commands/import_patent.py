@@ -3,7 +3,6 @@ import time
 
 from celery import chain
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.tasks import (
     get_docket_by_pacer_case_id,
@@ -12,6 +11,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.recap.constants import PATENT, PATENT_ANDA
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Docket
@@ -40,7 +40,9 @@ def get_dockets(options: dict) -> None:
 
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
 
     NOS_CODES = [PATENT, PATENT_ANDA]

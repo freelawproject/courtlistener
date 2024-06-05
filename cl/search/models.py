@@ -124,6 +124,7 @@ class SOURCES:
     COLUMBIA_M_MANUAL_INPUT_M_HARVARD = "ZMU"
     COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
+    RECAP = "G"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -223,6 +224,10 @@ class SOURCES:
         (
             COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             "columbia archive merged with lawbox, court website and Harvard",
+        ),
+        (
+            RECAP,
+            "recap",
         ),
     )
 
@@ -1935,7 +1940,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         ).exclude(pk="scotus")
 
-    def district_pacer_courts(self) -> models.QuerySet:
+    def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -3157,6 +3162,7 @@ class Opinion(OrderedModel, AbstractDateTimeModel):
     REHEARING = "070rehearing"
     ON_THE_MERITS = "080onthemerits"
     ON_MOTION_TO_STRIKE = "090onmotiontostrike"
+    TRIAL_COURT = "100trialcourt"
     OPINION_TYPES = (
         (COMBINED, "Combined Opinion"),
         (UNANIMOUS, "Unanimous Opinion"),
@@ -3170,6 +3176,7 @@ class Opinion(OrderedModel, AbstractDateTimeModel):
         (REHEARING, "Rehearing"),
         (ON_THE_MERITS, "On the Merits"),
         (ON_MOTION_TO_STRIKE, "On Motion to Strike Cost Bill"),
+        (TRIAL_COURT, "Trial Court Document"),
     )
     cluster = models.ForeignKey(
         OpinionCluster,

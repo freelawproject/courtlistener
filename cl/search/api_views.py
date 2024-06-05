@@ -10,25 +10,33 @@ from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.search import api_utils
 from cl.search.api_serializers import (
-    BaseRECAPDocumentESResultSerializer,
     CourtSerializer,
     DocketEntrySerializer,
     DocketESResultSerializer,
     DocketSerializer,
     ExtendedPersonESSerializer,
     OAESResultSerializer,
+    OpinionClusterESResultSerializer,
     OpinionClusterSerializer,
-    OpinionESResultSerializer,
     OpinionsCitedSerializer,
     OpinionSerializer,
     OriginalCourtInformationSerializer,
+    PersonESResultSerializer,
+    RECAPDocumentESResultSerializer,
     RECAPDocumentSerializer,
     RECAPESResultSerializer,
     SearchResultSerializer,
     TagSerializer,
+    V3OAESResultSerializer,
+    V3OpinionESResultSerializer,
 )
 from cl.search.constants import SEARCH_HL_TAG
-from cl.search.documents import DocketDocument
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    OpinionClusterDocument,
+    PersonDocument,
+)
 from cl.search.filters import (
     CourtFilter,
     DocketEntryFilter,
@@ -202,13 +210,15 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
                 search_type == SEARCH_TYPES.ORAL_ARGUMENT
                 and waffle.flag_is_active(request, "oa-es-active")
             ):
-                serializer = OAESResultSerializer(result_page, many=True)
+                serializer = V3OAESResultSerializer(result_page, many=True)
             elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
                 request, "p-es-active"
             ):
                 serializer = ExtendedPersonESSerializer(result_page, many=True)
             elif search_type == SEARCH_TYPES.OPINION and is_opinion_active:
-                serializer = OpinionESResultSerializer(result_page, many=True)
+                serializer = V3OpinionESResultSerializer(
+                    result_page, many=True
+                )
             else:
                 if cd["q"] == "":
                     cd["q"] = "*"  # Get everything
@@ -227,12 +237,52 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     # but folks will need to log in to get past the thresholds.
     permission_classes = (permissions.AllowAny,)
 
+    supported_search_types = {
+        SEARCH_TYPES.RECAP: {
+            "document_class": DocketDocument,
+            "serializer_class": RECAPESResultSerializer,
+        },
+        SEARCH_TYPES.DOCKETS: {
+            "document_class": DocketDocument,
+            "serializer_class": DocketESResultSerializer,
+        },
+        SEARCH_TYPES.RECAP_DOCUMENT: {
+            "document_class": DocketDocument,
+            "serializer_class": RECAPDocumentESResultSerializer,
+        },
+        SEARCH_TYPES.OPINION: {
+            "document_class": OpinionClusterDocument,
+            "serializer_class": OpinionClusterESResultSerializer,
+        },
+        SEARCH_TYPES.PEOPLE: {
+            "document_class": PersonDocument,
+            "serializer_class": PersonESResultSerializer,
+        },
+        SEARCH_TYPES.ORAL_ARGUMENT: {
+            "document_class": AudioDocument,
+            "serializer_class": OAESResultSerializer,
+        },
+    }
+
     def list(self, request, *args, **kwargs):
         search_form = SearchForm(request.GET, is_es_form=True)
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
-            search_query = DocketDocument.search()
+
+            supported_search_type = self.supported_search_types.get(
+                search_type
+            )
+            if not supported_search_type:
+                raise NotFound(
+                    detail="Search type not found or not supported."
+                )
+            search_query = supported_search_type["document_class"].search()
+
+            paginator = ESCursorPagination()
+            cd["request_date"] = paginator.initialize_context_from_request(
+                request, search_type
+            )
             highlighting_fields = {}
             main_query, child_docs_query = do_es_api_query(
                 search_query,
@@ -241,14 +291,12 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                 SEARCH_HL_TAG,
                 request.version,
             )
-            paginator = ESCursorPagination()
             es_list_instance = api_utils.CursorESList(
                 main_query,
                 child_docs_query,
                 None,
                 None,
                 cd,
-                version=request.version,
             )
             results_page = paginator.paginate_queryset(
                 es_list_instance, request
@@ -259,19 +307,9 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
             results_page = api_utils.limit_api_results_to_page(
                 results_page, paginator.cursor
             )
-            if search_type == SEARCH_TYPES.RECAP:
-                serializer = RECAPESResultSerializer(results_page, many=True)
-            elif search_type == SEARCH_TYPES.DOCKETS:
-                serializer = DocketESResultSerializer(results_page, many=True)
-            elif search_type == SEARCH_TYPES.RECAP_DOCUMENT:
-                serializer = BaseRECAPDocumentESResultSerializer(
-                    results_page, many=True
-                )
-            else:
-                # Not found error
-                raise NotFound(
-                    detail="Search type not found or not supported."
-                )
+
+            serializer_class = supported_search_type["serializer_class"]
+            serializer = serializer_class(results_page, many=True)
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(
