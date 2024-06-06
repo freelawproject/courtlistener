@@ -387,7 +387,9 @@ class BaseCourtUploadForm(forms.Form):
         :return: list of judges from specific court
         """
         return Person.objects.filter(
-            positions__court_id=self.pk, is_alias_of=None
+            positions__court_id=self.pk,
+            is_alias_of=None,
+            positions__date_retirement=None,
         ).order_by("name_first")
 
     def set_judges_qs(self, judges_qs) -> None:
