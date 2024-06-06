@@ -119,7 +119,7 @@ def make_objects(
         blocked=blocked,
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
-        disposition=item.get("cluster_disposition") or "",
+        disposition=item.get("disposition") or "",
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]

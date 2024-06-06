@@ -27,6 +27,7 @@ from cl.search.models import (
     OpinionCluster,
     OriginatingCourtInformation,
 )
+from cl.users.models import UserProfile
 
 
 class CitationRedirectorForm(forms.Form):
@@ -316,7 +317,7 @@ class BaseCourtUploadForm(forms.Form):
     opinion_type = forms.CharField(
         label="Opinion Type",
         required=True,
-        initial=Opinion.LEAD,
+        initial=Opinion.COMBINED,
         widget=forms.Select(
             choices=Opinion.OPINION_TYPES, attrs={"class": "form-control"}
         ),
@@ -482,7 +483,7 @@ class BaseCourtUploadForm(forms.Form):
         self.cleaned_data["item"] = {
             "source": Docket.DIRECT_INPUT,
             "cluster_source": SOURCES.DIRECT_COURT_INPUT,
-            "cluster_disposition": self.cleaned_data.get("disposition", ""),
+            "disposition": self.cleaned_data.get("disposition", ""),
             "case_names": self.cleaned_data.get("case_title"),
             "case_dates": self.cleaned_data.get("publication_date"),
             "precedential_statuses": "Published",

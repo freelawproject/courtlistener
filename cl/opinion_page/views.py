@@ -163,7 +163,7 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     "uploaders_missctapp",
 )
 @async_to_sync
-async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
+async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
     """Display upload form and intake Opinions for partner courts
 
     :param request: A GET or POST request for the page
@@ -199,26 +199,21 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
     # Fix mypy errors
     upload_form: Any
 
-    if pk == "tennworkcompcl":
-        upload_form = TennWorkCompClUploadForm
-    elif pk == "tennworkcompapp":
-        upload_form = TennWorkCompAppUploadForm
-    elif pk == "me":
-        upload_form = MeCourtUploadForm
-    elif pk == "mo":
-        upload_form = MoCourtUploadForm
-    elif pk == "moctapp":
-        upload_form = MoCtAppCourtUploadForm
-    elif pk == "moctapped":
-        upload_form = MoCtAppEdCourtUploadForm
-    elif pk == "moctappsd":
-        upload_form = MoCtAppSdCourtUploadForm
-    elif pk == "moctappwd":
-        upload_form = MoCtAppWdCourtUploadForm
-    elif pk == "miss":
-        upload_form = MissCourtUploadForm
-    else:
-        upload_form = MissCtAppCourtUploadForm
+    upload_form_classes = {
+        "tennworkcompcl": (TennWorkCompClUploadForm, f"img/{pk}.jpg"),
+        "tennworkcompapp": (TennWorkCompAppUploadForm, f"img/{pk}.jpg"),
+        "me": (MeCourtUploadForm, f"{pk}.png"),
+        "mo": (MoCourtUploadForm, f"{pk}.png"),
+        "moctapp": (MoCtAppCourtUploadForm, "mo.png"),
+        "moctapped": (MoCtAppEdCourtUploadForm, "mo.png"),
+        "moctappsd": (MoCtAppSdCourtUploadForm, "mo.png"),
+        "moctappwd": (MoCtAppWdCourtUploadForm, "mo.png"),
+        "miss": (MissCourtUploadForm, f"{pk}.png"),
+        "missctapp": (MissCtAppCourtUploadForm, f"{pk}.png"),
+    }
+
+    upload_form = upload_form_classes[pk][0]
+    court_seal = upload_form_classes[pk][1]
 
     form = await sync_to_async(upload_form)(pk=pk)
     if request.method == "POST":
@@ -242,7 +237,7 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
         request,
         "publish.html",
         {
-            "court_image": f"img/{pk}.jpg",
+            "court_image": court_seal,
             "form": form,
             "private": True,
             "pk": pk,
