@@ -220,16 +220,13 @@ class Command(VerboseCommand):
             )
 
             # Store the results of this iteration and log the progress
-            r.hset(f"{record_type}_import_status", "last_pk", last_pk)
             r.hset(
                 f"{record_type}_import_status",
-                "next_iteration_counter",
-                counter,
-            )
-            r.hset(
-                f"{record_type}_import_status",
-                "records_processed",
-                records_processed + record_count,
+                mapping={
+                    "last_pk": last_pk,
+                    "next_iteration_counter": counter,
+                    "records_processed": records_processed + record_count,
+                },
             )
             logger.info(
                 "\rRetrieved {}/{}, ({:.0%}), last PK processed: {},".format(
