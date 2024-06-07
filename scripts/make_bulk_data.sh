@@ -125,7 +125,7 @@ oralarguments_fields='(
 	       id, date_created, date_modified, source, case_name_short,
 	       case_name, case_name_full, judges, sha1, download_url, local_path_mp3,
 	       local_path_original_file, filepath_ia, ia_upload_failure_count, duration,
-	       processing_complete, date_blocked, blocked, stt_status, stt_google_response,
+	       processing_complete, date_blocked, blocked, stt_status, stt_transcript,
 	       docket_id
 	   )'
 oralarguments_csv_filename="oral-arguments-$(date -I).csv"

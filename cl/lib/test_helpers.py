@@ -708,7 +708,7 @@ audio_common_fields = {
     "snippet": lambda x: (
         x["snippet"]
         if x.get("snippet")
-        else x["result"].transcript if x["result"].stt_google_response else ""
+        else x["result"].transcript if x["result"].stt_transcript else ""
     ),
 }
 

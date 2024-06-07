@@ -1,11 +1,17 @@
-from django.conf import settings
-from django.utils.text import slugify
+from math import ceil
 
-from cl.audio.models import Audio
+import openai
+from django.conf import settings
+from django.db import transaction
+from django.utils.text import slugify
+from sentry_sdk import capture_exception
+
+from cl.audio.models import Audio, AudioTranscriptionMetadata
 from cl.audio.utils import make_af_filename
 from cl.celery_init import app
 from cl.corpus_importer.tasks import increment_failure_count, upload_to_ia
 from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.command_utils import logger
 from cl.lib.recap_utils import get_bucket_name
 
 
@@ -45,3 +51,55 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
         af.save()
     else:
         increment_failure_count(af)
+
+
+@app.task
+def transcribe_from_open_ai_api(audio_pk: int):
+    """Get transcription from OpenAI API whisper-1 model
+    openai.OpenAI() client expects the environment variable OPENAI_API_KEY to be set
+
+    If successful, updates Audio object and creates related AudioTranscriptionMetadata object
+
+    :param audio_pk: audio object primary key
+    """
+    audio = Audio.objects.get(pk=audio_pk)
+    audio_file = audio.local_path_mp3
+    file = (audio_file.name.split("/")[-1], audio_file.read(), "mp3")
+
+    logger.info("Starting transcription for audio %s", audio_pk)
+
+    with openai.OpenAI() as client:
+        try:
+            transcript = client.audio.transcriptions.create(
+                file=file,
+                model="whisper-1",
+                language="en",
+                response_format="verbose_json",
+                timestamp_granularities=["word", "segment"],
+                prompt=audio.case_name,
+            )
+        except openai.RateLimitError:
+            # implement backoff strategy
+            # More about openai errors
+            # https://github.com/openai/openai-python?tab=readme-ov-file#handling-errors
+            pass
+        except Exception as e:
+            capture_exception(e)
+            return
+
+        transcript_dict = transcript.to_dict()
+
+        with transaction.atomic():
+            audio.stt_transcript = transcript_dict["text"]
+            audio.stt_status = Audio.STT_COMPLETE
+            audio.stt_source = Audio.STT_OPENAI_WHISPER
+            audio.duration = ceil(transcript_dict["duration"])
+            audio.save()
+
+            metadata = {
+                "segments": transcript_dict["segments"],
+                "word": transcript_dict["words"],
+            }
+            AudioTranscriptionMetadata.objects.create(
+                audio=audio, metadata=metadata
+            )

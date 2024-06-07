@@ -1980,7 +1980,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                     docket__docket_number="19-5735",
                     stt_status=Audio.STT_COMPLETE,
                     judges="John Smith",
-                    stt_google_response=json_transcript,
+                    stt_transcript=json_transcript,
                 )
 
         # Confirm Alert date_last_hit is updated.
@@ -2110,7 +2110,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                     docket=self.docket,
                     stt_status=Audio.STT_COMPLETE,
                     judges="George Smith",
-                    stt_google_response=json_transcript,
+                    stt_transcript=json_transcript,
                 )
 
         self.assertEqual(len(mail.outbox), 3, msg="Wrong number of emails.")
