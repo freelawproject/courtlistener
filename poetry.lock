@@ -1059,6 +1059,17 @@ files = [
 Django = ">=3.2"
 
 [[package]]
+name = "django-ordered-model"
+version = "3.7.4"
+description = "Allows Django models to be ordered and provides a simple admin interface for reordering them."
+optional = false
+python-versions = "*"
+files = [
+    {file = "django-ordered-model-3.7.4.tar.gz", hash = "sha256:f258b9762525c00a53009e82f8b8bf2a3aa315e8b453e281e8fdbbfe2b8cb3ba"},
+    {file = "django_ordered_model-3.7.4-py3-none-any.whl", hash = "sha256:dfcd3183fe0749dad1c9971cba1d6240ce7328742a30ddc92feca41107bb241d"},
+]
+
+[[package]]
 name = "django-override-storage"
 version = "0.3.2"
 description = "Django test helpers to manage file storage side effects."
@@ -5254,4 +5265,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "814ca0b0dc8db689f83e391fc58b494de48f6321085872bfaa8e37b7a7fc0e99"
+content-hash = "a64d61d094d3896cb204e882ff2471b4f3b69def7416a2b50cdcedc9acf6455e"
