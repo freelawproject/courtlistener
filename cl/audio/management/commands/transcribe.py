@@ -10,6 +10,80 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.types import OptionsType
 
 
+def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
+    """Check that the audio file exists and that it's size is
+    25MB or less
+
+    OpenAI API' whisper-1 model has a limit of 25MB
+
+    :param audio: audio object
+
+    :return: True if audio can be processed by OpenAI API
+    """
+    # audio.duration should map to the file size with little variability
+    # However, it can be unreliable, so we trust it only for shorter files
+    if audio.duration and audio.duration < 3000:
+        return True
+
+    try:
+        # Request the file size from the storage
+        # currently an AWS bucket
+        size_mb = audio.local_path_mp3.size / 1_000_000
+        if size_mb < 25:
+            return True
+
+        logger.warning(
+            "Audio id %s actual size is greater than API limit %s",
+            audio.pk,
+            size_mb,
+        )
+    except (FileNotFoundError, ValueError):
+        # FileNotFoundError: when the name does not exist in the bucket
+        # ValueError: when local_path_mp3 is None
+        logger.warning(
+            "Audio id %s has no local_path_mp3, needs reprocessing",
+            audio.pk,
+        )
+    return False
+
+
+def handle_open_ai_transcriptions(options: OptionsType) -> None:
+    """Get Audio objects from DB according to `options`,
+    validate and call a celery task for processing them
+
+    :param options: argparse options
+
+    :return None
+    """
+    requests_per_minute = options["rpm"]
+
+    if options.get("retry_failures"):
+        query = Q(stt_status=Audio.STT_FAILED)
+    else:
+        query = Q(stt_status=Audio.STT_NEEDED)
+
+    logger.info(
+        "%s audio files to transcribe", Audio.objects.filter(query).count()
+    )
+
+    valid_count = 0
+    for audio in Audio.objects.filter(query):
+        if not audio_can_be_processed_by_open_ai_api(audio):
+            continue
+
+        valid_count += 1
+        transcribe_from_open_ai_api.delay(audio.pk)
+
+        # For parallel processing: seed RPM requests per minute
+        # if requests_per_minute == 0, do not sleep
+        if requests_per_minute and valid_count % requests_per_minute == 0:
+            logger.info(
+                "Sent %s transcription requests, sleeping for 1 minute",
+                requests_per_minute,
+            )
+            time.sleep(61)
+
+
 class Command(VerboseCommand):
     help = "Transcribe audio files using a Speech to Text model"
 
@@ -17,9 +91,9 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--model",
             choices=[
-                "openai-api",
+                "open-ai-api",
             ],
-            default="openai-api",
+            default="open-ai-api",
             help="Model to use for extraction",
         )
         parser.add_argument(
@@ -29,7 +103,7 @@ class Command(VerboseCommand):
             help="Requests Per Minute, a rate limit in the model API",
         )
         parser.add_argument(
-            "--retry",
+            "--retry-failures",
             action="store_true",
             default=False,
             help="Retry transcription of failed audio files",
@@ -37,61 +111,6 @@ class Command(VerboseCommand):
 
     def handle(self, *args: List[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
-        requests_per_minute = options["rpm"]
 
-        if options.get("retry"):
-            query = Q(stt_status=Audio.STT_FAILED)
-        else:
-            query = Q(stt_status=Audio.STT_NEEDED)
-
-        # OpenAI API' whisper-1 model has a limit of 25MB for the
-        # audio file, which matches an Audio.duration of up to 4000
-        # seconds. However, Audio.duration value is not reliable
-        # from 2020 - present due to a bug in its calculation
-        if options.get("model") == "openai-api":
-            duration_query_1 = Q(
-                duration__lt=3500, date_created__year__gt=2019
-            )
-            duration_query_2 = Q(
-                duration__lt=4000, date_created__year__lte=2019
-            )
-            query = query & (duration_query_1 | duration_query_2)
-
-        logger.info(
-            "%s audio files to transcribe", Audio.objects.filter(query).count()
-        )
-
-        valid_count = 0
-        for audio in Audio.objects.filter(query):
-            # Validate that audio can actually be processed
-            try:
-                # Following the previous comment about Audio.duration
-                # only check durations that may cause a problem
-                if audio.duration and audio.duration > 3500:
-                    size_mb = audio.local_path_mp3.size / 1_000_000
-                    if size_mb > 25:
-                        logger.warning(
-                            "Audio id %s actual size is greater than API limit %s",
-                            audio.pk,
-                            size_mb,
-                        )
-                        continue
-            except FileNotFoundError:
-                # Triggered when local_path_mp3 does not exist
-                logger.warning(
-                    "Audio id %s has no local_path_mp3, needs reprocessing",
-                    audio.pk,
-                )
-                continue
-
-            valid_count += 1
-            transcribe_from_open_ai_api(audio.pk)
-
-            # For parallel processing: seed RPM requests per minute
-            # if requests_per_minute == 0, do not sleep
-            if requests_per_minute and valid_count % requests_per_minute == 0:
-                logger.info(
-                    "Sent %s transcription requests, sleeping for 1 minute",
-                    requests_per_minute,
-                )
-                time.sleep(61)
+        if options["model"] == "open-ai-api":
+            handle_open_ai_transcriptions(options)

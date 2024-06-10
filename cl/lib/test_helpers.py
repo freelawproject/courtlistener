@@ -1,5 +1,4 @@
 import datetime
-import json
 import unittest
 from functools import wraps
 from typing import Sized, cast
@@ -1458,25 +1457,7 @@ class AudioESTestCase(SimpleTestCase):
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2013, 8, 14),
         )
-        cls.transcript_response = {
-            "response": {
-                "results": [
-                    {
-                        "alternatives": [
-                            {
-                                "transcript": "This is the best transcript. Nunc egestas sem sed libero feugiat, at interdum quam viverra. Pellentesque hendrerit ut augue at sagittis. Mauris faucibus fringilla lacus, eget maximus risus. Phasellus id mi at eros fermentum vestibulum nec nec diam. In nec sapien nunc. Ut massa ante, accumsan a erat eget, rhoncus pellentesque felis.",
-                                "confidence": 0.85,
-                            },
-                            {
-                                "transcript": "Another possible transcript.",
-                                "confidence": 0.75,
-                            },
-                        ]
-                    },
-                ]
-            }
-        }
-        cls.json_transcript = json.dumps(cls.transcript_response)
+        cls.transcript = "This is the best transcript. Nunc egestas sem sed libero feugiat, at interdum quam viverra. Pellentesque hendrerit ut augue at sagittis. Mauris faucibus fringilla lacus, eget maximus risus. Phasellus id mi at eros fermentum vestibulum nec nec diam. In nec sapien nunc. Ut massa ante, accumsan a erat eget, rhoncus pellentesque felis."
         cls.filepath_local = SimpleUploadedFile(
             "sec_frank.mp3", b"mp3 binary content", content_type="audio/mpeg"
         )
@@ -1492,7 +1473,7 @@ class AudioESTestCase(SimpleTestCase):
             blocked=False,
             sha1="a49ada009774496ac01fb49818837e2296705c97",
             stt_status=Audio.STT_COMPLETE,
-            stt_google_response=cls.json_transcript,
+            stt_transcript=cls.transcript,
         )
         cls.audio_2 = AudioFactory.create(
             case_name="Jose A. Dominguez v. Loretta E. Lynch",

@@ -56,9 +56,12 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
 @app.task
 def transcribe_from_open_ai_api(audio_pk: int):
     """Get transcription from OpenAI API whisper-1 model
-    openai.OpenAI() client expects the environment variable OPENAI_API_KEY to be set
 
-    If successful, updates Audio object and creates related AudioTranscriptionMetadata object
+    openai.OpenAI() client expects the environment
+    variable OPENAI_API_KEY to be set
+
+    If successful, updates Audio object and creates
+    related AudioTranscriptionMetadata object
 
     :param audio_pk: audio object primary key
     """
@@ -68,7 +71,11 @@ def transcribe_from_open_ai_api(audio_pk: int):
 
     logger.info("Starting transcription for audio %s", audio_pk)
 
-    with openai.OpenAI() as client:
+    # openai client will retry by default "Connection errors,
+    # 408 Request Timeout, 409 Conflict, 429 Rate Limit, and
+    # >=500 Internal errors". See more:
+    # https://github.com/openai/openai-python?tab=readme-ov-file#retries
+    with openai.OpenAI(max_retries=5) as client:
         try:
             transcript = client.audio.transcriptions.create(
                 file=file,
@@ -78,12 +85,14 @@ def transcribe_from_open_ai_api(audio_pk: int):
                 timestamp_granularities=["word", "segment"],
                 prompt=audio.case_name,
             )
-        except openai.RateLimitError:
-            # implement backoff strategy
-            # More about openai errors
-            # https://github.com/openai/openai-python?tab=readme-ov-file#handling-errors
-            pass
-        except Exception as e:
+        except openai.UnprocessableEntityError:
+            audio.stt_status = Audio.STT_FAILED
+            audio.save()
+            logger.warning("UnprocessableEntityError for audio %s", audio_pk)
+            return
+        except (openai.APIStatusError, openai.APIConnectionError) as e:
+            # Sending to Sentry errors that are not auto-retried
+            # or that have failed many times
             capture_exception(e)
             return
 
@@ -98,7 +107,7 @@ def transcribe_from_open_ai_api(audio_pk: int):
 
             metadata = {
                 "segments": transcript_dict["segments"],
-                "word": transcript_dict["words"],
+                "words": transcript_dict["words"],
             }
             AudioTranscriptionMetadata.objects.create(
                 audio=audio, metadata=metadata
