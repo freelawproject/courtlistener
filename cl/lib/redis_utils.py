@@ -79,11 +79,10 @@ def make_update_pacer_case_id_key(court_id: str) -> str:
     return f"update.pacer_case_id:{court_id}"
 
 
-def acquire_atomic_redis_lock(r: Redis, key, ttl: int) -> str:
-    """Acquires an atomic lock in Redis.
+def acquire_redis_lock(r: Redis, key, ttl: int) -> str:
+    """Acquires a lock in Redis.
 
     This method attempts to acquire a lock with the given key and TTL in Redis.
-    It uses a Lua script to ensure the lock is set atomically.
     If the lock is already in use by another process, it retries until the
     lock is acquired.
 
@@ -93,32 +92,20 @@ def acquire_atomic_redis_lock(r: Redis, key, ttl: int) -> str:
     :return: A unique identifier for the lock.
     """
 
-    # Lua script to acquire lock
-    lua_script = """
-    local lock_key = KEYS[1]
-    local lock_value = ARGV[1]
-    local ttl = ARGV[2]
-
-    if redis.call("SET", lock_key, lock_value, "NX", "PX", ttl) then
-        return 1
-    else
-        return 0
-    end
-    """
     identifier = str(uuid.uuid4())
     while True:
-        if r.eval(lua_script, 1, key, identifier, ttl) == 1:
+        if r.set(key, identifier, nx=True, px=ttl):
             return identifier
         time.sleep(0.1)
 
 
-def release_atomic_redis_lock(r: Redis, key, identifier: str) -> int:
+def release_redis_lock(r: Redis, key, identifier: str) -> int:
     """Releases an atomic lock in Redis.
 
     This method releases the lock with the given key and identifier in Redis.
-    It uses a Lua script to ensure the lock is only released if the identifier
-    matches the current lock value. This prevents other processes from
-    mistakenly releasing the lock.
+    It uses a Lua script to ensure the lock is released atomically if the
+    identifier matches the current lock value.
+    This prevents other processes from mistakenly releasing the lock.
 
     :param r: The Redis DB to connect to as a connection interface.
     :param key: The key for the lock in Redis.

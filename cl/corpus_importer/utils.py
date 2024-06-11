@@ -8,6 +8,7 @@ from typing import Any, Iterator, Optional, Set
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
+from django.conf import settings
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
@@ -1035,34 +1036,36 @@ def make_iquery_probing_key(court_id: str) -> str:
     return f"iquery.probing.enqueued:{court_id}"
 
 
+def compute_binary_probe_jitter(testing: bool) -> int:
+    """Compute the jitter for binary probes.
+
+    :param testing: A boolean flag indicating whether the function is being
+    executed in a testing environment. If True, jitter is disabled and returns 0.
+    :return: An integer representing the jitter value for binary probes.
+    """
+
+    # Probe limit e.g: 9 probe iterations -> 256
+    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
+    return random.randint(1, round(probe_limit * 0.05)) if not testing else 0
+
+
 def compute_next_binary_probe(
-    iquery_pacer_case_id_final: int,
-    probe_iteration: int,
-    court_probe_cycle_no_hits: int,
-    probe_limit: int,
-) -> tuple[int, int]:
+    highest_known_pacer_case_id: int, iteration: int, jitter: int
+) -> int:
     """Compute the next binary  probe target for a given PACER case ID.
 
     This computes the next value of a geometric binary sequence (2 ** (N - 1))
-    where N is the current probe iteration. If court_probe_cycle_no_hits is > 1
-    a 5% jitter is added to the next value to ensure probing values are not the
-    same from the previous one and increase the possibility of getting a hit.
+    where N is the current probe iteration. In non-testing mode a jitter is
+    added to the next value to ensure probing values are not the same from the
+    previous iteration to increase the possibility of getting a hit.
 
-    :param iquery_pacer_case_id_final: The final PACER case ID.
-    :param probe_iteration: The current probe iteration number.
-    :param court_probe_cycle_no_hits: The number of court probe iterations performed.
-    :param probe_limit: The probe threshold value.
+    :param highest_known_pacer_case_id: The final PACER case ID.
+    :param iteration: The current probe iteration number.
+    :param jitter: The jitter value to apply.
     :return: The updated probe_iteration and the PACER case ID to lookup.
     """
 
-    jitter = 0
-    if court_probe_cycle_no_hits > 1:
-        # The previous iquery_pages_probing tasks didn't find a higher
-        # watermark, apply a jitter this time.
-        jitter = random.randint(1, round(probe_limit * 0.05))
-
     pacer_case_id_to_lookup = (
-        iquery_pacer_case_id_final + (2 ** (probe_iteration - 1)) + jitter
+        highest_known_pacer_case_id + (2 ** (iteration - 1)) + jitter
     )
-    probe_iteration += 1
-    return probe_iteration, pacer_case_id_to_lookup
+    return pacer_case_id_to_lookup

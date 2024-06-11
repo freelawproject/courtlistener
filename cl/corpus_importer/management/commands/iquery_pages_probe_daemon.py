@@ -3,15 +3,14 @@ import time
 from django.conf import settings
 from redis import ConnectionError
 
-from cl.corpus_importer.tasks import iquery_pages_probing
+from cl.corpus_importer.tasks import iquery_pages_probe
 from cl.corpus_importer.utils import make_iquery_probing_key
-from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 from cl.search.models import Court
 
 
-def enqueue_iquery_probing(court_id: str) -> bool:
+def enqueue_iquery_probe(court_id: str) -> bool:
     """Get iquery forward probing semaphore.
 
     :param court_id: The identifier for the court.
@@ -58,21 +57,18 @@ class Command(VerboseCommand):
         court_ids = get_all_pacer_courts()
         iterations_completed = 0
         q = settings.CELERY_IQUERY_QUEUE
-        # Create a queue equal than the number of courts we're doing.
-        throttle = CeleryThrottle(queue_name=q, min_items=len(court_ids))
         r = get_redis_interface("CACHE")
         testing = True if testing_iterations else False
         while True:
             for court_id in court_ids:
                 if r.exists(f"court_wait:{court_id}"):
                     continue
-                throttle.maybe_wait()
                 try:
-                    newly_enqueued = enqueue_iquery_probing(court_id)
+                    newly_enqueued = enqueue_iquery_probe(court_id)
                     if newly_enqueued:
                         # No other probing being conducted for the court.
                         # Enqueue it.
-                        iquery_pages_probing.delay(court_id, testing)
+                        iquery_pages_probe.delay(court_id, testing)
                 except ConnectionError:
                     logger.info(
                         "Failed to connect to redis. Waiting a bit and making "

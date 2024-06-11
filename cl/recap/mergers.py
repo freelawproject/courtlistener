@@ -1669,7 +1669,7 @@ def save_iquery_to_docket(
     d: Docket,
     tag_names: Optional[List[str]],
     add_to_solr: bool = False,
-    from_iquery_scrape=False,
+    avoid_trigger_signal=False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 
@@ -1678,12 +1678,12 @@ def save_iquery_to_docket(
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
     :param add_to_solr: Whether to save the completed docket to solr
-    :param from_iquery_scrape: Weather this method was invoked by the iquery
+    :param avoid_trigger_signal: Weather this method was invoked by the iquery
     sweep task or the iquery probing task.
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
-    d.from_iquery_scrape = from_iquery_scrape
+    d.avoid_trigger_signal = avoid_trigger_signal
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -1746,16 +1746,16 @@ def process_case_query_report(
     court_id: str,
     pacer_case_id: int,
     report_data: dict[str, Any],
-    from_iquery_scrape: bool = False,
+    avoid_trigger_signal: bool = False,
 ) -> None:
-    """Process the case query report from iquery_pages_probing task.
+    """Process the case query report from iquery_pages_probe task.
     Find and update/store the docket accordingly. This method is able to retry
     on IntegrityError due to a race condition when saving the docket.
 
     :param court_id:  A CL court ID where we'll look things up.
     :param pacer_case_id: The internal PACER case ID number
     :param report_data: A dictionary containing report data.
-    :param from_iquery_scrape: Weather this method was invoked by the iquery
+    :param avoid_trigger_signal: Weather this method was invoked by the iquery
     sweep task or the iquery probing task.
     :return: None
     """
@@ -1768,7 +1768,7 @@ def process_case_query_report(
     d.pacer_case_id = pacer_case_id
     d.add_recap_source()
     d = async_to_sync(update_docket_metadata)(d, report_data)
-    d.from_iquery_scrape = from_iquery_scrape
+    d.avoid_trigger_signal = avoid_trigger_signal
     d.save()
     add_bankruptcy_data_to_docket(d, report_data)
     add_items_to_solr([d.pk], "search.Docket")

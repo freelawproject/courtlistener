@@ -2,7 +2,6 @@ import copy
 import logging
 import os
 import shutil
-import time
 from datetime import date
 from http import HTTPStatus
 from io import BytesIO
@@ -54,6 +53,7 @@ from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.utils import (
+    compute_binary_probe_jitter,
     compute_next_binary_probe,
     make_iquery_probing_key,
     mark_ia_upload_needed,
@@ -1140,38 +1140,16 @@ def filter_docket_by_tags(
     return data
 
 
-# Retry 10 times. First one after 1m, then again every 5 minutes.
-@app.task(
-    bind=True,
-    autoretry_for=(PacerLoginException, RedisConnectionError),
-    max_retries=10,
-    interval_start=1 * 60,
-    interval_step=5 * 60,
-    ignore_result=True,
-)
-def make_docket_by_iquery(
-    self: Task,
-    court_id: str,
-    pacer_case_id: int,
-    using: str = "default",
-    tag_names: Optional[List[str]] = None,
-    log_results_redis: bool = False,
-    from_iquery_scrape: bool = False,
-) -> Optional[int]:
-    """
-    Using the iquery endpoint, create or update a docket
+def query_case_query_report(
+    court_id: str, pacer_case_id: int
+) -> dict[str, Any]:
+    """Query the iquery page for a given PACER case ID.
 
-    :param self: The celery task
-    :param court_id: A CL court ID where we'll look things up
-    :param pacer_case_id: The pacer_case_id to use to look up the case
-    :param using: The database to use for the docket lookup
-    :param tag_names: A list of strings that should be added to the docket as
-    tags
-    :param log_results_redis: Log results in redis for the ready mix project
-    :param from_iquery_scrape: Weather this method was invoked by the iquery
-    sweep task or the iquery probing task.
-    :return: None if failed, else the ID of the created/updated docket
+    :param court_id: A CL court ID where we'll look things up.
+    :param pacer_case_id: The Pacer Case ID to lookup.
+    :return: The report.data.
     """
+
     cookies = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
@@ -1183,8 +1161,36 @@ def make_docket_by_iquery(
         password=settings.PACER_PASSWORD,
     )
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
+    report.query(pacer_case_id)
+    return report.data
+
+
+def make_docket_by_iquery_base(
+    self: Task,
+    court_id: str,
+    pacer_case_id: int,
+    using: str = "default",
+    tag_names: Optional[List[str]] = None,
+    log_results_redis: bool = False,
+    avoid_trigger_signal: bool = False,
+) -> Optional[int]:
+    """
+    Using the iquery endpoint, create or update a docket
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up
+    :param pacer_case_id: The pacer_case_id to use to look up the case
+    :param using: The database to use for the docket lookup
+    :param tag_names: A list of strings that should be added to the docket as
+    tags
+    :param log_results_redis: Log results in redis for the ready mix project
+    :param avoid_trigger_signal: Weather this method was invoked by the iquery
+    sweep task or the iquery probing task.
+    :return: None if failed, else the ID of the created/updated docket
+    """
+
     try:
-        report.query(pacer_case_id)
+        report_data = query_case_query_report(court_id, pacer_case_id)
     except (requests.Timeout, requests.RequestException) as exc:
         logger.warning(
             "Timeout or unknown RequestException on iquery crawl. "
@@ -1195,7 +1201,7 @@ def make_docket_by_iquery(
         raise self.retry(exc=exc)
 
     r = get_redis_interface("CACHE")
-    if not report.data:
+    if not report_data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
             court_id,
@@ -1213,7 +1219,7 @@ def make_docket_by_iquery(
     d = async_to_sync(find_docket_object)(
         court_id,
         str(pacer_case_id),
-        report.data["docket_number"],
+        report_data["docket_number"],
         using=using,
     )
 
@@ -1221,11 +1227,102 @@ def make_docket_by_iquery(
     d.add_recap_source()
     return save_iquery_to_docket(
         self,
-        report.data,
+        report_data,
         d,
         tag_names,
         add_to_solr=True,
-        from_iquery_scrape=from_iquery_scrape,
+        avoid_trigger_signal=avoid_trigger_signal,
+    )
+
+
+# Retry 10 times. First one after 1m, then again every 5 minutes.
+@app.task(
+    bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
+    max_retries=10,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
+def make_docket_by_iquery(
+    self: Task,
+    court_id: str,
+    pacer_case_id: int,
+    using: str = "default",
+    tag_names: Optional[List[str]] = None,
+    log_results_redis: bool = False,
+    avoid_trigger_signal: bool = False,
+) -> Optional[int]:
+    """
+    make_docket_by_iquery_base wrapper without throttling for its use in bulk
+    imports to avoid Celery runaways when used in combination with
+    CeleryThrottle.
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up
+    :param pacer_case_id: The pacer_case_id to use to look up the case
+    :param using: The database to use for the docket lookup
+    :param tag_names: A list of strings that should be added to the docket as
+    tags
+    :param log_results_redis: Log results in redis for the ready mix project
+    :param avoid_trigger_signal: Weather this method was invoked by the iquery
+    sweep task or the iquery probing task.
+    :return: None if failed, else the ID of the created/updated docket
+    """
+
+    return make_docket_by_iquery_base(
+        self,
+        court_id,
+        pacer_case_id,
+        using,
+        tag_names,
+        log_results_redis,
+        avoid_trigger_signal,
+    )
+
+
+@app.task(
+    bind=True,
+    autoretry_for=(PacerLoginException, RedisConnectionError),
+    max_retries=10,
+    interval_start=1 * 60,
+    interval_step=5 * 60,
+    ignore_result=True,
+)
+@throttle_task(settings.IQUERY_COURT_RATE, key="court_id")
+def make_docket_by_iquery_sweep(
+    self: Task,
+    court_id: str,
+    pacer_case_id: int,
+    using: str = "default",
+    tag_names: Optional[List[str]] = None,
+    log_results_redis: bool = False,
+    avoid_trigger_signal: bool = False,
+) -> Optional[int]:
+    """
+     make_docket_by_iquery_base wrapper with court throttling for its use in
+     the iquery sweep signal.
+
+    :param self: The celery task
+    :param court_id: A CL court ID where we'll look things up
+    :param pacer_case_id: The pacer_case_id to use to look up the case
+    :param using: The database to use for the docket lookup
+    :param tag_names: A list of strings that should be added to the docket as
+    tags
+    :param log_results_redis: Log results in redis for the ready mix project
+    :param avoid_trigger_signal: Weather this method was invoked by the iquery
+    sweep task or the iquery probing task.
+    :return: None if failed, else the ID of the created/updated docket
+    """
+
+    return make_docket_by_iquery_base(
+        self,
+        court_id,
+        pacer_case_id,
+        using,
+        tag_names,
+        log_results_redis,
+        avoid_trigger_signal,
     )
 
 
@@ -1233,44 +1330,30 @@ def make_docket_by_iquery(
 def query_iquery_page(
     court_id: str, pacer_case_id: int
 ) -> bool | dict[str, Any]:
-    """Query the iquery page for a given PACER case ID.
+    """A small wrapper to query the iquery page for a given PACER case ID to
+    support retries via the @retry decorator in case of a failure.
 
     :param court_id: A CL court ID where we'll look things up.
     :param pacer_case_id: The Pacer Case ID to lookup.
     :return: False if not valid report, otherwise the report.data.
     """
 
-    cookies = get_or_cache_pacer_cookies(
-        "pacer_scraper",
-        settings.PACER_USERNAME,
-        password=settings.PACER_PASSWORD,
-    )
-    s = ProxyPacerSession(
-        cookies=cookies,
-        username=settings.PACER_USERNAME,
-        password=settings.PACER_PASSWORD,
-    )
-    report = CaseQuery(map_cl_to_pacer_id(court_id), s)
-    report.query(pacer_case_id)
-    if not report.data:
+    report_data = query_case_query_report(court_id, pacer_case_id)
+    if not report_data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
             court_id,
             pacer_case_id,
         )
         return False
-    return report.data
+    return report_data
 
 
 @app.task(
     bind=True,
-    autoretry_for=(RedisConnectionError,),
-    max_retries=3,
-    interval_start=1 * 60,
-    interval_step=5 * 60,
     ignore_result=True,
 )
-def iquery_pages_probing(
+def iquery_pages_probe(
     self: Task,
     court_id: str,
     testing: bool = False,
@@ -1288,38 +1371,17 @@ def iquery_pages_probing(
     r = get_redis_interface("CACHE")
     probe_iteration = 1
     latest_match = 0
-    time_out_counter = 0
-    consecutive_empty_probes = 0
-    iquery_pacer_case_id_final = int(
-        r.hget("iquery_pacer_case_id_final", court_id) or 0
+    highest_known_pacer_case_id = int(
+        r.hget("highest_known_pacer_case_id", court_id) or 0
     )
-
-    # Probe limit e.g: 9 probe iterations -> 256
-    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
-    court_probe_cycle_no_hits = r.hincrby(
-        "court_probe_cycle_no_hits", court_id, 1
-    )
+    jitter = compute_binary_probe_jitter(testing)
     reports_data = []
+    found_match = False
     while probe_iteration <= settings.IQUERY_PROBE_ITERATIONS:
-        if time_out_counter >= 3:
-            logger.warning(
-                "Aborting probing task for %s after 3 consecutive iterations "
-                "that timed out.",
-                court_id,
-            )
-            r.setex(
-                f"court_wait:{court_id}",
-                settings.IQUERY_COURT_BLOCKED_WAIT,
-                2,
-            )
-            break
-
-        probe_iteration, pacer_case_id_to_lookup = compute_next_binary_probe(
-            iquery_pacer_case_id_final,
-            probe_iteration,
-            court_probe_cycle_no_hits,
-            probe_limit,
+        pacer_case_id_to_lookup = compute_next_binary_probe(
+            highest_known_pacer_case_id, probe_iteration, jitter
         )
+        probe_iteration += 1
         try:
             report_data = query_iquery_page(court_id, pacer_case_id_to_lookup)
         except HTTPError:
@@ -1339,51 +1401,38 @@ def iquery_pages_probing(
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
             return None
 
-        except requests.Timeout as exc:
+        except requests.Timeout:
             logger.warning(
-                "The court website is probably down. Waiting a bit before trying "
-                "the next pacer_case_id."
+                "The court %s website is probably down. Aborting the probe task.",
+                court_id,
             )
-            time.sleep(settings.IQUERY_COURT_TIMEOUT_WAIT)
-            time_out_counter += 1
-            continue
+            break
 
         if report_data:
             # Find and update/store the Docket.
             reports_data.append((pacer_case_id_to_lookup, report_data))
             latest_match = pacer_case_id_to_lookup
-            # Restart consecutive_empty_probes
-            consecutive_empty_probes = 0
-        else:
-            consecutive_empty_probes += 1
-            if (
-                consecutive_empty_probes
-                >= settings.IQUERY_PROBE_MAX_CONSECUTIVE_FAILURES
-            ):
-                # Too many consecutive blank probes in a row.
-                # Terminate the probing loop.
-                break
+            found_match = True
+        elif found_match:
+            # If a match has been found and this is a blank hit, abort it.
+            break
 
-    if latest_match > iquery_pacer_case_id_final:
-        if testing:
-            # For testing purposes update test_iquery_pacer_case_id_final
-            r.hset("test_iquery_pacer_case_id_final", court_id, latest_match)
-        # The latest iquery_pacer_case_id_final was found.
-        # Restart court_probe_cycle_no_hits
-        r.hset("court_probe_cycle_no_hits", court_id, 0)
+    if latest_match > highest_known_pacer_case_id and testing:
+        # For testing purposes update test_highest_known_pacer_case_id
+        r.hset("test_highest_known_pacer_case_id", court_id, latest_match)
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.
-    from_iquery_scrape = True
+    avoid_trigger_signal = True
     for index, report_data in enumerate(reports_data):
         if index == len(reports_data) - 1:
             # Only trigger the sweep signal on the last hit.
-            from_iquery_scrape = False
+            avoid_trigger_signal = False
         process_case_query_report(
             court_id,
             report_data[0],
             report_data[1],
-            from_iquery_scrape=from_iquery_scrape,
+            avoid_trigger_signal=avoid_trigger_signal,
         )
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 

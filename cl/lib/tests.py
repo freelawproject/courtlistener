@@ -24,9 +24,9 @@ from cl.lib.pacer import (
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
 from cl.lib.redis_utils import (
-    acquire_atomic_redis_lock,
+    acquire_redis_lock,
     get_redis_interface,
-    release_atomic_redis_lock,
+    release_redis_lock,
 )
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
@@ -1121,13 +1121,13 @@ class TestElasticsearchUtils(SimpleTestCase):
 class TestRedisUtils(SimpleTestCase):
     """Test Redis utils functions."""
 
-    def test_atomic_redis_lock(self) -> None:
-        """Test acquiring and releasing an atomic Redis lock."""
+    def test_redis_lock(self) -> None:
+        """Test acquiring and releasing a Redis lock."""
 
         lock_key = "test_lock"
         r = get_redis_interface("CACHE")
-        identifier = acquire_atomic_redis_lock(r, lock_key, 2000)
+        identifier = acquire_redis_lock(r, lock_key, 2000)
         self.assertTrue(identifier)
 
-        result = release_atomic_redis_lock(r, lock_key, identifier)
+        result = release_redis_lock(r, lock_key, identifier)
         self.assertEqual(result, 1)
