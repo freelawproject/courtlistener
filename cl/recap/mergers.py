@@ -111,7 +111,7 @@ async def find_docket_object(
             },
             {"pacer_case_id": pacer_case_id},
         ]
-    if docket_number_core:
+    if docket_number_core and not pacer_case_id:
         # Sometimes we don't know how to make core docket numbers. If that's
         # the case, we will have a blank value for the field. We must not do
         # lookups by blank values. See: freelawproject/courtlistener#1531
@@ -124,14 +124,13 @@ async def find_docket_object(
                 {"docket_number_core": docket_number_core},
             ]
         )
-    else:
+    elif docket_number and not pacer_case_id:
         # Finally, as a last resort, we can try the docket number. It might not
         # match b/c of punctuation or whatever, but we can try. Avoid lookups
         # by blank docket_number values.
-        if docket_number:
-            lookups.append(
-                {"pacer_case_id": None, "docket_number": docket_number},
-            )
+        lookups.append(
+            {"pacer_case_id": None, "docket_number": docket_number},
+        )
 
     for kwargs in lookups:
         ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)

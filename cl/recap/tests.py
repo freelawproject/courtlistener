@@ -7328,7 +7328,7 @@ class LookupDocketsTest(TestCase):
 
         d = async_to_sync(find_docket_object)(
             self.court.pk,
-            self.docket_core_data["docket_entries"][0]["pacer_case_id"],
+            None,
             self.docket_core_data["docket_number"],
         )
         async_to_sync(update_docket_metadata)(d, self.docket_core_data)
@@ -7345,7 +7345,7 @@ class LookupDocketsTest(TestCase):
 
         d = async_to_sync(find_docket_object)(
             self.court.pk,
-            self.docket_no_core_data["docket_entries"][0]["pacer_case_id"],
+            None,
             self.docket_no_core_data["docket_number"],
         )
         async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
@@ -7426,7 +7426,7 @@ class LookupDocketsTest(TestCase):
         )
         new_d = async_to_sync(find_docket_object)(
             self.court_appellate.pk,
-            docket_data_lower_number["docket_entries"][0]["pacer_case_id"],
+            None,
             docket_data_lower_number["docket_number"],
         )
         async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)
