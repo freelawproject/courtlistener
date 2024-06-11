@@ -53,8 +53,8 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
         increment_failure_count(af)
 
 
-@app.task
-def transcribe_from_open_ai_api(audio_pk: int):
+@app.task(bind=True, max_retries=5, retry=True)
+def transcribe_from_open_ai_api(self, audio_pk: int):
     """Get transcription from OpenAI API whisper-1 model
 
     openai.OpenAI() client expects the environment
@@ -71,11 +71,8 @@ def transcribe_from_open_ai_api(audio_pk: int):
 
     logger.info("Starting transcription for audio %s", audio_pk)
 
-    # openai client will retry by default "Connection errors,
-    # 408 Request Timeout, 409 Conflict, 429 Rate Limit, and
-    # >=500 Internal errors". See more:
-    # https://github.com/openai/openai-python?tab=readme-ov-file#retries
-    with openai.OpenAI(max_retries=5) as client:
+    # Prevent default openai client retrying
+    with openai.OpenAI(max_retries=0) as client:
         try:
             transcript = client.audio.transcriptions.create(
                 file=file,
@@ -85,14 +82,26 @@ def transcribe_from_open_ai_api(audio_pk: int):
                 timestamp_granularities=["word", "segment"],
                 prompt=audio.case_name,
             )
+        # Error handling inspired by openai's package retry policy
+        # https://github.com/openai/openai-python/blob/54a5911f5215148a0bdeb10e2bcfb84f635a75b9/src/openai/_base_client.py#L679-L712
+        except openai.RateLimitError:
+            self.retry(countdown=60 * (1 + self.request.retries))
+        except (
+            openai.APIConnectionError,
+            openai.ConflictError,
+            openai.InternalServerError,
+        ):
+            self.retry(countdown=60)
         except openai.UnprocessableEntityError:
             audio.stt_status = Audio.STT_FAILED
             audio.save()
             logger.warning("UnprocessableEntityError for audio %s", audio_pk)
             return
-        except (openai.APIStatusError, openai.APIConnectionError) as e:
-            # Sending to Sentry errors that are not auto-retried
-            # or that have failed many times
+        except Exception as e:
+            # Sends to Sentry errors that we don't expect or
+            # nor want to retry. Includes some openai package errors:
+            # (openai.BadRequestError, openai.AuthenticationError,
+            # openai.PermissionDeniedError, openai.NotFoundError)
             capture_exception(e)
             return
 
