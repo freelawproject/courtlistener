@@ -56,7 +56,6 @@ class Command(VerboseCommand):
         # If a new court is added to the DB. We should restart the daemon.
         court_ids = get_all_pacer_courts()
         iterations_completed = 0
-        q = settings.CELERY_IQUERY_QUEUE
         r = get_redis_interface("CACHE")
         testing = True if testing_iterations else False
         while True:
@@ -68,7 +67,10 @@ class Command(VerboseCommand):
                     if newly_enqueued:
                         # No other probing being conducted for the court.
                         # Enqueue it.
-                        iquery_pages_probe.delay(court_id, testing)
+                        iquery_pages_probe.apply_async(
+                            args=(court_id, testing),
+                            queue=settings.CELERY_IQUERY_QUEUE,
+                        )
                 except ConnectionError:
                     logger.info(
                         "Failed to connect to redis. Waiting a bit and making "

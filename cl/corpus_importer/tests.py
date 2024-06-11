@@ -3356,6 +3356,7 @@ class ScrapeIqueryPagesTest(TestCase):
         Court.objects.all().delete()
         cls.court_canb = CourtFactory(id="canb", jurisdiction="FB")
         cls.court_cand = CourtFactory(id="cand", jurisdiction="FB")
+        cls.court_txed = CourtFactory(id="txed", jurisdiction="FB")
         cls.court_nysd = CourtFactory(id="nysd", jurisdiction="FB")
         cls.court_gamb = CourtFactory(id="gamb", jurisdiction="FB")
         cls.court_hib = CourtFactory(id="hib", jurisdiction="FB")
@@ -3367,7 +3368,6 @@ class ScrapeIqueryPagesTest(TestCase):
         keys_to_clean = [
             "highest_known_pacer_case_id",
             "court_wait:*",
-            "court_probe_cycle_no_hits",
             "iquery.probing.enqueued:*",
         ]
         for key_to_clean in keys_to_clean:
@@ -3430,35 +3430,33 @@ class ScrapeIqueryPagesTest(TestCase):
         # Simulate a highest_known_pacer_case_id  = 8
         r.hset("highest_known_pacer_case_id", self.court_cand.pk, 8)
         r.hset("test_highest_known_pacer_case_id", self.court_cand.pk, 8)
-        # First court_probe_cycle_no_hits, no jitter
-        r.hset("court_probe_cycle_no_hits", self.court_cand.pk, 0)
         # Execute the task
         iquery_pages_probe.delay(self.court_cand.pk, testing=True)
 
         # New highest_known_pacer_case_id according to the cand test pattern in
         # test_patterns
         # {
-        #         9: False,
-        #         10: False,
-        #         12: True,
-        #         13: True,
-        #         16: True,
-        #         18: True,
-        #         24: True,
-        #         40: True,
-        #         72: False,
-        #         136: False,
-        #         137: True,
-        #         264: True,
+        #         9: False, #1
+        #         10: False, #2
+        #         12: True, #4
+        #         13: True, #5
+        #         16: True, #8
+        #         18: True, #10
+        #         24: True, #16
+        #         40: False, #32
+        #         72: False, #64
+        #         136: False, #128
+        #         137: True, #129
+        #         264: True, #256
         #     }
         # Note that the probing is aborted on 136 after reaching to False hits
         highest_known_pacer_case_id = r.hget(
             "test_highest_known_pacer_case_id", self.court_cand.pk
         )
-        self.assertEqual(int(highest_known_pacer_case_id), 40)
-        # Probing will add 4 more dockets
+        self.assertEqual(int(highest_known_pacer_case_id), 24)
+        # Probing will add 3 more dockets
         self.assertEqual(
-            dockets.count(), 4, msg="Docket number doesn't match."
+            dockets.count(), 3, msg="Docket number doesn't match."
         )
 
     @patch(
@@ -3474,8 +3472,6 @@ class ScrapeIqueryPagesTest(TestCase):
         # Simulate a highest_known_pacer_case_id  = 8
         r.hset("highest_known_pacer_case_id", self.court_nysd.pk, 8)
         r.hset("test_highest_known_pacer_case_id", self.court_nysd.pk, 8)
-        # First court_probe_cycle_no_hits, no jitter
-        r.hset("court_probe_cycle_no_hits", self.court_nysd.pk, 0)
         # Execute the task
         iquery_pages_probe.delay(self.court_nysd.pk, testing=True)
 
@@ -3520,8 +3516,6 @@ class ScrapeIqueryPagesTest(TestCase):
         # Simulate a highest_known_pacer_case_id  = 8
         r.hset("highest_known_pacer_case_id", self.court_gamb.pk, 8)
         r.hset("test_highest_known_pacer_case_id", self.court_gamb.pk, 8)
-        # First court_probe_cycle_no_hits, no jitter
-        r.hset("court_probe_cycle_no_hits", self.court_gamb.pk, 0)
         # Execute the task
         iquery_pages_probe.delay(self.court_gamb.pk, testing=True)
 
@@ -3547,8 +3541,6 @@ class ScrapeIqueryPagesTest(TestCase):
         # Simulate a highest_known_pacer_case_id  = 8
         r.hset("highest_known_pacer_case_id", self.court_hib.pk, 8)
         r.hset("test_highest_known_pacer_case_id", self.court_hib.pk, 8)
-        # First court_probe_cycle_no_hits, no jitter
-        r.hset("court_probe_cycle_no_hits", self.court_hib.pk, 0)
         # Execute the task
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             iquery_pages_probe.delay(self.court_hib.pk, testing=True)
@@ -3724,7 +3716,7 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(
                 int(highest_known_pacer_case_id),
                 5,
-                msg="Wrong number of dockets returned.",
+                msg="Wrong pacer_case_id returned.",
             )
 
             ### Create a Docket with a pacer_case_id smaller than highest_known_pacer_case_id
@@ -3757,8 +3749,9 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(
                 int(highest_known_pacer_case_id),
                 5,
-                msg="Wrong number of dockets returned.",
+                msg="Wrong pacer_case_id returned.",
             )
+            # No extra dockets were created by the sweep.
             self.assertEqual(dockets.count(), 2)
 
             ### Create a Docket with a pacer_case_id bigger than highest_known_pacer_case_id
@@ -3819,16 +3812,16 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(highest_known_pacer_case_id, None)
 
             ### Integration test probing task + sweep task
+            # IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED True
             dockets = Docket.objects.filter(court_id=self.court_cand.pk)
             self.assertEqual(dockets.count(), 0)
             r = get_redis_interface("CACHE")
             # Simulate a highest_known_pacer_case_id  = 8
             r.hset("highest_known_pacer_case_id", self.court_cand.pk, 8)
             r.hset("iquery_pacer_case_id_current", self.court_cand.pk, 8)
-            # First court_probe_cycle_no_hits, no jitter
-            r.hset("court_probe_cycle_no_hits", self.court_cand.pk, 0)
-
-            with patch(
+            with override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
+            ), patch(
                 "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
                 side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
                     *args, **kwargs
@@ -3846,10 +3839,42 @@ class ScrapeIqueryPagesTest(TestCase):
                 1,
                 msg="Wrong number of sweep task called.",
             )
-
-            # Probing will add 4 dockets + 2 added for the sweep task.
+            # Probing will add 3 dockets (12, 16, 24) + 2 added for the sweep task (13,18).
             self.assertEqual(
-                dockets.count(), 6, msg="Docket number doesn't match."
+                dockets.count(), 5, msg="Docket number doesn't match."
+            )
+
+            ### Integration test probing task + sweep
+            # IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED False
+            dockets = Docket.objects.filter(court_id=self.court_txed.pk)
+            self.assertEqual(dockets.count(), 0)
+            r = get_redis_interface("CACHE")
+            # Simulate a highest_known_pacer_case_id  = 8
+            r.hset("highest_known_pacer_case_id", self.court_txed.pk, 8)
+            r.hset("iquery_pacer_case_id_current", self.court_txed.pk, 8)
+            with override_settings(
+                IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
+            ), patch(
+                "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
+                side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
+                    *args, **kwargs
+                ),
+            ) as mock_iquery_sweep, self.captureOnCommitCallbacks(
+                execute=True
+            ):
+                # Execute the probing task
+                iquery_pages_probe.delay(self.court_txed.pk, testing=True)
+
+            # update_latest_case_id_and_schedule_iquery_sweep should be called
+            # 1 time only for the latest probing hit.
+            self.assertEqual(
+                mock_iquery_sweep.call_count,
+                1,
+                msg="Wrong number of sweep task called.",
+            )
+            # Probing will add 3 dockets (9,10,12) + 1 added for the sweep task (11).
+            self.assertEqual(
+                dockets.count(), 4, msg="Docket number doesn't match for txed."
             )
         finally:
             # Ensure the signal is disconnected after the test

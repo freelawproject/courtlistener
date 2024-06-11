@@ -53,6 +53,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
                 args=(court_id, iquery_pacer_case_id_current),
                 kwargs={"avoid_trigger_signal": True},
                 countdown=task_scheduled_countdown,
+                queue=settings.CELERY_IQUERY_QUEUE,
             )
 
         # Update the iquery_pacer_case_id_current in Redis
@@ -78,8 +79,8 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
     update_latest_case_id_and_schedule_iquery_sweep
     """
 
-    if not settings.IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED and not getattr(
-        instance, "avoid_trigger_signal", False
+    if not settings.IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED and getattr(
+        instance, "avoid_trigger_signal", True
     ):
         # If the signal is disabled for uploads in general and the instance
         # doesn't have avoid_trigger_signal set, abort it. This is a Docket
@@ -89,7 +90,8 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
 
     if getattr(instance, "avoid_trigger_signal", False):
         # This is an instance added by the iquery_pages_probe task
-        # or the iquery sweep scraper.
+        # or the iquery sweep scraper that should be ignored (no the highest
+        # pacer_case_id)
         return None
 
     # Only call update_latest_case_id_and_schedule_iquery_sweep if this is a

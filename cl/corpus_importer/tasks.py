@@ -1433,8 +1433,8 @@ def iquery_pages_probe(
             avoid_trigger_signal = False
         process_case_query_report(
             court_id,
-            report_data[0],
-            report_data[1],
+            pacer_case_id=report_data[0],
+            report_data=report_data[1],
             avoid_trigger_signal=avoid_trigger_signal,
         )
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))

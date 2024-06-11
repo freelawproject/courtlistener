@@ -116,18 +116,18 @@ test_patterns = {
         9: True,
     },
     "cand": {
-        9: False,
-        10: False,
-        12: True,
-        13: True,
-        16: True,
-        18: True,
-        24: True,
-        40: True,
-        72: False,
-        136: False,
-        137: True,
-        264: True,
+        9: False,  # 1
+        10: False,  # 2
+        12: True,  # 4
+        13: True,  # 5
+        16: True,  # 8
+        18: True,  # 10
+        24: True,  # 16
+        40: False,  # 32
+        72: False,  # 64
+        136: False,  # 128
+        137: True,  # 129
+        264: True,  # 256
     },
     "nysd": {
         9: False,
@@ -140,6 +140,14 @@ test_patterns = {
         136: True,
         264: True,
         520: True,
+    },
+    "txed": {
+        9: True,
+        10: True,
+        11: True,
+        12: True,
+        13: False,
+        16: False,
     },
     "gamb": HTTPError,
     "hib": Timeout,
