@@ -3369,6 +3369,8 @@ class ScrapeIqueryPagesTest(TestCase):
             "highest_known_pacer_case_id",
             "court_wait:*",
             "iquery.probing.enqueued:*",
+            "test_highest_known_pacer_case_id",
+            "iquery_pacer_case_id_current",
         ]
         for key_to_clean in keys_to_clean:
             key = self.r.keys(key_to_clean)
@@ -3579,6 +3581,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("highest_known_pacer_case_id", self.court_gamb.pk, 1000)
         r.hset("highest_known_pacer_case_id", self.court_hib.pk, 1000)
         r.hset("highest_known_pacer_case_id", self.court_gand.pk, 1000)
+        r.hset("highest_known_pacer_case_id", self.court_txed.pk, 1000)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -3620,6 +3623,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("highest_known_pacer_case_id", self.court_nysd.pk, 1000)
         r.hset("highest_known_pacer_case_id", self.court_canb.pk, 1000)
         r.hset("highest_known_pacer_case_id", self.court_gand.pk, 1000)
+        r.hset("highest_known_pacer_case_id", self.court_txed.pk, 1000)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
