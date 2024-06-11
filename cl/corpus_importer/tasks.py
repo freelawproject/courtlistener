@@ -1375,7 +1375,7 @@ def iquery_pages_probe(
     probe_iteration = 1
     latest_match = 0
     highest_known_pacer_case_id = int(
-        r.hget("highest_known_pacer_case_id", court_id) or 0
+        r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
     jitter = compute_binary_probe_jitter(testing)
     reports_data = []
@@ -1391,7 +1391,7 @@ def iquery_pages_probe(
             # Set expiration accordingly and value to 2 to difference from
             # other waiting times.
             r.setex(
-                f"court_wait:{court_id}",
+                f"iquery:court_wait:{court_id}",
                 settings.IQUERY_COURT_BLOCKED_WAIT,
                 2,
             )
@@ -1421,8 +1421,10 @@ def iquery_pages_probe(
             break
 
     if latest_match > highest_known_pacer_case_id and testing:
-        # For testing purposes update test_highest_known_pacer_case_id
-        r.hset("test_highest_known_pacer_case_id", court_id, latest_match)
+        # For testing purposes update iquery:test_highest_known_pacer_case_id
+        r.hset(
+            "iquery:test_highest_known_pacer_case_id", court_id, latest_match
+        )
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.

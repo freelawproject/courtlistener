@@ -31,15 +31,19 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     lock_value = acquire_redis_lock(r, update_lock_key, 60 * 1000)
 
     highest_known_pacer_case_id = int(
-        r.hget("highest_known_pacer_case_id", court_id) or 0
+        r.hget("iquery:highest_known_pacer_case_id", court_id) or 0
     )
     iquery_pacer_case_id_current = int(
-        r.hget("iquery_pacer_case_id_current", court_id) or 0
+        r.hget("iquery:pacer_case_id_current", court_id) or 0
     )
     incoming_pacer_case_id = int(docket.pacer_case_id)
     found_higher_case_id = False
     if incoming_pacer_case_id > highest_known_pacer_case_id:
-        r.hset("highest_known_pacer_case_id", court_id, incoming_pacer_case_id)
+        r.hset(
+            "iquery:highest_known_pacer_case_id",
+            court_id,
+            incoming_pacer_case_id,
+        )
         found_higher_case_id = True
 
     if found_higher_case_id:
@@ -58,7 +62,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
 
         # Update the iquery_pacer_case_id_current in Redis
         r.hset(
-            "iquery_pacer_case_id_current",
+            "iquery:pacer_case_id_current",
             court_id,
             iquery_pacer_case_id_current,
         )

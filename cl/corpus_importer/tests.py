@@ -3366,11 +3366,11 @@ class ScrapeIqueryPagesTest(TestCase):
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
         keys_to_clean = [
-            "highest_known_pacer_case_id",
-            "court_wait:*",
+            "iquery:highest_known_pacer_case_id",
+            "iquery:court_wait:*",
             "iquery.probing.enqueued:*",
-            "test_highest_known_pacer_case_id",
-            "iquery_pacer_case_id_current",
+            "iquery:test_highest_known_pacer_case_id",
+            "iquery:pacer_case_id_current",
         ]
         for key_to_clean in keys_to_clean:
             key = self.r.keys(key_to_clean)
@@ -3430,8 +3430,10 @@ class ScrapeIqueryPagesTest(TestCase):
         self.assertEqual(dockets.count(), 0)
         r = get_redis_interface("CACHE")
         # Simulate a highest_known_pacer_case_id  = 8
-        r.hset("highest_known_pacer_case_id", self.court_cand.pk, 8)
-        r.hset("test_highest_known_pacer_case_id", self.court_cand.pk, 8)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_cand.pk, 8)
+        r.hset(
+            "iquery:test_highest_known_pacer_case_id", self.court_cand.pk, 8
+        )
         # Execute the task
         iquery_pages_probe.delay(self.court_cand.pk, testing=True)
 
@@ -3453,7 +3455,7 @@ class ScrapeIqueryPagesTest(TestCase):
         #     }
         # Note that the probing is aborted on 136 after reaching to False hits
         highest_known_pacer_case_id = r.hget(
-            "test_highest_known_pacer_case_id", self.court_cand.pk
+            "iquery:test_highest_known_pacer_case_id", self.court_cand.pk
         )
         self.assertEqual(int(highest_known_pacer_case_id), 24)
         # Probing will add 3 more dockets
@@ -3472,8 +3474,10 @@ class ScrapeIqueryPagesTest(TestCase):
         self.assertEqual(dockets.count(), 0)
         r = get_redis_interface("CACHE")
         # Simulate a highest_known_pacer_case_id  = 8
-        r.hset("highest_known_pacer_case_id", self.court_nysd.pk, 8)
-        r.hset("test_highest_known_pacer_case_id", self.court_nysd.pk, 8)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_nysd.pk, 8)
+        r.hset(
+            "iquery:test_highest_known_pacer_case_id", self.court_nysd.pk, 8
+        )
         # Execute the task
         iquery_pages_probe.delay(self.court_nysd.pk, testing=True)
 
@@ -3494,7 +3498,7 @@ class ScrapeIqueryPagesTest(TestCase):
         # Note that the probe is terminated on 264 after reaching the 9 probe
         # iterations.
         highest_known_pacer_case_id = r.hget(
-            "test_highest_known_pacer_case_id", self.court_nysd.pk
+            "iquery:test_highest_known_pacer_case_id", self.court_nysd.pk
         )
         self.assertEqual(int(highest_known_pacer_case_id), 264)
         # Probing will add 6 more dockets
@@ -3516,18 +3520,20 @@ class ScrapeIqueryPagesTest(TestCase):
 
         r = get_redis_interface("CACHE")
         # Simulate a highest_known_pacer_case_id  = 8
-        r.hset("highest_known_pacer_case_id", self.court_gamb.pk, 8)
-        r.hset("test_highest_known_pacer_case_id", self.court_gamb.pk, 8)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_gamb.pk, 8)
+        r.hset(
+            "iquery:test_highest_known_pacer_case_id", self.court_gamb.pk, 8
+        )
         # Execute the task
         iquery_pages_probe.delay(self.court_gamb.pk, testing=True)
 
         # highest_known_pacer_case_id is not updated due to the block.
         highest_known_pacer_case_id = r.hget(
-            "test_highest_known_pacer_case_id", self.court_gamb.pk
+            "iquery:test_highest_known_pacer_case_id", self.court_gamb.pk
         )
         self.assertEqual(int(highest_known_pacer_case_id), 8)
         # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
-        court_wait = r.get(f"court_wait:{self.court_gamb.pk}")
+        court_wait = r.get(f"iquery:court_wait:{self.court_gamb.pk}")
         self.assertEqual(int(court_wait), 2)
 
     @patch(
@@ -3541,8 +3547,8 @@ class ScrapeIqueryPagesTest(TestCase):
 
         r = get_redis_interface("CACHE")
         # Simulate a highest_known_pacer_case_id  = 8
-        r.hset("highest_known_pacer_case_id", self.court_hib.pk, 8)
-        r.hset("test_highest_known_pacer_case_id", self.court_hib.pk, 8)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_hib.pk, 8)
+        r.hset("iquery:test_highest_known_pacer_case_id", self.court_hib.pk, 8)
         # Execute the task
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             iquery_pages_probe.delay(self.court_hib.pk, testing=True)
@@ -3552,7 +3558,7 @@ class ScrapeIqueryPagesTest(TestCase):
         self.assertEqual(mock_sleep.call_count, 2)
         # highest_known_pacer_case_id is not updated due to the Timeout.
         highest_known_pacer_case_id = r.hget(
-            "test_highest_known_pacer_case_id", self.court_hib.pk
+            "iquery:test_highest_known_pacer_case_id", self.court_hib.pk
         )
         self.assertEqual(int(highest_known_pacer_case_id), 8)
 
@@ -3572,16 +3578,16 @@ class ScrapeIqueryPagesTest(TestCase):
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 0)
         r = get_redis_interface("CACHE")
-        r.hset("highest_known_pacer_case_id", self.court_canb.pk, 0)
-        r.hset("highest_known_pacer_case_id", self.court_cand.pk, 135)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_canb.pk, 0)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_cand.pk, 135)
 
         # Set an highest_known_pacer_case_id outside cl.tests.fakes.test_patterns
         # in order to abort them.
-        r.hset("highest_known_pacer_case_id", self.court_nysd.pk, 1000)
-        r.hset("highest_known_pacer_case_id", self.court_gamb.pk, 1000)
-        r.hset("highest_known_pacer_case_id", self.court_hib.pk, 1000)
-        r.hset("highest_known_pacer_case_id", self.court_gand.pk, 1000)
-        r.hset("highest_known_pacer_case_id", self.court_txed.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_nysd.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_gamb.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_hib.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 1000)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -3609,21 +3615,21 @@ class ScrapeIqueryPagesTest(TestCase):
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 0)
         r = get_redis_interface("CACHE")
-        r.hset("highest_known_pacer_case_id", self.court_gamb.pk, 8)
-        r.hset("highest_known_pacer_case_id", self.court_hib.pk, 8)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_gamb.pk, 8)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_hib.pk, 8)
 
-        court_wait_gamb = r.get(f"court_wait:{self.court_gamb.pk}")
+        court_wait_gamb = r.get(f"iquery:court_wait:{self.court_gamb.pk}")
         self.assertEqual(court_wait_gamb, None)
-        court_wait_hib = r.get(f"court_wait:{self.court_hib.pk}")
+        court_wait_hib = r.get(f"iquery:court_wait:{self.court_hib.pk}")
         self.assertEqual(court_wait_hib, None)
 
         # Set an highest_known_pacer_case_id outside cl.tests.fakes.test_patterns
         # in order to abort them.
-        r.hset("highest_known_pacer_case_id", self.court_cand.pk, 1000)
-        r.hset("highest_known_pacer_case_id", self.court_nysd.pk, 1000)
-        r.hset("highest_known_pacer_case_id", self.court_canb.pk, 1000)
-        r.hset("highest_known_pacer_case_id", self.court_gand.pk, 1000)
-        r.hset("highest_known_pacer_case_id", self.court_txed.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_cand.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_nysd.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_canb.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 1000)
+        r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 1000)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -3634,11 +3640,11 @@ class ScrapeIqueryPagesTest(TestCase):
         # Assertions for court_gamb blocked.
         # highest_known_pacer_case_id is not updated due to court_gamb block.
         highest_known_pacer_case_id = r.hget(
-            "highest_known_pacer_case_id", self.court_gamb.pk
+            "iquery:highest_known_pacer_case_id", self.court_gamb.pk
         )
         self.assertEqual(int(highest_known_pacer_case_id), 8)
         # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
-        court_wait = r.get(f"court_wait:{self.court_gamb.pk}")
+        court_wait = r.get(f"iquery:court_wait:{self.court_gamb.pk}")
         self.assertEqual(int(court_wait), 2)
 
         # Assertions for court_hib timeouts.
@@ -3647,7 +3653,7 @@ class ScrapeIqueryPagesTest(TestCase):
         self.assertEqual(mock_sleep.call_count, 2)
         # highest_known_pacer_case_id is not updated due to the block.
         highest_known_pacer_case_id = r.hget(
-            "highest_known_pacer_case_id", self.court_hib.pk
+            "iquery:highest_known_pacer_case_id", self.court_hib.pk
         )
         self.assertEqual(int(highest_known_pacer_case_id), 8)
         # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
@@ -3685,7 +3691,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
             r = get_redis_interface("CACHE")
             # Simulate a highest_known_pacer_case_id = 5
-            r.hset("highest_known_pacer_case_id", self.court_gand.pk, 5)
+            r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 5)
             ### Create a Docket with a pacer_case_id bigger than highest_known_pacer_case_id
             # IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED is False. So no signal should
             # be processed.
@@ -3714,7 +3720,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 dockets.count(), 1, msg="Wrong number of dockets returned."
             )
             highest_known_pacer_case_id = r.hget(
-                "highest_known_pacer_case_id", self.court_gand.pk
+                "iquery:highest_known_pacer_case_id", self.court_gand.pk
             )
             # highest_known_pacer_case_id shouldn't be changed.
             self.assertEqual(
@@ -3748,7 +3754,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
             # highest_known_pacer_case_id shouldn't have changed.
             highest_known_pacer_case_id = r.hget(
-                "highest_known_pacer_case_id", self.court_gand.pk
+                "iquery:highest_known_pacer_case_id", self.court_gand.pk
             )
             self.assertEqual(
                 int(highest_known_pacer_case_id),
@@ -3759,7 +3765,7 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(dockets.count(), 2)
 
             ### Create a Docket with a pacer_case_id bigger than highest_known_pacer_case_id
-            r.hset("iquery_pacer_case_id_current", self.court_gand.pk, 5)
+            r.hset("iquery:pacer_case_id_current", self.court_gand.pk, 5)
             with patch(
                 "cl.corpus_importer.signals.update_latest_case_id_and_schedule_iquery_sweep",
                 side_effect=lambda *args, **kwargs: update_latest_case_id_and_schedule_iquery_sweep(
@@ -3786,7 +3792,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 dockets.count(), 5, msg="Wrong number of dockets returned."
             )
             highest_known_pacer_case_id = r.hget(
-                "highest_known_pacer_case_id", self.court_gand.pk
+                "iquery:highest_known_pacer_case_id", self.court_gand.pk
             )
             self.assertEqual(int(highest_known_pacer_case_id), 8)
 
@@ -3810,7 +3816,7 @@ class ScrapeIqueryPagesTest(TestCase):
             # One docket created by the factory.
             self.assertEqual(dockets.count(), 1)
             highest_known_pacer_case_id = r.hget(
-                "highest_known_pacer_case_id", self.court_ca1.pk
+                "iquery:highest_known_pacer_case_id", self.court_ca1.pk
             )
             # highest_known_pacer_case_id shouldn't exist for this court.
             self.assertEqual(highest_known_pacer_case_id, None)
@@ -3821,8 +3827,8 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(dockets.count(), 0)
             r = get_redis_interface("CACHE")
             # Simulate a highest_known_pacer_case_id  = 8
-            r.hset("highest_known_pacer_case_id", self.court_cand.pk, 8)
-            r.hset("iquery_pacer_case_id_current", self.court_cand.pk, 8)
+            r.hset("iquery:highest_known_pacer_case_id", self.court_cand.pk, 8)
+            r.hset("iquery:pacer_case_id_current", self.court_cand.pk, 8)
             with override_settings(
                 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True
             ), patch(
@@ -3854,8 +3860,8 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(dockets.count(), 0)
             r = get_redis_interface("CACHE")
             # Simulate a highest_known_pacer_case_id  = 8
-            r.hset("highest_known_pacer_case_id", self.court_txed.pk, 8)
-            r.hset("iquery_pacer_case_id_current", self.court_txed.pk, 8)
+            r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 8)
+            r.hset("iquery:pacer_case_id_current", self.court_txed.pk, 8)
             with override_settings(
                 IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=False
             ), patch(

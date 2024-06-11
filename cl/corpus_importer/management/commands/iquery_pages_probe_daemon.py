@@ -60,7 +60,7 @@ class Command(VerboseCommand):
         testing = True if testing_iterations else False
         while True:
             for court_id in court_ids:
-                if r.exists(f"court_wait:{court_id}"):
+                if r.exists(f"iquery:court_wait:{court_id}"):
                     continue
                 try:
                     newly_enqueued = enqueue_iquery_probe(court_id)
