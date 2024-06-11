@@ -1748,7 +1748,7 @@ def process_case_query_report(
     report_data: dict[str, Any],
     avoid_trigger_signal: bool = False,
 ) -> None:
-    """Process the case query report from iquery_pages_probe task.
+    """Process the case query report from probe_iquery_pages task.
     Find and update/store the docket accordingly. This method is able to retry
     on IntegrityError due to a race condition when saving the docket.
 

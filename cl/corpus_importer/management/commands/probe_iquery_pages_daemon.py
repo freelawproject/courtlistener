@@ -3,7 +3,7 @@ import time
 from django.conf import settings
 from redis import ConnectionError
 
-from cl.corpus_importer.tasks import iquery_pages_probe
+from cl.corpus_importer.tasks import probe_iquery_pages
 from cl.corpus_importer.utils import make_iquery_probing_key
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
@@ -67,7 +67,7 @@ class Command(VerboseCommand):
                     if newly_enqueued:
                         # No other probing being conducted for the court.
                         # Enqueue it.
-                        iquery_pages_probe.apply_async(
+                        probe_iquery_pages.apply_async(
                             args=(court_id, testing),
                             queue=settings.CELERY_IQUERY_QUEUE,
                         )

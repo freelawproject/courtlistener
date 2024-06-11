@@ -69,7 +69,7 @@ from cl.corpus_importer.signals import (
 from cl.corpus_importer.tasks import (
     generate_ia_json,
     get_and_save_free_document_report,
-    iquery_pages_probe,
+    probe_iquery_pages,
 )
 from cl.corpus_importer.utils import (
     ClusterSourceException,
@@ -3349,7 +3349,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
 )
 class ScrapeIqueryPagesTest(TestCase):
-    """Tests related to iquery_pages_probe_daemon command."""
+    """Tests related to probe_iquery_pages_daemon command."""
 
     @classmethod
     def setUpTestData(cls):
@@ -3424,7 +3424,7 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     def test_iquery_pages_probe_task(self, mock_cookies):
-        """Test iquery_pages_probe task."""
+        """Test probe_iquery_pages task."""
 
         dockets = Docket.objects.filter(court_id=self.court_cand.pk)
         self.assertEqual(dockets.count(), 0)
@@ -3435,7 +3435,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_cand.pk, 8
         )
         # Execute the task
-        iquery_pages_probe.delay(self.court_cand.pk, testing=True)
+        probe_iquery_pages.delay(self.court_cand.pk, testing=True)
 
         # New highest_known_pacer_case_id according to the cand test pattern in
         # test_patterns
@@ -3468,7 +3468,7 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     def test_iquery_pages_probe_nysd(self, mock_cookies):
-        """Test iquery_pages_probe."""
+        """Test probe_iquery_pages."""
 
         dockets = Docket.objects.filter(court_id=self.court_nysd.pk)
         self.assertEqual(dockets.count(), 0)
@@ -3479,7 +3479,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_nysd.pk, 8
         )
         # Execute the task
-        iquery_pages_probe.delay(self.court_nysd.pk, testing=True)
+        probe_iquery_pages.delay(self.court_nysd.pk, testing=True)
 
         # New highest_known_pacer_case_id according to the nysd test pattern in
         # cl.tests.fakes.test_patterns
@@ -3525,7 +3525,7 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_gamb.pk, 8
         )
         # Execute the task
-        iquery_pages_probe.delay(self.court_gamb.pk, testing=True)
+        probe_iquery_pages.delay(self.court_gamb.pk, testing=True)
 
         # highest_known_pacer_case_id is not updated due to the block.
         highest_known_pacer_case_id = r.hget(
@@ -3551,7 +3551,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("iquery:test_highest_known_pacer_case_id", self.court_hib.pk, 8)
         # Execute the task
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
-            iquery_pages_probe.delay(self.court_hib.pk, testing=True)
+            probe_iquery_pages.delay(self.court_hib.pk, testing=True)
 
         # 2 sleeps before aborting the task. The probe is retried 2 times
         # independently via the @retry decorator.
@@ -3571,8 +3571,8 @@ class ScrapeIqueryPagesTest(TestCase):
         "cl.corpus_importer.tasks.CaseQuery",
         new=FakeCaseQueryReport,
     )
-    def test_iquery_pages_probe_daemon(self, mock_cookies):
-        """Test iquery_pages_probe_daemon by providing an initial and final
+    def test_probe_iquery_pages_daemon(self, mock_cookies):
+        """Test probe_iquery_pages_daemon by providing an initial and final
         pacer_case_ids to scrape."""
 
         dockets = Docket.objects.all()
@@ -3591,7 +3591,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
-                "iquery_pages_probe_daemon",
+                "probe_iquery_pages_daemon",
                 testing_iterations=1,
             )
         # 3 additional dockets should exist after complete the probe.
@@ -3605,10 +3605,10 @@ class ScrapeIqueryPagesTest(TestCase):
         new=FakeCaseQueryReport,
     )
     @patch("cl.corpus_importer.tasks.logger")
-    def test_iquery_pages_probe_daemon_court_down_and_timeout(
+    def test_probe_iquery_pages_daemon_court_down_and_timeout(
         self, mock_logger, mock_cookies
     ):
-        """Test iquery_pages_probe_daemon when a court has blocked us or
+        """Test probe_iquery_pages_daemon when a court has blocked us or
         is the requests are timing out.
         """
 
@@ -3633,7 +3633,7 @@ class ScrapeIqueryPagesTest(TestCase):
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
-                "iquery_pages_probe_daemon",
+                "probe_iquery_pages_daemon",
                 testing_iterations=1,
             )
 
@@ -3840,7 +3840,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                iquery_pages_probe.delay(self.court_cand.pk, testing=True)
+                probe_iquery_pages.delay(self.court_cand.pk, testing=True)
 
             # update_latest_case_id_and_schedule_iquery_sweep should be called
             # 1 time only for the latest probing hit.
@@ -3873,7 +3873,7 @@ class ScrapeIqueryPagesTest(TestCase):
                 execute=True
             ):
                 # Execute the probing task
-                iquery_pages_probe.delay(self.court_txed.pk, testing=True)
+                probe_iquery_pages.delay(self.court_txed.pk, testing=True)
 
             # update_latest_case_id_and_schedule_iquery_sweep should be called
             # 1 time only for the latest probing hit.

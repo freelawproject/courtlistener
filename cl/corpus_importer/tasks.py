@@ -1356,7 +1356,7 @@ def query_iquery_page(
     bind=True,
     ignore_result=True,
 )
-def iquery_pages_probe(
+def probe_iquery_pages(
     self: Task,
     court_id: str,
     testing: bool = False,

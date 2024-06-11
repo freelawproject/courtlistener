@@ -93,7 +93,7 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
         return None
 
     if getattr(instance, "avoid_trigger_signal", False):
-        # This is an instance added by the iquery_pages_probe task
+        # This is an instance added by the probe_iquery_pages task
         # or the iquery sweep scraper that should be ignored (no the highest
         # pacer_case_id)
         return None
