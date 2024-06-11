@@ -1184,8 +1184,9 @@ def make_docket_by_iquery_base(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Weather this method was invoked by the iquery
-    sweep task or the iquery probing task.
+    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
     :return: None if failed, else the ID of the created/updated docket
     """
 
@@ -1265,8 +1266,9 @@ def make_docket_by_iquery(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Weather this method was invoked by the iquery
-    sweep task or the iquery probing task.
+    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
     :return: None if failed, else the ID of the created/updated docket
     """
 
@@ -1310,8 +1312,9 @@ def make_docket_by_iquery_sweep(
     :param tag_names: A list of strings that should be added to the docket as
     tags
     :param log_results_redis: Log results in redis for the ready mix project
-    :param avoid_trigger_signal: Weather this method was invoked by the iquery
-    sweep task or the iquery probing task.
+    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
     :return: None if failed, else the ID of the created/updated docket
     """
 

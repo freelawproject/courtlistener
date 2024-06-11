@@ -3550,7 +3550,7 @@ class ScrapeIqueryPagesTest(TestCase):
         # First court_probe_cycle_no_hits, no jitter
         r.hset("court_probe_cycle_no_hits", self.court_hib.pk, 0)
         # Execute the task
-        with patch("cl.corpus_importer.tasks.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             iquery_pages_probe.delay(self.court_hib.pk, testing=True)
 
         # 2 sleeps before aborting the task. The probe is retried 2 times
@@ -3588,7 +3588,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("highest_known_pacer_case_id", self.court_hib.pk, 1000)
         r.hset("highest_known_pacer_case_id", self.court_gand.pk, 1000)
 
-        with patch("cl.corpus_importer.tasks.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
                 "iquery_pages_probe_daemon",
                 testing_iterations=1,
@@ -3629,7 +3629,7 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("highest_known_pacer_case_id", self.court_canb.pk, 1000)
         r.hset("highest_known_pacer_case_id", self.court_gand.pk, 1000)
 
-        with patch("cl.corpus_importer.tasks.time.sleep") as mock_sleep:
+        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
                 "iquery_pages_probe_daemon",
                 testing_iterations=1,

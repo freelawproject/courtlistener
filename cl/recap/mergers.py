@@ -1678,8 +1678,9 @@ def save_iquery_to_docket(
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
     :param add_to_solr: Whether to save the completed docket to solr
-    :param avoid_trigger_signal: Weather this method was invoked by the iquery
-    sweep task or the iquery probing task.
+    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
@@ -1755,8 +1756,9 @@ def process_case_query_report(
     :param court_id:  A CL court ID where we'll look things up.
     :param pacer_case_id: The internal PACER case ID number
     :param report_data: A dictionary containing report data.
-    :param avoid_trigger_signal: Weather this method was invoked by the iquery
-    sweep task or the iquery probing task.
+    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
     :return: None
     """
     d = async_to_sync(find_docket_object)(
