@@ -20,12 +20,12 @@ def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
 
     :return: True if audio can be processed by OpenAI API
     """
-    # audio.duration should map to the file size with little variability
-    # However, it can be unreliable, so we trust it only for shorter files
-    if audio.duration and audio.duration < 3000:
-        return True
-
     try:
+        # audio.duration should map to the file size with little variability
+        # However, it can be unreliable, so we trust it only for shorter files
+        if audio.local_path_mp3 and audio.duration and audio.duration < 3000:
+            return True
+
         # Request the file size from the storage
         # currently an AWS bucket
         size_mb = audio.local_path_mp3.size / 1_000_000
@@ -39,15 +39,16 @@ def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
         )
     except (FileNotFoundError, ValueError):
         # FileNotFoundError: when the name does not exist in the bucket
-        # ValueError: when local_path_mp3 is None
+        # ValueError: when local_path_mp3 is None or a null FileField
         logger.warning(
             "Audio id %s has no local_path_mp3, needs reprocessing",
             audio.pk,
         )
+
     return False
 
 
-def handle_open_ai_transcriptions(options: OptionsType) -> None:
+def handle_open_ai_transcriptions(options) -> None:
     """Get Audio objects from DB according to `options`,
     validate and call a celery task for processing them
 
