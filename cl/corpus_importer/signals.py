@@ -28,7 +28,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     # when getting and updating it.
     update_lock_key = make_update_pacer_case_id_key(court_id)
     # ttl one hour.
-    lock_value = acquire_redis_lock(r, update_lock_key, 60 * 60 * 1000)
+    lock_value = acquire_redis_lock(r, update_lock_key, 60 * 1000)
 
     highest_known_pacer_case_id = int(
         r.hget("highest_known_pacer_case_id", court_id) or 0
