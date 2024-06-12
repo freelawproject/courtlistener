@@ -23,7 +23,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     """
 
     r = get_redis_interface("CACHE")
-    court_id = str(docket.court_id)
+    court_id = docket.court_id
     # Get the latest pacer_case_id from Redis using a lock to avoid race conditions
     # when getting and updating it.
     update_lock_key = make_update_pacer_case_id_key(court_id)
