@@ -40,6 +40,11 @@ def get_total_number_of_records(type: str, use_replica: bool = False) -> int:
             FROM search_opinion
             WHERE extracted_by_ocr != true
             """
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            query = """
+            SELECT count(*) AS exact_count
+            FROM audio_audio
+            """
 
     with connections[
         "replica" if use_replica else "default"
@@ -85,6 +90,9 @@ def get_custom_query(type: str, last_pk: str) -> tuple[str, list[Any]]:
                 if not last_pk
                 else "WHERE id > %s AND extracted_by_ocr != true"
             )
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            base_query = "SELECT id from audio_audio"
+            filter_clause = "" if not last_pk else "WHERE id > %s"
 
     if last_pk:
         params.append(last_pk)
