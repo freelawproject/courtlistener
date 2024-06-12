@@ -17,6 +17,7 @@ from django.test import override_settings
 from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
+from factory import RelatedFactory
 from waffle.testutils import override_flag
 
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -29,6 +30,9 @@ from cl.lib.test_helpers import (
     SitemapTest,
 )
 from cl.opinion_page.forms import (
+    MeCourtUploadForm,
+    MissCourtUploadForm,
+    MoCourtUploadForm,
     TennWorkCompAppUploadForm,
     TennWorkCompClUploadForm,
 )
@@ -37,7 +41,11 @@ from cl.opinion_page.utils import (
     make_docket_title,
 )
 from cl.opinion_page.views import get_prev_next_volumes
-from cl.people_db.factories import PersonFactory, PositionFactory
+from cl.people_db.factories import (
+    PersonFactory,
+    PersonWithChildrenFactory,
+    PositionFactory,
+)
 from cl.people_db.models import Person
 from cl.recap.factories import (
     AppellateAttachmentFactory,
@@ -1023,12 +1031,32 @@ class UploadPublication(TestCase):
         # Create courts
         court_cl = CourtFactory.create(id="tennworkcompcl")
         court_app = CourtFactory.create(id="tennworkcompapp")
+        court_mo = CourtFactory.create(id="mo")
+        court_miss = CourtFactory.create(id="miss")
+        court_me = CourtFactory.create(id="me")
 
         # Create judges
         people = PersonFactory.create_batch(4)
         for person in people[:3]:
             PositionFactory.create(court=court_app, person=person)
         PositionFactory.create(court=court_cl, person=people[3])
+        people_me = PersonFactory.create_batch(3)
+        for person in people_me:
+            PositionFactory.create(
+                court=court_me, person=person, position_type="c-jus"
+            )
+        PersonWithChildrenFactory(
+            positions=RelatedFactory(
+                PositionFactory, factory_related_name="person", court=court_mo
+            )
+        )
+        PersonWithChildrenFactory(
+            positions=RelatedFactory(
+                PositionFactory,
+                factory_related_name="person",
+                court=court_miss,
+            )
+        )
 
         # Create users
         cls.tenn_user = UserFactory.create(
@@ -1089,6 +1117,52 @@ class UploadPublication(TestCase):
             "publication_date": datetime.date(2019, 4, 13),
         }
 
+        self.me_data = {
+            "case_title": "A Sample Case",
+            "docket_number": "Pen-23-123",
+            "court_str": "me",
+            "pk": "me",
+            "date_argued": datetime.date(2024, 5, 12),
+            "date_reargued": datetime.date(2024, 6, 12),
+            "author_str": "Sample",
+            "publication_date": datetime.date(2024, 4, 12),
+            "cite_volume": "2024",
+            "cite_reporter": "ME",
+            "cite_page": "1",
+            "panel": Person.objects.filter(
+                positions__court_id="me"
+            ).values_list("pk", flat=True),
+        }
+
+        # mo and moctapp have the same fields
+        self.mo_data = {
+            "lead_author": Person.objects.filter(positions__court_id="mo")[
+                0
+            ].id,
+            "case_title": "A Sample Case",
+            "docket_number": "SC123456",
+            "court_str": "mo",
+            "pk": "mo",
+            "disposition": "Lorem ipsum dolor sit amet",
+            "author_str": "Sample",
+            "publication_date": datetime.date(2024, 6, 12),
+        }
+
+        # miss and missctapp have the same fields
+        self.miss_data = {
+            "lead_author": Person.objects.filter(positions__court_id="miss")[
+                0
+            ].id,
+            "case_title": "A Sample Case",
+            "docket_number": "2021-CT-123456-SCT",
+            "court_str": "miss",
+            "pk": "miss",
+            "disposition": "Lorem ipsum dolor sit amet",
+            "summary": "Lorem ipsum dolor sit amet",
+            "author_str": "Sample",
+            "publication_date": datetime.date(2024, 6, 12),
+        }
+
     def tearDown(self) -> None:
         if os.path.exists(os.path.join(settings.MEDIA_ROOT, "pdf/2019/")):
             shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
@@ -1135,9 +1209,10 @@ class UploadPublication(TestCase):
             msg=f"The citation count should be zero not {cite_count}",
         )
 
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
         if form.is_valid():
             form.save()
-        self.assertEqual(form.is_valid(), True, form.errors)
 
         # Validate that citations were created on upload.
         count = OpinionCluster.objects.all().count()
@@ -1193,10 +1268,10 @@ class UploadPublication(TestCase):
             cite_count,
             msg=f"The citation count should be zero not {cite_count}",
         )
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
 
         if form.is_valid():
             form.save()
-        self.assertEqual(form.is_valid(), True, form.errors)
 
         # Check that citations were created on upload.
         count = OpinionCluster.objects.all().count()
@@ -1242,6 +1317,64 @@ class UploadPublication(TestCase):
         form.fields["lead_author"].queryset = qs
         form.fields["second_judge"].queryset = qs
         form.fields["third_judge"].queryset = qs
+
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
+        if form.is_valid():
+            form.save()
+
+        self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+
+    def test_me_form_save(self, mock) -> None:
+        """Can we save maine form successfully to db?"""
+
+        pre_count = Opinion.objects.all().count()
+
+        form = MeCourtUploadForm(
+            self.me_data,
+            pk="me",
+            files={"pdf_upload": self.pdf},
+        )
+
+        print("panel", form.fields["panel"].queryset)
+
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
+        if form.is_valid():
+            form.save()
+
+        self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+
+    def test_mo_form_save(self, mock) -> None:
+        """Can we save missouri form successfully to db?"""
+
+        pre_count = Opinion.objects.all().count()
+
+        form = MoCourtUploadForm(
+            self.mo_data,
+            pk="mo",
+            files={"pdf_upload": self.pdf},
+        )
+
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
+        if form.is_valid():
+            form.save()
+
+        self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+
+    def test_miss_form_save(self, mock) -> None:
+        """Can we save mississippi form successfully to db?"""
+
+        pre_count = Opinion.objects.all().count()
+
+        form = MissCourtUploadForm(
+            self.miss_data,
+            pk="miss",
+            files={"pdf_upload": self.pdf},
+        )
+
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
 
         if form.is_valid():
             form.save()

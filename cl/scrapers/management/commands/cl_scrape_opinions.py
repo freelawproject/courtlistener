@@ -103,7 +103,6 @@ def make_objects(
         item.get("source") or Docket.SCRAPER,
         blocked=blocked,
         date_blocked=date_blocked,
-        appeal_from_str=item.get("lower_court_str", ""),
     )
 
     cluster = OpinionCluster(
@@ -134,9 +133,10 @@ def make_objects(
         url = ""
 
     opinion = Opinion(
-        type=item.get("opinion_type") or Opinion.COMBINED,
+        type=Opinion.COMBINED,
         sha1=sha1_hash,
         download_url=url,
+        author_str=item.get("author_str") or "",
     )
 
     cf = ContentFile(content)
