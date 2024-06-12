@@ -155,7 +155,7 @@ class BaseCourtUploadForm(forms.Form):
             }
         ),
     )
-    publication_date = forms.DateField(
+    date_filed = forms.DateField(
         label="Publication Date",
         required=True,
         widget=forms.TextInput(
@@ -166,141 +166,6 @@ class BaseCourtUploadForm(forms.Form):
             }
         ),
     )
-    date_argued = forms.DateField(
-        label="Argued Date",
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control datepicker",
-                "placeholder": "Argued Date",
-                "autocomplete": "off",
-            }
-        ),
-    )
-    date_reargued = forms.DateField(
-        label="Reargued Date",
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control datepicker",
-                "placeholder": "Reargued Date",
-                "autocomplete": "off",
-            }
-        ),
-    )
-    lead_author = forms.ModelChoiceField(
-        queryset=Person.objects.none(),
-        required=True,
-        label="Lead Author",
-        widget=forms.Select(
-            attrs={
-                "class": "form-control",
-                "placeholder": "Choose Lead Author",
-            }
-        ),
-    )
-    second_judge = forms.ModelChoiceField(
-        queryset=Person.objects.none(),
-        required=False,
-        label="Second Panelist",
-        widget=forms.Select(attrs={"class": "form-control"}),
-    )
-    third_judge = forms.ModelChoiceField(
-        queryset=Person.objects.none(),
-        required=False,
-        label="Third Panelist",
-        widget=forms.Select(attrs={"class": "form-control"}),
-    )
-    panel = forms.ModelMultipleChoiceField(
-        queryset=Person.objects.none(),
-        required=True,
-        label="Panel",
-        widget=forms.SelectMultiple(
-            attrs={
-                "class": "form-control input-lg",
-                "height": "100%",
-                "size": "10",
-            }
-        ),
-    )
-
-    judges = forms.CharField(
-        label="Judges / Lead author",
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "Judges / Lead author string, use this in case you can't "
-                "find the name(s) in the list(s) above",
-                "autocomplete": "off",
-            }
-        ),
-    )
-
-    cite_volume = forms.IntegerField(
-        label="Cite Year",
-        required=True,
-        widget=forms.Select(
-            choices=[(x, x) for x in range(datetime.now().year, 2013, -1)],
-            attrs={"class": "form-control"},
-        ),
-    )
-    cite_reporter = forms.CharField(
-        label="Cite Reporter",
-        required=True,
-    )
-    cite_page = forms.IntegerField(
-        label="Cite Page",
-        required=True,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "autocomplete": "off",
-            }
-        ),
-    )
-
-    disposition = forms.CharField(
-        label="Disposition",
-        required=False,
-        widget=forms.Textarea(
-            attrs={
-                "class": "form-control",
-            }
-        ),
-    )
-
-    summary = forms.CharField(
-        label="Summary",
-        required=False,
-        widget=forms.Textarea(attrs={"class": "form-control"}),
-    )
-
-    # TODO this could be a select field with hardcoded options for a specific court
-    lower_court_str = forms.CharField(
-        label="Lower Court",
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "Lower court name",
-                "autocomplete": "off",
-            }
-        ),
-    )
-
-    lower_court_docket_number = forms.CharField(
-        label="Lower Court docket number",
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "Lower court docket number",
-                "autocomplete": "off",
-            }
-        ),
-    )
-
     download_url = forms.URLField(
         validators=[URLValidator()],
         label="Download Url",
@@ -313,16 +178,6 @@ class BaseCourtUploadForm(forms.Form):
             }
         ),
     )
-
-    opinion_type = forms.CharField(
-        label="Opinion Type",
-        required=True,
-        initial=Opinion.COMBINED,
-        widget=forms.Select(
-            choices=Opinion.OPINION_TYPES, attrs={"class": "form-control"}
-        ),
-    )
-
     pdf_upload = forms.FileField(
         label="Opinion PDF",
         required=True,
@@ -339,6 +194,124 @@ class BaseCourtUploadForm(forms.Form):
         q_judges = self.get_judges_qs()
         self.set_judges_qs(q_judges)
 
+    def add_author_field(self, required=True):
+        """Add author field when required"""
+        lead_author = forms.ModelChoiceField(
+            queryset=Person.objects.none(),
+            required=required,
+            label="Lead Author",
+            widget=forms.Select(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Choose Lead Author",
+                }
+            ),
+        )
+        self.fields["lead_author"] = lead_author
+
+    def add_author_str_field(self, required=True):
+        """Add author str field when required"""
+        author_str = forms.CharField(
+            label="Author String",
+            required=required,
+            widget=forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Use this in case you can't find the name in the list above",
+                    "autocomplete": "off",
+                }
+            ),
+        )
+        self.fields["author_str"] = author_str
+
+    def add_judges_field(self, required=True):
+        """Add judges field when required"""
+        judges = forms.CharField(
+            label="Judges",
+            required=required,
+            widget=forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Judges",
+                    "autocomplete": "off",
+                }
+            ),
+        )
+        self.fields["judges"] = judges
+
+    def add_panel_field(self, required=True):
+        """Add panel field when required"""
+        panel = forms.ModelMultipleChoiceField(
+            queryset=Person.objects.none(),
+            required=required,
+            label="Panel",
+            widget=forms.SelectMultiple(
+                attrs={
+                    "class": "form-control input-lg",
+                    "height": "100%",
+                    "size": "10",
+                }
+            ),
+        )
+        self.fields["panel"] = panel
+
+    def add_argue_fields(self, required=True):
+        """Add argued/reargued field when required"""
+        date_argued = forms.DateField(
+            label="Argued Date",
+            required=required,
+            widget=forms.TextInput(
+                attrs={
+                    "class": "form-control datepicker",
+                    "placeholder": "Argued Date",
+                    "autocomplete": "off",
+                }
+            ),
+        )
+        date_reargued = forms.DateField(
+            label="Reargued Date",
+            required=required,
+            widget=forms.TextInput(
+                attrs={
+                    "class": "form-control datepicker",
+                    "placeholder": "Reargued Date",
+                    "autocomplete": "off",
+                }
+            ),
+        )
+        self.fields["date_argued"] = date_argued
+        self.fields["date_reargued"] = date_reargued
+
+    def add_citation_fields(self, required=True) -> None:
+        """Add citations fields when required"""
+
+        cite_volume = forms.IntegerField(
+            label="Cite Year",
+            required=required,
+            widget=forms.Select(
+                choices=[(x, x) for x in range(datetime.now().year, 2013, -1)],
+                attrs={"class": "form-control"},
+            ),
+        )
+        cite_reporter = forms.CharField(
+            label="Cite Reporter",
+            required=required,
+        )
+        cite_page = forms.IntegerField(
+            label="Cite Page",
+            required=required,
+            widget=forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "autocomplete": "off",
+                }
+            ),
+        )
+
+        self.fields["cite_volume"] = cite_volume
+        self.fields["cite_reporter"] = cite_reporter
+        self.fields["cite_page"] = cite_page
+
     def non_required_fields(self, fields: list[str]) -> None:
         """Set fields as optional
 
@@ -346,7 +319,8 @@ class BaseCourtUploadForm(forms.Form):
         :return: None
         """
         for field in fields:
-            self.fields[field].required = False
+            if field in self.fields:
+                self.fields[field].required = False
 
     def drop_fields(self, fields: list[str]) -> None:
         """Remove fields not used in other courts
@@ -357,7 +331,8 @@ class BaseCourtUploadForm(forms.Form):
         :return: None
         """
         for field in fields:
-            del self.fields[field]
+            if field in self.fields:
+                del self.fields[field]
 
     @staticmethod
     def person_label(obj) -> str:
@@ -601,20 +576,10 @@ class MeCourtUploadForm(BaseCourtUploadForm):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self.drop_fields(
-            [
-                "lead_author",
-                "second_judge",
-                "third_judge",
-                "summary",
-                "judges",
-                "lower_court_str",
-                "lower_court_docket_number",
-                "disposition",
-                "download_url",
-                "opinion_type",
-            ]
-        )
+        # Add required fields for specific court
+        self.add_citation_fields()
+        self.add_argue_fields(required=False)
+        self.add_panel_field()
 
         # The court requested the order of the panel match the seniority
         # of the judges, in order or date joined after sorting by pos type
@@ -630,173 +595,19 @@ class MeCourtUploadForm(BaseCourtUploadForm):
             attrs={"class": "form-control", "readonly": "readonly"},
         )
 
-
-class MoCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Supreme Court of Missouri (mo) Upload Portal
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-        self.non_required_fields(["lead_author"])
-        self.drop_fields(
+        self.order_fields(
             [
+                "case_title",
+                "docket_number",
+                "date_filed",
                 "date_argued",
                 "date_reargued",
+                "panel",
                 "cite_volume",
                 "cite_reporter",
                 "cite_page",
-                "summary",
-                "second_judge",
-                "third_judge",
-                "panel",
-                "lower_court_str",
-                "lower_court_docket_number",
-            ]
-        )
-
-
-class MoCtAppCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Missouri Court of Appeals (moctapp) Upload Portal
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.non_required_fields(["lead_author"])
-        self.drop_fields(
-            [
-                "date_argued",
-                "date_reargued",
-                "cite_volume",
-                "cite_reporter",
-                "cite_page",
-                "summary",
-                "second_judge",
-                "third_judge",
-                "panel",
-                "lower_court_str",
-                "lower_court_docket_number",
-            ]
-        )
-
-
-class MoCtAppEdCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Missouri Court of Appeals Eastern District (moctapped) Upload Portal
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.non_required_fields(["lead_author"])
-        self.drop_fields(
-            [
-                "date_argued",
-                "date_reargued",
-                "cite_volume",
-                "cite_reporter",
-                "cite_page",
-                "summary",
-                "second_judge",
-                "third_judge",
-                "panel",
-                "lower_court_str",
-                "lower_court_docket_number",
-            ]
-        )
-
-
-class MoCtAppSdCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Missouri Court of Appeals Southern District (moctappsd) Upload Portal
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.non_required_fields(["lead_author"])
-        self.drop_fields(
-            [
-                "date_argued",
-                "date_reargued",
-                "cite_volume",
-                "cite_reporter",
-                "cite_page",
-                "summary",
-                "second_judge",
-                "third_judge",
-                "panel",
-                "lower_court_str",
-                "lower_court_docket_number",
-            ]
-        )
-
-
-class MoCtAppWdCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Missouri Court of Appeals Western District (moctappwd) Upload Portal
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.non_required_fields(["lead_author"])
-        self.drop_fields(
-            [
-                "date_argued",
-                "date_reargued",
-                "cite_volume",
-                "cite_reporter",
-                "cite_page",
-                "summary",
-                "second_judge",
-                "third_judge",
-                "panel",
-                "lower_court_str",
-                "lower_court_docket_number",
-            ]
-        )
-
-
-class MissCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Mississippi Supreme Court (miss) Upload Portal
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.non_required_fields(["lead_author"])
-        self.drop_fields(
-            [
-                "date_argued",
-                "date_reargued",
-                "cite_volume",
-                "cite_reporter",
-                "cite_page",
-                "second_judge",
-                "third_judge",
-                "panel",
-            ]
-        )
-
-
-class MissCtAppCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Court of Appeals of Mississippi (missctapp) Upload Portal
-    """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.non_required_fields(["lead_author"])
-        self.drop_fields(
-            [
-                "date_argued",
-                "date_reargued",
-                "cite_volume",
-                "cite_reporter",
-                "cite_page",
-                "second_judge",
-                "third_judge",
-                "panel",
+                "download_url",
+                "pdf_upload",
             ]
         )
 
@@ -809,24 +620,26 @@ class TennWorkCompClUploadForm(BaseCourtUploadForm):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+
+        self.add_author_field()
+        self.add_citation_fields()
+
         self.fields["cite_reporter"].widget = forms.Select(
             choices=[("TN WC", "TN WC")],
             attrs={"class": "form-control", "readonly": "readonly"},
         )
-        self.drop_fields(
+
+        self.order_fields(
             [
-                "date_argued",
-                "date_reargued",
-                "panel",
-                "second_judge",
-                "third_judge",
-                "summary",
-                "lower_court_str",
-                "lower_court_docket_number",
-                "disposition",
-                "judges",
-                "opinion_type",
+                "case_title",
+                "docket_number",
+                "date_filed",
+                "lead_author",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
                 "download_url",
+                "pdf_upload",
             ]
         )
 
@@ -837,24 +650,43 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
     Portal
     """
 
+    second_judge = forms.ModelChoiceField(
+        queryset=Person.objects.none(),
+        required=False,
+        label="Second Panelist",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    third_judge = forms.ModelChoiceField(
+        queryset=Person.objects.none(),
+        required=False,
+        label="Third Panelist",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+
+        self.add_author_field()
+        self.add_citation_fields()
+
         self.fields["cite_reporter"].widget = forms.Select(
             choices=[("TN WC App.", "TN WC App.")],
             attrs={"class": "form-control", "readonly": "readonly"},
         )
-        self.drop_fields(
+
+        self.order_fields(
             [
-                "date_argued",
-                "date_reargued",
-                "panel",
-                "summary",
-                "lower_court_str",
-                "lower_court_docket_number",
-                "disposition",
-                "judges",
-                "opinion_type",
+                "case_title",
+                "docket_number",
+                "date_filed",
+                "lead_author",
+                "second_judge",
+                "third_judge",
+                "cite_volume",
+                "cite_reporter",
+                "cite_page",
                 "download_url",
+                "pdf_upload",
             ]
         )
 
@@ -883,4 +715,77 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
                     self.cleaned_data.get("third_judge"),
                 ],
             )
+        )
+
+
+class MoCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Missouri Upload Portal (mo, moctapp, moctapped, moctappsd and moctappwd)
+    """
+
+    disposition = forms.CharField(
+        label="Disposition",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+            }
+        ),
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.add_author_field()
+        self.add_author_str_field(required=False)
+        self.order_fields(
+            [
+                "case_title",
+                "docket_number",
+                "date_filed",
+                "lead_author",
+                "author_str",
+                "disposition",
+                "download_url",
+                "pdf_upload",
+            ]
+        )
+
+
+class MissCourtUploadForm(BaseCourtUploadForm):
+    """
+    Form for Mississippi Upload Portal (miss and missctapp)
+    """
+
+    disposition = forms.CharField(
+        label="Disposition",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+            }
+        ),
+    )
+
+    summary = forms.CharField(
+        label="Summary",
+        required=False,
+        widget=forms.Textarea(attrs={"class": "form-control"}),
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.add_author_field()
+        self.add_author_str_field(required=False)
+        self.order_fields(
+            [
+                "case_title",
+                "docket_number",
+                "date_filed",
+                "lead_author",
+                "author_str",
+                "disposition",
+                "summary",
+                "download_url",
+                "pdf_upload",
+            ]
         )

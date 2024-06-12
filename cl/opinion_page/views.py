@@ -64,12 +64,7 @@ from cl.opinion_page.forms import (
     DocketEntryFilterForm,
     MeCourtUploadForm,
     MissCourtUploadForm,
-    MissCtAppCourtUploadForm,
     MoCourtUploadForm,
-    MoCtAppCourtUploadForm,
-    MoCtAppEdCourtUploadForm,
-    MoCtAppSdCourtUploadForm,
-    MoCtAppWdCourtUploadForm,
     TennWorkCompAppUploadForm,
     TennWorkCompClUploadForm,
 )
@@ -204,12 +199,12 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
         "tennworkcompapp": (TennWorkCompAppUploadForm, f"img/{pk}.jpg"),
         "me": (MeCourtUploadForm, f"{pk}.png"),
         "mo": (MoCourtUploadForm, f"{pk}.png"),
-        "moctapp": (MoCtAppCourtUploadForm, "mo.png"),
-        "moctapped": (MoCtAppEdCourtUploadForm, "mo.png"),
-        "moctappsd": (MoCtAppSdCourtUploadForm, "mo.png"),
-        "moctappwd": (MoCtAppWdCourtUploadForm, "mo.png"),
+        "moctapp": (MoCourtUploadForm, "mo.png"),
+        "moctapped": (MoCourtUploadForm, "mo.png"),
+        "moctappsd": (MoCourtUploadForm, "mo.png"),
+        "moctappwd": (MoCourtUploadForm, "mo.png"),
         "miss": (MissCourtUploadForm, f"{pk}.png"),
-        "missctapp": (MissCtAppCourtUploadForm, f"{pk}.png"),
+        "missctapp": (MissCourtUploadForm, f"{pk}.png"),
     }
 
     upload_form = upload_form_classes[pk][0]
