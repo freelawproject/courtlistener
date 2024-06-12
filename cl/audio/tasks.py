@@ -1,9 +1,16 @@
 from math import ceil
 
-import openai
 from django.conf import settings
 from django.db import transaction
 from django.utils.text import slugify
+from openai import (
+    APIConnectionError,
+    ConflictError,
+    InternalServerError,
+    OpenAI,
+    RateLimitError,
+    UnprocessableEntityError,
+)
 from sentry_sdk import capture_exception
 
 from cl.audio.models import Audio, AudioTranscriptionMetadata
@@ -53,7 +60,20 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
         increment_failure_count(af)
 
 
-@app.task(bind=True, max_retries=5, retry=True)
+# Error handling inspired by openai's package retry policy
+# https://github.com/openai/openai-python/blob/54a5911f5215148a0bdeb10e2bcfb84f635a75b9/src/openai/_base_client.py#L679-L712
+@app.task(
+    bind=True,
+    autoretry_for=(
+        RateLimitError,
+        APIConnectionError,
+        ConflictError,
+        InternalServerError,
+    ),
+    max_retries=3,
+    retry_backoff=1 * 60,
+    retry_backoff_max=10 * 60,
+)
 def transcribe_from_open_ai_api(self, audio_pk: int):
     """Get transcription from OpenAI API whisper-1 model
 
@@ -72,7 +92,7 @@ def transcribe_from_open_ai_api(self, audio_pk: int):
     logger.info("Starting transcription for audio %s", audio_pk)
 
     # Prevent default openai client retrying
-    with openai.OpenAI(max_retries=0) as client:
+    with OpenAI(max_retries=0) as client:
         try:
             transcript = client.audio.transcriptions.create(
                 file=file,
@@ -82,24 +102,14 @@ def transcribe_from_open_ai_api(self, audio_pk: int):
                 timestamp_granularities=["word", "segment"],
                 prompt=audio.case_name,
             )
-        # Error handling inspired by openai's package retry policy
-        # https://github.com/openai/openai-python/blob/54a5911f5215148a0bdeb10e2bcfb84f635a75b9/src/openai/_base_client.py#L679-L712
-        except openai.RateLimitError:
-            self.retry(countdown=60 * (1 + self.request.retries))
-        except (
-            openai.APIConnectionError,
-            openai.ConflictError,
-            openai.InternalServerError,
-        ):
-            self.retry(countdown=60)
-        except openai.UnprocessableEntityError:
+        except UnprocessableEntityError:
             audio.stt_status = Audio.STT_FAILED
             audio.save()
             logger.warning("UnprocessableEntityError for audio %s", audio_pk)
             return
         except Exception as e:
             # Sends to Sentry errors that we don't expect or
-            # nor want to retry. Includes some openai package errors:
+            # don't want to retry. Includes some openai package errors:
             # (openai.BadRequestError, openai.AuthenticationError,
             # openai.PermissionDeniedError, openai.NotFoundError)
             capture_exception(e)

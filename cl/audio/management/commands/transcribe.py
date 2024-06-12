@@ -1,6 +1,5 @@
 import argparse
 import time
-from typing import List
 
 from django.db.models import Q
 
@@ -110,7 +109,7 @@ class Command(VerboseCommand):
             help="Retry transcription of failed audio files",
         )
 
-    def handle(self, *args: List[str], **options: OptionsType) -> None:
+    def handle(self, *args: list[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
 
         if options["model"] == "open-ai-api":

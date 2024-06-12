@@ -27,6 +27,10 @@ permissions, for example:
 
 manage.py clone_from_cl --type search.Docket --id 17090923 --add-docket-entries
 
+You can also clone audio files (oral arguments) related to a docket. For example:
+
+manage.py clone_from_cl --type search.Docket --id 66635300 18473600 --add-audio-files
+
 Now you can clone people positions, for example:
 
 manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --clone-person-positions
@@ -48,7 +52,6 @@ import os
 import pathlib
 import sys
 from datetime import datetime
-from typing import List
 
 import requests
 from django.apps import apps
@@ -387,9 +390,12 @@ def clone_docket(
 
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
+            print("before audio file")
 
             if add_audio_files:
+                print("Adding audio files")
                 docket_data = get_json_data(docket_url, session)
+                print(docket_data)
                 clone_audio_files(
                     session, docket_data.get("audio_files", []), docket
                 )
@@ -480,7 +486,7 @@ def clone_docket(
 
 
 def clone_audio_files(
-    session: Session, audio_files: List[str], docket: Docket
+    session: Session, audio_files: list[str], docket: Docket
 ):
     """Clone audio_audio rows related to the docket
     Also, clone the actual `local_mp3_path` files to the dev storage.
@@ -1122,7 +1128,6 @@ class Command(BaseCommand):
         self.ids = options.get("ids")
         self.download_cluster_files = options.get("download_cluster_files")
         self.add_docket_entries = options.get("add_docket_entries")
-        self.add_audio_files = options.get("add_audio_files")
         self.clone_person_positions = options.get("clone_person_positions")
         self.add_to_solr = options.get("add_to_solr")
 
@@ -1152,7 +1157,7 @@ class Command(BaseCommand):
                     self.s,
                     self.ids,
                     self.add_docket_entries,
-                    self.add_audio_files,
+                    options["add_audio_files"],
                     self.clone_person_positions,
                     self.add_to_solr,
                     self.type,
