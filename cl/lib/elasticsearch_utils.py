@@ -48,6 +48,7 @@ from cl.lib.utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
     lookup_child_courts,
+    map_to_docket_entry_sorting,
 )
 from cl.people_db.models import Position
 from cl.search.constants import (
@@ -522,6 +523,17 @@ def build_sort_results(
         "citeCount desc": {"citeCount": {"order": "desc"}},
         "citeCount asc": {"citeCount": {"order": "asc"}},
     }
+
+    if api_version == "v3":
+        # Override entry_date_filed sorting keys in the V3 RECAP Search API.
+        # Since no function score is required to sort documents because no
+        # has_child query is used.
+        order_by_map["entry_date_filed desc"] = {
+            "entry_date_filed": {"order": "desc"}
+        }
+        order_by_map["entry_date_filed asc"] = {
+            "entry_date_filed": {"order": "asc"}
+        }
 
     require_v4_function_score = cd["type"] in [
         SEARCH_TYPES.RECAP,
@@ -2865,7 +2877,20 @@ def do_es_api_query(
                     }
                 }
             )
+        elif cd["type"] == SEARCH_TYPES.DOCKETS:
+            extra_options.update(
+                {
+                    "collapse": {
+                        "field": "docket_id",
+                    }
+                }
+            )
+
         main_query = main_query.extra(**extra_options)
+        if cd["type"] == SEARCH_TYPES.RECAP:
+            # In the RECAP type, the dateFiled sorting param is converted to
+            # entry_date_filed
+            cd["order_by"] = map_to_docket_entry_sorting(cd["order_by"])
         main_query = main_query.sort(
             build_sort_results(cd, api_version=api_version)
         )
@@ -2929,17 +2954,23 @@ def build_cardinality_count(
     return search_query.extra(size=0, track_total_hits=True)
 
 
-def do_collapse_count_query(main_query: Search, query: Query) -> int | None:
+def do_collapse_count_query(
+    search_type: str, main_query: Search, query: Query
+) -> int | None:
     """Execute an Elasticsearch count query for queries that uses collapse.
     Uses a query with aggregation to determine the number of unique opinions
-    based on the 'cluster_id' field.
+    based on the 'cluster_id' or 'docket_id' according to the search_type.
 
+    :param search_type: The search type to perform.
     :param main_query: The Elasticsearch DSL Search object.
     :param query: The ES Query object to perform the count query.
     :return: The results count.
     """
 
-    search_query = build_cardinality_count(main_query, query, "cluster_id")
+    unique_field = (
+        "cluster_id" if search_type == SEARCH_TYPES.OPINION else "docket_id"
+    )
+    search_query = build_cardinality_count(main_query, query, unique_field)
     try:
         total_results = (
             search_query.execute().aggregations.unique_documents.value
