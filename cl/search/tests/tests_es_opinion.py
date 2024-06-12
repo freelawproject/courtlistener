@@ -445,7 +445,11 @@ class OpinionV3APISearchTest(
         r = await self._test_api_results_count(search_params, 1, "API fields")
 
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(opinion_v3_search_api_keys))
+        self.assertEqual(
+            keys_count,
+            len(opinion_v3_search_api_keys),
+            msg="Wrong number of keys.",
+        )
         for (
             field,
             get_expected_value,

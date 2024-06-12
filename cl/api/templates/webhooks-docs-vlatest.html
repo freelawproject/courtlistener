@@ -241,10 +241,10 @@
   --url '{% get_full_host %}{% url "search-list" version="v3" %}?type=d&docket_number=22-cv-81294&case_name=trump' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' | \
 jq '.results[0].docket_id' | \
-xargs curl -X POST \
-  --url 'https://www.courtlistener.com/api/rest/v3/docket-alert/' \
+xargs -I % curl -X POST \
+  --url 'https://www.courtlistener.com/api/rest/v3/docket-alerts/' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  --data docket_id=$1 </pre>
+  --data 'docket=%' </pre>
     </li>
     <li>
       <p><strong>For users</strong> of <a href="{% url 'recap_email_help' %}">@recap.email</a>, the best way to subscribe to a case is to have <a href="{% url 'view_recap_email' %}">auto-subscribe turned on in your settings</a>.

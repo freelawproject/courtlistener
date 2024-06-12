@@ -385,3 +385,13 @@ def sanitize_unbalanced_quotes(query: str) -> str:
             query, quotes_count, '"'
         )
     return query
+
+
+def map_to_docket_entry_sorting(sort_string: str) -> str:
+    """Convert a RECAP sorting param to a docket entry sorting parameter."""
+    if sort_string == "dateFiled asc":
+        return "entry_date_filed asc"
+    elif sort_string == "dateFiled desc":
+        return "entry_date_filed desc"
+    else:
+        return sort_string
