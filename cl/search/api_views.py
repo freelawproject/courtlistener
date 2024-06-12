@@ -29,6 +29,7 @@ from cl.search.api_serializers import (
     TagSerializer,
     V3OAESResultSerializer,
     V3OpinionESResultSerializer,
+    V3RECAPDocumentESResultSerializer,
 )
 from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
@@ -206,25 +207,36 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
             paginator = pagination.PageNumberPagination()
             sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
             result_page = paginator.paginate_queryset(sl, request)
-            if (
-                search_type == SEARCH_TYPES.ORAL_ARGUMENT
-                and waffle.flag_is_active(request, "oa-es-active")
-            ):
-                serializer = V3OAESResultSerializer(result_page, many=True)
-            elif search_type == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(
-                request, "p-es-active"
-            ):
-                serializer = ExtendedPersonESSerializer(result_page, many=True)
-            elif search_type == SEARCH_TYPES.OPINION and is_opinion_active:
-                serializer = V3OpinionESResultSerializer(
-                    result_page, many=True
-                )
-            else:
-                if cd["q"] == "":
-                    cd["q"] = "*"  # Get everything
-                serializer = SearchResultSerializer(
-                    result_page, many=True, context={"schema": sl.conn.schema}
-                )
+
+            match search_type:
+                case SEARCH_TYPES.ORAL_ARGUMENT if waffle.flag_is_active(
+                    request, "oa-es-active"
+                ):
+                    serializer = V3OAESResultSerializer(result_page, many=True)
+                case SEARCH_TYPES.PEOPLE if waffle.flag_is_active(
+                    request, "p-es-active"
+                ):
+                    serializer = ExtendedPersonESSerializer(
+                        result_page, many=True
+                    )
+                case SEARCH_TYPES.OPINION if is_opinion_active:
+                    serializer = V3OpinionESResultSerializer(
+                        result_page, many=True
+                    )
+                case (
+                    SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
+                ) if waffle.flag_is_active(request, "r-es-search-api-active"):
+                    serializer = V3RECAPDocumentESResultSerializer(
+                        result_page, many=True
+                    )
+                case _:
+                    if cd["q"] == "":
+                        cd["q"] = "*"  # Get everything
+                    serializer = SearchResultSerializer(
+                        result_page,
+                        many=True,
+                        context={"schema": sl.conn.schema},
+                    )
             return paginator.get_paginated_response(serializer.data)
         # Invalid search.
         return response.Response(
