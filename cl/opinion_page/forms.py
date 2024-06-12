@@ -746,7 +746,7 @@ class MoCourtUploadForm(BaseCourtUploadForm):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.add_author_field()
-        self.add_judges_field()
+        self.add_judges_field(required=False)
         self.set_judges_qs()
         self.add_author_str_field(required=False)
         self.order_fields(
@@ -789,7 +789,7 @@ class MissCourtUploadForm(BaseCourtUploadForm):
         super().__init__(*args, **kwargs)
         self.add_author_field()
         self.set_judges_qs()
-        self.add_judges_field()
+        self.add_judges_field(required=False)
         self.add_author_str_field(required=False)
         self.order_fields(
             [
