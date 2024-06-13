@@ -1856,7 +1856,7 @@ def merge_unavailable_fields_on_parent_document(
 
             oa_ids = {entry["id"] for entry in results}
             oa_docs = Audio.objects.filter(pk__in=oa_ids).only(
-                "id", "stt_google_response", "stt_status"
+                "id", "stt_transcript", "stt_status"
             )
             oa_docs_dict = {
                 doc.id: (
