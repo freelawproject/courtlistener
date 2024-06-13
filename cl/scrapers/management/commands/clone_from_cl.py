@@ -390,12 +390,9 @@ def clone_docket(
 
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
-            print("before audio file")
 
             if add_audio_files:
-                print("Adding audio files")
                 docket_data = get_json_data(docket_url, session)
-                print(docket_data)
                 clone_audio_files(
                     session, docket_data.get("audio_files", []), docket
                 )
