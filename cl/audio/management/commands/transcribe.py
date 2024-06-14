@@ -62,12 +62,15 @@ def handle_open_ai_transcriptions(options) -> None:
     else:
         query = Q(stt_status=Audio.STT_NEEDED)
 
-    logger.info(
-        "%s audio files to transcribe", Audio.objects.filter(query).count()
-    )
+    queryset = Audio.objects.filter(query)
+    logger.info("%s audio files to transcribe", queryset.count())
+
+    if options["limit"]:
+        queryset = queryset[: options["limit"]]
+        logger.info("Processing only %s audio files", options["limit"])
 
     valid_count = 0
-    for audio in Audio.objects.filter(query):
+    for audio in queryset:
         if not audio_can_be_processed_by_open_ai_api(audio):
             continue
 
@@ -107,6 +110,13 @@ class Command(VerboseCommand):
             action="store_true",
             default=False,
             help="Retry transcription of failed audio files",
+        )
+        parser.add_argument(
+            "--limit",
+            type=int,
+            default=0,
+            help="""Max number of audio files to get from the database
+            for processing. '--limit 0' means there is no limit. Default: 0""",
         )
 
     def handle(self, *args: list[str], **options: OptionsType) -> None:
