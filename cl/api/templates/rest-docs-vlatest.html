@@ -137,7 +137,7 @@
         <a href="https://docs.djangoproject.com/en/dev/topics/auth/" target="_blank">Cookie/Session Authentication</a>
       </li>
       <li>
-        <a href="http://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
+        <a href="https://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
       </li>
     </ol>
     <p>All of these methods are secure, so the choice of which to use is generally a question of what's most convenient for the context of your work. Our recommendations are:
@@ -286,7 +286,7 @@
     <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v3" %}?cluster__docket__court=scotus"</pre>
     <p>This uses the <code>Opinion</code> API to get <code>Opinions</code> that are part of <code>Opinion Clusters</code> that are on <code>Dockets</code> in the <code>Court</code> with the ID of <code>scotus</code>. To understand this data model better, see the <a href="{% url "case_law_api_help" %}">case law API documentation</a>.
     </p>
-    <p>To use date filters, supply dates in <a href="http://en.wikipedia.org/wiki/ISO_8601" target="_blank">ISO-8601 format</a>.
+    <p>To use date filters, supply dates in <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank">ISO-8601 format</a>.
     </p>
     <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Dockets</code> from non-Federal Appellate jurisdictions:
     </p>
