@@ -44,6 +44,11 @@ def get_total_number_of_records(type: str, use_replica: bool = False) -> int:
             query = """
             SELECT count(*) AS exact_count
             FROM audio_audio
+            WHERE
+                local_path_mp3 != '' AND
+                download_url != 'https://www.cadc.uscourts.gov/recordings/recordings.nsf/' AND
+                position('Unavailable' in download_url) = 0 AND
+                duration > 30
             """
 
     with connections[
@@ -92,7 +97,24 @@ def get_custom_query(type: str, last_pk: str) -> tuple[str, list[Any]]:
             )
         case SEARCH_TYPES.ORAL_ARGUMENT:
             base_query = "SELECT id from audio_audio"
-            filter_clause = "" if not last_pk else "WHERE id > %s"
+            no_argument_where_clause = """
+            WHERE local_path_mp3 != '' AND
+                download_url != 'https://www.cadc.uscourts.gov/recordings/recordings.nsf/' AND
+                position('Unavailable' in download_url) = 0 AND
+                duration > 30
+            """
+            where_clause_with_argument = """
+            WHERE id > %s AND
+                local_path_mp3 != '' AND
+                download_url != 'https://www.cadc.uscourts.gov/recordings/recordings.nsf/' AND
+                position('Unavailable' in download_url) = 0 AND
+                duration > 30
+            """
+            filter_clause = (
+                no_argument_where_clause
+                if not last_pk
+                else where_clause_with_argument
+            )
 
     if last_pk:
         params.append(last_pk)
