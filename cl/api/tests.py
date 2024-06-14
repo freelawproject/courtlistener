@@ -1315,7 +1315,7 @@ class V4DRFPaginationTest(TestCase):
                 date_filed=date(2015, 8, i + 1),
             )
 
-        params = {"order_by": "date_filed"}
+        params: dict[str, str | int] = {"order_by": "date_filed"}
         # Request then first page and compare the results. In this sorting key
         # results where date_filed is not None are shown first.
         with mock.patch.object(
@@ -1388,7 +1388,7 @@ class V4DRFPaginationTest(TestCase):
                 date_filed=date(2015, 8, i + 1),
             )
 
-        params = {"order_by": "date_created"}
+        params: dict[str, str | int] = {"order_by": "date_created"}
         # Start requesting the first page of date_created which uses cursor
         # pagination.
         with mock.patch.object(
