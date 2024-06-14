@@ -1400,7 +1400,7 @@ class SitemapTest(TestCase):
                 xml_tree.xpath(
                     "//s:url",
                     namespaces={
-                        "s": "https://www.sitemaps.org/schemas/sitemap/0.9"
+                        "s": "http://www.sitemaps.org/schemas/sitemap/0.9"
                     },
                 ),
             )
