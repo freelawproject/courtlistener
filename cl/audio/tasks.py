@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils.text import slugify
 from openai import (
     APIConnectionError,
+    BadRequestError,
     ConflictError,
     InternalServerError,
     OpenAI,
@@ -102,10 +103,12 @@ def transcribe_from_open_ai_api(self, audio_pk: int):
                 timestamp_granularities=["word", "segment"],
                 prompt=audio.case_name,
             )
-        except UnprocessableEntityError:
+        except (UnprocessableEntityError, BadRequestError) as e:
+            # BadRequestError is an HTTP 400 and has this message:
+            # 'The audio file could not be decoded or its format is not supported'
             audio.stt_status = Audio.STT_FAILED
             audio.save()
-            logger.warning("UnprocessableEntityError for audio %s", audio_pk)
+            capture_exception(e)
             return
         except Exception as e:
             # Sends to Sentry errors that we don't expect or
