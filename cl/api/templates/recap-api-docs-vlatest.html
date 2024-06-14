@@ -1,0 +1,380 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}RECAP APIs for PACER Data – CourtListener.com{% endblock %}
+{% block og_title %}RECAP APIs for PACER Data – CourtListener.com{% endblock %}
+
+{% block description %}Use these APIs to download content from PACER and share it in the RECAP Archive of federal court cases and filings.{% endblock %}
+{% block og_description %}Use these APIs to download content from PACER and share it in the RECAP Archive of federal court cases and filings.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#pacer-fetch">PACER Fetch API</a></li>
+      <ul>
+        <li><a href="#monitoring">Monitoring</a></li>
+        <li><a href="#security">Security</a></li>
+        <li><a href="#pdf">Purchasing PDFs</a></li>
+        <li><a href="#attachment-pages">Scraping Attachment Page</a></li>
+        <li><a href="#dockets">Purchasing Dockets</a></li>
+      </ul>
+      <li><a href="#recap-upload">RECAP Upload API</a></li>
+      <ul>
+        <li><a href="#global-params">Global Parameters</a></li>
+        <li><a href="#recap-dockets">Uploading Dockets</a></li>
+        <li><a href="#recap-pdf">Uploading PDFs</a></li>
+        <li><a href="#recap-zips">Uploading Zips</a></li>
+        <li><a href="#recap-atts">Uploading Attachment Pages</a></li>
+        <li><a href="#example">API Example</a></li>
+      </ul>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">RECAP APIs for&nbsp;PACER</h1>
+  <p class="lead">Use these APIs to scrape PACER data and to upload data into CourtListener's database of federal court cases and filings.
+  </p>
+  <p>These APIs work in conjunction with our <a href="{% url "pacer_api_help" %}">PACER APIs and data model</a>.
+  </p>
+  <p>The endpoints for RECAP are:</p>
+  <ul>
+    <li>
+      <p><code>{% url "pacerfetchqueue-list" version="v3" %}</code> &mdash; Use this API to scrape PACER data, including dockets, PDFs, and more.
+      </p>
+    </li>
+    <li>
+      <p><code>{% url "processingqueue-list" version="v3" %}</code> &mdash; Use this API to upload PACER data to CourtListener and to check on the progress of an upload.
+      </p>
+    </li>
+  </ul>
+
+  <h2 id="pacer-fetch">PACER Fetch <small> — <code>{% url "pacerfetchqueue-list" version="v3" %}</code></small></h2>
+  <p>Use this API to buy PACER content and add it to CourtListener so that it is available via our website, APIs, <a href="{% url "webhooks_docs" %}">webhooks</a>, and <a href="{% url "replication_docs" %}">replicated database</a>. This is <a href="https://free.law/2019/11/05/pacer-fetch-api">a free API</a>, but it uses your PACER credentials to purchase and download PACER content. You'll still have to pay your PACER bill when it comes.
+  </p>
+  <p>Because downloading content from PACER takes time, this API is asynchronous. After you send an HTTP <code>POST</code>, it immediately responds with an ID for the request and places the request in a queue to be downloaded by our scrapers. Most requests are completed within seconds.
+  </p>
+  <p>As the request is processed, it will have a status code:
+  </p>
+  <table class="table">
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>1</code></td>
+      <td>Awaiting processing in queue</td>
+    </tr>
+    <tr>
+      <td><code>2</code></td>
+      <td>Item processed successfully</td>
+    </tr>
+    <tr>
+      <td><code>3</code></td>
+      <td>Item encountered an error while processing</td>
+    </tr>
+    <tr>
+      <td><code>4</code></td>
+      <td>Item is currently being processed</td>
+    </tr>
+    <tr>
+      <td><code>5</code></td>
+      <td>Item failed processing, but will be retried</td>
+    </tr>
+    <tr>
+      <td><code>6</code></td>
+      <td>Item failed validity tests during your POST</td>
+    </tr>
+    <tr>
+      <td><code>7</code></td>
+      <td>There was insufficient metadata to complete the task</td>
+    </tr>
+  </tbody>
+  </table>
+
+  <h3 id="monitoring">Monitoring Your Request</h3>
+  <p>To monitor your request, poll the API for your request, or use our <a href="{% url "webhooks_docs" %}#recap-fetch">Fetch Webhook</a> to get immediate updates without polling.</p>
+  <p>We recommend using the webhook endpoint, since it reduces load on our servers.
+  </p>
+
+  <h3 id="security">Security of RECAP Fetch API</h3>
+  <p>A security maxim is to never share your password. This API requires that you violate this maxim. Why should you do so, and how do we handle your password securely?
+  </p>
+  <p>While we prefer not to have unhashed user passwords, PACER lacks any permissions-based or granular authentication system. This means that the only way we can act on your behalf is to have your credentials.
+  </p>
+  <p>Once we have your password, we work to rid ourselves of it as quickly as possible. We do not store it in our database or logs at any time. Instead, we use it to immediately log into the PACER system. That gives us cookies for your account, which we store in our in-memory database with a one hour expiration period. As soon as we have the cookies, we throw away your username and password.
+  </p>
+  <p>The result of this system is that we have your password until we have logged you in, and no longer. After that point, we only have a cache of your cookies for one hour.
+  </p>
+  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up!</strong> This API gets content on your behalf using <em>your</em> access rights. This means that if you use this API to request a sealed item from PACER, we will go get it and add it to our system, just like you asked. <strong>Do not do this</strong>. If you do this accidentally, <a href="{% url "contact" %}">please get in touch</a> as soon as possible, so we can revert the error.
+  </p>
+  <p>If you have questions about our approach, please see <a href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.
+  </p>
+
+  <h3 id="examples">API Examples</h3>
+  <h4 id="pdf"> Purchasing PDFs</h4>
+  <ol>
+    <li>
+      <p>Set <code>request_type</code> field to <code>2</code>, which indicates PDFs.</p>
+    </li>
+    <li>
+      <p>Set the <code>recap_document</code> field to the ID for the RECAP Document you wish to add to our system.
+      </p>
+      <p>To identify the <code>recap_document</code> ID, look up the RECAP Document in <a href="{% url "pacer_api_help" %}">our PACER API</a> and provide the CourtListener ID for the item.
+      </p>
+    </li>
+  </ol>
+  <p>An example of downloading a PDF by <code>recap_document</code> ID might be:
+  </p>
+  <pre class="scrollable">curl -X POST \
+  --data 'request_type=2' \
+  --data 'pacer_username=xxx' \
+  --data 'pacer_password=yyy' \
+  --data 'recap_document=112' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
+  <p>If you have a client code, you can provide it to the API with the <code>client_code</code> parameter.</p>
+  <p>If we do not have the <code>pacer_doc_id</code> for a particular <code>recap_document</code>, we will not be able to download it. If that's the case, you'll get an error message asking you to download the docket, which will get us the <code>pacer_doc_id</code> we need. Once that is completed you can retry your PDF purchase.
+  </p>
+
+  <h4 id="attachment-pages">Scraping Attachment Pages</h4>
+  <p>Attachment pages are the pages that you see in PACER after you click to download a document if a docket entry has attachments. These pages are free in PACER. Fetching attachment pages is done same as PDFs, above, but with <code>request_type</code> set to <code>3</code>.
+  </p>
+
+  <h4 id="dockets">Purchasing Dockets</h4>
+  <p>Buying docket information is done similarly, but has a few additional options:</p>
+  <ol>
+    <li><p>Provide the <code>request_type</code> of <code>1</code> for dockets.</p></li>
+    <li>
+      <p>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair:</p>
+      <ul>
+        <li><p><code>pacer_case_id</code> is the internal ID in the PACER system.</p></li>
+        <li><p><code>docket_number</code> is the visible docket number humans use to refer to the case.</p></li>
+        <li>
+          <p><code>court</code> is the CourtListener court ID.</p>
+          {% include "includes/court-id-mappings.html" %}
+        </li>
+      </ul>
+    </li>
+    <li>
+      <p>As when buying dockets from PACER directly, you can choose to buy only some docket entries, omit parties, do a date range query, etc. To see how to use these options map to the API, place an HTTP <code>OPTIONS</code> request.
+      </p>
+    </li>
+  </ol>
+  <p>For example, this request identifies a case by docket number and court:</p>
+  <pre class="scrollable">curl -X POST \
+--data 'request_type=1' \
+--data 'pacer_username=xxx' \
+--data 'pacer_password=yyy' \
+--data 'docket_number=5:16-cv-00432' \
+--data 'court=okwd' \
+--header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+"{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
+  <p>This is the same, but includes parties and counsel:</p>
+  <pre class="scrollable">curl -X POST \
+--data 'request_type=1' \
+--data 'pacer_username=xxx' \
+--data 'pacer_password=yyy' \
+--data 'docket_number=5:16-cv-00432' \
+--data 'court=okwd' \
+--data 'show_parties_and_counsel=true' \
+--header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+"{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
+  <p>Finally, this request updates an existing docket in CourtListener by its ID, but only gets the parties and counsel. Docket entries are excluded by requesting only ones from before 1980:
+  </p>
+  <pre class="scrollable">curl -X POST \
+--data 'request_type=1' \
+--data 'pacer_username=xxx' \
+--data 'pacer_password=yyy' \
+--data 'docket=5' \
+--data 'show_parties_and_counsel=true' \
+--data 'de_date_end=1980-01-01' \
+--header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+"{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
+  <p>Sometimes, we get a PDF before we get a docket, making it impossible to know what case the PDF is associated with. We call these "orphan documents" because they do not have valid parent objects in our system.
+  </p>
+  <p>Later, when we receive new or updated docket information, we have an opportunity to fix this problem by checking our system for orphan documents. When this happens, the orphans will automatically be associated with the new docket information, and the case will have PDFs linked to it.
+  </p>
+
+
+  <h2 id="recap-upload">RECAP Upload API <small>— <code>{% url "processingqueue-list" version="v3" %}</code></small></h2>
+  <p>This API is used by the RECAP extension and a handful of special partners to upload PACER content to the RECAP Archive. This API is not available to the public. If you have a collection of PACER data you wish to donate to the RECAP Archive so it is permanently available to the public, please <a href="{% url "contact" %}">get in touch</a>.
+  </p>
+  <p>We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.
+  </p>
+  <p>When you make an upload, you create a <code>Processing Queue</code> object in the CourtListener system. This object will be returned in the HTTP response to your upload, so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:
+  </p>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>status</code></td>
+        <td>When you upload an item, it is placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the possible values, place an <code>OPTIONS</code> request to this endpoint.</td>
+      </tr>
+      <tr>
+        <td><code>error_message</code></td>
+        <td>This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred. (It's not strictly errors.)</td>
+      </tr>
+      <tr>
+        <td>
+          <code>docket</code><br>
+          <code>docket_entry</code><br>
+          <code>recap_document</code>
+        </td>
+        <td>After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and all three fields will be populated for uploaded PDFs.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 id="global-params">Global Parameters</h3>
+  <p>The following parameters apply to all uploads:</p>
+  <ul>
+    <li>
+      <p><code>upload_type</code> <em>(required)</em> &mdash; This field accepts integers representing object types in PACER. Send an HTTP <code>OPTIONS</code> request to this API to learn the possible values for this field.
+      </p>
+    </li>
+    <li>
+      <p><code>filepath_local</code> <em>(required)</em> &mdash; Use this field to upload the binary data you are submitting, whether it HTML of a docket or attachment menu or a PDF file.
+      </p>
+    </li>
+    <li>
+      <p><code>court</code> <em>(required)</em> &mdash; The CourtListener court id.</p>
+      {% include "includes/court-id-mappings.html" %}
+    </li>
+    <li>
+      <p><code>debug</code> <em>(optional)</em> &mdash; While you are developing, use this field to test your work. When it is set to <code>true</code>, your uploads will not make changes to the RECAP Archive, but you will create processing requests which will be processed in debug mode.
+      </p>
+    </li>
+  </ul>
+
+  <h3>API Examples</h3>
+  <h4 id="recap-dockets">Uploading Dockets, History Reports, and Claims Registries</h4>
+  <p>These are fairly straightforward uploads. In addition to the required fields above, supply the <code>pacer_case_id</code> field.
+  </p>
+
+  <h4 id="recap-pdf">Uploading PDFs</h4>
+  <p>To upload PDFs, include the <code>pacer_doc_id</code> and <code>document_number</code> fields. The fourth digit of the <code>pacer_doc_id</code> must always be normalized to a zero before uploading (see below).
+  </p>
+  <p>If you are uploading an attachment, you must also provide the <code>attachment_number</code> field. Because some cases share documents, the <code>pacer_case_id</code> field should also be provided, though it's not a required field if it's unknown.
+  </p>
+  <p><code>pacer_doc_id</code> is the number you see in URLs when purchasing documents on PACER and in the HTML when clicking document numbers on docket pages. For example, in the URL <code>ecf.flp.uscourts.gov/doc1/035021404350</code>, the <code>pacer_doc_id</code> is <code>035021404350</code>.
+  </p>
+  <p>There are three variables embedded in each <code>pacer_doc_id</code> number:
+  </p>
+  <ul>
+    <li>
+      <p>The first three digits (in this case, <code>035</code>) are a code indicating the court.
+      </p>
+    </li>
+    <li>
+      <p>The fourth digit is a zero or one, and is a boolean value that determines if URL should load an attachment page for the document or instead take you directly to the purchase page (we believe this digit is why the URL mentions <code>/doc1/</code>).
+      </p>
+      <p><strong>Important:</strong> When uploading to this endpoint, the fourth digit must always be normalized to a zero before uploading.
+      </p>
+    </li>
+    <li>
+      <p>The remaining digits are the serial number of the document itself.
+      </p>
+    </li>
+  </ul>
+  <p>PDF uploads will only succeed when they can be associated with a docket. If the RECAP Archive does not have a docket for the <code>pacer_doc_id</code> you uploaded, your upload will be re-queued and retried several times. If that fails, your PDF upload will be marked as an "orphan document." Later, when the docket is uploaded, your PDF will be automatically associated with it. Until then it's not visible in the system.
+  </p>
+
+  <h4 id="recap-zips">Uploading Document Zips</h4>
+  <p>From the attachment page in district court PACER websites, there is a button to get all the documents for a particular docket entry as a zip. Such zips can be uploaded using the same parameters as PDFs, using the <code>upload_type</code> of <code>10</code>.
+  </p>
+
+  <h4 id="recap-atts">Uploading Attachment Menus</h4>
+  <p>These are the HTML pages that you will see that list the attachments for a docket entry. The only required field for this upload type is <code>pacer_case_id</code>.
+
+  <h3 id="example">A Complete Example</h3>
+  <p>Pulling this all together, a docket upload might look like:</p>
+  <pre class=pre-scrollable">curl -v \
+  --form upload_type=1 \
+  --form "filepath_local=@docket.html" \
+  --form court=dcd \
+  --form pacer_case_id=&lt;some-value&gt; \
+  --form debug=true \
+  '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
+  <p>In response, you would receive an object like this:</p>
+  <pre class="pre-scrollable tall">{
+    "id": 13684105,
+    "court": "dcd",
+    "docket": null,
+    "docket_entry": null,
+    "recap_document": null,
+    "date_created": "2024-05-18T08:01:14.457637-07:00",
+    "date_modified": "2024-05-18T08:01:14.953939-07:00",
+    "pacer_case_id": "",
+    "pacer_doc_id": "",
+    "acms_document_guid": "",
+    "document_number": null,
+    "attachment_number": null,
+    "status": 1,
+    "upload_type": 1,
+    "error_message": "",
+    "debug": false
+}</pre>
+  <p>Then, to check the status, you can poll it with:</p>
+  <pre class="pre-scrollable">curl \
+  '{% get_full_host %}{% url "processingqueue-detail" version="v3" pk="13684105" %}'
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
+  <p>Which will soon return:</p>
+  <pre class="pre-scrollable tall">{
+    "id": 13684105,
+    "court": "dcd",
+    "docket": "https://www.courtlistener.com/api/rest/v3/dockets/8903924/",
+    "docket_entry": null,
+    "recap_document": null,
+    "date_created": "2024-05-18T08:01:14.457637-07:00",
+    "date_modified": "2024-05-18T08:01:14.953939-07:00",
+    "pacer_case_id": "",
+    "pacer_doc_id": "",
+    "acms_document_guid": "",
+    "document_number": null,
+    "attachment_number": null,
+    "status": 2,
+    "upload_type": 1,
+    "error_message": "Successful upload! Nice work.",
+    "debug": false
+}</pre>
+  <p>Note that:</p>
+  <ul>
+    <li>The <code>error_message</code> and <code>docket</code> fields are completed.
+    </li>
+    <li>The <code>status</code> field is now <code>2</code>.</li>
+  </ul>
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

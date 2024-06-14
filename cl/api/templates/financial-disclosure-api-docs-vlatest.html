@@ -64,6 +64,8 @@
   </p>
   <p>Judicial officers and certain judicial employees in the United States are required to file financial disclosure reports by <a href="https://www.law.cornell.edu/uscode/text/5a/compiledact-95-521/title-I">Title I of the Ethics in Government Act of 1978</a>. The Act requires that designated federal officials publicly disclose their personal financial interests to ensure confidence in the integrity of the federal government by demonstrating that they are able to carry out their duties without compromising the public trust.
   </p>
+  <p>These APIs were used by the Wall Street Journal in <a href="https://www.wsj.com/articles/131-federal-judges-broke-the-law-by-hearing-cases-where-they-had-a-financial-interest-11632834421">their 17-part exposé</a> about the hidden conflicts of federal judges. That led to Congress passing a law to put this information online. It was also used by ProPublica in <a href="https://www.propublica.org/article/clarence-thomas-scotus-undisclosed-luxury-travel-gifts-crow">their Pulitzer prize winning reporting</a> about failures to disclose gifts and perks.
+  </p>
   <p>This data is updated in partnership with organizations using it. Please <a href="{% url "contact" %}">get in touch</a> if you would like to work together to process and ingest the latest disclosure records.
   </p>
 
@@ -97,7 +99,7 @@
   <h3 id="understanding">Understanding the Fields</h3>
   <p>Like most of our APIs, field definitions can be obtained by sending an HTTP <code>OPTIONS</code> request to any of the APIs. For example, this request, piped through <a href="https://github.com/jqlang/jq"><code>jq</code></a>, shows you the fields of the Gifts API:
   </p>
-  <pre class="pre-scrollable">curl -X OPTIONS "{% get_full_host %}{% url "gift-list" version="v3" %}" \
+  <pre class="pre-scrollable tall">curl -X OPTIONS "{% get_full_host %}{% url "gift-list" version="v3" %}" \
     | jq '.actions.POST'
 
 {
@@ -177,7 +179,7 @@
   </p>
   <p>This field can be used as a filter. For example, here are all the investments with redacted information:
   </p>
-  <pre class="pre-scrollable">curl "{% get_full_host %}{% url "investment-list" version="v3" %}?redacted=True" \
+  <pre class="pre-scrollable tall">curl "{% get_full_host %}{% url "investment-list" version="v3" %}?redacted=True" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
 {
   "count": 27404,

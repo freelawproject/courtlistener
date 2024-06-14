@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Oral Argument Audio APIs – CourtListener.com{% endblock %}
+{% block og_title %}Oral Argument Audio APIs – CourtListener.com{% endblock %}
+
+{% block description %}We have the biggest collection of oral argument audio in the world. Use these APIs to gather and analyze oral argument audio files from federal courts.{% endblock %}
+{% block og_description %}We have the biggest collection of oral argument audio in the world. Use these APIs to gather and analyze oral argument audio files from federal courts.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#apis">The APIs</a></li>
+      <ul>
+        <li><a href="#audio-endpoint">Oral Arguments</a></li>
+        <li><a href="#docket-endpoint">Dockets</a></li>
+      </ul>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Oral Argument Recoding&nbsp;APIs</h1>
+  <p class="lead">Use these APIs to gather and analyze the largest collection of oral argument recordings on the Internet.
+  </p>
+
+
+  <h2 id="apis">The APIs</h2>
+  <h3 id="audio-endpoint">Oral Argument Recordings <small> — <nobr><code>{% url "audio-list" version="v3" %}</code></nobr></small></h3>
+  <p>Use this API to gather data about oral argument recordings. This API is linked to the docket API (below), which contains data about each case. It is also linked to the <a href="{% url "judge_api_help" %}">judge API</a>, which has information about the judges in the case.
+  </p>
+  <p>The audio files we gather from court websites come in many formats. After we gather the files, we convert them into optimized MP3s that have a 22050Hz sample rate and 48k bitrate. After converting the files, we set the ID3 tags to better values that we scraped. Finally, we set the cover art for the MP3 to the seal of the court, and set the publisher album art to our logo.
+  </p>
+  <p>The original audio files can be downloaded from the court using the <code>download_url</code> field. If you prefer to download our enhanced version, that location is in the <code>local_path_mp3</code> field. To download the file, see our <a href="{% url "field_api_help" %}">help article on this topic</a>.
+  </p>
+  <p>The <code>duration</code> field contains an estimated length of the audio file, in seconds. Because these MP3s are variable bitrate, this field is based on sampling the file and is not always accurate.
+  </p>
+  <p>As with all other APIs, you can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "audio-list" version="v3" %}"</pre>
+
+
+  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version="v3" %}</code></small></h3>
+  {% include "includes/docket-endpoint.html" %}
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Legal Citation APIs – CourtListener.com{% endblock %}
+{% block og_title %}Legal Citation APIs – CourtListener.com{% endblock %}
+
+{% block description %}Use these APIs to understand the citation graph in the CourtListener case law database.{% endblock %}
+{% block og_description %}Use these APIs to understand the citation graph in the CourtListener case law database.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#cites-endpoint">Cited/Citing API</a></li>
+      <li><a href="#bulk-data">Bulk Data</a></li>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Legal Citation&nbsp;API</h1>
+  <p class="lead">Use these APIs to analyze and query the network of citations between legal cases.</p>
+  <p>These APIs are powered by <a href="https://free.law/projects/eyecite">Eyecite</a>, our tool for identifying citations in legal text. Using that tool, we have identified millions of citations between legal decisions, which you can query using these APIs.
+  </p>
+  <p>These citations power our visualizations, tables of authorities, citation search, and more.
+  </p>
+  <p>To look up specific citations, see our <a href="{% url "citation_lookup_api" %}">citation lookup and verification API</a>.</p>
+
+
+  <h2 id="cites-endpoint">Opinions Cited/Citing API<br><small><code>{% url "opinionscited-list" version="v3" %}</code></small></h2>
+  <p>This endpoint provides an interface into the citation graph that CourtListener provides between opinions in <a href="{% url "case_law_api_help" %}">our case law database</a>.
+  <p>You can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinionscited-list" version="v3" %}"</pre>
+  <p>That query will return the following filter options:</p>
+  <pre class="pre-scrollable tall">{
+  "id": {
+    "type": "NumberRangeFilter",
+    "lookup_types": [
+      "exact",
+      "gte",
+      "gt",
+      "lte",
+      "lt",
+      "range"
+    ]
+  },
+  "citing_opinion": {
+    "type": "RelatedFilter",
+    "lookup_types": "See available filters for 'Opinions'"
+  },
+  "cited_opinion": {
+    "type": "RelatedFilter",
+    "lookup_types": "See available filters for 'Opinions'"
+  }
+}</pre>
+  <p>To understand <code>RelatedFilters</code>, see our <a href="{% url "rest_docs" version="v3" %}">filtering documentation</a>.</p>
+  <p>These filters allow you to filter to the opinions that an opinion cites (it's "Authorities") or the opinions that cite it.
+  </p>
+  <p>For example, opinion <code>2812209</code> is the decision in <em>Obergefell v. Hodges</em>. To see what it cites:</p>
+  <pre class="pre-scrollable tall">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinionscited-list" version="v3" %}?citing_opinion=2812209"</pre>
+  <p>Which returns (in part):</p>
+  <pre class="pre-scrollable tall">{
+  "count": 75,
+  "next": "https://www.courtlistener.com/api/rest/v3/opinions-cited/?citing_opinion=2812209&page=2",
+  "previous": null,
+  "results": [
+    {
+      "resource_uri": "https://www.courtlistener.com/api/rest/v3/opinions-cited/167909003/",
+      "id": 167909003,
+      "citing_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/2812209/",
+      "cited_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/96405/",
+      "depth": 1
+    },
+    {
+      "resource_uri": "https://www.courtlistener.com/api/rest/v3/opinions-cited/167909002/",
+      "id": 167909002,
+      "citing_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/2812209/",
+      "cited_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/2264443/",
+      "depth": 1
+    },
+…</pre>
+  <p>To go the other direction, and see what cites <em>Obergefell</em>, use the <code>cited_opinion</code> parameter instead:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinionscited-list" version="v3" %}?cited_opinion=2812209"</pre>
+  <p>That returns (in part):</p>
+  <pre class="pre-scrollable tall">{
+  "count": 403,
+  "next": "https://www.courtlistener.com/api/rest/v3/opinions-cited/?cited_opinion=2812209&page=2",
+  "previous": null,
+  "results": [
+    {
+      "resource_uri": "https://www.courtlistener.com/api/rest/v3/opinions-cited/213931728/",
+      "id": 213931728,
+      "citing_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/10008139/",
+      "cited_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/2812209/",
+      "depth": 4
+    },
+…</pre>
+  <p>Note that:</p>
+  <ul>
+    <li>
+      <p>The <code>depth</code> field indicates how many times the cited opinion is referenced by the citing opinion. In the example above opinion <code>10008139</code> references <em>Obergefell</em> (<code>2812209</code>) four times. This may indicate that <em>Obergefell</em> is an important authority for <code>10008139</code>.
+      </p>
+    </li>
+    <li>
+      <p>Opinions are often published in more than one book or online resource. Therefore, many opinions have more than one citation to them. These are called "parallel citations." We do not have every parallel citation for every decision. This can impact the accuracy of the graph.
+      </p>
+    </li>
+    <li>
+      <p>Frequently, we backfill citations, adding a new citation to an older case. When we do this, we do not always re-run our citation linking utility. This means that any later cases that referred to the newly-added citation may not be linked to it for some time.
+      </p>
+    </li>
+  </ul>
+
+  <h2 id="bulk-data">Bulk Data</h2>
+  <p>The citation graph is exported once a month as part of our <a href="{% url "bulk_data_index" %}#citation-data">bulk data system</a>.
+  </p>
+  <p>If you want to analyze the citation network, that is often the best place to begin.
+  </p>
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

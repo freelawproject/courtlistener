@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Case Law APIs – CourtListener.com{% endblock %}
+{% block og_title %}Case Law APIs – CourtListener.com{% endblock %}
+
+{% block description %}Use these APIs to gather data from our massive collection of case law.{% endblock %}
+{% block og_description %}Use these APIs to gather data from our massive collection of case law.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#apis">The APIs</a></li>
+      <ul>
+        <li><a href="#docket-endpoint">Dockets</a></li>
+        <li><a href="#cluster-endpoint">Clusters</a></li>
+        <li><a href="#opinion-endpoint">Opinions</a></li>
+        <li><a href="#court-endpoint">Courts</a></li>
+      </ul>
+      <li><a href="#examples">API Examples</a></li>
+      <ul>
+        <li><a href="#filtering-court">Filtering by Court</a></li>
+        <li><a href="#filtering-dn">Filtering by Docket No.</a></li>
+        <li><a href="#search">Making a Custom Corpus</a></li>
+        <li><a href="#by-url">Finding by URL</a></li>
+      </ul>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Case Law&nbsp;API</h1>
+  <p class="lead">Use these APIs to access our huge and growing database of case law.
+  </p>
+  <p>To learn more about this collection, including the cases it has and how we get new data each day, see <a href="{% url "coverage_opinions" %}">our coverage page on the topic</a>.
+  </p>
+  <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.
+  </p>
+  <p>The four most important objects in this data set are courts, dockets, clusters, and opinions. Together, these hold most of the information from a single case:
+  </p>
+  <ul>
+    <li>
+      <p><code>Court</code> objects hold information about thousands of courts in this country, including their name, abbreviation, founding date, and more. Every docket is joined to a court to indicate where the case was filed.
+      </p>
+    </li>
+    <li>
+      <p><code>Docket</code> objects hold metadata about the case like the date it was initiated or terminated, the docket number, and more. Every cluster is joined to a docket.
+      </p>
+    </li>
+    <li>
+      <p><code>Cluster</code> objects group together opinions when a panel hears a case and there is more than one decision, such as a dissent, concurrence, etc. Clusters are an abstraction we created. Every opinion is joined to a cluster.
+      </p>
+    </li>
+    <li>
+      <p><code>Opinion</code> objects contain the text of the decision and the metadata related to the individual panel member that wrote it.
+      </p>
+    </li>
+  </ul>
+  <p>Putting this all together, dockets are filed in particular courts and contain clusters of opinions.
+  </p>
+  <p>If you are looking for a particular piece of metadata, you will find it at the lowest object from the list above where it would not be repeated in the database.
+  </p>
+  <p>For example, you <em>could</em> make the docket number a field of the opinion object. This would be fine until you had more than one opinion in a cluster, or more than one cluster joined to a docket. When that happened, you would wind up repeating the docket number value in each opinion object. Instead, if you make it a field of the docket object, you only have to save it to one place: The docket that binds together the clusters and opinions.
+  </p>
+  <p>Another example is the opinion text. You <em>could</em> make it a field of the cluster, say, but, again, that wouldn't work, since it wouldn't be clear which opinion the text was a part of in a case with a dissent, concurrence, and majority opinion.
+  </p>
+  <p>There are two other objects in the case law database:</p>
+  <ul>
+    <li>
+      <p><strong>Citation</strong> objects link together which opinion objects cite each other. For more information, see <a href="{% url "citation_api_help" %}">their help page</a>.
+      </p>
+    </li>
+    <li>
+      <p><strong>Parenthetical</strong> objects are extracted from the opinion text when a decision explains a citation it relies on as authority. These are not <a href="https://github.com/freelawproject/courtlistener/issues/4082">yet</a> available in an API, but are available as bulk data.
+      </p>
+    </li>
+  </ul>
+
+
+  <h2 id="apis">The APIs</h2>
+  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version="v3" %}</code></small></h3>
+  {% include "includes/docket-endpoint.html" %}
+  <p>The name of a docket can change in response to the outside world, but the names of clusters do not change. Therefore, we have <code>case_name</code> fields on both the docket and the cluster.
+  </p>
+  <p>For example, a suit filed against the EPA administrator might be captioned <em>Petroleum Co. v. Regan</em>. That would go into the case name fields of the docket and any decisions that were issued. But if the administrator resigns before the case is resolved, the docket would get a new case name, <em>Petroleum Co. v. New Administrator</em>, while the case name fields on the clusters would not change.
+  </p>
+  <p>For more information on case names, see the <a href="{% url "field_api_help" %}#case-names">help article on this topic</a>.</p>
+
+
+  <h3 id="cluster-endpoint">Clusters <small> — <code>{% url "opinioncluster-list" version="v3" %}</code></small></h3>
+  <p>This is a major API that provides the millions of <code>Opinion Clusters</code> that are available on CourtListener.
+  </p>
+  <p>As with all other APIs, you can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}"</pre>
+  <p>A few notes:</p>
+  <ul>
+    <li>
+      <p>The <code>id</code> field of the cluster is used in case law URLs on CourtListener.
+      </p>
+    </li>
+    <li>
+      <p>The <code>sub_opinions</code> field provides a list of the opinions that are linked to each cluster.
+      </p>
+    </li>
+    <li>
+      <p>There are several fields with judge information, such as <code>judges</code>, <code>panel</code>, <code>non_participating_judges</code>, etc. Some of these fields contain strings and others are linked to records in our <a href="{% url "judge_api_help" %}">judge API</a>. When we are able to normalize a judge's name into a record in the judge database, we do so. If not, we store their name in a string field for later normalization.
+      </p>
+    </li>
+  </ul>
+
+
+  <h3 id="opinion-endpoint">Opinions <small> — <code>{% url "opinion-list" version="v3" %}</code></small></h3>
+  <p>This API contains the text and other metadata about specific decisions.
+  </p>
+  <p>As with all other APIs, you can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinion-list" version="v3" %}"</pre>
+  <p>A few notes:</p>
+  <ul>
+    <li>
+      <p>The <code>type</code> field indicates whether the item is a concurrence, lead opinion, dissent, etc. The values provided for this field are proceeded by numbers so that if they are sorted, they will also be sorted from highest priority to lowest. The most common type of opinion is a "Combined Opinion" this is what we label any opinion that either cannot be identified as a specific type, or that contains more than one type.
+      </p>
+    </li>
+    <li>
+      <p>The <code>download_url</code> field contains the original location where we scraped the decision. Many courts do not maintain <a href="https://www.w3.org/Provider/Style/URI.html">Cool URIs</a>, so this field is often unreliable.
+      </p>
+    </li>
+    <li>
+      <p>The <code>local_path</code> field contains the path to the binary file for the decision, if we have one. To use it, see the <a href="{% url "field_api_help" %}#downloads">help article on this topic</a>.
+      </p>
+    </li>
+    <li>
+      <p>The <code>opinions_cited</code> field has a list of other opinions cited by the one you are reviewing.
+      </p>
+    </li>
+    <li>
+      <p>The <code>citations</code> field will contain a list of parallel citations for the cluster. See the <a href="{% url "citation_api_help" %}">citation API</a> for details.
+      </p>
+    </li>
+    <li>
+      <p>Each opinion has several text fields that will be populated depending on the cluster's <code>source</code> field. For example, scraped opinions tend not to have great text while those from the Harvard corpus do. The best way to get the text for an opinion is to choose the first populated fields from the list below (from best to worst):
+      </p>
+      <ul>
+        <li>
+          <code>html_with_citations</code> is generated by finding citations in the text of the other fields. All items should eventually have this field, though it can be empty initially or if our citation lookup utility fails. In general, this field is used to generate pages on CourtListener.
+        </li>
+        <li>
+          <code>html_columbia</code> will be populated if we got the content from the Columbia collaboration.
+        </li>
+        <li>
+          <code>html_lawbox</code> will be populated if we got the content from the Lawbox donation.
+        </li>
+        <li>
+          <code>xml_harvard</code> will be populated if the source was Harvard's Caselaw Access Project. This field has a lot of data but is not always perfect due to being created by OCR instead of by humans.</li>
+        <li>
+          <code>html_anon_2020</code> will be populated if we got the content from our anonymous source in 2020.</li>
+        <li>
+          <code>html</code> will be populated if we got the opinion from a court's website as a Word Perfect or HTML document, or if we got the opinion from Resource.org, which provided HTML documents.
+        </li>
+        <li>
+          <code>plain_text</code> will be populated if we got the opinion from a court's website as a PDF or Microsoft Word document.
+        </li>
+      </ul>
+    </li>
+  </ul>
+
+
+  <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version="v3" %}</code></small></h3>
+  {% include "includes/court-endpoint.html" %}
+
+
+  <h2 id="examples">API Examples</h2>
+  <h3 id="filtering-court">Filtering to Opinions in a Court</h3>
+  <p>Opinions are joined to clusters, which join to dockets, and finally to courts. Therefore, one way to get opinions in a specific court is to use a filter like <code>cluster__docket__court=XYZ</code> (note the use of double underscores):
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinion-list" version="v3" %}?cluster__docket__court=scotus"</pre>
+  <p>That returns:</p>
+  <pre class="pre-scrollable">{
+  "count": 521329,
+  "next": "https://www.courtlistener.com/api/rest/v3/opinions/?cluster__docket__court=scotus&page=2",
+  "previous": null,
+  "results": [
+      {
+          "resource_uri": "https://www.courtlistener.com/api/rest/v3/opinions/9973155/",
+          "id": 9973155,
+  ...</pre>
+  <p>Such an approach is fine if all you want is the opinion object, but often you'll want the docket and the cluster too.
+  </p>
+  <p>In that case, start by getting the dockets with a filter like <code>court=XYZ</code>, then use the IDs in those dockets to get clusters and opinions.
+  </p>
+  <p>For example, this gets the dockets from SCOTUS:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v3" %}?court=scotus"</pre>
+  <p>The first result contains a <code>clusters</code> key like:</p>
+  <pre class="pre-scrollable">"clusters": [
+    "{% get_full_host %}{% url "opinioncluster-detail" version="v3" pk="9502621" %}"
+],</pre>
+  <p>So we can simply get that URL:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinioncluster-detail" version="v3" pk="9502621" %}"</pre>
+  <p>That returns a cluster, which has the following keys:</p>
+  <pre class="pre-scrollable">"docket": "{% get_full_host %}{% url "docket-detail" version="v3" pk="68533094" %}",
+"sub_opinions": [
+    "{% get_full_host %}{% url "opinion-detail" version="v3" pk="9969234" %}"
+],</pre>
+  <p>Finally, GET the links in the <code>sub_opinions</code> field to have the complete object:
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinion-detail" version="v3" pk="9969234" %}"</pre>
+
+
+  <h3 id="filtering-dn">Filtering by Docket Number</h3>
+  <p>If you know a docket number, you can use it to look up a docket,  cluster, or opinion:
+  </p>
+  <p>A docket by docket number:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v3" %}?docket_number=23A994"</pre>
+  <p>A cluster by docket number:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}?docket__docket_number=23A994"</pre>
+  <p>An opinion by docket number:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinion-list" version="v3" %}?cluster__docket__docket_number=23A994"</pre>
+  <p>Docket numbers are not unique, so you'll want to add a court filter too:
+  </p>
+  <ul>
+    <li>For dockets, add: <code>&amp;court=scotus</code></li>
+    <li>For clusters, add: <code>&amp;docket__court=scotus</code></li>
+    <li>For opinions, add: <code>&amp;cluster__docket__court=scotus</code></li>
+  </ul>
+  <p>You may also find the <a href="{% url "search_api_help" %}">search API</a> helpful, since it will do fuzzy docket searches.</p>
+
+
+  <h3 id="search">Making a Custom Case Law Corpus</h3>
+  <p>A common need by empirical researchers is a collection of case law about a particular topic. To build such a corpus, use the <a href="{% url "search_api_help" %}">search API</a> to identify cases and use these APIs to download them.
+  </p>
+
+
+  <h3 id="by-url">Finding a Case by URL</h3>
+  <p>If you know the URL of a case, you can find it in the cluster API. For example, <em>Obergefell v. Hodges</em> has this URL, with cluster ID <code>2812209</code>:
+  </p>
+  <pre class="pre-scrollable">{% get_full_host %}{% url "view_case" "2812209" "obergefell-v-hodges" %}</pre>
+  <p>This case can be found in the cluster API using that same ID:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "opinioncluster-detail" version="v3" pk="2812209" %}"</pre>
+  <p>Opinion IDs do not reliably match cluster IDs.</p>
+
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}
