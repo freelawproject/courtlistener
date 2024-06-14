@@ -483,6 +483,9 @@ a.black-link:focus {
 .nowrap {
   white-space: nowrap;
 }
+.tall {
+  max-height: 740px;
+}
 
 .round-bottom {
   -webkit-border-bottom-right-radius: 6px;
