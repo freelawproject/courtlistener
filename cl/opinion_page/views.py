@@ -152,7 +152,7 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
                 mutable_GET,
                 override_params={
                     "filed_after": (
-                        datetime.datetime.today() - datetime.timedelta(days=28)
+                        datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
                     ),
                     "order_by": "dateFiled desc",
                     "court": court,
@@ -167,7 +167,7 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
                     "type": SEARCH_TYPES.OPINION,
                     "court": court,
                     "filed_after": (
-                        datetime.datetime.today() - datetime.timedelta(days=28)
+                        datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
                     ),
                 }
             )
