@@ -410,7 +410,7 @@ class OAV3SearchAPITests(
                 blocked=False,
                 sha1="a49ada009774496ac01fb49818837e2296705c97",
                 stt_status=Audio.STT_COMPLETE,
-                stt_google_response=self.json_transcript,
+                stt_transcript=self.transcript,
             )
             audio_1.panel.add(self.author)
             audio_1.processing_complete = True
