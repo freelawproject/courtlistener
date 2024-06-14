@@ -1,4 +1,3 @@
-import json
 from typing import Dict, List, Union
 
 import pghistory
@@ -35,6 +34,13 @@ class Audio(AbstractDateTimeModel):
         (STT_COMPLETE, "Speech to Text Complete"),
         (STT_FAILED, "Speech to Text Failed"),
     )
+    STT_OPENAI_WHISPER = 1
+    STT_SELF_HOSTED_WHISPER = 2
+    STT_SOURCES = [
+        (STT_OPENAI_WHISPER, "OpenAI API's whisper-1 model"),
+        (STT_SELF_HOSTED_WHISPER, "Self hosted Whisper model"),
+    ]
+
     # Annotation required b/c this FK is nullable, which breaks absolute_url
     docket: Docket = models.ForeignKey(
         Docket,
@@ -142,9 +148,16 @@ class Audio(AbstractDateTimeModel):
         choices=STT_STATUSES,
         default=STT_NEEDED,
     )
-    stt_google_response = models.TextField(
-        "Speech to text Google response",
-        help_text="The JSON response object returned by Google Speech.",
+    stt_source = models.SmallIntegerField(
+        "Speech to text source",
+        help_text="Source used to get the transcription",
+        choices=STT_SOURCES,
+        blank=True,
+        null=True,
+    )
+    stt_transcript = models.TextField(
+        "Speech to text transcription",
+        help_text="Speech to text transcription",
         blank=True,
     )
 
@@ -159,26 +172,14 @@ class Audio(AbstractDateTimeModel):
             "judges",
             "sha1",
             "source",
-            "stt_google_response",
+            "stt_transcript",
             "docket_id",
         ]
     )
 
     @property
     def transcript(self) -> str:
-        j = json.loads(self.stt_google_response)
-        # Find the alternative with the highest confidence for every utterance
-        # in the results.
-        best_utterances = []
-        for utterance in j["response"]["results"]:
-            best_confidence = 0
-            for alt in utterance["alternatives"]:
-                current_confidence = alt.get("confidence", 0)
-                if current_confidence > best_confidence:
-                    best_transcript = alt["transcript"]
-                    best_confidence = current_confidence
-            best_utterances.append(best_transcript)
-        return " ".join(best_utterances)
+        return self.stt_transcript
 
     class Meta:
         ordering = ["-date_created"]
@@ -289,3 +290,12 @@ class AudioPanel(Audio.panel.through):  # type: ignore
 
     class Meta:
         proxy = True
+
+
+class AudioTranscriptionMetadata(models.Model):
+    audio = models.ForeignKey(Audio, on_delete=models.DO_NOTHING)
+    metadata = models.JSONField(
+        help_text="Word and/or segment level metadata returned by a STT model."
+        " May be used for diarization. Contains start and end timestamps for "
+        "segments and words, probabilities and other model outputs"
+    )
