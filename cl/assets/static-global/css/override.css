@@ -894,7 +894,7 @@ input.court-checkbox, input.status-checkbox {
 
 /* Special case for Oregon, which has a name attr with a value of TOP on
    content that isn't a link. See example here:
-   http://www.publications.ojd.state.or.us/docs/S054822.htm#TOP
+   https://www.publications.ojd.state.or.us/docs/S054822.htm#TOP
 
    Idea here is to simply ignore the anchor element.
 */

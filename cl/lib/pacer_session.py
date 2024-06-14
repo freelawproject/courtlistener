@@ -18,7 +18,7 @@ class ProxyPacerSession(PacerSession):
     PacerSession class to achieve the following:
 
     - Sets the 'X-WhSentry-TLS' header to 'true' for all requests.
-    - Replaces 'https://' with 'http://' in the URL before making the request.
+    - Replaces 'https://' with 'https://' in the URL before making the request.
     - Uses a proxy server for all requests.
 
     If the post method is called with a 'headers' argument, it merges the

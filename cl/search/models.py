@@ -2402,7 +2402,7 @@ class OpinionCluster(AbstractDateTimeModel):
     scdb_decision_direction = models.IntegerField(
         help_text=(
             'the ideological "direction" of a decision in the Supreme '
-            "Court database. More details at: http://scdb.wustl.edu/"
+            "Court database. More details at: https://scdb.wustl.edu/"
             "documentation.php?var=decisionDirection"
         ),
         choices=SCDB_DECISION_DIRECTIONS,
@@ -2412,7 +2412,7 @@ class OpinionCluster(AbstractDateTimeModel):
     scdb_votes_majority = models.IntegerField(
         help_text=(
             "the number of justices voting in the majority in a Supreme "
-            "Court decision. More details at: http://scdb.wustl.edu/"
+            "Court decision. More details at: https://scdb.wustl.edu/"
             "documentation.php?var=majVotes"
         ),
         blank=True,
@@ -2421,7 +2421,7 @@ class OpinionCluster(AbstractDateTimeModel):
     scdb_votes_minority = models.IntegerField(
         help_text=(
             "the number of justices voting in the minority in a Supreme "
-            "Court decision. More details at: http://scdb.wustl.edu/"
+            "Court decision. More details at: https://scdb.wustl.edu/"
             "documentation.php?var=minVotes"
         ),
         blank=True,

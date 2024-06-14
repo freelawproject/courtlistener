@@ -35,7 +35,7 @@ info_tips = (
     f'Free Law Project is a 501(c)(3) non-profit that relies on your support to operate. Please <a href="{DONATE_URL}?referrer=tip">donate</a> to support this site</a>. <i class="fa fa-heart red"></i>',
     f'CourtListener serves more than 200 million requests per year, but has a lean staff of only a handful of developers. Please <a href="{DONATE_URL}?referrer=tip">donate</a> to support our work making the judiciary more equitable. <i class="fa fa-heart red"></i>',
     f'CourtListener is supported by <a href="{DONATE_URL}?referrer=tip">user donations</a> and small grants. More donations result in less time spent seeking grants and more time adding features. <i class="fa fa-heart red"></i>',
-    f'Free Law Project is a member of the <a href="http://www.falm.info/">Free Access to Law Movement</a> and relies heavily on <a href="{DONATE_URL}?referrer=tip">your donations</a>. <i class="fa fa-heart red"></i>',
+    f'Free Law Project is a member of the <a href="https://www.falm.info/">Free Access to Law Movement</a> and relies heavily on <a href="{DONATE_URL}?referrer=tip">your donations</a>. <i class="fa fa-heart red"></i>',
     'Free Law Project, the non-profit behind CourtListener, provides <a href="https://free.law/data-consulting/">data consulting and client services</a> for those that need help with our data.',
     'If you have a GitHub account, you <a href="https://github.com/sponsors/freelawproject/">can sponsor our work</a> so we can do more of it. <i class="fa fa-heart red"></i>',
     # Recognition

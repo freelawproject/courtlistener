@@ -26,7 +26,7 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
  - Blog: https://free.law
- - Twitter: http://twitter.com/freelawproject
+ - Twitter: https://twitter.com/freelawproject
  - Donate: https://donate.free.law/forms/supportflp
  - Become a Member: https://donate.free.law/forms/membership
 
