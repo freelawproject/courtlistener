@@ -60,8 +60,6 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
         "-date_created",
         "date_modified",
         "-date_modified",
-        "date_completed",
-        "-date_completed",
     ]
 
     @async_to_sync
@@ -98,8 +96,6 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
         "-date_created",
         "date_modified",
         "-date_modified",
-        "date_completed",
-        "-date_completed",
     ]
 
     def get_message_id_from_request_data(self):
