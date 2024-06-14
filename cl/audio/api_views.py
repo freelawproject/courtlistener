@@ -15,6 +15,10 @@ class AudioViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
         "date_blocked",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
     queryset = (
         Audio.objects.all()
         .select_related("docket")

@@ -95,6 +95,10 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
         "date_modified",
         "name_last",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
 
 
 class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -120,6 +124,10 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_dod",
         "name_last",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
 
 
 class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -141,6 +149,10 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_retirement",
         "date_termination",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
 
 
 class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -148,6 +160,10 @@ class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = RetentionEventSerializer
     filterset_class = RetentionEventFilter
     ordering_fields = ("id", "date_created", "date_modified", "date_retention")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
 
 
 class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -155,6 +171,10 @@ class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = EducationSerializer
     filterset_class = EducationFilter
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
 
 
 class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -162,6 +182,10 @@ class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = SchoolSerializer
     filterset_class = SchoolFilter
     ordering_fields = ("id", "date_created", "date_modified", "name")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
 
 
 class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -175,6 +199,10 @@ class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_start",
         "date_end",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
 
 
 class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -186,6 +214,10 @@ class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
         "date_accessed",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id"]
 
 
 class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -198,6 +230,10 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
         "year_rated",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
 
 
 class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -215,6 +251,11 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
         "roles",
     ).order_by("-id")
 
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
@@ -226,3 +267,8 @@ class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
     )
     queryset = Attorney.objects.prefetch_related("roles").order_by("-id")
+
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]

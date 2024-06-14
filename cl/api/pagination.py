@@ -5,8 +5,13 @@ from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.paginator import InvalidPage
+from django.db.models import QuerySet
 from rest_framework.exceptions import NotFound
-from rest_framework.pagination import BasePagination, PageNumberPagination
+from rest_framework.pagination import (
+    BasePagination,
+    CursorPagination,
+    PageNumberPagination,
+)
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
@@ -16,64 +21,187 @@ from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESCursor
 
 
-class ShallowOnlyPageNumberPagination(PageNumberPagination):
-    """A paginator that blocks deep pagination
-
-    Thank you MuckRock for this contribution.
+class VersionBasedPagination(PageNumberPagination):
+    """The base paginator for handling V3 and V4 DB endpoints.
+    This supports CursorPagination for V4 endpoints when sorting by "id" or
+    "date_created". It uses PageNumberPagination for V3 endpoints and for V4
+    endpoints when sorting by keys that don't support CursorPagination.
     """
 
     max_pagination_depth = 100
+    version = "v3"
+    cursor_query_param = "cursor"
+    invalid_cursor_message = "Invalid cursor"
+    compatible_sorting = {
+        "id": "int",
+        "-id": "int",
+        "date_created": "date",
+        "-date_created": "date",
+    }
+    ordering = ""
+    other_cursor_ordering_keys = []
+
+    def __init__(self):
+        super().__init__()
+        self.cursor_paginator = CursorPagination()
+        self.cursor_paginator.page_size = self.page_size
 
     def paginate_queryset(self, queryset, request, view=None):
         """
         Paginate a queryset if required, either returning a
         page object, or `None` if pagination is not configured for this view.
         """
-        page_size = self.get_page_size(request)
-        if not page_size:
-            return None
 
-        paginator = self.django_paginator_class(queryset, page_size)
-        page_number = self.get_page_number(request, paginator)
+        if hasattr(view, "ordering"):
+            self.ordering = view.ordering
+        if hasattr(view, "other_cursor_ordering_keys"):
+            self.other_cursor_ordering_keys = view.other_cursor_ordering_keys
 
-        try:
-            page_number = int(page_number)
-        except (TypeError, ValueError):
-            msg = "Invalid page: That page number is not an integer"
-            raise NotFound(msg)
-
-        if page_number > self.max_pagination_depth:
-            msg = "Invalid page: Deep API pagination is not allowed. Please review API documentation."
-            raise NotFound(msg)
-
-        try:
-            self.page = paginator.page(page_number)
-        except InvalidPage as exc:
-            msg = self.invalid_page_message.format(
-                page_number=page_number, message=str(exc)
+        self.version = request.version
+        if request.version == "v4" and self.ordering:
+            all_cursor_ordering_keys = []
+            self.request = request
+            requested_ordering = request.query_params.get(
+                "order_by", self.ordering
             )
-            raise NotFound(msg)
+            all_cursor_ordering_keys.extend(self.other_cursor_ordering_keys)
+            all_cursor_ordering_keys.append(self.ordering)
+            if requested_ordering in all_cursor_ordering_keys:
+                # Handle the queryset using CursorPagination
+                return handle_database_cursor_pagination(
+                    self, request, requested_ordering, queryset, view
+                )
 
-        if paginator.num_pages > 1 and self.template is not None:
-            # The browsable API should display pagination controls.
-            self.display_page_controls = True
+        # Handle the queryset using PageNumberPagination
+        return handle_shallow_only_page_number_pagination(
+            self, request, queryset
+        )
 
-        self.request = request
-        return list(self.page)
+    def get_paginated_response(self, data):
+        ordering = self.request.query_params.get("order_by", self.ordering)
+        all_cursor_ordering_keys = []
+        all_cursor_ordering_keys.extend(self.other_cursor_ordering_keys)
+        all_cursor_ordering_keys.append(self.ordering)
+        if self.version == "v4" and ordering in all_cursor_ordering_keys:
+            # Get paginated response for CursorPagination
+            return self.cursor_paginator.get_paginated_response(data)
+
+        # Get paginated response for PageNumberPagination
+        return super().get_paginated_response(data)
 
 
-class TinyAdjustablePagination(ShallowOnlyPageNumberPagination):
+def determine_string_type(string: str) -> str:
+    """Determine the type of given string.
+
+    :param string: The input string to classify.
+    :return: A string indicating the type of the input
+    ('int', 'date', or 'unknown').
+    """
+    # Try to parse as integer
+    try:
+        int(string)
+        return "int"
+    except ValueError:
+        pass
+
+    # Try to parse as date
+    try:
+        datetime.datetime.fromisoformat(string)
+        return "date"
+    except ValueError:
+        pass
+
+    return "unknown"
+
+
+def handle_database_cursor_pagination(
+    self: VersionBasedPagination,
+    request: Request,
+    requested_ordering: str,
+    queryset: QuerySet,
+    view,
+) -> list | None:
+    """Handle cursor pagination for database queries based on the request and
+     ordering.
+
+    :param self: The VersionBasedPagination instance.
+    :param request: The DRF Request object.
+    :param requested_ordering: The field by which the queryset should be ordered.
+    :param queryset: The Django QuerySet to be paginated.
+    :param view: The view instance from which this method is called.
+    :return: A paginated list of query results.
+    """
+
+    if self.cursor_query_param in request.query_params:
+        cursor = self.cursor_paginator.decode_cursor(request)
+        cursor_position = cursor and cursor.position
+        position_type = determine_string_type(str(cursor_position))
+        valid_sorting = self.compatible_sorting[requested_ordering]
+        if valid_sorting != position_type:
+            raise NotFound(self.invalid_cursor_message)
+
+    self.cursor_paginator.ordering = requested_ordering
+    return self.cursor_paginator.paginate_queryset(queryset, request, view)
+
+
+def handle_shallow_only_page_number_pagination(
+    self: VersionBasedPagination, request: Request, queryset: QuerySet
+) -> list | None:
+    """A paginator that blocks deep pagination
+
+     Thank you MuckRock for this contribution.
+
+    :param self: The VersionBasedPagination instance.
+    :param request: The DRF Request object.
+    :param queryset: The Django QuerySet to be paginated.
+    :return: A paginated list of query results.
+    """
+
+    page_size = self.get_page_size(request)
+    if not page_size:
+        return None
+
+    paginator = self.django_paginator_class(queryset, page_size)
+    page_number = self.get_page_number(request, paginator)
+
+    try:
+        page_number = int(page_number)
+    except (TypeError, ValueError):
+        msg = "Invalid page: That page number is not an integer"
+        raise NotFound(msg)
+
+    if page_number > self.max_pagination_depth:
+        msg = "Invalid page: Deep API pagination is not allowed. Please review API documentation."
+        raise NotFound(msg)
+
+    try:
+        self.page = paginator.page(page_number)
+    except InvalidPage as exc:
+        msg = self.invalid_page_message.format(
+            page_number=page_number, message=str(exc)
+        )
+        raise NotFound(msg)
+
+    if paginator.num_pages > 1 and self.template is not None:
+        # The browsable API should display pagination controls.
+        self.display_page_controls = True
+
+    self.request = request
+    return list(self.page)
+
+
+class TinyAdjustablePagination(VersionBasedPagination):
     page_size = 5
     page_size_query_param = "page_size"
     max_page_size = 20
 
 
-class MediumAdjustablePagination(ShallowOnlyPageNumberPagination):
+class MediumAdjustablePagination(VersionBasedPagination):
     page_size = 50
     page_size_query_param = "page_size"
 
 
-class BigPagination(ShallowOnlyPageNumberPagination):
+class BigPagination(VersionBasedPagination):
     page_size = 300
 
 

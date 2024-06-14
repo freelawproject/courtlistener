@@ -45,21 +45,33 @@ router.register(r"search", search_views.SearchViewSet, basename="search")
 router.register(r"tag", search_views.TagViewSet, basename="tag")
 
 # People & Entities
-router.register(r"people", people_views.PersonViewSet)
+router.register(r"people", people_views.PersonViewSet, basename="people")
 router.register(
     r"disclosure-typeahead",
     people_views.PersonDisclosureViewSet,
     basename="disclosuretypeahead",
 )
-router.register(r"positions", people_views.PositionViewSet)
-router.register(r"retention-events", people_views.RetentionEventViewSet)
-router.register(r"educations", people_views.EducationViewSet)
-router.register(r"schools", people_views.SchoolViewSet)
 router.register(
-    r"political-affiliations", people_views.PoliticalAffiliationViewSet
+    r"positions", people_views.PositionViewSet, basename="position"
 )
-router.register(r"sources", people_views.SourceViewSet)
-router.register(r"aba-ratings", people_views.ABARatingViewSet)
+router.register(
+    r"retention-events",
+    people_views.RetentionEventViewSet,
+    basename="retention-event",
+)
+router.register(
+    r"educations", people_views.EducationViewSet, basename="education"
+)
+router.register(r"schools", people_views.SchoolViewSet, basename="school")
+router.register(
+    r"political-affiliations",
+    people_views.PoliticalAffiliationViewSet,
+    basename="political-affiliation",
+)
+router.register(r"sources", people_views.SourceViewSet, basename="source")
+router.register(
+    r"aba-ratings", people_views.ABARatingViewSet, basename="aba-rating"
+)
 router.register(r"parties", people_views.PartyViewSet, basename="party")
 router.register(
     r"attorneys", people_views.AttorneyViewSet, basename="attorney"
@@ -165,7 +177,7 @@ urlpatterns = [
         include("rest_framework.urls", namespace="rest_framework"),
     ),
     re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
-    re_path(r"^api/rest/(?P<version>[v4]+)/", include(router_v4.urls)),
+    re_path(r"^api/rest/(?P<version>[v4]+)/", include(router.urls)),
     # Documentation
     path("help/api/", views.api_index, name="api_index"),
     path("help/api/jurisdictions/", views.court_index, name="court_index"),
