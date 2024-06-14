@@ -238,7 +238,7 @@ urlpatterns = [
     path(
         "help/api/rest/v3/financial-disclosures/",
         TemplateView.as_view(
-                         #"financial-disclosure-docs-vlatest.html"
+            # "financial-disclosure-docs-vlatest.html"
             template_name="financial-disclosure-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
