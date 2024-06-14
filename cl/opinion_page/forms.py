@@ -168,18 +168,6 @@ class BaseCourtUploadForm(forms.Form):
             }
         ),
     )
-    download_url = forms.URLField(
-        validators=[URLValidator()],
-        label="Download Url",
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "The URL where the document is originally located",
-                "autocomplete": "off",
-            }
-        ),
-    )
     pdf_upload = forms.FileField(
         label="Opinion PDF",
         required=True,
@@ -193,13 +181,13 @@ class BaseCourtUploadForm(forms.Form):
         self.initial["court_str"] = self.pk
         self.initial["court"] = Court.objects.get(pk=self.pk)
 
-    def add_author_field(self, required=True):
+    def add_author_field(self, required=False):
         """Add author field to form
 
         :param required: field is required or not
         :return: None
         """
-        lead_author = forms.ModelChoiceField(
+        self.fields["lead_author"] = forms.ModelChoiceField(
             queryset=Person.objects.none(),
             required=required,
             label="Lead Author",
@@ -210,7 +198,6 @@ class BaseCourtUploadForm(forms.Form):
                 }
             ),
         )
-        self.fields["lead_author"] = lead_author
 
     def add_author_str_field(self, required=True):
         """Add author str field to form
@@ -218,7 +205,7 @@ class BaseCourtUploadForm(forms.Form):
         :param required: field is required or not
         :return: None
         """
-        author_str = forms.CharField(
+        self.fields["author_str"] = forms.CharField(
             label="Author String",
             required=required,
             widget=forms.TextInput(
@@ -230,7 +217,6 @@ class BaseCourtUploadForm(forms.Form):
                 }
             ),
         )
-        self.fields["author_str"] = author_str
 
     def add_judges_field(self, required=True):
         """Add judges field to form
@@ -238,18 +224,18 @@ class BaseCourtUploadForm(forms.Form):
         :param required: field is required or not
         :return: None
         """
-        judges = forms.CharField(
+        self.fields["judges"] = forms.CharField(
             label="Judges",
             required=required,
             widget=forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Judges",
+                    "placeholder": "The judges that participated in the opinion as a "
+                    "simple text string.",
                     "autocomplete": "off",
                 }
             ),
         )
-        self.fields["judges"] = judges
 
     def add_panel_field(self, required=True):
         """Add panel field to form
@@ -257,7 +243,7 @@ class BaseCourtUploadForm(forms.Form):
         :param required: field is required or not
         :return: None
         """
-        panel = forms.ModelMultipleChoiceField(
+        self.fields["panel"] = forms.ModelMultipleChoiceField(
             queryset=Person.objects.none(),
             required=required,
             label="Panel",
@@ -269,7 +255,6 @@ class BaseCourtUploadForm(forms.Form):
                 }
             ),
         )
-        self.fields["panel"] = panel
 
     def add_argue_fields(self, required=True):
         """Add argued/reargued field to form
@@ -277,7 +262,7 @@ class BaseCourtUploadForm(forms.Form):
         :param required: field is required or not
         :return: None
         """
-        date_argued = forms.DateField(
+        self.fields["date_argued"] = forms.DateField(
             label="Argued Date",
             required=required,
             widget=forms.TextInput(
@@ -288,7 +273,7 @@ class BaseCourtUploadForm(forms.Form):
                 }
             ),
         )
-        date_reargued = forms.DateField(
+        self.fields["date_reargued"] = forms.DateField(
             label="Reargued Date",
             required=required,
             widget=forms.TextInput(
@@ -299,16 +284,14 @@ class BaseCourtUploadForm(forms.Form):
                 }
             ),
         )
-        self.fields["date_argued"] = date_argued
-        self.fields["date_reargued"] = date_reargued
 
     def add_citation_fields(self, required=True) -> None:
         """Add citations fields to form
 
-        :param required: field is required or not
+        :param required: fields are required or not
         :return: None
         """
-        cite_volume = forms.IntegerField(
+        self.fields["cite_volume"] = forms.IntegerField(
             label="Cite Year",
             required=required,
             widget=forms.Select(
@@ -316,11 +299,11 @@ class BaseCourtUploadForm(forms.Form):
                 attrs={"class": "form-control"},
             ),
         )
-        cite_reporter = forms.CharField(
+        self.fields["cite_reporter"] = forms.CharField(
             label="Cite Reporter",
             required=required,
         )
-        cite_page = forms.IntegerField(
+        self.fields["cite_page"] = forms.IntegerField(
             label="Cite Page",
             required=required,
             widget=forms.TextInput(
@@ -331,9 +314,24 @@ class BaseCourtUploadForm(forms.Form):
             ),
         )
 
-        self.fields["cite_volume"] = cite_volume
-        self.fields["cite_reporter"] = cite_reporter
-        self.fields["cite_page"] = cite_page
+    def add_download_url(self, required=False):
+        """Add download url field to form
+
+        :param required: field is required or not
+        :return: None
+        """
+        self.fields["download_url"] = forms.URLField(
+            validators=[URLValidator()],
+            label="Download Url",
+            required=required,
+            widget=forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "The URL where the document is originally located",
+                    "autocomplete": "off",
+                }
+            ),
+        )
 
     @staticmethod
     def person_label(obj) -> str:
@@ -749,6 +747,7 @@ class MoCourtUploadForm(BaseCourtUploadForm):
         self.add_judges_field(required=False)
         self.set_judges_qs()
         self.add_author_str_field(required=False)
+        self.add_download_url()
         self.order_fields(
             [
                 "case_title",
@@ -791,6 +790,7 @@ class MissCourtUploadForm(BaseCourtUploadForm):
         self.set_judges_qs()
         self.add_judges_field(required=False)
         self.add_author_str_field(required=False)
+        self.add_download_url()
         self.order_fields(
             [
                 "case_title",

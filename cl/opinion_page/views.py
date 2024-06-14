@@ -33,6 +33,7 @@ from reporters_db import (
     REPORTERS,
     VARIATIONS_ONLY,
 )
+from seal_rookery.search import ImageSizes, seal
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.citations.utils import (
@@ -79,6 +80,7 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
+    SEARCH_TYPES,
     Citation,
     Court,
     Docket,
@@ -88,14 +90,15 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.selectors import get_clusters_from_citation_str
-from cl.search.views import do_search
+from cl.search.views import do_es_search, do_search
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
-async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
+def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     """Individual Court Home Pages"""
-    if pk not in [
+
+    available_courts = [
         "tennworkcompcl",
         "tennworkcompapp",
         "me",
@@ -106,10 +109,12 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
         "moctappwd",
         "miss",
         "missctapp",
-    ]:
+    ]
+
+    if pk not in available_courts:
         raise Http404("Court pages only implemented for select courts.")
 
-    render_court = await Court.objects.aget(pk=pk)
+    render_court = Court.objects.get(pk=pk)
     render_dict = {
         "private": False,
         "pk": pk,
@@ -123,22 +128,51 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
         courts = [pk]
         template = "court.html"
 
+    court_seal = seal(pk, ImageSizes.SMALL)
+    if "moctapp" in pk:
+        # return mo seal
+        court_seal = seal("mo", ImageSizes.SMALL)
+    if "tennworkcomp" in pk:
+        # return tenn seal
+        court_seal = seal("tenn", ImageSizes.SMALL)
+
+    render_dict["court_seal"] = court_seal
+
     for court in courts:
         if "tennwork" in court:
             results = f"results_{court}"
         else:
             results = "results"
-        response = await sync_to_async(do_search)(
-            request.GET.copy(),
-            override_params={
-                "filed_after": (
-                    datetime.datetime.today() - datetime.timedelta(days=28)
-                ),
-                "order_by": "dateFiled desc",
-                "court": court,
-            },
-            facet=False,
-        )
+
+        mutable_GET = request.GET.copy()
+
+        if not waffle.flag_is_active(request, "o-es-active"):
+            # Do solr search
+            response = do_search(
+                mutable_GET,
+                override_params={
+                    "filed_after": (
+                        datetime.datetime.today() - datetime.timedelta(days=28)
+                    ),
+                    "order_by": "dateFiled desc",
+                    "court": court,
+                },
+                facet=False,
+            )
+        else:
+            # Do es search
+            mutable_GET.update(
+                {
+                    "order_by": "dateFiled desc",
+                    "type": SEARCH_TYPES.OPINION,
+                    "court": court,
+                    "filed_after": (
+                        datetime.datetime.today() - datetime.timedelta(days=28)
+                    ),
+                }
+            )
+            response = do_es_search(mutable_GET)
+
         render_dict[results] = response["results"]
     return TemplateResponse(request, template, render_dict)
 
@@ -164,7 +198,8 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
     :param request: A GET or POST request for the page
     :param pk: The CL Court ID for each court
     """
-    if pk not in [
+
+    available_courts = [
         "tennworkcompcl",
         "tennworkcompapp",
         "me",
@@ -175,7 +210,9 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
         "moctappwd",
         "miss",
         "missctapp",
-    ]:
+    ]
+
+    if pk not in available_courts:
         raise Http404(
             "Court pages only implemented for Tennessee Worker Comp Courts, "
             "Maine SJC, Missouri Supreme Court, Missouri Court of Appeals, "
@@ -195,21 +232,27 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
     upload_form: Any
 
     upload_form_classes = {
-        "tennworkcompcl": (TennWorkCompClUploadForm, f"img/{pk}.jpg"),
-        "tennworkcompapp": (TennWorkCompAppUploadForm, f"img/{pk}.jpg"),
-        "me": (MeCourtUploadForm, f"{pk}.png"),
-        "mo": (MoCourtUploadForm, f"{pk}.png"),
-        "moctapp": (MoCourtUploadForm, "mo.png"),
-        "moctapped": (MoCourtUploadForm, "mo.png"),
-        "moctappsd": (MoCourtUploadForm, "mo.png"),
-        "moctappwd": (MoCourtUploadForm, "mo.png"),
-        "miss": (MissCourtUploadForm, f"{pk}.png"),
-        "missctapp": (MissCourtUploadForm, f"{pk}.png"),
+        "tennworkcompcl": TennWorkCompClUploadForm,
+        "tennworkcompapp": TennWorkCompAppUploadForm,
+        "me": MeCourtUploadForm,
+        "mo": MoCourtUploadForm,
+        "moctapp": MoCourtUploadForm,
+        "moctapped": MoCourtUploadForm,
+        "moctappsd": MoCourtUploadForm,
+        "moctappwd": MoCourtUploadForm,
+        "miss": MissCourtUploadForm,
+        "missctapp": MissCourtUploadForm,
     }
 
-    upload_form = upload_form_classes[pk][0]
-    court_seal = upload_form_classes[pk][1]
+    court_seal = seal(pk, ImageSizes.SMALL)
+    if "moctapp" in pk:
+        # return mo seal
+        court_seal = seal("mo", ImageSizes.SMALL)
+    if "tennworkcomp" in pk:
+        # return tenn seal
+        court_seal = seal("tenn", ImageSizes.SMALL)
 
+    upload_form = upload_form_classes[pk]
     form = await sync_to_async(upload_form)(pk=pk)
     if request.method == "POST":
         form = await sync_to_async(upload_form)(

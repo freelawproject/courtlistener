@@ -4065,6 +4065,17 @@ reference = "main"
 resolved_reference = "0632024e72e22a71e17cdb778805561f7cdd33d8"
 
 [[package]]
+name = "seal-rookery"
+version = "2.2.3"
+description = "A collection of court seals that can be used in any project."
+optional = false
+python-versions = "*"
+files = [
+    {file = "seal_rookery-2.2.3-py2.py3-none-any.whl", hash = "sha256:a1180628a15c879004b582ffac0b82f55c6158775150a8457e7fce37d53ce45b"},
+    {file = "seal_rookery-2.2.3.tar.gz", hash = "sha256:fc2a233a26bd8768332ae5f80e3b9031b5be9d8998d6f130f2d866edbcf605b4"},
+]
+
+[[package]]
 name = "selenium"
 version = "4.16.0"
 description = ""
@@ -5254,4 +5265,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "814ca0b0dc8db689f83e391fc58b494de48f6321085872bfaa8e37b7a7fc0e99"
+content-hash = "7f7d837c2986c51810dcdf7ebdb11e60d75021bcb09abdafd2c2f03bf18d769a"

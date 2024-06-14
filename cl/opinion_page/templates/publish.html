@@ -37,13 +37,8 @@
 		<div class="row">
 			<div class="col-xs-1"></div>
 			<div class="col-xs-2">
-                {% if "tenn" in pk %}
-                    <img src="{% static court_image %}" class="img-responsive"
+                <img src="{{ court_image }}" class="img-responsive"
 					 width="128" height="128">
-                {% else %}
-                    <img src="https://seals.free.law/v2/128/{{ court_image }}" class="img-responsive"
-					 width="128" height="128">
-                {% endif %}
 			</div>
 			<div class="col-xs-8">
 				<h1>

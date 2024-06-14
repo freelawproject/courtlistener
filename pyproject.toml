@@ -112,6 +112,7 @@ django-permissions-policy = "^4.19.0"
 juriscraper = "^2.6.0"
 tiktoken = "^0.6.0"
 hyperscan = "^0.7.7"
+seal-rookery = "^2.2.3"
 
 
 [tool.poetry.group.dev.dependencies]

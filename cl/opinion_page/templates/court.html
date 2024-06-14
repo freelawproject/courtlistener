@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load auth %}
 {% load static %}
+{% load waffle_tags %}
 
 {% block title %}
   Decisions for {{ court }} – CourtListener.com
@@ -30,8 +31,7 @@
       <div class="col-md-1">
       </div>
       <div class="col-md-2">
-        <img src="{% static 'img/' %}{{ pk }}.jpg" class="img-responsive"
-           width="128" height="128">
+        <img src="{{ court_seal }}" class="img-responsive" width="128" height="128">
       </div>
       <div class="col-md-8">
         <h1>Decisions of the {{ court }}
@@ -91,9 +91,14 @@
             Decision</a></p>
         {% endif %}
         {% if results.paginator.count > 0 %}
-          {% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
+          {% flag "o-es-active" %}
+            {% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
+          {% else %}
+            {% include "includes/search_result_solr.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
+          {% endflag %}
+
           <p class="left">
-            <a href="/?court_{{ pk }}=on&order_by=dateFiled+desc"
+            <a href="/?court_{{ pk }}=on&order_by=dateFiled+desc&court={{ pk }}"
                class="btn btn-default btn-lg v-offset-above-2"
                rel="nofollow"
             >See More Recent Opinions</a>
