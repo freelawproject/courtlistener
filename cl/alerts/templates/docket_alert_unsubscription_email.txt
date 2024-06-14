@@ -11,7 +11,8 @@ https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' "subscrib
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
 
  - Blog: https://free.law
- - Twitter: https://twitter.com/freelawproject
+ - BlueSky: https://bsky.app/profile/free.law
+ - X: https://x.com/freelawproject
  - Donate: https://donate.free.law/forms/supportflp
  - Become a Member: https://donate.free.law/forms/membership
 
