@@ -170,6 +170,11 @@ API_TITLE = "CourtListener Legal Data API"
 router_v4 = DefaultRouter()
 router_v4.register(r"search", search_views.SearchV4ViewSet, basename="search")
 
+for prefix, viewset, basename in router.registry:
+    # Register all the URLs from the v3 router into the v4 router except for
+    # the "search" route.
+    if basename != "search":
+        router_v4.register(prefix, viewset, basename)
 
 urlpatterns = [
     path(
@@ -177,7 +182,7 @@ urlpatterns = [
         include("rest_framework.urls", namespace="rest_framework"),
     ),
     re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)),
-    re_path(r"^api/rest/(?P<version>[v4]+)/", include(router.urls)),
+    re_path(r"^api/rest/(?P<version>[v4]+)/", include(router_v4.urls)),
     # Documentation
     path("help/api/", views.api_index, name="api_index"),
     path("help/api/jurisdictions/", views.court_index, name="court_index"),
