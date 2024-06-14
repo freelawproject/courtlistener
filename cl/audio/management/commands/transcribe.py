@@ -75,7 +75,9 @@ def handle_open_ai_transcriptions(options) -> None:
             continue
 
         valid_count += 1
-        transcribe_from_open_ai_api.delay(audio.pk)
+        transcribe_from_open_ai_api.apply_async(
+            args=(audio.pk,), queue=options["queue"]
+        )
 
         # For parallel processing: seed RPM requests per minute
         # if requests_per_minute == 0, do not sleep
@@ -117,6 +119,11 @@ class Command(VerboseCommand):
             default=0,
             help="""Max number of audio files to get from the database
             for processing. '--limit 0' means there is no limit. Default: 0""",
+        )
+        parser.add_argument(
+            "--queue",
+            default="batch1",
+            help="The celery queue where the tasks should be processed.",
         )
 
     def handle(self, *args: list[str], **options: OptionsType) -> None:
