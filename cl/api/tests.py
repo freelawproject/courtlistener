@@ -17,7 +17,7 @@ from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
-from cl.alerts.api_views import SearchAlertViewSet
+from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import (
@@ -28,6 +28,18 @@ from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.factories import AudioFactory
+from cl.disclosures.api_views import (
+    AgreementViewSet,
+    DebtViewSet,
+    FinancialDisclosureViewSet,
+    GiftViewSet,
+    InvestmentViewSet,
+    NonInvestmentIncomeViewSet,
+    PositionViewSet,
+    ReimbursementViewSet,
+    SpouseIncomeViewSet,
+)
+from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     AudioTestCase,
@@ -48,7 +60,15 @@ from cl.people_db.api_views import (
     SourceViewSet,
 )
 from cl.recap.factories import ProcessingQueueFactory
+from cl.recap.views import (
+    EmailProcessingQueueViewSet,
+    FjcIntegratedDatabaseViewSet,
+    PacerDocIdLookupViewSet,
+    PacerFetchRequestViewSet,
+    PacerProcessingQueueViewSet,
+)
 from cl.search.api_views import (
+    CourtViewSet,
     DocketEntryViewSet,
     DocketViewSet,
     OpinionClusterViewSet,
@@ -65,6 +85,7 @@ from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import UserProfile
+from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
 class BasicAPIPageTest(TestCase):
@@ -999,7 +1020,11 @@ class V4DRFPaginationTest(TestCase):
             user__password=make_password("password"),
         )
         ps = Permission.objects.filter(codename="has_recap_api_access")
+        ps_upload = Permission.objects.filter(
+            codename="has_recap_upload_access"
+        )
         cls.user_1.user.user_permissions.add(*ps)
+        cls.user_1.user.user_permissions.add(*ps_upload)
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         for i in range(10):
             DocketFactory(
@@ -1035,10 +1060,13 @@ class V4DRFPaginationTest(TestCase):
             msg=f"Error comparing {sort_key} results from: {start} to {end} ",
         )
 
-    async def _api_v4_get_request(self, endpoint, params):
+    async def _api_v4_request(self, endpoint, params, method="get"):
         url = reverse(endpoint, kwargs={"version": "v4"})
         api_client = await sync_to_async(make_client)(self.user_1.user.pk)
-        return await api_client.get(url, params)
+        if method == "get":
+            return await api_client.get(url, params)
+        if method == "post":
+            return await api_client.post(url, params)
 
     async def _base_test_for_v4_endpoints(
         self,
@@ -1057,10 +1085,13 @@ class V4DRFPaginationTest(TestCase):
                 *args, **kwargs
             ),
         ) as mock_cursor_pagination:
-
             # Confirm the default sorting key works with cursor pagination
-            response = await self._api_v4_get_request(endpoint, {})
-        self.assertEqual(response.status_code, 200, msg="Wrong status code")
+            response = await self._api_v4_request(endpoint, {})
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Wrong status code primary cursor key.",
+        )
         self.assertEqual(
             mock_cursor_pagination.call_count,
             1,
@@ -1081,9 +1112,13 @@ class V4DRFPaginationTest(TestCase):
                 *args, **kwargs
             ),
         ) as mock_cursor_pagination:
-            response = await self._api_v4_get_request(endpoint, params)
+            response = await self._api_v4_request(endpoint, params)
 
-        self.assertEqual(response.status_code, 200, msg="Wrong status code")
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Wrong status code secondary cursor key.",
+        )
 
         # Confirm cursor pagination is also applied in this request for secondary_cursor_key
         self.assertEqual(
@@ -1097,11 +1132,81 @@ class V4DRFPaginationTest(TestCase):
             requested_ordering, secondary_cursor_key, msg="Wrong ordering key"
         )
 
-        # Try a non-cursor sorting key and avoid deep pagination
-        params = {"order_by": non_cursor_key, "page": 20}
+        if non_cursor_key:
+            # Try a non-cursor sorting key and avoid deep pagination
+            params = {"order_by": non_cursor_key, "page": 20}
+            with mock.patch.object(
+                viewset, "pagination_class", ExamplePagination
+            ):
+                response = await self._api_v4_request(endpoint, params)
+            self.assertEqual(
+                response.status_code,
+                404,
+                msg="Wrong status code page number pagination.",
+            )
+            self.assertEqual(
+                response.json()["detail"],
+                "Invalid page: Deep API pagination is not allowed. Please review API documentation.",
+            )
+
+    async def _test_v4_non_cursor_endpoints(
+        self,
+        endpoint,
+        additional_params,
+        secondary_non_cursor_key,
+        viewset,
+    ):
+        """Base test for V4 endpoints for cursor and page number pagination."""
+        # Mock handle_database_cursor_pagination
+        with mock.patch(
+            "cl.api.pagination.handle_database_cursor_pagination",
+            side_effect=lambda *args, **kwargs: handle_database_cursor_pagination(
+                *args, **kwargs
+            ),
+        ) as mock_cursor_pagination:
+            # Confirm the default sorting doesn't work with cursor pagination
+            response = await self._api_v4_request(endpoint, additional_params)
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Wrong status code primary cursor key.",
+        )
+        self.assertEqual(
+            mock_cursor_pagination.call_count,
+            0,
+            msg="Wrong number of cursor calls",
+        )
+
+        # Confirm a secondary sorting key doesn't work with cursor pagination
+        params = {"order_by": secondary_non_cursor_key}
+        params.update(additional_params)
+        with mock.patch(
+            "cl.api.pagination.handle_database_cursor_pagination",
+            side_effect=lambda *args, **kwargs: handle_database_cursor_pagination(
+                *args, **kwargs
+            ),
+        ) as mock_cursor_pagination:
+            response = await self._api_v4_request(endpoint, params)
+        self.assertEqual(
+            response.status_code,
+            200,
+            msg="Wrong status code primary cursor key.",
+        )
+        self.assertEqual(
+            mock_cursor_pagination.call_count,
+            0,
+            msg="Wrong number of cursor calls",
+        )
+
+        # Confirm we can avoid deep pagination
+        params.update({"page": 20})
         with mock.patch.object(viewset, "pagination_class", ExamplePagination):
-            response = await self._api_v4_get_request(endpoint, params)
-        self.assertEqual(response.status_code, 404, msg="Wrong status code")
+            response = await self._api_v4_request(endpoint, params)
+        self.assertEqual(
+            response.status_code,
+            404,
+            msg="Wrong status code page number pagination.",
+        )
         self.assertEqual(
             response.json()["detail"],
             "Invalid page: Deep API pagination is not allowed. Please review API documentation.",
@@ -1393,7 +1498,7 @@ class V4DRFPaginationTest(TestCase):
         await self._base_test_for_v4_endpoints(
             endpoint="originatingcourtinformation-list",
             default_ordering="-id",
-            secondary_cursor_key="id",
+            secondary_cursor_key="date_modified",
             non_cursor_key="date_filed",
             viewset=OriginatingCourtInformationViewSet,
         )
@@ -1405,7 +1510,7 @@ class V4DRFPaginationTest(TestCase):
         await self._base_test_for_v4_endpoints(
             endpoint="recapdocument-list",
             default_ordering="-id",
-            secondary_cursor_key="date_created",
+            secondary_cursor_key="date_modified",
             non_cursor_key="date_upload",
             viewset=RECAPDocumentViewSet,
         )
@@ -1442,7 +1547,7 @@ class V4DRFPaginationTest(TestCase):
             endpoint="opinion-list",
             default_ordering="-id",
             secondary_cursor_key="date_created",
-            non_cursor_key="date_modified",
+            non_cursor_key=None,
             viewset=OpinionViewSet,
         )
 
@@ -1475,9 +1580,9 @@ class V4DRFPaginationTest(TestCase):
         number pagination works properly."""
 
         await self._base_test_for_v4_endpoints(
-            endpoint="people-list",
+            endpoint="person-list",
             default_ordering="-id",
-            secondary_cursor_key="date_created",
+            secondary_cursor_key="date_modified",
             non_cursor_key="date_dob",
             viewset=PersonViewSet,
         )
@@ -1489,7 +1594,7 @@ class V4DRFPaginationTest(TestCase):
         await self._base_test_for_v4_endpoints(
             endpoint="disclosuretypeahead-list",
             default_ordering="-id",
-            secondary_cursor_key="date_created",
+            secondary_cursor_key="date_modified",
             non_cursor_key="name_last",
             viewset=PersonDisclosureViewSet,
         )
@@ -1511,7 +1616,7 @@ class V4DRFPaginationTest(TestCase):
         and page number pagination works properly."""
 
         await self._base_test_for_v4_endpoints(
-            endpoint="retention-event-list",
+            endpoint="retentionevent-list",
             default_ordering="-id",
             secondary_cursor_key="date_created",
             non_cursor_key="date_retention",
@@ -1526,7 +1631,7 @@ class V4DRFPaginationTest(TestCase):
             endpoint="education-list",
             default_ordering="-id",
             secondary_cursor_key="date_created",
-            non_cursor_key="date_modified",
+            non_cursor_key=None,
             viewset=EducationViewSet,
         )
 
@@ -1547,7 +1652,7 @@ class V4DRFPaginationTest(TestCase):
         cursor and page number pagination works properly."""
 
         await self._base_test_for_v4_endpoints(
-            endpoint="political-affiliation-list",
+            endpoint="politicalaffiliation-list",
             default_ordering="-id",
             secondary_cursor_key="date_created",
             non_cursor_key="date_start",
@@ -1561,7 +1666,7 @@ class V4DRFPaginationTest(TestCase):
         await self._base_test_for_v4_endpoints(
             endpoint="source-list",
             default_ordering="-id",
-            secondary_cursor_key="id",
+            secondary_cursor_key="date_modified",
             non_cursor_key="date_accessed",
             viewset=SourceViewSet,
         )
@@ -1571,7 +1676,7 @@ class V4DRFPaginationTest(TestCase):
         page number pagination works properly."""
 
         await self._base_test_for_v4_endpoints(
-            endpoint="aba-rating-list",
+            endpoint="abarating-list",
             default_ordering="-id",
             secondary_cursor_key="date_created",
             non_cursor_key="year_rated",
@@ -1586,7 +1691,7 @@ class V4DRFPaginationTest(TestCase):
             endpoint="party-list",
             default_ordering="-id",
             secondary_cursor_key="date_created",
-            non_cursor_key="date_modified",
+            non_cursor_key=None,
             viewset=PartyViewSet,
         )
 
@@ -1598,9 +1703,266 @@ class V4DRFPaginationTest(TestCase):
             endpoint="attorney-list",
             default_ordering="-id",
             secondary_cursor_key="date_created",
-            non_cursor_key="date_modified",
+            non_cursor_key=None,
             viewset=AttorneyViewSet,
         )
+
+    async def test_processingqueue_endpoint(self):
+        """Test the V4 ProcessingQueue endpoint confirming that their cursor
+        and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="processingqueue-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=PacerProcessingQueueViewSet,
+        )
+
+    async def test_emailprocessingqueue_endpoint(self):
+        """Test the V4 EmailProcessingQueue endpoint confirming that their
+        cursor and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="emailprocessingqueue-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=EmailProcessingQueueViewSet,
+        )
+
+    async def test_pacerfetchqueue_endpoint(self):
+        """Test the V4 PacerFetchQueue endpoint confirming that their cursor
+        and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="pacerfetchqueue-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_completed",
+            non_cursor_key="",
+            viewset=PacerFetchRequestViewSet,
+        )
+
+    async def test_fjcintegrateddatabase_endpoint(self):
+        """Test the V4 FJCIntegratedDatabase endpoint confirming that their
+        cursor and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="fjcintegrateddatabase-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="date_filed",
+            viewset=FjcIntegratedDatabaseViewSet,
+        )
+
+    async def test_usertag_endpoint(self):
+        """Test the V4 User Tag endpoint confirming that their cursor and page
+        number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="UserTag-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="name",
+            viewset=UserTagViewSet,
+        )
+
+    async def test_dockettag_endpoint(self):
+        """Test the V4 DocketTag endpoint confirming that their cursor and
+        page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="DocketTag-list",
+            default_ordering="-id",
+            secondary_cursor_key="id",
+            non_cursor_key="docket",
+            viewset=DocketTagViewSet,
+        )
+
+    async def test_jsonversion_endpoint(self):
+        """Test the V4 JSONVersion endpoint confirming that their cursor and
+        page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="jsonversion-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=JSONViewSet,
+        )
+
+    async def test_scotusmap_endpoint(self):
+        """Test the V4 SCOTUSMap endpoint confirming that their cursor and
+        page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="scotusmap-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="user",
+            viewset=VisualizationViewSet,
+        )
+
+    async def test_agreement_endpoint(self):
+        """Test the V4 Agreement endpoint confirming that their cursor and page
+        number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="agreement-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=AgreementViewSet,
+        )
+
+    async def test_debt_endpoint(self):
+        """Test the V4 Debt endpoint confirming that their cursor and page
+        number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="debt-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=DebtViewSet,
+        )
+
+    async def test_financialdisclosure_endpoint(self):
+        """Test the V4 Financial Disclosure endpoint confirming that their
+        cursor and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="financialdisclosure-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=FinancialDisclosureViewSet,
+        )
+
+    async def test_gift_endpoint(self):
+        """Test the V4 Gift endpoint confirming that their cursor and page
+        number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="gift-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=GiftViewSet,
+        )
+
+    async def test_investment_endpoint(self):
+        """Test the V4 Investment endpoint confirming that their cursor and
+        page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="investment-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=InvestmentViewSet,
+        )
+
+    async def test_noninvestmentincome_endpoint(self):
+        """Test the V4 Non-Investment Income endpoint confirming that their
+        cursor and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="noninvestmentincome-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=NonInvestmentIncomeViewSet,
+        )
+
+    async def test_disclosureposition_endpoint(self):
+        """Test the V4 Disclosure Position endpoint confirming that their
+        cursor and page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="disclosureposition-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=PositionViewSet,
+        )
+
+    async def test_reimbursement_endpoint(self):
+        """Test the V4 Reimbursement endpoint confirming that their cursor and
+        page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="reimbursement-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=ReimbursementViewSet,
+        )
+
+    async def test_spouseincome_endpoint(self):
+        """Test the V4 Spouse Income endpoint confirming that their cursor and
+        page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="spouseincome-list",
+            default_ordering="-id",
+            secondary_cursor_key="date_modified",
+            non_cursor_key="",
+            viewset=SpouseIncomeViewSet,
+        )
+
+    async def test_docket_alert_endpoint(self):
+        """Test the V4 DocketAlert endpoint confirming that their cursor and
+        page number pagination works properly."""
+
+        await self._base_test_for_v4_endpoints(
+            endpoint="docket-alert-list",
+            default_ordering="-date_created",
+            secondary_cursor_key="date_created",
+            non_cursor_key="",
+            viewset=DocketAlertViewSet,
+        )
+
+    # non-cursor pagination endpoints
+    async def test_courts_endpoint(self):
+        """Test the V4 Courts endpoint confirming page number pagination works
+        properly."""
+
+        await self._test_v4_non_cursor_endpoints(
+            endpoint="court-list",
+            additional_params={},
+            secondary_non_cursor_key="end_date",
+            viewset=CourtViewSet,
+        )
+
+    async def test_recap_query_endpoint(self):
+        """Test the V4 RECAPQuery endpoint confirming page number pagination
+        works properly."""
+
+        await self._test_v4_non_cursor_endpoints(
+            endpoint="fast-recapdocument-list",
+            additional_params={"pacer_doc_id": "1"},
+            secondary_non_cursor_key="pacer_doc_id",
+            viewset=PacerDocIdLookupViewSet,
+        )
+
+    async def test_membership_webhooks_endpoint(self):
+        """Test membership-webhooks endpoint works on V4"""
+        r = await self._api_v4_request("membership-webhooks-list", {}, "post")
+        data = json.loads(r.content)
+        self.assertIn("This field is required.", data["eventTrigger"])
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    async def test_citation_lookup_endpoint(self):
+        """Test CitationLookup endpoint works on V4"""
+
+        r = await self._api_v4_request(
+            "citation-lookup-list", {"text": "this is a text"}, "post"
+        )
+        data = json.loads(r.content)
+        # The response should be an empty json object and a success HTTP code.
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertEqual(len(data), 0)
 
 
 class DRFRecapPermissionTest(TestCase):

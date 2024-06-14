@@ -45,7 +45,7 @@ router.register(r"search", search_views.SearchViewSet, basename="search")
 router.register(r"tag", search_views.TagViewSet, basename="tag")
 
 # People & Entities
-router.register(r"people", people_views.PersonViewSet, basename="people")
+router.register(r"people", people_views.PersonViewSet, basename="person")
 router.register(
     r"disclosure-typeahead",
     people_views.PersonDisclosureViewSet,
@@ -57,7 +57,7 @@ router.register(
 router.register(
     r"retention-events",
     people_views.RetentionEventViewSet,
-    basename="retention-event",
+    basename="retentionevent",
 )
 router.register(
     r"educations", people_views.EducationViewSet, basename="education"
@@ -66,11 +66,11 @@ router.register(r"schools", people_views.SchoolViewSet, basename="school")
 router.register(
     r"political-affiliations",
     people_views.PoliticalAffiliationViewSet,
-    basename="political-affiliation",
+    basename="politicalaffiliation",
 )
 router.register(r"sources", people_views.SourceViewSet, basename="source")
 router.register(
-    r"aba-ratings", people_views.ABARatingViewSet, basename="aba-rating"
+    r"aba-ratings", people_views.ABARatingViewSet, basename="abarating"
 )
 router.register(r"parties", people_views.PartyViewSet, basename="party")
 router.register(

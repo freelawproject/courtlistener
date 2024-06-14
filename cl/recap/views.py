@@ -51,6 +51,18 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
         "date_created",
         "date_modified",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+        "date_completed",
+        "-date_completed",
+    ]
 
     @async_to_sync
     async def perform_create(self, serializer):
@@ -72,6 +84,23 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter
+    ordering_fields = (
+        "id",
+        "date_created",
+        "date_modified",
+    )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+        "date_completed",
+        "-date_completed",
+    ]
 
     def get_message_id_from_request_data(self):
         return self.request.data.get("mail", {}).get("message_id")
@@ -101,6 +130,18 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
         "date_modified",
         "date_completed",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+        "date_completed",
+        "-date_completed",
+    ]
 
     def perform_create(self, serializer):
         fq = serializer.save(user=self.request.user)
@@ -152,3 +193,14 @@ class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
         "date_modified",
         "date_filed",
     )
+
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]

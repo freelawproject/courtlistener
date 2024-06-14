@@ -98,7 +98,13 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -127,7 +133,13 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -152,7 +164,13 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -163,7 +181,13 @@ class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -174,7 +198,13 @@ class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -185,7 +215,13 @@ class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -202,7 +238,13 @@ class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -217,7 +259,7 @@ class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id"]
+    other_cursor_ordering_keys = ["id", "date_modified", "-date_modified"]
 
 
 class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -233,7 +275,13 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -254,7 +302,13 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -271,4 +325,10 @@ class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]

@@ -50,6 +50,10 @@ class DocketAlertViewSet(LoggingMixin, ModelViewSet):
         "date_created",
         "date_modified",
     )
+    # Default cursor ordering key
+    ordering = "-date_created"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["date_created"]
 
     def get_queryset(self):
         """

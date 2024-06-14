@@ -21,6 +21,16 @@ class UserTagViewSet(ModelViewSet):
         "name",
         "view_count",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
 
     def get_queryset(self):
         q = Q(published=True)
@@ -34,6 +44,10 @@ class DocketTagViewSet(ModelViewSet):
     serializer_class = DocketTagSerializer
     filterset_class = DocketTagFilter
     pagination_class = MediumAdjustablePagination
+    # Default cursor ordering key
+    ordering = "-id"
+    # Other cursor ordering keys
+    other_cursor_ordering_keys = ["id"]
 
     def get_queryset(self):
         return DocketTag.objects.filter(

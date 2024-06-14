@@ -67,7 +67,13 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
 
 
@@ -86,7 +92,14 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "-id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "-id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
     queryset = (
         Docket.objects.select_related(
             "court",
@@ -108,7 +121,13 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
     queryset = (
         DocketEntry.objects.select_related(
             "docket",  # For links back to dockets
@@ -132,7 +151,13 @@ class RECAPDocumentViewSet(
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
     queryset = (
         RECAPDocument.objects.select_related(
             "docket_entry", "docket_entry__docket"
@@ -175,7 +200,13 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
     queryset = OpinionCluster.objects.prefetch_related(
         "sub_opinions", "panel", "non_participating_judges", "citations"
     ).order_by("-id")
@@ -192,7 +223,13 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
     queryset = (
         Opinion.objects.select_related("cluster", "author")
         .prefetch_related("opinions_cited", "joined_by")
@@ -216,7 +253,13 @@ class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
     # Default cursor ordering key
     ordering = "-id"
     # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id", "date_created", "-date_created"]
+    other_cursor_ordering_keys = [
+        "id",
+        "date_created",
+        "-date_created",
+        "date_modified",
+        "-date_modified",
+    ]
     queryset = Tag.objects.all().order_by("-id")
 
 
