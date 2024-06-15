@@ -246,40 +246,118 @@
               </a>
               <ul class="dropdown-menu" role="menu">
                 <li>
-                  <a href="{% url "advanced_o" %}" tabindex="101">Case Law Search</a>
+                  <a href="{% url "advanced_o" %}" tabindex="101">Search Case Law</a>
                 </li>
                 {% flag "parenthetical-search" %}
                   <li>
-                    <a href="{% url "advanced_pa" %}" tabindex="101">Parentheticals Search</a>
+                    <a href="{% url "advanced_pa" %}" tabindex="101">Search Parentheticals</a>
                   </li>
                 {% endflag %}
                 <li>
                   <a href="{% url "citation_homepage" %}"
-                     tabindex="102">Citation Look Up</a>
+                     tabindex="102">Look Up Citations</a>
                 </li>
                 <li>
                   <a href="{% url "mapper_homepage" %}" tabindex="102">Citation Visualizations</a>
                 </li>
+                <li>
+                  <a href="{% url "coverage_opinions" %}" tabindex="103">About this Collection</a>
+                </li>
+                <li>
+                  <a href="{% url "case_law_api_help" %}" tabindex="104">API</a>
+                </li>
               </ul>
             </li>
-            <li class="{% block navbar-r %}inactive{% endblock %}" id="navbar-r">
-              <a href="{% url "advanced_r" %}" tabindex="103">RECAP Archive</a>
+            <li class="dropdown {% block navbar-r %}inactive{% endblock %}" id="navbar-r">
+              <a href="#"
+                 class="dropdown-toggle"
+                 tabindex="200"
+                 data-toggle="dropdown">RECAP Archive&nbsp;<span class="caret"></span>
+              </a>
+              <ul class="dropdown-menu" role="menu">
+                <li>
+                  <a href="{% url "advanced_r" %}" tabindex="201">Search PACER Data</a>
+                </li>
+                <li>
+                  <a href="https://free.law/recap/" tabindex="202">Install RECAP</a>
+                </li>
+                <li>
+                  <a href="{% url "alert_help" %}#recap-alerts" tabindex="203">Get Case Alerts</a>
+                </li>
+                <li>
+                  <a href="{% url "coverage_recap" %}" tabindex="204">About this Collection</a>
+                </li>
+                <li>
+                  <a href="https://free.law/data-consulting/" tabindex="205">Bulk Data Service</a>
+                </li>
+                <li>
+                  <a href="{% url "pacer_api_help" %}" tabindex="206">API</a>
+                </li>
+              </ul>
             </li>
-            <li class="{% block navbar-oa %}inactive{% endblock %}" id="navbar-oa">
-              <a href="{% url "advanced_oa" %}" tabindex="104">Oral Arguments</a>
+            <li class="dropdown {% block navbar-oa %}inactive{% endblock %}" id="navbar-oa">
+              <a href="#"
+                 class="dropdown-toggle"
+                 tabindex="300"
+                 data-toggle="dropdown">Oral Arguments&nbsp;<span class="caret"></span></a>
+              <ul class="dropdown-menu" role="menu">
+                <li>
+                  <a href="{% url "advanced_oa" %}" tabindex="301">Search Oral Arguments</a>
+                </li>
+                <li>
+                  <a href="{% url "alert_help" %}#search-alerts" tabindex="302">Get Search Alerts</a>
+                </li>
+                <li>
+                  <a href="{% url "podcasts" %}" tabindex="303">Custom Podcasts</a>
+                </li>
+                <li>
+                  <a href="{% url "coverage_oa" %}" tabindex="304">About this Collection</a>
+                </li>
+                <li>
+                  <a href="{% url "oral_argument_api_help" %}" tabindex="305">API</a>
+                </li>
+              </ul>
             </li>
-            <li class="{% block navbar-p %}inactive{% endblock %}" id="navbar-p">
-              <a href="{% url "advanced_p" %}" tabindex="105">Judges</a>
+            <li class="dropdown {% block navbar-p %}inactive{% endblock %}" id="navbar-p">
+              <a href="#"
+                 class="dropdown-toggle"
+                 tabindex="400"
+                 data-toggle="dropdown">Judges&nbsp;<span class="caret"></span></a>
+              <ul class="dropdown-menu" role="menu">
+                <li>
+                  <a href="{% url "advanced_p" %}" tabindex="401">Search Judges</a>
+                </li>
+                <li>
+                  <a href="https://free.law/projects/judge-db" tabindex="404">About this Collection</a>
+                </li>
+                <li>
+                  <a href="{% url "judge_api_help" %}" tabindex="405">API</a>
+                </li>
+              </ul>
             </li>
-              <li class="{% block navbar-fd %}inactive{% endblock %}" id="navbar-fd">
-                <a href="{% url "advanced_fd" %}" tabindex="106">Financial Disclosures</a>
-              </li>
+            <li class="dropdown {% block navbar-fd %}inactive{% endblock %}" id="navbar-fd">
+              <a href="#"
+                 class="dropdown-toggle"
+                 tabindex="500"
+                 data-toggle="dropdown">Financial Disclosures&nbsp;<span class="caret"></span></a>
+              <ul class="dropdown-menu" role="menu">
+                <li>
+                  <a href="{% url "advanced_fd" %}" tabindex="501">Search Financial Disclosures</a>
+                </li>
+                <li>
+                  <a href="{% url "coverage_fds" %}" tabindex="502">About this Collection</a>
+                </li>
+                <li>
+                  <a href="{% url "financial_disclosures_api_help" %}" tabindex="503">API</a>
+                </li>
+              </ul>
+            </li>
           </ul>
           <ul class="nav navbar-nav navbar-right">
             <li
               class="{% block navbar-donate %}inactive{% endblock %} hidden-xs">
               <a href="https://donate.free.law/forms/membership"
-                 tabindex="109"
+                 tabindex="600"
                  class="donate"><i class="fa fa-heart-o"></i>&nbsp;Donate</a>
             </li>
           </ul>
@@ -314,7 +392,8 @@
       </div>
       <div class="col-sm-6 right">
         <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?forwardedFromSecureDomain=1&subscription=9"
-          class="btn btn-default">
+          class="btn btn-default"
+          tabindex="10000">
           <i class="fa fa-newspaper-o"></i>&nbsp;Subscribe
         </a>
       </div>
@@ -328,27 +407,27 @@
         <div class="col-xs-6">
           <div class="col-sm-6 no-gutter">
             <div class="footer-item">
-              <a href="https://free.law/about/">About</a>
+              <a href="https://free.law/about/" tabindex="11000">About</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "help_home" %}">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
+              <a href="{% url "help_home" %}" tabindex="11001">Help</a> &amp; <a href="{% url "faq" %}">FAQ</a>
             </div>
             <div class="footer-item">
-              <a href="https://donate.free.law/forms/membership">Donate</a>
+              <a href="https://donate.free.law/forms/membership" tabindex="11002">Donate</a>
             </div>
           </div>
 
           <div class="col-sm-6 no-gutter">
             <div class="footer-item">
-              <a href="{% url "coverage" %}">About Our Data</a>
+              <a href="{% url "coverage" %}" tabindex="11003">About Our Data</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "api_index" %}">APIs &amp; Bulk Data</a>
+              <a href="{% url "api_index" %}" tabindex="11004">APIs &amp; Bulk Data</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "feeds_info" %}">Feeds</a> <span
+              <a href="{% url "feeds_info" %}" tabindex="11005">Feeds</a> <span
               class="alt">&amp;</span>
-              <a href="{% url "podcasts" %}">Podcasts</a>&nbsp;<i
+              <a href="{% url "podcasts" %}" tabindex="11006">Podcasts</a>&nbsp;<i
               class="gray fa fa-podcast inline"></i>
             </div>
           </div>
@@ -357,35 +436,35 @@
         <div class="col-xs-6">
           <div class="col-sm-6 no-gutter">
             <div class="footer-item">
-              <a href="https://free.law">Blog Posts</a>
+              <a href="https://free.law" tabindex="11007">Blog Posts</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "contact" %}">Contact</a>
+              <a href="{% url "contact" %}" tabindex="11008">Contact</a>
             </div>
             <div class="footer-item">
-              <a href="https://free.law/data-consulting/">Data Services</a>
+              <a href="https://free.law/data-consulting/" tabindex="11009">Data Services</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "contribute" %}">Contribute</a>
+              <a href="{% url "contribute" %}" tabindex="11010">Contribute</a>
             </div>
           </div>
 
           <div class="col-sm-6 no-gutter">
             <div class="footer-item">
-              <a href="{% url "terms" %}">Terms &amp; Privacy</a>
+              <a href="{% url "terms" %}" tabindex="11011">Terms &amp; Privacy</a>
             </div>
             <div class="footer-item">
-              <a href="{% url "terms" %}#removal">Removal</a>
+              <a href="{% url "terms" %}#removal" tabindex="11012">Removal</a>
             </div>
             <div class="footer-item">
-              <a href="https://free.law/vulnerability-disclosure-policy/">Vulnerability Policies</a>
+              <a href="https://free.law/vulnerability-disclosure-policy/" tabindex="11013">Vulnerability Policies</a>
             </div>
           </div>
         </div>
       </div>
     </div>
     <div class="col-sm-4 text-right" id="donate-image">
-      <a href="https://donate.free.law/forms/membership">
+      <a href="https://donate.free.law/forms/membership"  tabindex="11014">
         <img src="{% static "png/donate-button.png" %}"
              alt="Donate to support our work"
              height="75"
@@ -394,7 +473,7 @@
     </div>
     <div class="col-sm-12" id="by-line">
       <p>CourtListener is sponsored by the non-profit <a
-        href="https://free.law">Free Law Project</a>.</p>
+        href="https://free.law" tabindex="11015">Free Law Project</a>.</p>
     </div>
   </footer>
   {% endblock %}
@@ -402,23 +481,29 @@
 
 {% block social %}
 <div class="text-center hidden-print" id="social-container">
-  <a href="https://free.law/" class="fa-stack fa-lg">
+  <a href="https://free.law/" 
+     class="fa-stack fa-lg" 
+     tabindex="12000">
     <i class="fa fa-circle fa-stack-2x gray"></i>
     <i class="fa fa-link fa-stack-1x fa-inverse"></i>
   </a>
   <a href="https://x.com/freelawproject"
      rel="noreferrer"
-     class="fa-stack fa-lg">
+     class="fa-stack fa-lg"
+     tabindex="12001">
     <i class="fa fa-circle fa-stack-2x gray"></i>
     <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
   </a>
-  <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9" class="fa-stack fa-lg">
+  <a href="https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9" 
+     class="fa-stack fa-lg"
+     tabindex="12002">
     <i class="fa fa-circle fa-stack-2x gray"></i>
     <i class="fa fa-newspaper-o fa-stack-1x fa-inverse"></i>
   </a>
   <a href="https://github.com/freelawproject/courtlistener"
      rel="noreferrer"
-     class="fa-stack fa-lg">
+     class="fa-stack fa-lg"
+     tabindex="12003">
     <i class="fa fa-circle fa-stack-2x gray"></i>
     <i class="fa fa-github fa-stack-1x fa-inverse"></i>
   </a>
