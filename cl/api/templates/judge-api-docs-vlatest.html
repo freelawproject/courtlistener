@@ -148,6 +148,10 @@
   <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
   </p>
 
+  <p>To filter for judges educated at a particular school:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "person-list" version="v3" %}?educations__school__name__contains=Rochester"</pre>
 
   <h3 id="aba-ratings">ABA Ratings <br>
     <small><code>{% url "abarating-list" version="v3" %}</code></small></h3>
