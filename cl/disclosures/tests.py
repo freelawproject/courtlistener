@@ -290,8 +290,9 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         self.browser.get(self.live_server_url)
         dropdown = self.browser.find_element(By.ID, "navbar-fd")
         dropdown.click()
-        link = self.browser.find_element(By.LINK_TEXT,
-                                         "Search Financial Disclosures")
+        link = self.browser.find_element(
+            By.LINK_TEXT, "Search Financial Disclosures"
+        )
         link.click()
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
