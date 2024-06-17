@@ -53,13 +53,11 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     )
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
     @async_to_sync
@@ -89,13 +87,11 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     )
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
     def get_message_id_from_request_data(self):
@@ -128,15 +124,12 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
     )
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
         "date_completed",
-        "-date_completed",
     ]
 
     def perform_create(self, serializer):
@@ -192,11 +185,9 @@ class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
 
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]

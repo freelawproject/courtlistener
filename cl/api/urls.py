@@ -176,6 +176,13 @@ for prefix, viewset, basename in router.registry:
     if basename != "search":
         router_v4.register(prefix, viewset, basename)
 
+# When we finally need to deprecate V3 of the API, the process to remove it, is:
+# - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
+# - The only ViewSet that requires removal is SearchViewSet and its related
+# helper methods should also be removed.
+# - Remove all references to "v3" in the code and tests and simplify them
+# accordingly, as no need to apply conditions based on the V3 API version.
+# - Remove V3 documentation.
 urlpatterns = [
     path(
         "api-auth/",

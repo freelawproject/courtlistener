@@ -24,13 +24,11 @@ class JSONViewSet(LoggingMixin, ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
     def get_queryset(self):
@@ -45,13 +43,11 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified", "user")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
     def get_queryset(self):

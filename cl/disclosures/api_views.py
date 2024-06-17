@@ -43,13 +43,11 @@ class AgreementViewSet(LoggingMixin, viewsets.ModelViewSet):
     filterset_class = AgreementFilter
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
 
@@ -60,13 +58,11 @@ class DebtViewSet(LoggingMixin, viewsets.ModelViewSet):
     filterset_class = DebtFilter
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
 
@@ -91,13 +87,11 @@ class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
 
@@ -108,13 +102,11 @@ class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
 
@@ -125,13 +117,11 @@ class InvestmentViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
 
@@ -142,13 +132,11 @@ class NonInvestmentIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
 
@@ -159,13 +147,11 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
 
@@ -176,13 +162,11 @@ class ReimbursementViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
 
 
@@ -193,11 +177,9 @@ class SpouseIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]

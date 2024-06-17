@@ -20,10 +20,7 @@ from rest_framework.test import APIRequestFactory
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
-from cl.api.pagination import (
-    VersionBasedPagination,
-    handle_database_cursor_pagination,
-)
+from cl.api.pagination import VersionBasedPagination
 from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
@@ -1012,6 +1009,18 @@ class V3DRFPaginationTest(SimpleTestCase):
             self.paginate_queryset(request)
 
 
+# Mock handle_database_cursor_pagination helpers
+original_handle_database_cursor_pagination = (
+    VersionBasedPagination.handle_database_cursor_pagination
+)
+
+
+def handle_database_cursor_pagination_wrapper(*args, **kwargs):
+    handle_database_cursor_pagination_wrapper.call_count += 1
+    handle_database_cursor_pagination_wrapper.call_args = args
+    return original_handle_database_cursor_pagination(*args, **kwargs)
+
+
 class V4DRFPaginationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -1079,11 +1088,13 @@ class V4DRFPaginationTest(TestCase):
         """Base test for V4 endpoints for cursor and page number pagination."""
 
         # Mock handle_database_cursor_pagination
-        with mock.patch(
-            "cl.api.pagination.handle_database_cursor_pagination",
-            side_effect=lambda *args, **kwargs: handle_database_cursor_pagination(
-                *args, **kwargs
-            ),
+        # Initialize call count and call arguments tracking
+        handle_database_cursor_pagination_wrapper.call_count = 0
+        handle_database_cursor_pagination_wrapper.call_args = None
+        with mock.patch.object(
+            VersionBasedPagination,
+            "handle_database_cursor_pagination",
+            new=handle_database_cursor_pagination_wrapper,
         ) as mock_cursor_pagination:
             # Confirm the default sorting key works with cursor pagination
             response = await self._api_v4_request(endpoint, {})
@@ -1097,8 +1108,7 @@ class V4DRFPaginationTest(TestCase):
             1,
             msg="Wrong number of cursor calls",
         )
-
-        args, kwargs = mock_cursor_pagination.call_args
+        args = mock_cursor_pagination.call_args
         requested_ordering = args[2]
         self.assertEqual(
             requested_ordering, default_ordering, msg="Wrong ordering key"
@@ -1106,11 +1116,12 @@ class V4DRFPaginationTest(TestCase):
 
         # Try a different cursor sorting key.
         params = {"order_by": secondary_cursor_key}
-        with mock.patch(
-            "cl.api.pagination.handle_database_cursor_pagination",
-            side_effect=lambda *args, **kwargs: handle_database_cursor_pagination(
-                *args, **kwargs
-            ),
+        handle_database_cursor_pagination_wrapper.call_count = 0
+        handle_database_cursor_pagination_wrapper.call_args = None
+        with mock.patch.object(
+            VersionBasedPagination,
+            "handle_database_cursor_pagination",
+            new=handle_database_cursor_pagination_wrapper,
         ) as mock_cursor_pagination:
             response = await self._api_v4_request(endpoint, params)
 
@@ -1126,7 +1137,7 @@ class V4DRFPaginationTest(TestCase):
             1,
             msg="Wrong number of cursor calls for secondary key",
         )
-        args, kwargs = mock_cursor_pagination.call_args
+        args = mock_cursor_pagination.call_args
         requested_ordering = args[2]
         self.assertEqual(
             requested_ordering, secondary_cursor_key, msg="Wrong ordering key"
@@ -1158,11 +1169,12 @@ class V4DRFPaginationTest(TestCase):
     ):
         """Base test for V4 endpoints for cursor and page number pagination."""
         # Mock handle_database_cursor_pagination
-        with mock.patch(
-            "cl.api.pagination.handle_database_cursor_pagination",
-            side_effect=lambda *args, **kwargs: handle_database_cursor_pagination(
-                *args, **kwargs
-            ),
+        handle_database_cursor_pagination_wrapper.call_count = 0
+        handle_database_cursor_pagination_wrapper.call_args = None
+        with mock.patch.object(
+            VersionBasedPagination,
+            "handle_database_cursor_pagination",
+            new=handle_database_cursor_pagination_wrapper,
         ) as mock_cursor_pagination:
             # Confirm the default sorting doesn't work with cursor pagination
             response = await self._api_v4_request(endpoint, additional_params)
@@ -1180,11 +1192,12 @@ class V4DRFPaginationTest(TestCase):
         # Confirm a secondary sorting key doesn't work with cursor pagination
         params = {"order_by": secondary_non_cursor_key}
         params.update(additional_params)
-        with mock.patch(
-            "cl.api.pagination.handle_database_cursor_pagination",
-            side_effect=lambda *args, **kwargs: handle_database_cursor_pagination(
-                *args, **kwargs
-            ),
+        handle_database_cursor_pagination_wrapper.call_count = 0
+        handle_database_cursor_pagination_wrapper.call_args = None
+        with mock.patch.object(
+            VersionBasedPagination,
+            "handle_database_cursor_pagination",
+            new=handle_database_cursor_pagination_wrapper,
         ) as mock_cursor_pagination:
             response = await self._api_v4_request(endpoint, params)
         self.assertEqual(

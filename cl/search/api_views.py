@@ -66,13 +66,11 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     serializer_class = OriginalCourtInformationSerializer
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
     queryset = OriginatingCourtInformation.objects.all().order_by("-id")
 
@@ -91,14 +89,11 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
-        "-id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
     queryset = (
         Docket.objects.select_related(
@@ -120,13 +115,11 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     ordering_fields = ("id", "date_created", "date_modified", "date_filed")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
     queryset = (
         DocketEntry.objects.select_related(
@@ -150,13 +143,11 @@ class RECAPDocumentViewSet(
     ordering_fields = ("id", "date_created", "date_modified", "date_upload")
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
     queryset = (
         RECAPDocument.objects.select_related(
@@ -199,13 +190,11 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
     queryset = OpinionCluster.objects.prefetch_related(
         "sub_opinions", "panel", "non_participating_judges", "citations"
@@ -222,13 +211,11 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
     queryset = (
         Opinion.objects.select_related("cluster", "author")
@@ -242,8 +229,8 @@ class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     filterset_class = OpinionsCitedFilter
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = ["id"]
+    # Additional cursor ordering fields
+    cursor_ordering_fields = ["id"]
     queryset = OpinionsCited.objects.all().order_by("-id")
 
 
@@ -252,13 +239,11 @@ class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = TagSerializer
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
     queryset = Tag.objects.all().order_by("-id")
 

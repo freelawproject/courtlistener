@@ -17,13 +17,11 @@ class AudioViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
     # Default cursor ordering key
     ordering = "-id"
-    # Other cursor ordering keys
-    other_cursor_ordering_keys = [
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
         "id",
         "date_created",
-        "-date_created",
         "date_modified",
-        "-date_modified",
     ]
     queryset = (
         Audio.objects.all()
