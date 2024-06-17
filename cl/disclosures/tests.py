@@ -307,8 +307,10 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
         """Can we search for judges?"""
         self.browser.get(self.live_server_url)
         self.browser.implicitly_wait(2)
-        link = self.browser.find_element(By.ID, "navbar-fd")
-        link.click()
+        self.browser.find_element(By.ID, "navbar-fd").click()
+        self.browser.find_element(
+            By.LINK_TEXT, "Search Financial Disclosures"
+        ).click()
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
         )
