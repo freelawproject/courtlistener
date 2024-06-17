@@ -288,7 +288,10 @@ class DisclosureReactLoadTest(BaseSeleniumTest):
     def test_disclosure_homepage(self) -> None:
         """Can we load disclosure homepage?"""
         self.browser.get(self.live_server_url)
-        link = self.browser.find_element(By.ID, "navbar-fd")
+        dropdown = self.browser.find_element(By.ID, "navbar-fd")
+        dropdown.click()
+        link = self.browser.find_element(By.LINK_TEXT,
+                                         "Search Financial Disclosures")
         link.click()
         self.assertIn(
             "Judicial Financial Disclosures Database", self.browser.title
