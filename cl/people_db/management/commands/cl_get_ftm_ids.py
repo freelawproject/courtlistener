@@ -18,7 +18,7 @@ leveldict = {
 }
 
 url_template = (
-    "http://api.followthemoney.org/?"
+    "https://api.followthemoney.org/?"
     "f-core=1&"
     "c-exi=1&"
     "gro=c-t-id&"

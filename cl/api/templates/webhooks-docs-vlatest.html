@@ -270,15 +270,13 @@ xargs -I % curl -X POST \
 }
   </pre>
   <p>
-    The <code>results</code> key is based on the  <a href="{% url 'rest_docs' %}#docket-entry-endpoint">Docket Entry API</a> and has all the same fields except for the <code>resource_uri</code> and <code>tags</code> fields, which are omitted, and the <code>docket</code> field is an <code>ID</code> instead of a URL. If you already have access to that API, you can <a href="{% url "docketentry-detail" version="v3" pk=20615503 %}">see an example object here</a>, and do an HTTP OPTIONS request to get a description of the fields:
+    The <code>results</code> key is based on the  <a href="{% url 'pacer_api_help' %}#docket-entry-endpoint">Docket Entry API</a>. It has all the same fields except for the <code>resource_uri</code> and <code>tags</code> fields, which are omitted, and the <code>docket</code> field is an <code>ID</code> instead of a URL. If you already have access to that API, you can <a href="{% url "docketentry-detail" version="v3" pk=20615503 %}">see an example object here</a>, and do an HTTP OPTIONS request to get a description of the fields:
   </p>
   <pre class="v-offset-below-1 scrollable" >curl -X OPTIONS \
   --url '{% get_full_host %}{% url "docketentry-list" version="v3" %}' \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
   <p>
     If you do not yet have access to the Docket Entry API, please <a href="{% url "contact" %}">let us know</a>. In the meantime, another way to see an example event is via <a href="{% url "webhooks_getting_started" %}#testing">the webhook testing tool</a>.
-  </p>
-  <p>You can also learn more about the API in the API documentation, where we explain how to <a href="{% url 'rest_docs' %}#downloading-files">download files from the API</a> and list <a href="{% url 'rest_docs' %}#field-details">a few field-specific tips</a>.
   </p>
 
   <h3 id="search-alerts">Search Alert Events</h3>
