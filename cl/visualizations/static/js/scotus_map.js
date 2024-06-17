@@ -1216,7 +1216,7 @@ $(document).ready(function () {
 
     if (s !== '') {
       value =
-        '<a href="https://scdb.wustl.edu/analysisCaseDetail.php?cid=' +
+        '<a href="http://scdb.wustl.edu/analysisCaseDetail.php?cid=' +
         s +
         '-01" target="_blank">' +
         s +

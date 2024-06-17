@@ -25,7 +25,7 @@
    },
    {
       "field":"scdb_id",
-      "description":"The ID of an opinion in the <a href='https://scdb.wustl.edu/'>Supreme Court Database</a>.",
+      "description":"The ID of an opinion in the <a href='http://scdb.wustl.edu/'>Supreme Court Database</a>.",
       "opinions":true,
       "parentheticals":false,
       "recap_archive":false,
