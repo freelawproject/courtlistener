@@ -77,18 +77,22 @@ def import_opinions_from_recap(
             .first()
         )
 
-        documents = RECAPDocument.objects.filter(
-            docket_entry__docket__court=court,
-            docket_entry__date_filed__gt=cluster.date_filed,
-            is_available=True,
-            is_free_on_pacer=True,
-        ).order_by("id")
+        recap_document_ids = (
+            RECAPDocument.objects.filter(
+                docket_entry__docket__court=court,
+                docket_entry__date_filed__gt=cluster.date_filed,
+                is_available=True,
+                is_free_on_pacer=True,
+            )
+            .only("id")
+            .order_by("id")
+        )
 
         throttle = CeleryThrottle(queue_name=queue)
-        for recap_document in documents.iterator():
+        for recap_document_id in recap_document_ids.iterator():
             throttle.maybe_wait()
             ingest_recap_document.apply_async(
-                args=[recap_document.id], queue=queue
+                args=[recap_document_id], queue=queue
             )
             if total_count > 0 and count >= total_count:
                 logger.info(
