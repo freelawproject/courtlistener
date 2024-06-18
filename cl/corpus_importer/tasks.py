@@ -2345,7 +2345,7 @@ def ingest_recap_document(self, recap_document_id: int) -> None:
     :param recap_document: The document to inspect and import
     :return:None
     """
-    logger.info(f"Importing recap document {recap_document.id}")
+    logger.info(f"Importing recap document {recap_document_id}")
     recap_document = (
         RECAPDocument.objects.select_related("docket_entry__docket")
         .only(

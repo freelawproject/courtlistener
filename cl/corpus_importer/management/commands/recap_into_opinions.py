@@ -88,7 +88,7 @@ def import_opinions_from_recap(
         for recap_document in documents.iterator():
             throttle.maybe_wait()
             ingest_recap_document.apply_async(
-                args=[recap_document], queue=queue
+                args=[recap_document.id], queue=queue
             )
             if total_count > 0 and count >= total_count:
                 logger.info(
