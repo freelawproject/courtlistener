@@ -138,6 +138,7 @@ class BaseCourtUploadForm(forms.Form):
     case_title = forms.CharField(
         label="Caption",
         required=True,
+        help_text=Docket.case_name_full.field.help_text,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
@@ -149,6 +150,7 @@ class BaseCourtUploadForm(forms.Form):
     docket_number = forms.CharField(
         label="Docket Number",
         required=True,
+        help_text=Docket.docket_number.field.help_text,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
@@ -160,6 +162,7 @@ class BaseCourtUploadForm(forms.Form):
     publication_date = forms.DateField(
         label="Publication Date",
         required=True,
+        help_text=OpinionCluster.date_filed.field.help_text,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control datepicker",
@@ -191,6 +194,7 @@ class BaseCourtUploadForm(forms.Form):
             queryset=Person.objects.none(),
             required=required,
             label="Lead Author",
+            help_text=Opinion.author.field.help_text,
             widget=forms.Select(
                 attrs={
                     "class": "form-control",
@@ -207,12 +211,12 @@ class BaseCourtUploadForm(forms.Form):
         """
         self.fields["author_str"] = forms.CharField(
             label="Author String",
+            help_text=Opinion.author_str.field.help_text,
             required=required,
             widget=forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Use this in case you can't find the name in the "
-                    "list above",
+                    "placeholder": "Author",
                     "autocomplete": "off",
                 }
             ),
@@ -227,11 +231,11 @@ class BaseCourtUploadForm(forms.Form):
         self.fields["judges"] = forms.CharField(
             label="Judges",
             required=required,
+            help_text=OpinionCluster.judges.field.help_text,
             widget=forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "The judges that participated in the opinion as a "
-                    "simple text string.",
+                    "placeholder": "Smith, Ginsburg, Scalia etc.",
                     "autocomplete": "off",
                 }
             ),
@@ -247,6 +251,7 @@ class BaseCourtUploadForm(forms.Form):
             queryset=Person.objects.none(),
             required=required,
             label="Panel",
+            help_text=OpinionCluster.panel.field.help_text,
             widget=forms.SelectMultiple(
                 attrs={
                     "class": "form-control input-lg",
@@ -264,6 +269,7 @@ class BaseCourtUploadForm(forms.Form):
         """
         self.fields["date_argued"] = forms.DateField(
             label="Argued Date",
+            help_text=Docket.date_argued.field.help_text,
             required=required,
             widget=forms.TextInput(
                 attrs={
@@ -275,6 +281,7 @@ class BaseCourtUploadForm(forms.Form):
         )
         self.fields["date_reargued"] = forms.DateField(
             label="Reargued Date",
+            help_text=Docket.date_reargued.field.help_text,
             required=required,
             widget=forms.TextInput(
                 attrs={
@@ -323,11 +330,12 @@ class BaseCourtUploadForm(forms.Form):
         self.fields["download_url"] = forms.URLField(
             validators=[URLValidator()],
             label="Download Url",
+            help_text=Opinion.download_url.field.help_text,
             required=required,
             widget=forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "The URL where the document is originally located",
+                    "placeholder": "https://www",
                     "autocomplete": "off",
                 }
             ),
@@ -530,9 +538,7 @@ class BaseCourtUploadForm(forms.Form):
 
 
 class MeCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Supreme Judicial Court of Maine (me) Upload Portal
-    """
+    """Form for Supreme Judicial Court of Maine (me) Upload Portal"""
 
     def get_judges_qs(self):
         return (
@@ -597,7 +603,6 @@ class MeCourtUploadForm(BaseCourtUploadForm):
                 "cite_volume",
                 "cite_reporter",
                 "cite_page",
-                "download_url",
                 "pdf_upload",
             ]
         )
@@ -609,10 +614,8 @@ class MeCourtUploadForm(BaseCourtUploadForm):
 
 
 class TennWorkCompClUploadForm(BaseCourtUploadForm):
-    """
-    Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl) Upload
-    Portal
-    """
+    """Form for Tennessee Court of Workers' Compensation Claims (tennworkcompcl)
+    Upload Portal"""
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -634,7 +637,6 @@ class TennWorkCompClUploadForm(BaseCourtUploadForm):
                 "cite_volume",
                 "cite_reporter",
                 "cite_page",
-                "download_url",
                 "pdf_upload",
             ]
         )
@@ -646,10 +648,8 @@ class TennWorkCompClUploadForm(BaseCourtUploadForm):
 
 
 class TennWorkCompAppUploadForm(BaseCourtUploadForm):
-    """
-    Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp) Upload
-    Portal
-    """
+    """Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp)
+    Upload Portal"""
 
     second_judge = forms.ModelChoiceField(
         queryset=Person.objects.none(),
@@ -686,7 +686,6 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
                 "cite_volume",
                 "cite_reporter",
                 "cite_page",
-                "download_url",
                 "pdf_upload",
             ]
         )
@@ -727,12 +726,17 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
 
 
 class MoCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Missouri Upload Portal (mo, moctapped, moctappsd and moctappwd)
+    """Form for Missouri Upload Portal
+
+    Missouri Supreme Court [mo]
+    Missouri Court of Appeals, Eastern District [moctapped]
+    Missouri Court of Appeals, Southern District [moctappsd]
+    Missouri Court of Appeals, Western District [moctappwd]
     """
 
     disposition = forms.CharField(
         label="Disposition",
+        help_text=OpinionCluster.disposition.field.help_text,
         required=False,
         widget=forms.Textarea(
             attrs={
@@ -764,12 +768,15 @@ class MoCourtUploadForm(BaseCourtUploadForm):
 
 
 class MissCourtUploadForm(BaseCourtUploadForm):
-    """
-    Form for Mississippi Upload Portal (miss and missctapp)
+    """Form for Mississippi Upload Portal
+
+    Mississippi Supreme Court [miss]
+    Mississippi Court of Appeals [missctapp]
     """
 
     disposition = forms.CharField(
         label="Disposition",
+        help_text=OpinionCluster.disposition.field.help_text,
         required=False,
         widget=forms.Textarea(
             attrs={
@@ -780,6 +787,7 @@ class MissCourtUploadForm(BaseCourtUploadForm):
 
     summary = forms.CharField(
         label="Summary",
+        help_text=OpinionCluster.summary.field.help_text,
         required=False,
         widget=forms.Textarea(attrs={"class": "form-control"}),
     )

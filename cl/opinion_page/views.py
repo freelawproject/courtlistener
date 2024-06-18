@@ -95,7 +95,7 @@ from cl.search.views import do_es_search, do_search
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
-def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
+async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     """Individual Court Home Pages"""
 
     available_courts = [
@@ -103,7 +103,6 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
         "tennworkcompapp",
         "me",
         "mo",
-        "moctapp",
         "moctapped",
         "moctappsd",
         "moctappwd",
@@ -114,7 +113,7 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     if pk not in available_courts:
         raise Http404("Court pages only implemented for select courts.")
 
-    render_court = Court.objects.get(pk=pk)
+    render_court = await Court.objects.aget(pk=pk)
     render_dict = {
         "private": False,
         "pk": pk,
@@ -146,13 +145,19 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
 
         mutable_GET = request.GET.copy()
 
-        if not waffle.flag_is_active(request, "o-es-active"):
+        es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
+            request, "oa-es-active"
+        )
+
+        if not es_flag_for_oa:
             # Do solr search
-            response = do_search(
+            response = await sync_to_async(do_search)(
                 mutable_GET,
                 override_params={
                     "filed_after": (
-                        datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
+                        datetime.datetime.today()
+                        - datetime.timedelta(days=28)
+                        # type: ignore
                     ),
                     "order_by": "dateFiled desc",
                     "court": court,
@@ -171,7 +176,7 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
                     ),
                 }
             )
-            response = do_es_search(mutable_GET)
+            response = await sync_to_async(do_es_search)(mutable_GET)
 
         render_dict[results] = response["results"]
     return TemplateResponse(request, template, render_dict)
@@ -184,7 +189,6 @@ def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     "uploaders_tennworkcompapp",
     "uploaders_me",
     "uploaders_mo",
-    "uploaders_moctapp",
     "uploaders_moctapped",
     "uploaders_moctappsd",
     "uploaders_moctappwd",
@@ -204,7 +208,6 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
         "tennworkcompapp",
         "me",
         "mo",
-        "moctapp",
         "moctapped",
         "moctappsd",
         "moctappwd",
@@ -236,7 +239,6 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
         "tennworkcompapp": TennWorkCompAppUploadForm,
         "me": MeCourtUploadForm,
         "mo": MoCourtUploadForm,
-        "moctapp": MoCourtUploadForm,
         "moctapped": MoCourtUploadForm,
         "moctappsd": MoCourtUploadForm,
         "moctappwd": MoCourtUploadForm,
