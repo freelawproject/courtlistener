@@ -70,17 +70,22 @@ def import_opinions_from_recap(
     count = 0
     for court in courts:
         logger.info(f"Importing RECAP documents for {court}")
-        cluster = (
-            OpinionCluster.objects.filter(docket__court=court)
+
+        # Manually select the replica db which has an addt'l index added to
+        # improve this query.
+        latest_date_filed = (
+            OpinionCluster.objects.using("replica")
+            .filter(docket__court=court)
             .exclude(source=SOURCES.RECAP)
             .order_by("-date_filed")
+            .values_list("date_filed", flat=True)
             .first()
         )
 
         recap_document_ids = (
             RECAPDocument.objects.filter(
                 docket_entry__docket__court=court,
-                docket_entry__date_filed__gt=cluster.date_filed,
+                docket_entry__date_filed__gt=latest_date_filed,
                 is_available=True,
                 is_free_on_pacer=True,
             )
