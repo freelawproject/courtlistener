@@ -2346,6 +2346,20 @@ def ingest_recap_document(self, recap_document: RECAPDocument) -> None:
     :return:None
     """
     logger.info(f"Importing recap document {recap_document.id}")
+    recap_document = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .only(
+            "sha1",
+            "page_count",
+            "filepath_local",
+            "docket_entry__date_filed",
+            "docket_entry__docket__docket_number",
+            "docket_entry__docket__case_name",
+            "docket_entry__docket__case_name_full",
+            "docket_entry__docket__case_name_short",
+        )
+        .get(id=recap_document_id)
+    )
     docket = recap_document.docket_entry.docket
     if "cv" not in docket.docket_number.lower():
         logger.info("Skipping non-civil opinion")
