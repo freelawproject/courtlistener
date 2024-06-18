@@ -792,7 +792,7 @@ class CourtTestCase(SimpleTestCase):
             full_name="First Circuit",
             jurisdiction="F",
             citation_string="1st Cir.",
-            url="http://www.ca1.uscourts.gov/",
+            url="https://www.ca1.uscourts.gov/",
         )
         cls.court_2 = CourtFactory(
             id="test",

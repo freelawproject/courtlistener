@@ -125,7 +125,7 @@ def clean_string(s):
 
 
 # For use in harmonize function
-# More details: http://www.law.cornell.edu/citation/4-300.htm
+# More details: https://www.law.cornell.edu/citation/4-300.htm
 US = r"USA|U\.S\.A\.|U\.S\.?|U\. S\.?|(The )?United States of America|The United States"
 UNITED_STATES = re.compile(rf"^({US})(,|\.)?$", re.I)
 THE_STATE = re.compile(r"the state", re.I)
