@@ -2339,7 +2339,7 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def ingest_recap_document(self, recap_document: RECAPDocument) -> None:
+def ingest_recap_document(self, recap_document_id: int) -> None:
     """Ingest recap document into Opinions
 
     :param recap_document: The document to inspect and import
