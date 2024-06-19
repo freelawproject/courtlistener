@@ -50,7 +50,7 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 def import_opinions_from_recap(
-    court: Optional[str] = None,
+    court_str: Optional[str] = None,
     skip_until: Optional[str] = None,
     total_count: int = 0,
     queue: str = "batch1",
@@ -63,14 +63,14 @@ def import_opinions_from_recap(
     :param queue: The queue to use for celery
     :return: None
     """
-    if not court:
+    if not court_str:
         filter_conditions = Q(jurisdiction=Court.FEDERAL_DISTRICT) & ~Q(
             id__in=["orld", "dcd"]
         )
         if skip_until:
             filter_conditions &= Q(id__gte=skip_until)
     else:
-        filter_conditions = Q(pk=court)
+        filter_conditions = Q(pk=court_str)
     courts = Court.objects.filter(filter_conditions).order_by("id")
 
     count = 0
