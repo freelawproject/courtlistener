@@ -8,6 +8,7 @@ from io import BytesIO
 from tempfile import NamedTemporaryFile
 from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
+import eyecite
 import internetarchive as ia
 import requests
 from asgiref.sync import async_to_sync
@@ -20,6 +21,13 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Prefetch
 from django.db.models.query import prefetch_related_objects
 from django.utils.timezone import now
+from eyecite.tokenizers import HyperscanTokenizer
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    RemoteProtocolError,
+    TimeoutException,
+)
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
@@ -51,11 +59,13 @@ from urllib3.exceptions import ReadTimeoutError
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
 from cl.audio.models import Audio
 from cl.celery_init import app
+from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.celery_utils import throttle_task
 from cl.lib.crypto import sha1
+from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import (
     get_blocked_status,
@@ -98,14 +108,19 @@ from cl.recap.models import (
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf_base
 from cl.search.models import (
+    SOURCES,
     ClaimHistory,
     Court,
     Docket,
     DocketEntry,
+    Opinion,
+    OpinionCluster,
     RECAPDocument,
     Tag,
 )
 from cl.search.tasks import add_items_to_solr
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 logger = logging.getLogger(__name__)
 
@@ -2294,3 +2309,109 @@ def query_and_save_list_of_creditors(
     delete_redis_semaphore(
         "CACHE", make_list_of_creditors_key(court_id, d_number_file_name)
     )
+
+
+@retry(
+    ExceptionToCheck=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+    ),
+    tries=3,
+    delay=5,
+    backoff=2,
+    logger=logger,
+)
+def extract_recap_document(rd: RECAPDocument) -> Response:
+    """Call recap-extract from doctor with retries
+
+    :param rd: the recap document to extract
+    :return: Response object
+    """
+    response = async_to_sync(microservice)(
+        service="recap-extract",
+        item=rd,
+        params={"strip_margin": True},
+    )
+    response.raise_for_status()
+    return response
+
+
+@app.task(bind=True, max_retries=5, ignore_result=True)
+def ingest_recap_document(self, recap_document_id: int) -> None:
+    """Ingest recap document into Opinions
+
+    :param recap_document: The document to inspect and import
+    :return:None
+    """
+    logger.info(f"Importing recap document {recap_document_id}")
+    recap_document = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .only(
+            "sha1",
+            "page_count",
+            "filepath_local",
+            "docket_entry__date_filed",
+            "docket_entry__docket__docket_number",
+            "docket_entry__docket__case_name",
+            "docket_entry__docket__case_name_full",
+            "docket_entry__docket__case_name_short",
+        )
+        .get(id=recap_document_id)
+    )
+    docket = recap_document.docket_entry.docket
+    if "cv" not in docket.docket_number.lower():
+        logger.info("Skipping non-civil opinion")
+        return
+
+    ops = Opinion.objects.filter(sha1=recap_document.sha1)
+    if ops.count() > 0:
+        logger.info(f"Skipping previously imported opinion: {ops[0].id}")
+        return
+
+    response = extract_recap_document(rd=recap_document)
+    r = response.json()
+
+    try:
+        citations = eyecite.get_citations(
+            r["content"], tokenizer=HYPERSCAN_TOKENIZER
+        )
+    except AttributeError:
+        # Tokenizer fails with some unicode characters
+        # Ex. 42\u2009U.S.C.\u2009§\u200912131 \u2009 is a small space
+        # fallback to regular citation match
+        logger.warning(
+            f"Hyperscan failed for {recap_document}, trying w/o tokenizer"
+        )
+        citations = eyecite.get_citations(r["content"])
+
+    case_law_citations = filter_out_non_case_law_citations(citations)
+    if len(case_law_citations) == 0:
+        logger.info(f"No citation found for rd: {recap_document.id}")
+        return
+
+    with transaction.atomic():
+        cluster = OpinionCluster.objects.create(
+            case_name_full=docket.case_name_full,
+            case_name=docket.case_name,
+            case_name_short=docket.case_name_short,
+            docket=docket,
+            date_filed=recap_document.docket_entry.date_filed,
+            source=SOURCES.RECAP,
+        )
+        Opinion.objects.create(
+            cluster=cluster,
+            type=Opinion.TRIAL_COURT,
+            plain_text=r["content"],
+            page_count=recap_document.page_count,
+            sha1=recap_document.sha1,
+            local_path=recap_document.filepath_local,
+            extracted_by_ocr=r["extracted_by_ocr"],
+        )
+
+        logger.info(
+            "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(
+                cluster.id
+            )
+        )

@@ -182,16 +182,17 @@ def get_binary_content(
         r = follow_redirections(r, requests.Session())
         r.raise_for_status()
     else:
+        # some sites require a custom ssl_context, contained in the Site's
+        # session. However, we can't send a request with both a
+        # custom ssl_context and `verify = False`
+        has_cipher = hasattr(site, "cipher")
+        s = site.request["session"] if has_cipher else requests.session()
+
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
-        s = (
-            site.request["session"]
-            if hasattr(site, "cipher")
-            else requests.session()
-        )
         r = s.get(
             download_url,
-            verify=False,  # WA has a certificate we don't understand
+            verify=has_cipher,  # WA has a certificate we don't understand
             headers=headers,
             cookies=site.cookies,
             timeout=300,
