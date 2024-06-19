@@ -1,5 +1,3 @@
-from typing import Optional
-
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.management import BaseCommand
