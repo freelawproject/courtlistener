@@ -76,7 +76,8 @@ def handle_open_ai_transcriptions(options) -> None:
 
         valid_count += 1
         transcribe_from_open_ai_api.apply_async(
-            args=(audio.pk,), queue=options["queue"]
+            args=(audio.pk, options["dont_retry_task"]),
+            queue=options["queue"],
         )
 
         # For parallel processing: seed RPM requests per minute
@@ -124,6 +125,13 @@ class Command(VerboseCommand):
             "--queue",
             default="batch1",
             help="The celery queue where the tasks should be processed.",
+        )
+        parser.add_argument(
+            "--dont-retry-task",
+            default=False,
+            action="store_true",
+            help="""Do not retry celery tasks. Useful to monitor or
+            debug API requests""",
         )
 
     def handle(self, *args: list[str], **options: OptionsType) -> None:
