@@ -1,5 +1,6 @@
 from asgiref.sync import async_to_sync
 from django.core.management import BaseCommand
+from django.db.models import Q
 from eyecite.tokenizers import HyperscanTokenizer
 from httpx import (
     HTTPStatusError,
@@ -47,25 +48,28 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 def import_opinions_from_recap(
-    court=None,
-    total_count=0,
-    queue="batch1",
+    court: str = None,
+    skip_until: str = None,
+    total_count: int = 0,
+    queue: str = "batch1",
 ) -> None:
     """Import recap documents into opinion db
 
     :param court: Court ID if any
+    :param skip_until: Court ID to re-start at
     :param total_count: The number of new opinions to add
     :param queue: The queue to use for celery
     :return: None
     """
     if not court:
-        courts = Court.objects.filter(
-            jurisdiction=Court.FEDERAL_DISTRICT
-        ).exclude(
+        filter_conditions = Q(jurisdiction=Court.FEDERAL_DISTRICT) & ~Q(
             id__in=["orld", "dcd"]
-        )  # orld is historical and we gather dcd opinions from the court
+        )
+        if skip_until:
+            filter_conditions &= Q(id__gte=skip_until)
     else:
-        courts = Court.objects.filter(pk=court)
+        filter_conditions = Q(pk=court)
+    courts = Court.objects.filter(filter_conditions).order_by("id")
 
     count = 0
     for court in courts:
@@ -81,6 +85,11 @@ def import_opinions_from_recap(
             .values_list("date_filed", flat=True)
             .first()
         )
+        if latest_date_filed == None:
+            logger.error(
+                msg=f"Court {court.id} has no opinion clusters for recap import"
+            )
+            continue
 
         recap_document_ids = (
             RECAPDocument.objects.filter(
@@ -95,6 +104,10 @@ def import_opinions_from_recap(
 
         throttle = CeleryThrottle(queue_name=queue)
         for recap_document_id in recap_document_ids.iterator():
+            count += 1
+            logger.info(
+                f"{count}: Importing rd {recap_document_id.id} in {court.id}"
+            )
             throttle.maybe_wait()
             ingest_recap_document.apply_async(
                 args=[recap_document_id], queue=queue
@@ -120,6 +133,12 @@ class Command(BaseCommand):
             required=False,
         )
         parser.add_argument(
+            "--skip-until",
+            help="Specific court ID to restart import with",
+            type=str,
+            required=False,
+        )
+        parser.add_argument(
             "--total",
             type=int,
             help="Number of files to import - set to 0 to import endlessly",
@@ -134,7 +153,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         court = options.get("court")
+        skip_until = options.get("skip_until")
         total_count = options.get("total")
         queue = options.get("queue")
-
-        import_opinions_from_recap(court, total_count, queue)
+        import_opinions_from_recap(court, skip_until, total_count, queue)
