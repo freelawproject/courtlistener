@@ -51,7 +51,7 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 def import_opinions_from_recap(
-    court_str: str | None  = None,
+    court_str: str | None = None,
     skip_until: str | None = None,
     total_count: int = 0,
     queue: str = "batch1",
