@@ -1,3 +1,5 @@
+from typing import Optional
+
 from asgiref.sync import async_to_sync
 from django.core.management import BaseCommand
 from django.db.models import Q
@@ -48,8 +50,8 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 def import_opinions_from_recap(
-    court: str = None,
-    skip_until: str = None,
+    court: Optional[str] = None,
+    skip_until: Optional[str] = None,
     total_count: int = 0,
     queue: str = "batch1",
 ) -> None:
