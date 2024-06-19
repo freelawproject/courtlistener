@@ -65,17 +65,11 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
 # https://github.com/openai/openai-python/blob/54a5911f5215148a0bdeb10e2bcfb84f635a75b9/src/openai/_base_client.py#L679-L712
 @app.task(
     bind=True,
-    autoretry_for=(
-        RateLimitError,
-        APIConnectionError,
-        ConflictError,
-        InternalServerError,
-    ),
     max_retries=3,
     retry_backoff=1 * 60,
     retry_backoff_max=10 * 60,
 )
-def transcribe_from_open_ai_api(self, audio_pk: int):
+def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
     """Get transcription from OpenAI API whisper-1 model
 
     openai.OpenAI() client expects the environment
@@ -87,10 +81,23 @@ def transcribe_from_open_ai_api(self, audio_pk: int):
     :param audio_pk: audio object primary key
     """
     audio = Audio.objects.get(pk=audio_pk)
+    logger.info(
+        "Starting transcription for audio %s retry %s",
+        audio_pk,
+        self.request.retries,
+    )
+
+    # While testing we saw more requests than expected
+    # so we double check for Audio.stt_status
+    if audio.stt_status == Audio.STT_COMPLETE:
+        logger.error(
+            "Audio %s with status STT_COMPLETE was sent for transcription",
+            audio_pk,
+        )
+        return
+
     audio_file = audio.local_path_mp3
     file = (audio_file.name.split("/")[-1], audio_file.read(), "mp3")
-
-    logger.info("Starting transcription for audio %s", audio_pk)
 
     # Prevent default openai client retrying
     with OpenAI(max_retries=0) as client:
@@ -103,6 +110,17 @@ def transcribe_from_open_ai_api(self, audio_pk: int):
                 timestamp_granularities=["word", "segment"],
                 prompt=audio.case_name,
             )
+        except (
+            RateLimitError,
+            APIConnectionError,
+            ConflictError,
+            InternalServerError,
+        ) as exc:
+            # Handle retryable exception here so as to monitor them in
+            # Sentry
+            capture_exception(exc)
+            if self.request.retries < self.max_retries and not dont_retry:
+                raise self.retry(exc=exc)
         except (UnprocessableEntityError, BadRequestError) as e:
             # BadRequestError is an HTTP 400 and has this message:
             # 'The audio file could not be decoded or its format is not supported'
@@ -113,8 +131,8 @@ def transcribe_from_open_ai_api(self, audio_pk: int):
         except Exception as e:
             # Sends to Sentry errors that we don't expect or
             # don't want to retry. Includes some openai package errors:
-            # (openai.BadRequestError, openai.AuthenticationError,
-            # openai.PermissionDeniedError, openai.NotFoundError)
+            # (openai.AuthenticationError, openai.PermissionDeniedError,
+            # openai.NotFoundError)
             capture_exception(e)
             return
 
