@@ -101,6 +101,7 @@ def import_opinions_from_recap(
             ingest_recap_document.apply_async(
                 args=[recap_document_id.id], queue=queue
             )
+            count += 1
             if total_count > 0 and count >= total_count:
                 logger.info(
                     f"RECAP import completed for {total_count} documents"
