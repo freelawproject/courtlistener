@@ -108,6 +108,7 @@ from cl.recap.models import (
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf_base
 from cl.search.models import (
+    PRECEDENTIAL_STATUS,
     SOURCES,
     ClaimHistory,
     Court,
@@ -2339,10 +2340,15 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def ingest_recap_document(self, recap_document_id: int) -> None:
+def ingest_recap_document(
+    self,
+    recap_document_id: int,
+    add_to_solr: bool,
+) -> None:
     """Ingest recap document into Opinions
 
-    :param recap_document: The document to inspect and import
+    :param recap_document_id: The document id to inspect and import
+    :param add_to_solr: Whether to add to solr
     :return:None
     """
     logger.info(f"Importing recap document {recap_document_id}")
@@ -2399,8 +2405,9 @@ def ingest_recap_document(self, recap_document_id: int) -> None:
             docket=docket,
             date_filed=recap_document.docket_entry.date_filed,
             source=SOURCES.RECAP,
+            precedential_status=PRECEDENTIAL_STATUS.UNKNOWN,
         )
-        Opinion.objects.create(
+        opinion = Opinion.objects.create(
             cluster=cluster,
             type=Opinion.TRIAL_COURT,
             plain_text=r["content"],
@@ -2409,6 +2416,10 @@ def ingest_recap_document(self, recap_document_id: int) -> None:
             local_path=recap_document.filepath_local,
             extracted_by_ocr=r["extracted_by_ocr"],
         )
+
+        if add_to_solr:
+            # Add opinions to solr
+            add_items_to_solr.delay([opinion.id], "search.Opinion")
 
         logger.info(
             "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(
