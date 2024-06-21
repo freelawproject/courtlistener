@@ -29,10 +29,16 @@ class Audio(AbstractDateTimeModel):
     STT_NEEDED = 0
     STT_COMPLETE = 1
     STT_FAILED = 2
+    STT_HALLUCINATION = 3
+    STT_FILE_TOO_BIG = 4
+    STT_NO_FILE = 5
     STT_STATUSES = (
         (STT_NEEDED, "Speech to Text Needed"),
         (STT_COMPLETE, "Speech to Text Complete"),
         (STT_FAILED, "Speech to Text Failed"),
+        (STT_HALLUCINATION, "Transcription does not match audio"),
+        (STT_FILE_TOO_BIG, "File size is bigger than 25 MB"),
+        (STT_NO_FILE, "File does not exist"),
     )
     STT_OPENAI_WHISPER = 1
     STT_SELF_HOSTED_WHISPER = 2

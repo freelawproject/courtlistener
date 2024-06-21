@@ -15,7 +15,7 @@ from openai import (
 from sentry_sdk import capture_exception
 
 from cl.audio.models import Audio, AudioTranscriptionMetadata
-from cl.audio.utils import make_af_filename
+from cl.audio.utils import make_af_filename, transcription_was_hallucinated
 from cl.celery_init import app
 from cl.corpus_importer.tasks import increment_failure_count, upload_to_ia
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -121,6 +121,7 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
             capture_exception(exc)
             if self.request.retries < self.max_retries and not dont_retry:
                 raise self.retry(exc=exc)
+            return
         except (UnprocessableEntityError, BadRequestError) as e:
             # BadRequestError is an HTTP 400 and has this message:
             # 'The audio file could not be decoded or its format is not supported'
@@ -140,9 +141,13 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
 
         with transaction.atomic():
             audio.stt_transcript = transcript_dict["text"]
-            audio.stt_status = Audio.STT_COMPLETE
-            audio.stt_source = Audio.STT_OPENAI_WHISPER
             audio.duration = ceil(transcript_dict["duration"])
+            audio.stt_source = Audio.STT_OPENAI_WHISPER
+            if transcription_was_hallucinated(audio):
+                audio.stt_status = Audio.STT_HALLUCINATION
+            else:
+                audio.stt_status = Audio.STT_COMPLETE
+
             audio.save()
 
             metadata = {
