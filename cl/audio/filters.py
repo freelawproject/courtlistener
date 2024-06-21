@@ -25,4 +25,5 @@ class AudioFilter(NoEmptyFilterSet):
             "blocked": ["exact"],
             "date_blocked": DATE_LOOKUPS,
             "processing_complete": ["exact"],
+            "stt_status": INTEGER_LOOKUPS,
         }
