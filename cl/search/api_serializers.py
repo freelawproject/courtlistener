@@ -731,3 +731,18 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "pacer_doc_id",
             "trustee_str",
         )
+
+
+class RECAPNestedResultSerializer(
+    RECAPMetaMixin, BaseDocketESResultSerializer
+):
+    """The serializer class for RECAP search type results."""
+
+    recap_documents = BaseRECAPDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+
+    class Meta(BaseDocketESResultSerializer.Meta):
+        exclude = BaseDocketESResultSerializer.Meta.exclude + (
+            "docket_absolute_url",
+        )

@@ -342,6 +342,11 @@ class Command(VerboseCommand):
             action="store_true",
             help="Use this flag to only index documents missing in the index.",
         )
+        parser.add_argument(
+            "--nested",
+            action="store_true",
+            help="Whether to perform a indexing of Nested documents.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -475,6 +480,7 @@ class Command(VerboseCommand):
         pk_offset = self.options["pk_offset"]
         document_type = self.options.get("document_type", None)
         missing = self.options.get("missing", False)
+        nested = self.options.get("nested", False)
         fields_map = {}
         if event_doc_type == EventTable.DOCKET:
             fields_map = recap_document_field_mapping["save"][Docket][
@@ -535,6 +541,7 @@ class Command(VerboseCommand):
                             search_type,
                             document_type,
                             testing_mode=testing_mode,
+                            nested=nested,
                         ).set(queue=queue).apply_async()
                     case "remove_parent_and_child_docs_by_query":
                         remove_parent_and_child_docs_by_query.si(

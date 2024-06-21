@@ -45,6 +45,7 @@ from cl.search.documents import (
     OpinionDocument,
     PersonDocument,
     PositionDocument,
+    RECAPNestedDocument,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -1071,6 +1072,7 @@ def index_parent_or_child_docs(
     search_type: str,
     document_type: str | None,
     testing_mode: bool = False,
+    nested: bool = False,
 ) -> None:
     """Index parent or child documents in Elasticsearch.
 
@@ -1089,7 +1091,9 @@ def index_parent_or_child_docs(
     child_instances = QuerySet()
     match search_type:
         case SEARCH_TYPES.RECAP:
-            parent_es_document = DocketDocument
+            parent_es_document = (
+                RECAPNestedDocument if nested else DocketDocument
+            )
             child_es_document = ESRECAPDocument
             child_id_property = "RECAP"
             if document_type == "parent":

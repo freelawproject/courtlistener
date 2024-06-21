@@ -19,6 +19,7 @@ from waffle.testutils import override_flag
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    do_es_sweep_nested_query,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
@@ -46,9 +47,15 @@ from cl.search.api_serializers import (
     DocketESResultSerializer,
     RECAPDocumentESResultSerializer,
     RECAPESResultSerializer,
+    RECAPNestedResultSerializer,
 )
 from cl.search.api_views import SearchV4ViewSet
-from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
+from cl.search.documents import (
+    ES_CHILD_ID,
+    DocketDocument,
+    ESRECAPDocument,
+    RECAPNestedDocument,
+)
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -6672,3 +6679,63 @@ class RECAPHistoryTablesIndexingTest(
         )
         if keys:
             self.r.delete(*keys)
+
+
+class RECAPSearchNestedIndexTest(
+    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase
+):
+    """
+    RECAP Nested Index Tests
+    """
+
+    version_api = "v4"
+    skip_common_tests = False
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        cls.rebuild_index("search.Docket")
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            super().setUpTestData()
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                document_type="parent",
+                testing_mode=True,
+                nested=True,
+            )
+
+    async def _test_api_results_count(
+        self, params, expected_count, field_name
+    ):
+
+        search_query = RECAPNestedDocument.search()
+        results, total_hits = await sync_to_async(do_es_sweep_nested_query)(
+            search_query,
+            params,
+        )
+        results = RECAPNestedResultSerializer(results, many=True).data
+        got = len(results)
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in API with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return results
+
+    async def test_cross_object_string_query(self) -> None:
+        """Confirm a cross-object string query return the right results."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_api.pk} cause:(401 Civil) juryDemand:Plaintiff short_description:(Order Letter) plain_text:(shown in the API)",
+        }
+
+        await self._test_api_results_count(search_params, 1, "API fields")

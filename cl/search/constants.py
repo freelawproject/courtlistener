@@ -96,6 +96,11 @@ SEARCH_RECAP_PARENT_QUERY_FIELDS = [
     "chapter",
     "trustee_str",
 ]
+SEARCH_RECAP_NESTED_CHILD_QUERY_FIELDS = [
+    "short_description",
+    "plain_text",
+    "document_type",
+]
 SEARCH_OPINION_QUERY_FIELDS = [
     "court",
     "court_id",
