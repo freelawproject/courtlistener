@@ -296,4 +296,5 @@ o_type_index_map = {
     Opinion.REHEARING: "rehearing",
     Opinion.ON_THE_MERITS: "on-the-merits",
     Opinion.ON_MOTION_TO_STRIKE: "on-motion-to-strike",
+    Opinion.TRIAL_COURT: "trial-court-document",
 }
