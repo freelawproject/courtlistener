@@ -67,6 +67,11 @@ def transcription_was_hallucinated(audio: Audio) -> bool:
     There may be other types of hallucinations that will require
     other approaches
     """
+    # we don't have much audios in this range, the model does
+    # not work well here
+    if not audio.duration or audio.duration < 500:
+        return False
+
     # Parameters got from a linear model estimated
     # from 1377 transcriptions
     # lm(unique_words ~ duration)
@@ -75,11 +80,6 @@ def transcription_was_hallucinated(audio: Audio) -> bool:
 
     unique_words = len(set(audio.stt_transcript.split(" ")))
     expected_number_of_unique_words = intercept + linear_coef * audio.duration
-
-    # we don't have much audios in this range, the model does
-    # not work well here
-    if audio.duration < 500:
-        return False
 
     # Accepts a variation up to 50% less from the line of best fit
     if unique_words > expected_number_of_unique_words * tolerance:
