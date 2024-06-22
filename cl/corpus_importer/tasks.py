@@ -1185,10 +1185,10 @@ def make_docket_by_iquery_base(
     court_id: str,
     pacer_case_id: int,
     using: str = "default",
-    tag_names: Optional[List[str]] = None,
+    tag_names: list[str] | None = None,
     log_results_redis: bool = False,
     avoid_trigger_signal: bool = False,
-) -> Optional[int]:
+) -> int | None:
     """
     Using the iquery endpoint, create or update a docket
 
@@ -1265,10 +1265,10 @@ def make_docket_by_iquery(
     court_id: str,
     pacer_case_id: int,
     using: str = "default",
-    tag_names: Optional[List[str]] = None,
+    tag_names: list[str] | None = None,
     log_results_redis: bool = False,
     avoid_trigger_signal: bool = False,
-) -> Optional[int]:
+) -> int | None:
     """
     make_docket_by_iquery_base wrapper without throttling for its use in bulk
     imports to avoid Celery runaways when used in combination with
@@ -1312,10 +1312,10 @@ def make_docket_by_iquery_sweep(
     court_id: str,
     pacer_case_id: int,
     using: str = "default",
-    tag_names: Optional[List[str]] = None,
+    tag_names: list[str] | None = None,
     log_results_redis: bool = False,
     avoid_trigger_signal: bool = False,
-) -> Optional[int]:
+) -> int | None:
     """
      make_docket_by_iquery_base wrapper with court throttling for its use in
      the iquery sweep signal.
