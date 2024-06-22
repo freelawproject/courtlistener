@@ -40,12 +40,13 @@ from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
     DocketDocument,
+    DocketSweepDocument,
     ESRECAPDocument,
+    ESRECAPSweepDocument,
     OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
     PositionDocument,
-    RECAPNestedDocument,
 )
 from cl.search.models import (
     SEARCH_TYPES,
@@ -967,6 +968,7 @@ def index_parent_and_child_docs(
     instance_ids: list[int],
     search_type: str,
     testing_mode: bool = False,
+    sweep_index: bool = False,
 ) -> None:
     """Index parent and child documents in Elasticsearch.
 
@@ -986,8 +988,12 @@ def index_parent_and_child_docs(
             child_es_document = PositionDocument
             child_id_property = "POSITION"
         case SEARCH_TYPES.RECAP:
-            parent_es_document = DocketDocument
-            child_es_document = ESRECAPDocument
+            parent_es_document = (
+                DocketSweepDocument if sweep_index else DocketDocument
+            )
+            child_es_document = (
+                ESRECAPSweepDocument if sweep_index else ESRECAPDocument
+            )
             child_id_property = "RECAP"
         case SEARCH_TYPES.OPINION:
             parent_es_document = OpinionClusterDocument
@@ -1072,7 +1078,7 @@ def index_parent_or_child_docs(
     search_type: str,
     document_type: str | None,
     testing_mode: bool = False,
-    nested: bool = False,
+    sweep_index: bool = False,
 ) -> None:
     """Index parent or child documents in Elasticsearch.
 
@@ -1092,9 +1098,11 @@ def index_parent_or_child_docs(
     match search_type:
         case SEARCH_TYPES.RECAP:
             parent_es_document = (
-                RECAPNestedDocument if nested else DocketDocument
+                DocketSweepDocument if sweep_index else DocketDocument
             )
-            child_es_document = ESRECAPDocument
+            child_es_document = (
+                ESRECAPSweepDocument if sweep_index else ESRECAPDocument
+            )
             child_id_property = "RECAP"
             if document_type == "parent":
                 parent_instances = Docket.objects.filter(pk__in=instance_ids)

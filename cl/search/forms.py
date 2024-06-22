@@ -221,6 +221,16 @@ class SearchForm(forms.Form):
         ),
     )
     atty_name.as_str_types = [SEARCH_TYPES.RECAP]
+    firm_name = forms.CharField(
+        required=False,
+        label="Firm Name",
+        widget=forms.TextInput(
+            attrs={
+                "class": "external-input form-control",
+                "autocomplete": "off",
+            },
+        ),
+    )
 
     #
     # Oral argument fields

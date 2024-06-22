@@ -343,9 +343,9 @@ class Command(VerboseCommand):
             help="Use this flag to only index documents missing in the index.",
         )
         parser.add_argument(
-            "--nested",
+            "--sweep-index",
             action="store_true",
-            help="Whether to perform a indexing of Nested documents.",
+            help="Whether to perform an indexing for the sweep index.",
         )
 
     def handle(self, *args, **options):
@@ -480,7 +480,7 @@ class Command(VerboseCommand):
         pk_offset = self.options["pk_offset"]
         document_type = self.options.get("document_type", None)
         missing = self.options.get("missing", False)
-        nested = self.options.get("nested", False)
+        sweep_index = self.options.get("sweep_index", False)
         fields_map = {}
         if event_doc_type == EventTable.DOCKET:
             fields_map = recap_document_field_mapping["save"][Docket][
@@ -532,7 +532,10 @@ class Command(VerboseCommand):
                 match task_to_use:
                     case "index_parent_and_child_docs":
                         index_parent_and_child_docs.si(
-                            chunk, search_type, testing_mode=testing_mode
+                            chunk,
+                            search_type,
+                            testing_mode=testing_mode,
+                            sweep_index=sweep_index,
                         ).set(queue=queue).apply_async()
 
                     case "index_parent_or_child_docs":
@@ -541,7 +544,7 @@ class Command(VerboseCommand):
                             search_type,
                             document_type,
                             testing_mode=testing_mode,
-                            nested=nested,
+                            sweep_index=sweep_index,
                         ).set(queue=queue).apply_async()
                     case "remove_parent_and_child_docs_by_query":
                         remove_parent_and_child_docs_by_query.si(

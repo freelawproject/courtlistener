@@ -58,6 +58,8 @@ from cl.search.constants import (
     PEOPLE_ES_HL_FIELDS,
     PEOPLE_ES_HL_KEYWORD_FIELDS,
     RELATED_PATTERN,
+    SEARCH_ALERTS_DOCKET_HL_FIELDS,
+    SEARCH_ALERTS_DOCKET_KEYWORDS_HL_FIELDS,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_OPINION_HL_FIELDS,
@@ -69,7 +71,6 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
-    SEARCH_RECAP_NESTED_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     api_child_highlight_map,
 )
@@ -889,6 +890,7 @@ def build_has_child_query(
     order_by: tuple[str, str] | None = None,
     child_highlighting: bool = True,
     default_current_date: datetime.date | None = None,
+    alerts: bool = False,
 ) -> QueryString:
     """Build a 'has_child' query.
 
@@ -901,6 +903,7 @@ def build_has_child_query(
     :param child_highlighting: Whether highlighting should be enabled in child docs.
     :param default_current_date: The default current date to use for computing
      a stable date score across pagination in the V4 Search API.
+    :param alerts: If highlighting is being applied to search Alerts hits.
     :return: The 'has_child' query.
     """
 
@@ -917,8 +920,9 @@ def build_has_child_query(
             default_current_date=default_current_date,
         )
 
+    hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
     highlight_options, fields_to_exclude = build_highlights_dict(
-        highlighting_fields, SEARCH_HL_TAG, child_highlighting
+        highlighting_fields, hl_tag, child_highlighting
     )
 
     inner_hits = {
@@ -1068,7 +1072,7 @@ def build_es_base_query(
     cd: CleanData,
     child_highlighting: bool = True,
     api_version: Literal["v3", "v4"] | None = None,
-    nested_query: bool = False,
+    alerts: bool = False,
 ) -> tuple[Search, QueryString | None]:
     """Builds filters and fulltext_query based on the given cleaned
      data and returns an elasticsearch query.
@@ -1077,7 +1081,7 @@ def build_es_base_query(
     :param cd: The cleaned data object containing the query and filters.
     :param child_highlighting: Whether highlighting should be enabled in child docs.
     :param api_version: Optional, the request API version.
-    :param nested_query: Whether to perform a nested query.
+    :param alerts: If highlighting is being applied to search Alerts hits.
     :return: A two-tuple, the Elasticsearch search query object and an ES
     QueryString for child documents, or None if there is no need to query
     child documents.
@@ -1155,15 +1159,6 @@ def build_es_base_query(
                     ],
                 )
             )
-            nested_child_fields = SEARCH_RECAP_NESTED_CHILD_QUERY_FIELDS.copy()
-            nested_child_fields.extend(
-                add_fields_boosting(
-                    cd,
-                    [
-                        "description",
-                    ],
-                )
-            )
             child_query_fields = {"recap_document": child_fields}
             parent_query_fields = SEARCH_RECAP_PARENT_QUERY_FIELDS.copy()
             parent_query_fields.extend(
@@ -1175,21 +1170,14 @@ def build_es_base_query(
                     ],
                 )
             )
-
-            if nested_query:
-                main_query, _ = build_full_nested_es_queries(
-                    cd,
-                    nested_child_fields,
-                    parent_query_fields,
-                )
-            else:
-                main_query, join_query = build_full_join_es_queries(
-                    cd,
-                    child_query_fields,
-                    parent_query_fields,
-                    child_highlighting=child_highlighting,
-                    api_version=api_version,
-                )
+            main_query, join_query = build_full_join_es_queries(
+                cd,
+                child_query_fields,
+                parent_query_fields,
+                child_highlighting=child_highlighting,
+                api_version=api_version,
+                alerts=alerts,
+            )
 
         case SEARCH_TYPES.OPINION:
             str_query = cd.get("q", "")
@@ -1300,7 +1288,7 @@ def build_child_docs_query(
         query
         for query in parent_filters
         if isinstance(query, QueryString)
-        and query.fields[0] in ["party", "attorney"]
+        and query.fields[0] in ["party", "attorney", "firm"]
     ]
     parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
@@ -1475,7 +1463,15 @@ def add_es_highlighting(
             highlighting_fields = PEOPLE_ES_HL_FIELDS
             highlighting_keyword_fields = PEOPLE_ES_HL_KEYWORD_FIELDS
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            highlighting_fields = SEARCH_RECAP_HL_FIELDS
+            highlighting_fields = (
+                SEARCH_ALERTS_DOCKET_HL_FIELDS
+                if alerts
+                else SEARCH_RECAP_HL_FIELDS
+            )
+            if alerts:
+                highlighting_keyword_fields = (
+                    SEARCH_ALERTS_DOCKET_KEYWORDS_HL_FIELDS
+                )
         case SEARCH_TYPES.OPINION:
             highlighting_fields = SEARCH_OPINION_HL_FIELDS
 
@@ -2006,14 +2002,11 @@ def fetch_es_results(
     return [], 0, error, None, None
 
 
-def build_has_child_filters(
-    cd: CleanData, nested_query=False
-) -> list[QueryString]:
+def build_has_child_filters(cd: CleanData) -> list[QueryString]:
     """Builds Elasticsearch 'has_child' filters based on the given child type
     and CleanData.
 
     :param cd: The user input CleanedData.
-    :param nested_query: Whether to perform a nested query.
     :return: A list of QueryString objects containing the 'has_child' filters.
     """
 
@@ -2047,36 +2040,22 @@ def build_has_child_filters(
         attachment_number = cd.get("attachment_number", "")
 
         if available_only:
-            field = (
-                "is_available"
-                if not nested_query
-                else "documents.is_available"
-            )
             queries_list.extend(
                 build_term_query(
-                    field,
+                    "is_available",
                     available_only,
                 )
             )
         if description:
-            field = (
-                "description" if not nested_query else "documents.description"
-            )
-            queries_list.extend(build_text_filter(field, description))
+            queries_list.extend(build_text_filter("description", description))
         if document_number:
-            field = (
-                "document_number"
-                if not nested_query
-                else "documents.document_number"
+            queries_list.extend(
+                build_term_query("document_number", document_number)
             )
-            queries_list.extend(build_term_query(field, document_number))
         if attachment_number:
-            field = (
-                "attachment_number"
-                if not nested_query
-                else "documents.attachment_number"
+            queries_list.extend(
+                build_term_query("attachment_number", attachment_number)
             )
-            queries_list.extend(build_term_query(field, attachment_number))
 
     return queries_list
 
@@ -2133,6 +2112,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                 *build_text_filter("referredTo", cd.get("referred_to", "")),
                 *build_text_filter("party", cd.get("party_name", "")),
                 *build_text_filter("attorney", cd.get("atty_name", "")),
+                *build_text_filter("firm", cd.get("firm_name", "")),
                 *build_daterange_query(
                     "dateFiled",
                     cd.get("filed_before", ""),
@@ -2357,6 +2337,7 @@ def build_full_join_es_queries(
     mlt_query: Query | None = None,
     child_highlighting: bool = True,
     api_version: Literal["v3", "v4"] | None = None,
+    alerts: bool = False,
 ) -> tuple[QueryString | list, QueryString | None]:
     """Build a complete Elasticsearch query with both parent and child document
       conditions.
@@ -2367,6 +2348,7 @@ def build_full_join_es_queries(
     :param mlt_query: the More Like This Query object.
     :param child_highlighting: Whether highlighting should be enabled in child docs.
     :param api_version: Optional, the request API version.
+    :param alerts: If highlighting is being applied to search Alerts hits.
     :return: An Elasticsearch QueryString object.
     """
 
@@ -2411,7 +2393,7 @@ def build_full_join_es_queries(
             query
             for query in parent_filters
             if isinstance(query, QueryString)
-            and query.fields[0] in ["party", "attorney"]
+            and query.fields[0] in ["party", "attorney", "firm"]
         ]
         has_parent_parties_filter = build_has_parent_parties_query(
             parties_filters
@@ -2425,7 +2407,7 @@ def build_full_join_es_queries(
                     query
                     for query in parent_filters
                     if not isinstance(query, QueryString)
-                    or query.fields[0] not in ["party", "attorney"]
+                    or query.fields[0] not in ["party", "attorney", "firm"]
                 ]
             )
             if parties_filters:
@@ -2473,6 +2455,7 @@ def build_full_join_es_queries(
                 get_function_score_sorting_key(cd, api_version),
                 child_highlighting=child_highlighting,
                 default_current_date=cd.get("request_date"),
+                alerts=alerts,
             )
 
         if parties_filters and not has_child_query:
@@ -2487,6 +2470,7 @@ def build_full_join_es_queries(
                 SEARCH_RECAP_CHILD_HL_FIELDS,
                 get_function_score_sorting_key(cd, api_version),
                 default_current_date=cd.get("request_date"),
+                alerts=alerts,
             )
 
         if has_child_query:
@@ -3055,175 +3039,10 @@ def do_es_alert_estimation_query(
     return estimation_query.count()
 
 
-def build_nested_child_query(
-    query: QueryString | str,
-    child_type: str,
-    child_hits_limit: int,
-    highlighting_fields: dict[str, int] | None = None,
-) -> QueryString:
-    """Build a nested query.
-
-    :param query: The Elasticsearch query string or QueryString object.
-    :param child_type: The type of the child document.
-    :param child_hits_limit: The maximum number of child hits to be returned.
-    :param highlighting_fields: List of fields to highlight in child docs.
-    :return: The 'has_child' query.
-    """
-
-    highlight_options, fields_to_exclude = build_highlights_dict(
-        highlighting_fields, SEARCH_HL_TAG
-    )
-    inner_hits = {
-        "name": f"filter_query_inner_{child_type}",
-        "size": child_hits_limit,
-        "_source": {
-            "excludes": fields_to_exclude,
-        },
-    }
-    if highlight_options:
-        inner_hits["highlight"] = highlight_options
-
-    return Q(
-        "nested",
-        path="documents",
-        score_mode="max",
-        query=query,
-        inner_hits=inner_hits,
-    )
-
-
-def build_full_nested_es_queries(
-    cd: CleanData,
-    child_query_fields: list[str],
-    parent_query_fields: list[str],
-) -> tuple[QueryString | list, QueryString | None]:
-    """Build a complete Elasticsearch query with both parent and nested
-    documents conditions.
-
-    :param cd: The query CleanedData
-    :param child_query_fields: A dictionary mapping child fields document type.
-    :param parent_query_fields: A list of fields for the parent document.
-    :return: An Elasticsearch QueryString object.
-    """
-
-    q_should = []
-    child_query = None
-    if cd["type"] in [
-        SEARCH_TYPES.RECAP,
-        SEARCH_TYPES.DOCKETS,
-        SEARCH_TYPES.RECAP_DOCUMENT,
-        SEARCH_TYPES.OPINION,
-        SEARCH_TYPES.PEOPLE,
-    ]:
-        # Build child filters.
-        child_filters = build_has_child_filters(cd, nested_query=True)
-        # Copy the original child_filters before appending parent fields.
-        # For its use later in the parent filters.
-        child_filters_original = deepcopy(child_filters)
-        # Build child text query.
-        child_fields = [f"documents.{field}" for field in child_query_fields]
-        child_text_query = build_fulltext_query(
-            child_fields, cd.get("q", ""), only_queries=True
-        )
-
-        # Build parent filters.
-        parent_filters = build_join_es_filters(cd)
-
-        # Build the child query based on child_filters and child child_text_query
-        match child_filters, child_text_query:
-            case [], []:
-                pass
-            case [], _:
-                child_query = Q(
-                    "bool",
-                    should=child_text_query,
-                    minimum_should_match=1,
-                )
-            case _, []:
-                child_query = Q(
-                    "bool",
-                    filter=child_filters,
-                )
-            case _, _:
-                child_query = Q(
-                    "bool",
-                    filter=child_filters,
-                    should=child_text_query,
-                    minimum_should_match=1,
-                )
-
-        _, query_hits_limit = get_child_top_hits_limit(cd, cd["type"])
-        has_child_query = None
-        if child_text_query or child_filters:
-            hl_fields = api_child_highlight_map.get((True, cd["type"]), {})
-            has_child_query = build_nested_child_query(
-                child_query,
-                "recap_document",
-                query_hits_limit,
-                hl_fields,
-            )
-
-        if has_child_query:
-            q_should.append(has_child_query)
-
-        # Build the parent filter and text queries.
-        string_query = build_fulltext_query(
-            parent_query_fields, cd.get("q", ""), only_queries=True
-        )
-
-        # If child filters are set, add a nested query as a filter to the
-        # parent query to exclude results without matching children.
-        if child_filters_original:
-            parent_filters.append(
-                Q(
-                    "nested",
-                    path="documents",
-                    score_mode="max",
-                    query=Q("bool", filter=child_filters_original),
-                )
-            )
-        parent_query = None
-        match parent_filters, string_query:
-            case [], []:
-                pass
-            case [], _:
-                parent_query = Q(
-                    "bool",
-                    should=string_query,
-                    minimum_should_match=1,
-                )
-            case _, []:
-                parent_query = Q(
-                    "bool",
-                    filter=parent_filters,
-                )
-            case _, _:
-                parent_query = Q(
-                    "bool",
-                    filter=parent_filters,
-                    should=string_query,
-                    minimum_should_match=1,
-                )
-        if parent_query:
-            q_should.append(parent_query)
-
-    if not q_should:
-        return [], child_query
-
-    final_query = Q(
-        "bool",
-        should=q_should,
-    )
-    return (
-        final_query,
-        child_query,
-    )
-
-
 def do_es_sweep_nested_query(
     search_query: Search,
     cd: CleanData,
-) -> tuple[list[defaultdict] | None, int | None]:
+) -> tuple[list[Hit] | None, int | None]:
     """Build an ES query for its use in the daily RECAP sweep index.
 
     :param search_query: Elasticsearch DSL Search object.
@@ -3241,19 +3060,15 @@ def do_es_sweep_nested_query(
 
     hits = None
     try:
-        s, _ = build_es_base_query(
-            search_query,
-            cd,
-            True,
-            nested_query=True,
-        )
+        s, _ = build_es_base_query(search_query, cd, True, alerts=True)
     except (
         UnbalancedParenthesesQuery,
         UnbalancedQuotesQuery,
         BadProximityQuery,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
-    main_query = add_es_highlighting(s, cd, highlighting=True)
+    main_query = add_es_highlighting(s, cd, alerts=True)
+    main_query = main_query.sort(build_sort_results(cd))
     main_query = main_query.extra(from_=0, size=30)
     results = main_query.execute()
     if results:
@@ -3272,3 +3087,21 @@ def do_es_sweep_nested_query(
             result["child_docs"] = child_result_objects
 
     return results, hits
+
+
+def docket_field_matched(hit: Hit) -> bool:
+    """Determine whether HL matched a Docket field.
+
+    :param hit: The ES hit.
+    :return: True if the hit matched a Docket field. Otherwise, False.
+    """
+
+    plain_hl = set(SEARCH_ALERTS_DOCKET_KEYWORDS_HL_FIELDS)
+    vector_hl = set(SEARCH_ALERTS_DOCKET_HL_FIELDS.keys())
+    docket_hl = set()
+    if hasattr(hit.meta, "highlight"):
+        highlights = hit.meta.highlight.to_dict()
+        docket_hl = set([hl for hl in highlights.keys()])
+    if docket_hl.issubset(plain_hl.union(vector_hl)):
+        return True
+    return False

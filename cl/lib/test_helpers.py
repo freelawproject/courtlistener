@@ -278,15 +278,19 @@ docket_api_common_keys = {
     ),
     "court_id": lambda x: x["result"].docket_entry.docket.court.pk,
     "dateArgued": lambda x: (
-        (
-            x["result"].docket_entry.docket.date_argued.isoformat()
-            if x.get("V4")
-            else midnight_pt_test(
-                x["result"].docket_entry.docket.date_argued
-            ).isoformat()
+        x["dateArgued"]
+        if x.get("dateArgued")
+        else (
+            (
+                x["result"].docket_entry.docket.date_argued.isoformat()
+                if x.get("V4")
+                else midnight_pt_test(
+                    x["result"].docket_entry.docket.date_argued
+                ).isoformat()
+            )
+            if x["result"].docket_entry.docket.date_argued
+            else None
         )
-        if x["result"].docket_entry.docket.date_argued
-        else None
     ),
     "dateFiled": lambda x: (
         (
@@ -315,7 +319,11 @@ docket_api_common_keys = {
         if x.get("docketNumber")
         else x["result"].docket_entry.docket.docket_number
     ),
-    "docket_id": lambda x: x["result"].docket_entry.docket_id,
+    "docket_id": lambda x: (
+        x["docket_id"]
+        if x.get("docket_id")
+        else x["result"].docket_entry.docket_id
+    ),
     "jurisdictionType": lambda x: x[
         "result"
     ].docket_entry.docket.jurisdiction_type,
@@ -348,10 +356,14 @@ docket_api_common_keys = {
 recap_type_v4_api_keys = docket_api_common_keys.copy()
 recap_type_v4_api_keys.update(
     {
-        "attorney": lambda x: list(
-            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-                "attorney"
-            ]
+        "attorney": lambda x: (
+            x["attorney"]
+            if x.get("attorney")
+            else list(
+                DocketDocument().prepare_parties(
+                    x["result"].docket_entry.docket
+                )["attorney"]
+            )
         ),
         "attorney_id": lambda x: list(
             DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
@@ -371,10 +383,14 @@ recap_type_v4_api_keys.update(
         "docket_absolute_url": lambda x: x[
             "result"
         ].docket_entry.docket.get_absolute_url(),
-        "firm": lambda x: list(
-            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-                "firm"
-            ]
+        "firm": lambda x: (
+            x["firm"]
+            if x.get("firm")
+            else list(
+                DocketDocument().prepare_parties(
+                    x["result"].docket_entry.docket
+                )["firm"]
+            )
         ),
         "firm_id": lambda x: list(
             DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
@@ -386,10 +402,14 @@ recap_type_v4_api_keys.update(
             if x["result"].docket_entry.docket.pacer_case_id
             else ""
         ),
-        "party": lambda x: list(
-            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-                "party"
-            ]
+        "party": lambda x: (
+            x["party"]
+            if x.get("party")
+            else list(
+                DocketDocument().prepare_parties(
+                    x["result"].docket_entry.docket
+                )["party"]
+            )
         ),
         "party_id": lambda x: list(
             DocketDocument().prepare_parties(x["result"].docket_entry.docket)[

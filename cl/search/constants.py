@@ -96,11 +96,6 @@ SEARCH_RECAP_PARENT_QUERY_FIELDS = [
     "chapter",
     "trustee_str",
 ]
-SEARCH_RECAP_NESTED_CHILD_QUERY_FIELDS = [
-    "short_description",
-    "plain_text",
-    "document_type",
-]
 SEARCH_OPINION_QUERY_FIELDS = [
     "court",
     "court_id",
@@ -159,6 +154,34 @@ SEARCH_RECAP_HL_FIELDS = {
     "juryDemand": 0,
     "referredTo": 0,
     "suitNature": 0,
+}
+
+SEARCH_ALERTS_DOCKET_HL_FIELDS = {
+    "assignedTo": 0,
+    "caseName": 0,
+    "cause": 0,
+    "court_citation_string": 0,
+    "docketNumber": 0,
+    "juryDemand": 0,
+    "referredTo": 0,
+    "suitNature": 0,
+    "party": 0,
+    "attorney": 0,
+    "firm": 0,
+}
+
+SEARCH_ALERTS_DOCKET_KEYWORDS_HL_FIELDS = {
+    "docket_id",
+    "court_id",
+    "firm_id",
+    "assigned_to_id",
+    "referred_to_id",
+    "dateFiled",
+    "dateArgued",
+    "dateTerminated",
+    "jurisdictionType",
+    "chapter",
+    "trustee_str",
 }
 
 SEARCH_OPINION_HL_FIELDS = {

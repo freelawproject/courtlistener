@@ -528,6 +528,7 @@ class BaseDocketESResultSerializer(DocumentSerializer):
     attorney = NoneToListField(read_only=True, required=False)
     firm_id = NoneToListField(read_only=True, required=False)
     firm = NoneToListField(read_only=True, required=False)
+    docket_id = HighlightedField(read_only=True)
 
     class Meta:
         document = DocketDocument
@@ -730,19 +731,4 @@ class V3RECAPDocumentESResultSerializer(DocumentSerializer):
             "cites",
             "pacer_doc_id",
             "trustee_str",
-        )
-
-
-class RECAPNestedResultSerializer(
-    RECAPMetaMixin, BaseDocketESResultSerializer
-):
-    """The serializer class for RECAP search type results."""
-
-    recap_documents = BaseRECAPDocumentESResultSerializer(
-        many=True, read_only=True, source="child_docs"
-    )
-
-    class Meta(BaseDocketESResultSerializer.Meta):
-        exclude = BaseDocketESResultSerializer.Meta.exclude + (
-            "docket_absolute_url",
         )
