@@ -136,13 +136,13 @@ class BaseCourtUploadForm(forms.Form):
 
     court_str = forms.CharField(required=True, widget=forms.HiddenInput())
     case_title = forms.CharField(
-        label="Caption",
+        label="Case Title",
         required=True,
         help_text=Docket.case_name_full.field.help_text,
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
-                "placeholder": "Caption",
+                "placeholder": "Apple v. Google",
                 "autocomplete": "off",
             }
         ),
@@ -150,7 +150,7 @@ class BaseCourtUploadForm(forms.Form):
     docket_number = forms.CharField(
         label="Docket Number",
         required=True,
-        help_text=Docket.docket_number.field.help_text,
+        help_text="The docket number for the case.",
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
@@ -216,7 +216,7 @@ class BaseCourtUploadForm(forms.Form):
             widget=forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Author",
+                    "placeholder": "Roberts, CJ.",
                     "autocomplete": "off",
                 }
             ),
@@ -235,7 +235,7 @@ class BaseCourtUploadForm(forms.Form):
             widget=forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "Smith, Ginsburg, Scalia etc.",
+                    "placeholder": "Roberts, Ginsburg, Scalia",
                     "autocomplete": "off",
                 }
             ),
@@ -329,13 +329,13 @@ class BaseCourtUploadForm(forms.Form):
         """
         self.fields["download_url"] = forms.URLField(
             validators=[URLValidator()],
-            label="Download Url",
+            label="Download URL",
             help_text=Opinion.download_url.field.help_text,
             required=required,
             widget=forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "https://www",
+                    "placeholder": "",
                     "autocomplete": "off",
                 }
             ),
