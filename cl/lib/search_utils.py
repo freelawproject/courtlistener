@@ -356,7 +356,7 @@ def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
     and 44 F.2d 92. I.e., this ensures that queries don't span citations. This
     works because internally Solr uses proximity to create multiValue fields.
 
-    See: http://stackoverflow.com/a/33858649/64911 and
+    See: https://stackoverflow.com/a/33858649/64911 and
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
