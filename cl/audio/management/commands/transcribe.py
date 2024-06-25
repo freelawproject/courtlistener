@@ -36,6 +36,8 @@ def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
             audio.pk,
             size_mb,
         )
+        audio.stt_status = Audio.STT_FILE_TOO_BIG
+        audio.save()
     except (FileNotFoundError, ValueError):
         # FileNotFoundError: when the name does not exist in the bucket
         # ValueError: when local_path_mp3 is None or a null FileField
@@ -43,6 +45,8 @@ def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
             "Audio id %s has no local_path_mp3, needs reprocessing",
             audio.pk,
         )
+        audio.stt_status = Audio.STT_NO_FILE
+        audio.save()
 
     return False
 
@@ -76,7 +80,8 @@ def handle_open_ai_transcriptions(options) -> None:
 
         valid_count += 1
         transcribe_from_open_ai_api.apply_async(
-            args=(audio.pk,), queue=options["queue"]
+            args=(audio.pk, options["dont_retry_task"]),
+            queue=options["queue"],
         )
 
         # For parallel processing: seed RPM requests per minute
@@ -124,6 +129,13 @@ class Command(VerboseCommand):
             "--queue",
             default="batch1",
             help="The celery queue where the tasks should be processed.",
+        )
+        parser.add_argument(
+            "--dont-retry-task",
+            default=False,
+            action="store_true",
+            help="""Do not retry celery tasks. Useful to monitor or
+            debug API requests""",
         )
 
     def handle(self, *args: list[str], **options: OptionsType) -> None:
