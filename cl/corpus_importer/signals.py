@@ -39,10 +39,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     )
     incoming_pacer_case_id = int(docket.pacer_case_id)
     found_higher_case_id = False
-    if (
-        highest_known_pacer_case_id
-        and incoming_pacer_case_id > highest_known_pacer_case_id
-    ):
+    if incoming_pacer_case_id > highest_known_pacer_case_id:
         r.hset(
             "iquery:highest_known_pacer_case_id",
             court_id,
@@ -63,7 +60,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
             # iquery_pacer_case_id_current for the court in Redis.
             logger.error(
                 "Tried to schedule more than 10,800 iquery pages to scrape for "
-                "court %s . Aborting it to avoid Celery runaways.",
+                "court %s aborting it to avoid Celery runaways.",
                 court_id,
             )
             release_redis_lock(r, update_lock_key, lock_value)
