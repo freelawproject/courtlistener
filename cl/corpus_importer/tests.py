@@ -3345,7 +3345,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
     return_value=None,
 )
 @override_settings(
-    IQUERY_PROBE_MAX_CONSECUTIVE_FAILURES=2,
+    IQUERY_PROBE_DAEMON_ENABLED=True,
     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
 )
 class ScrapeIqueryPagesTest(TestCase):
@@ -3542,8 +3542,8 @@ class ScrapeIqueryPagesTest(TestCase):
     )
     @patch("cl.corpus_importer.tasks.logger")
     def test_iquery_pages_probe_court_timeout(self, mock_logger, mock_cookies):
-        """Test a CaseQuery request times out. Wait IQUERY_COURT_TIMEOUT_WAIT
-        seconds before trying the next pacer_case_id."""
+        """Test a CaseQuery request times out. Abort the task after an iquery
+        page retrieval fails after individual retries."""
 
         r = get_redis_interface("CACHE")
         # Simulate a highest_known_pacer_case_id  = 8

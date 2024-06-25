@@ -1405,10 +1405,10 @@ def probe_iquery_pages(
         except HTTPError:
             # Set expiration accordingly and value to 2 to difference from
             # other waiting times.
-            r.setex(
+            r.set(
                 f"iquery:court_wait:{court_id}",
-                settings.IQUERY_COURT_BLOCKED_WAIT,
                 2,
+                settings.IQUERY_COURT_BLOCKED_WAIT,
             )
             logger.warning(
                 "HTTPError occurred when crawling iquery. The court %s website "

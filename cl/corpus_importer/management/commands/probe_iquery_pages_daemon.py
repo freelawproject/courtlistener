@@ -58,7 +58,7 @@ class Command(VerboseCommand):
         iterations_completed = 0
         r = get_redis_interface("CACHE")
         testing = True if testing_iterations else False
-        while True:
+        while True and settings.IQUERY_PROBE_DAEMON_ENABLED:
             for court_id in court_ids:
                 if r.exists(f"iquery:court_wait:{court_id}"):
                     continue

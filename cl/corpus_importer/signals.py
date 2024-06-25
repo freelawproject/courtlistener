@@ -6,6 +6,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from cl.corpus_importer.tasks import make_docket_by_iquery_sweep
+from cl.lib.command_utils import logger
 from cl.lib.redis_utils import (
     acquire_redis_lock,
     get_redis_interface,
@@ -23,7 +24,7 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     """
 
     r = get_redis_interface("CACHE")
-    court_id = docket.court_id
+    court_id: str = docket.court_id
     # Get the latest pacer_case_id from Redis using a lock to avoid race conditions
     # when getting and updating it.
     update_lock_key = make_update_pacer_case_id_key(court_id)
@@ -38,7 +39,10 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
     )
     incoming_pacer_case_id = int(docket.pacer_case_id)
     found_higher_case_id = False
-    if incoming_pacer_case_id > highest_known_pacer_case_id:
+    if (
+        highest_known_pacer_case_id
+        and incoming_pacer_case_id > highest_known_pacer_case_id
+    ):
         r.hset(
             "iquery:highest_known_pacer_case_id",
             court_id,
@@ -47,8 +51,24 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
         found_higher_case_id = True
 
     if found_higher_case_id:
+        tasks_to_schedule = (
+            incoming_pacer_case_id - iquery_pacer_case_id_current
+        )
+        if tasks_to_schedule > 10_800:
+            # Considering a Celery countdown of 1 second and a visibility_timeout
+            # of 6 hours, the maximum countdown time should be set to 21,600 to
+            # avoid a celery runaway. It's safer to abort if more than 10,800
+            # tasks are attempted to be scheduled. This could indicate an issue
+            # with retrieving the highest_known_pacer_case_id or a loss of the
+            # iquery_pacer_case_id_current for the court in Redis.
+            logger.error(
+                "Tried to schedule more than 10,800 iquery pages to scrape for "
+                "court %s . Aborting it to avoid Celery runaways.",
+                court_id,
+            )
+            release_redis_lock(r, update_lock_key, lock_value)
+            return None
         task_scheduled_countdown = 0
-
         while iquery_pacer_case_id_current + 1 < incoming_pacer_case_id:
             iquery_pacer_case_id_current += 1
             task_scheduled_countdown += 1
@@ -104,7 +124,6 @@ def handle_update_latest_case_id_and_schedule_iquery_sweep(
     if (
         created
         and instance.pacer_case_id
-        and getattr(instance, "court", None)
         and instance.court_id
         in list(
             Court.federal_courts.district_or_bankruptcy_pacer_courts()

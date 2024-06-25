@@ -1052,7 +1052,7 @@ def compute_binary_probe_jitter(testing: bool) -> int:
 def compute_next_binary_probe(
     highest_known_pacer_case_id: int, iteration: int, jitter: int
 ) -> int:
-    """Compute the next binary  probe target for a given PACER case ID.
+    """Compute the next binary probe target for a given PACER case ID.
 
     This computes the next value of a geometric binary sequence (2 ** (N - 1))
     where N is the current probe iteration. In non-testing mode a jitter is

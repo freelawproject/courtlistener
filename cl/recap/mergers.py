@@ -1668,7 +1668,7 @@ def save_iquery_to_docket(
     d: Docket,
     tag_names: Optional[List[str]],
     add_to_solr: bool = False,
-    avoid_trigger_signal=False,
+    avoid_trigger_signal: bool = False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 

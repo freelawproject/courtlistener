@@ -79,7 +79,7 @@ def make_update_pacer_case_id_key(court_id: str) -> str:
     return f"update.pacer_case_id:{court_id}"
 
 
-def acquire_redis_lock(r: Redis, key, ttl: int) -> str:
+def acquire_redis_lock(r: Redis, key: str, ttl: int) -> str:
     """Acquires a lock in Redis.
 
     This method attempts to acquire a lock with the given key and TTL in Redis.
@@ -99,7 +99,7 @@ def acquire_redis_lock(r: Redis, key, ttl: int) -> str:
         time.sleep(0.1)
 
 
-def release_redis_lock(r: Redis, key, identifier: str) -> int:
+def release_redis_lock(r: Redis, key: str, identifier: str) -> int:
     """Releases an atomic lock in Redis.
 
     This method releases the lock with the given key and identifier in Redis.
