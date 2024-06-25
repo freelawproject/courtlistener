@@ -1,5 +1,5 @@
-import traceback
 import datetime
+import traceback
 
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
@@ -7,32 +7,35 @@ from django.http import QueryDict
 from django.utils.timezone import now
 from elasticsearch.exceptions import RequestError, TransportError
 
+from cl.alerts.models import Alert
+from cl.alerts.tasks import send_search_alert_emails
+from cl.alerts.utils import query_includes_rd_field, recap_document_hl_matched
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.search.documents import DocketSweepDocument
-from cl.search.models import SEARCH_TYPES
-from cl.stats.utils import tally_stat
-from cl.alerts.tasks import send_search_alert_emails
-from cl.alerts.models import Alert
 from cl.search.exception import (
     BadProximityQuery,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
-from cl.alerts.utils import recap_document_hl_matched, query_includes_rd_field
+from cl.search.models import SEARCH_TYPES
+from cl.stats.utils import tally_stat
 
 
 def index_daily_recap_documents():
     # TODO implement
     pass
 
+
 def has_rd_hit_been_triggered():
     # TODO implement
     return False
 
+
 def has_docket_hit_been_triggered():
     # TODO implement
     return True
+
 
 def query_and_send_alerts(rate):
     alert_users = User.objects.filter(alerts__rate=rate).distinct()
@@ -54,13 +57,16 @@ def query_and_send_alerts(rate):
                     search_query,
                     search_params,
                 )
-            except (UnbalancedParenthesesQuery,
-        UnbalancedQuotesQuery,
-        BadProximityQuery,TransportError, ConnectionError, RequestError):
+            except (
+                UnbalancedParenthesesQuery,
+                UnbalancedQuotesQuery,
+                BadProximityQuery,
+                TransportError,
+                ConnectionError,
+                RequestError,
+            ):
                 traceback.print_exc()
-                logger.info(
-                    f"Search for this alert failed: {alert.query}\n"
-                )
+                logger.info(f"Search for this alert failed: {alert.query}\n")
                 continue
 
             alerts_to_update.append(alert.pk)
@@ -69,9 +75,12 @@ def query_and_send_alerts(rate):
                 results_to_send = []
                 for hit in results:
                     if not includes_rd_fields:
-                        rds_to_send = [rd_hit for rd_hit in hit["child_docs"]
-                                       if not recap_document_hl_matched(
-                                rd_hit) and not has_rd_hit_been_triggered()]
+                        rds_to_send = [
+                            rd_hit
+                            for rd_hit in hit["child_docs"]
+                            if not recap_document_hl_matched(rd_hit)
+                            and not has_rd_hit_been_triggered()
+                        ]
                         if rds_to_send:
                             hit["child_docs"] = rds_to_send
                             results_to_send.append(hit)
