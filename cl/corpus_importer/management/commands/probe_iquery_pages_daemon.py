@@ -71,6 +71,9 @@ class Command(VerboseCommand):
                             args=(court_id, testing),
                             queue=settings.CELERY_IQUERY_QUEUE,
                         )
+                        logger.info(
+                            "Enqueued iquery probing for court %s", court_id
+                        )
                 except ConnectionError:
                     logger.info(
                         "Failed to connect to redis. Waiting a bit and making "

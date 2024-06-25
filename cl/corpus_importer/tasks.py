@@ -1448,12 +1448,23 @@ def probe_iquery_pages(
         if index == len(reports_data) - 1:
             # Only trigger the sweep signal on the last hit.
             avoid_trigger_signal = False
-        process_case_query_report(
-            court_id,
-            pacer_case_id=report_data[0],
-            report_data=report_data[1],
-            avoid_trigger_signal=avoid_trigger_signal,
-        )
+        try:
+            process_case_query_report(
+                court_id,
+                pacer_case_id=report_data[0],
+                report_data=report_data[1],
+                avoid_trigger_signal=avoid_trigger_signal,
+            )
+        except IntegrityError:
+            # Individual IntegrityError retries failed for the report. Log the
+            # error and try the next report.
+            logger.error(
+                "IntegrityError occurred when processing iquery page for "
+                "court: %s and pacer_case_id: %s",
+                court_id,
+                report_data[0],
+            )
+            continue
     delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
 
 
