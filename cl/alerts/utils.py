@@ -4,7 +4,7 @@ from datetime import date
 from django.conf import settings
 from django.http import QueryDict
 from elasticsearch_dsl import Q, Search
-from elasticsearch_dsl.response import Response
+from elasticsearch_dsl.response import Hit, Response
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -14,9 +14,15 @@ from cl.alerts.models import (
 )
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import add_es_highlighting
+from cl.lib.types import CleanData
+from cl.search.constants import (
+    ALERTS_HL_TAG,
+    SEARCH_RECAP_CHILD_HL_FIELDS,
+    recap_document_filters,
+    recap_document_indexed_fields,
+)
 from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES, Docket
-from cl.users.models import UserProfile
 
 
 @dataclass
@@ -137,4 +143,47 @@ def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
             f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} hits stored for this alert."
         )
         return True
+    return False
+
+
+def recap_document_hl_matched(rd_hit: Hit) -> bool:
+    """Determine whether HL matched a RECAPDocument text field.
+
+    :param rd_hit: The ES hit.
+    :return: True if the hit matched a RECAPDocument field. Otherwise, False.
+    """
+
+    matched_rd_hl = set()
+    rd_hl_fields = set(SEARCH_RECAP_CHILD_HL_FIELDS.keys())
+    if hasattr(rd_hit, "highlight"):
+        highlights = rd_hit.highlight.to_dict()
+        matched_rd_hl.update(
+            hl_key
+            for hl_key, hl_value in highlights.items()
+            for hl in hl_value
+            if f"<{ALERTS_HL_TAG}>" in hl
+        )
+    if matched_rd_hl and matched_rd_hl.issubset(rd_hl_fields):
+        return True
+    return False
+
+
+def query_includes_rd_field(query_params: CleanData) -> bool:
+    """Determine whether the query includes any indexed fields in the query
+    string or filters specific to RECAP Documents.
+
+    :param query_params: The query parameters.
+    :return: True if any recap document fields or filters are included in the
+    query, otherwise False.
+    """
+
+    query_string = query_params.get("q", "")
+    for rd_field in recap_document_indexed_fields:
+        if f"{rd_field}:" in query_string:
+            return True
+
+    for rd_filter in recap_document_filters:
+        if query_params.get(rd_filter, ""):
+            return True
+
     return False

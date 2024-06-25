@@ -528,7 +528,6 @@ class BaseDocketESResultSerializer(DocumentSerializer):
     attorney = NoneToListField(read_only=True, required=False)
     firm_id = NoneToListField(read_only=True, required=False)
     firm = NoneToListField(read_only=True, required=False)
-    docket_id = HighlightedField(read_only=True)
 
     class Meta:
         document = DocketDocument

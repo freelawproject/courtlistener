@@ -19,8 +19,6 @@ from waffle.testutils import override_flag
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
-    do_es_sweep_nested_query,
-    docket_field_matched,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
@@ -50,12 +48,7 @@ from cl.search.api_serializers import (
     RECAPESResultSerializer,
 )
 from cl.search.api_views import SearchV4ViewSet
-from cl.search.documents import (
-    ES_CHILD_ID,
-    DocketDocument,
-    DocketSweepDocument,
-    ESRECAPDocument,
-)
+from cl.search.documents import ES_CHILD_ID, DocketDocument, ESRECAPDocument
 from cl.search.factories import (
     BankruptcyInformationFactory,
     CourtFactory,
@@ -6679,163 +6672,3 @@ class RECAPHistoryTablesIndexingTest(
         )
         if keys:
             self.r.delete(*keys)
-
-
-class RECAPSearchSweepIndexTest(
-    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
-):
-    """
-    RECAP Sweep Index Tests
-    """
-
-    version_api = "v4"
-    skip_common_tests = False
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.rebuild_index("people_db.Person")
-        cls.rebuild_index("search.Docket")
-        cls.mock_date = now().replace(day=15, hour=0)
-        with time_machine.travel(cls.mock_date, tick=False):
-            super().setUpTestData()
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
-                sweep_index=True,
-            )
-
-    async def _test_api_results_count(
-        self, params, expected_count, field_name
-    ):
-
-        search_query = DocketSweepDocument.search()
-        results, total_hits = await sync_to_async(do_es_sweep_nested_query)(
-            search_query,
-            params,
-        )
-        results = RECAPESResultSerializer(results, many=True).data
-        got = len(results)
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of search results in API with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
-        )
-        return results
-
-    async def test_cross_object_string_query_and_hl(self) -> None:
-        """Confirm a cross-object string query return the right results and
-        highlighting is properly applied.
-        """
-
-        # Docket-only query HL
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": f"id:{self.rd_api.pk} cause:(401 Civil) "
-            f"court_citation_string:Appeals juryDemand:Plaintiff "
-            f"docket_id:{self.rd_api.docket_entry.docket.pk} "
-            f"dateArgued:[2022-05-19T00:00:00Z TO 2022-05-21T00:00:00Z]",
-            "assigned_to": "George",
-            "referred_to": "George",
-            "case_name": "America vs API",
-            "docket_number": "1:24-bk-0000",
-            "nature_of_suit": "569",
-            "party_name": "Defendant John Doe",
-            "atty_name": "John Doe",
-            "firm_name": "Associates America",
-        }
-
-        # RECAP Search type HL disabled.
-        r = await self._test_api_results_count(search_params, 1, "API fields")
-        keys_count = len(r[0])
-        self.assertEqual(keys_count, len(recap_type_v4_api_keys))
-        rd_keys_count = len(r[0]["recap_documents"][0])
-        self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
-
-        content_to_compare = {
-            "result": self.rd_api,
-            "V4": True,
-            "assignedTo": "<strong>George</strong> Doe II",
-            "caseName": "<strong>America</strong> <strong>vs</strong> <strong>API</strong> Lorem",
-            "cause": "<strong>401</strong> <strong>Civil</strong>",
-            "court_citation_string": "<strong>Appeals</strong>. CA9.",
-            "docketNumber": "<strong>1:24-bk-0000</strong>",
-            "juryDemand": "<strong>Plaintiff</strong>",
-            "referredTo": "<strong>George</strong> Doe II",
-            "suitNature": "<strong>569</strong>",
-            "party": [
-                "<strong>Defendant</strong> <strong>John</strong> <strong>Doe</strong>"
-            ],
-            "firm": ["<strong>Associates</strong> <strong>America</strong>"],
-            "attorney": ["<strong>John</strong> <strong>Doe</strong>"],
-            "docket_id": f"<strong>{self.rd_api.docket_entry.docket.pk}</strong>",
-            "dateArgued": f"<strong>2022-05-19</strong>",
-        }
-        await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            recap_type_v4_api_keys,
-            recap_document_v4_api_keys,
-            v4_recap_meta_keys,
-        )
-
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "order_by": "dateFiled desc",
-        }
-        # Match all query RECAP Search type HL enabled, get snippet from ES.
-        with override_settings(NO_MATCH_HL_SIZE=50):
-            r = await self._test_api_results_count(
-                search_params, 5, "API fields"
-            )
-        content_to_compare = {
-            "result": self.rd_2,
-            "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas",
-            "V4": True,
-        }
-        await self._test_api_fields_content(
-            r,
-            content_to_compare,
-            recap_type_v4_api_keys,
-            recap_document_v4_api_keys,
-            v4_recap_meta_keys,
-        )
-
-    async def test_query_matched_docket_field(self) -> None:
-
-        # Docket-only query HL
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": f"id:{self.rd_api.pk} cause:(401 Civil) "
-            f"court_citation_string:Appeals juryDemand:Plaintiff "
-            f"docket_id:{self.rd_api.docket_entry.docket.pk} ",
-        }
-
-        search_query = DocketSweepDocument.search()
-        results, total_hits = await sync_to_async(do_es_sweep_nested_query)(
-            search_query,
-            search_params,
-        )
-        d_field_matched = docket_field_matched(results[0])
-        self.assertEqual(d_field_matched, True)
-
-        # RECAPDocument-only query HL
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": f"id:{self.rd_api.pk} short_description:(Order Letter) plain_text:(shown in the API)",
-            "description": "MOTION for Leave",
-            "document_number": "2",
-        }
-        search_query = DocketSweepDocument.search()
-        results, total_hits = await sync_to_async(do_es_sweep_nested_query)(
-            search_query,
-            search_params,
-        )
-        d_field_matched = docket_field_matched(results[0])
-        self.assertEqual(d_field_matched, False)

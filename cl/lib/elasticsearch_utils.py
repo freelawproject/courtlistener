@@ -58,8 +58,6 @@ from cl.search.constants import (
     PEOPLE_ES_HL_FIELDS,
     PEOPLE_ES_HL_KEYWORD_FIELDS,
     RELATED_PATTERN,
-    SEARCH_ALERTS_DOCKET_HL_FIELDS,
-    SEARCH_ALERTS_DOCKET_KEYWORDS_HL_FIELDS,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
     SEARCH_OPINION_HL_FIELDS,
@@ -1288,7 +1286,7 @@ def build_child_docs_query(
         query
         for query in parent_filters
         if isinstance(query, QueryString)
-        and query.fields[0] in ["party", "attorney", "firm"]
+        and query.fields[0] in ["party", "attorney"]
     ]
     parties_has_parent_query = build_has_parent_parties_query(parties_filters)
 
@@ -1463,15 +1461,7 @@ def add_es_highlighting(
             highlighting_fields = PEOPLE_ES_HL_FIELDS
             highlighting_keyword_fields = PEOPLE_ES_HL_KEYWORD_FIELDS
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            highlighting_fields = (
-                SEARCH_ALERTS_DOCKET_HL_FIELDS
-                if alerts
-                else SEARCH_RECAP_HL_FIELDS
-            )
-            if alerts:
-                highlighting_keyword_fields = (
-                    SEARCH_ALERTS_DOCKET_KEYWORDS_HL_FIELDS
-                )
+            highlighting_fields = SEARCH_RECAP_HL_FIELDS
         case SEARCH_TYPES.OPINION:
             highlighting_fields = SEARCH_OPINION_HL_FIELDS
 
@@ -2112,7 +2102,6 @@ def build_join_es_filters(cd: CleanData) -> List:
                 *build_text_filter("referredTo", cd.get("referred_to", "")),
                 *build_text_filter("party", cd.get("party_name", "")),
                 *build_text_filter("attorney", cd.get("atty_name", "")),
-                *build_text_filter("firm", cd.get("firm_name", "")),
                 *build_daterange_query(
                     "dateFiled",
                     cd.get("filed_before", ""),
@@ -2393,7 +2382,7 @@ def build_full_join_es_queries(
             query
             for query in parent_filters
             if isinstance(query, QueryString)
-            and query.fields[0] in ["party", "attorney", "firm"]
+            and query.fields[0] in ["party", "attorney"]
         ]
         has_parent_parties_filter = build_has_parent_parties_query(
             parties_filters
@@ -3039,7 +3028,7 @@ def do_es_alert_estimation_query(
     return estimation_query.count()
 
 
-def do_es_sweep_nested_query(
+def do_es_sweep_alert_query(
     search_query: Search,
     cd: CleanData,
 ) -> tuple[list[Hit] | None, int | None]:
@@ -3058,21 +3047,16 @@ def do_es_sweep_nested_query(
     else:
         return None, None
 
-    hits = None
-    try:
-        s, _ = build_es_base_query(search_query, cd, True, alerts=True)
-    except (
-        UnbalancedParenthesesQuery,
-        UnbalancedQuotesQuery,
-        BadProximityQuery,
-    ) as e:
-        raise ElasticBadRequestError(detail=e.message)
+    total_hits = None
+
+    s, _ = build_es_base_query(search_query, cd, True, alerts=True)
+
     main_query = add_es_highlighting(s, cd, alerts=True)
     main_query = main_query.sort(build_sort_results(cd))
     main_query = main_query.extra(from_=0, size=30)
     results = main_query.execute()
     if results:
-        hits = results.hits.total.value
+        total_hits = results.hits.total.value
 
     limit_inner_hits({}, results, cd["type"])
     set_results_highlights(results, cd["type"])
@@ -3081,27 +3065,7 @@ def do_es_sweep_nested_query(
         child_result_objects = []
         if hasattr(result, "child_docs"):
             for child_doc in result.child_docs:
-                child_result_objects.append(
-                    defaultdict(lambda: None, child_doc["_source"].to_dict())
-                )
+                child_result_objects.append(child_doc.to_dict())
             result["child_docs"] = child_result_objects
 
-    return results, hits
-
-
-def docket_field_matched(hit: Hit) -> bool:
-    """Determine whether HL matched a Docket field.
-
-    :param hit: The ES hit.
-    :return: True if the hit matched a Docket field. Otherwise, False.
-    """
-
-    plain_hl = set(SEARCH_ALERTS_DOCKET_KEYWORDS_HL_FIELDS)
-    vector_hl = set(SEARCH_ALERTS_DOCKET_HL_FIELDS.keys())
-    docket_hl = set()
-    if hasattr(hit.meta, "highlight"):
-        highlights = hit.meta.highlight.to_dict()
-        docket_hl = set([hl for hl in highlights.keys()])
-    if docket_hl.issubset(plain_hl.union(vector_hl)):
-        return True
-    return False
+    return results, total_hits

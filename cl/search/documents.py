@@ -790,7 +790,7 @@ class DocketBaseDocument(Document):
     timestamp = fields.DateField()
 
     # Docket Fields
-    docket_id = fields.KeywordField(attr="pk")
+    docket_id = fields.IntegerField(attr="pk")
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
         term_vector="with_positions_offsets",
@@ -1831,51 +1831,6 @@ class OpinionClusterDocument(OpinionBaseDocument):
 
 @recap_sweep_index.document
 class DocketSweepDocument(DocketDocument):
-    party = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            term_vector="with_positions_offsets",
-            fields={
-                "exact": fields.TextField(
-                    analyzer="english_exact",
-                    term_vector="with_positions_offsets",
-                    search_analyzer="search_analyzer_exact",
-                ),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
-    attorney = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            term_vector="with_positions_offsets",
-            fields={
-                "exact": fields.TextField(
-                    analyzer="english_exact",
-                    term_vector="with_positions_offsets",
-                    search_analyzer="search_analyzer_exact",
-                ),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
-    firm = fields.ListField(
-        fields.TextField(
-            analyzer="text_en_splitting_cl",
-            term_vector="with_positions_offsets",
-            fields={
-                "exact": fields.TextField(
-                    analyzer="english_exact",
-                    term_vector="with_positions_offsets",
-                    search_analyzer="search_analyzer_exact",
-                ),
-            },
-            search_analyzer="search_analyzer",
-            multi=True,
-        )
-    )
 
     class Django:
         model = Docket
@@ -1884,6 +1839,7 @@ class DocketSweepDocument(DocketDocument):
 
 @recap_sweep_index.document
 class ESRECAPSweepDocument(ESRECAPDocument):
+
     class Django:
         model = RECAPDocument
         ignore_signals = True

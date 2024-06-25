@@ -1,0 +1,112 @@
+import traceback
+import datetime
+
+from asgiref.sync import async_to_sync
+from django.contrib.auth.models import User
+from django.http import QueryDict
+from django.utils.timezone import now
+from elasticsearch.exceptions import RequestError, TransportError
+
+from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
+from cl.search.documents import DocketSweepDocument
+from cl.search.models import SEARCH_TYPES
+from cl.stats.utils import tally_stat
+from cl.alerts.tasks import send_search_alert_emails
+from cl.alerts.models import Alert
+from cl.search.exception import (
+    BadProximityQuery,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
+from cl.alerts.utils import recap_document_hl_matched, query_includes_rd_field
+
+
+def index_daily_recap_documents():
+    # TODO implement
+    pass
+
+def has_rd_hit_been_triggered():
+    # TODO implement
+    return False
+
+def has_docket_hit_been_triggered():
+    # TODO implement
+    return True
+
+def query_and_send_alerts(rate):
+    alert_users = User.objects.filter(alerts__rate=rate).distinct()
+    alerts_sent_count = 0
+    now_time = datetime.datetime.now()
+    for user in alert_users:
+        alerts = user.alerts.filter(rate=rate)
+        logger.info(f"Running alerts for user '{user}': {alerts}")
+
+        hits = []
+        alerts_to_update = []
+        for alert in alerts:
+            search_params = QueryDict(alert.query.encode(), mutable=True)
+            includes_rd_fields = query_includes_rd_field(search_params)
+
+            try:
+                search_query = DocketSweepDocument.search()
+                results, total_hits = do_es_sweep_alert_query(
+                    search_query,
+                    search_params,
+                )
+            except (UnbalancedParenthesesQuery,
+        UnbalancedQuotesQuery,
+        BadProximityQuery,TransportError, ConnectionError, RequestError):
+                traceback.print_exc()
+                logger.info(
+                    f"Search for this alert failed: {alert.query}\n"
+                )
+                continue
+
+            alerts_to_update.append(alert.pk)
+            if len(results) > 0:
+                search_type = search_params.get("type", SEARCH_TYPES.OPINION)
+                results_to_send = []
+                for hit in results:
+                    if not includes_rd_fields:
+                        rds_to_send = [rd_hit for rd_hit in hit["child_docs"]
+                                       if not recap_document_hl_matched(
+                                rd_hit) and not has_rd_hit_been_triggered()]
+                        if rds_to_send:
+                            hit["child_docs"] = rds_to_send
+                            results_to_send.append(hit)
+
+                hits.append(
+                    [alert, search_type, results_to_send, len(results_to_send)]
+                )
+                alert.query_run = search_params.urlencode()
+                alert.date_last_hit = now()
+                alert.save()
+
+        if hits:
+            send_search_alert_emails.delay([(user.pk, hits)])
+            alerts_sent_count += 1
+
+        # Update Alert's date_last_hit in bulk.
+        Alert.objects.filter(id__in=alerts_to_update).update(
+            date_last_hit=now_time
+        )
+        async_to_sync(tally_stat)(f"alerts.sent.{rate}", inc=alerts_sent_count)
+        logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
+
+
+def query_and_schedule_wly_and_mly_alerts():
+    # TODO implement
+    pass
+
+
+class Command(VerboseCommand):
+    help = "Send RECAP Search Alerts."
+
+    def handle(self, *args, **options):
+        super().handle(*args, **options)
+
+        index_daily_recap_documents()
+        query_and_send_alerts(Alert.REAL_TIME)
+        query_and_send_alerts(Alert.DAILY)
+        query_and_schedule_wly_and_mly_alerts()
