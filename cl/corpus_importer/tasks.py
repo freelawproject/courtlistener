@@ -1408,7 +1408,7 @@ def probe_iquery_pages(
             r.set(
                 f"iquery:court_wait:{court_id}",
                 2,
-                settings.IQUERY_COURT_BLOCKED_WAIT,
+                ex=settings.IQUERY_COURT_BLOCKED_WAIT,
             )
             logger.warning(
                 "HTTPError occurred when crawling iquery. The court %s website "
