@@ -1336,8 +1336,6 @@ class UploadPublication(TestCase):
             files={"pdf_upload": self.pdf},
         )
 
-        print("panel", form.fields["panel"].queryset)
-
         self.assertEqual(form.is_valid(), True, msg=form.errors)
 
         if form.is_valid():
@@ -1348,7 +1346,9 @@ class UploadPublication(TestCase):
     def test_mo_form_save(self, mock) -> None:
         """Can we save missouri form successfully to db?"""
 
-        pre_count = Opinion.objects.all().count()
+        pre_count = Opinion.objects.filter(
+            cluster__docket__court__id="mo"
+        ).count()
 
         form = MoCourtUploadForm(
             self.mo_data,
@@ -1361,12 +1361,17 @@ class UploadPublication(TestCase):
         if form.is_valid():
             form.save()
 
-        self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+        post_save_count = Opinion.objects.filter(
+            cluster__docket__court__id="mo"
+        ).count()
+        self.assertEqual(pre_count + 1, post_save_count)
 
     def test_miss_form_save(self, mock) -> None:
         """Can we save mississippi form successfully to db?"""
 
-        pre_count = Opinion.objects.all().count()
+        pre_count = Opinion.objects.filter(
+            cluster__docket__court__id="miss"
+        ).count()
 
         form = MissCourtUploadForm(
             self.miss_data,
@@ -1379,7 +1384,10 @@ class UploadPublication(TestCase):
         if form.is_valid():
             form.save()
 
-        self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+        post_save_count = Opinion.objects.filter(
+            cluster__docket__court__id="miss"
+        ).count()
+        self.assertEqual(pre_count + 1, post_save_count)
 
     def test_form_two_judges_2042(self, mock) -> None:
         """Can we still save if there's only one or two judges on the panel?"""
