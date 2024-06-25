@@ -38,11 +38,7 @@
         </h1>
         {% if pk == "me" %}
           <div class="lead gray">
-            <p>The Supreme Judicial Court of Maine has partnered with the
-              non-profit organization, Free Law Project, to host its court
-              decisions on CourtListener.com. Free Law Project is proud to
-              support this partnership and makes the decisions available
-              online as they are released by the court.</p>
+            <p>The Supreme Judicial Court of Maine has partnered with the non-profit organization, Free Law Project, to host its court decisions on CourtListener.com. Free Law Project is proud to support this partnership and makes the decisions available online as they are released by the court.</p>
           </div>
         {% endif %}
       </div>
@@ -51,30 +47,28 @@
     </div>
 
     <div class="row" id="main-query-box">
-      <form action="/?" method="get" id="court-search-form" class="form-inline"
-          role="form">
+      <form action="/?" method="get" id="court-search-form" class="form-inline" role="form">
         <div id="search-container" class="text-center">
           <div class="input-group">
             <input class="form-control input-lg"
-                 value=""
-                 name="q"
-                 id="id_q"
-                 autocomplete="off"
-                 type="text">
+                   value=""
+                   name="q"
+                   id="id_q"
+                   autocomplete="off"
+                   type="text">
             <div class="hidden">
               <label for="id_{{ pk }}">
-                <input id="id_{{ pk }}" name="court_{{ pk }}"
-                     checked="checked" type="checkbox">
+                <input id="id_{{ pk }}" name="court_{{ pk }}" checked="checked" type="checkbox">
               </label>
             </div>
 
             <span class="input-group-btn">
-        <button type="submit"
-            class="btn btn-primary btn-lg"
-            name="search"
-            id="search-button"><i class="fa fa-search"></i>&nbsp;Search
-        </button>
-      </span>
+              <button type="submit"
+                      class="btn btn-primary btn-lg"
+                      name="search"
+                      id="search-button"><i class="fa fa-search"></i>&nbsp;Search
+              </button>
+            </span>
           </div>
           <div class="clearfix"></div>
         </div>
@@ -82,13 +76,10 @@
     </div>
     <div class="row">
       <div class="col-md-8">
-        <h3>Recent Decisions of the&nbsp;{{ court }} <i
-            class="gray fa fa-file-text-o"></i></h3>
+        <h3>Recent Decisions of the&nbsp;{{ court }} <i class="gray fa fa-file-text-o"></i></h3>
         {% if request.user|in_group:"uploaders_{{ pk }}" %}
           <p><a href="{% url "court_publish_page" pk=pk %}"
-              class="btn btn-default"><i
-              class="fa fa-upload"></i>&nbsp;Upload New {{ court }}
-            Decision</a></p>
+              class="btn btn-default"><i class="fa fa-upload"></i>&nbsp;Upload New {{ court }} Decision</a></p>
         {% endif %}
         {% if results.paginator.count > 0 %}
           {% flag "o-es-active" %}
