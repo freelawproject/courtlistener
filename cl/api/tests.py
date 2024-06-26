@@ -1093,14 +1093,14 @@ class V4DRFPaginationTest(TestCase):
         cursor_paginator = CursorPagination()
         cursor_paginator.base_url = "/"
 
-        def generate_test_cursor(ordering_key: str) -> str:
+        def generate_test_cursor(ordering_key: str) -> str | None:
             """Generates a valid cursor for testing according to the ordering
             key type.
             :param ordering_key: The ordering key of the cursor.
             :return: A valid cursor for testing.
             """
             position = 10 if "id" in ordering_key else now()
-            cursor = Cursor(offset=1, reverse=False, position=position)
+            cursor = Cursor(offset=1, reverse=False, position=position)  # type: ignore
             encoded_cursor = cursor_paginator.encode_cursor(cursor)
             parsed_url = urlparse(encoded_cursor)
             query_params = parse_qs(parsed_url.query)
