@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from http import HTTPStatus
 from typing import Any, Dict
 from unittest import mock
+from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
@@ -13,7 +14,9 @@ from django.http import HttpRequest, JsonResponse
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils.timezone import now
 from rest_framework.exceptions import NotFound
+from rest_framework.pagination import Cursor, CursorPagination
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
@@ -1087,6 +1090,22 @@ class V4DRFPaginationTest(TestCase):
     ):
         """Base test for V4 endpoints for cursor and page number pagination."""
 
+        cursor_paginator = CursorPagination()
+        cursor_paginator.base_url = "/"
+
+        def generate_test_cursor(ordering_key: str) -> str:
+            """Generates a valid cursor for testing according to the ordering
+            key type.
+            :param ordering_key: The ordering key of the cursor.
+            :return: A valid cursor for testing.
+            """
+            position = 10 if "id" in ordering_key else now()
+            cursor = Cursor(offset=1, reverse=False, position=position)
+            encoded_cursor = cursor_paginator.encode_cursor(cursor)
+            parsed_url = urlparse(encoded_cursor)
+            query_params = parse_qs(parsed_url.query)
+            return query_params.get("cursor", [None])[0]
+
         # Mock handle_database_cursor_pagination
         # Initialize call count and call arguments tracking
         handle_database_cursor_pagination_wrapper.call_count = 0
@@ -1096,8 +1115,11 @@ class V4DRFPaginationTest(TestCase):
             "handle_database_cursor_pagination",
             new=handle_database_cursor_pagination_wrapper,
         ) as mock_cursor_pagination:
+            cursor_value = generate_test_cursor(default_ordering)
             # Confirm the default sorting key works with cursor pagination
-            response = await self._api_v4_request(endpoint, {})
+            response = await self._api_v4_request(
+                endpoint, {"cursor": cursor_value}
+            )
         self.assertEqual(
             response.status_code,
             200,
@@ -1115,7 +1137,8 @@ class V4DRFPaginationTest(TestCase):
         )
 
         # Try a different cursor sorting key.
-        params = {"order_by": secondary_cursor_key}
+        cursor_value = generate_test_cursor(secondary_cursor_key)
+        params = {"order_by": secondary_cursor_key, "cursor": cursor_value}
         handle_database_cursor_pagination_wrapper.call_count = 0
         handle_database_cursor_pagination_wrapper.call_args = None
         with mock.patch.object(

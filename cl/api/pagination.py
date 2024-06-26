@@ -39,6 +39,8 @@ class VersionBasedPagination(PageNumberPagination):
         "-date_created": "date",
         "date_modified": "date",
         "-date_modified": "date",
+        "date_completed": "date",
+        "-date_completed": "date",
     }
     ordering = ""
     cursor_ordering_fields = []
