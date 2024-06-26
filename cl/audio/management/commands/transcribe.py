@@ -1,8 +1,6 @@
 import argparse
 import time
 
-from django.db.models import Q
-
 from cl.audio.models import Audio
 from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import VerboseCommand, logger
@@ -36,8 +34,9 @@ def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
             audio.pk,
             size_mb,
         )
-        audio.stt_status = Audio.STT_FILE_TOO_BIG
-        audio.save()
+        if audio.stt_status != Audio.STT_FILE_TOO_BIG:
+            audio.stt_status = Audio.STT_FILE_TOO_BIG
+            audio.save()
     except (FileNotFoundError, ValueError):
         # FileNotFoundError: when the name does not exist in the bucket
         # ValueError: when local_path_mp3 is None or a null FileField
@@ -45,8 +44,9 @@ def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
             "Audio id %s has no local_path_mp3, needs reprocessing",
             audio.pk,
         )
-        audio.stt_status = Audio.STT_NO_FILE
-        audio.save()
+        if audio.stt_status != Audio.STT_NO_FILE:
+            audio.stt_status = Audio.STT_NO_FILE
+            audio.save()
 
     return False
 
@@ -61,12 +61,12 @@ def handle_open_ai_transcriptions(options) -> None:
     """
     requests_per_minute = options["rpm"]
 
-    if options.get("retry_failures"):
-        query = Q(stt_status=Audio.STT_FAILED)
-    else:
-        query = Q(stt_status=Audio.STT_NEEDED)
+    status_code = options.get("status_to_process")
+    for code, descr in Audio.STT_STATUSES:
+        if code == status_code:
+            logger.info("Querying Audio.stt_status = %s. %s", code, descr)
 
-    queryset = Audio.objects.filter(query)
+    queryset = Audio.objects.filter(stt_status=status_code)
     logger.info("%s audio files to transcribe", queryset.count())
 
     if options["limit"]:
@@ -96,6 +96,12 @@ def handle_open_ai_transcriptions(options) -> None:
 
 class Command(VerboseCommand):
     help = "Transcribe audio files using a Speech to Text model"
+    status_choices = [
+        code for code, _ in Audio.STT_STATUSES if code != Audio.STT_COMPLETE
+    ]
+    status_help = "; ".join(
+        [f"{code} - {descr}" for code, descr in Audio.STT_STATUSES]
+    )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
@@ -113,10 +119,11 @@ class Command(VerboseCommand):
             help="Requests Per Minute, a rate limit in the model API",
         )
         parser.add_argument(
-            "--retry-failures",
-            action="store_true",
-            default=False,
-            help="Retry transcription of failed audio files",
+            "--status-to-process",
+            choices=self.status_choices,
+            default=Audio.STT_NEEDED,
+            type=int,
+            help=f"Audio.stt_status value to process. Default {Audio.STT_NEEDED}. {self.status_help}",
         )
         parser.add_argument(
             "--limit",
