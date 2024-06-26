@@ -512,7 +512,7 @@ def clone_audio_files(
 
         if not audio_json.get("stt_transcript"):
             audio_json["stt_transcript"] = ""
-            audio_json["docket"] = docket
+        audio_json["docket"] = docket
 
         audio = Audio(**audio_json)
 
