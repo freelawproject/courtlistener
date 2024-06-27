@@ -42,6 +42,9 @@ jobs:
       - name: Create Kubeconfig with AWS CLI
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
+      - name: Update Environment Variables
+        run: kubectl annotate externalsecret cl-env force-sync=$(date +%s) --overwrite -n ${{ env.EKS_NAMESPACE }} 
+
       - name: Launch Temporary Pod
         id: tempPod
         run: |
