@@ -106,7 +106,7 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
     if size_mb >= 25:
         audio_response: Response = async_to_sync(microservice)(
             service="downsize-audio",
-            item=audio_file,
+            item=audio,
         )
         audio_response.raise_for_status()
         # Removes the ".mp3" extension from the filename
