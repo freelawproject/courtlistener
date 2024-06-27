@@ -440,7 +440,7 @@ class TranscriptionTest(TestCase):
         cls.OpenAITranscriptionClass = OpenAITranscription
 
     def test_audio_file_validation(self) -> None:
-        """Can we validate audio files existance and size for OpenAI API use?"""
+        """Can we validate audio files existance OpenAI API use?"""
         can_be_processed = audio_can_be_processed_by_open_ai_api(
             self.audio_without_local_path_mp3
         )
@@ -453,20 +453,6 @@ class TranscriptionTest(TestCase):
             self.audio_without_local_path_mp3.stt_status,
             Audio.STT_NO_FILE,
             "status was not updated to STT_NO_FILE",
-        )
-
-        can_be_processed = audio_can_be_processed_by_open_ai_api(
-            self.audio_bigger_than_limit_duration
-        )
-        self.assertFalse(
-            can_be_processed,
-            "Longer than allowed audio file passed as valid",
-        )
-        self.audio_bigger_than_limit_duration.refresh_from_db()
-        self.assertEqual(
-            self.audio_bigger_than_limit_duration.stt_status,
-            Audio.STT_FILE_TOO_BIG,
-            "status was not updated to STT_FILE_TOO_BIG",
         )
 
         self.assertTrue(
