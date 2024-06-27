@@ -43,7 +43,9 @@ jobs:
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
       - name: Update Environment Variables
-        run: kubectl annotate externalsecret cl-env force-sync=$(date +%s) --overwrite -n ${{ env.EKS_NAMESPACE }} 
+        env:
+          CL_ENV: cl-env
+        run: kubectl annotate es $CL_ENV force-sync=$(date +%s) --overwrite -n ${{ env.EKS_NAMESPACE }} && kubectl wait es -n ${{ env.EKS_NAMESPACE }} --for=jsonpath="{.status.conditions[?(@.reason=='SecretSynced')].status}"=True --timeout=30s $CL_ENV
 
       - name: Launch Temporary Pod
         id: tempPod
