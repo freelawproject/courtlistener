@@ -22,6 +22,14 @@ class JSONViewSet(LoggingMixin, ModelViewSet):
     permission_classes = [IsAuthenticated, IsParentVisualizationOwner]
     serializer_class = JSONVersionSerializer
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
     def get_queryset(self):
         return JSONVersion.objects.filter(
@@ -33,6 +41,14 @@ class VisualizationViewSet(LoggingMixin, ModelViewSet):
     permission_classes = [IsAuthenticated, IsOwner]
     serializer_class = VisualizationSerializer
     ordering_fields = ("id", "date_created", "date_modified", "user")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
     def get_queryset(self):
         return SCOTUSMap.objects.filter(
