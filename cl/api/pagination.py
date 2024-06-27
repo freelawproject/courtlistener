@@ -5,8 +5,13 @@ from urllib.parse import parse_qs, urlencode
 
 from django.conf import settings
 from django.core.paginator import InvalidPage
+from django.db.models import QuerySet
 from rest_framework.exceptions import NotFound
-from rest_framework.pagination import BasePagination, PageNumberPagination
+from rest_framework.pagination import (
+    BasePagination,
+    CursorPagination,
+    PageNumberPagination,
+)
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.utils.urls import replace_query_param
@@ -16,19 +21,109 @@ from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESCursor
 
 
-class ShallowOnlyPageNumberPagination(PageNumberPagination):
-    """A paginator that blocks deep pagination
-
-    Thank you MuckRock for this contribution.
+class VersionBasedPagination(PageNumberPagination):
+    """The base paginator for handling V3 and V4 DB endpoints.
+    This supports CursorPagination for V4 endpoints when sorting by "id" or
+    "date_created". It uses PageNumberPagination for V3 endpoints and for V4
+    endpoints when sorting by fields that don't support CursorPagination.
     """
 
     max_pagination_depth = 100
+    version = "v3"
+    cursor_query_param = "cursor"
+    invalid_cursor_message = "Invalid cursor"
+    compatible_sorting = {
+        "id": "int",
+        "-id": "int",
+        "date_created": "date",
+        "-date_created": "date",
+        "date_modified": "date",
+        "-date_modified": "date",
+        "date_completed": "date",
+        "-date_completed": "date",
+    }
+    ordering = ""
+    cursor_ordering_fields = []
+
+    def __init__(self):
+        super().__init__()
+        self.cursor_paginator = CursorPagination()
+        self.cursor_paginator.page_size = self.page_size
+
+    def do_v4_cursor_pagination(self):
+        """Determine if v4 cursor pagination should be applied.
+
+        :return: A two tuple containing:
+        - A boolean indicating if cursor pagination should be applied.
+        - The requested ordering key if applicable.
+        """
+
+        requested_ordering = self.request.query_params.get(
+            "order_by", self.ordering
+        )
+        all_cursor_ordering_fields = self.generate_all_cursor_fields(
+            self.cursor_ordering_fields
+        )
+        return (
+            all(
+                [
+                    self.version == "v4",
+                    requested_ordering,
+                    requested_ordering in all_cursor_ordering_fields,
+                ]
+            ),
+            requested_ordering,
+        )
 
     def paginate_queryset(self, queryset, request, view=None):
         """
         Paginate a queryset if required, either returning a
         page object, or `None` if pagination is not configured for this view.
         """
+
+        if hasattr(view, "ordering"):
+            self.ordering = view.ordering
+        if hasattr(view, "cursor_ordering_fields"):
+            self.cursor_ordering_fields = view.cursor_ordering_fields
+
+        self.version = request.version
+        self.request = request
+        do_cursor_pagination, requested_ordering = (
+            self.do_v4_cursor_pagination()
+        )
+        if do_cursor_pagination:
+            # Handle the queryset using CursorPagination
+            return self.handle_database_cursor_pagination(
+                request, requested_ordering, queryset, view
+            )
+
+        # Handle the queryset using PageNumberPagination
+        return self.handle_shallow_only_page_number_pagination(
+            request, queryset
+        )
+
+    def get_paginated_response(self, data):
+        do_cursor_pagination, _ = self.do_v4_cursor_pagination()
+        if do_cursor_pagination:
+            # Get paginated response for CursorPagination
+            return self.cursor_paginator.get_paginated_response(data)
+
+        # Get paginated response for PageNumberPagination
+        return super().get_paginated_response(data)
+
+    def handle_shallow_only_page_number_pagination(
+        self, request: Request, queryset: QuerySet
+    ) -> list | None:
+        """A paginator that blocks deep pagination
+
+         Thank you MuckRock for this contribution.
+
+        :param self: The VersionBasedPagination instance.
+        :param request: The DRF Request object.
+        :param queryset: The Django QuerySet to be paginated.
+        :return: A paginated list of query results.
+        """
+
         page_size = self.get_page_size(request)
         if not page_size:
             return None
@@ -61,19 +156,80 @@ class ShallowOnlyPageNumberPagination(PageNumberPagination):
         self.request = request
         return list(self.page)
 
+    def handle_database_cursor_pagination(
+        self,
+        request: Request,
+        requested_ordering: str,
+        queryset: QuerySet,
+        view,
+    ) -> list | None:
+        """Handle cursor pagination for database queries based on the request and
+         ordering.
 
-class TinyAdjustablePagination(ShallowOnlyPageNumberPagination):
+        :param self: The VersionBasedPagination instance.
+        :param request: The DRF Request object.
+        :param requested_ordering: The field by which the queryset should be ordered.
+        :param queryset: The Django QuerySet to be paginated.
+        :param view: The view instance from which this method is called.
+        :return: A paginated list of query results.
+        """
+        if self.cursor_query_param in request.query_params:
+            cursor = self.cursor_paginator.decode_cursor(request)
+            cursor_position = cursor and cursor.position
+            position_type = self.determine_cursor_position_type(
+                str(cursor_position)
+            )
+            valid_sorting = self.compatible_sorting[requested_ordering]
+            if valid_sorting != position_type:
+                raise NotFound(self.invalid_cursor_message)
+
+        self.cursor_paginator.ordering = requested_ordering
+        return self.cursor_paginator.paginate_queryset(queryset, request, view)
+
+    @staticmethod
+    def determine_cursor_position_type(position: str) -> str:
+        """Determine the type of given string.
+
+        :param position: The input cursor to classify.
+        :return: A string indicating the type of the input
+        ('int', 'date', or 'unknown').
+        """
+        # Check if it's an integer.
+        if position.isdigit():
+            return "int"
+
+        # Try to parse as date
+        try:
+            datetime.datetime.fromisoformat(position)
+            return "date"
+        except ValueError:
+            pass
+
+        return "unknown"
+
+    @staticmethod
+    def generate_all_cursor_fields(cursor_fields: list[str]) -> list[str]:
+        """Generates a list of all cursor fields, including the original
+        fields and their reversed counterparts with a "-" prefix.
+
+        :param cursor_fields: A list of strings representing the original cursor fields.
+        :return: A new list containing both the original and reversed cursor fields.
+        """
+        return cursor_fields + [f"-{field}" for field in cursor_fields]
+
+
+class TinyAdjustablePagination(VersionBasedPagination):
     page_size = 5
     page_size_query_param = "page_size"
     max_page_size = 20
 
 
-class MediumAdjustablePagination(ShallowOnlyPageNumberPagination):
+class MediumAdjustablePagination(VersionBasedPagination):
     page_size = 50
     page_size_query_param = "page_size"
 
 
-class BigPagination(ShallowOnlyPageNumberPagination):
+class BigPagination(VersionBasedPagination):
     page_size = 300
 
 

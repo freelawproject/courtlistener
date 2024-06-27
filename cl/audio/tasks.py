@@ -1,8 +1,10 @@
 from math import ceil
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import transaction
 from django.utils.text import slugify
+from httpx import Response
 from openai import (
     APIConnectionError,
     BadRequestError,
@@ -20,6 +22,7 @@ from cl.celery_init import app
 from cl.corpus_importer.tasks import increment_failure_count, upload_to_ia
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
+from cl.lib.microservice_utils import microservice
 from cl.lib.recap_utils import get_bucket_name
 
 
@@ -87,8 +90,8 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
         self.request.retries,
     )
 
-    # While testing we saw more requests than expected
-    # so we double check for Audio.stt_status
+    # Double check for Audio.stt_status in case the request was
+    # duplicated for some reason
     if audio.stt_status == Audio.STT_COMPLETE:
         logger.error(
             "Audio %s with status STT_COMPLETE was sent for transcription",
@@ -97,19 +100,40 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
         return
 
     audio_file = audio.local_path_mp3
-    file = (audio_file.name.split("/")[-1], audio_file.read(), "mp3")
+    file_name = audio_file.name.split("/")[-1]
+    size_mb = audio_file.size / 1_000_000
+    # Check size and downsize file if necessary.
+    if size_mb >= 25:
+        audio_response: Response = async_to_sync(microservice)(
+            service="downsize-audio",
+            item=audio_file,
+        )
+        audio_response.raise_for_status()
+        # Removes the ".mp3" extension from the filename
+        name = file_name.split(".")[0]
+        file = (f"{name}.ogg", audio_response.content, "ogg")
+    else:
+        file = (file_name, audio_file.read(), "mp3")
 
     # Prevent default openai client retrying
     with OpenAI(max_retries=0) as client:
+        kwargs = {
+            "file": file,
+            "model": "whisper-1",
+            "language": "en",
+            "response_format": "verbose_json",
+            "timestamp_granularities": ["word", "segment"],
+            "prompt": audio.case_name,
+        }
+
+        # The most common hallucination we have seen is the case name
+        # repeated in a loop. Manual testing showed that not sending
+        # the case name helps to get a clean transcript
+        if audio.stt_status == Audio.STT_HALLUCINATION:
+            kwargs.pop("prompt", "")
+
         try:
-            transcript = client.audio.transcriptions.create(
-                file=file,
-                model="whisper-1",
-                language="en",
-                response_format="verbose_json",
-                timestamp_granularities=["word", "segment"],
-                prompt=audio.case_name,
-            )
+            transcript = client.audio.transcriptions.create(**kwargs)
         except (
             RateLimitError,
             APIConnectionError,
@@ -118,16 +142,14 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
         ) as exc:
             # Handle retryable exception here so as to monitor them in
             # Sentry
-            capture_exception(exc)
             if self.request.retries < self.max_retries and not dont_retry:
                 raise self.retry(exc=exc)
             return
-        except (UnprocessableEntityError, BadRequestError) as e:
+        except (UnprocessableEntityError, BadRequestError):
             # BadRequestError is an HTTP 400 and has this message:
             # 'The audio file could not be decoded or its format is not supported'
             audio.stt_status = Audio.STT_FAILED
             audio.save()
-            capture_exception(e)
             return
         except Exception as e:
             # Sends to Sentry errors that we don't expect or
@@ -143,13 +165,17 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
             audio.stt_transcript = transcript_dict["text"]
             audio.duration = ceil(transcript_dict["duration"])
             audio.stt_source = Audio.STT_OPENAI_WHISPER
+
             if transcription_was_hallucinated(audio):
+                if audio.stt_status == Audio.STT_HALLUCINATION:
+                    logger.error(
+                        "Audio %s: hallucination was not corrected", audio.pk
+                    )
                 audio.stt_status = Audio.STT_HALLUCINATION
             else:
                 audio.stt_status = Audio.STT_COMPLETE
 
             audio.save()
-
             metadata = {
                 "segments": transcript_dict["segments"],
                 "words": transcript_dict["words"],

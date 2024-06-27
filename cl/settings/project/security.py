@@ -109,6 +109,7 @@ CSP_IMG_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
     "https://portraits.free.law/",
+    "https://seals.free.law/",
     "data:",  # @tailwindcss/forms uses data URIs for images.
 )
 CSP_MEDIA_SRC = (

@@ -1,7 +1,7 @@
 import datetime
 from collections import OrderedDict, defaultdict
 from http import HTTPStatus
-from typing import Dict, Union
+from typing import Any, Dict, Union
 from urllib.parse import urlencode
 
 import eyecite
@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import F, IntegerField, Prefetch
+from django.db.models import IntegerField, Prefetch
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import (
@@ -20,7 +20,6 @@ from django.http.response import (
     HttpResponseNotAllowed,
 )
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
-from django.template import loader
 from django.template.defaultfilters import slugify
 from django.template.response import TemplateResponse
 from django.urls import reverse
@@ -34,6 +33,7 @@ from reporters_db import (
     REPORTERS,
     VARIATIONS_ONLY,
 )
+from seal_rookery.search import ImageSizes, seal
 
 from cl.citations.parenthetical_utils import get_or_create_parenthetical_groups
 from cl.citations.utils import (
@@ -62,8 +62,12 @@ from cl.lib.view_utils import increment_view_count
 from cl.opinion_page.feeds import DocketFeed
 from cl.opinion_page.forms import (
     CitationRedirectorForm,
-    CourtUploadForm,
     DocketEntryFilterForm,
+    MeCourtUploadForm,
+    MissCourtUploadForm,
+    MoCourtUploadForm,
+    TennWorkCompAppUploadForm,
+    TennWorkCompClUploadForm,
 )
 from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
@@ -76,6 +80,7 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
+    SEARCH_TYPES,
     Citation,
     Court,
     Docket,
@@ -85,14 +90,27 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.selectors import get_clusters_from_citation_str
-from cl.search.views import do_search
+from cl.search.views import do_es_search, do_search
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     """Individual Court Home Pages"""
-    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+
+    available_courts = [
+        "tennworkcompcl",
+        "tennworkcompapp",
+        "me",
+        "mo",
+        "moctapped",
+        "moctappsd",
+        "moctappwd",
+        "miss",
+        "missctapp",
+    ]
+
+    if pk not in available_courts:
         raise Http404("Court pages only implemented for select courts.")
 
     render_court = await Court.objects.aget(pk=pk)
@@ -102,29 +120,64 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
         "court": render_court.full_name,
     }
 
-    if "tennworkcomp" in pk:
+    if pk == "tennworkcompapp" or pk == "tennworkcompcl":
         courts = ["tennworkcompcl", "tennworkcompapp"]
         template = "tn-court.html"
     else:
         courts = [pk]
         template = "court.html"
 
+    court_seal = seal(pk, ImageSizes.SMALL)
+    if "moctapp" in pk:
+        # return mo seal
+        court_seal = seal("mo", ImageSizes.SMALL)
+    if "tennworkcomp" in pk:
+        # return tenn seal
+        court_seal = seal("tenn", ImageSizes.SMALL)
+
+    render_dict["court_seal"] = court_seal
+
     for court in courts:
         if "tennwork" in court:
             results = f"results_{court}"
         else:
             results = "results"
-        response = await sync_to_async(do_search)(
-            request.GET.copy(),
-            override_params={
-                "filed_after": (
-                    datetime.datetime.today() - datetime.timedelta(days=28)
-                ),
-                "order_by": "dateFiled desc",
-                "court": court,
-            },
-            facet=False,
+
+        mutable_GET = request.GET.copy()
+
+        es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
+            request, "oa-es-active"
         )
+
+        if not es_flag_for_oa:
+            # Do solr search
+            response = await sync_to_async(do_search)(
+                mutable_GET,
+                override_params={
+                    "filed_after": (
+                        datetime.datetime.today()
+                        - datetime.timedelta(days=28)
+                        # type: ignore
+                    ),
+                    "order_by": "dateFiled desc",
+                    "court": court,
+                },
+                facet=False,
+            )
+        else:
+            # Do es search
+            mutable_GET.update(
+                {
+                    "order_by": "dateFiled desc",
+                    "type": SEARCH_TYPES.OPINION,
+                    "court": court,
+                    "filed_after": (
+                        datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
+                    ),
+                }
+            )
+            response = await sync_to_async(do_es_search)(mutable_GET)
+
         render_dict[results] = response["results"]
     return TemplateResponse(request, template, render_dict)
 
@@ -135,17 +188,38 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     "uploaders_tennworkcompcl",
     "uploaders_tennworkcompapp",
     "uploaders_me",
+    "uploaders_mo",
+    "uploaders_moctapped",
+    "uploaders_moctappsd",
+    "uploaders_moctappwd",
+    "uploaders_miss",
+    "uploaders_missctapp",
 )
 @async_to_sync
-async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
+async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
     """Display upload form and intake Opinions for partner courts
 
     :param request: A GET or POST request for the page
     :param pk: The CL Court ID for each court
     """
-    if pk not in ["tennworkcompcl", "tennworkcompapp", "me"]:
+
+    available_courts = [
+        "tennworkcompcl",
+        "tennworkcompapp",
+        "me",
+        "mo",
+        "moctapped",
+        "moctappsd",
+        "moctappwd",
+        "miss",
+        "missctapp",
+    ]
+
+    if pk not in available_courts:
         raise Http404(
-            "Court pages only implemented for Tennessee Worker Comp Courts and Maine SJC."
+            "Court pages only implemented for Tennessee Worker Comp Courts, "
+            "Maine SJC, Missouri Supreme Court, Missouri Court of Appeals, "
+            "Mississippi Supreme Court and Mississippi Court of Appeals."
         )
     # Validate the user has permission
     user = await request.auser()  # type: ignore[attr-defined]
@@ -157,9 +231,33 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
                 "You do not have permission to access this page."
             )
 
-    form = await sync_to_async(CourtUploadForm)(pk=pk)
+    # Fix mypy errors
+    upload_form: Any
+
+    upload_form_classes = {
+        "tennworkcompcl": TennWorkCompClUploadForm,
+        "tennworkcompapp": TennWorkCompAppUploadForm,
+        "me": MeCourtUploadForm,
+        "mo": MoCourtUploadForm,
+        "moctapped": MoCourtUploadForm,
+        "moctappsd": MoCourtUploadForm,
+        "moctappwd": MoCourtUploadForm,
+        "miss": MissCourtUploadForm,
+        "missctapp": MissCourtUploadForm,
+    }
+
+    court_seal = seal(pk, ImageSizes.SMALL)
+    if "moctapp" in pk:
+        # return mo seal
+        court_seal = seal("mo", ImageSizes.SMALL)
+    if "tennworkcomp" in pk:
+        # return tenn seal
+        court_seal = seal("tenn", ImageSizes.SMALL)
+
+    upload_form = upload_form_classes[pk]
+    form = await sync_to_async(upload_form)(pk=pk)
     if request.method == "POST":
-        form = await sync_to_async(CourtUploadForm)(
+        form = await sync_to_async(upload_form)(
             request.POST, request.FILES, pk=pk
         )
         if await sync_to_async(form.is_valid)():
@@ -176,7 +274,14 @@ async def court_publish_page(request: HttpRequest, pk: int) -> HttpResponse:
                 request, "Error submitting form, please review below."
             )
     return TemplateResponse(
-        request, "publish.html", {"form": form, "private": True, "pk": pk}
+        request,
+        "publish.html",
+        {
+            "court_image": court_seal,
+            "form": form,
+            "private": True,
+            "pk": pk,
+        },
     )
 
 
@@ -653,7 +758,9 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 
     try:
         note = await Note.objects.aget(
-            cluster_id=cluster.pk, user=await request.auser()  # type: ignore[attr-defined]
+            cluster_id=cluster.pk,
+            user=await request.auser(),  # type: ignore[attr-defined]
+            # type: ignore[attr-defined]
         )
     except (ObjectDoesNotExist, TypeError):
         # Not note or anonymous user
