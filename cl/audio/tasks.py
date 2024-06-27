@@ -4,7 +4,14 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import transaction
 from django.utils.text import slugify
-from httpx import Response
+from httpx import (
+    HTTPStatusError,
+    NetworkError,
+    ReadError,
+    RemoteProtocolError,
+    Response,
+    TimeoutException,
+)
 from openai import (
     APIConnectionError,
     BadRequestError,
@@ -22,6 +29,7 @@ from cl.celery_init import app
 from cl.corpus_importer.tasks import increment_failure_count, upload_to_ia
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
+from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.lib.recap_utils import get_bucket_name
 
@@ -64,6 +72,33 @@ def upload_audio_to_ia(self, af_pk: int) -> None:
         increment_failure_count(af)
 
 
+@retry(
+    ExceptionToCheck=(
+        NetworkError,
+        TimeoutException,
+        RemoteProtocolError,
+        HTTPStatusError,
+        ReadError,
+    ),
+    tries=3,
+    delay=5,
+    backoff=2,
+    logger=logger,
+)
+def downsize_audio_file(audio: Audio) -> Response:
+    """Call downsize-audio service from doctor with retries
+
+    :param audio: the audio file to downsize
+    :return: Response object
+    """
+    response = async_to_sync(microservice)(
+        service="downsize-audio",
+        item=audio,
+    )
+    response.raise_for_status()
+    return response
+
+
 # Error handling inspired by openai's package retry policy
 # https://github.com/openai/openai-python/blob/54a5911f5215148a0bdeb10e2bcfb84f635a75b9/src/openai/_base_client.py#L679-L712
 @app.task(
@@ -104,11 +139,7 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
     size_mb = audio_file.size / 1_000_000
     # Check size and downsize file if necessary.
     if size_mb >= 25:
-        audio_response: Response = async_to_sync(microservice)(
-            service="downsize-audio",
-            item=audio,
-        )
-        audio_response.raise_for_status()
+        audio_response: Response = downsize_audio_file(audio)
         # Removes the ".mp3" extension from the filename
         name = file_name.split(".")[0]
         file = (f"{name}.ogg", audio_response.content, "ogg")
