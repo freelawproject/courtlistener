@@ -34,7 +34,30 @@ def get_all_pacer_courts() -> list[str]:
 
 
 class Command(VerboseCommand):
-    help = "Run the iquery pages probing daemon."
+    help = """Run the iquery pages probing daemon.
+
+The goal of this daemon is to ensure that we always have every case in PACER.
+
+It works by taking the highest pacer_case_id we know as of the last iteration,
+and then doing geometric probing of higher numbers to discover the highest
+current pacer_case_id in each court.
+
+For example, if the highest ID we know about as of 12:00PT is 1000, we would
+check ID 1002, then 1004, 1008, 1016, etc., until we stop finding valid cases.
+Because cases can be sealed, deleted, etc, we also add jitter to the IDs we
+select, to ensure that we don't get stuck due to bad luck.
+
+Once the highest value is found, we schedule iquery download tasks one second
+apart to fill in the missing section. For example, if we start at ID 1000, then
+learn that ID 1032 is the highest, we'd create 31 celery tasks for items 1000
+to 1032, and we'd schedule them over the next 31 seconds.
+
+The last piece of this system is that we have content coming in from a lot of
+sources all the time, so we use signals to backfill missing content as well.
+For example, if we think 1,000 is the highest ID, and somebody RECAPs a docket
+with ID of 1032, the signal will catch that and create tasks to fill in numbers
+1001 to 1031.
+"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
