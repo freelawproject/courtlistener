@@ -1,7 +1,12 @@
 from datetime import date
 from unittest.mock import MagicMock
 
-from cl.corpus_importer.factories import FreeOpinionRowDataFactory
+from requests.exceptions import HTTPError, Timeout
+
+from cl.corpus_importer.factories import (
+    CaseQueryDataFactory,
+    FreeOpinionRowDataFactory,
+)
 
 DOCKET_NUMBER = "5:18-cr-00227"
 CASE_NAME = "United States v. Maldonado-Passage"
@@ -91,3 +96,81 @@ class FakeFreeOpinionReport:
                 court_id="cand", docket_number="5:18-ap-07075"
             )
         ]
+
+
+test_patterns = {
+    "canb": {
+        1: True,
+        2: True,
+        4: False,
+        8: False,
+        16: False,
+        32: False,
+        64: False,
+    },
+    "gand": {
+        5: True,
+        6: True,
+        7: True,
+        8: True,
+        9: True,
+    },
+    "cand": {
+        9: False,  # 1
+        10: False,  # 2
+        12: True,  # 4
+        13: True,  # 5
+        16: True,  # 8
+        18: True,  # 10
+        24: True,  # 16
+        40: False,  # 32
+        72: False,  # 64
+        136: False,  # 128
+        137: True,  # 129
+        264: True,  # 256
+    },
+    "nysd": {
+        9: False,
+        10: False,
+        12: False,
+        16: True,
+        24: True,
+        40: True,
+        72: True,
+        136: True,
+        264: True,
+        520: True,
+    },
+    "txed": {
+        9: True,
+        10: True,
+        11: True,
+        12: True,
+        13: False,
+        16: False,
+    },
+    "gamb": HTTPError,
+    "hib": Timeout,
+}
+
+
+class FakeCaseQueryReport:
+
+    def __init__(self, court_id, pacer_session=None):
+        self.pacer_case_id = None
+        self.court_id = court_id
+
+    def query(self, pacer_case_id):
+        self.pacer_case_id = pacer_case_id
+
+    @property
+    def data(self):
+        test_pattern = test_patterns.get(self.court_id, {})
+        if not isinstance(test_pattern, dict) and issubclass(
+            test_pattern, Exception
+        ):
+            raise test_pattern()
+
+        if test_pattern and test_pattern.get(self.pacer_case_id):
+            return CaseQueryDataFactory()
+        return None
