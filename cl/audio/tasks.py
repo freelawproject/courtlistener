@@ -1,8 +1,10 @@
 from math import ceil
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.db import transaction
 from django.utils.text import slugify
+from httpx import Response
 from openai import (
     APIConnectionError,
     BadRequestError,
@@ -20,6 +22,7 @@ from cl.celery_init import app
 from cl.corpus_importer.tasks import increment_failure_count, upload_to_ia
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import logger
+from cl.lib.microservice_utils import microservice
 from cl.lib.recap_utils import get_bucket_name
 
 
@@ -97,7 +100,20 @@ def transcribe_from_open_ai_api(self, audio_pk: int, dont_retry: bool = False):
         return
 
     audio_file = audio.local_path_mp3
-    file = (audio_file.name.split("/")[-1], audio_file.read(), "mp3")
+    file_name = audio_file.name.split("/")[-1]
+    size_mb = audio_file.size / 1_000_000
+    # Check size and downsize file if necessary.
+    if size_mb >= 25:
+        audio_response: Response = async_to_sync(microservice)(
+            service="downsize-audio",
+            item=audio_file,
+        )
+        audio_response.raise_for_status()
+        # Removes the ".mp3" extension from the filename
+        name = file_name.split(".")[0]
+        file = (f"{name}.ogg", audio_response.content, "ogg")
+    else:
+        file = (file_name, audio_file.read(), "mp3")
 
     # Prevent default openai client retrying
     with OpenAI(max_retries=0) as client:
