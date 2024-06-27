@@ -1,4 +1,5 @@
 import itertools
+import random
 import re
 from datetime import date
 from difflib import SequenceMatcher
@@ -7,6 +8,7 @@ from typing import Any, Iterator, Optional, Set
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
+from django.conf import settings
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
@@ -1024,3 +1026,46 @@ def get_court_id(raw_court: str) -> list[str]:
             return found_court
 
     return []
+
+
+def make_iquery_probing_key(court_id: str) -> str:
+    """Small wrapper to centralize iquery probing key semaphore generation.
+    :param court_id: A CL court ID
+    :return: The semaphore iquery probing key
+    """
+    return f"iquery.probing.enqueued:{court_id}"
+
+
+def compute_binary_probe_jitter(testing: bool) -> int:
+    """Compute the jitter for binary probes.
+
+    :param testing: A boolean flag indicating whether the function is being
+    executed in a testing environment. If True, jitter is disabled and returns 0.
+    :return: An integer representing the jitter value for binary probes.
+    """
+
+    # Probe limit e.g: 9 probe iterations -> 256
+    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
+    return random.randint(1, round(probe_limit * 0.05)) if not testing else 0
+
+
+def compute_next_binary_probe(
+    highest_known_pacer_case_id: int, iteration: int, jitter: int
+) -> int:
+    """Compute the next binary probe target for a given PACER case ID.
+
+    This computes the next value of a geometric binary sequence (2 ** (N - 1))
+    where N is the current probe iteration. In non-testing mode a jitter is
+    added to the next value to ensure probing values are not the same from the
+    previous iteration to increase the possibility of getting a hit.
+
+    :param highest_known_pacer_case_id: The final PACER case ID.
+    :param iteration: The current probe iteration number.
+    :param jitter: The jitter value to apply.
+    :return: The updated probe_iteration and the PACER case ID to lookup.
+    """
+
+    pacer_case_id_to_lookup = (
+        highest_known_pacer_case_id + (2 ** (iteration - 1)) + jitter
+    )
+    return pacer_case_id_to_lookup

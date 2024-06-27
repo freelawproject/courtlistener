@@ -1,4 +1,6 @@
-from typing import Union, cast
+import time
+import uuid
+from typing import Union
 
 from django.conf import settings
 from redis import Redis
@@ -39,7 +41,7 @@ def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
     :param r: The Redis DB to connect to as a connection interface or str that
     can be handed off to get_redis_interface.
     :param key: The key to create
-    :param ttl: How long the key should live
+    :param ttl: How long the key should live in seconds.
     :return: True if the key was created else False
     """
     if isinstance(r, str):
@@ -71,3 +73,54 @@ def delete_redis_semaphore(r: Union[str, Redis], key: str) -> None:
     if isinstance(r, str):
         r = get_redis_interface(r)
     r.delete(key)
+
+
+def make_update_pacer_case_id_key(court_id: str) -> str:
+    return f"update.pacer_case_id:{court_id}"
+
+
+def acquire_redis_lock(r: Redis, key: str, ttl: int) -> str:
+    """Acquires a lock in Redis.
+
+    This method attempts to acquire a lock with the given key and TTL in Redis.
+    If the lock is already in use by another process, it retries until the
+    lock is acquired.
+
+    :param r: The Redis DB to connect to as a connection interface.
+    :param key: The key for the lock in Redis.
+    :param ttl: Time-to-live for the lock in milliseconds.
+    :return: A unique identifier for the lock.
+    """
+
+    identifier = str(uuid.uuid4())
+    while True:
+        if r.set(key, identifier, nx=True, px=ttl):
+            return identifier
+        time.sleep(0.1)
+
+
+def release_redis_lock(r: Redis, key: str, identifier: str) -> int:
+    """Releases an atomic lock in Redis.
+
+    This method releases the lock with the given key and identifier in Redis.
+    It uses a Lua script to ensure the lock is released atomically if the
+    identifier matches the current lock value.
+    This prevents other processes from mistakenly releasing the lock.
+
+    :param r: The Redis DB to connect to as a connection interface.
+    :param key: The key for the lock in Redis.
+    :param identifier: The unique identifier for the lock.
+    :return: None
+    """
+    # Lua script to release lock
+    lua_script = """
+    local lock_key = KEYS[1]
+    local lock_value = ARGV[1]
+
+    if redis.call("GET", lock_key) == lock_value then
+        return redis.call("DEL", lock_key)
+    else
+        return 0
+    end
+    """
+    return r.eval(lua_script, 1, key, identifier)
