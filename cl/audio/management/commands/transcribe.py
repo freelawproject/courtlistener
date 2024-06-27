@@ -67,6 +67,8 @@ def handle_open_ai_transcriptions(options) -> None:
             logger.info("Querying Audio.stt_status = %s. %s", code, descr)
 
     queryset = Audio.objects.filter(stt_status=status_code)
+    if options["max_audio_duration"]:
+        queryset = queryset.filter(duration__lte=options["max_audio_duration"])
     logger.info("%s audio files to transcribe", queryset.count())
 
     if options["limit"]:
@@ -143,6 +145,13 @@ class Command(VerboseCommand):
             action="store_true",
             help="""Do not retry celery tasks. Useful to monitor or
             debug API requests""",
+        )
+        parser.add_argument(
+            "--max-audio-duration",
+            type=int,
+            default=0,
+            help="""Specify the maximum duration (in seconds) of the audio
+            files to process""",
         )
 
     def handle(self, *args: list[str], **options: OptionsType) -> None:
