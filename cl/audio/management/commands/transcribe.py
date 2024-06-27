@@ -16,8 +16,8 @@ def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
     """
     # Checks if the the local_path_mp3 is not None and the file exists
     # in the bucket.
-    if deepgetattr(audio, 'local_path_mp3.name', None):
-            return True
+    if deepgetattr(audio, "local_path_mp3.name", None):
+        return True
 
     logger.warning(
         "Audio id %s has no local_path_mp3, needs reprocessing",
