@@ -6,6 +6,7 @@ from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.management import call_command
 from django.utils.timezone import now
+from lxml import html
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import SEARCH_TYPES, Alert
@@ -74,6 +75,108 @@ class RECAPAlertsSweepIndexTest(
                 html_content = content
                 break
         return html_content
+
+    def _confirm_number_of_alerts(self, html_content, expected_count):
+        """Test the number of alerts included in the email alert."""
+        tree = html.fromstring(html_content)
+        got = len(tree.xpath("//h2"))
+
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of alerts in the email. "
+            "Expected: %s - Got: %s\n\n" % (expected_count, got),
+        )
+
+    def _count_alert_hits_and_child_hits(
+        self,
+        html_content,
+        alert_title,
+        expected_hits,
+        case_title,
+        expected_child_hits,
+    ):
+        """Confirm the following assertions for the email alert:
+        - An specific alert is included in the email alert.
+        - The specified alert contains the expected number of hits.
+        - The specified case contains the expected number of child hits.
+        """
+        tree = html.fromstring(html_content)
+        alert_element = tree.xpath(f"//h2[contains(text(), '{alert_title}')]")
+        self.assertTrue(
+            alert_element, msg=f"Not alert with title {alert_title} found."
+        )
+
+        # Find the corresponding case_title under the alert_element
+        alert_index = tree.xpath("//h2").index(alert_element[0])
+        alert_cases = tree.xpath(
+            f"//h2[{alert_index + 1}]/following-sibling::h3"
+        )
+        self.assertEqual(
+            len(alert_cases),
+            expected_hits,
+            msg="Did not get the right number of hits for the alert %s. "
+            "Expected: %s - Got: %s\n\n"
+            % (alert_title, expected_hits, len(alert_cases)),
+        )
+        if case_title:
+            child_hit_count = 0
+            for case in alert_cases:
+                case_text = " ".join(case.xpath(".//text()")).strip()
+                if case_title in case_text:
+                    child_hit_count = len(
+                        case.xpath("following-sibling::ul[1]/li/a")
+                    )
+
+            self.assertEqual(
+                child_hit_count,
+                expected_child_hits,
+                msg="Did not get the right number of child hits for the case %s. "
+                "Expected: %s - Got: %s\n\n"
+                % (case_title, expected_child_hits, child_hit_count),
+            )
+
+    def _assert_child_hits_content(
+        self,
+        html_content,
+        alert_title,
+        case_title,
+        expected_child_descriptions,
+    ):
+        """Confirm the child hits in a case are the expected ones, comparing
+        their descriptions.
+        """
+        tree = html.fromstring(html_content)
+        alert_element = tree.xpath(f"//h2[contains(text(), '{alert_title}')]")
+        # Find the corresponding case_title under the alert_element
+        alert_index = tree.xpath("//h2").index(alert_element[0])
+        alert_cases = tree.xpath(
+            f"//h2[{alert_index + 1}]/following-sibling::h3"
+        )
+
+        def extract_child_descriptions(case_item):
+            child_documents = case_item.xpath("//ul/li")
+            results = []
+            for li in child_documents:
+                a_tag = li.xpath(".//a")[0]
+                full_text = a_tag.text_content()
+                first_part = full_text.split("\u2014")[0].strip()
+                results.append(first_part)
+
+            return results
+
+        child_descriptions = set()
+        for case in alert_cases:
+            case_text = "".join(case.xpath(".//text()")).strip()
+            if case_title in case_text:
+                child_descriptions = set(extract_child_descriptions(case))
+                break
+
+        self.assertEqual(
+            child_descriptions,
+            set(expected_child_descriptions),
+            msg=f"Child hits didn't match for case {case_title}",
+        )
 
     async def test_recap_document_hl_matched(self) -> None:
         """Test recap_document_hl_matched method that determines weather a hit
@@ -244,8 +347,7 @@ class RECAPAlertsSweepIndexTest(
         Assert the content structure accordingly.
         """
 
-        # This docket-only alert, matches a Docket added today.
-
+        # This docket-only alert matches a Docket ingested today.
         docket_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -265,15 +367,29 @@ class RECAPAlertsSweepIndexTest(
         )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_only_alert.name,
+            1,
+            self.de.docket.case_name,
+            0,
+        )
 
-        # This test shouldn't match the Docket-only alert when the RD is added
-        # today since its parent Docket was not modified today.
+        # Assert email text version:
+        txt_email = mail.outbox[0].body
+        self.assertIn(docket_only_alert.name, txt_email)
+
+        # The following test shouldn't match the Docket-only alert when the RD
+        # is added today since its parent Docket was not modified today.
         AlertFactory(
             user=self.user_profile_2.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Docket Only Not Triggered",
             query='q="405 Civil"&type=r',
         )
+        # Simulate docket is ingested a day before.
         one_day_before = now() - datetime.timedelta(days=1)
         mock_date = one_day_before.replace(hour=5)
         with time_machine.travel(mock_date, tick=False):
@@ -289,16 +405,17 @@ class RECAPAlertsSweepIndexTest(
                 jury_demand="1,000,000",
             )
 
+        # Its related RD is ingested today.
         mock_date = now().replace(hour=5)
         with time_machine.travel(mock_date, tick=False):
-            de = DocketEntryWithParentsFactory(
+            alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             rd = RECAPDocumentFactory(
-                docket_entry=de,
+                docket_entry=alert_de,
                 description="Motion to File",
                 document_number="1",
                 is_available=True,
@@ -306,7 +423,6 @@ class RECAPAlertsSweepIndexTest(
                 pacer_doc_id="018036652436",
                 plain_text="plain text for 018036652436",
             )
-
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
@@ -323,11 +439,12 @@ class RECAPAlertsSweepIndexTest(
             ),
         ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts")
-        # No new alert should be triggered.
+        # The RD ingestion's shouldn't match the docket-only alert.
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
 
+        # Test a RECAP-only alert query.
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -345,8 +462,29 @@ class RECAPAlertsSweepIndexTest(
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self._confirm_number_of_alerts(html_content, 1)
+        # Only one child hit should be included in the case within the alert.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            recap_only_alert.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert.name,
+            alert_de.docket.case_name,
+            [rd.description],
+        )
+        # Assert email text version:
+        txt_email = mail.outbox[1].body
+        self.assertIn(recap_only_alert.name, txt_email)
+        self.assertIn(rd.description, txt_email)
 
-        # Trigger the alert again.
+        # Trigger the same alert again to confirm that no new alert is
+        # triggered because previous hits have already triggered the same alert
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -359,9 +497,10 @@ class RECAPAlertsSweepIndexTest(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
-        # Create a new RD for the same DocketEntry.
-        rd = RECAPDocumentFactory(
-            docket_entry=de,
+        # Create a new RD for the same DocketEntry to confirm this new RD is
+        # properly included in the alert email.
+        rd_2 = RECAPDocumentFactory(
+            docket_entry=alert_de,
             description="Motion to File 2",
             document_number="2",
             is_available=True,
@@ -390,12 +529,22 @@ class RECAPAlertsSweepIndexTest(
         self.assertEqual(
             len(mail.outbox), 3, msg="Outgoing emails don't match."
         )
+        html_content = self.get_html_content_from_email(mail.outbox[2])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert.name,
+            alert_de.docket.case_name,
+            [rd_2.description],
+        )
 
+        # The following test confirms that hits previously matched with other
+        # alerts can match a different alert.
         recap_only_alert_2 = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert RECAP Only Docket Entry",
-            query=f"q=docket_entry_id:{de.pk}&type=r",
+            query=f"q=docket_entry_id:{alert_de.pk}&type=r",
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -405,7 +554,135 @@ class RECAPAlertsSweepIndexTest(
         ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts")
 
-        # A new alert should be triggered containing two RDs.
+        # A new alert should be triggered containing two RDs (rd and rd_2)
         self.assertEqual(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
         )
+        html_content = self.get_html_content_from_email(mail.outbox[3])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert_2.name,
+            alert_de.docket.case_name,
+            [rd.description, rd_2.description],
+        )
+        # Assert email text version:
+        txt_email = mail.outbox[3].body
+        self.assertIn(recap_only_alert.name, txt_email)
+        self.assertIn(rd.description, txt_email)
+        self.assertIn(rd_2.description, txt_email)
+
+        # The following test confirms that a cross-object alert is properly
+        # matched and triggered
+        recap_only_alert_3 = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object query",
+            query=f'q="Motion to File 2"&docket_number={docket.docket_number}&type=r',
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts")
+
+        # A new alert should be triggered containing one RD (rd_2)
+        self.assertEqual(
+            len(mail.outbox), 5, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[4])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert_3.name,
+            alert_de.docket.case_name,
+            [rd_2.description],
+        )
+        # Assert email text version:
+        txt_email = mail.outbox[4].body
+        self.assertIn(recap_only_alert_3.name, txt_email)
+        self.assertIn(rd_2.description, txt_email)
+
+    def test_limit_alert_case_child_hits(self) -> None:
+        """Test limit case child hits up to 5 and display the "View additional
+        results for this Case" button.
+        """
+
+        mock_date = now().replace(hour=5)
+        with time_machine.travel(mock_date, tick=False):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=self.de.docket,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd_descriptions = []
+            for i in range(6):
+                rd = RECAPDocumentFactory(
+                    docket_entry=alert_de,
+                    description=f"Motion to File {i+1}",
+                    document_number=f"{i+1}",
+                    pacer_doc_id=f"018036652436{i+1}",
+                )
+                if i < 5:
+                    # Omit the last alert to compare. Only up to 5 should be
+                    # included in the case.
+                    rd_descriptions.append(rd.description)
+
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+            sweep_index=True,
+        )
+        recap_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert RECAP Only Docket Entry",
+            query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts")
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(recap_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            recap_only_alert.name,
+            1,
+            self.de.docket.case_name,
+            5,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert.name,
+            alert_de.docket.case_name,
+            rd_descriptions,
+        )
+        # Assert the View more results button is present in the alert.
+        self.assertIn("View Additional Results for this Case", html_content)
+
+        # Assert email text version:
+        txt_email = mail.outbox[0].body
+        self.assertIn(recap_only_alert.name, txt_email)
+        for description in rd_descriptions:
+            with self.subTest(
+                description=description, msg="Plain text descriptions"
+            ):
+                self.assertIn(description, txt_email)
+
+        self.assertIn("View Additional Results for this Case", txt_email)

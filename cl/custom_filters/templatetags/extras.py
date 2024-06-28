@@ -1,5 +1,6 @@
 import random
 import re
+import urllib.parse
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -10,6 +11,7 @@ from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
 from elasticsearch_dsl import AttrDict, AttrList
 
+from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
 from cl.search.models import Docket, DocketEntry
 
 register = template.Library()
@@ -198,13 +200,15 @@ def citation(obj) -> SafeString:
 
 
 @register.simple_tag
-def contains_highlights(content: str) -> bool:
+def contains_highlights(content: str, alert: bool = False) -> bool:
     """Check if a given string contains the mark tag used in highlights.
 
     :param content: The input string to check.
+    :param alert: Whether this tag is being used in the alert template.
     :return: True if the mark highlight tag is found, otherwise False.
     """
-    pattern = r"<mark>.*?</mark>"
+    hl_tag = ALERTS_HL_TAG if alert else SEARCH_HL_TAG
+    pattern = rf"<{hl_tag}>.*?</{hl_tag}>"
     matches = re.findall(pattern, content)
     return bool(matches)
 
@@ -243,3 +247,15 @@ def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
         original_value = result.get(field, "")
 
     return render_string_or_list(hl_value) if hl_value else original_value
+
+
+@register.simple_tag
+def extract_q_value(query: str) -> str:
+    """Extract the value of the "q" parameter from a URL-encoded query string.
+
+    :param query: The URL-encoded query string.
+    :return: The value of the "q" parameter or an empty string if "q" is not found.
+    """
+
+    parsed_query = urllib.parse.parse_qs(query)
+    return parsed_query.get("q", [""])[0]

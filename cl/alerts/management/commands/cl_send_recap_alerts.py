@@ -124,7 +124,9 @@ def query_and_send_alerts(rate):
                 results_to_send = []
                 for hit in results:
                     if not includes_rd_fields:
-                        # Possible Docket-only query
+                        # Possible Docket-only alert
+                        # TODO important to keep the original ES child structure to preserve HLs.
+                        # Maybe we can merge HL after filtering them?
                         rds_to_send = filter_rd_alert_hits(
                             r, alert.pk, hit["child_docs"], check_rd_hl=True
                         )
@@ -135,6 +137,7 @@ def query_and_send_alerts(rate):
                         elif should_docket_hit_be_included(
                             r, alert.pk, hit.docket_id
                         ):
+                            # Docket-only alert
                             hit["child_docs"] = []
                             results_to_send.append(hit)
                             add_document_hit_to_alert_set(
@@ -146,7 +149,7 @@ def query_and_send_alerts(rate):
                             r, alert.pk, hit["child_docs"]
                         )
                         if rds_to_send:
-                            # Cross-object query
+                            # Cross-object alert
                             hit["child_docs"] = rds_to_send
                             results_to_send.append(hit)
 
@@ -162,7 +165,6 @@ def query_and_send_alerts(rate):
                     alert.query_run = search_params.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
-
         if hits:
             send_search_alert_emails.delay([(user.pk, hits)])
             alerts_sent_count += 1

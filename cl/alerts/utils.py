@@ -154,7 +154,7 @@ def recap_document_hl_matched(rd_hit: Hit) -> bool:
     :return: True if the hit matched a RECAPDocument field. Otherwise, False.
     """
 
-    matched_rd_hl = set()
+    matched_rd_hl: set[str] = set()
     rd_hl_fields = set(SEARCH_RECAP_CHILD_HL_FIELDS.keys())
     if hasattr(rd_hit, "highlight"):
         highlights = rd_hit.highlight.to_dict()

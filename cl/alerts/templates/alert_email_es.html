@@ -25,7 +25,7 @@
             {% for result in results %}
                 {% if forloop.first %}
                     <h2 style="font-size: 2em; font-weight: normal; font-family: inherit; color: #111; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;" class="alt bottom">
-                        Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% endif %} alert &mdash; {{alert.name}} &mdash; had {{num_results}}{% if num_results >= hits_limit  %}+{% endif %} hit{{results|pluralize}}:
+                        Your {{alert.get_rate_display|lower}} {% if type == 'o' %}opinion{% elif type == 'oa' %}oral argument{% elif type == 'r' %}RECAP{% endif %} alert &mdash; {{alert.name}} &mdash; had {{num_results}}{% if num_results >= hits_limit  %}+{% endif %} hit{{results|pluralize}}:
                     </h2>
                     <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
                       <a href="https://www.courtlistener.com/?{{ alert.query_run|safe }}&edit_alert={{ alert.pk }}">View Full Results / Edit this Alert</a><br>
@@ -34,28 +34,65 @@
                 {% endif %}
 
                 <h3 class="alt bottom" style="font-size: 1.5em; font-weight: normal; line-height: 1; font-family: 'Warnock Pro', 'Goudy Old Style','Palatino','Book Antiqua', Georgia, serif; color: #666; border: 0; vertical-align: baseline; font-style: italic; margin: 0; padding: 0;">
-                    <a href="https://www.courtlistener.com{{result.absolute_url}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                    <a href="https://www.courtlistener.com{% if type == 'r' %}{{result.docket_absolute_url}}{% else %}{{result.absolute_url}}{% endif %}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
                         {{ forloop.counter }}. {{ result|get_highlight:"caseName"|safe }}
-                        ({% if result.court_id != 'scotus' %}{{ result|get_highlight:"court_citation_string"|nbsp|safe }}&nbsp;{% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
+                        ({% if result.court_id != 'scotus' %}{{ result|get_highlight:"court_citation_string"|nbsp|safe }}&nbsp;{% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% elif type == 'r' %}{{ result.dateFiled|date:"Y" }}{% endif %})
                     </a>
                 </h3>
-                <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
-                  <strong style="font-weight: bold;">
-                      View original:
-                  </strong>
-                  {% if result.download_url %}
-                    <a href="{{result.download_url}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
-                        From the court
+                {% if type == 'r' %}
+                    {% if result.docketNumber %}
+                      <strong style="font-weight: bold;">Docket Number: </strong>
+                      {{ result|get_highlight:"docketNumber"|safe }}
+                    {% endif %}
+                    <br>
+                    <strong style="font-weight: bold;">Date Filed: </strong>
+                    {% if result.dateFiled %}
+                      {{ result.dateFiled|date:"F jS, Y" }}
+                    {% else %}
+                      Unknown Date
+                    {% endif %}
+                    <ul>
+                      {% for doc in result.child_docs %}
+                        {% with doc=doc|get_attrdict:"_source" %}
+                          <li>
+                            <a href="https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}" class="visitable">{% if doc.short_description %}{{ doc.short_description|render_string_or_list|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{% if doc.document_number %}{{ doc.document_number }}{% endif %}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
+                            </a>
+                            {% if doc.description %}
+                                <span style="display: block; margin-top: 5px;">Description: {{ doc.description|render_string_or_list|safe }}</span>
+                            {% endif %}
+                            {% if doc.plain_text %}
+                              {% contains_highlights doc.plain_text.0 True as highlighted %}
+                              <span style="display: block; margin-top: 5px;">{% if highlighted %}&hellip; {% endif %}{{ doc.plain_text|render_string_or_list|safe|underscore_to_space }} &hellip;</span>
+                            {% endif %}
+                          </li>
+                        {% endwith %}
+                      {% endfor %}
+                    </ul>
+                    {% if result.child_remaining %}
+                      {% extract_q_value alert.query_run as q_value %}
+                      <a href="https://www.courtlistener.com/?type={{ type|urlencode }}&q={% if q_value %}({{ q_value|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}">
+                        <strong>View Additional Results for this Case</strong>
+                      </a>
+                    {% endif %}
+                {% else %}
+                   <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+                    <strong style="font-weight: bold;">
+                        View original:
+                    </strong>
+                    {% if result.download_url %}
+                      <a href="{{result.download_url}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                          From the court
+                      </a>
+                      &nbsp;&nbsp;|&nbsp;&nbsp;
+                    {% endif %}
+                  {% if result.local_path %}
+                    {# Provide link to S3. #}
+                    <a href="https://storage.courtlistener.com/{{result.local_path}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                        Our backup
                     </a>
-                    &nbsp;&nbsp;|&nbsp;&nbsp;
                   {% endif %}
-                {% if result.local_path %}
-                  {# Provide link to S3. #}
-                  <a href="https://storage.courtlistener.com/{{result.local_path}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
-                      Our backup
-                  </a>
+                  </p>
                 {% endif %}
-                </p>
                 {% if type == 'oa' %}
                   <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 0; padding: 0;">
                     <strong style="font-weight: bold;">Date Argued: </strong>
