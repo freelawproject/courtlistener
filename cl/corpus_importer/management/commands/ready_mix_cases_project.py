@@ -143,7 +143,7 @@ def get_latest_pacer_case_id(court_id: str, date_filed: date) -> str | None:
             pacer_case_id__isnull=False,
         )
         .only("date_filed", "pacer_case_id", "court_id")
-        .order_by("-date_filed")
+        .order_by("-date_filed", "-date_created")
         .first()
     )
 
@@ -171,6 +171,13 @@ def get_and_store_starting_case_ids(options: OptionsType, r: Redis) -> None:
             r.hdel("iquery_status", court_id)
             continue
         r.hset("iquery_status", court_id, latest_pacer_case_id)
+        # Set the Redis keys for the iquery daemon and the sweep scraper.
+        r.hset(
+            "iquery:highest_known_pacer_case_id",
+            court_id,
+            latest_pacer_case_id,
+        )
+        r.hset("iquery:pacer_case_id_current", court_id, latest_pacer_case_id)
     logger.info("Finished setting starting pacer_case_ids.")
 
 

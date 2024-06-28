@@ -1,48 +1,31 @@
 import argparse
 import time
 
-from django.db.models import Q
-
 from cl.audio.models import Audio
 from cl.audio.tasks import transcribe_from_open_ai_api
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.types import OptionsType
+from cl.lib.utils import deepgetattr
 
 
 def audio_can_be_processed_by_open_ai_api(audio: Audio) -> bool:
-    """Check that the audio file exists and that it's size is
-    25MB or less
-
-    OpenAI API' whisper-1 model has a limit of 25MB
+    """Check the audio file exists in the bucket.
 
     :param audio: audio object
-
     :return: True if audio can be processed by OpenAI API
     """
-    try:
-        # audio.duration should map to the file size with little variability
-        # However, it can be unreliable, so we trust it only for shorter files
-        if audio.local_path_mp3 and audio.duration and audio.duration < 3000:
-            return True
+    # Checks if the the local_path_mp3 is not None and the file exists
+    # in the bucket.
+    if deepgetattr(audio, "local_path_mp3.name", None):
+        return True
 
-        # Request the file size from the storage
-        # currently an AWS bucket
-        size_mb = audio.local_path_mp3.size / 1_000_000
-        if size_mb < 25:
-            return True
-
-        logger.warning(
-            "Audio id %s actual size is greater than API limit %s",
-            audio.pk,
-            size_mb,
-        )
-    except (FileNotFoundError, ValueError):
-        # FileNotFoundError: when the name does not exist in the bucket
-        # ValueError: when local_path_mp3 is None or a null FileField
-        logger.warning(
-            "Audio id %s has no local_path_mp3, needs reprocessing",
-            audio.pk,
-        )
+    logger.warning(
+        "Audio id %s has no local_path_mp3, needs reprocessing",
+        audio.pk,
+    )
+    if audio.stt_status != Audio.STT_NO_FILE:
+        audio.stt_status = Audio.STT_NO_FILE
+        audio.save()
 
     return False
 
@@ -57,12 +40,14 @@ def handle_open_ai_transcriptions(options) -> None:
     """
     requests_per_minute = options["rpm"]
 
-    if options.get("retry_failures"):
-        query = Q(stt_status=Audio.STT_FAILED)
-    else:
-        query = Q(stt_status=Audio.STT_NEEDED)
+    status_code = options.get("status_to_process")
+    for code, descr in Audio.STT_STATUSES:
+        if code == status_code:
+            logger.info("Querying Audio.stt_status = %s. %s", code, descr)
 
-    queryset = Audio.objects.filter(query)
+    queryset = Audio.objects.filter(stt_status=status_code)
+    if options["max_audio_duration"]:
+        queryset = queryset.filter(duration__lte=options["max_audio_duration"])
     logger.info("%s audio files to transcribe", queryset.count())
 
     if options["limit"]:
@@ -92,6 +77,12 @@ def handle_open_ai_transcriptions(options) -> None:
 
 class Command(VerboseCommand):
     help = "Transcribe audio files using a Speech to Text model"
+    status_choices = [
+        code for code, _ in Audio.STT_STATUSES if code != Audio.STT_COMPLETE
+    ]
+    status_help = "; ".join(
+        [f"{code} - {descr}" for code, descr in Audio.STT_STATUSES]
+    )
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
@@ -109,10 +100,11 @@ class Command(VerboseCommand):
             help="Requests Per Minute, a rate limit in the model API",
         )
         parser.add_argument(
-            "--retry-failures",
-            action="store_true",
-            default=False,
-            help="Retry transcription of failed audio files",
+            "--status-to-process",
+            choices=self.status_choices,
+            default=Audio.STT_NEEDED,
+            type=int,
+            help=f"Audio.stt_status value to process. Default {Audio.STT_NEEDED}. {self.status_help}",
         )
         parser.add_argument(
             "--limit",
@@ -132,6 +124,13 @@ class Command(VerboseCommand):
             action="store_true",
             help="""Do not retry celery tasks. Useful to monitor or
             debug API requests""",
+        )
+        parser.add_argument(
+            "--max-audio-duration",
+            type=int,
+            default=0,
+            help="""Specify the maximum duration (in seconds) of the audio
+            files to process""",
         )
 
     def handle(self, *args: list[str], **options: OptionsType) -> None:
