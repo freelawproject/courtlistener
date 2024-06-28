@@ -1,12 +1,13 @@
 import argparse
+import datetime
 import os
-from datetime import date, timedelta
 from typing import Callable, Dict, List, Optional, Tuple, cast
 
 from celery.canvas import chain
 from django.conf import settings
 from django.db.models import QuerySet
 from django.utils.timezone import now
+from juriscraper.lib.date_utils import make_date_range_tuples
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.lib.string_utils import CaseNameTweaker
 from requests import RequestException
@@ -19,6 +20,7 @@ from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     process_free_opinion_result,
 )
+from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id, map_pacer_to_cl_id
@@ -35,7 +37,7 @@ PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 def get_next_date_range(
     court_id: str,
     span: int = 7,
-) -> Tuple[Optional[date], Optional[date]]:
+) -> Tuple[Optional[datetime.date], Optional[datetime.date]]:
     """Get the next start and end query dates for a court.
 
     Check the DB for the last date for a court that was completed. Return the
@@ -64,21 +66,67 @@ def get_next_date_range(
     # Ensure that we go back five days from the last time we had success if
     # that success was in the last few days.
     last_complete_date = min(
-        now().date() - timedelta(days=5), last_completion_log.date_queried
+        now().date() - datetime.timedelta(days=5),
+        last_completion_log.date_queried,
     )
     next_end_date = min(
-        now().date(), last_complete_date + timedelta(days=span)
+        now().date(), last_complete_date + datetime.timedelta(days=span)
     )
     return last_complete_date, next_end_date
 
 
-def mark_court_in_progress(court_id: str, d: date) -> QuerySet:
+def mark_court_in_progress(court_id: str, d: datetime.date) -> QuerySet:
     log = PACERFreeDocumentLog.objects.create(
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
         date_queried=d,
         court_id=map_pacer_to_cl_id(court_id),
     )
     return log
+
+
+def fetch_doc_report(
+    pacer_court_id: int,
+    start: Optional[datetime.date],
+    end: Optional[datetime.date],
+):
+    exception_raised = False
+    status = PACERFreeDocumentLog.SCRAPE_FAILED
+
+    logger.info(
+        "Attempting to get latest document references for "
+        "%s between %s and %s",
+        pacer_court_id,
+        start,
+        end,
+    )
+    try:
+        status = get_and_save_free_document_report(pacer_court_id, start, end)
+    except (
+        RequestException,
+        ReadTimeoutError,
+        IndexError,
+        TypeError,
+        PacerLoginException,
+        ValueError,
+    ) as exc:
+        if isinstance(exc, (RequestException, ReadTimeoutError)):
+            reason = "network error."
+        elif isinstance(exc, IndexError):
+            reason = "PACER 6.3 bug."
+        elif isinstance(exc, (TypeError, ValueError)):
+            reason = "failing PACER website."
+        elif isinstance(exc, PacerLoginException):
+            reason = "PACER login issue."
+        else:
+            reason = "unknown reason."
+        logger.error(
+            "Failed to get free document references for "
+            f"{pacer_court_id} between {start} and "
+            f"{end} due to {reason}."
+        )
+        exception_raised = True
+
+    return exception_raised, status
 
 
 def get_and_save_free_document_reports(options: OptionsType) -> None:
@@ -95,96 +143,100 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
     done.
     """
     # Kill any *old* logs that report they're in progress. (They've failed.)
-    three_hrs_ago = now() - timedelta(hours=3)
+    three_hrs_ago = now() - datetime.timedelta(hours=3)
     PACERFreeDocumentLog.objects.filter(
         date_started__lt=three_hrs_ago,
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
     ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED)
 
-    cl_court_ids = (
-        Court.federal_courts.district_or_bankruptcy_pacer_courts()
-        .filter(
-            in_use=True,
-            end_date=None,
-        )
-        .exclude(pk__in=["casb", "gub", "ilnb", "innb", "miwb", "ohsb", "prb"])
-        .values_list("pk", flat=True)
-    )
-    pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
-    today = now()
-    for pacer_court_id in pacer_court_ids:
-        while True:
-            next_start_d, next_end_d = get_next_date_range(pacer_court_id)
-            if next_end_d is None:
-                logger.warning(
-                    f"Free opinion scraper for {pacer_court_id} still "
-                    "in progress."
-                )
-                break
+    excluded_court_ids = ["casb", "gub", "ilnb", "innb", "miwb", "ohsb", "prb"]
 
-            logger.info(
-                "Attempting to get latest document references for "
-                "%s between %s and %s",
-                pacer_court_id,
-                next_start_d,
-                next_end_d,
+    if options["courts"] != ["all"]:
+        cl_court_ids = (
+            Court.federal_courts.district_or_bankruptcy_pacer_courts()
+            .filter(
+                in_use=True,
+                end_date=None,
+                pk__in=options["courts"],
             )
-            mark_court_in_progress(pacer_court_id, next_end_d)
-            try:
-                status = get_and_save_free_document_report(
+            .exclude(pk__in=excluded_court_ids)
+            .values_list("pk", flat=True)
+        )
+    else:
+        cl_court_ids = (
+            Court.federal_courts.district_or_bankruptcy_pacer_courts()
+            .filter(
+                in_use=True,
+                end_date=None,
+            )
+            .exclude(pk__in=excluded_court_ids)
+            .values_list("pk", flat=True)
+        )
+
+    pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
+
+    if options["date_start"] and options["date_end"]:
+        date_ranges = make_date_range_tuples(
+            options["date_start"], options["date_end"], gap=options["span"]
+        )
+        for pacer_court_id in pacer_court_ids:
+            for start, end in date_ranges:
+                exception_raised, status = fetch_doc_report(
+                    pacer_court_id, start, end
+                )
+                if exception_raised:
+                    break
+
+    else:
+        today = now()
+        for pacer_court_id in pacer_court_ids:
+            while True:
+                next_start_d, next_end_d = get_next_date_range(pacer_court_id)
+                print(
+                    f"next_start_d: {next_start_d} - next_end_d: {next_end_d}"
+                )
+                if next_end_d is None:
+                    logger.warning(
+                        f"Free opinion scraper for {pacer_court_id} still "
+                        "in progress."
+                    )
+                    break
+
+                mark_court_in_progress(pacer_court_id, next_end_d)
+
+                exc, status = fetch_doc_report(
                     pacer_court_id, next_start_d, next_end_d
                 )
-            except (
-                RequestException,
-                ReadTimeoutError,
-                IndexError,
-                TypeError,
-                PacerLoginException,
-                ValueError,
-            ) as exc:
-                if isinstance(exc, (RequestException, ReadTimeoutError)):
-                    reason = "network error."
-                elif isinstance(exc, IndexError):
-                    reason = "PACER 6.3 bug."
-                elif isinstance(exc, (TypeError, ValueError)):
-                    reason = "failing PACER website."
-                elif isinstance(exc, PacerLoginException):
-                    reason = "PACER login issue."
-                else:
-                    reason = "unknown reason."
-                logger.error(
-                    "Failed to get free document references for "
-                    f"{pacer_court_id} between {next_start_d} and "
-                    f"{next_end_d} due to {reason}."
-                )
-                mark_court_done_on_date(
-                    PACERFreeDocumentLog.SCRAPE_FAILED,
-                    pacer_court_id,
-                    next_end_d,
-                )
-                break
+                if exc:
+                    mark_court_done_on_date(
+                        PACERFreeDocumentLog.SCRAPE_FAILED,
+                        pacer_court_id,
+                        next_end_d,
+                    )
+                    break
 
-            mark_court_done_on_date(status, pacer_court_id, next_end_d)
+                mark_court_done_on_date(status, pacer_court_id, next_end_d)
 
-            if status == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
-                if next_end_d >= today.date():
-                    logger.info(
-                        "Got all document references for '%s'.", pacer_court_id
+                if status == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
+                    if next_end_d >= today.date():
+                        logger.info(
+                            "Got all document references for '%s'.",
+                            pacer_court_id,
+                        )
+                        # Break from while loop, onwards to next court
+                        break
+                    else:
+                        # More dates to do; let it continue
+                        continue
+
+                elif status == PACERFreeDocumentLog.SCRAPE_FAILED:
+                    logger.error(
+                        "Encountered critical error on %s "
+                        "(network error?). Marking as failed and "
+                        "pressing on." % pacer_court_id
                     )
                     # Break from while loop, onwards to next court
                     break
-                else:
-                    # More dates to do; let it continue
-                    continue
-
-            elif status == PACERFreeDocumentLog.SCRAPE_FAILED:
-                logger.error(
-                    "Encountered critical error on %s "
-                    "(network error?). Marking as failed and "
-                    "pressing on." % pacer_court_id
-                )
-                # Break from while loop, onwards to next court
-                break
 
 
 def get_pdfs(options: OptionsType) -> None:
@@ -202,7 +254,18 @@ def get_pdfs(options: OptionsType) -> None:
     q = cast(str, options["queue"])
     index = options["index"]
     cnt = CaseNameTweaker()
-    rows = PACERFreeDocumentRow.objects.filter(error_msg="").only("pk")
+    rows = PACERFreeDocumentRow.objects.filter(error_msg="")
+
+    if options["courts"] != ["all"]:
+        rows = rows.filter(court_id__in=options["courts"])
+
+    if options["date_start"] and options["date_end"]:
+        rows = rows.filter(
+            date_filed__gte=options["date_start"],
+            date_filed__lte=options["date_end"],
+        )
+
+    rows = rows.only("pk")
     count = rows.count()
     task_name = "downloading"
     if index:
@@ -297,9 +360,42 @@ class Command(VerboseCommand):
             default=False,
             help="Do we index as we go, or leave that to be done later?",
         )
+        parser.add_argument(
+            "--courts",
+            type=str,
+            default=["all"],
+            nargs="*",
+            help="The courts that you wish to parse.",
+        )
+        parser.add_argument(
+            "--date-start",
+            dest="date_start",
+            required=False,
+            type=valid_date,
+            help="Date when the query should start.",
+        )
+        parser.add_argument(
+            "--date-end",
+            dest="date_end",
+            required=False,
+            type=valid_date,
+            help="Date when the query should end.",
+        )
+        parser.add_argument(
+            "--span",
+            type=int,
+            default=7,
+            help="The number of days, inclusive, that a query should span at a time.",
+        )
 
     def handle(self, *args: List[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
+
+        if options["date_start"] and options["date_end"]:
+            if options["date_start"] > options["date_end"]:  # type: ignore
+                print("Error: date-end must be greater than date-start.")
+                return
+
         action = cast(Callable, options["action"])
         action(options)
 
