@@ -125,8 +125,6 @@ def query_and_send_alerts(rate):
                 for hit in results:
                     if not includes_rd_fields:
                         # Possible Docket-only alert
-                        # TODO important to keep the original ES child structure to preserve HLs.
-                        # Maybe we can merge HL after filtering them?
                         rds_to_send = filter_rd_alert_hits(
                             r, alert.pk, hit["child_docs"], check_rd_hl=True
                         )

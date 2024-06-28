@@ -3053,7 +3053,9 @@ def do_es_sweep_alert_query(
 
     main_query = add_es_highlighting(s, cd, alerts=True)
     main_query = main_query.sort(build_sort_results(cd))
-    main_query = main_query.extra(from_=0, size=30)
+    main_query = main_query.extra(
+        from_=0, size=settings.SCHEDULED_ALERT_HITS_LIMIT
+    )
     results = main_query.execute()
     if results:
         total_hits = results.hits.total.value
