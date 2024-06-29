@@ -4,7 +4,6 @@ import operator
 import re
 import time
 import traceback
-from collections import defaultdict
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps

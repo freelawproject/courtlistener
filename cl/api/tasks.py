@@ -1,6 +1,8 @@
 import json
+from collections import defaultdict
 from typing import Any
 
+from elasticsearch_dsl.response import Hit
 from rest_framework.renderers import JSONRenderer
 
 from cl.alerts.api_serializers import SearchAlertSerializerModel
@@ -10,9 +12,12 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
-from cl.search.api_serializers import V3OAESResultSerializer
+from cl.search.api_serializers import (
+    RECAPESResultSerializer,
+    V3OAESResultSerializer,
+)
 from cl.search.api_utils import ResultObject
-from cl.search.models import DocketEntry
+from cl.search.models import SEARCH_TYPES, DocketEntry
 
 
 @app.task()
@@ -79,25 +84,47 @@ def send_docket_alert_webhook_events(
 
 @app.task()
 def send_es_search_alert_webhook(
-    results: list[dict[str, Any]],
+    results: list[dict[str, Any]] | list[Hit],
     webhook_pk: int,
-    alert: Alert,
+    alert_pk: int,
 ) -> None:
     """Send a search alert webhook event containing search results from a
     search alert object.
 
     :param results: The search results returned by SOLR for this alert.
     :param webhook_pk: The webhook endpoint ID object to send the event to.
-    :param alert: The search alert object.
+    :param alert_pk: The search alert ID.
     """
 
     webhook = Webhook.objects.get(pk=webhook_pk)
+    alert = Alert.objects.get(pk=alert_pk)
     serialized_alert = SearchAlertSerializerModel(alert).data
-    es_results = []
-    for result in results:
-        result["snippet"] = result["text"]
-        es_results.append(ResultObject(initial=result))
-    serialized_results = V3OAESResultSerializer(es_results, many=True).data
+    match alert.alert_type:
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            es_results = []
+            for result in results:
+                result["snippet"] = result["text"]
+                es_results.append(ResultObject(initial=result))
+            serialized_results = V3OAESResultSerializer(
+                es_results, many=True
+            ).data
+        case SEARCH_TYPES.RECAP:
+            for result in results:
+                child_result_objects = []
+                if hasattr(result, "child_docs"):
+                    for child_doc in result.child_docs:
+                        child_result_objects.append(
+                            defaultdict(
+                                lambda: None, child_doc["_source"].to_dict()
+                            )
+                        )
+                result["child_docs"] = child_result_objects
+            serialized_results = RECAPESResultSerializer(
+                results, many=True
+            ).data
+        case _:
+            # No implemented alert type.
+            return None
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),

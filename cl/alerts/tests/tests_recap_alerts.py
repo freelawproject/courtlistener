@@ -6,6 +6,7 @@ from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
+from django.utils.html import strip_tags
 from django.utils.timezone import now
 from lxml import html
 
@@ -13,7 +14,7 @@ from cl.alerts.factories import AlertFactory
 from cl.alerts.models import SEARCH_TYPES, Alert
 from cl.alerts.utils import query_includes_rd_field, recap_document_hl_matched
 from cl.api.factories import WebhookFactory
-from cl.api.models import WebhookEventType
+from cl.api.models import WebhookEvent, WebhookEventType
 from cl.donate.models import NeonMembership
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.test_helpers import RECAPSearchTestCase
@@ -194,6 +195,38 @@ class RECAPAlertsSweepIndexTest(
             set(expected_child_descriptions),
             msg=f"Child hits didn't match for case {case_title}, Got {child_descriptions}, Expected: {expected_child_descriptions} ",
         )
+
+    def _count_webhook_hits_and_child_hits(
+        self,
+        webhooks,
+        alert_title,
+        expected_hits,
+        case_title,
+        expected_child_hits,
+    ):
+        """Confirm the following assertions for the search alert webhook:
+        - An specific alert webhook was triggered.
+        - The specified alert contains the expected number of hits.
+        - The specified case contains the expected number of child hits.
+        """
+
+        for webhook in webhooks:
+            if webhook["payload"]["alert"]["name"] == alert_title:
+                webhook_cases = webhook["payload"]["results"]
+                self.assertEqual(
+                    len(webhook_cases),
+                    expected_hits,
+                    msg=f"Did not get the right number of hits for the alert %s. "
+                    % alert_title,
+                )
+                for case in webhook["payload"]["results"]:
+                    if case_title == strip_tags(case["caseName"]):
+                        self.assertEqual(
+                            len(case["recap_documents"]),
+                            expected_child_hits,
+                            msg=f"Did not get the right number of child documents for the case %s. "
+                            % case_title,
+                        )
 
     async def test_recap_document_hl_matched(self) -> None:
         """Test recap_document_hl_matched method that determines weather a hit
@@ -747,7 +780,7 @@ class RECAPAlertsSweepIndexTest(
             description="Motion to File 2",
             document_number="2",
             pacer_doc_id="018036652440",
-            plain_text= "plain text lorem"
+            plain_text="plain text lorem",
         )
 
         docket_only_alert = AlertFactory(
@@ -767,10 +800,20 @@ class RECAPAlertsSweepIndexTest(
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object",
             query=f'q="File Amicus Curiae" AND "Motion to File 2" AND '
-                  f'"plain text lorem" AND "410 Civil" AND '
-                  f'id:{rd_2.pk}&docket_number={docket.docket_number}'
-                  f'&case_name="{docket.case_name}"&type=r',
+            f'"plain text lorem" AND "410 Civil" AND '
+            f"id:{rd_2.pk}&docket_number={docket.docket_number}"
+            f'&case_name="{docket.case_name}"&type=r',
         )
+        AlertFactory(
+            user=self.user_profile_2.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object",
+            query=f'q="File Amicus Curiae" AND "Motion to File 2" AND '
+            f'"plain text lorem" AND "410 Civil" AND '
+            f"id:{rd_2.pk}&docket_number={docket.docket_number}"
+            f'&case_name="{docket.case_name}"&type=r',
+        )
+
         call_command(
             "cl_index_parent_and_child_docs",
             search_type=SEARCH_TYPES.RECAP,
@@ -788,8 +831,14 @@ class RECAPAlertsSweepIndexTest(
             call_command("cl_send_recap_alerts")
 
         self.assertEqual(
-            len(mail.outbox), 1, msg="Outgoing emails don't match."
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
+
+        # Assert webhooks.
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        self.assertEqual(len(webhook_events), 3)
 
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
@@ -800,7 +849,14 @@ class RECAPAlertsSweepIndexTest(
             html_content,
             docket_only_alert.name,
             3,
-            self.de.docket.case_name,
+            docket.case_name,
+            0,
+        )
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            docket_only_alert.name,
+            3,
+            docket.case_name,
             0,
         )
 
@@ -809,6 +865,13 @@ class RECAPAlertsSweepIndexTest(
         # The recap-only alert contain 2 child hits.
         self._count_alert_hits_and_child_hits(
             html_content,
+            recap_only_alert.name,
+            1,
+            alert_de.docket.case_name,
+            2,
+        )
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
             recap_only_alert.name,
             1,
             alert_de.docket.case_name,
@@ -831,6 +894,13 @@ class RECAPAlertsSweepIndexTest(
             alert_de.docket.case_name,
             1,
         )
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            cross_object_alert_with_hl.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
         self._assert_child_hits_content(
             html_content,
             cross_object_alert_with_hl.name,
@@ -840,19 +910,25 @@ class RECAPAlertsSweepIndexTest(
 
         # Assert HL in the cross_object_alert_with_hl
         self.assertIn(f"<strong>{docket.case_name}</strong>", html_content)
-        self.assertEqual(html_content.count(f"<strong>{docket.case_name}</strong>"), 1)
+        self.assertEqual(
+            html_content.count(f"<strong>{docket.case_name}</strong>"), 1
+        )
         self.assertIn(f"<strong>{docket.docket_number}</strong>", html_content)
         self.assertEqual(
-            html_content.count(f"<strong>{docket.docket_number}</strong>"), 1)
+            html_content.count(f"<strong>{docket.docket_number}</strong>"), 1
+        )
         self.assertIn(f"<strong>{rd_2.plain_text}</strong>", html_content)
         self.assertEqual(
-            html_content.count(f"<strong>{rd_2.plain_text}</strong>"), 1)
+            html_content.count(f"<strong>{rd_2.plain_text}</strong>"), 1
+        )
         self.assertIn(f"<strong>{rd_2.description}</strong>", html_content)
         self.assertEqual(
-            html_content.count(f"<strong>{rd_2.description}</strong>"), 1)
+            html_content.count(f"<strong>{rd_2.description}</strong>"), 1
+        )
         self.assertIn("<strong>File Amicus Curiae</strong>", html_content)
         self.assertEqual(
-            html_content.count("<strong>File Amicus Curiae</strong>"), 1)
+            html_content.count("<strong>File Amicus Curiae</strong>"), 1
+        )
 
         # Assert email text version:
         txt_email = mail.outbox[0].body

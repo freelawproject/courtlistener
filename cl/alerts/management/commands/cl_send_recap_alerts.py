@@ -16,6 +16,8 @@ from cl.alerts.utils import (
     query_includes_rd_field,
     recap_document_hl_matched,
 )
+from cl.api.models import WebhookEventType
+from cl.api.tasks import send_es_search_alert_webhook
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.redis_utils import get_redis_interface
@@ -163,6 +165,17 @@ def query_and_send_alerts(rate):
                     alert.query_run = search_params.urlencode()
                     alert.date_last_hit = now()
                     alert.save()
+
+                    # Send webhook event if the user has a SEARCH_ALERT
+                    # endpoint enabled.
+                    user_webhooks = user.webhooks.filter(
+                        event_type=WebhookEventType.SEARCH_ALERT, enabled=True
+                    )
+                    for user_webhook in user_webhooks:
+                        send_es_search_alert_webhook.delay(
+                            results_to_send, user_webhook.pk, alert.pk
+                        )
+
         if hits:
             send_search_alert_emails.delay([(user.pk, hits)])
             alerts_sent_count += 1
