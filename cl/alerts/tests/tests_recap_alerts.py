@@ -11,7 +11,7 @@ from django.utils.timezone import now
 from lxml import html
 
 from cl.alerts.factories import AlertFactory
-from cl.alerts.models import SEARCH_TYPES, Alert
+from cl.alerts.models import SEARCH_TYPES, Alert, ScheduledAlertHit
 from cl.alerts.utils import query_includes_rd_field, recap_document_hl_matched
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
@@ -350,7 +350,7 @@ class RECAPAlertsSweepIndexTest(
         AlertFactory(
             user=self.user_profile_2.user,
             rate=Alert.REAL_TIME,
-            name="Test RT Opinion Alert",
+            name="Test RT RECAP Alert",
             query='q="401 Civil"',
         )
         AlertFactory(
@@ -944,3 +944,58 @@ class RECAPAlertsSweepIndexTest(
                     txt_email,
                     msg="RECAPDocument wasn't found in the email content.",
                 )
+
+    def test_schedule_wly_and_mly_recap_alerts(self) -> None:
+        """Test Weekly and Monthly RECAP Search Alerts are scheduled daily
+        before being sent later.
+        """
+
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Alert Docket Only",
+            query='q="401 Civil"&type=r',
+        )
+        recap_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.MONTHLY,
+            name="Test Alert RECAP Only Docket Entry",
+            query=f"q=docket_entry_id:{self.de.pk}&type=r",
+        )
+        cross_object_alert_with_hl = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Alert Cross-object",
+            query=f'q="401 Civil" id:{self.rd.pk}&type=r',
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts")
+
+        self.assertEqual(
+            len(mail.outbox), 0, msg="Outgoing emails don't match."
+        )
+        schedule_alerts = ScheduledAlertHit.objects.all()
+        self.assertEqual(schedule_alerts.count(), 3)
+
+        # Assert webhooks.
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        self.assertEqual(len(webhook_events), 3)
+
+        # Send  Weekly alerts and check assertions.
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
+        # Send  Monthly alerts and check assertions.
+        call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
