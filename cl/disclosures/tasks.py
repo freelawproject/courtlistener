@@ -2,6 +2,7 @@ import datetime
 from typing import Optional, Union
 
 import requests
+from asgiref.sync import async_to_sync
 from dateutil.parser import ParserError, parse
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -29,7 +30,7 @@ from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.microservice_utils import microservice
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.redis_utils import create_redis_semaphore, make_redis_interface
+from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 
 
 def make_disclosure_key(data_id: str) -> str:
@@ -55,12 +56,12 @@ def make_financial_disclosure_thumbnail_from_pdf(self, pk: int) -> None:
     disclosure = FinancialDisclosure.objects.select_for_update().get(pk=pk)
     pdf_content = disclosure.filepath.read()
 
-    response = microservice(
+    response = async_to_sync(microservice)(
         service="generate-thumbnail",
         file_type="pdf",
         file=pdf_content,
     )
-    if not response.ok:
+    if not response.is_success:
         if self.request.retries == self.max_retries:
             disclosure.thumbnail_status = THUMBNAIL_STATUSES.FAILED
             disclosure.save()
@@ -88,13 +89,13 @@ def extract_content(
 
     # Extraction takes between 7 seconds and 80 minutes for super
     # long Trump extraction with ~5k investments
-    response = microservice(
+    response = async_to_sync(microservice)(
         service="extract-disclosure",
         file_type="pdf",
         file=pdf_bytes,
     )
 
-    if not response.ok:
+    if not response.is_success:
         logger.warning(
             msg="Could not extract data from this document",
             extra=dict(
@@ -224,9 +225,11 @@ def save_disclosure(extracted_data: dict, disclosure) -> None:
                 redacted=any(v["is_redacted"] for v in debt.values()),
                 creditor_name=debt["Creditor"]["text"],
                 description=debt["Description"]["text"],
-                value_code=debt["Value Code"]["text"]
-                if debt["Value Code"]["text"] != "None"
-                else "",
+                value_code=(
+                    debt["Value Code"]["text"]
+                    if debt["Value Code"]["text"] != "None"
+                    else ""
+                ),
             )
             for debt in extracted_data["sections"]["Liabilities"]["rows"]
         ]
@@ -327,14 +330,14 @@ def save_and_upload_disclosure(
     if len(disclosure) > 0:
         return disclosure[0]
 
-    page_count = microservice(
+    page_count = async_to_sync(microservice)(
         service="page-count",
         file_type="pdf",
         file=response.content,
     ).text
     if not page_count:
         logger.error(
-            msg=f"Page count failed",
+            msg="Page count failed",
             extra={"disclosure_id": disclosure_key, "url": data["url"]},
         )
 
@@ -375,7 +378,7 @@ def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
     :param data: The disclosure information to process
     :return: None
     """
-    redis_db = make_redis_interface("CACHE")
+    redis_db = get_redis_interface("CACHE")
     disclosure_key = make_disclosure_key(data["id"])
     newly_enqueued = create_redis_semaphore(
         redis_db,
@@ -438,7 +441,7 @@ def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
         )
     except ValidationError:
         logger.exception(
-            f"Validation Error up saving disclosure",
+            "Validation Error up saving disclosure",
             extra={"disclosure_id": data["id"]},
         )
 

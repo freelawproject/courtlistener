@@ -9,7 +9,7 @@
 
 
 {% block content %}
-  <div class="hidden-xs hidden-sm col-md-3">
+  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
     <div id="toc">
       <h3>Table of Contents</h3>
       <ul>
@@ -35,11 +35,10 @@
     <h1>Help with Tags and Notes on CourtListener</h1>
     <p>Our tagging and notes features help you to tag, organize, and share cases that you are working with. To learn more about these features, continue reading below.
     </p>
-    <p>We hope that if you find these tools useful, you will donate to <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP, to support the ongoing development and maintenance of these and other features.
+    <p>We hope that if you find these tools useful, you will become a member of <a href="https://free.law">Free Law Project</a>, the non-profit supporting CourtListener and RECAP. It is the best thing you can do to support ongoing feature development and maintenance.
     </p>
-    <p><a href="{% url "donate" %}?referrer=alerts-help"
-          class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i> Donate Now</a></p>
-
+    <p><a href="https://donate.free.law/forms/membership"
+      class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i> Join Now</a></p>
 
     <hr>
 
@@ -92,13 +91,13 @@
 
 
     <h2 id="notes">Notes</h2>
-    <p>You can use the Notes feature to save Dockets, RECAP Documents, Opinions, and Oral arguments to the <a href="{% url 'profile_notes' %}">Notes tab</a> in your account. You can add notes to each note item as well.
+    <p>You can use the Notes feature to save dockets, PACER documents, case law, and oral arguments to the <a href="{% url 'profile_notes' %}">Notes tab</a> in your account. You can add notes to each note item as well.
     </p>
     <p>Notes on dockets will be shown in <a href="{% url 'alert_help' %}#recap-alerts">docket alerts</a> that we send you, if you subscribe to a case, but are otherwise always private.
     </p>
 
     <h3 id="making-notes">Save a Note</h3>
-    <p>To save a note on an item on CourtListener, log in and click <strong>Add Note</strong> button on a Docket, RECAP Document, Opinion, or Oral Argument.</p>
+    <p>To save a note on an item on CourtListener, log in and click <strong>Add Note</strong> button on a docket, PACER document, decision, or oral argument recording.</p>
     <p><img src="{% static "png/add-note-button.png" %}"
          alt="screenshot of the star icon to add a note to an item"
          class="img-responsive img-rounded shadow center-block"

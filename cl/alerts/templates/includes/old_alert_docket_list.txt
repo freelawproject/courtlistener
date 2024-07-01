@@ -2,6 +2,6 @@
 {{ docket.court }}
 Terminated: {{ docket.date_terminated|date:"M j, Y" }}{% if docket.date_last_filing %}
 Last Entry: {{ docket.date_last_filing|date:"M j, Y" }}{% endif %}
-https://www.courtlistener.com{{ docket.get_absolute_url }}
+https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc
 
 {% endfor %}

@@ -19,13 +19,17 @@ from cl.people_db.factories import PersonFactory
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SOURCES,
+    BankruptcyInformation,
     Citation,
     Court,
     Docket,
     DocketEntry,
     Opinion,
     OpinionCluster,
+    OpinionsCited,
+    OpinionsCitedByRECAPDocument,
     Parenthetical,
+    ParentheticalGroup,
     RECAPDocument,
 )
 from cl.tests.providers import LegalProvider
@@ -75,6 +79,14 @@ class ParentheticalFactory(DjangoModelFactory):
     describing_opinion = SelfAttribute("described_opinion")
     text = Faker("sentence")
     score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+
+
+class ParentheticalGroupFactory(DjangoModelFactory):
+    class Meta:
+        model = ParentheticalGroup
+
+    score = Faker("pyfloat", min_value=0, max_value=1, right_digits=4)
+    size = Faker("random_int", min=1, max=100)
 
 
 class ParentheticalWithParentsFactory(ParentheticalFactory):
@@ -185,7 +197,7 @@ class OpinionClusterFactoryWithChildrenAndParents(
         OpinionWithChildrenFactory,
         factory_related_name="cluster",
     )
-    precedential_status = ("Published", "Precedential")  # Always precedential
+    precedential_status = PRECEDENTIAL_STATUS.PUBLISHED  # Always precedential
 
 
 class OpinionClusterWithParentsFactory(
@@ -195,6 +207,15 @@ class OpinionClusterWithParentsFactory(
     """Make an OpinionCluster with Docket parents"""
 
     pass
+
+
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
 
 
 class DocketEntryFactory(DjangoModelFactory):
@@ -243,23 +264,10 @@ class DocketEntryReuseParentsFactory(
     pass
 
 
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
-
-    description = Faker("text", max_nb_chars=750)
-    document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
-
-
 class DocketFactory(DjangoModelFactory):
     class Meta:
         model = Docket
 
-    idb_data = RelatedFactory(
-        "cl.recap.factories.FjcIntegratedDatabaseFactory",
-        factory_related_name="docket",
-    )
     source = FuzzyChoice(Docket.SOURCE_CHOICES, getter=lambda c: c[0])
     court = SubFactory(CourtFactory)
     appeal_from = SubFactory(CourtFactory)
@@ -293,3 +301,39 @@ class OpinionClusterFactoryMultipleOpinions(
         size=3,  # by default create 3 opinions
     )
     precedential_status = ("Published", "Precedential")
+
+
+class OpinionsCitedWithParentsFactory(DjangoModelFactory):
+    """Make a OpinionCited with Opinion parents"""
+
+    class Meta:
+        model = OpinionsCited
+
+    citing_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )
+    cited_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )
+
+
+class BankruptcyInformationFactory(DjangoModelFactory):
+    class Meta:
+        model = BankruptcyInformation
+
+    chapter = Faker("random_id_string")
+    trustee_str = Faker("name_female")
+
+
+class OpinionsCitedByRECAPDocumentFactory(DjangoModelFactory):
+    """Make a OpinionsCitedByRECAPDocument with parents"""
+
+    class Meta:
+        model = OpinionsCitedByRECAPDocument
+
+    citing_document = SubFactory(
+        "cl.search.factories.RECAPDocumentFactory",
+    )
+    cited_opinion = SubFactory(
+        "cl.search.factories.OpinionFactory",
+    )

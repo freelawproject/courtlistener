@@ -18,7 +18,7 @@
     </li>
     <li>
       <p>If you are interested in obtaining large quantities of our data, we <a
-        href="{% url "bulk_data_index" %}">recommend using bulk data files</a>. These provide CSV files of our opinion, people, and financial disclosures databases.
+        href="{% url "bulk_data_index" %}">recommend using bulk data files</a>. These provide CSV files of our case law, people, and financial disclosures databases.
       </p>
     </li>
     <li>
@@ -108,7 +108,7 @@
   <ol>
     <li>
       <p>When we import other data sources, we clean them up. For example, we <a href="https://free.law/2011/08/25/second-series-of-federal-reporter-from-1950-to-1993-now-on-courtlistener/">
-      manually corrected</a> more than ten thousand items from Public.Resource.Org, and more than 75,000 from <a href="https://case.law/">Harvard's Caselaw Access Project</a>.
+      manually corrected</a> more than ten thousand items from Public.Resource.Org, and we have cleaned up or fixed more than one-million items in <a href="https://case.law/">Harvard's Caselaw Access Project</a>.
       </p>
     </li>
     <li>
@@ -125,8 +125,7 @@
   </ol>
   <p>You can learn more about the data that we have on our coverage pages.</p>
   <p>
-    <a href="{% url "coverage" %}" class="btn btn-primary">Opinions and PACER Coverage</a>
-    <a href="{% url "coverage_fds" %}" class="btn btn-primary">Financial Disclosure Coverage</a>
+    <a href="{% url "coverage" %}" class="btn btn-primary btn-lg">Coverage Details</a>
   </p>
 
 
@@ -136,22 +135,8 @@
   <p>If you plan to use this data on the Internet, carefully consider how you will protect these people and their privacy wishes. The simplest way to do that is to use the <code>blocked</code> flag that's available on most objects.
   </p>
 
-  <div class="well v-offset-above-3">
-    <h2 class="top text-center">Please Support Open Legal Data</h2>
-    <p>These services are sponsored by <a href="https://free.law">Free Law Project</a> and users like you. We provide these services in furtherance of our mission to make the legal sector more innovative and equitable.
-    </p>
-    <p>We have provided these services for over a decade, and we need your contributions to continue curating and enhancing them.
-    </p>
-    <p>Will you support us today with a donation?</p>
-    <div class="row">
-      <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
-      <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
-        <p class="text-center">
-          <a href="{% url "donate" %}?referrer={{ request.path }}" class="btn btn-lg btn-block btn-danger"><i class="fa fa-heart-o"></i> Donate Now</a>
-        </p>
-      </div>
-    </div>
-  </div>
+  {% include "includes/donate_footer_plea.html" %}
+
 </div>
 <div class="hidden-xs col-sm-2 col-md-3"></div>
 {% endblock %}

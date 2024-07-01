@@ -8,7 +8,7 @@
 {% block canonical %}{% get_canonical_element %}{% endblock %}
 {% block title %}{{ title }} – CourtListener.com{% endblock %}
 {% block og_title %}{{ title }} – CourtListener.com{% endblock %}
-{% block description %}Opinion for {{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
+{% block description %}{{ title }} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endblock %}
 {% block og_description %}{{ cluster|best_case_name }}{% if summaries_count > 0 %} — {{ top_parenthetical_groups.0.representative.text|capfirst }}{% else %} — Brought to you by Free Law Project, a non-profit dedicated to creating high quality open legal information.{% endif %}
 {% endblock %}
 
@@ -71,11 +71,14 @@
         {# show this div if there is a note, otherwise, put it in place, in anticipation of it becoming one. #}
         <div class="{% if not note_form.instance.cluster_id %}hidden{% endif %} sidebar-section" id="sidebar-notes">
             <div>
-                <h3 class="inline"><span>Your Notes</span></h3>
-                <p class="inline" data-toggle="modal" data-target="#modal-save-note">
-                    (<a href="#note-editor">edit</a>)
+                <h3>
+                    <span>Your Notes</span>
+                    <span class="edit" data-toggle="modal" data-target="#modal-save-note">
+                     (<a href="#note-editor">edit</a>)
                      <i class="fa fa-pencil gray pointer"></i>
-                </p>
+                     </span>
+                </h3>
+
                 <p id="sidebar-notes-text">
                     {{ note_form.instance.notes|default:"(none)" }}
                 </p>
@@ -152,48 +155,24 @@
         </div>
 
 
-        {# Show cases this case cites #}
-        {% if authorities_count > 0  %}
-            <div id="authorities" class="sidebar-section">
-                <h3><span>Authorities ({{ authorities_count|intcomma }})</span></h3>
-                <p class="bottom">This opinion cites:</p>
-                <ul>
-                    {% for authority in top_authorities %}
-                        <li>
-                            <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
-                                {{ authority.caption|safe|truncatewords:10|v_wrapper }}
-                            </a>
-                            {% if authority.citation_depth %}
-                              <span class="small gray">({{ authority.citation_depth }}&nbsp;time{{ authority.citation_depth|pluralize }})</span>
-                            {% endif %}
-                        </li>
-                    {% endfor %}
-                </ul>
-                <h4>
-                    <a href="{% url "view_authorities" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
-                       class="btn btn-default">
-                        View All Authorities
-                    </a>
-                </h4>
-            </div>
-        {% endif %}
+        {% include "includes/authorities_section.html" with authorities_context=authorities_context%}
+
 
         {# Related opinions #}
         {% if related_clusters %}
             <div id="recommendations" class="sidebar-section">
-                <h3><span>Related Opinions</span></h3>
+                <h3><span>Related Case Law</span></h3>
 
-                <p class="bottom">The following opinions cover similar topics:</p>
+                <p class="bottom">The following case law covers similar topics:</p>
 
                 {% url 'show_results' as show_results_url %}
 
                 {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
-                {% with event_category='clickRelated' event_action='clickRelated_'|add:related_algorithm|add:'_seed'|add:pk_str %}
                 {% with opinions=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
 
                   {% include 'includes/opinions_sidebar.html' %}
 
-                {% endwith %}{% endwith %}{% endwith %}
+                {% endwith %}{% endwith %}
             </div>
         {% endif %}
 
@@ -201,11 +180,22 @@
         {% if cluster.top_visualizations %}
             <div id="visualizations" class="sidebar-section">
                 <h3><span>Visualizations</span></h3>
-                {% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug as cluster_visualizations_url %}
 
-                {% with opinions=cluster.top_visualizations|slice:":5" full_list_url=cluster_visualizations_url|add:"?q"|add:request.META.QUERY_STRING %}
-                    {% include 'includes/opinions_sidebar.html' %}
-                {% endwith %}
+                <ul>
+                    {% for viz in cluster.top_visualizations|slice:":5" %}
+                        <li>
+                            <a href="{{ viz.get_absolute_url }}">
+                                {{ viz.title|default_if_none:"N/A"|safe|truncatewords:10|v_wrapper }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p>
+                    <a href="{% url "cluster_visualizations" pk=cluster.pk slug=cluster.slug %}"
+                       class="btn btn-default">
+                        View All Visualizations
+                    </a>
+                </p>
             </div>
         {% endif %}
 
@@ -232,19 +222,13 @@
 {% block content %}
     <article class="col-sm-9">
         {% with opinion_count=cluster.sub_opinions.all.count %}
-            <h2 class="inline">{{ cluster.caption|safe|v_wrapper }}</h2>
+            <h2 class="inline">{{ caption|safe|v_wrapper }}</h2>
             {% include "includes/notes_modal.html" %}
 
             <h3>{{ cluster.docket.court }}</h3>
             <p>
               {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.cluster_id %}
             </p>
-            {% if cluster.syllabus %}
-                <div class="well well-sm">
-                    <h4>Summary of Opinion</h4>
-                    <p>{{ cluster.syllabus | safe }} </p>
-                </div>
-            {% endif %}
 
             <p class="bottom">
                 <span class="meta-data-header">Filed{% if cluster.date_filed_is_approximate %} Approximately{% endif %}:</span>
@@ -349,7 +333,6 @@
                 {% endif %}
                 {% endwith %}
             {% endif %}
-
             {% if cluster.nature_of_suit %}
             <p class="bottom">
                 <span class="meta-data-header">Nature of suit:</span>
@@ -358,7 +341,7 @@
             {% endif %}
 
             {# Download original? #}
-            {% if 'C' in cluster.source and has_downloads or 'D' in cluster.source%}
+            {% if 'C' in cluster.source and has_downloads or 'D' in cluster.source or "G" in cluster.source %}
                 <div class="btn-group v-offset-below-3 v-offset-above-1">
                     <button type="button"
                             class="btn btn-primary dropdown-toggle"
@@ -397,6 +380,21 @@
             {% endif %}
 
             <br>
+            {# Add headmatter, if a Harvard opinion #}
+            {% if cluster.source in "U" %}
+              {% if cluster.headmatter %}
+                <div id="headmatter" class="serif-text">
+                  {{ cluster.headmatter|safe }}
+                </div>
+              {% endif %}
+            {% endif %}
+
+            {% if cluster.syllabus %}
+                <div class="well well-sm">
+                    <h4>Summary of Opinion</h4>
+                    <p>{{ cluster.syllabus | safe }} </p>
+                </div>
+            {% endif %}
 
             {# Only display tabs and make panels if more than one sub-opinion. #}
             {% if opinion_count > 1 %}
@@ -445,6 +443,7 @@
                                 </p>
                             {% endif %}
                         {% endif %}
+
                         {% if sub_opinion.extracted_by_ocr %}
                             <div class="col-sm-12 alert-warning alert v-offset-above-2">
                                 <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
@@ -470,7 +469,7 @@
                                 {% if sub_opinion.html_with_citations %}
                                   {% if cluster.source == "C" %}
                                     {# It's a PDF with no HTML enrichment #}
-                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe }}</div>
+                                    <div class="plaintext">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
                                   {% else %}
                                     <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
                                   {% endif %}
@@ -479,13 +478,13 @@
                                 {% elif sub_opinion.html_lawbox %}
                                   <div class="serif-text">{{ sub_opinion.html_lawbox|safe }}</div>
                                 {% elif sub_opinion.xml_harvard %}
-                                  <div class="serif-text">{{ sub_opinion.xml_harvard|safe }}</div>
+                                  <div class="serif-text harvard">{{ sub_opinion.xml_harvard|safe }}</div>
                                 {% elif sub_opinion.html_anon_2020 %}
                                   <div class="serif-text">{{ sub_opinion.html_anon_2020|safe }}</div>
                                 {% elif sub_opinion.html %}
                                   <div class="serif-text">{{sub_opinion.html|safe}}</div>
                                 {% else %}
-                                    <pre>{{sub_opinion.plain_text}}</pre>
+                                  <pre>{{sub_opinion.plain_text}}</pre>
                                 {% endif %}
                             </div>
                         </div>

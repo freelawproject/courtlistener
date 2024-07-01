@@ -1,14 +1,16 @@
-from typing import Union, cast
+import time
+import uuid
+from typing import Union
 
 from django.conf import settings
 from redis import Redis
 
 
-def make_redis_interface(
+def get_redis_interface(
     db_name: str,
     decode_responses: bool = True,
 ) -> Redis:
-    """Create a redis connection object
+    """Pick an existing redis connection from the global object.
 
     :param db_name: The name of the database to use, as defined in our settings
     :param decode_responses: Whether to decode responses with utf-8. If you're
@@ -16,12 +18,7 @@ def make_redis_interface(
     it.
     :return Redis interface using django settings
     """
-    return Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=cast(int, settings.REDIS_DATABASES[db_name]),  # type: ignore
-        decode_responses=decode_responses,
-    )
+    return settings.REDIS_CLIENTS[f"{db_name}-{decode_responses}"]
 
 
 def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
@@ -42,13 +39,13 @@ def create_redis_semaphore(r: Union[str, Redis], key: str, ttl: int) -> bool:
     possibility of a race condition.
 
     :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to make_redis_interface.
+    can be handed off to get_redis_interface.
     :param key: The key to create
-    :param ttl: How long the key should live
+    :param ttl: How long the key should live in seconds.
     :return: True if the key was created else False
     """
     if isinstance(r, str):
-        r = make_redis_interface(r)
+        r = get_redis_interface(r)
 
     currently_enqueued = bool(r.get(key))
     if currently_enqueued:
@@ -69,10 +66,61 @@ def delete_redis_semaphore(r: Union[str, Redis], key: str) -> None:
     """Delete a redis key
 
     :param r: The Redis DB to connect to as a connection interface or str that
-    can be handed off to make_redis_interface.
+    can be handed off to get_redis_interface.
     :param key: The key to delete
     :return: None
     """
     if isinstance(r, str):
-        r = make_redis_interface(r)
+        r = get_redis_interface(r)
     r.delete(key)
+
+
+def make_update_pacer_case_id_key(court_id: str) -> str:
+    return f"update.pacer_case_id:{court_id}"
+
+
+def acquire_redis_lock(r: Redis, key: str, ttl: int) -> str:
+    """Acquires a lock in Redis.
+
+    This method attempts to acquire a lock with the given key and TTL in Redis.
+    If the lock is already in use by another process, it retries until the
+    lock is acquired.
+
+    :param r: The Redis DB to connect to as a connection interface.
+    :param key: The key for the lock in Redis.
+    :param ttl: Time-to-live for the lock in milliseconds.
+    :return: A unique identifier for the lock.
+    """
+
+    identifier = str(uuid.uuid4())
+    while True:
+        if r.set(key, identifier, nx=True, px=ttl):
+            return identifier
+        time.sleep(0.1)
+
+
+def release_redis_lock(r: Redis, key: str, identifier: str) -> int:
+    """Releases an atomic lock in Redis.
+
+    This method releases the lock with the given key and identifier in Redis.
+    It uses a Lua script to ensure the lock is released atomically if the
+    identifier matches the current lock value.
+    This prevents other processes from mistakenly releasing the lock.
+
+    :param r: The Redis DB to connect to as a connection interface.
+    :param key: The key for the lock in Redis.
+    :param identifier: The unique identifier for the lock.
+    :return: None
+    """
+    # Lua script to release lock
+    lua_script = """
+    local lock_key = KEYS[1]
+    local lock_value = ARGV[1]
+
+    if redis.call("GET", lock_key) == lock_value then
+        return redis.call("DEL", lock_key)
+    else
+        return 0
+    end
+    """
+    return r.eval(lua_script, 1, key, identifier)

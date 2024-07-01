@@ -12,7 +12,7 @@ from redis.exceptions import ConnectionError
 from cl.corpus_importer.tasks import make_docket_by_iquery
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.models import Court, Docket
 
@@ -31,15 +31,17 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
     :return None
     """
     q = options["queue"]
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     # This is a simple dictionary that's populated with the maximum
     # pacer_case_id in the CL DB as of 2021-01-18. The idea is to use this to
     # prevent the scraper from going forever. You can reset it by querying the
     # latest item in the DB by date_filed, and then using r.hmset to save it.
     max_ids = r.hgetall("iquery_max_ids")
 
-    courts = Court.federal_courts.district_pacer_courts().exclude(
-        pk__in=["uscfc", "arb", "cit"]
+    courts = (
+        Court.federal_courts.district_or_bankruptcy_pacer_courts().exclude(
+            pk__in=["uscfc", "arb", "cit"]
+        )
     )
     if options["courts"] != ["all"]:
         courts = courts.filter(pk__in=options["courts"])
@@ -77,7 +79,7 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
                     "a new connection."
                 )
                 time.sleep(10)
-                r = make_redis_interface("CACHE")
+                r = get_redis_interface("CACHE")
                 # Continuing here will skip this court for this iteration; not
                 # a huge deal.
                 continue
@@ -149,12 +151,14 @@ def update_open_cases(options) -> None:
     # the court_id field. This way, we can do one hit per court per some
     # schedule. It should help us avoid getting banned. Hopefully!
     q = options["queue"]
-    courts = Court.federal_courts.district_pacer_courts().exclude(
-        pk__in=["uscfc", "arb", "cit", "jpml"]
+    courts = (
+        Court.federal_courts.district_or_bankruptcy_pacer_courts().exclude(
+            pk__in=["uscfc", "arb", "cit", "jpml"]
+        )
     )
     ds = (
         Docket.objects.filter(
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             date_terminated=None,
             court__in=courts,
             pacer_case_id__isnull=False,

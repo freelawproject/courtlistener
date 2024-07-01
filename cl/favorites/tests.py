@@ -1,19 +1,15 @@
 import time
+from http import HTTPStatus
 
 from django.contrib.auth.hashers import make_password
-from django.test import Client
+from django.test.client import AsyncClient
 from django.urls import reverse
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_201_CREATED,
-    HTTP_400_BAD_REQUEST,
-)
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.favorites.factories import NoteFactory
 from cl.favorites.models import DocketTag, Note, UserTag
-from cl.lib.test_helpers import SimpleUserDataMixin
+from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
@@ -21,54 +17,55 @@ from cl.tests.utils import make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 
 
-class NoteTest(SimpleUserDataMixin, TestCase):
+class NoteTest(SimpleUserDataMixin, TestCase, AudioTestCase):
     fixtures = [
         "test_court.json",
         "test_objects_search.json",
         "judge_judy.json",
-        "test_objects_audio.json",
     ]
 
     def setUp(self) -> None:
         # Set up some handy variables
-        self.client = Client()
+        self.async_client = AsyncClient()
         self.note_cluster_params = {
             "cluster_id": 1,
             "name": "foo",
             "notes": "testing notes",
         }
         self.note_audio_params = {
-            "audio_id": 1,
+            "audio_id": self.audio_1.pk,
             "name": "foo",
             "notes": "testing notes",
         }
 
-    def test_create_note(self) -> None:
+    async def test_create_note(self) -> None:
         """Can we create a note by sending a post?"""
         self.assertTrue(
-            self.client.login(username="pandora", password="password")
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
         )
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = self.client.post(
+            r = await self.async_client.post(
                 reverse("save_or_update_note"),
                 params,
                 follow=True,
-                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                X_REQUESTED_WITH="XMLHttpRequest",
             )
             self.assertEqual(r.status_code, 200)
             self.assertIn("It worked", r.content.decode())
 
         # And can we delete them?
         for params in [self.note_cluster_params, self.note_audio_params]:
-            r = self.client.post(
+            r = await self.async_client.post(
                 reverse("delete_note"),
                 params,
                 follow=True,
-                HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+                X_REQUESTED_WITH="XMLHttpRequest",
             )
         self.assertEqual(r.status_code, 200)
         self.assertIn("It worked", r.content.decode())
-        self.client.logout()
+        await self.async_client.alogout()
 
 
 class UserNotesTest(BaseSeleniumTest):
@@ -89,7 +86,7 @@ class UserNotesTest(BaseSeleniumTest):
             user__username="pandora",
             user__password=make_password("password"),
         )
-        super(UserNotesTest, self).setUp()
+        super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(
@@ -413,135 +410,216 @@ class APITests(APITestCase):
         UserTag.objects.all().delete()
         DocketTag.objects.all().delete()
 
-    def make_a_good_tag(self, client, tag_name="taggy-tag"):
+    async def make_a_good_tag(self, client, tag_name="taggy-tag"):
         data = {
             "name": tag_name,
         }
-        return client.post(self.tag_path, data, format="json")
+        return await client.post(self.tag_path, data, format="json")
 
-    def tag_a_docket(self, client, docket_id, tag_id):
+    async def tag_a_docket(self, client, docket_id, tag_id):
         data = {
             "docket": docket_id,
             "tag": tag_id,
         }
-        return client.post(self.docket_path, data, format="json")
+        return await client.post(self.docket_path, data, format="json")
 
-    def test_make_a_tag(self) -> None:
+    async def test_make_a_tag(self) -> None:
         # Make a simple tag
-        response = self.make_a_good_tag(self.client)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        response = await self.make_a_good_tag(self.client)
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
         # Link it to the docket
         tag_id = response.json()["id"]
         docket_to_tag_id = 1
-        response = self.tag_a_docket(self.client, docket_to_tag_id, tag_id)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        response = await self.tag_a_docket(
+            self.client, docket_to_tag_id, tag_id
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
         # And does everything make sense?
-        tag = UserTag.objects.get(pk=tag_id)
-        tagged_dockets = tag.dockets.all()
-        self.assertEqual(tagged_dockets[0].id, docket_to_tag_id)
+        tag = await UserTag.objects.aget(pk=tag_id)
+        tagged_dockets = await tag.dockets.all().afirst()
+        self.assertEqual(tagged_dockets.id, docket_to_tag_id)
 
-    def test_failing_slug(self) -> None:
+    async def test_failing_slug(self) -> None:
         data = {
             "name": "tag with space",
         }
-        response = self.client.post(self.tag_path, data, format="json")
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        response = await self.client.post(self.tag_path, data, format="json")
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
-    def test_rename_tag_via_put(self) -> None:
-        response = self.make_a_good_tag(self.client)
+    async def test_rename_tag_via_put(self) -> None:
+        response = await self.make_a_good_tag(self.client)
         response_data = response.json()
         tag_id = response_data["id"]
         old_name = response_data["name"]
         new_name = "super-taggy-tag"
 
         # Check name before PUT
-        tag = UserTag.objects.get(pk=tag_id)
+        tag = await UserTag.objects.aget(pk=tag_id)
         self.assertEqual(tag.name, old_name)
 
         # Check name after the PUT
         put_path = reverse(
             "UserTag-detail", kwargs={"version": "v3", "pk": tag_id}
         )
-        response = self.client.put(put_path, {"name": new_name}, format="json")
-        self.assertEqual(response.status_code, HTTP_200_OK)
-        tag.refresh_from_db()
+        response = await self.client.put(
+            put_path, {"name": new_name}, format="json"
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        await tag.arefresh_from_db()
         self.assertEqual(tag.name, new_name)
 
-    def test_list_users_tags(self) -> None:
+    async def test_list_users_tags(self) -> None:
         """Cam we get a user's tags (and not other users tags)?"""
         # make some tags for some users
-        self.make_a_good_tag(self.client, tag_name="foo")
-        self.make_a_good_tag(self.client, tag_name="foo2")
+        await self.make_a_good_tag(self.client, tag_name="foo")
+        await self.make_a_good_tag(self.client, tag_name="foo2")
         # This tag should not show up in self.client's results
-        self.make_a_good_tag(self.client2, tag_name="foo2")
+        await self.make_a_good_tag(self.client2, tag_name="foo2")
 
         # All tags for the user
-        response = self.client.get(self.tag_path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        response = await self.client.get(self.tag_path)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["count"], 2)
 
         # Prefix query
-        response = self.client.get(self.tag_path, {"name__startswith": "foo"})
+        response = await self.client.get(
+            self.tag_path, {"name__startswith": "foo"}
+        )
         self.assertEqual(response.json()["count"], 2)
-        response = self.client.get(self.tag_path, {"name__startswith": "foo2"})
+        response = await self.client.get(
+            self.tag_path, {"name__startswith": "foo2"}
+        )
         self.assertEqual(response.json()["count"], 1)
 
-    def test_can_users_only_see_own_tags_or_public_ones(self) -> None:
+    async def test_can_users_only_see_own_tags_or_public_ones(self) -> None:
         # Use two users to create two tags
-        self.make_a_good_tag(self.client, tag_name="foo")
-        self.make_a_good_tag(self.client2, tag_name="foo2")
+        await self.make_a_good_tag(self.client, tag_name="foo")
+        await self.make_a_good_tag(self.client2, tag_name="foo2")
 
         # The user should only be able to see one so far (their own)
-        response = self.client.get(self.tag_path)
+        response = await self.client.get(self.tag_path)
         self.assertEqual(response.json()["count"], 1)
 
         # But then the second user names theirs public
-        UserTag.objects.filter(name="foo2").update(published=True)
+        await UserTag.objects.filter(name="foo2").aupdate(published=True)
 
         # And now self.client can see two tags
-        response = self.client.get(self.tag_path)
+        response = await self.client.get(self.tag_path)
         self.assertEqual(response.json()["count"], 2)
 
         # And if they want to, they can just show their own
-        response = self.client.get(
+        response = await self.client.get(
             self.tag_path, {"user": self.pandora.user.pk}
         )
         self.assertEqual(response.json()["count"], 1)
 
-    def test_use_a_tag_thats_not_yours(self) -> None:
+    async def test_use_a_tag_thats_not_yours(self) -> None:
         # self.client makes a tag. self.client2 tries to use it
-        response = self.make_a_good_tag(self.client, tag_name="foo")
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
         docket_to_tag_id = 1
-        response = self.tag_a_docket(self.client, docket_to_tag_id, tag_id)
-        self.assertEqual(response.status_code, HTTP_201_CREATED)
+        response = await self.tag_a_docket(
+            self.client, docket_to_tag_id, tag_id
+        )
+        self.assertEqual(response.status_code, HTTPStatus.CREATED)
 
-        response = self.tag_a_docket(self.client2, docket_to_tag_id, tag_id)
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        response = await self.tag_a_docket(
+            self.client2, docket_to_tag_id, tag_id
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
         # Same as above, but with a public tag
-        UserTag.objects.filter(pk=tag_id).update(published=True)
-        response = self.tag_a_docket(self.client2, docket_to_tag_id, tag_id)
-        self.assertEqual(response.status_code, HTTP_400_BAD_REQUEST)
+        await UserTag.objects.filter(pk=tag_id).aupdate(published=True)
+        response = await self.tag_a_docket(
+            self.client2, docket_to_tag_id, tag_id
+        )
+        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
 
-    def test_can_only_see_your_tag_associations(self) -> None:
+    async def test_can_filter_tag_associations_using_docket_id(self) -> None:
+        """Test filter for the docket field in the docket-tags endpoint"""
+
+        # create a tag and use it for docket #1 and #2
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client, 1, tag_id)
+        response = await self.tag_a_docket(self.client, 2, tag_id)
+
+        # create another tag for docket #2
+        response = await self.make_a_good_tag(self.client, tag_name="foo-2")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client, 2, tag_id)
+
+        # filter the associations using the docket id
+        response = await self.client.get(self.docket_path, {"docket": 1})
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["count"], 1)
+
+        response = await self.client.get(self.docket_path, {"docket": 2})
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["count"], 2)
+
+    async def test_can_filter_tag_associations_using_user_id(self) -> None:
+        """Test filter for the docket field in the docket-tags endpoint"""
+
+        # create a two tags using client 1 and use them in docket #1
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client, 1, tag_id)
+        response = await self.make_a_good_tag(self.client, tag_name="foo-c1")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client, 1, tag_id)
+
+        await UserTag.objects.filter(name="foo").aupdate(published=True)
+
+        # create another tag using client 2 and use it in docket #1
+        response = await self.make_a_good_tag(self.client2, tag_name="foo-c2")
+        tag_id = response.json()["id"]
+        response = await self.tag_a_docket(self.client2, 1, tag_id)
+
+        await UserTag.objects.filter(name="foo-c2").aupdate(published=True)
+
+        # query the associations(own + public) for docket #1 using client 1
+        response = await self.client.get(self.docket_path, {"docket": 1})
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["count"], 3)
+
+        # query the associations(own + public) for docket #1 using client 2
+        response = await self.client2.get(self.docket_path, {"docket": 1})
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["count"], 2)
+
+        # filter association using user id
+        response = await self.client.get(
+            self.docket_path, {"docket": 1, "tag__user": self.pandora.user.pk}
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["count"], 2)
+
+        response = await self.client2.get(
+            self.docket_path,
+            {"docket": 1, "tag__user": self.unconfirmed.user.pk},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["count"], 1)
+
+    async def test_can_only_see_your_tag_associations(self) -> None:
         # Make a tag, and tag a docket with it
-        response = self.make_a_good_tag(self.client, tag_name="foo")
+        response = await self.make_a_good_tag(self.client, tag_name="foo")
         tag_id = response.json()["id"]
         docket_to_tag_id = 1
-        self.tag_a_docket(self.client, docket_to_tag_id, tag_id)
+        await self.tag_a_docket(self.client, docket_to_tag_id, tag_id)
 
         # Check that client2 can't see that association
-        response = self.client2.get(self.docket_path)
+        response = await self.client2.get(self.docket_path)
         self.assertEqual(response.json()["count"], 0)
 
         # But self.client *can*.
-        response = self.client.get(self.docket_path)
+        response = await self.client.get(self.docket_path)
         self.assertEqual(response.json()["count"], 1)
 
         # Making it a public tag changes things. Now client2 can see it.
-        UserTag.objects.filter(pk=tag_id).update(published=True)
-        response = self.client2.get(self.docket_path)
+        await UserTag.objects.filter(pk=tag_id).aupdate(published=True)
+        response = await self.client2.get(self.docket_path)
         self.assertEqual(response.json()["count"], 1)

@@ -12,7 +12,7 @@ from redis import Redis
 from cl.lib.command_utils import logger
 from cl.lib.decorators import retry
 from cl.lib.ratelimiter import parse_rate
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 
 PRIORITY_SEP: str = "\x06\x16"
 DEFAULT_PRIORITY_STEPS: List[int] = [0, 3, 6, 9]
@@ -24,7 +24,7 @@ def clear_queue(queue_name: str):
         make_queue_name_for_pri(queue_name, pri)
         for pri in DEFAULT_PRIORITY_STEPS
     ]
-    r = make_redis_interface("CELERY")
+    r = get_redis_interface("CELERY")
     return sum([r.delete(x) for x in priority_names])
 
 
@@ -37,7 +37,7 @@ def make_queue_name_for_pri(queue: str, pri: int) -> str:
 
      - batch1\x06\x163 <-- P3 queue named batch1
 
-    There's more information about this in Github, but it doesn't look like it
+    There's more information about this in GitHub, but it doesn't look like it
     will change any time soon:
 
       - https://github.com/celery/kombu/issues/422
@@ -67,11 +67,11 @@ def get_queue_length(queue_name: str = "celery") -> int:
         make_queue_name_for_pri(queue_name, pri)
         for pri in DEFAULT_PRIORITY_STEPS
     ]
-    r = make_redis_interface("CELERY")
-    return sum([r.llen(x) for x in priority_names])
+    r = get_redis_interface("CELERY")
+    return sum(r.llen(x) for x in priority_names)
 
 
-class CeleryThrottle(object):
+class CeleryThrottle:
     """A class for throttling celery."""
 
     def __init__(
@@ -87,17 +87,30 @@ class CeleryThrottle(object):
         :param min_items: Generally keep the queue longer than this, and
         always shorter than 2× this value.
         """
-        # All these variables are Final, i.e., they're consts. The only
-        # instance variable that changes is the shortage variable below.
-        self.min: Final = min_items
-        self.max: Final = min_items * 2
+
+        # These variables are Final, i.e., they're consts.
         self.poll_interval: Final = poll_interval
         self.queue_name: Final = queue_name
+
+        # The only instances variables that changes is the shortage, min and
+        # max variables below.
+        self.min = min_items
+        self.max = min_items * 2
 
         # `shortage` stores the number of items that the queue is short by, as
         # compared to `self.max`. At init, the queue is empty, so it's short
         # by the full amount. Fill it up.
         self.shortage = self.max
+
+    def update_min_items(self, min_value: int) -> None:
+        """Update the minimum items and adjust related parameters.
+
+        :param min_value: New minimum items value.
+        """
+        self.min = min_value
+        self.max = min_value * 2
+        # Important to update the self.shortage since the max has changed.
+        self.shortage = self.max - get_queue_length(self.queue_name)
 
     def maybe_wait(self) -> None:
         """Make the user wait until the queue is short enough"""
@@ -147,7 +160,7 @@ def throttle_task(rate: str, key: str | None = None) -> Callable:
                     raise KeyError(
                         f"Unknown parameter '{key}' in throttle_task "
                         f"decorator of function {task.name}. "
-                        f"`key` parameter must match a parameter "
+                        "`key` parameter must match a parameter "
                         f"name from function signature: '{sig}'"
                     )
             delay = get_task_wait(task, rate, key=key_value)
@@ -270,10 +283,11 @@ def get_task_wait(
     wait until the next open window for processing. If not throttled, returns
     zero (i.e., don't wait).
     """
-    task_sub_key = f"{task.name}{':' + str(key) if key else ''}"
+    task_sub_key_suffix = f":{str(key)}" if key else ""
+    task_sub_key = f"{task.name}{task_sub_key_suffix}"
     throttle_key = f"celery_throttle:{task_sub_key}"
 
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
 
     allowed_task_count, duration = parse_rate(rate)
 

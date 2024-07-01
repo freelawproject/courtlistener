@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import pickle
-from datetime import datetime
 
 from django.apps import apps
 from django.conf import settings
@@ -24,7 +23,7 @@ from cl.lasc.models import (
 )
 from cl.lasc.utils import make_case_id
 from cl.lib.crypto import sha1_of_json_data
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ LASC_SESSION_STATUS_KEY = "session:lasc:status"
 LASC_SESSION_COOKIE_KEY = "session:lasc:cookies"
 
 
-class SESSION_IS(object):
+class SESSION_IS:
     LOGGING_IN = "logging_in"
     OK = "ok"
 
@@ -48,7 +47,7 @@ def login_to_court():
 
     :return: None
     """
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     # Give yourself a few minutes to log in
     r.set(LASC_SESSION_STATUS_KEY, SESSION_IS.LOGGING_IN, ex=60 * 2)
     lasc_session = LASCSession(username=LASC_USERNAME, password=LASC_PASSWORD)
@@ -68,7 +67,7 @@ def establish_good_login(self):
     :param self: A Celery task object
     :return: None
     """
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     status = r.get(LASC_SESSION_STATUS_KEY)
     if status == SESSION_IS.LOGGING_IN:
         self.retry()
@@ -77,12 +76,12 @@ def establish_good_login(self):
     login_to_court()
 
 
-def make_lasc_search():
+def make_lasc_search() -> LASCSearch:
     """Create a logged-in LASCSearch object with cookies pulled from cache
 
     :return: LASCSearch object
     """
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     session = LASCSession()
     session.cookies = pickle.loads(r.get(LASC_SESSION_COOKIE_KEY))
     return LASCSearch(session)
@@ -209,7 +208,7 @@ def add_or_update_case_db(self, case_id):
             e,
             retries_remaining,
         )
-        r = make_redis_interface("CACHE")
+        r = get_redis_interface("CACHE")
         r.delete(LASC_SESSION_COOKIE_KEY, LASC_SESSION_STATUS_KEY)
         self.retry()
 

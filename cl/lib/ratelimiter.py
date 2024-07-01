@@ -13,7 +13,7 @@ from django_ratelimit.exceptions import Ratelimited
 from redis import ConnectionError
 
 
-def strip_port_to_make_ip_key(group: str, request: HttpRequest) -> str:
+def get_user_ip_from_cloudfront_headers(request: HttpRequest) -> str:
     """Make a good key to use for caching the request's IP
 
     CloudFront provides a header that returns the user's IP and port. Weirdly,
@@ -28,7 +28,6 @@ def strip_port_to_make_ip_key(group: str, request: HttpRequest) -> str:
 
         96.23.39.106
 
-    :param group: Unused: The group key from the ratelimiter
     :param request: The HTTP request from the user
     :return: A simple key that can be used to throttle the user if needed.
     """
@@ -36,8 +35,29 @@ def strip_port_to_make_ip_key(group: str, request: HttpRequest) -> str:
     return header.split(":")[0]
 
 
+def get_ip_for_ratelimiter(group: str, request: HttpRequest) -> str:
+    """A wrapper to get the IP in a ratelimiter
+
+    :param group: Unused: The group key from the ratelimiter
+    :param request: The HTTP request from the user
+    :return: A simple key that can be used to throttle the user if needed.
+    """
+    return get_user_ip_from_cloudfront_headers(request)
+
+
+def get_path_to_make_key(group: str, request: HttpRequest) -> str:
+    """Return a string representing the full path to the requested page. This
+    helper makes a good key to create a global limit to throttle requests.
+
+    :param group: Unused: The group key from the ratelimiter
+    :param request: The HTTP request from the user
+    :return: A key that can be used to throttle request to a single URL if needed.
+    """
+    return request.path
+
+
 ratelimiter_all_250_per_h = ratelimit(
-    key=strip_port_to_make_ip_key,
+    key=get_ip_for_ratelimiter,
     rate="250/h",
 )
 # Decorators can't easily be mocked, and we need to not trigger this decorator
@@ -47,19 +67,25 @@ if "test" in sys.argv:
     ratelimiter_all_2_per_m = lambda func: func
     ratelimiter_unsafe_3_per_m = lambda func: func
     ratelimiter_unsafe_10_per_m = lambda func: func
+    ratelimiter_unsafe_2000_per_h = lambda func: func
 else:
     ratelimiter_all_2_per_m = ratelimit(
-        key=strip_port_to_make_ip_key,
+        key=get_ip_for_ratelimiter,
         rate="2/m",
     )
     ratelimiter_unsafe_3_per_m = ratelimit(
-        key=strip_port_to_make_ip_key,
+        key=get_ip_for_ratelimiter,
         rate="3/m",
         method=UNSAFE,
     )
     ratelimiter_unsafe_10_per_m = ratelimit(
-        key=strip_port_to_make_ip_key,
+        key=get_ip_for_ratelimiter,
         rate="10/m",
+        method=UNSAFE,
+    )
+    ratelimiter_unsafe_2000_per_h = ratelimit(
+        key=get_path_to_make_key,
+        rate="2000/h",
         method=UNSAFE,
     )
 
@@ -110,10 +136,7 @@ def get_ip_from_host(host: str) -> str:
 def host_is_approved(host: str) -> bool:
     """Check whether the domain is in our approved allowlist."""
     return any(
-        [
-            host.endswith(approved_domain)
-            for approved_domain in APPROVED_DOMAINS
-        ]
+        host.endswith(approved_domain) for approved_domain in APPROVED_DOMAINS
     )
 
 
@@ -141,7 +164,7 @@ def is_allowlisted(request: HttpRequest) -> bool:
     cache_name = getattr(settings, "RATELIMIT_USE_CACHE", "default")
     cache = caches[cache_name]
     allowlist_cache_prefix = "rl:allowlist"
-    ip_address = request.META.get("REMOTE_ADDR")
+    ip_address = get_user_ip_from_cloudfront_headers(request)
     if ip_address is None:
         return False
 

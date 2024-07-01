@@ -3,7 +3,6 @@ from argparse import RawTextHelpFormatter
 
 from celery import chain
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.management.commands.everything_project import (
     NOS_EXCLUSIONS,
@@ -14,6 +13,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.search.models import Docket
 from cl.search.tasks import add_or_update_recap_docket
 
@@ -34,7 +34,9 @@ def add_all_nysd_to_cl(options):
     """
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
 
     # IDs obtained by binary search of docket numbers on PACER website.
@@ -49,7 +51,7 @@ def add_all_nysd_to_cl(options):
         if pacer_case_id % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = PacerSession(
+            session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             session.login()
@@ -68,7 +70,9 @@ def get_dockets(options):
     """
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
 
     buchwald_id = 450
@@ -89,7 +93,7 @@ def get_dockets(options):
         if i % 5000 == 0:
             # Re-authenticate just in case the auto-login mechanism isn't
             # working.
-            session = PacerSession(
+            session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             session.login()
@@ -135,7 +139,7 @@ Limitations:
 """
 
     def create_parser(self, *args, **kwargs):
-        parser = super(Command, self).create_parser(*args, **kwargs)
+        parser = super().create_parser(*args, **kwargs)
         parser.formatter_class = RawTextHelpFormatter
         return parser
 

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import requests
+from asgiref.sync import async_to_sync
 from celery import Task
 from dateparser import parse
 from django.core.files.base import ContentFile
@@ -255,8 +256,7 @@ def check_if_feed_changed(self, court_pk, feed_status_pk, date_last_built):
         return
 
     logger.info(
-        "%s: Feed changed or doing a sweep. Moving on to the merge."
-        % feed_status.court_id
+        f"{feed_status.court_id}: Feed changed or doing a sweep. Moving on to the merge."
     )
     rss_feed.parse()
     logger.info(
@@ -289,19 +289,19 @@ def hash_item(item):
     return item_hash
 
 
-def is_cached(item_hash):
+async def is_cached(item_hash):
     """Check if a hash is in the RSS Item Cache"""
-    return RssItemCache.objects.filter(hash=item_hash).exists()
+    return await RssItemCache.objects.filter(hash=item_hash).aexists()
 
 
-def cache_hash(item_hash):
+async def cache_hash(item_hash):
     """Add a new hash to the RSS Item Cache
 
     :param item_hash: A SHA1 hash you wish to cache.
     :returns True if successful, False if not.
     """
     try:
-        RssItemCache.objects.create(hash=item_hash)
+        await RssItemCache.objects.acreate(hash=item_hash)
     except IntegrityError:
         # Happens during race conditions or when you try to cache something
         # that's already in there.
@@ -330,21 +330,21 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
     d_pks_to_alert = []
     for docket in feed_data:
         item_hash = hash_item(docket)
-        if is_cached(item_hash):
+        if async_to_sync(is_cached)(item_hash):
             continue
 
         with transaction.atomic():
-            cached_ok = cache_hash(item_hash)
+            cached_ok = async_to_sync(cache_hash)(item_hash)
             if not cached_ok:
                 # The item is already in the cache, ergo it's getting processed
                 # in another thread/process and we had a race condition.
                 continue
-            d = find_docket_object(
+            d = async_to_sync(find_docket_object)(
                 court_pk, docket["pacer_case_id"], docket["docket_number"]
             )
 
             d.add_recap_source()
-            update_docket_metadata(d, docket)
+            async_to_sync(update_docket_metadata)(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
             try:
@@ -357,9 +357,9 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
             if metadata_only:
                 continue
 
-            des_returned, rds_created, content_updated = add_docket_entries(
-                d, docket["docket_entries"]
-            )
+            items_returned, rds_created, content_updated = async_to_sync(
+                add_docket_entries
+            )(d, docket["docket_entries"])
 
         if content_updated:
             newly_enqueued = enqueue_docket_alert(d.pk)

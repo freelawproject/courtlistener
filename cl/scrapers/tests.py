@@ -2,38 +2,66 @@ import os
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
+from unittest import TestCase, mock
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import now
 
+from cl.alerts.factories import AlertFactory
+from cl.alerts.models import Alert
+from cl.api.factories import WebhookFactory
+from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
+from cl.donate.factories import DonationFactory
+from cl.donate.models import Donation
 from cl.lib.microservice_utils import microservice
+from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
-    cl_report_scrape_status,
     cl_scrape_opinions,
     cl_scrape_oral_arguments,
 )
-from cl.scrapers.models import ErrorLog, UrlHash
+from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
-from cl.scrapers.utils import get_extension
+from cl.scrapers.utils import get_binary_content, get_extension
 from cl.search.factories import CourtFactory, DocketFactory
 from cl.search.models import Court, Docket, Opinion
 from cl.settings import MEDIA_ROOT
-from cl.tests.cases import SimpleTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
+from cl.users.factories import UserProfileWithParentsFactory
 
 
-class ScraperIngestionTest(TestCase):
+class ScraperIngestionTest(ESIndexTestCase, TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")
+        cls.user_profile = UserProfileWithParentsFactory()
+        cls.donation = DonationFactory(
+            donor=cls.user_profile.user,
+            amount=20,
+            status=Donation.PROCESSED,
+            send_annual_reminder=True,
+        )
+        cls.webhook_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.SEARCH_ALERT,
+            url="https://example.com/",
+            enabled=True,
+        )
+        cls.search_alert_oa = AlertFactory(
+            user=cls.user_profile.user,
+            rate=Alert.DAILY,
+            name="Test Alert OA",
+            query="type=oa",
+        )
 
     def test_extension(self):
-        r = microservice(
+        r = async_to_sync(microservice)(
             service="buffer-extension",
             params={"mime": True},
         )
@@ -46,7 +74,7 @@ class ScraperIngestionTest(TestCase):
             case_name="Tarrant Regional Water District v. Herrmann old",
             docket_number="11-889",
             court=self.court,
-            source=Docket.SCRAPER,
+            source=Docket.RECAP,
             pacer_case_id=None,
         )
 
@@ -54,7 +82,7 @@ class ScraperIngestionTest(TestCase):
             case_name="State of Indiana v. Charles Barker old",
             docket_number="49S00-0308-DP-392",
             court=self.court,
-            source=Docket.SCRAPER,
+            source=Docket.IDB,
             pacer_case_id=None,
         )
 
@@ -62,7 +90,7 @@ class ScraperIngestionTest(TestCase):
             case_name="Intl Fidlty Ins Co v. Ideal Elec Sec Co old",
             docket_number="96-7169",
             court=self.court,
-            source=Docket.SCRAPER,
+            source=Docket.RECAP_AND_IDB,
             pacer_case_id="12345",
         )
 
@@ -89,6 +117,10 @@ class ScraperIngestionTest(TestCase):
         d_1.refresh_from_db()
         d_2.refresh_from_db()
         d_3.refresh_from_db()
+        self.assertEqual(d_1.source, Docket.RECAP_AND_SCRAPER)
+        self.assertEqual(d_2.source, Docket.SCRAPER_AND_IDB)
+        self.assertEqual(d_3.source, Docket.RECAP_AND_SCRAPER_AND_IDB)
+
         self.assertEqual(
             d_1.case_name, "Tarrant Regional Water District v. Herrmann"
         )
@@ -97,6 +129,78 @@ class ScraperIngestionTest(TestCase):
             d_3.case_name, "Intl Fidlty Ins Co v. Ideal Elec Sec Co"
         )
 
+    def test_opinion_dockets_source_assigment(self) -> None:
+        """Test that the opinion dockets source gets properly assigned."""
+        docket = DocketFactory.create(
+            case_name="Lorem Ipsum",
+            docket_number="11-8890",
+            court=self.court,
+            source=Docket.RECAP,
+            pacer_case_id="01111",
+        )
+        non_columbia_sources_tests = generate_docket_target_sources(
+            Docket.NON_COLUMBIA_SOURCES(), Docket.COLUMBIA
+        )
+        non_harvard_sources_tests = generate_docket_target_sources(
+            Docket.NON_HARVARD_SOURCES(), Docket.HARVARD
+        )
+        non_scraper_sources_tests = generate_docket_target_sources(
+            Docket.NON_SCRAPER_SOURCES(), Docket.SCRAPER
+        )
+
+        source_assigment_tests = [
+            (
+                non_columbia_sources_tests,
+                Docket.NON_COLUMBIA_SOURCES(),
+                Docket.COLUMBIA,
+            ),
+            (
+                non_harvard_sources_tests,
+                Docket.NON_HARVARD_SOURCES(),
+                Docket.HARVARD,
+            ),
+            (
+                non_scraper_sources_tests,
+                Docket.NON_SCRAPER_SOURCES(),
+                Docket.SCRAPER,
+            ),
+        ]
+
+        for (
+            expected_sources,
+            non_sources,
+            source_to_assign,
+        ) in source_assigment_tests:
+            with self.subTest(
+                f"Testing {source_to_assign} source assigment.",
+                expected_sources=expected_sources,
+                non_sources=non_sources,
+                source_to_assign=source_to_assign,
+            ):
+                self.assertEqual(
+                    len(expected_sources),
+                    len(non_sources),
+                    msg="Was a new non-recap source added?",
+                )
+                for source, expected_source in expected_sources.items():
+                    with self.subTest(
+                        f"Testing source {source} assigment.",
+                        source=source,
+                        expected_source=expected_source,
+                    ):
+                        Docket.objects.filter(pk=docket.pk).update(
+                            source=getattr(Docket, source)
+                        )
+                        docket.refresh_from_db()
+                        docket.add_opinions_source(source_to_assign)
+                        docket.save()
+                        docket.refresh_from_db()
+                        self.assertEqual(
+                            docket.source,
+                            getattr(Docket, expected_source),
+                            msg="The source does not match.",
+                        )
+
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
 
@@ -104,16 +208,17 @@ class ScraperIngestionTest(TestCase):
             case_name="Jeremy v. Julian old",
             docket_number="23-232388",
             court=self.court,
-            source=Docket.SCRAPER,
+            source=Docket.RECAP,
             pacer_case_id=None,
         )
 
         site = test_oral_arg_scraper.Site()
         site.method = "LOCAL"
         parsed_site = site.parse()
-        cl_scrape_oral_arguments.Command().scrape_court(
-            parsed_site, full_crawl=True
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            cl_scrape_oral_arguments.Command().scrape_court(
+                parsed_site, full_crawl=True
+            )
 
         # There should now be two items in the database.
         audio_files = Audio.objects.all()
@@ -126,6 +231,33 @@ class ScraperIngestionTest(TestCase):
         )
         d_1.refresh_from_db()
         self.assertEqual(d_1.case_name, "Jeremy v. Julian")
+        self.assertEqual(d_1.source, Docket.RECAP_AND_SCRAPER)
+
+        # Confirm that OA Search Alerts are properly triggered after an OA is
+        # scraped and its MP3 file is processed.
+        # Two webhook events should be sent, both of them to user_profile user
+        webhook_events = WebhookEvent.objects.all()
+        self.assertEqual(len(webhook_events), 2)
+
+        cases_names = ["Jeremy v. Julian", "Ander v. Leo"]
+        for webhook_sent in webhook_events:
+            self.assertEqual(
+                webhook_sent.webhook.user,
+                self.user_profile.user,
+            )
+            content = webhook_sent.content
+            # Check if the webhook event payload is correct.
+            self.assertEqual(
+                content["webhook"]["event_type"],
+                WebhookEventType.SEARCH_ALERT,
+            )
+            self.assertIn(
+                content["payload"]["results"][0]["caseName"], cases_names
+            )
+            self.assertIsNotNone(content["payload"]["results"][0]["duration"])
+            self.assertIsNotNone(
+                content["payload"]["results"][0]["local_path"]
+            )
 
     def test_parsing_xml_opinion_site_to_site_object(self) -> None:
         """Does a basic parse of a site reveal the right number of items?"""
@@ -227,43 +359,6 @@ class ExtensionIdentificationTest(SimpleTestCase):
         with open(os.path.join(self.path, "not_wpd.html"), "rb") as f:
             data = f.read()
         self.assertEqual(get_extension(data), ".html")
-
-
-class ReportScrapeStatusTest(TestCase):
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
-    def setUp(self) -> None:
-        super(ReportScrapeStatusTest, self).setUp()
-        self.court = Court.objects.get(pk="test")
-        # Make some errors that we can tally
-        ErrorLog(
-            log_level="WARNING", court=self.court, message="test_msg"
-        ).save()
-        ErrorLog(
-            log_level="CRITICAL", court=self.court, message="test_msg"
-        ).save()
-
-    def test_tallying_errors(self) -> None:
-        errors = cl_report_scrape_status.tally_errors()
-        self.assertEqual(
-            errors["test"],
-            [1, 1],
-            msg=f"Did not get expected error counts. Instead got: {errors['test']}",
-        )
-
-    @staticmethod
-    def test_simple_report_generation():
-        """Without doing the hard work of creating and checking for actual
-        errors, can we at least generate the report?
-
-        A better version of this test would check the contents of the generated
-        report by importing it from the test inbox.
-        """
-        cl_report_scrape_status.generate_report()
 
 
 class DupcheckerTest(TestCase):
@@ -377,7 +472,7 @@ class DupcheckerWithFixturesTest(TestCase):
     ]
 
     def setUp(self) -> None:
-        super(DupcheckerWithFixturesTest, self).setUp()
+        super().setUp()
         self.court = Court.objects.get(pk="test")
 
         # Set the dup_threshold to zero for these tests
@@ -512,7 +607,7 @@ class AudioFileTaskTest(TestCase):
             "case_name_short": audio_obj.case_name_short,
             "download_url": audio_obj.download_url,
         }
-        audio_response = microservice(
+        audio_response = async_to_sync(microservice)(
             service="convert-audio",
             item=audio_obj,
             params=audio_data,
@@ -523,3 +618,46 @@ class AudioFileTaskTest(TestCase):
             HTTPStatus.OK,
             msg="Unsuccessful audio conversion",
         )
+
+
+class ScraperContentTypeTest(TestCase):
+    def setUp(self):
+        # Common mock setup for all tests
+        self.mock_response = mock.MagicMock()
+        self.mock_response.content = b"not empty"
+        self.mock_response.headers = {"Content-Type": "application/pdf"}
+        self.site = test_opinion_scraper.Site()
+
+    @mock.patch("requests.Session.get")
+    def test_unexpected_content_type(self, mock_get):
+        """Test when content type doesn't match scraper expectation."""
+        mock_get.return_value = self.mock_response
+        self.site.expected_content_types = ["text/html"]
+
+        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        self.assertIn("UnexpectedContentTypeError:", msg)
+
+    @mock.patch("requests.Session.get")
+    def test_correct_content_type(self, mock_get):
+        """Test when content type matches scraper expectation."""
+        mock_get.return_value = self.mock_response
+        self.site.expected_content_types = ["application/pdf"]
+
+        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        self.assertEqual("", msg)
+
+        self.mock_response.headers = {
+            "Content-Type": "application/pdf;charset=utf-8"
+        }
+        mock_get.return_value = self.mock_response
+        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        self.assertEqual("", msg)
+
+    @mock.patch("requests.Session.get")
+    def test_no_content_type(self, mock_get):
+        """Test for no content type expected (ie. Montana)"""
+        mock_get.return_value = self.mock_response
+        self.site.expected_content_types = None
+
+        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        self.assertEqual("", msg)

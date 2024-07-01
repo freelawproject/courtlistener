@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
-from datetime import date, datetime
-from typing import Dict, Iterable, List, Optional, Tuple
+from datetime import datetime
+from typing import Dict, Iterable, List, Optional, no_type_check
 
+import waffle
 from django.conf import settings
+from elasticsearch_dsl.response import Hit
 from eyecite import resolve_citations
 from eyecite.models import (
     CitationBase,
@@ -19,19 +21,24 @@ from eyecite.utils import strip_punct
 from requests import Session
 from scorched.response import SolrResponse
 
-from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
-from cl.lib.types import (
+from cl.citations.match_citations_queries import es_search_db_for_full_citation
+from cl.citations.types import (
     MatchedResourceType,
     ResolvedFullCites,
-    SearchParam,
     SupportedCitationType,
 )
-from cl.search.models import Opinion
+from cl.citations.utils import (
+    QUERY_LENGTH,
+    get_years_from_reporter,
+    make_name_param,
+)
+from cl.custom_filters.templatetags.text_filters import best_case_name
+from cl.lib.scorched_utils import ExtraSolrInterface, ExtraSolrSearch
+from cl.lib.types import SearchParam
+from cl.search.models import Opinion, RECAPDocument
 
 DEBUG = True
 
-QUERY_LENGTH = 10
 
 NO_MATCH_RESOURCE = Resource(case_citation(source_text="UNMATCHED_CITATION"))
 
@@ -42,19 +49,6 @@ def build_date_range(start_year: int, end_year: int) -> str:
     end = datetime(end_year, 12, 31)
     date_range = f"[{start.isoformat()}Z TO {end.isoformat()}Z]"
     return date_range
-
-
-def make_name_param(
-    defendant: str,
-    plaintiff: str | None = None,
-) -> Tuple[str, int]:
-    """Remove punctuation and return cleaned string plus its length in tokens."""
-    token_list = defendant.split()
-    if plaintiff:
-        token_list.extend(plaintiff.split())
-        # Strip out punctuation, which Solr doesn't like
-    query_words = [strip_punct(t) for t in token_list]
-    return " ".join(query_words), len(query_words)
 
 
 def reverse_match(
@@ -73,7 +67,7 @@ def reverse_match(
         query_tokens = case_name.split()[start:]
         query = " ".join(query_tokens)
         # ~ performs a proximity search for the preceding phrase
-        # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
+        # See: https://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
         params["q"] = f'"{query}"~{len(query_tokens)}'
         params["caller"] = "reverse_match"
         new_results = conn.query().add_extra(**params).execute()
@@ -107,22 +101,6 @@ def case_name_query(
             # Else, try again
         results = new_results
     return results
-
-
-def get_years_from_reporter(
-    citation: FullCaseCitation,
-) -> Tuple[int, int]:
-    """Given a citation object, try to look it its dates in the reporter DB"""
-    start_year = 1750
-    end_year = date.today().year
-
-    edition_guess = citation.edition_guess
-    if edition_guess:
-        if hasattr(edition_guess.start, "year"):
-            start_year = edition_guess.start.year
-        if hasattr(edition_guess.end, "year"):
-            start_year = edition_guess.end.year
-    return start_year, end_year
 
 
 def search_db_for_fullcitation(
@@ -221,10 +199,13 @@ def resolve_fullcase_citation(
 ) -> MatchedResourceType:
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
-        db_search_results: SolrResponse = search_db_for_fullcitation(
-            full_citation
-        )
-
+        db_search_results: SolrResponse | list[Hit]
+        if waffle.switch_is_active("es_resolve_citations"):
+            # Revolve citations using ES; enable once all the opinions are
+            # indexed.
+            db_search_results = es_search_db_for_full_citation(full_citation)
+        else:
+            db_search_results = search_db_for_fullcitation(full_citation)
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
             result_id = db_search_results[0]["id"]
@@ -287,13 +268,21 @@ def resolve_supra_citation(
     )
 
 
+@no_type_check
 def do_resolve_citations(
-    citations: List[CitationBase], citing_opinion: Opinion
+    citations: List[CitationBase], citing_object: Opinion | RECAPDocument
 ) -> Dict[MatchedResourceType, List[SupportedCitationType]]:
     # Set the citing opinion on FullCaseCitation objects for later matching
     for c in citations:
         if type(c) is FullCaseCitation:
-            c.citing_opinion = citing_opinion
+            if isinstance(citing_object, Opinion):
+                c.citing_opinion = citing_object
+            elif isinstance(citing_object, RECAPDocument):
+                # if the object doing the citing is a RECAPDocument,
+                # refer to it as a citing document.
+                c.citing_document = citing_object
+            else:
+                raise "Unknown citing type."
 
     # Call and return eyecite's resolve_citations() function
     return resolve_citations(

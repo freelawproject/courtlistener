@@ -4,8 +4,10 @@ import string
 from collections import OrderedDict
 from datetime import date
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from eyecite.utils import clean_text
 
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -17,6 +19,8 @@ from ...people_db.lookup_utils import (
     lookup_judges_by_last_name_list,
 )
 from .convert_columbia_html import convert_columbia_html
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 # only make a solr connection once
 SOLR_CONN = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
@@ -235,11 +239,9 @@ def make_and_save(
 
     min_date: if not none, will skip cases after min_date
     """
-    date_filed = (
-        date_argued
-    ) = (
-        date_reargued
-    ) = date_reargument_denied = date_cert_granted = date_cert_denied = None
+    date_filed = date_argued = date_reargued = date_reargument_denied = (
+        date_cert_granted
+    ) = date_cert_denied = None
     unknown_date = None
     for date_cluster in item["dates"]:
         for date_info in date_cluster:
@@ -337,7 +339,10 @@ def make_and_save(
     # get citation objects in a list for addition to the cluster
     found_citations = []
     for c in item["citations"]:
-        found = get_citations(clean_text(c, ["html", "inline_whitespace"]))
+        found = get_citations(
+            clean_text(c, ["html", "inline_whitespace"]),
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
         if not found:
             # if the docket number --is-- citation string, we're likely dealing
             # with a somewhat common triplet of (docket number, date,
@@ -391,7 +396,7 @@ def make_and_save(
         attorneys=item["attorneys"] or "",
         posture=item["posture"] or "",
     )
-    panel = lookup_judges_by_last_name_list(
+    panel = async_to_sync(lookup_judges_by_last_name_list)(
         item["panel"], item["court_id"], panel_date
     )
 
@@ -400,7 +405,7 @@ def make_and_save(
         if opinion_info["author"] is None:
             author = None
         else:
-            author = lookup_judge_by_last_name(
+            author = async_to_sync(lookup_judge_by_last_name)(
                 opinion_info["author"], item["court_id"], panel_date
             )
 
@@ -420,7 +425,7 @@ def make_and_save(
             # reading this, you'll need to update this code.
             local_path=opinion_info["local_path"],
         )
-        joined_by = lookup_judges_by_last_name_list(
+        joined_by = async_to_sync(lookup_judges_by_last_name_list)(
             item["joining"], item["court_id"], panel_date
         )
         opinions.append((opinion, joined_by))
@@ -479,7 +484,7 @@ def find_dups(docket, cluster):
         "fq": [
             f"court_id:{docket.court_id}",
             "citation:(%s)"
-            % " OR ".join('"%s"~5' % c for c in cluster.citations.all() if c),
+            % " OR ".join(f'"{c}"~5' for c in cluster.citations.all() if c),
         ],
         "rows": 100,
         "caller": "corpus_importer.import_columbia.populate_opinions",
@@ -575,7 +580,7 @@ def get_good_words(word_list, stop_words_size=500):
     return list(OrderedDict.fromkeys(good_words))
 
 
-class StopWords(object):
+class StopWords:
     """A very simple object that can hold stopwords, but that is only
     initialized once.
     """

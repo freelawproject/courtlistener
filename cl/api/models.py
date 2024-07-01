@@ -18,7 +18,7 @@ class WebhookEventType(models.IntegerChoices):
 
 
 HttpStatusCodes = models.IntegerChoices(  # type: ignore
-    "HttpStatusCodes", [(s.name, s.value) for s in HTTPStatus]
+    "HttpStatusCodes", [(s.name, s.value) for s in HTTPStatus]  # type: ignore[arg-type]
 )
 
 
@@ -57,7 +57,7 @@ class Webhook(AbstractDateTimeModel):
         return f"<Webhook: {self.pk} for event type '{self.get_event_type_display()}'>"
 
 
-class WEBHOOK_EVENT_STATUS(object):
+class WEBHOOK_EVENT_STATUS:
     """WebhookEvent Status Types"""
 
     IN_PROGRESS = 0
@@ -115,7 +115,7 @@ class WebhookEvent(AbstractDateTimeModel):
     )
     status_code = models.SmallIntegerField(
         help_text="The HTTP status code received from the POST request.",
-        choices=HttpStatusCodes.choices,
+        choices=HttpStatusCodes.choices,  # type: ignore[attr-defined]
         blank=True,
         null=True,
     )

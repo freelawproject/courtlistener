@@ -7,8 +7,19 @@
 
 
 {% block content %}
-  <div class="hidden-xs hidden-sm col-md-3">
+  <div class="col-xs-12 hidden-md hidden-lg">
+    <h4 class="v-offset-below-2">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "coverage" %}">Back to Coverage Overview</a>
+    </h4>
+  </div>
+
+  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
     <div id="toc">
+      <h4 class="v-offset-below-3">
+        <i class="fa fa-arrow-circle-o-left gray"></i>
+        <a href="{% url "coverage" %}">Back to Coverage Home</a>
+      </h4>
       <h3>Table of Contents</h3>
       <ul>
         <li><a href="#overview">Overview</a></li>
@@ -21,14 +32,14 @@
 
 
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <h1 id="overview">Data Coverage &mdash; What Financial Disclosures Do We&nbsp;Have?</h1>
+    <h1 id="overview">Data Coverage &mdash; What Financial Disclosures Does CourtListener Have?</h1>
     <p>The <a href="https://www.govinfo.gov/content/pkg/USCODE-2010-title5/pdf/USCODE-2010-title5-app-ethicsing.pdf"> Ethics in Government Act of 1978</a> requires that senior government officials file annual disclosures listing their personal financial interests. In the Judicial Branch, this law applies to certain judicial employees and all judges. Once filed, these disclosures are generally available to the public for six years. After that time has elapsed the statute generally <a href="https://www.law.cornell.edu/uscode/text/5a/compiledact-95-521/title-I/section-105">requires that disclosures be "destroyed."</a>
     </p>
     <p>Historically, these disclosures were not collected systematically because it was too difficult to do so. Each disclosure had to be requested individually by fax, and had to be paid for by check. A big change to this policy came in the <a href="https://www.uscourts.gov/sites/default/files/2017-03_0.pdf#page=12">March, 2017 meeting of the Judicial Conference</a>, where they created a new policy that allowed the disclosures to be released on "electronic storage devices…at no cost to the requestor."
     </p>
     <p>This was a monumental change in policy, and since that time, <strong>Free Law Project has requested all of the judicial disclosures that are legally available</strong>. The Ethics in Government Act also requires certain judicial personnel to complete financial disclosures. We have requested these as well, but asked that the request be fulfilled as a lower priority than the judicial disclosures.
     </p>
-    <p>At this time, we have received over <a href="https://twitter.com/FreeLawProject/status/1301921783151341568">a dozen thumb drives from the Financial Disclosures Office</a>.
+    <p>At this time, we have received over <a href="https://x.com/FreeLawProject/status/1301921783151341568">a dozen thumb drives from the Financial Disclosures Office</a>.
     </p>
 
     <p>
@@ -41,7 +52,7 @@
     </p>
     <p>Additionally, judicial nominees file financial disclosures with the Senate Judiciary Committee during the nomination process. Free Law Project <a href="https://www.github.com/freelawproject/nomination-extractor/">built a machine learning model and tool</a> that could identify financial disclosures and used it to scan hundreds of thousands of pages of Senate records.</p>
 
-    <p><a href="https://www.judicialwatch.org/" rel="nofollow">One other organization</a> has systematically placed disclosures online, and we have gathered their corpus as well, as described below. A news organization called ABPNews also gathered them in the late nineties, but after going out of business in 2000, <a href="https://twitter.com/FreeLawProject/status/1093612415185350656">their records were lost to water damage</a>. If you know of other sources, <a href="{% url "contact" %}">please get in touch</a>.
+    <p><a href="https://www.judicialwatch.org/" rel="nofollow">One other organization</a> has systematically placed disclosures online, and we have gathered their corpus as well, as described below. A news organization called ABPNews also gathered them in the late nineties, but after going out of business in 2000, <a href="https://x.com/FreeLawProject/status/1093612415185350656">their records were lost to water damage</a>. If you know of other sources, <a href="{% url "contact" %}">please get in touch</a>.
     </p>
     <hr>
 
@@ -205,7 +216,7 @@
         </p>
       </li>
       <li>
-        <p>A few disclosures were hand written. We were unable to parse those.</p>
+        <p>A few disclosures were handwritten. We were unable to parse those.</p>
       </li>
       <li>
         <p>Many disclosures we lack &mdash; particularly older ones &mdash; <a href="https://github.com/freelawproject/courtlistener/issues/1644">are available as part of judicial nomination proceedings</a>. We are looking for a funder to help us add them to the collection.</p>
@@ -214,8 +225,6 @@
 
     <p>Whenever possible, we work with the Office of Financial Disclosures to remedy badly processed disclosures and get them into our system, but this can be an overwhelming administrative effort for our small organization. As with everything we do, your support helps makes this project possible.
     </p>
-    <p class="v-offset-above-3"><a href="{% url "donate" %}?referer=fd-coverage-page"
-                                   class="btn btn-danger btn-lg"><i class="fa fa-heart-o"></i>&nbsp;Please Donate to Support Our Work</a>
-    </p>
+    {% include "includes/donate_footer_plea.html" %}
   </div>
 {% endblock %}

@@ -100,16 +100,25 @@
                           <li role="separator" class="divider"></li>
                           <li>
                               <a href="{{ rd.pacer_url }}"
-                                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                                {% if '-' in rd.pacer_doc_id %}
+                                  class="open_buy_acms_modal"
+                                  data-toggle="modal"
+                                  data-target="#modal-buy-acms"
+                                {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                                   class="open_buy_pacer_modal"
                                   data-toggle="modal"
                                   data-target="#modal-buy-pacer"
                                 {% endif %}
                                 target="_blank"
                                 rel="nofollow">
-                                  {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                                  {% if '-' in rd.pacer_doc_id %}
+                                    Direct Link Unavailable
+                                  {% else %}
+                                    {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                                  {% endif %}
                               </a>
                           </li>
+                        </li>
                         {% endif %}
                     </ul>
                   {% else %}
@@ -119,14 +128,23 @@
                     {% else %}
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
-                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                          {% if '-' in rd.pacer_doc_id %}
+                            class="disabled open_buy_acms_modal cursor btn btn-default btn-xs"
+                            data-toggle="modal" data-target="#modal-buy-acms"
+                            style="pointer-events: all;"
+                          {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                             class="open_buy_pacer_modal btn btn-default btn-xs"
                             data-toggle="modal" data-target="#modal-buy-pacer"
                           {% else%}
                             class="btn btn-default btn-xs"
                           {% endif %}
                             target="_blank"
-                            rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                            rel="nofollow">
+                            {% if '-' in rd.pacer_doc_id %}
+                              Direct Link Unavailable
+                            {% else %}
+                              Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
+                            {% endif %}
                         </a>
                       {% endif %}
                     {% endif %}
@@ -150,7 +168,12 @@
                     {% else %}
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
-                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                          {% if '-' in rd.pacer_doc_id %}
+                            data-toggle="modal"
+                            data-target="#modal-buy-acms"
+                            class="disabled open_buy_acms_modal cursor btn btn-default btn-xs"
+                            style="pointer-events: all;"
+                          {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                             data-toggle="modal"
                             data-target="#modal-buy-pacer"
                             class="open_buy_pacer_modal btn btn-default btn-xs"
@@ -159,7 +182,7 @@
                           {% endif %}
                           target="_blank"
                           rel="nofollow"
-                          title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i>
+                          title="{% if '-' in rd.pacer_doc_id %}Direct Link Unavailable{% else%}Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}{% endif %}"><i class="fa fa-download"></i>
                         </a>
                       {% endif %}
                     {% endif %}

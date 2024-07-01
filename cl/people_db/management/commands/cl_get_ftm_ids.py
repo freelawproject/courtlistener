@@ -18,7 +18,7 @@ leveldict = {
 }
 
 url_template = (
-    "http://api.followthemoney.org/?"
+    "https://api.followthemoney.org/?"
     "f-core=1&"
     "c-exi=1&"
     "gro=c-t-id&"
@@ -234,7 +234,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         candidate_id_map = make_dict_of_ftm_eids(options["dont_use_pickle"])
         clear_old_values(options["clear_old_values"], options["debug"])
         update_judges_by_solr(candidate_id_map, debug=options["debug"])

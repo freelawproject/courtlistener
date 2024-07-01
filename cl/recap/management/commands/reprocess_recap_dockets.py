@@ -84,7 +84,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         if options["extract_and_add_solr_unextracted_rds"]:
             queue = options["queue"]
             sys.stdout.write(
@@ -100,7 +100,7 @@ class Command(VerboseCommand):
                 # The latter is defined by ones that *don't* have blank
                 # filepath_local fields.
                 Q(html_documents__isnull=False) | ~Q(filepath_local=""),
-                source__in=Docket.RECAP_SOURCES,
+                source__in=Docket.RECAP_SOURCES(),
             )
             .distinct()
             .only("pk", "case_name")

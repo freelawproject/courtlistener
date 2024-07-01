@@ -1,11 +1,11 @@
 import os
 
 from django.conf import settings
-from juriscraper.pacer.http import PacerSession
 
 from cl.corpus_importer.tasks import get_pacer_doc_id_with_show_case_doc_url
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.search.models import Court, RECAPDocument
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -34,7 +34,7 @@ def get_pacer_doc_ids(options):
             continue
         throttle.maybe_wait()
         if completed % 1000 == 0:
-            session = PacerSession(
+            session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             session.login()
@@ -71,5 +71,5 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         get_pacer_doc_ids(options)

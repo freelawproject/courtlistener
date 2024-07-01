@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% load static %}
+{% load extras %}
+
+{% block title %}REST API Change Log &ndash; CourtListener.com{% endblock %}
+{% block description %}
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" %}">Back to REST API Docs</a>
+  </h4>
+</div>
+
+<div class="hidden-xs hidden-sm col-md-3">
+  <h4 class="v-offset-below-3">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" %}">Back to REST API Docs</a>
+  </h4>
+</div>
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">REST API Change Log</h1>
+  <ul>
+    <li>
+      <p><strong>v3.15</strong> — Allow deep pagination on the Court endpoint, add <code>docket_id</code> to the Clusters endpoint, and add <code>cluster_id</code> and <code>author_id</code> to the Opinions endpoint.</p>
+    </li>
+    <li>
+      <p><strong>v3.14</strong> &mdash; This release blocks users from paginating past page 100 in the API. This release is not backwards incompatible, but is being released on an emergency basis to stop crawlers that have been impacting our database tier. In our performance documentation, we have long warned against using deep pagination. Now it is blocked. If you need this functionality for your application, please consider using filters to complete your crawling instead.</p>
+    </li>
+    <li>
+      <p><strong>v3.13</strong> &mdash; This version adds data from newly added judicial financial disclosure documents. This data is now included in a series of new endpoints to explore financial disclosures. For example, you can filter by gifts received by a specific federal judge or district.</p>
+      <p>The new endpoints include <code>gifts</code>, <code>reimbursements</code>, <code>disclosure-positions</code>, <code>agreements</code>, <code>debts</code>, <code>investments</code>, <code>spouse-income</code>, <code>non-investment-incomes</code> and <code>financial-disclosures</code>. For an understanding of these fields, see the endpoint documentation.</p>
+    </li>
+    <li>
+      <p><strong>v3.12</strong> &mdash; This version deprecates the experimental Core API interface we tried previously. Swagger/OpenAPI has become the standard. Our support of OpenAPI remains experimental, but our toolkit should support it better than previously.</p>
+      <p>Many endpoints can only be filtered by specific values. For example, to filter the <code>educations</code> endpoint to only bachelor's degrees, you'd use <code>degree_level=ba</code> as part of your GET request. In the past, if invalid filter values were used, zero results would be returned because zero items would match that query. This made sense, but did not help users identify their error. These values now return a <code>400</code> status code and an error message instead.</p>
+    </li>
+    <li>
+      <p><strong>v3.11</strong> &mdash; This version adds several fields and changes one.</p>
+      <p><code>Person.date_completed</code>: The date and time the person was last considered complete.</p>
+      <p><code>Person.dod_country</code> and <code>Person.dob_country</code>: The country where a person was born or died.</p>
+      <p><code>Position.sector</code>: Whether a position was in the private or public sector.</p>
+      <p><code>Court.date_last_pacer_contact</code>: This will track the last time we contacted PACER for a court.</p>
+      <p><code>Court.pacer_rss_entry_types</code>: This will track the types of entries available in a court's PACER RSS feed.</p>
+      <p><code>Position.date_started</code> is now a nullable field.</p>
+    </li>
+    <li>
+      <p><strong>v3.10</strong> &mdash; This version introduces the visualization APIs.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.9</strong> &mdash; This version adds attachment page fetching to the RECAP fetch API.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.8</strong> &mdash; This version adds fields to support Harvard case law data.  This includes <code>correction</code>, <code>cross_reference</code>, <code>disposition</code>, <code>headnotes</code>, <code>history</code>, <code>other_dates</code> and <code>summary</code> fields for Cluster endpoint, and <code>joined_by_str</code> and <code>xml_harvard</code> fields for Opinion endpoint.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.7</strong> &mdash; This version adds data from the Federal Judicial Center's Integrated Database. This data is now included in a new endpoint and as a new <code>idb_data</code> key in the Docket object. For an understanding of these fields, see the endpoint documentation.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.6</strong> &mdash; This version deprecated the numerous <code>federal_cite_one</code>, <code>neutral_cite</code>, <code>lexis_cite</code>, and other citation fields, replacing them with a nested field called <code>citations</code>. The old fields will continue receiving updates until February 1, 2019, and will be removed on May 1, 2019.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.5</strong> &mdash; This version adds the <code>mdl_status</code> field to the docket endpoint.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.4</strong> &mdash; This version adds the <code>file_size</code> field to the RECAP document endpoint. This field contains the size (in bytes) of any document that we have.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.3</strong> &ndash; This version added a variety of appellate fields to the docket object including a new related item called the <code>OriginalCourtInformation</code>. See <a href="#og-court-info-endpoint">documentation of that new endpoint</a> for details.
+      </p>
+      <p>The new fields added to the docket include <code>appeal_from</code>, <code>appeal_from_str</code>, <code>originating_court_information</code>, <code>panel</code>, <code>panel_str</code>, <code>appellate_fee_status</code>, and <code>appellate_case_type_information</code>.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.2</strong> &ndash; This version added the <code>id</code> field to many of the endpoints.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.1</strong> &ndash; This version added experimental Swagger and Core API implementations.
+      </p>
+    </li>
+    <li>
+      <p><strong>v3.0</strong> &ndash; Upgraded and overhauled the API to use the Django REST Framework.
+      </p>
+    </li>
+    <li>
+      <p><strong>v2</strong> &ndash; <a
+      href="{% url "rest_docs" version="v2" %}">For original documentation, see: {% url "rest_docs" version="v2" %}</a>
+      </p>
+    </li>
+    <li>
+      <p><strong>v1</strong> &ndash; <a href="{% url "rest_docs" version="v1" %}">For original documentation, see: {% url "rest_docs" version="v1" %}</a>
+      </p>
+    </li>
+  </ul>
+</div>
+{% endblock %}

@@ -2,7 +2,7 @@ from django.contrib.auth.decorators import user_passes_test
 
 
 def group_required(*group_names):
-    """Verify user group memebership
+    """Verify user group membership
 
     :param group_names: Array of strings
     :return: Whether the user is in one of the groups

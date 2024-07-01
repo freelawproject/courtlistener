@@ -1351,7 +1351,7 @@ COURT_TIMEZONES = {
     "flmb": "US/Eastern",
     "flmd": "US/Eastern",
     # some offices flnd are in US/Central (e.g. Pensacola, Panama City)
-    # http://www.flsd.uscourts.gov/?page_id=7850
+    # https://www.flsd.uscourts.gov/?page_id=7850
     "flnb": "US/Eastern",
     "flnd": "US/Eastern",
     "flsb": "US/Eastern",

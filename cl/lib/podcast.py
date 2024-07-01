@@ -7,12 +7,12 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
     def rss_attributes(self):
         return {
             "version": self._version,
-            "xmlns:atom": "http://www.w3.org/2005/Atom",
-            "xmlns:itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
+            "xmlns:atom": "https://www.w3.org/2005/Atom",
+            "xmlns:itunes": "https://www.itunes.com/dtds/podcast-1.0.dtd",
         }
 
     def add_root_elements(self, handler):
-        super(iTunesPodcastsFeedGenerator, self).add_root_elements(handler)
+        super().add_root_elements(handler)
         handler.addQuickElement("itunes:subtitle", self.feed["subtitle"])
         handler.addQuickElement("itunes:author", self.feed["author_name"])
         handler.addQuickElement("itunes:summary", self.feed["description"])
@@ -31,9 +31,7 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
         )
 
     def add_item_elements(self, handler, item):
-        super(iTunesPodcastsFeedGenerator, self).add_item_elements(
-            handler, item
-        )
+        super().add_item_elements(handler, item)
         handler.addQuickElement("itunes:duration", item["duration"])
         handler.addQuickElement("itunes:explicit", item["explicit"])
         handler.addQuickElement("itunes:author", item["author"])

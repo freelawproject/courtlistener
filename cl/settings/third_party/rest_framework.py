@@ -15,15 +15,25 @@ REST_FRAMEWORK = {
     # Versioning
     "DEFAULT_VERSIONING_CLASS": "rest_framework.versioning.URLPathVersioning",
     "DEFAULT_VERSION": "v3",
-    "ALLOWED_VERSIONS": {"v3"},
+    "ALLOWED_VERSIONS": {"v3", "v4"},
     # Throttles
     "DEFAULT_THROTTLE_CLASSES": (
         "rest_framework.throttling.AnonRateThrottle",
         "cl.api.utils.ExceptionalUserRateThrottle",
     ),
-    "DEFAULT_THROTTLE_RATES": {"anon": "100/day", "user": "5000/hour"},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "5000/hour",
+        "citations": "60/min",
+    },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Email non-functional; making many requests, 2024-04-23
+        "NicolasMadan": "10/hour",
+        # Didn't respond to emails, 2023-10-02
+        "Tylersuard": "10/hour",
+        # Didn't respond to emails, 2023-08-04
+        "skalecorn12": "10/hour",
         # Didn't respond to emails; looks unsavory.
         "donier": "10/hour",
         # Doing a background check service, we told them we didn't want to work
@@ -59,9 +69,10 @@ REST_FRAMEWORK = {
         "hdave4": "15000/hour",  # GSU
         "ellliottt": "15000/hour",
         "flooie": "20000/hour",  # Needed for testing
-        "WarrenLex": "10000/hour",  # For big litigation days (wow)
+        "WarrenLex": "20000/hour",  # For big litigation days (wow)
         "quevon24": "500000/hour",  # Perform tests, clone cases in local env
     },
+    "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES": {},
     # Auth
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.BasicAuthentication",
@@ -87,7 +98,7 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
     ),
     # Assorted & Sundry
-    "DEFAULT_PAGINATION_CLASS": "cl.api.pagination.ShallowOnlyPageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "cl.api.pagination.VersionBasedPagination",
     "PAGE_SIZE": 20,
     "URL_FIELD_NAME": "resource_uri",
     "DEFAULT_METADATA_CLASS": "cl.api.utils.SimpleMetadataWithFilters",

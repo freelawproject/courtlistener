@@ -14,7 +14,7 @@
 
 {% block title %}
     {% if search_form.type.value == SEARCH_TYPES.OPINION %}
-        Advanced Legal Opinion Search – CourtListener.com
+        Advanced Case Law Search – CourtListener.com
     {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
         Advanced RECAP Archive Search for PACER – CourtListener.com
     {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
@@ -26,7 +26,7 @@
 
 {% block og_title %}
   {% if search_form.type.value == SEARCH_TYPES.OPINION %}
-    Advanced Legal Opinion Search – CourtListener.com
+    Advanced Case Law Search – CourtListener.com
   {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
     Advanced RECAP Archive Search for PACER – CourtListener.com
   {% elif search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
@@ -38,7 +38,7 @@
 
 {% block footer-scripts %}
   {% include "includes/date_picker.html" %}
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     $(document).ready(function () {
       $('#start-scroll').on("click", function () {
         $('html, body').animate({
@@ -70,8 +70,12 @@
     <div id="advanced-page" class="col-xs-12">
         <div id="above-main-query">
             {% if search_form.type.value == SEARCH_TYPES.OPINION %}
-                <h1 class="text-center">Advanced Opinion Search</h1>
+                <h1 class="text-center">Advanced Case Law Search</h1>
                 <p class="text-center gray large">Search millions of opinions across hundreds of jurisdictions. Updated constantly.
+                </p>
+            {% elif search_form.type.value == SEARCH_TYPES.PARENTHETICAL %}
+                <h1 class="text-center">Advanced Parenthetical Search</h1>
+                <p class="text-center gray large">Search over a million summaries written by judges to find on-point decisions.
                 </p>
             {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
                 <h1 class="text-center">Advanced RECAP Search</h1>
@@ -247,7 +251,55 @@
                     details&hellip;</a>
             </div>
         </div>
-
+        {% elif search_form.type.value == SEARCH_TYPES.PARENTHETICAL %}
+          <div class="row">
+            {#  Modal is at bottom of results, so it loads last. #}
+            <div id="extra-sidebar-fields" class="col-sm-9">
+                <div class="row">
+                    <div class="col-sm-12">
+                        <div class="row">
+                            <div class="col-sm-4">
+                                <a href="#" class="btn btn-default btn-lg v-offset-above-1"
+                                   type="button" data-toggle="modal"
+                                   data-target="#court-picker">
+                                    <span class="hidden-sm">Select </span>Jurisdictions
+                                    <span id="jurisdiction-count"
+                                          class="badge">{{ court_count_human|default:""}}</span>
+                                </a>
+                            </div>
+                            <div class="col-sm-4">
+                                {% include "includes/order_by_dropdown.html" %}
+                            </div>
+                            <div class="col-sm-4">
+                              <div class="form-group">
+                                  {{ search_form.docket_number.label_tag }}
+                                  {{ search_form.docket_number }}
+                              </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.filed_after.label_tag }}
+                            {{ search_form.filed_after }}
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            {{ search_form.filed_before.label_tag }}
+                            {{ search_form.filed_before }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                {% include "includes/operators_quick_list.html" %}
+                <a class="text-right" href="{% url 'advanced_search' %}">More
+                    details&hellip;</a>
+            </div>
+        </div>
         {% elif search_form.type.value == SEARCH_TYPES.RECAP %}
         <div class="row">
             {# Modal is at bottom of results, so it loads last #}
@@ -538,24 +590,24 @@
         {%  if search_form.type.value == SEARCH_TYPES.OPINION %}
         <div class="row learn-more" id="about-opinions">
             <div class="col-xs-12">
-                <h2>About the CourtListener Corpus of Opinions</h2>
+                <h2>About the CourtListener Case Law Database</h2>
             </div>
             <div class="col-md-4">
                 <h3>Background</h3>
-                <p>The opinions in CourtListener have been collected since 2009 by <a href="https://free.law">Free Law Project</a>, a non-profit devoted to high-quality legal data. We have collected these opinions so that lawyers, researchers, journalists, corporate organizations, and the public can have easy access to them.
+                <p>The case law in CourtListener has been collected since 2009 by <a href="https://free.law">Free Law Project</a>, a non-profit devoted to high-quality legal data. We have collected these case law so that lawyers, researchers, journalists, corporate organizations, and the public can have easy access to it.
                 </p>
-                <p>We have gathered and curated these opinions from a variety of sources, including court websites, information donations, <a href="https://public.resource.org">Public.Resource.org</a>, and the <a href="http://scdb.wustl.edu/">Supreme Court Database</a>.
+                <p>We have gathered and curated case law from a variety of sources, including court websites, information donations, <a href="https://public.resource.org">Public.Resource.org</a>, and the <a href="http://scdb.wustl.edu/">Supreme Court Database</a>.
                 </p>
-                <p>This work has been possible thanks to <a href="https://free.law/thanks/">financial and volunteer support</a> from a growing list of people and organizations. If this work is valuable to you, your research, or your organization, please donate so our work can continue and thrive.
+                <p>This work has been possible thanks to <a href="https://free.law/thanks/">financial and volunteer support</a> from a growing list of people and organizations. If this work is valuable to you, your research, or your organization, please donate or become a member so our work can continue and thrive.
                 </p>
                 <p>
-                    <a href="{% url "donate" %}?referrer=opinion-adv-search"
-                       class="btn btn-danger">Donate Now</a>
+                  <a href="https://donate.free.law/forms/supportflp" class="btn btn-danger">Donate Now</a>
+                  <a href="https://donate.free.law/forms/membership" class="btn btn-danger">Join Free.law</a>
                 </p>
             </div>
             <div class="col-md-4">
                 <h3>Coverage</h3>
-                <p>Our collection of opinions combines the best data from many sources. On our <a href="{% url "coverage" %}">coverage page</a>, you can see court-by-court graphs of what we have and can see which courts we get data from on an ongoing basis.
+                <p>Our case law database combines the best data from many sources. On our <a href="{% url "coverage_opinions" %}">coverage page</a>, you can see court-by-court graphs of what we have and can see which courts we get data from on an ongoing basis.
                 </p>
                 <p>We are particularly proud of our Supreme Court data, which we consider to be the best collection available. We have made thousands of corrections to the other publicly available data sets, and have enhanced it with data from the <a href="https://free.law/2011/05/25/updated-scotus-dates/">Library of Congress</a> and the <a href="https://free.law/2014/12/21/scdb/">Supreme Court Database</a>.
                 </p>
@@ -573,7 +625,7 @@
             </div>
             <div class="col-md-4">
                 <h3>Alerts</h3>
-                <p>For the courts where we get content on an <a href="{% url "coverage" %}#scraped-jurisdictions">ongoing basis</a>, you can set up alerts for any search query. This way, you get an email whenever there is a new opinion matching your query.
+                <p>For the courts where we get content on an <a href="{% url "coverage_opinions" %}">ongoing basis</a>, you can set up alerts for any search query. This way, you get an email whenever there is a new decision matching your query.
                 </p>
                 <p>Some popular queries are your company name or that of your competitor, a legal area that you follow, or even <a href="https://free.law/2016/01/30/citation-searching/">a citation alert</a> that emails when a certain case is cited. We also offer <a href="{% url "feeds_info" %}">custom RSS feeds</a> for any search query.
                 </p>
@@ -598,17 +650,17 @@
             </div>
             <div class="col-md-4">
                 <h3>Background</h3>
-                <p>The RECAP Archive is a searchable collection of millions of PACER documents and dockets that were gathered using our <a href="https://free.law/recap/">RECAP Extensions for Firefox, Chrome and Safari</a>. PACER is the government-run system where nearly every legal document is filed from federal cases. The archive also includes <a href="https://free.law/2017/08/15/we-have-all-free-pacer/">every free PACER opinion</a>. This unique archive was created to partially address what we see as the <a href="https://free.law/2015/03/20/what-is-the-pacer-problem/">PACER Problem</a>.
+                <p>The RECAP Archive is a searchable collection of millions of PACER documents and dockets that were gathered using our <a href="https://free.law/recap/">RECAP Extensions for Firefox, Chrome and Safari</a>. PACER is the government-run system where nearly every legal document is filed from federal cases. The archive also includes <a href="https://free.law/2017/08/15/we-have-all-free-pacer/">every free PACER filing</a>. This unique archive was created to partially address what we see as the <a href="https://free.law/2015/03/20/what-is-the-pacer-problem/">PACER Problem</a>.
                 </p>
                 <p>Using this archive, you can finally search and download millions of PACER documents, including those that were originally scanned PDFs, <a href="https://free.law/2016/09/26/extracting-text-millions-of-pacer-documents/">which we laboriously convert to text</a>.
                 </p>
                 <p>This work was made possible thanks to a partnership with <a href="https://citp.princeton.edu/">The Center for Information Technology Policy at Princeton</a>, the generous data contributions of thousands of RECAP users, and a ton of <a href="https://free.law/thanks/">volunteer support</a>.
                 </p>
-                <p>If you find this work valuable, or if it saves you money on your PACER bill, please donate.
+                <p>If you find this work valuable, or if it saves you money on your PACER bill, please donate or become a member.
                 </p>
                 <p>
-                    <a href="{% url "donate" %}?referrer=recap-adv-search"
-                       class="btn btn-danger">Donate Now</a>
+                    <a href="https://donate.free.law/forms/supportflp" class="btn btn-danger">Donate Now</a>
+                    <a href="https://donate.free.law/forms/membership" class="btn btn-danger">Join Free.law</a>
                 </p>
             </div>
             <div class="col-md-4">
@@ -679,28 +731,22 @@
                 </p>
                 <p>These audio files are an important part of the historical record, and we are delighted to collect them for students, historians, researchers, journalists, attorneys, and the public.
                 </p>
-                <p>This work has been possible thanks to a grant from Columbia University Library, and a ton of <a href="https://free.law/thanks/">volunteer support</a>. If you find this work valuable, please donate so that it may continue and thrive.
+                <p>This work has been possible thanks to a grant from Columbia University Library, and a ton of <a href="https://free.law/thanks/">volunteer support</a>. If you find this work valuable, please donate or become a member so that it may continue and thrive.
                 </p>
                 <p>
-                    <a href="{% url "donate" %}?referrer=oral-arg-adv-search"
-                       class="btn btn-danger">Donate Now</a>
+                    <a href="https://donate.free.law/forms/supportflp" class="btn btn-danger">Donate Now</a>
+                    <a href="https://donate.free.law/forms/membership" class="btn btn-danger">Join Free.law</a>
                 </p>
             </div>
             <div class="col-sm-4">
                 <h3>Coverage</h3>
-                <p>We collect oral argument audio from the Supreme Court and all of the Federal Circuit courts that provide it. On the state side, we are slowly adding support for additional courts, and we are looking for support to add more. You can see all of the courts that we support on an ongoing basis <a href="{% url "coverage" %}#scraped-jurisdictions">on our coverage page</a>.
+                <p>We collect oral argument audio from the Supreme Court and all of the Federal Circuit courts that provide it. On the state side, we are slowly adding support for additional courts, and we are looking for support to add more. You can see all of the courts that we support on an ongoing basis <a href="{% url "coverage_oa" %}">on our coverage page</a>.
                 </p>
                 <p>Our collection of SCOTUS recordings goes back to 2013. Before that, we recommend <a href="https://www.oyez.org" target="_blank">the wonderful Oyez Project</a>, which goes back to 1955.
                 </p>
 
                 <h3>Podcasts&nbsp;<i class="fa fa-podcast gray"></i></h3>
-                <p>For every jurisdiction <a
-                        href="{% url "coverage" %}#scraped-jurisdictions">that
-                    we support</a>, we provide Podcasts automatically, so you
-                    can listen to the latest arguments from that court. It's
-                    also possible to create a Podcast from any search that you
-                    make, allowing you to make custom Podcasts with only the
-                    information you want to hear.
+                <p>For every jurisdiction <a href="{% url "coverage_oa" %}">that we support</a>, we provide Podcasts automatically, so you can listen to the latest arguments from that court. It is also possible to create a Podcast from any search that you make, allowing you to make custom Podcasts with only the information you want to hear.
                 </p>
                 <p>
                     <a href="{% url "podcasts" %}" class="btn btn-primary">Learn
@@ -725,7 +771,7 @@
                 <h3>Background</h3>
                 <p>The CourtListener Judicial database <a href="https://free.law/2016/04/19/judge_database/">was formed</a> as partnership with researcher Elliott Ash at Princeton University and with support from the National Science Foundation and Knight Foundation.
                 </p>
-                <p>The database has information about thousands of judges from federal and state courts, including their biographical and educational background, judicial and non-judicial positions held, political affiliations, American Bar Association ratings, <a href="https://free.law/2016/07/27/judge-campaign-finance-data">campaign finance data</a>, and <a href="https://free.law/2016/06/29/judge-authorship">opinions authored</a>.
+                <p>The database has information about thousands of judges from federal and state courts, including their biographical and educational background, judicial and non-judicial positions held, political affiliations, American Bar Association ratings, <a href="https://free.law/2016/07/27/judge-campaign-finance-data">campaign finance data</a>, and <a href="https://free.law/2016/06/29/judge-authorship">case law authored</a>.
                 </p>
                 <p>
                     <a href="https://free.law/projects/judge-db/"
@@ -750,7 +796,7 @@
                 <p>To learn more about how this works, <a href="{% url "contact" %}">get in touch</a>.
                 </p>
                 <p>
-                    <a href="{% url "donate" %}?referrer=judge-adv-search"
+                    <a href="https://donate.free.law/forms/supportflp"
                        class="btn btn-danger">Donate Now</a>
                 </p>
             </div>

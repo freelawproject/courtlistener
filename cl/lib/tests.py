@@ -1,17 +1,16 @@
 import datetime
 from typing import Tuple, TypedDict, cast
 
-from django.contrib.auth.hashers import make_password
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
-from django.db.models import F
-from django.test import override_settings
-from django.urls import reverse
-from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
 
+from cl.lib.date_time import midnight_pt
+from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
+    is_docket_number,
     make_docket_number_core,
     make_upload_path,
 )
@@ -24,8 +23,20 @@ from cl.lib.pacer import (
 )
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
+from cl.lib.redis_utils import (
+    acquire_redis_lock,
+    get_redis_interface,
+    release_redis_lock,
+)
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.utils import (
+    check_for_proximity_tokens,
+    check_unbalanced_parenthesis,
+    check_unbalanced_quotes,
+    sanitize_unbalanced_parenthesis,
+    sanitize_unbalanced_quotes,
+)
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
@@ -35,7 +46,6 @@ from cl.search.factories import (
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserProfileWithParentsFactory
 
 
 class TestPacerUtils(TestCase):
@@ -45,12 +55,14 @@ class TestPacerUtils(TestCase):
         """Do we properly set small bankruptcy dockets to private?"""
         d = Docket()
         d.court = Court.objects.get(pk="akb")
-        blocked, date_blocked = get_blocked_status(d)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(d)
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets with few entries should be blocked.",
         )
-        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(
+            d, count_override=501
+        )
         self.assertFalse(
             blocked,
             msg="Bankruptcy dockets with many entries "
@@ -58,7 +70,9 @@ class TestPacerUtils(TestCase):
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
-        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(
+            d, count_override=501
+        )
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets that start blocked "
@@ -295,6 +309,20 @@ class TestModelHelpers(TestCase):
             clean_docket_number("Nos. 12-213, Dockets 27264, 27265"), "12-213"
         )
 
+    def test_is_docket_number(self) -> None:
+        """Test is_docket_number method correctly detects a docket number."""
+
+        self.assertEqual(is_docket_number("1:21-cv-1234-ABC"), True)
+        self.assertEqual(is_docket_number("1:21-cv-1234"), True)
+        self.assertEqual(is_docket_number("1:21-bk-1234"), True)
+        self.assertEqual(is_docket_number("21-1234"), True)
+        self.assertEqual(is_docket_number("21-cv-1234"), True)
+        self.assertEqual(is_docket_number("21 1234"), False)
+        self.assertEqual(is_docket_number("14 august"), False)
+        self.assertEqual(is_docket_number("21-string"), False)
+        self.assertEqual(is_docket_number("string-2134"), False)
+        self.assertEqual(is_docket_number("21"), False)
+
 
 class S3PrivateUUIDStorageTest(TestCase):
     @classmethod
@@ -337,45 +365,6 @@ class TestMimeLookup(SimpleTestCase):
         }
         for test_path in tests.keys():
             self.assertEqual(tests.get(test_path), lookup_mime_type(test_path))
-
-
-@override_settings(MAINTENANCE_MODE_ENABLED=True)
-class TestMaintenanceMiddleware(TestCase):
-    """Test the maintenance middleware"""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        # Do this in two steps to avoid triggering profile creation signal
-        admin = UserProfileWithParentsFactory.create(
-            user__username="admin",
-            user__password=make_password("password"),
-        )
-        admin.user.is_superuser = True
-        admin.user.is_staff = True
-        admin.user.save()
-
-    def test_middleware_works_when_enabled(self) -> None:
-        """Does the middleware block users when enabled?"""
-        r = self.client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_503_SERVICE_UNAVAILABLE,
-            "Did not get correct status code. Got: %s instead of %s"
-            % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE),
-        )
-
-    def test_staff_can_get_through(self) -> None:
-        """Can staff get through when the middleware is enabled?"""
-        self.assertTrue(
-            self.client.login(username="admin", password="password")
-        )
-        r = self.client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_200_OK,
-            "Staff did not get through, but should have. Staff got status "
-            "code of: %s instead of %s" % (r.status_code, HTTP_200_OK),
-        )
 
 
 class TestPACERPartyParsing(SimpleTestCase):
@@ -926,3 +915,219 @@ class TestFactoriesClasses(TestCase):
             cluster_2.sub_opinions.all().order_by("type")[2].type,
             "070rehearing",
         )
+
+
+class TestDateTimeHelpers(SimpleTestCase):
+    def test_midnight_pt(self) -> None:
+        # Date in PSD time -8 hours UTC offset
+        pst_date = datetime.date(2023, 1, 3)
+        pst_date_time = midnight_pt(pst_date)
+        pst_utc_offset_hours = pst_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        self.assertEqual(pst_utc_offset_hours, -8.0)
+
+        # Date in PDT time -7 hours UTC offset
+        pdt_date = datetime.date(2023, 5, 3)
+        pdt_date_time = midnight_pt(pdt_date)
+        pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600  # type: ignore
+        self.assertEqual(pdt_utc_offset_hours, -7.0)
+
+
+class TestElasticsearchUtils(SimpleTestCase):
+    def test_can_add_conjunction(self) -> None:
+        tests = [
+            {"input": "a", "output": "a"},
+            {"input": "a b", "output": "a AND b"},
+            {"input": "a b (c d)", "output": "a AND b AND (c d)"},
+            {
+                "input": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+                "output": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+            },
+            {
+                "input": "a b (c d) [a b]",
+                "output": "a AND b AND (c d) AND [a b]",
+            },
+            {
+                "input": 'a b (c d) [a b] "a c"',
+                "output": 'a AND b AND (c d) AND [a b] AND "a c"',
+            },
+            {
+                "input": "a b (c d) [a b] NOT word1",
+                "output": "a AND b AND (c d) AND [a b] AND NOT word1",
+            },
+            {
+                "input": 'a b NOT word1 (c d) [a b] NOT (word1 word2) "a z" NOT [word3 word4]',
+                "output": 'a AND b AND NOT word1 AND (c d) AND [a b] AND NOT (word1 word2) AND "a z" AND NOT [word3 word4]',
+            },
+            {
+                "input": 'a b NOT a (c d) [a b] NOT (a w) "a z" word1 AND word2',
+                "output": 'a AND b AND NOT a AND (c d) AND [a b] AND NOT (a w) AND "a z" AND word1 AND word2',
+            },
+            {
+                "input": 'a b NOT a (c d) [a b] AND (a w) "a z" word1 OR word2',
+                "output": 'a AND b AND NOT a AND (c d) AND [a b] AND (a w) AND "a z" AND word1 OR word2',
+            },
+            {
+                "input": "(A AND B) (a bc (a b)) and word1",
+                "output": "(A AND B) AND (a bc (a b)) and word1",
+            },
+            {
+                "input": 'field:"a w c" (a bc (a b) and w) and docket:"word1 word3"',
+                "output": 'field:"a w c" AND (a bc (a b) and w) and docket:"word1 word3"',
+            },
+        ]
+
+        for test in tests:
+            ouput_str = append_query_conjunctions(test["input"])
+            self.assertEqual(ouput_str, test["output"])
+
+    def test_check_and_sanitize_queries_bad_syntax(self) -> None:
+        """Tests for methods that check and sanitize queries with a bad search
+        syntax.
+        """
+
+        # Check for bad proximity tokens.
+        tests = [
+            {
+                "input_str": "This is a range /p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range /s query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range/s query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range/p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a /s range /p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is not a range query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity /short query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity /parent query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity long/short query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity long/parent query",
+                "output": False,
+            },
+        ]
+        for test in tests:
+            output = check_for_proximity_tokens(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
+
+        # Check for Unbalanced parentheses.
+        tests = [
+            {
+                "input_str": "This is (unbalanced",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": "This is unbalanced)",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": "This is (unbalanced)(",
+                "output": True,
+                "sanitized": "This is (unbalanced)",
+            },
+            {
+                "input_str": "This (is (unbalanced)(",
+                "output": True,
+                "sanitized": "This (is unbalanced)",
+            },
+            {
+                "input_str": "This (is (unbalanced)()",
+                "output": True,
+                "sanitized": "This (is (unbalanced))",
+            },
+            {
+                "input_str": "(This) (is (balanced))",
+                "output": False,
+                "sanitized": "(This) (is (balanced))",
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])
+
+        # Check for Unbalanced quotes.
+        tests = [
+            {
+                "input_str": 'This is "unbalanced',
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": 'This is "unbalanced""',
+                "output": True,
+                "sanitized": 'This is "unbalanced"',
+            },
+            {
+                "input_str": 'This "is" unbalanced"',
+                "output": True,
+                "sanitized": 'This "is" unbalanced',
+            },
+            {
+                "input_str": 'This "is" unbalanced"""',
+                "output": True,
+                "sanitized": 'This "is" unbalanced""',
+            },
+            {
+                "input_str": '"This is" "balanced"',
+                "output": False,
+                "sanitized": '"This is" "balanced"',
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_quotes(test["input_str"])  # type: ignore
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_quotes(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])
+
+
+class TestRedisUtils(SimpleTestCase):
+    """Test Redis utils functions."""
+
+    def test_redis_lock(self) -> None:
+        """Test acquiring and releasing a Redis lock."""
+
+        lock_key = "test_lock"
+        r = get_redis_interface("CACHE")
+        identifier = acquire_redis_lock(r, lock_key, 2000)
+        self.assertTrue(identifier)
+
+        result = release_redis_lock(r, lock_key, identifier)
+        self.assertEqual(result, 1)

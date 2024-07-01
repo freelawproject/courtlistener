@@ -2,8 +2,8 @@
 {% load extras static humanize %}
 
 {% block title %}Bulk Legal Data – CourtListener.com{% endblock %}
-{% block description %}Free legal bulk data for federal and state opinions, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
-{% block og_description %}Free legal bulk data for federal and state opinions, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
+{% block description %}Free legal bulk data for federal and state case law, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
+{% block og_description %}Free legal bulk data for federal and state case law, dockets, oral arguments, and judges from Free Law Project, a 501(c)(3) nonprofit. A complete Supreme Court corpus and the most complete and comprehensive database of American judges.{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -14,7 +14,7 @@
 {% block content %}
 <div class="col-xs-12">
 <div class="row">
-  <div class="hidden-xs hidden-sm col-md-3">
+  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
     <div id="toc">
       <h3>Table of Contents</h3>
       <ul>
@@ -23,7 +23,7 @@
         <li><a href="#formats">Data Definitions</a></li>
         <li><a href="#schemas">Schema Diagrams</a></li>
         <ul>
-          <li><a href="#opinions-db">Opinions Data</a></li>
+          <li><a href="#opinions-db">Case Law Data</a></li>
           <li><a href="#disclosures">Disclosures Data</a></li>
           <li><a href="#people-db">Judge Data</a></li>
           <li><a href="#audio-db">Oral Argument Data</a></li>
@@ -32,7 +32,7 @@
         <ul>
           <li><a href="#schedule">Data Generation Schedule</a></li>
           <li><a href="#contributing">Contributions</a></li>
-          <li><a href="#old">Old Formats</a></li>
+          <li><a href="#old">Release Notes</a></li>
           <li><a herf="#copyright">Copyright</a></li>
         </ul>
       </ul>
@@ -41,7 +41,7 @@
 
   <div class="col-xs-12 col-md-8 col-lg-6">
     <h1 id="about">Bulk Legal Data</h1>
-    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as opinions, oral arguments, dockets, and judges.
+    <p>For developers, legal researchers, journalists, and the public, we provide bulk files containing many types of data. In general the files that are available correspond to the major types of data we have in our database, such as case law, oral arguments, dockets, and judges.
     </p>
     <p><a href="{% url "contact" %}">Get in touch</a> if you're interested in types of data not provided here.
     </p>
@@ -50,7 +50,7 @@
 
 
     <h2 id="browsing">Browsing the Data Files</h2>
-    <p>As they are generated, files are streamed to an AWS S3 bucket. Dates are added to the filenames indicating when their generation began (in the UTC timezone).
+    <p>As they are generated, files are streamed to an AWS S3 bucket. Files are named with their generation time (UTC) and object type. Files are snapshots, not deltas.
     </p>
     <p>
       <a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/" class="btn btn-primary btn-lg">Browse Bulk Data</a>
@@ -58,8 +58,13 @@
 
 
     <h2 id="formats">Data Format and Field Definitions</h2>
-    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the <a href="https://www.postgresql.org/docs/current/sql-copy.html">COPY documentation</a> or by reading <a href="https://github.com/freelawproject/courtlistener/blob/main/scripts/make_bulk_data.sh">the code we use to generate these files</a>.
+    <p>Files are generated using the PostgreSQL <a href="https://www.postgresql.org/docs/current/sql-copy.html"><code>COPY TO</code></a> command. This generates CSV files that correspond with the tables in our database. Files are provided using the CSV output format, in the UTF-8 encoding, with a header row on the top. If you are using PostgreSQL, the easiest way to import these files is to use the <code>COPY FROM</code> command. Details about the CSVs we generate can be found in the <a href="https://www.postgresql.org/docs/current/sql-copy.html">COPY documentation</a> or by reading <a href="https://github.com/freelawproject/courtlistener/blob/main/scripts/make_bulk_data.sh">the code we use to generate these files</a>. You can import the data using <code>COPY FROM</code> by executing a sql statement like this:
     </p>
+    <blockquote>
+      <code>
+        COPY public.search_opinionscited (id, depth, cited_opinion_id, citing_opinion_id) FROM 'path_to_csv_file.csv' WITH (FORMAT csv, ENCODING utf8, header);
+      </code>
+    </blockquote>
     <p>The SQL commands to generate our database schema (including tables, columns, indexes, and constraints) are dumped whenever we generate the bulk data files. You can import the schema file into your own database with something like:
     </p>
     <blockquote>
@@ -102,8 +107,8 @@
   <div class="hidden-xs hidden-sm col-md-3"></div>
   <div class="col-xs-12 col-md-8 col-lg-6">
     <h2 id="bulk-data">Bulk Data Files</h2>
-    <h3 id="opinions-db">Opinions Data</h3>
-    <p>The following bulk data files are available for our opinions database. Use
+    <h3 id="opinions-db">Case Law Data</h3>
+    <p>The following bulk data files are available for our Case Law database. Use
       <a href="https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/list.html?prefix=bulk-data/">the browsable interface</a> to get their most recent links:</p>
     <ul>
       <li>
@@ -131,9 +136,12 @@
         </p>
       </li>
     </ul>
+    <p>We have also partnered with the Library Innovation Lab at Harvard Law Library to create <a href="https://huggingface.co/datasets/harvard-lil/cold-cases">a dataset on Hugging Face</a> with similar data.
+    </p>
+
 
     <h3 id="disclosures">Financial Disclosure Data</h3>
-    <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a href="{% url "rest_docs" %}">REST API documentation</a> or the <a href="{% url "coverage_fds" %}">disclosures coverage page</a>.
+    <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a href="{% url "financial_disclosures_api_help" %}">REST API documentation</a> or the <a href="{% url "coverage_fds" %}">disclosures coverage page</a>.
     </p>
 
     <h3 id="people-db">Judge Data</h3>
@@ -151,18 +159,24 @@
     </p>
 
     <h3 id="contributing">Adding Features and Fixing Bugs</h3>
-    <p>Like all Free Law Project initiatives, CourtListener is an open source project. If you are a developer and you notice bugs or missing features, we enthusiastically welcome your contributions <a href="https://github.com/freelawproject/courtlistener">on Github</a>.
+    <p>Like all Free Law Project initiatives, CourtListener is an open source project. If you are a developer and you notice bugs or missing features, we enthusiastically welcome your contributions <a href="https://github.com/freelawproject/courtlistener">on GitHub</a>.
     </p>
 
-    <h3 id="old">Obsoleted Bulk Data Formats</h3>
+    <h3 id="old">Release Notes</h3>
+	<p>
+      <strong>2023-09-26</strong>: Bulk script refactored to make it easier to maintain. Courthouse table added to bulk script. Court appeals_to through table added to bulk script. Bulk script now automatically generates a shell script to load bulk data and stream the script to S3.
+    </p>
+    <p>
+      <strong>2023-07-07</strong>: We added the <code>FORCE_QUOTE *</code> option to our export script so that null can be distinguished from blank values. In the past, both appeared in the CSVs as commas with nothing between them (<code>,,</code>). With this change, blanks will use quotes: (<code>,"",</code>), while nulls will remain as before. This should make the <code>COPY TO</code> commands work better. In addition, several missing columns are added to the bulk data to align our exports more closely with our database.
+    </p>
     <p>This is the third version of our bulk data system. Previous versions were available by jurisdiction, by day, month, or year, and in JSON format corresponding to our REST API. We also previously provided our CiteGeist data file. Each of these features has been removed in an effort to simply the feature. For more information, see <a href="https://github.com/freelawproject/courtlistener/issues/285">here (removing day/month/year files)</a> and <a href="https://github.com/freelawproject/courtlistener/issues/1983">here (removing the JSON format and switching to PostgreSQL dumps)</a>.
     </p>
 
     <h3 id="copyright"><span>Copyright</span></h3>
     <p>Our bulk data files are free of known copyright restrictions.<br/>
       <a rel="license"
-         href="http://creativecommons.org/publicdomain/mark/1.0/">
-        <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png"
+         href="https://creativecommons.org/publicdomain/mark/1.0/">
+        <img src="{% static "png/cc-pd.png" %}"
              alt="Public Domain Mark" height="31"
              width="88"/>
       </a>
@@ -180,7 +194,7 @@
         <div class="hidden-xs col-sm-1 col-md-2 col-lg-3"></div>
         <div class="col-xs-12 col-sm-10 col-md-8 col-lg-6">
           <p class="text-center">
-            <a href="{% url "donate" %}?referrer={{ request.path }}" class="btn btn-lg btn-block btn-danger"><i class="fa fa-heart-o"></i> Donate Now</a>
+            <a href="https://donate.free.law/forms/supportflp" class="btn btn-lg btn-block btn-danger"><i class="fa fa-heart-o"></i> Donate Now</a>
           </p>
         </div>
       </div>

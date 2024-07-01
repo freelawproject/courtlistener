@@ -11,7 +11,6 @@ env = environ.FileAwareEnv()
 
 SECRET_KEY = env("SECRET_KEY", default="THIS-is-a-Secret")
 
-
 ############
 # Database #
 ############
@@ -23,13 +22,11 @@ DATABASES = {
         "PASSWORD": env("DB_PASSWORD", default="postgres"),
         "CONN_MAX_AGE": env("DB_CONN_MAX_AGE", default=0),
         "HOST": env("DB_HOST", default="cl-postgres"),
-        # Disable DB serialization during tests for small speed boost
-        "TEST": {"SERIALIZE": False},
         "OPTIONS": {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
             # "prefer" is fine in dev, but poor in prod, where it should be
             # "require" or above.
-            "sslmode": env("DB_SSL_MODE", default="prefer"),
+            "sslmode": env("DB_SSL_MODE", default="require"),
         },
     },
 }
@@ -50,7 +47,6 @@ if env("DB_REPLICA_HOST", default=""):
 MAX_REPLICATION_LAG = env.int("MAX_REPLICATION_LAG", default=1e8)  # 100MB
 API_READ_DATABASES: List[str] = env("API_READ_DATABASES", default="replica")
 
-
 ####################
 # Cache & Sessions #
 ####################
@@ -69,7 +65,6 @@ CACHES = {
 # This sets Redis as the session backend. This is often advised against, but we
 # have pretty good persistency in Redis, so it's fairly well backed up.
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
-
 
 #####################################
 # Directories, Apps, and Middleware #
@@ -124,21 +119,23 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "django_permissions_policy.PermissionsPolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django_ratelimit.middleware.RatelimitMiddleware",
     "waffle.middleware.WaffleMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
-    "cl.lib.middleware.MaintenanceModeMiddleware",
     "pghistory.middleware.HistoryMiddleware",
 ]
 
 ROOT_URLCONF = "cl.urls"
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.admindocs",
     "django.contrib.contenttypes",
@@ -159,6 +156,7 @@ INSTALLED_APPS = [
     "storages",
     "waffle",
     "admin_cursor_paginator",
+    "django_elasticsearch_dsl",
     "pghistory",
     "pgtrigger",
     # CourtListener Apps
@@ -189,6 +187,8 @@ if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
     MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
+ASGI_APPLICATION = "cl.asgi.application"
+
 
 ################
 # Misc. Django #
@@ -202,7 +202,7 @@ DATETIME_FORMAT = "N j, Y, P e"
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 
 # Local time zone for this installation. Choices can be found here:
-# http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
+# https://en.wikipedia.org/wiki/List_of_tz_zones_by_name
 # although not all choices may be available on all operating systems.
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
@@ -214,7 +214,6 @@ MANAGERS = [
         env("MANAGER_EMAIL", default="joe@courtlistener.com"),
     )
 ]
-
 
 LOGIN_URL = "/sign-in/"
 LOGIN_REDIRECT_URL = "/"

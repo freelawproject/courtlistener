@@ -1,16 +1,27 @@
 {% load text_filters %}
-
+{% load waffle_tags %}
 <ul>
-    {% for opinion in opinions %}
+  {% flag "o-es-active" %}
+    {% for opinion in opinions.object_list %}
         <li>
-            <a href="{{ opinion.absolute_url }}?{{ request.META.QUERY_STRING }}"
-              {% if event_category and event_action %} onclick="_paq.push(['trackEvent', '{{ event_category }}', '{{ event_action }}', {{ opinion.id }}, {{ forloop.counter }}]);"{% endif %}>
+            <a href="{{ opinion.absolute_url }}?{{ request.META.QUERY_STRING }}">
                 {% with opinion.title as title  %}
                   {{ opinion.caseName|default:title|default_if_none:"N/A"|safe|truncatewords:10|v_wrapper }}
                 {% endwith %}
             </a>
         </li>
     {% endfor %}
+  {% else %}
+    {% for opinion in opinions %}
+        <li>
+            <a href="{{ opinion.absolute_url }}?{{ request.META.QUERY_STRING }}">
+                {% with opinion.title as title  %}
+                  {{ opinion.caseName|default:title|default_if_none:"N/A"|safe|truncatewords:10|v_wrapper }}
+                {% endwith %}
+            </a>
+        </li>
+    {% endfor %}
+  {% endflag %}
 </ul>
 <p>
     <a href="{{ full_list_url }}" class="btn btn-default">

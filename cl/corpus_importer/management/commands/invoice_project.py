@@ -4,7 +4,6 @@ from celery.canvas import chain
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
-from juriscraper.pacer import PacerSession
 from requests import Session
 
 from cl.corpus_importer.tasks import (
@@ -15,6 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.recap.tasks import process_recap_attachment
@@ -59,7 +59,9 @@ def get_attachment_pages(options):
     q = options["queue"]
     recap_user = User.objects.get(username="recap")
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
     paginator = Paginator(results, page_size)
     i = 0
@@ -105,7 +107,9 @@ def get_documents(options):
     """Download documents from PACER if we don't already have them."""
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
 
     page_size = 10000
@@ -191,7 +195,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "attachment_pages":
             get_attachment_pages(options)

@@ -4,11 +4,13 @@ import time
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
@@ -20,10 +22,10 @@ from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.models import ErrorLog
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     get_binary_content,
+    get_child_court,
     get_extension,
     signal_handler,
     update_or_create_docket,
@@ -38,21 +40,27 @@ from cl.search.models import (
     OpinionCluster,
 )
 
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
 cnt = CaseNameTweaker()
 
 
 def make_citation(
-    cite_str: str,
-    cluster: OpinionCluster,
+    cite_str: str, cluster: OpinionCluster, court_id: str
 ) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
-    citation_objs = get_citations(cite_str)
+    citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
     if not citation_objs:
         logger.error(
-            f"Could not parse citation",
-            extra=dict(cite=cite_str, cluster=cluster),
+            "Could not parse citation from court '%s'",
+            court_id,
+            extra=dict(
+                cite=cite_str,
+                cluster=cluster,
+                fingerprint=[f"{court_id}-no-citation-found"],
+            ),
         )
         return None
     # Convert the found cite type to a valid cite type for our DB.
@@ -106,13 +114,17 @@ def make_objects(
         source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
         nature_of_suit=item.get("nature_of_suit", ""),
+        summary=item.get("summary", ""),
         blocked=blocked,
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
+        disposition=item.get("disposition") or "",
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
-    citations = [make_citation(cite, cluster) for cite in cites if cite]
+    citations = [
+        make_citation(cite, cluster, court.id) for cite in cites if cite
+    ]
     # Remove citations that did not parse correctly.
     citations = [cite for cite in citations if cite]
 
@@ -124,6 +136,7 @@ def make_objects(
         type=Opinion.COMBINED,
         sha1=sha1_hash,
         download_url=url,
+        author_str=item.get("author_str") or "",
     )
 
     cf = ContentFile(content)
@@ -153,7 +166,7 @@ def save_everything(
         citation.save()
 
     if cluster.judges:
-        candidate_judges = lookup_judges_by_messy_str(
+        candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
             cluster.judges, docket.court.pk, cluster.date_filed
         )
         if len(candidate_judges) == 1:
@@ -175,7 +188,7 @@ class Command(VerboseCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
-        super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
+        super().__init__(stdout=None, stderr=None, no_color=False)
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -229,7 +242,7 @@ class Command(VerboseCommand):
 
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         if dup_checker.abort_by_url_hash(site.url, site.hash):
-            logger.debug(f"Aborting by url hash.")
+            logger.debug("Aborting by url hash.")
             return
 
         if site.cookies:
@@ -237,14 +250,21 @@ class Command(VerboseCommand):
         logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
+            # Minnesota currently rejects Courtlistener and Juriscraper as a User Agent
+            if court_str in ["minn", "minnctapp"]:
+                headers = site.headers
+            else:
+                headers = {"User-Agent": "CourtListener"}
+
             msg, r = get_binary_content(
                 item["download_urls"],
-                site.cookies,
+                site,
+                headers,
                 method=site.method,
             )
             if msg:
-                logger.warning(msg)
-                ErrorLog(log_level="WARNING", court=court, message=msg).save()
+                fingerprint = [f"{court_str}-unexpected-content-type"]
+                logger.error(msg, extra={"fingerprint": fingerprint})
                 continue
 
             content = site.cleanup_content(r.content)
@@ -294,8 +314,12 @@ class Command(VerboseCommand):
             )
             dup_checker.reset()
 
+            child_court = get_child_court(
+                item.get("child_courts", ""), court.id
+            )
+
             docket, opinion, cluster, citations = make_objects(
-                item, court, sha1_hash, content
+                item, child_court or court, sha1_hash, content
             )
 
             save_everything(
@@ -325,12 +349,12 @@ class Command(VerboseCommand):
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
 
-    def parse_and_scrape_site(self, mod, full_crawl):
+    def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site().parse()
-        self.scrape_court(site, full_crawl)
+        self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         global die_now
 
         # this line is used for handling SIGTERM (CTRL+4), so things can die
@@ -356,10 +380,18 @@ class Command(VerboseCommand):
             mod = __import__(
                 f"{package}.{module}", globals(), locals(), [module]
             )
+            module_string = mod.Site().court_id
+            court_id = module_string.split(".")[-1].split("_")[0]
+            if not Court.objects.get(id=court_id).has_opinion_scraper:
+                logger.info(f"{court_id} is currently disabled.")
+                i += 1
+                continue
             try:
-                self.parse_and_scrape_site(mod, options["full_crawl"])
+                self.parse_and_scrape_site(mod, options)
             except Exception as e:
-                capture_exception(e)
+                capture_exception(
+                    e, fingerprint=[module_string, "{{ default }}"]
+                )
             last_court_in_list = i == (num_courts - 1)
             daemon_mode = options["daemon"]
             if last_court_in_list:
