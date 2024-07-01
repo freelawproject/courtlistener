@@ -99,7 +99,7 @@ judge-pics = "^2.0.5"
 django-admin-cursor-paginator = "^0.1.5"
 sentry-sdk = {extras = ["celery", "django"], version = "^2.5.1"}
 selenium = "^4.16.0"
-ipython = "^8.20.0"
+ipython = "^8.26.0"
 time-machine = "^2.14.1"
 dateparser = "1.2.0"
 types-dateparser = "^1.1.4.20240106"
