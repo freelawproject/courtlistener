@@ -555,10 +555,10 @@ class OpinionV4APISearchTest(
     def setUpTestData(cls):
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
-            docket_empty = DocketFactory.create()
+            cls.docket_empty = DocketFactory.create()
             cls.empty_cluster = OpinionClusterFactory.create(
                 precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                docket=docket_empty,
+                docket=cls.docket_empty,
                 date_filed=datetime.date(2024, 2, 23),
             )
             cls.empty_opinion = OpinionFactory.create(
@@ -975,21 +975,30 @@ class OpinionV4APISearchTest(
         """Confirm a date_created filed without microseconds can be properly
         parsed by TimeStampField"""
 
+        no_micro_second_cluster = OpinionClusterFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+            docket=self.docket_empty,
+            date_filed=datetime.date(2024, 2, 23),
+        )
         date_created_no_microseconds = datetime.datetime(
             2010, 4, 28, 16, 1, 19, tzinfo=pytz.UTC
         )
-        self.empty_opinion.date_created = date_created_no_microseconds
-        self.empty_opinion.save()
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.OPINION,
-            queue="celery",
-            pk_offset=0,
-            testing_mode=True,
+        no_micro_second_opinion = OpinionFactory.create(
+            cluster=no_micro_second_cluster, plain_text=""
+        )
+        # Override date_created
+        no_micro_second_opinion.date_created = date_created_no_microseconds
+        no_micro_second_opinion.save()
+
+        # Index the document into ES.
+        es_save_document.delay(
+            no_micro_second_opinion.pk,
+            "search.Opinion",
+            OpinionDocument.__name__,
         )
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "q": f"id:{self.empty_opinion.pk}",
+            "q": f"id:{no_micro_second_opinion.pk}",
             f"stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}": "on",
         }
         r = self.client.get(
@@ -999,6 +1008,8 @@ class OpinionV4APISearchTest(
             r.data["results"][0]["opinions"][0]["meta"]["date_created"],
             date_created_no_microseconds.isoformat().replace("+00:00", "Z"),
         )
+
+        no_micro_second_cluster.delete()
 
     @override_settings(OPINION_HITS_PER_RESULT=6)
     def test_nested_opinions_limit(self) -> None:
