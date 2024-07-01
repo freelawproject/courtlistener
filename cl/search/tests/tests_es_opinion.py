@@ -2,6 +2,7 @@ import datetime
 from http import HTTPStatus
 from unittest import mock
 
+import pytz
 import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -968,6 +969,35 @@ class OpinionV4APISearchTest(
             opinion_v4_search_api_keys,
             opinion_document_v4_api_keys,
             v4_meta_keys,
+        )
+
+    def test_date_created_without_microseconds_parsing(self) -> None:
+        """Confirm a date_created filed without microseconds can be properly
+        parsed by TimeStampField"""
+
+        date_created_no_microseconds = datetime.datetime(
+            2010, 4, 28, 16, 1, 19, tzinfo=pytz.UTC
+        )
+        self.empty_opinion.date_created = date_created_no_microseconds
+        self.empty_opinion.save()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"id:{self.empty_opinion.pk}",
+            f"stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}": "on",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        self.assertEqual(
+            r.data["results"][0]["opinions"][0]["meta"]["date_created"],
+            date_created_no_microseconds.isoformat().replace("+00:00", "Z"),
         )
 
     @override_settings(OPINION_HITS_PER_RESULT=6)
