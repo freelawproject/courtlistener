@@ -50,7 +50,7 @@ def build_base_query(options: dict[str, Any]) -> Search:
     match options["search_type"]:
         case SEARCH_TYPES.OPINION:
             unique_sorting_key = "id"
-            cd["order_by"] = "score desc"
+            cd["order_by"] = f"{unique_sorting_key} desc"
             search_query = OpinionDocument.search()
             search_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
             search_fields.extend(["type", "text", "caseName", "docketNumber"])
@@ -83,13 +83,8 @@ def build_base_query(options: dict[str, Any]) -> Search:
     search_query = search_query.extra(size=options["es_page_size"] + 1)
     # Build the sorting settings for an ES query to work with the
     # 'search_after' pagination
-    default_sorting = build_sort_results(cd, False, "v4")
-    unique_sorting = build_sort_results(
-        {"type": cd["type"], "order_by": f"{unique_sorting_key} desc"},
-        False,
-        "v4",
-    )
-    search_query = search_query.sort(default_sorting, unique_sorting)
+    unique_sorting = build_sort_results(cd, False, "v4")
+    search_query = search_query.sort(unique_sorting)
     return search_query
 
 
