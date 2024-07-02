@@ -2601,9 +2601,10 @@ def ingest_recap_document(
         .get(id=recap_document_id)
     )
     docket = recap_document.docket_entry.docket
-    if "cv" not in docket.docket_number.lower():
-        logger.info("Skipping non-civil opinion")
-        return
+    if recap_document.docket_entry.docket.court.jurisdiction == "FD":
+        if "cv" not in docket.docket_number.lower():
+            logger.info("Skipping non-civil opinion in district court")
+            return
 
     ops = Opinion.objects.filter(sha1=recap_document.sha1)
     if ops.count() > 0:

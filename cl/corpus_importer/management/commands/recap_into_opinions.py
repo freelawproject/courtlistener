@@ -49,6 +49,7 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 def import_opinions_from_recap(
+    jurisdiction: str | None = None,
     court_str: str | None = None,
     skip_until: str | None = None,
     total_count: int = 0,
@@ -58,6 +59,7 @@ def import_opinions_from_recap(
 ) -> None:
     """Import recap documents into opinion db
 
+    :param jurisdiction: Court Jurisdiction if not FD
     :param court: Court ID if any
     :param skip_until: Court ID to re-start at
     :param total_count: The number of new opinions to add
@@ -69,7 +71,7 @@ def import_opinions_from_recap(
     court_query = Court.objects.using(db_connection)
 
     if not court_str:
-        filter_conditions = Q(jurisdiction=Court.FEDERAL_DISTRICT) & ~Q(
+        filter_conditions = Q(jurisdiction=jurisdiction) & ~Q(
             id__in=[
                 "orld",
                 "dcd",
@@ -138,6 +140,15 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--jurisdiction",
+            help="Select Jurisdiction",
+            type=str,
+            default=Court.FEDERAL_DISTRICT,
+            choices=[Court.FEDERAL_DISTRICT, Court.FEDERAL_BANKRUPTCY],
+            required=False,
+        )
+
+        parser.add_argument(
             "--court",
             help="Specific court ID to import - skip if want to ingest everything",
             type=str,
@@ -175,6 +186,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        jurisdiction = options.get("jurisdiction")
         court = options.get("court")
         skip_until = options.get("skip_until")
         total_count = options.get("total")
@@ -187,6 +199,7 @@ class Command(BaseCommand):
         )
 
         import_opinions_from_recap(
+            jurisdiction,
             court,
             skip_until,
             total_count,
