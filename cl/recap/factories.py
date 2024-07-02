@@ -2,7 +2,7 @@ import string
 
 from factory import DictFactory, Faker, List, SubFactory
 from factory.django import DjangoModelFactory, FileField
-from factory.fuzzy import FuzzyChoice, FuzzyInteger, FuzzyText
+from factory.fuzzy import FuzzyChoice, FuzzyFloat, FuzzyInteger, FuzzyText
 
 from cl.recap.constants import DATASET_SOURCES
 from cl.recap.models import (
@@ -56,6 +56,21 @@ class AppellateAttachmentPageFactory(DictFactory):
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
     pacer_seq_no = Faker("pyint", min_value=10_000, max_value=200_000)
+
+
+class ACMSAttachmentFactory(AppellateAttachmentFactory):
+    acms_document_guid = Faker("random_id_string")
+    cost = FuzzyFloat(0.1, 3.0)
+    permission = Faker("text", max_nb_chars=20)
+    file_size = FuzzyInteger(100)
+    date_filed = Faker("date_object")
+
+
+class ACMSAttachmentPageFactory(AppellateAttachmentPageFactory):
+    entry_number = Faker("pyint", min_value=0, max_value=100)
+    description = Faker("text", max_nb_chars=20)
+    date_filed = Faker("date_object")
+    date_end = Faker("date_object")
 
 
 class DocketEntryDataFactory(DictFactory):
