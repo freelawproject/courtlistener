@@ -1,12 +1,17 @@
 import copy
 import datetime
+import time
 import traceback
+from typing import Any
 
+import pytz
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.http import QueryDict
-from django.utils.timezone import now
+from django.utils import timezone
+from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch_dsl import connections
 from elasticsearch_dsl.response import Hit
 from redis import Redis
 
@@ -24,7 +29,7 @@ from cl.api.tasks import send_es_search_alert_webhook
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.redis_utils import get_redis_interface
-from cl.search.documents import DocketSweepDocument
+from cl.search.documents import DocketDocument, DocketSweepDocument
 from cl.search.exception import (
     BadProximityQuery,
     UnbalancedParenthesesQuery,
@@ -35,9 +40,197 @@ from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
 
 
-def index_daily_recap_documents():
-    # TODO implement
-    pass
+def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
+    """Fetch the status of a task from Elasticsearch.
+
+    :param task_id: The ID of the task to fetch the status for.
+    :param es: The Elasticsearch client instance.
+    :return: The status of the task if successful, or an empty dictionary if
+    an error occurs.
+    """
+    try:
+        return es.tasks.get(task_id=task_id)
+    except (
+        TransportError,
+        ConnectionError,
+        RequestError,
+    ) as e:
+        logger.error("Error getting sweep alert index task status: %s", e)
+        return {}
+
+
+def index_daily_recap_documents(
+    r: Redis, source_index: str, target_index: str, testing: bool = False
+) -> int:
+    """Index Dockets added/modified during the day and all their RECAPDocuments
+    and RECAPDocuments added/modified during the day and their parent Dockets.
+    It uses the ES re_index API,
+
+    :param r: Redis client instance.
+    :param source_index: The source Elasticsearch index from which documents
+     will be queried.
+    :param target_index: The target Elasticsearch index to which documents will
+     be re-indexed.
+    :param testing: Boolean flag for testing mode.
+    :return: The total number of documents re-indexed.
+    """
+
+    if not r.exists("alert_sweep:query_date"):
+        # In case of a failure, store the date when alerts should be queried in
+        # Redis, so the command can be resumed.
+        local_now = timezone.localtime().replace(tzinfo=None)
+        local_midnight = local_now.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        r.set("alert_sweep:query_date", local_midnight.isoformat())
+
+    else:
+        # If "alert_sweep:query_date" already exists get it from Redis.
+        local_midnight_str: str = str(r.get("alert_sweep:query_date"))
+        local_midnight = datetime.datetime.fromisoformat(local_midnight_str)
+
+    es = connections.get_connection()
+    # Convert the local (PDT) midnight time to UTC
+    local_timezone = pytz.timezone(timezone.get_current_timezone_name())
+    local_midnight_localized = local_timezone.localize(local_midnight)
+    local_midnight_utc = local_midnight_localized.astimezone(pytz.utc)
+    next_day_utc = local_midnight_utc + datetime.timedelta(days=1)
+
+    today_datetime_iso = local_midnight_utc.isoformat().replace("+00:00", "Z")
+    next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
+
+    # Re Index API query.
+    query = {
+        "bool": {
+            "should": [
+                # Dockets added/modified today
+                {
+                    "bool": {
+                        "must": [
+                            {
+                                "range": {
+                                    "timestamp": {
+                                        "gte": today_datetime_iso,
+                                        "lt": next_day_utc_iso,
+                                    }
+                                }
+                            },
+                            {"term": {"docket_child": "docket"}},
+                        ]
+                    }
+                },
+                # RECAPDocuments with parents added/modified today
+                {
+                    "has_parent": {
+                        "parent_type": "docket",
+                        "query": {
+                            "range": {
+                                "timestamp": {
+                                    "gte": today_datetime_iso,
+                                    "lt": next_day_utc_iso,
+                                }
+                            }
+                        },
+                    }
+                },
+                # RECAPDocuments added/modified today
+                {
+                    "bool": {
+                        "must": [
+                            {
+                                "range": {
+                                    "timestamp": {
+                                        "gte": today_datetime_iso,
+                                        "lt": next_day_utc_iso,
+                                    }
+                                }
+                            },
+                            {"term": {"docket_child": "recap_document"}},
+                        ]
+                    }
+                },
+                # Dockets that are parents of RECAPDocuments added/modified today
+                {
+                    "has_child": {
+                        "type": "recap_document",
+                        "query": {
+                            "range": {
+                                "timestamp": {
+                                    "gte": today_datetime_iso,
+                                    "lt": next_day_utc_iso,
+                                }
+                            }
+                        },
+                    }
+                },
+            ]
+        }
+    }
+
+    if not r.exists("alert_sweep:task_id"):
+        # In case of a failure, store the task_id in Redis so the command
+        # can be resumed.
+        response = es.reindex(
+            source={"index": source_index, "query": query},
+            dest={"index": target_index},
+            wait_for_completion=False,
+            refresh=True,
+        )
+        # Store the task ID in Redis
+        task_id = response["task"]
+        r.set("alert_sweep:task_id", task_id)
+    else:
+        task_id = r.get("alert_sweep:task_id")
+
+    estimated_time_remaining = 0.1 if testing else 60
+    time.sleep(estimated_time_remaining)
+    task_info = get_task_status(task_id, es)
+    if task_info:
+        status = task_info["task"]["status"]
+        created = status["created"]
+        total = status["total"]
+    else:
+        task_info["completed"] = False
+        created = 0
+        total = 0
+
+    iterations_count = 0
+    while not task_info["completed"]:
+        logger.info(
+            f"Task progress: {created}/{total} documents. Estimated time to"
+            f" finish: {estimated_time_remaining}."
+        )
+        task_info = get_task_status(task_id, es)
+        time.sleep(estimated_time_remaining)
+        if task_info and not task_info["completed"]:
+            status = task_info["task"]["status"]
+            start_time_millis = task_info["task"]["start_time_in_millis"]
+            start_time = datetime.datetime.fromtimestamp(
+                start_time_millis / 1000.0
+            )
+            created = status["created"]
+            total = status["total"]
+            if total and created:
+                estimated_time_remaining = datetime.timedelta(
+                    seconds=(
+                        (datetime.datetime.now() - start_time).total_seconds()
+                        / created
+                    )
+                    * (total - created)
+                ).total_seconds()
+        if not task_info:
+            iterations_count += 1
+        if iterations_count > 10:
+            logger.error(
+                "Re_index alert sweep index task has failed: %s/%s",
+                created,
+                total,
+            )
+            break
+
+    r.delete("alert_sweep:query_date")
+    r.delete("alert_sweep:task_id")
+    return total
 
 
 def should_docket_hit_be_included(
@@ -56,7 +249,7 @@ def should_docket_hit_be_included(
         return False
     date_modified = docket.date_modified.date()
     if not has_document_alert_hit_been_triggered(r, alert_id, "d", docket_id):
-        if date_modified == now().date():
+        if date_modified == timezone.now().date():
             return True
     return False
 
@@ -176,8 +369,7 @@ def send_search_alert_webhooks(
         )
 
 
-def query_and_send_alerts(rate: str) -> None:
-    r = get_redis_interface("CACHE")
+def query_and_send_alerts(r: Redis, rate: str) -> None:
     alert_users: UserProfile.user = User.objects.filter(
         alerts__rate=rate
     ).distinct()
@@ -212,7 +404,7 @@ def query_and_send_alerts(rate: str) -> None:
                     ]
                 )
                 alert.query_run = search_params.urlencode()  # type: ignore
-                alert.date_last_hit = now()
+                alert.date_last_hit = timezone.now()
                 alert.save()
 
                 # Send webhooks
@@ -230,8 +422,7 @@ def query_and_send_alerts(rate: str) -> None:
         logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
 
-def query_and_schedule_alerts(rate: str):
-    r = get_redis_interface("CACHE")
+def query_and_schedule_alerts(r: Redis, rate: str):
     alert_users = User.objects.filter(alerts__rate=rate).distinct()
     for user in alert_users:
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
@@ -279,10 +470,24 @@ def query_and_schedule_alerts(rate: str):
 class Command(VerboseCommand):
     help = "Send RECAP Search Alerts."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--testing-mode",
+            action="store_true",
+            help="Use this flag for testing purposes.",
+        )
+
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        index_daily_recap_documents()
-        query_and_send_alerts(Alert.REAL_TIME)
-        query_and_send_alerts(Alert.DAILY)
-        query_and_schedule_alerts(Alert.WEEKLY)
-        query_and_schedule_alerts(Alert.MONTHLY)
+        testing_mode = options.get("testing_mode", False)
+        r = get_redis_interface("CACHE")
+        index_daily_recap_documents(
+            r,
+            DocketDocument._index._name,
+            DocketSweepDocument._index._name,
+            testing=testing_mode,
+        )
+        query_and_send_alerts(r, Alert.REAL_TIME)
+        query_and_send_alerts(r, Alert.DAILY)
+        query_and_schedule_alerts(r, Alert.WEEKLY)
+        query_and_schedule_alerts(r, Alert.MONTHLY)

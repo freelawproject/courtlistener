@@ -8,17 +8,22 @@ from django.core.management import call_command
 from django.test.utils import override_settings
 from django.utils.html import strip_tags
 from django.utils.timezone import now
+from elasticsearch_dsl import Q
 from lxml import html
 
 from cl.alerts.factories import AlertFactory
+from cl.alerts.management.commands.cl_send_recap_alerts import (
+    index_daily_recap_documents,
+)
 from cl.alerts.models import SEARCH_TYPES, Alert, ScheduledAlertHit
 from cl.alerts.utils import query_includes_rd_field, recap_document_hl_matched
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.donate.models import NeonMembership
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
-from cl.search.documents import DocketSweepDocument
+from cl.search.documents import DocketDocument, DocketSweepDocument
 from cl.search.factories import (
     DocketEntryWithParentsFactory,
     DocketFactory,
@@ -50,7 +55,6 @@ class RECAPAlertsSweepIndexTest(
                 queue="celery",
                 pk_offset=0,
                 testing_mode=True,
-                sweep_index=True,
             )
 
             cls.user_profile = UserProfileWithParentsFactory()
@@ -68,6 +72,10 @@ class RECAPAlertsSweepIndexTest(
                 url="https://example.com/",
                 enabled=True,
             )
+
+    def setUp(self):
+        DocketSweepDocument._index.delete(ignore=404)
+        DocketSweepDocument.init()
 
     @staticmethod
     def get_html_content_from_email(email_content):
@@ -366,7 +374,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
         self.assertEqual(
@@ -377,6 +385,152 @@ class RECAPAlertsSweepIndexTest(
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
         self.assertIn(dly_recap_alert.name, html_content)
+
+    def test_index_daily_recap_documents(self) -> None:
+        """Test index_daily_recap_documents method over different documents
+        conditions.
+        """
+        r = get_redis_interface("CACHE")
+        recap_search = DocketDocument.search()
+        recap_dockets = recap_search.query(Q("match", docket_child="docket"))
+        self.assertEqual(recap_dockets.count(), 2)
+
+        recap_documents = recap_search.query(
+            Q("match", docket_child="recap_document")
+        )
+        self.assertEqual(recap_documents.count(), 3)
+
+        sweep_search = DocketSweepDocument.search()
+        self.assertEqual(
+            sweep_search.count(),
+            0,
+            msg="Wrong number of documents in the sweep index.",
+        )
+
+        # Index documents based Dockets changed today + all their
+        # RECAPDocuments indexed the same day.
+        with time_machine.travel(self.mock_date, tick=False):
+            documents_indexed = index_daily_recap_documents(
+                r,
+                DocketDocument._index._name,
+                DocketSweepDocument._index._name,
+                testing=True,
+            )
+        self.assertEqual(
+            documents_indexed, 5, msg="Wrong number of documents indexed."
+        )
+
+        sweep_search = DocketSweepDocument.search()
+        dockets_sweep = sweep_search.query(Q("match", docket_child="docket"))
+        self.assertEqual(dockets_sweep.count(), 2)
+
+        documents_sweep = sweep_search.query(
+            Q("match", docket_child="recap_document")
+        )
+        self.assertEqual(documents_sweep.count(), 3)
+
+        # Index Docket changed today + their RECAPDocuments indexed on
+        # previous days
+        with time_machine.travel(self.mock_date, tick=False):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-1234",
+                source=Docket.RECAP,
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
+
+        # Its related RD is ingested two days before.
+        two_days_before = now() - datetime.timedelta(days=2)
+        mock_two_days_before = two_days_before.replace(hour=5)
+        with time_machine.travel(mock_two_days_before, tick=False):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File",
+                document_number="1",
+                is_available=True,
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
+
+        # Run the indexer.
+        with time_machine.travel(self.mock_date, tick=False):
+            documents_indexed = index_daily_recap_documents(
+                r,
+                DocketDocument._index._name,
+                DocketSweepDocument._index._name,
+                testing=True,
+            )
+        self.assertEqual(
+            documents_indexed, 7, msg="Wrong number of documents indexed."
+        )
+
+        # Index a RECAPDocument changed today including its parent Docket
+        # indexed on previous days.
+        with time_machine.travel(mock_two_days_before, tick=False):
+            docket_2 = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE OFF",
+                docket_number="1:21-bk-1250",
+                source=Docket.RECAP,
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
+
+        # Its related RD is ingested today.
+        with time_machine.travel(self.mock_date, tick=False):
+            alert_de_2 = DocketEntryWithParentsFactory(
+                docket=docket_2,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=alert_de_2,
+                description="Motion to File Lorem",
+                document_number="2",
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
+
+        # Run the indexer.
+        with time_machine.travel(self.mock_date, tick=False):
+            documents_indexed = index_daily_recap_documents(
+                r,
+                DocketDocument._index._name,
+                DocketSweepDocument._index._name,
+                testing=True,
+            )
+        self.assertEqual(
+            documents_indexed, 9, msg="Wrong number of documents indexed."
+        )
 
     def test_filter_out_alerts_to_send_by_query_and_hits(self) -> None:
         """Test RECAP alerts can be properly filtered out according to
@@ -410,7 +564,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -473,14 +627,13 @@ class RECAPAlertsSweepIndexTest(
                 pacer_doc_id="018036652436",
                 plain_text="plain text for 018036652436",
             )
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.RECAP,
-            queue="celery",
-            pk_offset=0,
-            testing_mode=True,
-            sweep_index=True,
-        )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -488,7 +641,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
         # The RD ingestion's shouldn't match the docket-only alert.
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -507,7 +660,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
         # 1 New alert should be triggered.
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
@@ -541,7 +694,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
         # No new alert should be triggered.
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
@@ -564,7 +717,6 @@ class RECAPAlertsSweepIndexTest(
             queue="celery",
             pk_offset=0,
             testing_mode=True,
-            sweep_index=True,
         )
 
         with mock.patch(
@@ -573,7 +725,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing only the new RD created.
         self.assertEqual(
@@ -602,7 +754,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing two RDs (rd and rd_2)
         self.assertEqual(
@@ -636,7 +788,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing one RD (rd_2)
         self.assertEqual(
@@ -687,7 +839,6 @@ class RECAPAlertsSweepIndexTest(
             queue="celery",
             pk_offset=0,
             testing_mode=True,
-            sweep_index=True,
         )
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
@@ -701,7 +852,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -820,7 +971,6 @@ class RECAPAlertsSweepIndexTest(
             queue="celery",
             pk_offset=0,
             testing_mode=True,
-            sweep_index=True,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -828,7 +978,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
@@ -974,7 +1124,7 @@ class RECAPAlertsSweepIndexTest(
                 200, mock_raw=True
             ),
         ), time_machine.travel(self.mock_date, tick=False):
-            call_command("cl_send_recap_alerts")
+            call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 0, msg="Outgoing emails don't match."

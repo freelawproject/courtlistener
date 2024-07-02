@@ -53,12 +53,3 @@ opinion_index.settings(
     number_of_replicas=settings.ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS,
     analysis=settings.ELASTICSEARCH_DSL["analysis"],
 )
-
-
-# Define RECAP Nested elasticsearch index
-recap_sweep_index = Index("recap_sweep")
-recap_sweep_index.settings(
-    number_of_shards=settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
-    number_of_replicas=settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
-    analysis=settings.ELASTICSEARCH_DSL["analysis"],
-)

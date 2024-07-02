@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
@@ -29,7 +30,6 @@ from cl.search.es_indices import (
     parenthetical_group_index,
     people_db_index,
     recap_index,
-    recap_sweep_index,
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
@@ -1829,17 +1829,22 @@ class OpinionClusterDocument(OpinionBaseDocument):
         return "opinion_cluster"
 
 
-@recap_sweep_index.document
 class DocketSweepDocument(DocketDocument):
+    class Index:
+        name = "recap_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
 
-    class Django:
-        model = Docket
-        ignore_signals = True
 
-
-@recap_sweep_index.document
 class ESRECAPSweepDocument(ESRECAPDocument):
 
-    class Django:
-        model = RECAPDocument
-        ignore_signals = True
+    class Index:
+        name = "recap_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }

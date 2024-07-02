@@ -480,7 +480,6 @@ class Command(VerboseCommand):
         pk_offset = self.options["pk_offset"]
         document_type = self.options.get("document_type", None)
         missing = self.options.get("missing", False)
-        sweep_index = self.options.get("sweep_index", False)
         fields_map = {}
         if event_doc_type == EventTable.DOCKET:
             fields_map = recap_document_field_mapping["save"][Docket][
@@ -535,7 +534,6 @@ class Command(VerboseCommand):
                             chunk,
                             search_type,
                             testing_mode=testing_mode,
-                            sweep_index=sweep_index,
                         ).set(queue=queue).apply_async()
 
                     case "index_parent_or_child_docs":
@@ -544,7 +542,6 @@ class Command(VerboseCommand):
                             search_type,
                             document_type,
                             testing_mode=testing_mode,
-                            sweep_index=sweep_index,
                         ).set(queue=queue).apply_async()
                     case "remove_parent_and_child_docs_by_query":
                         remove_parent_and_child_docs_by_query.si(
