@@ -250,8 +250,8 @@ class Command(VerboseCommand):
         logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
-            # Minnesota currently rejects Courtlistener and Juriscraper as a User Agent
-            if court_str in ["minn", "minnctapp"]:
+            # Minn and Mass currently require browser specific user agents
+            if court_str in ["minn", "minnctapp", "mass", "massappct"]:
                 headers = site.headers
             else:
                 headers = {"User-Agent": "CourtListener"}
