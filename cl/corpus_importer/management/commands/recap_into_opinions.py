@@ -144,7 +144,7 @@ class Command(BaseCommand):
             help="Select Jurisdiction",
             type=str,
             default=Court.FEDERAL_DISTRICT,
-            choices=[c[0] for c in Court.JURISDICTIONS],
+            choices=[Court.FEDERAL_DISTRICT, Court.FEDERAL_BANKRUPTCY],
             required=False,
         )
 
