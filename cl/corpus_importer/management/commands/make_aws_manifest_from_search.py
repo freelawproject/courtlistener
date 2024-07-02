@@ -1,5 +1,7 @@
 import csv
 import io
+import operator
+from functools import reduce
 from typing import Any
 
 import boto3
@@ -7,9 +9,10 @@ from django.core.management import CommandParser  # type: ignore
 from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl import Q
 
+from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand
 from cl.lib.elasticsearch_utils import (
-    add_fields_boosting,
+    build_daterange_query,
     build_fulltext_query,
     build_sort_results,
 )
@@ -28,6 +31,10 @@ def build_base_query(options: dict[str, Any]) -> Search:
         options (dict[str, Any]): A dictionary containing search options:
             - search_text (str): The text to search for.
             - search_type (str): The type of search.
+            - filed_after (date | str): Filter documents filed **on or after**
+            the specified date.
+            - filed_before (date | str): Filter documents filed **on or before**
+            the specified date.
             - es_page_size (int): The desired number of results per page.
 
     Returns:
@@ -50,12 +57,17 @@ def build_base_query(options: dict[str, Any]) -> Search:
             q_should = build_fulltext_query(
                 search_fields, cd["q"], only_queries=True
             )
-            query = Q(
-                "bool",
-                should=q_should,
-                filter=Q("match", cluster_child="opinion"),
-                minimum_should_match=1,
-            )
+            filters = [Q("match", cluster_child="opinion")]
+            if options["filed_after"] or options["filed_before"]:
+                filters.extend(
+                    build_daterange_query(
+                        "dateFiled",
+                        options.get("filed_before", ""),
+                        options.get("filed_after", ""),
+                    )
+                )
+            query = Q("bool", should=q_should, minimum_should_match=1)
+            query.filter = reduce(operator.iand, filters)
         case _:
             raise NotImplemented
 
@@ -109,6 +121,20 @@ class Command(VerboseCommand):
                 SEARCH_TYPES.OPINION,
             ],
             help=f"The search type to import: ({', '.join([SEARCH_TYPES.OPINION])})",
+        )
+        parser.add_argument(
+            "--filed-after",
+            default="",
+            type=lambda s: valid_date(s) if s else "",
+            help="""Filter documents filed **on or after** the specified date.
+            Format: MM/DD/YYYY (e.g., 12/31/2023).""",
+        )
+        parser.add_argument(
+            "--filed-before",
+            default="",
+            type=lambda s: valid_date(s) if s else "",
+            help="""Filter documents filed **on or before** the specified date.
+            Format: MM/DD/YYYY (e.g., 12/31/2023).""",
         )
         parser.add_argument(
             "--es-page-size",
