@@ -135,11 +135,15 @@ class Command(VerboseCommand):
                         search_after=search_after
                     )
                 results = search_query.execute()
+                # This step ensures we only process the exact number of
+                # documents per page defined when calling the command,
+                # effectively removing the extra document originally included
+                # to check for the existence of a next page.
+                clean_page_data = results.hits[: options["es_page_size"]]
+
                 # Create an underscore-separated file name that lambda
                 # can split and use as part of batch processing.
-                ids = [
-                    str(r.id) for r in results.hits[: options["es_page_size"]]
-                ]
+                ids = [str(r.id) for r in clean_page_data]
                 query_dict = {
                     "bucket": bucket_name,
                     "file_name": "_".join(ids),
@@ -147,7 +151,7 @@ class Command(VerboseCommand):
                 writer.writerow(query_dict)
 
                 has_next = len(results) > options["es_page_size"]
-                search_after = results.hits[-1].meta.sort
+                search_after = clean_page_data[-1].meta.sort
 
             s3_client.put_object(
                 Key=f"{record_type}_es_filelist.csv",
