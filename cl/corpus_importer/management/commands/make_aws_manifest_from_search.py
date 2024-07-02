@@ -172,7 +172,8 @@ class Command(VerboseCommand):
                 writer.writerow(query_dict)
 
                 has_next = len(results) > options["es_page_size"]
-                search_after = clean_page_data[-1].meta.sort
+                if len(results) > 0:
+                    search_after = clean_page_data[-1].meta.sort
 
             s3_client.put_object(
                 Key=f"{record_type}_es_filelist.csv",
