@@ -46,17 +46,7 @@ def build_base_query(options: dict[str, Any]) -> Search:
             cd["order_by"] = "score desc"
             search_query = OpinionDocument.search()
             search_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
-            search_fields.extend(
-                add_fields_boosting(
-                    cd,
-                    [
-                        "type",
-                        "text",
-                        "caseName",
-                        "docketNumber",
-                    ],
-                ),
-            )
+            search_fields.extend(["type", "text", "caseName", "docketNumber"])
             q_should = build_fulltext_query(
                 search_fields, cd["q"], only_queries=True
             )
