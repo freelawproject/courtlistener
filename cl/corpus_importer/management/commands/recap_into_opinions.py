@@ -143,7 +143,8 @@ class Command(BaseCommand):
             "--jurisdiction",
             help="Select Jurisdiction",
             type=str,
-            default="FD",
+            default=Court.FEDERAL_DISTRICT,
+            choices=[c[0] for c in Court.JURISDICTIONS],
             required=False,
         )
 
