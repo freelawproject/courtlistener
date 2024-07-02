@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
@@ -1826,3 +1827,13 @@ class OpinionClusterDocument(OpinionBaseDocument):
 
     def prepare_cluster_child(self, instance):
         return "opinion_cluster"
+
+
+class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
+    class Index:
+        name = "recap_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }

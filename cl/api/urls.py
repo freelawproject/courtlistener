@@ -319,7 +319,7 @@ urlpatterns = [
         name="coverage_data_opinions",
     ),
     re_path(
-        r"^api/rest/v(?P<version>[123])/alert-frequency/(?P<day_count>\d+)/$",
+        r"^api/rest/v(?P<version>[1234])/alert-frequency/(?P<day_count>\d+)/$",
         views.get_result_count,
         name="alert_frequency",
     ),

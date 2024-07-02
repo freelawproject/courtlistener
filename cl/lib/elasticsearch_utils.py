@@ -887,6 +887,7 @@ def build_has_child_query(
     order_by: tuple[str, str] | None = None,
     child_highlighting: bool = True,
     default_current_date: datetime.date | None = None,
+    alerts: bool = False,
 ) -> QueryString:
     """Build a 'has_child' query.
 
@@ -899,6 +900,7 @@ def build_has_child_query(
     :param child_highlighting: Whether highlighting should be enabled in child docs.
     :param default_current_date: The default current date to use for computing
      a stable date score across pagination in the V4 Search API.
+    :param alerts: If highlighting is being applied to search Alerts hits.
     :return: The 'has_child' query.
     """
 
@@ -915,8 +917,9 @@ def build_has_child_query(
             default_current_date=default_current_date,
         )
 
+    hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
     highlight_options, fields_to_exclude = build_highlights_dict(
-        highlighting_fields, SEARCH_HL_TAG, child_highlighting
+        highlighting_fields, hl_tag, child_highlighting
     )
 
     inner_hits = {
@@ -1066,6 +1069,7 @@ def build_es_base_query(
     cd: CleanData,
     child_highlighting: bool = True,
     api_version: Literal["v3", "v4"] | None = None,
+    alerts: bool = False,
 ) -> tuple[Search, QueryString | None]:
     """Builds filters and fulltext_query based on the given cleaned
      data and returns an elasticsearch query.
@@ -1074,6 +1078,7 @@ def build_es_base_query(
     :param cd: The cleaned data object containing the query and filters.
     :param child_highlighting: Whether highlighting should be enabled in child docs.
     :param api_version: Optional, the request API version.
+    :param alerts: If highlighting is being applied to search Alerts hits.
     :return: A two-tuple, the Elasticsearch search query object and an ES
     QueryString for child documents, or None if there is no need to query
     child documents.
@@ -1168,7 +1173,9 @@ def build_es_base_query(
                 parent_query_fields,
                 child_highlighting=child_highlighting,
                 api_version=api_version,
+                alerts=alerts,
             )
+
         case SEARCH_TYPES.OPINION:
             str_query = cd.get("q", "")
             related_match = RELATED_PATTERN.search(str_query)
@@ -2318,6 +2325,7 @@ def build_full_join_es_queries(
     mlt_query: Query | None = None,
     child_highlighting: bool = True,
     api_version: Literal["v3", "v4"] | None = None,
+    alerts: bool = False,
 ) -> tuple[QueryString | list, QueryString | None]:
     """Build a complete Elasticsearch query with both parent and child document
       conditions.
@@ -2328,6 +2336,7 @@ def build_full_join_es_queries(
     :param mlt_query: the More Like This Query object.
     :param child_highlighting: Whether highlighting should be enabled in child docs.
     :param api_version: Optional, the request API version.
+    :param alerts: If highlighting is being applied to search Alerts hits.
     :return: An Elasticsearch QueryString object.
     """
 
@@ -2386,7 +2395,7 @@ def build_full_join_es_queries(
                     query
                     for query in parent_filters
                     if not isinstance(query, QueryString)
-                    or query.fields[0] not in ["party", "attorney"]
+                    or query.fields[0] not in ["party", "attorney", "firm"]
                 ]
             )
             if parties_filters:
@@ -2434,6 +2443,7 @@ def build_full_join_es_queries(
                 get_function_score_sorting_key(cd, api_version),
                 child_highlighting=child_highlighting,
                 default_current_date=cd.get("request_date"),
+                alerts=alerts,
             )
 
         if parties_filters and not has_child_query:
@@ -2448,6 +2458,7 @@ def build_full_join_es_queries(
                 SEARCH_RECAP_CHILD_HL_FIELDS,
                 get_function_score_sorting_key(cd, api_version),
                 default_current_date=cd.get("request_date"),
+                alerts=alerts,
             )
 
         if has_child_query:
@@ -2998,7 +3009,7 @@ def do_es_alert_estimation_query(
     """
 
     match cd["type"]:
-        case SEARCH_TYPES.OPINION:
+        case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP:
             after_field = "filed_after"
             before_field = "filed_before"
         case SEARCH_TYPES.ORAL_ARGUMENT:
@@ -3014,3 +3025,48 @@ def do_es_alert_estimation_query(
     estimation_query, _ = build_es_base_query(search_query, cd)
 
     return estimation_query.count()
+
+
+def do_es_sweep_alert_query(
+    search_query: Search,
+    cd: CleanData,
+) -> tuple[list[Hit] | None, int | None]:
+    """Build an ES query for its use in the daily RECAP sweep index.
+
+    :param search_query: Elasticsearch DSL Search object.
+    :param cd: The query CleanedData
+    :return: A two-tuple, the Elasticsearch search query object and an ES
+    Query for child documents, or None if there is no need to query
+    child documents.
+    """
+
+    search_form = SearchForm(cd, is_es_form=True)
+    if search_form.is_valid():
+        cd = search_form.cleaned_data
+    else:
+        return None, None
+
+    total_hits = None
+
+    s, _ = build_es_base_query(search_query, cd, True, alerts=True)
+
+    main_query = add_es_highlighting(s, cd, alerts=True)
+    main_query = main_query.sort(build_sort_results(cd))
+    main_query = main_query.extra(
+        from_=0, size=settings.SCHEDULED_ALERT_HITS_LIMIT
+    )
+    results = main_query.execute()
+    if results:
+        total_hits = results.hits.total.value
+
+    limit_inner_hits({}, results, cd["type"])
+    set_results_highlights(results, cd["type"])
+
+    for result in results:
+        child_result_objects = []
+        if hasattr(result, "child_docs"):
+            for child_doc in result.child_docs:
+                child_result_objects.append(child_doc.to_dict())
+            result["child_docs"] = child_result_objects
+
+    return results, total_hits

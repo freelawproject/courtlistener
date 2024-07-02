@@ -461,7 +461,7 @@ def send_webhook_alert_hits(
             send_es_search_alert_webhook.delay(
                 documents,
                 user_webhook.pk,
-                alert,
+                alert.pk,
             )
 
 

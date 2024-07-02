@@ -342,6 +342,11 @@ class Command(VerboseCommand):
             action="store_true",
             help="Use this flag to only index documents missing in the index.",
         )
+        parser.add_argument(
+            "--sweep-index",
+            action="store_true",
+            help="Whether to perform an indexing for the sweep index.",
+        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
@@ -526,7 +531,9 @@ class Command(VerboseCommand):
                 match task_to_use:
                     case "index_parent_and_child_docs":
                         index_parent_and_child_docs.si(
-                            chunk, search_type, testing_mode=testing_mode
+                            chunk,
+                            search_type,
+                            testing_mode=testing_mode,
                         ).set(queue=queue).apply_async()
 
                     case "index_parent_or_child_docs":

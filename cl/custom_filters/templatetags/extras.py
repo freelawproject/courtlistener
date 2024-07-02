@@ -1,16 +1,20 @@
 import random
 import re
+import urllib.parse
 
+import waffle
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
+from django.template.context import RequestContext
 from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
 from elasticsearch_dsl import AttrDict, AttrList
 
-from cl.search.models import Docket, DocketEntry
+from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
 
 register = template.Library()
 
@@ -198,13 +202,15 @@ def citation(obj) -> SafeString:
 
 
 @register.simple_tag
-def contains_highlights(content: str) -> bool:
+def contains_highlights(content: str, alert: bool = False) -> bool:
     """Check if a given string contains the mark tag used in highlights.
 
     :param content: The input string to check.
+    :param alert: Whether this tag is being used in the alert template.
     :return: True if the mark highlight tag is found, otherwise False.
     """
-    pattern = r"<mark>.*?</mark>"
+    hl_tag = ALERTS_HL_TAG if alert else SEARCH_HL_TAG
+    pattern = rf"<{hl_tag}>.*?</{hl_tag}>"
     matches = re.findall(pattern, content)
     return bool(matches)
 
@@ -243,3 +249,37 @@ def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
         original_value = result.get(field, "")
 
     return render_string_or_list(hl_value) if hl_value else original_value
+
+
+@register.simple_tag
+def extract_q_value(query: str) -> str:
+    """Extract the value of the "q" parameter from a URL-encoded query string.
+
+    :param query: The URL-encoded query string.
+    :return: The value of the "q" parameter or an empty string if "q" is not found.
+    """
+
+    parsed_query = urllib.parse.parse_qs(query)
+    return parsed_query.get("q", [""])[0]
+
+
+@register.simple_tag(takes_context=True)
+def alerts_supported(context: RequestContext, search_type: str) -> str:
+    """Determine if search alerts are supported based on the search type and flag
+    status.
+
+    :param context: The template context, which includes the request, required
+    for the waffle flag.
+    :param search_type: The type of search being performed.
+    :return: True if alerts are supported, False otherwise.
+    """
+
+    request = context["request"]
+    return (
+        search_type == SEARCH_TYPES.OPINION
+        or search_type == SEARCH_TYPES.ORAL_ARGUMENT
+        or (
+            search_type == SEARCH_TYPES.RECAP
+            and waffle.flag_is_active(request, "recap-alerts-active")
+        )
+    )
