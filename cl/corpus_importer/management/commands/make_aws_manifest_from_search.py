@@ -145,7 +145,8 @@ class Command(VerboseCommand):
                         search_after=search_after
                     )
                 results = search_query.execute()
-
+                # Create an underscore-separated file name that lambda
+                # can split and use as part of batch processing.
                 ids = [
                     str(r.id) for r in results.hits[: options["es_page_size"]]
                 ]
