@@ -29,7 +29,7 @@ from cl.api.tasks import send_es_search_alert_webhook
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.redis_utils import get_redis_interface
-from cl.search.documents import DocketDocument, DocketSweepDocument
+from cl.search.documents import DocketDocument, RECAPSweepDocument
 from cl.search.exception import (
     BadProximityQuery,
     UnbalancedParenthesesQuery,
@@ -286,7 +286,7 @@ def query_alerts(
     search_params: QueryDict,
 ) -> tuple[list[Hit] | None, int | None]:
     try:
-        search_query = DocketSweepDocument.search()
+        search_query = RECAPSweepDocument.search()
         return do_es_sweep_alert_query(
             search_query,
             search_params,
@@ -484,7 +484,7 @@ class Command(VerboseCommand):
         index_daily_recap_documents(
             r,
             DocketDocument._index._name,
-            DocketSweepDocument._index._name,
+            RECAPSweepDocument._index._name,
             testing=testing_mode,
         )
         query_and_send_alerts(r, Alert.REAL_TIME)

@@ -6,6 +6,7 @@ from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
+from django.urls import reverse
 from django.utils.html import strip_tags
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
@@ -23,7 +24,7 @@ from cl.donate.models import NeonMembership
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
-from cl.search.documents import DocketDocument, DocketSweepDocument
+from cl.search.documents import DocketDocument, RECAPSweepDocument
 from cl.search.factories import (
     DocketEntryWithParentsFactory,
     DocketFactory,
@@ -74,8 +75,8 @@ class RECAPAlertsSweepIndexTest(
             )
 
     def setUp(self):
-        DocketSweepDocument._index.delete(ignore=404)
-        DocketSweepDocument.init()
+        RECAPSweepDocument._index.delete(ignore=404)
+        RECAPSweepDocument.init()
 
     @staticmethod
     def get_html_content_from_email(email_content):
@@ -239,12 +240,23 @@ class RECAPAlertsSweepIndexTest(
     async def test_recap_document_hl_matched(self) -> None:
         """Test recap_document_hl_matched method that determines weather a hit
         contains RECAPDocument HL fields."""
+
+        # Index base document factories.
+        r = get_redis_interface("CACHE")
+        with time_machine.travel(self.mock_date, tick=False):
+            index_daily_recap_documents(
+                r,
+                DocketDocument._index._name,
+                RECAPSweepDocument._index._name,
+                testing=True,
+            )
+
         # Docket-only query
         search_params = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"401 Civil"',
         }
-        search_query = DocketSweepDocument.search()
+        search_query = RECAPSweepDocument.search()
         results, total_hits = await sync_to_async(do_es_sweep_alert_query)(
             search_query,
             search_params,
@@ -259,7 +271,7 @@ class RECAPAlertsSweepIndexTest(
             "type": SEARCH_TYPES.RECAP,
             "q": '"Mauris iaculis, leo sit amet hendrerit vehicula"',
         }
-        search_query = DocketSweepDocument.search()
+        search_query = RECAPSweepDocument.search()
         results, total_hits = await sync_to_async(do_es_sweep_alert_query)(
             search_query,
             search_params,
@@ -274,7 +286,7 @@ class RECAPAlertsSweepIndexTest(
             "type": SEARCH_TYPES.RECAP,
             "q": "SUBPOENAS SERVED OFF Mauris iaculis",
         }
-        search_query = DocketSweepDocument.search()
+        search_query = RECAPSweepDocument.search()
         results, total_hits = await sync_to_async(do_es_sweep_alert_query)(
             search_query,
             search_params,
@@ -400,7 +412,7 @@ class RECAPAlertsSweepIndexTest(
         )
         self.assertEqual(recap_documents.count(), 3)
 
-        sweep_search = DocketSweepDocument.search()
+        sweep_search = RECAPSweepDocument.search()
         self.assertEqual(
             sweep_search.count(),
             0,
@@ -413,14 +425,14 @@ class RECAPAlertsSweepIndexTest(
             documents_indexed = index_daily_recap_documents(
                 r,
                 DocketDocument._index._name,
-                DocketSweepDocument._index._name,
+                RECAPSweepDocument._index._name,
                 testing=True,
             )
         self.assertEqual(
             documents_indexed, 5, msg="Wrong number of documents indexed."
         )
 
-        sweep_search = DocketSweepDocument.search()
+        sweep_search = RECAPSweepDocument.search()
         dockets_sweep = sweep_search.query(Q("match", docket_child="docket"))
         self.assertEqual(dockets_sweep.count(), 2)
 
@@ -475,7 +487,7 @@ class RECAPAlertsSweepIndexTest(
             documents_indexed = index_daily_recap_documents(
                 r,
                 DocketDocument._index._name,
-                DocketSweepDocument._index._name,
+                RECAPSweepDocument._index._name,
                 testing=True,
             )
         self.assertEqual(
@@ -525,7 +537,7 @@ class RECAPAlertsSweepIndexTest(
             documents_indexed = index_daily_recap_documents(
                 r,
                 DocketDocument._index._name,
-                DocketSweepDocument._index._name,
+                RECAPSweepDocument._index._name,
                 testing=True,
             )
         self.assertEqual(
@@ -807,6 +819,8 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(cross_object_alert.name, txt_email)
         self.assertIn(rd_2.description, txt_email)
 
+        docket.delete()
+
     def test_limit_alert_case_child_hits(self) -> None:
         """Test limit case child hits up to 5 and display the "View additional
         results for this Case" button.
@@ -833,13 +847,13 @@ class RECAPAlertsSweepIndexTest(
                     # included in the case.
                     rd_descriptions.append(rd.description)
 
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.RECAP,
-            queue="celery",
-            pk_offset=0,
-            testing_mode=True,
-        )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -905,14 +919,16 @@ class RECAPAlertsSweepIndexTest(
             source=Docket.RECAP,
             cause="410 Civil",
         )
+        dockets_created = []
         for i in range(3):
-            DocketFactory(
+            docket_created = DocketFactory(
                 court=self.court,
                 case_name=f"SUBPOENAS SERVED CASE {i}",
                 docket_number=f"1:21-bk-123{i}",
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
+            dockets_created.append(docket_created)
 
         alert_de = DocketEntryWithParentsFactory(
             docket=docket,
@@ -1095,6 +1111,10 @@ class RECAPAlertsSweepIndexTest(
                     msg="RECAPDocument wasn't found in the email content.",
                 )
 
+        docket.delete()
+        for d in dockets_created:
+            d.delete()
+
     def test_schedule_wly_and_mly_recap_alerts(self) -> None:
         """Test Weekly and Monthly RECAP Search Alerts are scheduled daily
         before being sent later.
@@ -1149,3 +1169,40 @@ class RECAPAlertsSweepIndexTest(
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
+
+    def test_alert_frequency_estimation(self):
+        """Test alert frequency ES API endpoint for RECAP Alerts."""
+
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Frequency Test RECAP",
+        }
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "4", "day_count": "100"}
+            ),
+            search_params,
+        )
+        self.assertEqual(r.json()["count"], 0)
+
+        mock_date = now().replace(day=1, hour=5)
+        with time_machine.travel(
+            mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="Frequency Test RECAP",
+                docket_number="1:21-bk-1240",
+                source=Docket.RECAP,
+                date_filed=now().date(),
+            )
+
+        r = self.client.get(
+            reverse(
+                "alert_frequency", kwargs={"version": "4", "day_count": "100"}
+            ),
+            search_params,
+        )
+        self.assertEqual(r.json()["count"], 1)
+
+        docket.delete()

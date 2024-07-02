@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load humanize %}
 {% load text_filters %}
+{% load extras %}
 {% load static %}
 {% load waffle_tags %}
 
@@ -177,7 +178,8 @@
 
       <div class="row">
             <div class="col-sm-12">
-              {% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+              {% alerts_supported search_form.type.value as search_alerts_supported %}
+              {% if search_alerts_supported %}
                 {% include "includes/alert_modal.html" %}
               {% endif %}
               <form action="/"
@@ -193,7 +195,8 @@
                                    id="id_q"
                                    autocomplete="off"
                                    type="text">
-                            {% if search_form.type.value == SEARCH_TYPES.OPINION or search_form.type.value == SEARCH_TYPES.ORAL_ARGUMENT %}
+                            {% alerts_supported search_form.type.value as search_alerts_supported %}
+                            {% if search_alerts_supported %}
                               {% if not error and get_string %}
                                 <span class="input-group-addon input-group-addon-blended">
                                   <i class="fa fa-bell-o fa-lg gray pointer"

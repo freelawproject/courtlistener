@@ -2,9 +2,11 @@ import random
 import re
 import urllib.parse
 
+import waffle
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
+from django.template.context import RequestContext
 from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
@@ -12,7 +14,7 @@ from django.utils.safestring import SafeString, mark_safe
 from elasticsearch_dsl import AttrDict, AttrList
 
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
 
 register = template.Library()
 
@@ -259,3 +261,25 @@ def extract_q_value(query: str) -> str:
 
     parsed_query = urllib.parse.parse_qs(query)
     return parsed_query.get("q", [""])[0]
+
+
+@register.simple_tag(takes_context=True)
+def alerts_supported(context: RequestContext, search_type: str) -> str:
+    """Determine if search alerts are supported based on the search type and flag
+    status.
+
+    :param context: The template context, which includes the request, required
+    for the waffle flag.
+    :param search_type: The type of search being performed.
+    :return: True if alerts are supported, False otherwise.
+    """
+
+    request = context["request"]
+    return (
+        search_type == SEARCH_TYPES.OPINION
+        or search_type == SEARCH_TYPES.ORAL_ARGUMENT
+        or (
+            search_type == SEARCH_TYPES.RECAP
+            and waffle.flag_is_active(request, "recap-alerts-active")
+        )
+    )

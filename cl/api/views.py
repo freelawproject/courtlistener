@@ -20,7 +20,11 @@ from cl.lib.search_utils import (
     build_coverage_query,
     get_solr_interface,
 )
-from cl.search.documents import AudioDocument, OpinionClusterDocument
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    OpinionClusterDocument,
+)
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
 from cl.simple_pages.coverage_utils import build_chart_data
@@ -271,7 +275,10 @@ async def get_result_count(request, version, day_count):
     es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "o-es-active"
     )
-    is_es_form = es_flag_for_oa or es_flag_for_o
+    es_flag_for_r = await sync_to_async(waffle.flag_is_active)(
+        request, "recap-alerts-active"
+    )
+    is_es_form = es_flag_for_oa or es_flag_for_o or es_flag_for_r
     search_form = await sync_to_async(SearchForm)(
         request.GET.copy(), is_es_form=is_es_form
     )
@@ -293,6 +300,12 @@ async def get_result_count(request, version, day_count):
         case SEARCH_TYPES.OPINION if es_flag_for_o:
             # Elasticsearch version for O
             search_query = OpinionClusterDocument.search()
+            total_query_results = await sync_to_async(
+                do_es_alert_estimation_query
+            )(search_query, cd, day_count)
+        case SEARCH_TYPES.RECAP if es_flag_for_r:
+            # Elasticsearch version for RECAP
+            search_query = DocketDocument.search()
             total_query_results = await sync_to_async(
                 do_es_alert_estimation_query
             )(search_query, cd, day_count)

@@ -3009,7 +3009,7 @@ def do_es_alert_estimation_query(
     """
 
     match cd["type"]:
-        case SEARCH_TYPES.OPINION:
+        case SEARCH_TYPES.OPINION | SEARCH_TYPES.RECAP:
             after_field = "filed_after"
             before_field = "filed_before"
         case SEARCH_TYPES.ORAL_ARGUMENT:

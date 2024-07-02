@@ -1829,18 +1829,7 @@ class OpinionClusterDocument(OpinionBaseDocument):
         return "opinion_cluster"
 
 
-class DocketSweepDocument(DocketDocument):
-    class Index:
-        name = "recap_sweep"
-        settings = {
-            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
-            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
-            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
-        }
-
-
-class ESRECAPSweepDocument(ESRECAPDocument):
-
+class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
     class Index:
         name = "recap_sweep"
         settings = {
