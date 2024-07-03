@@ -2,6 +2,7 @@ import copy
 import datetime
 from collections import OrderedDict
 
+from dateutil import parser
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
 from django_elasticsearch_dsl import Document, fields
@@ -35,18 +36,7 @@ class TimeStampField(serializers.Field):
                     timezone.localtime(value)
                 )
         if isinstance(value, str):
-            try:
-                format_string = "%Y-%m-%dT%H:%M:%S.%f"
-                parsed_datetime = datetime.datetime.strptime(
-                    value, format_string
-                )
-            except ValueError:
-                # If the above format fails, try parsing with timezone
-                # information
-                format_string = "%Y-%m-%dT%H:%M:%S.%f%z"
-                parsed_datetime = datetime.datetime.strptime(
-                    value, format_string
-                )
+            parsed_datetime = parser.parse(value)
             return serializers.DateTimeField(
                 default_timezone=self.timezone
             ).to_representation(parsed_datetime)
