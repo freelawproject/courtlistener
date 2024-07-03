@@ -544,6 +544,9 @@ class RECAPAlertsSweepIndexTest(
             documents_indexed, 9, msg="Wrong number of documents indexed."
         )
 
+        docket.delete()
+        docket_2.delete()
+
     def test_filter_out_alerts_to_send_by_query_and_hits(self) -> None:
         """Test RECAP alerts can be properly filtered out according to
         their query and hits matched conditions.
@@ -712,24 +715,25 @@ class RECAPAlertsSweepIndexTest(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
-        # Create a new RD for the same DocketEntry to confirm this new RD is
-        # properly included in the alert email.
-        rd_2 = RECAPDocumentFactory(
-            docket_entry=alert_de,
-            description="Motion to File 2",
-            document_number="2",
-            is_available=True,
-            page_count=3,
-            pacer_doc_id="018036652436",
-            plain_text="plain text for 018036652436",
-        )
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.RECAP,
-            queue="celery",
-            pk_offset=0,
-            testing_mode=True,
-        )
+        with time_machine.travel(mock_date, tick=False):
+            # Create a new RD for the same DocketEntry to confirm this new RD is
+            # properly included in the alert email.
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 2",
+                document_number="2",
+                is_available=True,
+                page_count=3,
+                pacer_doc_id="018036652436",
+                plain_text="plain text for 018036652436",
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -905,6 +909,8 @@ class RECAPAlertsSweepIndexTest(
                 )
 
         self.assertIn("View Additional Results for this Case", txt_email)
+
+        alert_de.delete()
 
     @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
     def test_multiple_alerts_email_hits_limit_per_alert(self) -> None:
@@ -1146,29 +1152,77 @@ class RECAPAlertsSweepIndexTest(
         ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
+        # Weekly and monthly alerts are not sent right away but are scheduled as
+        # ScheduledAlertHit to be sent by the cl_send_scheduled_alerts command.
         self.assertEqual(
             len(mail.outbox), 0, msg="Outgoing emails don't match."
         )
         schedule_alerts = ScheduledAlertHit.objects.all()
         self.assertEqual(schedule_alerts.count(), 3)
 
-        # Assert webhooks.
+        # Webhooks are send immediately as hits are matched.
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True
         )
         self.assertEqual(len(webhook_events), 3)
 
-        # Send  Weekly alerts and check assertions.
+        # Send scheduled Weekly alerts and check assertions.
         call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
+        # Assert docket-only alert.
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_only_alert.name,
+            1,
+            self.de.docket.case_name,
+            0,
+        )
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_with_hl.name,
+            1,
+            self.de.docket.case_name,
+            1,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_alert_with_hl.name,
+            self.de.docket.case_name,
+            [self.rd.description],
+        )
+        # Assert email text version:
+        txt_email = mail.outbox[0].body
+        self.assertIn(docket_only_alert.name, txt_email)
+        self.assertIn(cross_object_alert_with_hl.name, txt_email)
+        self.assertIn(self.rd.description, txt_email)
 
-        # Send  Monthly alerts and check assertions.
+        # Send  scheduled Monthly alerts and check assertions.
         call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            recap_only_alert.name,
+            1,
+            self.de.docket.case_name,
+            2,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            recap_only_alert.name,
+            self.de.docket.case_name,
+            [self.rd.description, self.rd_att.description],
+        )
+        # Assert email text version:
+        txt_email = mail.outbox[1].body
+        self.assertIn(recap_only_alert.name, txt_email)
+        self.assertIn(self.rd.description, txt_email)
+        self.assertIn(self.rd_att.description, txt_email)
 
     def test_alert_frequency_estimation(self):
         """Test alert frequency ES API endpoint for RECAP Alerts."""
@@ -1189,6 +1243,7 @@ class RECAPAlertsSweepIndexTest(
         with time_machine.travel(
             mock_date, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
+            # Docket filed today.
             docket = DocketFactory(
                 court=self.court,
                 case_name="Frequency Test RECAP",
@@ -1197,12 +1252,36 @@ class RECAPAlertsSweepIndexTest(
                 date_filed=now().date(),
             )
 
+            # RECAPDocument filed today that belongs to a docket filed outside
+            # the estimation range.
+            date_outside_range = now() - datetime.timedelta(days=101)
+            alert_de = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Frequency Test RECAP",
+                    docket_number="1:21-bk-1245",
+                    source=Docket.RECAP,
+                    date_filed=date_outside_range.date(),
+                ),
+                entry_number=1,
+                date_filed=now().date(),
+            )
+            RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Frequency Test RECAP",
+                document_number="1",
+                pacer_doc_id="018036652450",
+            )
+
         r = self.client.get(
             reverse(
                 "alert_frequency", kwargs={"version": "4", "day_count": "100"}
             ),
             search_params,
         )
-        self.assertEqual(r.json()["count"], 1)
+        # 2 expected hits in the last 100 days. One docket filed today + one
+        # RECAPDocument filed today.
+        self.assertEqual(r.json()["count"], 2)
 
         docket.delete()
+        alert_de.docket.delete()

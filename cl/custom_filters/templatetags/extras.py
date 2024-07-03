@@ -132,11 +132,25 @@ def random_int(a: int, b: int) -> int:
 
 
 @register.filter
-def get_attrdict(mapping, key):
-    """Emulates the dictionary get for AttrDict objects. Useful when keys
-    have spaces or other punctuation."""
+def get_es_doc_content(
+    mapping: AttrDict | dict, scheduled_alert: bool = False
+) -> AttrDict | dict | str:
+    """
+    Returns the ES document content placed in the "_source" field if the
+    document is an AttrDict, or just returns the content if it's not necessary
+    to extract from "_source" such as in scheduled alerts where the content is
+     a dict.
+
+    :param mapping: The AttrDict or dict instance to extract the content from.
+    :param scheduled_alert: A boolean indicating if the content belongs to a
+    scheduled alert where the content is already in place.
+    :return: The ES document content.
+    """
+
+    if scheduled_alert:
+        return mapping
     try:
-        return mapping[key]
+        return mapping["_source"]
     except KeyError:
         return ""
 

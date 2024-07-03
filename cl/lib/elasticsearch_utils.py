@@ -135,8 +135,8 @@ def build_numeric_range_query(
 
 def build_daterange_query(
     field: str,
-    before: datetime.date,
-    after: datetime.date,
+    before: datetime.date | str,
+    after: datetime.date | str,
     relation: Literal["INTERSECTS", "CONTAINS", "WITHIN", None] = None,
 ) -> list[Range]:
     """Given field name and date range limits returns ElasticSearch range query or None
@@ -1991,7 +1991,7 @@ def fetch_es_results(
     return [], 0, error, None, None
 
 
-def build_has_child_filters(cd: CleanData) -> list[QueryString]:
+def build_has_child_filters(cd: CleanData) -> list[QueryString | Range]:
     """Builds Elasticsearch 'has_child' filters based on the given child type
     and CleanData.
 
@@ -2027,6 +2027,8 @@ def build_has_child_filters(cd: CleanData) -> list[QueryString]:
         description = cd.get("description", "")
         document_number = cd.get("document_number", "")
         attachment_number = cd.get("attachment_number", "")
+        entry_date_filed_after = cd.get("entry_date_filed_after", "")
+        entry_date_filed_before = cd.get("entry_date_filed_before", "")
 
         if available_only:
             queries_list.extend(
@@ -2044,6 +2046,14 @@ def build_has_child_filters(cd: CleanData) -> list[QueryString]:
         if attachment_number:
             queries_list.extend(
                 build_term_query("attachment_number", attachment_number)
+            )
+        if entry_date_filed_after or entry_date_filed_before:
+            queries_list.extend(
+                build_daterange_query(
+                    "entry_date_filed",
+                    entry_date_filed_before,
+                    entry_date_filed_after,
+                )
             )
 
     return queries_list
@@ -3023,6 +3033,44 @@ def do_es_alert_estimation_query(
     )
     cd[before_field] = None
     estimation_query, _ = build_es_base_query(search_query, cd)
+
+    if cd["type"] == SEARCH_TYPES.RECAP:
+        # The RECAP estimation query consists of two requests: one to estimate
+        # Docket hits and one to estimate RECAPDocument hits.
+        del cd[after_field]
+        del cd[before_field]
+        cd["entry_date_filed_after"] = (
+            datetime.date.today() - datetime.timedelta(days=int(day_count))
+        )
+        cd["entry_date_filed_before"] = None
+
+        main_doc_count_query = clean_count_query(estimation_query)
+        main_doc_count_query = main_doc_count_query.extra(
+            size=0, track_total_hits=True
+        )
+
+        # Perform the two queries in a single request.
+        multi_search = MultiSearch()
+        multi_search = multi_search.add(main_doc_count_query)
+
+        # Build RECAPDocuments count query.
+        _, join_query = build_es_base_query(search_query, cd)
+        child_docs_count_query = build_child_docs_query(join_query, cd)
+        child_total = 0
+        if child_docs_count_query:
+            child_docs_count_query = search_query.query(child_docs_count_query)
+            child_total_query = child_docs_count_query.extra(
+                size=0, track_total_hits=True
+            )
+            multi_search = multi_search.add(child_total_query)
+
+        responses = multi_search.execute()
+        parent_total = responses[0].hits.total.value
+        if child_docs_count_query:
+            child_doc_count_response = responses[1]
+            child_total = child_doc_count_response.hits.total.value
+        total_recap_estimation = parent_total + child_total
+        return total_recap_estimation
 
     return estimation_query.count()
 

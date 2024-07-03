@@ -467,7 +467,8 @@ def send_webhook_alert_hits(
 
 @app.task(ignore_result=True)
 def send_search_alert_emails(
-    email_alerts_to_send: list[tuple[int, list[SearchAlertHitType]]]
+    email_alerts_to_send: list[tuple[int, list[SearchAlertHitType]]],
+    scheduled_alert: bool = False,
 ) -> None:
     """Send search alert emails for multiple users.
 
@@ -491,6 +492,7 @@ def send_search_alert_emails(
         context = {
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
+            "scheduled_alert": scheduled_alert,
         }
         headers = {}
         query_string = ""
