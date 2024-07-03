@@ -59,6 +59,37 @@ def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
         return {}
 
 
+def compute_estimated_remaining_time(
+    initial_wait: float, start_time_millis: int, created: int, total: int
+) -> float:
+    """Compute the estimated remaining time for the re_index task to complete.
+
+    :param initial_wait: The default wait time in seconds.
+    :param start_time_millis: The start time in milliseconds epoch.
+    :param created: The number of items created so far.
+    :param total: The total number of items to be created.
+    :return: The estimated remaining time in seconds. If the start time,
+    created, or total are invalid, the initial default time is returned.
+    """
+
+    if start_time_millis is None or not created or not total:
+        return initial_wait
+
+    start_time = datetime.datetime.fromtimestamp(start_time_millis / 1000.0)
+    estimated_time_remaining = max(
+        datetime.timedelta(
+            seconds=(
+                (datetime.datetime.now() - start_time).total_seconds()
+                / created
+            )
+            * (total - created)
+        ).total_seconds(),
+        initial_wait,
+    )
+
+    return estimated_time_remaining
+
+
 def index_daily_recap_documents(
     r: Redis, source_index: str, target_index: str, testing: bool = False
 ) -> int:
@@ -182,19 +213,24 @@ def index_daily_recap_documents(
     else:
         task_id = r.get("alert_sweep:task_id")
 
-    estimated_time_remaining = 0.1 if testing else 60
-    time.sleep(estimated_time_remaining)
+    initial_wait = 0.01 if testing else 60.0
+    time.sleep(initial_wait)
     task_info = get_task_status(task_id, es)
     if task_info:
         status = task_info["task"]["status"]
         created = status["created"]
         total = status["total"]
+        start_time_millis = task_info["task"]["start_time_in_millis"]
     else:
         task_info["completed"] = False
         created = 0
         total = 0
+        start_time_millis = None
 
     iterations_count = 0
+    estimated_time_remaining = compute_estimated_remaining_time(
+        initial_wait, start_time_millis, created, total
+    )
     while not task_info["completed"]:
         logger.info(
             f"Task progress: {created}/{total} documents. Estimated time to"
@@ -205,19 +241,12 @@ def index_daily_recap_documents(
         if task_info and not task_info["completed"]:
             status = task_info["task"]["status"]
             start_time_millis = task_info["task"]["start_time_in_millis"]
-            start_time = datetime.datetime.fromtimestamp(
-                start_time_millis / 1000.0
-            )
             created = status["created"]
             total = status["total"]
             if total and created:
-                estimated_time_remaining = datetime.timedelta(
-                    seconds=(
-                        (datetime.datetime.now() - start_time).total_seconds()
-                        / created
-                    )
-                    * (total - created)
-                ).total_seconds()
+                estimated_time_remaining = compute_estimated_remaining_time(
+                    initial_wait, start_time_millis, created, total
+                )
         if not task_info:
             iterations_count += 1
         if iterations_count > 10:

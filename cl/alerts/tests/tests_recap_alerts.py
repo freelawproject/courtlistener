@@ -75,6 +75,9 @@ class RECAPAlertsSweepIndexTest(
             )
 
     def setUp(self):
+        self.r = get_redis_interface("CACHE")
+        self.r.delete("alert_sweep:query_date")
+        self.r.delete("alert_sweep:task_id")
         RECAPSweepDocument._index.delete(ignore=404)
         RECAPSweepDocument.init()
 
@@ -242,10 +245,9 @@ class RECAPAlertsSweepIndexTest(
         contains RECAPDocument HL fields."""
 
         # Index base document factories.
-        r = get_redis_interface("CACHE")
         with time_machine.travel(self.mock_date, tick=False):
             index_daily_recap_documents(
-                r,
+                self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument._index._name,
                 testing=True,
@@ -385,7 +387,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Only the RECAP RT alert for a member and the RECAP DLY alert are sent.
@@ -402,7 +404,6 @@ class RECAPAlertsSweepIndexTest(
         """Test index_daily_recap_documents method over different documents
         conditions.
         """
-        r = get_redis_interface("CACHE")
         recap_search = DocketDocument.search()
         recap_dockets = recap_search.query(Q("match", docket_child="docket"))
         self.assertEqual(recap_dockets.count(), 2)
@@ -423,7 +424,7 @@ class RECAPAlertsSweepIndexTest(
         # RECAPDocuments indexed the same day.
         with time_machine.travel(self.mock_date, tick=False):
             documents_indexed = index_daily_recap_documents(
-                r,
+                self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument._index._name,
                 testing=True,
@@ -485,7 +486,7 @@ class RECAPAlertsSweepIndexTest(
         # Run the indexer.
         with time_machine.travel(self.mock_date, tick=False):
             documents_indexed = index_daily_recap_documents(
-                r,
+                self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument._index._name,
                 testing=True,
@@ -535,7 +536,7 @@ class RECAPAlertsSweepIndexTest(
         # Run the indexer.
         with time_machine.travel(self.mock_date, tick=False):
             documents_indexed = index_daily_recap_documents(
-                r,
+                self.r,
                 DocketDocument._index._name,
                 RECAPSweepDocument._index._name,
                 testing=True,
@@ -578,7 +579,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -655,7 +656,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # The RD ingestion's shouldn't match the docket-only alert.
         self.assertEqual(
@@ -674,7 +675,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # 1 New alert should be triggered.
         self.assertEqual(
@@ -708,7 +709,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # No new alert should be triggered.
         self.assertEqual(
@@ -740,7 +741,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing only the new RD created.
@@ -769,7 +770,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing two RDs (rd and rd_2)
@@ -803,7 +804,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing one RD (rd_2)
@@ -869,7 +870,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -999,7 +1000,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -1149,7 +1150,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ), time_machine.travel(self.mock_date, tick=False):
+        ):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # Weekly and monthly alerts are not sent right away but are scheduled as
