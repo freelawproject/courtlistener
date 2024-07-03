@@ -2,7 +2,7 @@ import copy
 import datetime
 import time
 import traceback
-from typing import Any
+from typing import Any, Type
 
 import pytz
 from asgiref.sync import async_to_sync
@@ -91,20 +91,28 @@ def compute_estimated_remaining_time(
 
 
 def index_daily_recap_documents(
-    r: Redis, source_index: str, target_index: str, testing: bool = False
+    r: Redis,
+    source_index_name: str,
+    target_index: Type[RECAPSweepDocument],
+    testing: bool = False,
 ) -> int:
     """Index Dockets added/modified during the day and all their RECAPDocuments
     and RECAPDocuments added/modified during the day and their parent Dockets.
     It uses the ES re_index API,
 
     :param r: Redis client instance.
-    :param source_index: The source Elasticsearch index from which documents
-     will be queried.
+    :param source_index_name: The source Elasticsearch index name from which
+    documents will be queried.
     :param target_index: The target Elasticsearch index to which documents will
      be re-indexed.
     :param testing: Boolean flag for testing mode.
     :return: The total number of documents re-indexed.
     """
+
+    if r.exists("alert_sweep:re_index_completed"):
+        # The re-indexing has been completed for the day. Abort it and proceed
+        # with sending alerts.
+        return 0
 
     if not r.exists("alert_sweep:query_date"):
         # In case of a failure, store the date when alerts should be queried in
@@ -129,7 +137,6 @@ def index_daily_recap_documents(
 
     today_datetime_iso = local_midnight_utc.isoformat().replace("+00:00", "Z")
     next_day_utc_iso = next_day_utc.isoformat().replace("+00:00", "Z")
-
     # Re Index API query.
     query = {
         "bool": {
@@ -199,11 +206,16 @@ def index_daily_recap_documents(
     }
 
     if not r.exists("alert_sweep:task_id"):
+        # Remove the index from the previous day and create a new one.
+        target_index._index.delete(ignore=404)
+        target_index.init()
+        target_index_name = target_index._index._name
+
         # In case of a failure, store the task_id in Redis so the command
         # can be resumed.
         response = es.reindex(
-            source={"index": source_index, "query": query},
-            dest={"index": target_index},
+            source={"index": source_index_name, "query": query},
+            dest={"index": target_index_name},
             wait_for_completion=False,
             refresh=True,
         )
@@ -259,6 +271,8 @@ def index_daily_recap_documents(
 
     r.delete("alert_sweep:query_date")
     r.delete("alert_sweep:task_id")
+    if not testing:
+        r.set("alert_sweep:re_index_completed", 1, ex=3600 * 12)
     return total
 
 
@@ -497,6 +511,12 @@ def query_and_schedule_alerts(r: Redis, rate: str):
 
 
 class Command(VerboseCommand):
+    """Query and re-index (into the RECAP sweep index) all the RECAP content
+    that has changed during the current period, along with their related
+    documents. Then use the RECAP sweep index to query and send real-time and
+    daily RECAP alerts. Finally, schedule weekly and monthly RECAP alerts.
+    """
+
     help = "Send RECAP Search Alerts."
 
     def add_arguments(self, parser):
@@ -513,10 +533,11 @@ class Command(VerboseCommand):
         index_daily_recap_documents(
             r,
             DocketDocument._index._name,
-            RECAPSweepDocument._index._name,
+            RECAPSweepDocument,
             testing=testing_mode,
         )
         query_and_send_alerts(r, Alert.REAL_TIME)
         query_and_send_alerts(r, Alert.DAILY)
         query_and_schedule_alerts(r, Alert.WEEKLY)
         query_and_schedule_alerts(r, Alert.MONTHLY)
+        r.delete("alert_sweep:re_index_completed")

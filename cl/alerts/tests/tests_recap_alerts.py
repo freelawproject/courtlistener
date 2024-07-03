@@ -78,8 +78,6 @@ class RECAPAlertsSweepIndexTest(
         self.r = get_redis_interface("CACHE")
         self.r.delete("alert_sweep:query_date")
         self.r.delete("alert_sweep:task_id")
-        RECAPSweepDocument._index.delete(ignore=404)
-        RECAPSweepDocument.init()
 
     @staticmethod
     def get_html_content_from_email(email_content):
@@ -249,7 +247,7 @@ class RECAPAlertsSweepIndexTest(
             index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
-                RECAPSweepDocument._index._name,
+                RECAPSweepDocument,
                 testing=True,
             )
 
@@ -404,6 +402,8 @@ class RECAPAlertsSweepIndexTest(
         """Test index_daily_recap_documents method over different documents
         conditions.
         """
+        RECAPSweepDocument._index.delete(ignore=404)
+        RECAPSweepDocument.init()
         recap_search = DocketDocument.search()
         recap_dockets = recap_search.query(Q("match", docket_child="docket"))
         self.assertEqual(recap_dockets.count(), 2)
@@ -426,7 +426,7 @@ class RECAPAlertsSweepIndexTest(
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
-                RECAPSweepDocument._index._name,
+                RECAPSweepDocument,
                 testing=True,
             )
         self.assertEqual(
@@ -488,7 +488,7 @@ class RECAPAlertsSweepIndexTest(
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
-                RECAPSweepDocument._index._name,
+                RECAPSweepDocument,
                 testing=True,
             )
         self.assertEqual(
@@ -538,13 +538,96 @@ class RECAPAlertsSweepIndexTest(
             documents_indexed = index_daily_recap_documents(
                 self.r,
                 DocketDocument._index._name,
-                RECAPSweepDocument._index._name,
+                RECAPSweepDocument,
                 testing=True,
             )
         self.assertEqual(
             documents_indexed, 9, msg="Wrong number of documents indexed."
         )
 
+        # Docket and RD created on previous days, will be used later to confirm
+        # documents got indexed into the sweep index after partial updates.
+        three_days_before = now() - datetime.timedelta(days=5)
+        mock_three_days_before = three_days_before.replace(hour=5)
+        with time_machine.travel(
+            mock_three_days_before, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket_old = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED LOREM OFF",
+                docket_number="1:21-bk-1254",
+                source=Docket.RECAP,
+            )
+            alert_de_old = DocketEntryWithParentsFactory(
+                docket=docket_old,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd_old = RECAPDocumentFactory(
+                docket_entry=alert_de_old,
+                description="Motion to File",
+                document_number="1",
+                is_available=True,
+            )
+            rd_old_2 = RECAPDocumentFactory(
+                docket_entry=alert_de_old,
+                description="Motion to File 2",
+                document_number="2",
+                is_available=True,
+            )
+
+        # Run the indexer. No new documents re_indexed.
+        with time_machine.travel(self.mock_date, tick=False):
+            documents_indexed = index_daily_recap_documents(
+                self.r,
+                DocketDocument._index._name,
+                RECAPSweepDocument,
+                testing=True,
+            )
+        self.assertEqual(
+            documents_indexed, 9, msg="Wrong number of documents indexed."
+        )
+
+        # Update the documents today:
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            rd_old_2.document_number = 3
+            rd_old_2.save()
+
+        # Run the indexer. No new documents re_indexed.
+        with time_machine.travel(self.mock_date, tick=False):
+            documents_indexed = index_daily_recap_documents(
+                self.r,
+                DocketDocument._index._name,
+                RECAPSweepDocument,
+                testing=True,
+            )
+        self.assertEqual(
+            documents_indexed, 11, msg="Wrong number of documents indexed."
+        )
+
+        # Update the Docket today:
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket_old.case_name = "SUBPOENAS SERVED LOREM OFF UPDATED"
+            docket_old.save()
+
+        # Run the indexer. No new documents re_indexed.
+        with time_machine.travel(self.mock_date, tick=False):
+            documents_indexed = index_daily_recap_documents(
+                self.r,
+                DocketDocument._index._name,
+                RECAPSweepDocument,
+                testing=True,
+            )
+        self.assertEqual(
+            documents_indexed, 12, msg="Wrong number of documents indexed."
+        )
+
+        docket_old.delete()
         docket.delete()
         docket_2.delete()
 
@@ -579,7 +662,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -610,9 +693,8 @@ class RECAPAlertsSweepIndexTest(
             query='q="405 Civil"&type=r',
         )
         # Simulate docket is ingested a day before.
-        one_day_before = now() - datetime.timedelta(days=1)
-        mock_date = one_day_before.replace(hour=5)
-        with time_machine.travel(mock_date, tick=False):
+        one_day_before = self.mock_date - datetime.timedelta(days=1)
+        with time_machine.travel(one_day_before, tick=False):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -626,8 +708,7 @@ class RECAPAlertsSweepIndexTest(
             )
 
         # Its related RD is ingested today.
-        mock_date = now().replace(hour=5)
-        with time_machine.travel(mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -656,7 +737,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # The RD ingestion's shouldn't match the docket-only alert.
         self.assertEqual(
@@ -675,7 +756,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # 1 New alert should be triggered.
         self.assertEqual(
@@ -709,14 +790,14 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
         # No new alert should be triggered.
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
-        with time_machine.travel(mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False):
             # Create a new RD for the same DocketEntry to confirm this new RD is
             # properly included in the alert email.
             rd_2 = RECAPDocumentFactory(
@@ -741,7 +822,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing only the new RD created.
@@ -770,7 +851,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing two RDs (rd and rd_2)
@@ -804,7 +885,7 @@ class RECAPAlertsSweepIndexTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
+        ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
         # A new alert should be triggered containing one RD (rd_2)
@@ -831,8 +912,7 @@ class RECAPAlertsSweepIndexTest(
         results for this Case" button.
         """
 
-        mock_date = now().replace(hour=5)
-        with time_machine.travel(mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False):
             alert_de = DocketEntryWithParentsFactory(
                 docket=self.de.docket,
                 entry_number=1,
@@ -1239,10 +1319,8 @@ class RECAPAlertsSweepIndexTest(
             search_params,
         )
         self.assertEqual(r.json()["count"], 0)
-
-        mock_date = now().replace(day=1, hour=5)
         with time_machine.travel(
-            mock_date, tick=False
+            self.mock_date, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
             # Docket filed today.
             docket = DocketFactory(

@@ -462,6 +462,13 @@ def document_fields_to_update(
                 continue
             field_value = prepare_method(main_instance)
             fields_to_update[field] = field_value
+
+    if fields_to_update:
+        # If fields to update, append the timestamp to be updated too.
+        prepare_timestamp = getattr(es_document(), f"prepare_timestamp", None)
+        if prepare_timestamp:
+            field_value = prepare_timestamp(main_instance)
+            fields_to_update["timestamp"] = field_value
     return fields_to_update
 
 
@@ -762,9 +769,14 @@ def update_children_docs_by_query(
     # Build the UpdateByQuery script and execute it
     script_lines = []
     params = {}
+    if fields_to_update:
+        # If there are fields to update include the timestamp field too.
+        fields_to_update.append("timestamp")
     for field_to_update in fields_to_update:
         field_list = (
-            fields_map[field_to_update] if fields_map else [field_to_update]
+            ["timestamp"]
+            if field_to_update == "timestamp"
+            else fields_map.get(field_to_update, [field_to_update])
         )
         for field_name in field_list:
             script_lines.append(
