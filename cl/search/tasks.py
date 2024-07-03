@@ -776,7 +776,11 @@ def update_children_docs_by_query(
         field_list = (
             ["timestamp"]
             if field_to_update == "timestamp"
-            else fields_map.get(field_to_update, [field_to_update])
+            else (
+                fields_map[field_to_update]
+                if fields_map
+                else [field_to_update]
+            )
         )
         for field_name in field_list:
             script_lines.append(

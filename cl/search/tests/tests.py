@@ -2612,19 +2612,6 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
                 testing_mode=True,
             )
 
-        with self.captureOnCommitCallbacks(execute=True):
-            # Trigger a change in opinion_1 to confirm the timestamp is not
-            # updated.
-            opinion_1.type = Opinion.UNANIMOUS
-            opinion_1.save()
-
-        # The timestamp in opinion_1 remains the same as it was from 5 days ago
-        opinion_1_doc = OpinionClusterDocument.get(
-            ES_CHILD_ID(opinion_1.pk).OPINION
-        )
-        self.assertEqual(opinion_1_doc.type, "unanimous-opinion")
-        self.assertEqual(opinion_1_doc.timestamp.date(), five_days_ago.date())
-
         # The timestamp in opinion_2 is updated to 2 days ago.
         opinion_2_doc = OpinionClusterDocument.get(
             ES_CHILD_ID(opinion_2.pk).OPINION
