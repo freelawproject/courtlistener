@@ -151,9 +151,9 @@ def build_daterange_query(
 
     params = {}
     if any([before, after]):
-        if hasattr(after, "strftime"):
+        if isinstance(after, datetime.date):
             params["gte"] = f"{after.isoformat()}T00:00:00Z"
-        if hasattr(before, "strftime"):
+        if isinstance(before, datetime.date):
             params["lte"] = f"{before.isoformat()}T23:59:59Z"
         if relation is not None:
             allowed_relations = ["INTERSECTS", "CONTAINS", "WITHIN"]
