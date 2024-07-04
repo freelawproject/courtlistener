@@ -1333,7 +1333,7 @@ class RECAPAlertsSweepIndexTest(
 
             # RECAPDocument filed today that belongs to a docket filed outside
             # the estimation range.
-            date_outside_range = now() - datetime.timedelta(days=101)
+            date_outside_range = now() - datetime.timedelta(days=102)
             alert_de = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,

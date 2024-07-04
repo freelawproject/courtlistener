@@ -15,7 +15,7 @@ We have news regarding your alerts at CourtListener.com
 View Full Results / Edit this Alert: https://www.courtlistener.com/?{{ alert.query_run|safe }}&edit_alert={{ alert.pk }}
 Disable this Alert (one click): https://www.courtlistener.com{% url "disable_alert" alert.secret_key %}{% endif %}
 
-{{forloop.counter}}. {{ result.caseName|render_string_or_list|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|render_string_or_list|striptags }} {% endif %}{% if type == 'o' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
+{{forloop.counter}}. {{ result.caseName|render_string_or_list|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|render_string_or_list|striptags }} {% endif %}{% if type == 'o' or type == 'r' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
 {% if type == 'oa' %}{% if result.dateArgued %}Date Argued: {{ result.dateArgued|date:"F jS, Y" }}{% else %}Date Argued: Unknown Date {% endif %}{% if result.docketNumber %} | Docket Number: {{ result.docketNumber|render_string_or_list|safe|striptags }}{% endif %} | Duration: {{ result.duration|naturalduration }}{% if result.judge %} | Judge: {{ result.judge|render_string_or_list|safe|striptags|underscore_to_space }}{% endif %}{% endif %}
 {% if type == 'o' or type == 'oa' %}{% if result|get_highlight:"text" %}...{{ result|get_highlight:"text"|safe|striptags|underscore_to_space|compress_whitespace }}...{% endif %}{% endif %}
 {% if type == 'r' %}{% if result.dateFiled %}Date Filed: {{ result.dateFiled|date:"F jS, Y" }}{% else %}Date Filed: Unknown Date {% endif %}{% if result.docketNumber %} | Docket Number: {{ result.docketNumber|render_string_or_list|safe|striptags }}{% endif %}
@@ -24,7 +24,7 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
    {% if doc.plain_text %}{% contains_highlights doc.plain_text.0 True as highlighted %}{% if highlighted %}...{% endif %}{{ doc.plain_text|render_string_or_list|safe|striptags|underscore_to_space }}...{% endif %}
    View this document on our site: https://www.courtlistener.com{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}
 {% endwith %}{% endfor %}
-{% if result.child_remaining %}{% extract_q_value alert.query_run as q_value %}View Additional Results for this Case: https://www.courtlistener.com/?type={{ type|urlencode }}&q={% if q_value %}({{ q_value|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}{% endif %}
+{% if result.child_docs and result.child_remaining %}{% extract_q_value alert.query_run as q_value %}View Additional Results for this Case: https://www.courtlistener.com/?type={{ type|urlencode }}&q={% if q_value %}({{ q_value|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}{% endif %}
 {% endif %}~~~~~
  - View this item on our site: https://www.courtlistener.com{% if type == 'r' %}{{result.docket_absolute_url}}{% else %}{{result.absolute_url}}{% endif %}
 {% if result.download_url %} - Download original from the court: {{result.download_url}}

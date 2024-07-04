@@ -27,6 +27,7 @@ from cl.alerts.utils import (
 from cl.api.models import WebhookEventType
 from cl.api.tasks import send_es_search_alert_webhook
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.date_time import dt_as_local_date
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.documents import DocketDocument, RECAPSweepDocument
@@ -76,18 +77,41 @@ def compute_estimated_remaining_time(
         return initial_wait
 
     start_time = datetime.datetime.fromtimestamp(start_time_millis / 1000.0)
+    time_now = datetime.datetime.now()
     estimated_time_remaining = max(
         datetime.timedelta(
-            seconds=(
-                (datetime.datetime.now() - start_time).total_seconds()
-                / created
-            )
+            seconds=((time_now - start_time).total_seconds() / created)
             * (total - created)
         ).total_seconds(),
         initial_wait,
     )
 
     return estimated_time_remaining
+
+
+def retrieve_task_info(task_info: dict[str, Any]) -> dict[str, Any]:
+    """Retrieve task information from the given task dict.
+
+    :param task_info: A dictionary containing the task status information.
+    :return: A dictionary with the task completion status, created documents
+    count, total documents count, and the task start time in milliseconds.
+    Retrieve default values in case task_info is not valid.
+    """
+
+    if task_info:
+        status = task_info["task"]["status"]
+        return {
+            "completed": task_info["completed"],
+            "created": status["created"],
+            "total": status["total"],
+            "start_time_millis": task_info["task"]["start_time_in_millis"],
+        }
+    return {
+        "completed": False,
+        "created": 0,
+        "total": 0,
+        "start_time_millis": None,
+    }
 
 
 def index_daily_recap_documents(
@@ -110,6 +134,9 @@ def index_daily_recap_documents(
     """
 
     if r.exists("alert_sweep:re_index_completed"):
+        logger.info(
+            "The re-index task has been completed and will be omitted."
+        )
         # The re-indexing has been completed for the day. Abort it and proceed
         # with sending alerts.
         return 0
@@ -127,6 +154,7 @@ def index_daily_recap_documents(
         # If "alert_sweep:query_date" already exists get it from Redis.
         local_midnight_str: str = str(r.get("alert_sweep:query_date"))
         local_midnight = datetime.datetime.fromisoformat(local_midnight_str)
+        logger.info(f"Resuming re-indexing process for date: {local_midnight}")
 
     es = connections.get_connection()
     # Convert the local (PDT) midnight time to UTC
@@ -222,58 +250,50 @@ def index_daily_recap_documents(
         # Store the task ID in Redis
         task_id = response["task"]
         r.set("alert_sweep:task_id", task_id)
+        logger.info(f"Re-indexing task scheduled ID: {task_id}")
     else:
         task_id = r.get("alert_sweep:task_id")
+        logger.info(f"Resuming re-index task ID: {task_id}")
 
     initial_wait = 0.01 if testing else 60.0
     time.sleep(initial_wait)
-    task_info = get_task_status(task_id, es)
-    if task_info:
-        status = task_info["task"]["status"]
-        created = status["created"]
-        total = status["total"]
-        start_time_millis = task_info["task"]["start_time_in_millis"]
-    else:
-        task_info["completed"] = False
-        created = 0
-        total = 0
-        start_time_millis = None
-
+    get_task_info = retrieve_task_info(get_task_status(task_id, es))
     iterations_count = 0
     estimated_time_remaining = compute_estimated_remaining_time(
-        initial_wait, start_time_millis, created, total
+        initial_wait,
+        get_task_info["start_time_millis"],
+        get_task_info["created"],
+        get_task_info["total"],
     )
-    while not task_info["completed"]:
+    while not get_task_info["completed"]:
         logger.info(
-            f"Task progress: {created}/{total} documents. Estimated time to"
-            f" finish: {estimated_time_remaining}."
+            f"Task progress: {get_task_info['created']}/{get_task_info['total']} documents. "
+            f"Estimated time to finish: {estimated_time_remaining} seconds."
         )
         task_info = get_task_status(task_id, es)
+        get_task_info = retrieve_task_info(task_info)
         time.sleep(estimated_time_remaining)
-        if task_info and not task_info["completed"]:
-            status = task_info["task"]["status"]
-            start_time_millis = task_info["task"]["start_time_in_millis"]
-            created = status["created"]
-            total = status["total"]
-            if total and created:
-                estimated_time_remaining = compute_estimated_remaining_time(
-                    initial_wait, start_time_millis, created, total
-                )
+        if task_info and not get_task_info["completed"]:
+            estimated_time_remaining = compute_estimated_remaining_time(
+                initial_wait,
+                get_task_info["start_time_millis"],
+                get_task_info["created"],
+                get_task_info["total"],
+            )
         if not task_info:
             iterations_count += 1
         if iterations_count > 10:
             logger.error(
                 "Re_index alert sweep index task has failed: %s/%s",
-                created,
-                total,
+                get_task_info["created"],
+                get_task_info["total"],
             )
             break
 
-    r.delete("alert_sweep:query_date")
     r.delete("alert_sweep:task_id")
     if not testing:
         r.set("alert_sweep:re_index_completed", 1, ex=3600 * 12)
-    return total
+    return get_task_info["total"]
 
 
 def should_docket_hit_be_included(
@@ -290,9 +310,16 @@ def should_docket_hit_be_included(
     docket = Docket.objects.filter(id=docket_id).only("date_modified").first()
     if not docket:
         return False
-    date_modified = docket.date_modified.date()
     if not has_document_alert_hit_been_triggered(r, alert_id, "d", docket_id):
-        if date_modified == timezone.now().date():
+        local_midnight_localized = timezone.localtime(
+            timezone.make_aware(
+                datetime.datetime.fromisoformat(
+                    str(r.get("alert_sweep:query_date"))
+                )
+            )
+        )
+        date_modified_localized = dt_as_local_date(docket.date_modified)
+        if date_modified_localized == local_midnight_localized.date():
             return True
     return False
 
@@ -541,3 +568,4 @@ class Command(VerboseCommand):
         query_and_schedule_alerts(r, Alert.WEEKLY)
         query_and_schedule_alerts(r, Alert.MONTHLY)
         r.delete("alert_sweep:re_index_completed")
+        r.delete("alert_sweep:query_date")

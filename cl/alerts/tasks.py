@@ -475,6 +475,8 @@ def send_search_alert_emails(
     :param email_alerts_to_send: A list of two tuples containing the user to
     whom the alerts should be sent. A list of tuples containing the Search
     Alert, (Alert, search type, documents, and number of documents)
+    :param scheduled_alert: A boolean indicating weather this alert has been
+    scheduled
     :return: None
     """
 
