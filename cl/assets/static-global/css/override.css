@@ -2,20 +2,20 @@
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
 ::-moz-selection {
-  background: #AE0B0B;
+  background: #B53C2C;
   color: #fff;
   text-shadow: none;
 }
 
 ::selection {
-  background: #AE0B0B;
+  background: #B53C2C;
   color: #fff;
   text-shadow: none;
 }
 
 .navbar-brand {
   padding: 16px 15px 16px 30px;
-  height: 120px;
+  height: 85px;
 }
 
 header {
@@ -52,7 +52,7 @@ header {
 
 .navbar-default .navbar-nav > li.active a {
   background-color: transparent;
-  border-bottom-color: #AE0B0B;
+  border-bottom-color: #B53C2C;
 }
 
 .subnav {
@@ -89,7 +89,7 @@ header {
 .navbar-default .navbar-nav > li > a.donate,
 .navbar-default .navbar-nav > .active > a.donate,
 .navbar-default .navbar-nav > .active > a.donate:focus {
-  color: #AE0B0B;
+  color: #B53C2C;
   background-color: transparent;
   font-weight: bold;
   font-size: 110%;
@@ -97,7 +97,7 @@ header {
 
 .navbar-default .navbar-nav > .active > a.donate:hover {
   background-color: #e7e7e7;
-  color: #AE0B0B;
+  color: #B53C2C;
 }
 
 .navbar-default .navbar-nav > li > a.donate:hover {
@@ -1328,7 +1328,7 @@ body.embed .caseHoverText {
 
 .tt-suggestion:hover {
   color: #fff;
-  background-color: #AE0B0B;
+  background-color: #B53C2C;
 }
 
 .tt-suggestion.tt-is-under-cursor a {
@@ -1612,7 +1612,7 @@ rect.series-segment {
 
 /* CSS for the new full SVG CL logo */
 .cl-full-logo {
-    height: 100px;
+    height: 65px;
     display: block;
 }
 .cl-full-logo .free-law-link{
