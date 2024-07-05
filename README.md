@@ -40,22 +40,55 @@ To contact Free Law Project, see here:
 https://free.law/contact/
 
 
-                       ````
-                .:+oo++//++osso+/. -+++////+++.
-             -+ys/-`         ./yy+  `./mmmm/``
-           -sys:               `oo     ymmy
-          +yyo`                 `+`    ymmy
-         +yyy`                         ymms
-        -yyy+                          ymms
-        +yyy:                          ymms
-        +sss:                          ymms
-        /sss+                          ydds
-        `ssss.                         sdds
-         -syyo`                  ``    sdds
-          .oyys-                `s/    ydds            `+`
-            :shhs:`           `/ys`    yddh`          .hs
-              .:oyys+:-....-/oyys.  `./ddddy/:--.---:odd.
-                  `.-::///::-.`    -///////////////////-
+```
+                                   g@@D
+                                  "l@@B!
+                                   "@@"
+                                    @@
+                                    @@
+                            _P '@.  @@
+                            71__@   @@
+                              @@    @@    __
+                              @@    @@  ;F  @
+                              @@    @@  'h__@
+                              @@    @@    @g
+                              @@    @@    @g
+                              @@    @@    @g                     _~~_
+                              @@    @@    @g   @@@@@@@@@@@@@@@@@@F  |!
+                              @@    @@    @g   @@         @T     TmmP
+   _gg_                       @@    @@    @g   @@         @'
+   @   @gggggggggggggggggg    @@    @@    @g   @@         @\
+   '@WP      .@         @@    @@    @@    @g   @@        J "_
+             !@         @@    @@    @@    @g   @@       ,'  T
+             ;@         @@    @@    @@    @g   @@       8    %
+             W @        @@    @@    @@    @g   @@   ___d______@_-_
+            @   q       @@    @@    @@    @g   @@   ______________
+           ;"    g      @@    @@    @@    @g   @@   0@@@@@@@@@@@@"
+       ____E_____]L___  @@    @@    @@    @g   @@
+       ,_____________   @@    @@    @@    @g   @@
+       '@@@@@@@@@@@@D   @@    @@    @@    @g   @@
+                        @@    @@    @@    @g   @@
+                        @@    @@    @@    @g   @@
+                  _~ggg~_.       __g@g~_.      gg        ggg   gggggggg_,   ;gggggggggggg    
+                g@@P"""<@@g    _@@P"""<B@g     @@        @@@   @@@"""""Q@g  """""9@g"""""
+              .@@F       "    @@F       "@@,   @@        @@@   @@@      @@g      [@g        
+              g@@            |@@         (@@   @@        @@@   @@@     ,@@/      [@g                   
+              [@@            [@@         j@@   @@        @@g   @@@@@@@@@B        [@g           
+               @@L       ,    @@L       ,@@'   @@1       @@'   @@@   '@@L        [@g         
+                T@@_____g@@    T@@_____g@@      @@g____+@@?    @@@     @@a       [@g        
+                  '4B@BP"        '=B@BP"          <8B@B+"      BBB      0BB      "BN        
+              g        ;;   _~mma_  mmmmqmmmmm  mmmmmmms  _        ;   gmmmmmmm  gmmmmm__           
+              g        [|  F            |]      |         g\_      [   @         @       q
+              g        [|  1.           |]      |         g  q     [   @         @       [
+              g        [|    "+m__      |]      P""""""   g   "_   [   @""""""   @_______'
+              g        [|         \,    |]      |         g     \, [   @         @    `a
+              g        [| ,       /'    |]      |         g       q[   @         @      0        
+              """""""" ''   ""==""      '"      """"""""  "        "   """"""""  "       "
+                        @@    @@    @@    @g   @@
+                        @@    @@    @@    @g   @@
+                        @@    @@    @@    @g   @@
+```
+
 
 
 [issues]: https://github.com/freelawproject/courtlistener/issues
