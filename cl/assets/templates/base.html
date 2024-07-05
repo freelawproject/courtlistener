@@ -35,7 +35,7 @@
   <meta property="og:url" content="{% block og_url %}{% get_full_host %}{{ request.path }}{% endblock %}"/>
   <meta property="og:site_name" content="CourtListener"/>
   <meta property="og:image"
-        content="{% block og_image %}{% static "png/og-image-1280x640.png" %}{% endblock %}"/>
+        content="{% block og_image %}{% static "png/og-image-1200x630.png" %}{% endblock %}"/>
   <meta property="og:image:type" content="{% block og_image_type %}image/png{% endblock %}"/>
   <meta property="twitter:image:alt"
         content="{% block og_image_alt %}The CourtListener logo{% endblock %}"/>
@@ -164,14 +164,11 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand hidden-xs" href="/">
-            <img src="{% static "svg/logo-full.svg" %}"
-                 alt="CourtListener"
-                 height="40"
-                 tabindex="1"/>
+          <a class="navbar-brand hidden-xs" href="/" tabindex="1">
+            {% include "includes/cl_logo.svg" %}
           </a>
           <a class="navbar-brand visible-xs-block" href="/">
-            <img src="{% static "svg/logo-initials-only.svg" %}"
+            <img src="{% static "svg/tiny-color.svg" %}"
                  alt="CourtListener"
                  height="40"
                  tabindex="1"/>
@@ -225,9 +222,6 @@
             {% endif %}
           {% endblock %}
         </div><!--/.nav-collapse -->
-        <div class="col-sm-12 hidden-xs">
-          <p>From <a href="https://free.law">Free Law Project</a><span class="hidden-xs">, a 501(c)(3) non-profit</span>.</p>
-        </div>
       </div><!--/.container-fluid -->
     </div><!-- navbar -->
 
