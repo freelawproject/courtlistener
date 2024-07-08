@@ -1459,8 +1459,9 @@ def probe_iquery_pages(
             reports_data.append((pacer_case_id_to_lookup, report_data))
             latest_match = pacer_case_id_to_lookup
             found_match = True
-            # Restart court_blocked attempts.
+            # Restart court_blocked_attempts and court_empty_probe_attempts.
             r.set(f"iquery:court_blocked_attempts:{court_id}", 0)
+            r.set(f"iquery:court_empty_probe_attempts:{court_id}", 0)
         elif found_match:
             # If a match has been found and this is a blank hit, abort it.
             break
@@ -1470,6 +1471,27 @@ def probe_iquery_pages(
         r.hset(
             "iquery:test_highest_known_pacer_case_id", court_id, latest_match
         )
+
+    if not reports_data:
+        court_empty_probe_attempts = r.incr(
+            f"iquery:court_empty_probe_attempts:{court_id}"
+        )
+        if court_empty_probe_attempts >= settings.IQUERY_EMPTY_PROBES_LIMIT:
+            logger.error(
+                "The court %s has accumulated %s empty probe attempts. "
+                "Probably the probe got stuck and manual intervention is required.",
+                court_id,
+                settings.IQUERY_EMPTY_PROBES_LIMIT,
+            )
+            # Restart court_blocked_attempts to avoid continue logging the
+            # error on next iterations.
+            r.set(f"iquery:court_empty_probe_attempts:{court_id}", 0)
+            # Add a court wait time of one hour so the problem can be manually handled.
+            r.set(
+                f"iquery:court_wait:{court_id}",
+                3600,
+                ex=3600,
+            )
 
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.
