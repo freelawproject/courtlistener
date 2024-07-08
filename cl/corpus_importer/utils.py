@@ -1069,3 +1069,22 @@ def compute_next_binary_probe(
         highest_known_pacer_case_id + (2 ** (iteration - 1)) + jitter
     )
     return pacer_case_id_to_lookup
+
+
+def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
+    """Compute the wait time for the current attempt and the total accumulated
+    seconds from previous attempts.
+
+    :param court_blocked_attempts: The current number of blocked attempts.
+    :return: A tuple containing the wait time for the current attempt and the
+    total accumulated seconds.
+    """
+
+    current_wait_time = int(
+        settings.IQUERY_COURT_BLOCKED_WAIT * 2 ** (court_blocked_attempts - 1)
+    )
+    total_accumulated_time = sum(
+        settings.IQUERY_COURT_BLOCKED_WAIT * 2**i
+        for i in range(court_blocked_attempts)
+    )
+    return current_wait_time, total_accumulated_time

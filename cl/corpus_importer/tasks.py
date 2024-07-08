@@ -63,6 +63,7 @@ from cl.citations.utils import filter_out_non_case_law_citations
 from cl.corpus_importer.api_serializers import IADocketSerializer
 from cl.corpus_importer.utils import (
     compute_binary_probe_jitter,
+    compute_blocked_court_wait,
     compute_next_binary_probe,
     make_iquery_probing_key,
     mark_ia_upload_needed,
@@ -1405,17 +1406,44 @@ def probe_iquery_pages(
         except HTTPError:
             # Set expiration accordingly and value to 2 to difference from
             # other waiting times.
-            r.set(
-                f"iquery:court_wait:{court_id}",
-                2,
-                ex=settings.IQUERY_COURT_BLOCKED_WAIT,
+            court_blocked_attempts = r.incr(
+                f"iquery:court_blocked_attempts:{court_id}"
             )
-            logger.warning(
-                "HTTPError occurred when crawling iquery. The court %s website "
-                "is probably down or has blocked us. Abort probing for %s seconds ",
-                court_id,
-                settings.IQUERY_COURT_BLOCKED_WAIT,
-            )
+            if (
+                court_blocked_attempts
+                > settings.IQUERY_COURT_BLOCKED_MAX_ATTEMPTS
+            ):
+                court_blocked_time, total_accumulated_time = (
+                    compute_blocked_court_wait(court_blocked_attempts - 1)
+                )
+                logger.error(
+                    "The court %s has blocked the iquery page probing "
+                    "for around %s hours.",
+                    court_id,
+                    total_accumulated_time / 3600,
+                )
+                # Restart court_blocked attempts.
+                r.set(f"iquery:court_blocked_attempts:{court_id}", 0)
+                r.set(
+                    f"iquery:court_wait:{court_id}",
+                    settings.IQUERY_COURT_BLOCKED_WAIT,
+                    ex=settings.IQUERY_COURT_BLOCKED_WAIT,
+                )
+            else:
+                next_blocked_court_wait, _ = compute_blocked_court_wait(
+                    court_blocked_attempts
+                )
+                r.set(
+                    f"iquery:court_wait:{court_id}",
+                    next_blocked_court_wait,
+                    ex=next_blocked_court_wait,
+                )
+                logger.warning(
+                    "HTTPError occurred when crawling iquery. The court %s website "
+                    "is probably down or has blocked us. Abort probing for %s hours ",
+                    court_id,
+                    next_blocked_court_wait / 3600,
+                )
             delete_redis_semaphore("CACHE", make_iquery_probing_key(court_id))
             return None
 
@@ -1431,6 +1459,8 @@ def probe_iquery_pages(
             reports_data.append((pacer_case_id_to_lookup, report_data))
             latest_match = pacer_case_id_to_lookup
             found_match = True
+            # Restart court_blocked attempts.
+            r.set(f"iquery:court_blocked_attempts:{court_id}", 0)
         elif found_match:
             # If a match has been found and this is a blank hit, abort it.
             break
