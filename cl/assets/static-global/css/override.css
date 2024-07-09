@@ -15,7 +15,31 @@ Sets up all the overrides or additional CSS that the site uses.
 
 .navbar-brand {
   padding: 16px 15px 16px 30px;
-  height: 85px;
+  height: 135px;
+}
+
+/* CSS for the new full SVG CL logo */
+.cl-full-logo {
+    height: 115px;
+    display: block;
+}
+.cl-full-logo .free-law-link{
+  fill: transparent;
+}
+.cl-full-logo .cls-1 {
+  fill: #B53C2C;
+}
+.cl-full-logo .cls-1, .cls-2, .cls-3, .cls-4 {
+  stroke-width: 0px;
+}
+.cl-full-logo .cls-2 {
+  fill: #968f7f;
+}
+.cl-full-logo .cls-3 {
+  fill: #fff;
+}
+.cl-full-logo .cls-4 {
+  fill: #848582;
 }
 
 header {
@@ -192,8 +216,11 @@ a.button:active {
 }
 
 @media (max-width: 767px) {
+  .cl-full-logo{
+    height: 90px;
+  }
   .navbar-brand {
-    height: 65px;
+    height: 115px;
   }
   .navbar-default .navbar-nav > li form button{
     padding: 5px 15px 5px 25px;
@@ -1608,28 +1635,4 @@ rect.series-segment {
 
 .ml-1 {
   margin-left: 0.25rem !important;
-}
-
-/* CSS for the new full SVG CL logo */
-.cl-full-logo {
-    height: 65px;
-    display: block;
-}
-.cl-full-logo .free-law-link{
-  fill: transparent;
-}
-.cl-full-logo .cls-1 {
-  fill: #B53C2C;
-}
-.cl-full-logo .cls-1, .cls-2, .cls-3, .cls-4 {
-  stroke-width: 0px;
-}
-.cl-full-logo .cls-2 {
-  fill: #968f7f;
-}
-.cl-full-logo .cls-3 {
-  fill: #fff;
-}
-.cl-full-logo .cls-4 {
-  fill: #848582;
 }
