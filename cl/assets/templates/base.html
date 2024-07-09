@@ -39,31 +39,17 @@
   <meta property="og:image:type" content="{% block og_image_type %}image/png{% endblock %}"/>
   <meta property="twitter:image:alt"
         content="{% block og_image_alt %}The CourtListener logo{% endblock %}"/>
-  <meta property="og:image:width" content="{% block og_image_width %}1280{% endblock %}"/>
-  <meta property="og:image:height" content="{% block og_image_height %}640{% endblock %}"/>
+  <meta property="og:image:width" content="{% block og_image_width %}1200{% endblock %}"/>
+  <meta property="og:image:height" content="{% block og_image_height %}630{% endblock %}"/>
   {% endblock %}
 
   {% block icons %}
-  <link rel="icon" href="{% static "ico/favicon.ico" %}">
-  {# Apple Touch Icons, from https://mathiasbynens.be/notes/touch-icons#sizes #}
-  <link rel="icon" sizes="192x192"
-        href="{% static "png/touch-icon-192x192.png" %}">
-  <link rel="apple-touch-icon-precomposed" sizes="180x180"
-        href="{% static "png/apple-touch-icon-180x180-precomposed.png" %}">
-  <link rel="apple-touch-icon-precomposed" sizes="152x152"
-        href="{% static "png/apple-touch-icon-152x152-precomposed.png" %}">
-  <link rel="apple-touch-icon-precomposed" sizes="144x144"
-        href="{% static "png/apple-touch-icon-144x144-precomposed.png" %}">
-  <link rel="apple-touch-icon-precomposed" sizes="120x120"
-        href="{% static "png/apple-touch-icon-120x120-precomposed.png" %}">
-  <link rel="apple-touch-icon-precomposed" sizes="114x114"
-        href="{% static "png/apple-touch-icon-114x114-precomposed.png" %}">
-  <link rel="apple-touch-icon-precomposed" sizes="76x76"
-        href="{% static "png/apple-touch-icon-76x76-precomposed.png" %}">
-  <link rel="apple-touch-icon-precomposed" sizes="72x72"
-        href="{% static "png/apple-touch-icon-72x72-precomposed.png" %}">
-  <link rel="apple-touch-icon-precomposed"
-        href="{% static "png/apple-touch-icon-precomposed.png" %}">
+  {# Touch icons, etc from: https://evilmartians.com/chronicles/how-to-favicon-in-2021-six-files-that-fit-most-needs #}
+  <link rel="icon" href="{% static "ico/favicon.ico" %}" sizes="32x32">
+  <link rel="icon" href="{% static "svg/favicon.svg" %}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{% static "png/apple-touch-icon.png" %}">
+  {# Add hashes to manifest by hand. They're the first 12 chars of the MD5 of the file. #}
+  <link rel="manifest" href="{% static "json/manifest.json" %}">
   {% endblock %}
 
   <link href="{% static "css/font-awesome.css" %}" rel="stylesheet">
