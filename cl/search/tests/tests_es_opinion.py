@@ -59,6 +59,7 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    Court,
     Docket,
     Opinion,
     OpinionCluster,
@@ -1347,6 +1348,12 @@ class OpinionsESSearchTest(
             response.content.decode(),
             msg="Did not find the #homepage id when attempting to "
             "load the homepage",
+        )
+        court_count = await Court.objects.filter(in_use=True).acount()
+        self.assertIn(
+            f"{court_count} Jurisdictions",
+            response.content.decode(),
+            msg="Wrong number of Jurisdictions shown in Homepage",
         )
 
     async def test_fail_gracefully(self) -> None:
