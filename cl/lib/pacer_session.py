@@ -122,7 +122,7 @@ def get_or_cache_pacer_cookies(
     password: str,
     client_code: str | None = None,
     refresh: bool = False,
-) -> RequestsCookieJar:
+) -> tuple[RequestsCookieJar, str]:
     """Get PACER cookies for a user or create and cache fresh ones
 
     For the PACER Fetch API, we store users' PACER cookies in Redis with a
@@ -131,7 +131,7 @@ def get_or_cache_pacer_cookies(
 
     This function attempts to get cookies for a user from Redis. If it finds
     them, it returns them. If not, it attempts to log the user in and then
-    returns the fresh cookies (after caching them).
+    returns the fresh cookies and the proxy used to login(after caching them).
 
     :param user_pk: The PK of the user attempting to store their credentials.
     Needed to create the key in Redis.
@@ -139,21 +139,27 @@ def get_or_cache_pacer_cookies(
     :param password: The PACER password of the user
     :param client_code: The PACER client code of the user
     :param refresh: If True, refresh the cookies even if they're already cached
-    :return: Cookies for the PACER user
+    :return: A tuple containing the Request.CookieJar and the proxy address
     """
     r = get_redis_interface("CACHE", decode_responses=False)
-    cookies = get_pacer_cookie_from_cache(user_pk, r=r)
+    cookies_data = get_pacer_cookie_from_cache(user_pk, r=r)
     ttl_seconds = r.ttl(session_key % user_pk)
-    if cookies and ttl_seconds >= 300 and not refresh:
+    if cookies_data and ttl_seconds >= 300 and not refresh:
         # cookies were found in cache and ttl >= 5 minutes, return them
-        return cookies
+        if isinstance(cookies_data, tuple):
+            return cookies_data
+        return cookies_data, settings.EGRESS_PROXY_HOST
 
     # Unable to find cookies in cache, are about to expire or refresh needed
     # Login and cache new values.
-    cookies = log_into_pacer(username, password, client_code)
+    cookies, proxy = log_into_pacer(username, password, client_code)
     cookie_expiration = 60 * 60
-    r.set(session_key % user_pk, pickle.dumps(cookies), ex=cookie_expiration)
-    return cookies
+    r.set(
+        session_key % user_pk,
+        pickle.dumps((cookies, proxy)),
+        ex=cookie_expiration,
+    )
+    return cookies, proxy
 
 
 def get_pacer_cookie_from_cache(
