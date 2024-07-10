@@ -1,4 +1,5 @@
 import pickle
+import random
 from typing import Union
 from urllib.parse import urlparse
 
@@ -28,13 +29,36 @@ class ProxyPacerSession(PacerSession):
     """
 
     def __init__(
-        self, cookies=None, username=None, password=None, client_code=None
+        self,
+        cookies=None,
+        username=None,
+        password=None,
+        client_code=None,
+        proxy=None,
     ):
         super().__init__(cookies, username, password, client_code)
+        self.proxy_address = proxy if proxy else self._pick_proxy_connection()
         self.proxies = {
-            "http": settings.EGRESS_PROXY_HOST,
+            "http": self.proxy_address,
         }
         self.headers["X-WhSentry-TLS"] = "true"
+
+    def _pick_proxy_connection(self) -> str:
+        """
+        Picks a proxy connection string from available options.
+
+        If the `settings.EGRESS_PROXY_HOSTS` list is empty, this function
+        returns the value from `settings.EGRESS_PROXY_HOST`. Otherwise, it
+        randomly chooses a string from the `settings.EGRESS_PROXY_HOSTS` list
+        and returns it.
+
+        Returns:
+            str: The chosen proxy connection string.
+        """
+        if not settings.EGRESS_PROXY_HOSTS:
+            return settings.EGRESS_PROXY_HOST
+
+        return random.choice(settings.EGRESS_PROXY_HOSTS)
 
     def _change_protocol(self, url: str) -> str:
         """Converts a URL from HTTPS to HTTP protocol.
