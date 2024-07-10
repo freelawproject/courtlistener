@@ -75,7 +75,7 @@ def validate_queries_syntax(options: OptionsType) -> None:
         if search_form.is_valid():
             cd = search_form.cleaned_data
             try:
-                s, _ = build_es_base_query(search_query, cd)
+                s, _, _ = build_es_base_query(search_query, cd)
                 s = s.extra(size=0)
                 s.execute().to_dict()
                 # Waiting between requests to avoid hammering ES too quickly.

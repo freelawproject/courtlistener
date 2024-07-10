@@ -984,7 +984,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     @staticmethod
     def save_percolator_query(cd):
         search_query = AudioDocument.search()
-        query, _ = build_es_base_query(search_query, cd)
+        query, _, _ = build_es_base_query(search_query, cd)
         query_dict = query.to_dict()["query"]
         percolator_query = AudioPercolator(
             percolator_query=query_dict, rate=Alert.REAL_TIME

@@ -169,27 +169,6 @@ def recap_document_hl_matched(rd_hit: Hit) -> bool:
     return False
 
 
-def query_includes_rd_field(query_params: CleanData) -> bool:
-    """Determine whether the query includes any indexed fields in the query
-    string or filters specific to RECAP Documents.
-
-    :param query_params: The query parameters.
-    :return: True if any recap document fields or filters are included in the
-    query, otherwise False.
-    """
-
-    query_string = query_params.get("q", "")
-    for rd_field in recap_document_indexed_fields:
-        if f"{rd_field}:" in query_string:
-            return True
-
-    for rd_filter in recap_document_filters:
-        if query_params.get(rd_filter, ""):
-            return True
-
-    return False
-
-
 def make_alert_set_key(alert_id: int, document_type: str) -> str:
     """Generate a Redis key for storing alert hits.
 
