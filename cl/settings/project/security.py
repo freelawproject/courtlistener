@@ -16,6 +16,7 @@ ALLOWED_HOSTS: list[str] = env(
 EGRESS_PROXY_HOST = env(
     "EGRESS_PROXY_HOST", default="http://cl-webhook-sentry:9090"
 )
+EGRESS_PROXY_HOSTS: list[str] = env.list("EGRESS_PROXY_HOSTS", default=[])
 
 SECURE_HSTS_SECONDS = 63_072_000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
