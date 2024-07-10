@@ -497,7 +497,7 @@ class PacerDocketParserTest(TestCase):
 
     @patch(
         "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
-        return_value=None,
+        return_value=(None, None),
     )
     def test_get_and_save_free_document_report(self, mock_cookies) -> None:
         """Test the retrieval and storage of free document report data."""
@@ -3342,7 +3342,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
 
 @patch(
     "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
-    return_value=None,
+    return_value=(None, None),
 )
 @override_settings(
     IQUERY_PROBE_DAEMON_ENABLED=True,

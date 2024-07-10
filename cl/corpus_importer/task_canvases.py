@@ -18,7 +18,9 @@ from cl.recap.tasks import process_recap_attachment
 from cl.search.tasks import add_or_update_recap_docket
 
 
-def get_docket_and_claims(docket_number, court, case_name, cookies, tags, q):
+def get_docket_and_claims(
+    docket_number, court, case_name, cookies_data, tags, q
+):
     """Get the docket report, claims history report, and save it all to the DB
     and Solr
     """
@@ -27,13 +29,13 @@ def get_docket_and_claims(docket_number, court, case_name, cookies, tags, q):
             pass_through=None,
             docket_number=docket_number,
             court_id=court,
-            cookies=cookies,
+            cookies_data=cookies_data,
             case_name=case_name,
             docket_number_letters="bk",
         ).set(queue=q),
         get_docket_by_pacer_case_id.s(
             court_id=court,
-            cookies=cookies,
+            cookies_data=cookies_data,
             tag_names=tags,
             **{
                 "show_parties_and_counsel": True,
@@ -41,9 +43,9 @@ def get_docket_and_claims(docket_number, court, case_name, cookies, tags, q):
                 "show_list_of_member_cases": False,
             }
         ).set(queue=q),
-        get_bankr_claims_registry.s(cookies=cookies, tag_names=tags).set(
-            queue=q
-        ),
+        get_bankr_claims_registry.s(
+            cookies_data=cookies_data, tag_names=tags
+        ).set(queue=q),
         add_or_update_recap_docket.s().set(queue=q),
     ).apply_async()
 
@@ -72,7 +74,9 @@ def get_district_attachment_pages(options, rd_pks, tag_names, session):
             break
         throttle.maybe_wait()
         chain(
-            get_attachment_page_by_rd.s(rd_pk, session.cookies).set(queue=q),
+            get_attachment_page_by_rd.s(
+                rd_pk, (session.cookies, session.proxy_address)
+            ).set(queue=q),
             make_attachment_pq_object.s(rd_pk, recap_user.pk).set(queue=q),
             process_recap_attachment.s(tag_names=tag_names).set(queue=q),
         ).apply_async()

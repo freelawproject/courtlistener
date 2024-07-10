@@ -94,11 +94,11 @@ def get_petitions(
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
-
+        cookies_data = pacer_session.cookies, pacer_session.proxy_address
         chain(
-            get_pacer_doc_by_rd.s(
-                rd_pk, pacer_session.cookies, tag=tag_petitions
-            ).set(queue=q),
+            get_pacer_doc_by_rd.s(rd_pk, cookies_data, tag=tag_petitions).set(
+                queue=q
+            ),
             extract_recap_pdf.si(rd_pk).set(queue=q),
             add_items_to_solr.si([rd_pk], "search.RECAPDocument").set(queue=q),
         ).apply_async()
