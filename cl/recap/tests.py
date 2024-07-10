@@ -1205,7 +1205,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.get_or_cache_pacer_cookies",
-        side_effect=lambda x, y, z: None,
+        side_effect=lambda x, y, z: (None, None),
     )
     @mock.patch(
         "cl.recap.tasks.is_docket_entry_sealed",
@@ -2857,7 +2857,7 @@ class IdbMergeTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: None,
+    side_effect=lambda x, y, z: (None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -5315,7 +5315,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: "Cookie",
+    side_effect=lambda x, y, z: ("Cookie", settings.EGRESS_PROXY_HOST),
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
@@ -5689,7 +5689,7 @@ class CheckCourtConnectivityTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: None,
+    side_effect=lambda x, y, z: (None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
