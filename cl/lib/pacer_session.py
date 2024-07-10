@@ -99,13 +99,13 @@ def log_into_pacer(
     username: str,
     password: str,
     client_code: str | None = None,
-) -> RequestsCookieJar:
+) -> tuple[RequestsCookieJar, str]:
     """Log into PACER and return the cookie jar
 
     :param username: A PACER username
     :param password: A PACER password
     :param client_code: A PACER client_code
-    :return: Request.CookieJar
+    :return: A tuple containing the Request.CookieJar and the proxy address
     """
     s = ProxyPacerSession(
         username=username,
@@ -113,7 +113,7 @@ def log_into_pacer(
         client_code=client_code,
     )
     s.login()
-    return s.cookies
+    return s.cookies, s.proxy_address
 
 
 def get_or_cache_pacer_cookies(
