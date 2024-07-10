@@ -29,6 +29,7 @@ class UPLOAD_TYPE:
     CASE_QUERY_RESULT_PAGE = 14
     APPELLATE_CASE_QUERY_RESULT_PAGE = 15
     ACMS_DOCKET_JSON = 16
+    FREE_OPINIONS_REPORT = 17
     NAMES = (
         (DOCKET, "HTML Docket"),
         (ATTACHMENT_PAGE, "HTML attachment page"),
@@ -46,6 +47,7 @@ class UPLOAD_TYPE:
         (CASE_QUERY_RESULT_PAGE, "Case query result page"),
         (APPELLATE_CASE_QUERY_RESULT_PAGE, "Appellate Case query result page"),
         (ACMS_DOCKET_JSON, "ACMS docket JSON object"),
+        (FREE_OPINIONS_REPORT, "Free opinions report"),
     )
 
 

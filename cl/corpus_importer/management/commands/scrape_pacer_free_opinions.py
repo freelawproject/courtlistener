@@ -5,9 +5,7 @@ from typing import Callable, Dict, List, Optional, Tuple, cast
 
 from celery.canvas import chain
 from django.conf import settings
-from django.db.models import QuerySet
 from django.utils.timezone import now
-from juriscraper.lib.date_utils import make_date_range_tuples
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.lib.string_utils import CaseNameTweaker
 from requests import RequestException
@@ -75,7 +73,9 @@ def get_next_date_range(
     return last_complete_date, next_end_date
 
 
-def mark_court_in_progress(court_id: str, d: datetime.date) -> QuerySet:
+def mark_court_in_progress(
+    court_id: str, d: datetime.date
+) -> PACERFreeDocumentLog:
     log = PACERFreeDocumentLog.objects.create(
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
         date_queried=d,
@@ -88,9 +88,11 @@ def fetch_doc_report(
     pacer_court_id: int,
     start: Optional[datetime.date],
     end: Optional[datetime.date],
+    log_id: int = 0,
 ):
     exception_raised = False
     status = PACERFreeDocumentLog.SCRAPE_FAILED
+    rows_to_create = 0
 
     logger.info(
         "Attempting to get latest document references for "
@@ -100,7 +102,7 @@ def fetch_doc_report(
         end,
     )
     try:
-        status = get_and_save_free_document_report(pacer_court_id, start, end)
+        status, rows_to_create = get_and_save_free_document_report(pacer_court_id, start, end, log_id)  # type: ignore
     except (
         RequestException,
         ReadTimeoutError,
@@ -122,9 +124,18 @@ def fetch_doc_report(
         logger.error(
             "Failed to get free document references for "
             f"{pacer_court_id} between {start} and "
-            f"{end} due to {reason}."
+            f"{end} due to {reason}.",
+            exc_info=True,
         )
         exception_raised = True
+
+    logger.info(
+        "Got %s document references for " "%s between %s and %s",
+        rows_to_create,
+        pacer_court_id,
+        start,
+        end,
+    )
 
     return exception_raised, status
 
@@ -176,25 +187,19 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
     pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
 
     if options["date_start"] and options["date_end"]:
-        date_ranges = make_date_range_tuples(
-            options["date_start"], options["date_end"], gap=options["span"]
-        )
         for pacer_court_id in pacer_court_ids:
-            for start, end in date_ranges:
-                exception_raised, status = fetch_doc_report(
-                    pacer_court_id, start, end
-                )
-                if exception_raised:
-                    break
-
+            # Here we do not save the log since if an incorrect range is entered
+            # the next time the daily cron is executed the command could skip days
+            exc, status = fetch_doc_report(
+                pacer_court_id, options["date_start"], options["date_end"]  # type: ignore
+            )
+            if exc:
+                break
     else:
         today = now()
         for pacer_court_id in pacer_court_ids:
             while True:
                 next_start_d, next_end_d = get_next_date_range(pacer_court_id)
-                print(
-                    f"next_start_d: {next_start_d} - next_end_d: {next_end_d}"
-                )
                 if next_end_d is None:
                     logger.warning(
                         f"Free opinion scraper for {pacer_court_id} still "
@@ -202,20 +207,21 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                     )
                     break
 
-                mark_court_in_progress(pacer_court_id, next_end_d)
+                log = mark_court_in_progress(pacer_court_id, next_end_d)
 
                 exc, status = fetch_doc_report(
-                    pacer_court_id, next_start_d, next_end_d
+                    pacer_court_id, next_start_d, next_end_d, log.pk
                 )
                 if exc:
+                    # Something failed
                     mark_court_done_on_date(
+                        log.pk,
                         PACERFreeDocumentLog.SCRAPE_FAILED,
-                        pacer_court_id,
-                        next_end_d,
                     )
                     break
 
-                mark_court_done_on_date(status, pacer_court_id, next_end_d)
+                # Scrape successful
+                mark_court_done_on_date(log.pk, status)
 
                 if status == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
                     if next_end_d >= today.date():
@@ -233,7 +239,8 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                     logger.error(
                         "Encountered critical error on %s "
                         "(network error?). Marking as failed and "
-                        "pressing on." % pacer_court_id
+                        "pressing on." % pacer_court_id,
+                        exc_info=True,
                     )
                     # Break from while loop, onwards to next court
                     break
@@ -319,6 +326,21 @@ def ocr_available(options: OptionsType) -> None:
             logger.info(f"Sent {i + 1}/{count} tasks to celery so far.")
 
 
+def do_monthly():
+    # Run everything monthly range
+    pass
+
+
+def do_weekly():
+    # Run everything weekly range
+    pass
+
+
+def do_all():
+    # run all courts since first day started to query each court
+    pass
+
+
 def do_everything(options: OptionsType):
     logger.info("Running and compiling free document reports.")
     get_and_save_free_document_reports(options)
@@ -381,21 +403,16 @@ class Command(VerboseCommand):
             type=valid_date,
             help="Date when the query should end.",
         )
-        parser.add_argument(
-            "--span",
-            type=int,
-            default=7,
-            help="The number of days, inclusive, that a query should span at a time.",
-        )
 
     def handle(self, *args: List[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
 
         if options["date_start"] and options["date_end"]:
             if options["date_start"] > options["date_end"]:  # type: ignore
-                print("Error: date-end must be greater than date-start.")
+                print(
+                    "Error: date-end must be greater or equal than date-start option."
+                )
                 return
-
         action = cast(Callable, options["action"])
         action(options)
 
@@ -404,4 +421,7 @@ class Command(VerboseCommand):
         "get-report-results": get_and_save_free_document_reports,
         "get-pdfs": get_pdfs,
         "ocr-available": ocr_available,
+        "do-monthly": do_monthly,
+        "do-weekly": do_weekly,
+        "do-all": do_all,
     }
