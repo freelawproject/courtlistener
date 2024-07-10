@@ -1,8 +1,13 @@
 import datetime
+import pickle
 from typing import Tuple, TypedDict, cast
+from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.core.files.base import ContentFile
+from django.test import override_settings
+from requests.cookies import RequestsCookieJar
 
 from cl.lib.date_time import midnight_pt
 from cl.lib.elasticsearch_utils import append_query_conjunctions
@@ -20,6 +25,11 @@ from cl.lib.pacer import (
     normalize_attorney_contact,
     normalize_attorney_role,
     normalize_us_state,
+)
+from cl.lib.pacer_session import (
+    ProxyPacerSession,
+    get_or_cache_pacer_cookies,
+    session_key,
 )
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
@@ -78,6 +88,128 @@ class TestPacerUtils(TestCase):
             msg="Bankruptcy dockets that start blocked "
             "should stay blocked.",
         )
+
+
+class TestPacerSessionUtils(TestCase):
+
+    def setUp(self) -> None:
+        r = get_redis_interface("CACHE", decode_responses=False)
+        self.test_cookies = RequestsCookieJar()
+        self.test_cookies.set("PacerSession", "this-is-a-test")
+        r.set(
+            session_key % "test_user_old_format",
+            pickle.dumps(self.test_cookies),
+            ex=60 * 60,
+        )
+        r.set(
+            session_key % "test_user_new_format",
+            pickle.dumps((self.test_cookies, "http://proxy_1:9090")),
+            ex=60 * 60,
+        )
+        r.set(
+            session_key % "test_old_format_almost_expired",
+            pickle.dumps(self.test_cookies),
+            ex=60,
+        )
+        r.set(
+            session_key % "test_new_format_almost_expired",
+            pickle.dumps((self.test_cookies, "http://proxy_1:9090")),
+            ex=60,
+        )
+
+    def test_use_default_proxy_if_list_not_available(self) -> None:
+        """Does ProxyPacerSession uses the default proxy when no list is provided?"""
+        session = ProxyPacerSession(username="test", password="password")
+        self.assertEqual(session.proxy_address, settings.EGRESS_PROXY_HOST)
+
+    @override_settings(
+        EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+    )
+    def test_pick_random_proxy_when_list_is_available(self):
+        """Does ProxyPacerSession choose a random proxy from the available list?"""
+        session = ProxyPacerSession(username="test", password="password")
+        self.assertNotEqual(session.proxy_address, settings.EGRESS_PROXY_HOST)
+        self.assertIn(
+            session.proxy_address,
+            ["http://proxy_1:9090", "http://proxy_2:9090"],
+        )
+
+    def test_use_default_proxy_host_for_old_cookie_format(self):
+        """Can we handle the old cookie format properly?"""
+        cookies_data = get_or_cache_pacer_cookies(
+            "test_user_old_format", username="test", password="password"
+        )
+        self.assertIsInstance(cookies_data, tuple)
+        _, proxy = cookies_data
+        self.assertEqual(proxy, settings.EGRESS_PROXY_HOST)
+
+    @override_settings(
+        EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+    )
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_compute_new_cookies_with_new_format(self, mock_log_into_pacer):
+        """Are we using the tuple format for new cookies?"""
+        mock_log_into_pacer.return_value = (
+            self.test_cookies,
+            "http://proxy_1:9090",
+        )
+        cookies_data = get_or_cache_pacer_cookies(
+            "test_user_new_cookie", username="test", password="password"
+        )
+        self.assertIsInstance(cookies_data, tuple)
+        _, proxy = cookies_data
+        self.assertEqual(proxy, "http://proxy_1:9090")
+
+    def test_parse_cookie_proxy_pair_properly(self):
+        """Can we parse the tuple format from cache properly?"""
+        cookies_data = get_or_cache_pacer_cookies(
+            "test_user_new_format", username="test", password="password"
+        )
+        self.assertIsInstance(cookies_data, tuple)
+        _, proxy = cookies_data
+        self.assertEqual(proxy, "http://proxy_1:9090")
+
+    @override_settings(
+        EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+    )
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_compute_cookies_for_almost_expired_data(
+        self, mock_log_into_pacer
+    ):
+        """Are we using the tuple format when re-computing session?"""
+        mock_log_into_pacer.return_value = (
+            self.test_cookies,
+            "http://proxy_1:9090",
+        )
+
+        # Attempts to get almost expired cookies with the old format from cache
+        # Expects refresh.
+        cookies = get_or_cache_pacer_cookies(
+            "test_old_format_almost_expired",
+            username="test",
+            password="password",
+        )
+        self.assertIsInstance(cookies, tuple)
+        _, proxy = cookies
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
+        self.assertEqual(proxy, "http://proxy_1:9090")
+
+        mock_log_into_pacer.return_value = (
+            self.test_cookies,
+            "http://proxy_2:9090",
+        )
+
+        # Attempts to get almost expired cookies with the new format from cache
+        # Expects refresh.
+        cookies = get_or_cache_pacer_cookies(
+            "test_new_format_almost_expired",
+            username="test",
+            password="password",
+        )
+        self.assertIsInstance(cookies, tuple)
+        _, proxy = cookies
+        self.assertEqual(mock_log_into_pacer.call_count, 2)
+        self.assertEqual(proxy, "http://proxy_2:9090")
 
 
 class TestStringUtils(SimpleTestCase):
