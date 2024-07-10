@@ -78,6 +78,16 @@ LOGGING = {
         },
         # This is the one that's used practically everywhere in the code.
         "cl": {"handlers": ["console"], "level": "INFO", "propagate": True},
+        "juriscraper": {
+            "handlers": ["console"],
+            "propagate": True,
+            "level": "DEBUG",
+        },
+        "Logger": {
+            "handlers": ["console"],
+            "propagate": True,
+            "level": "DEBUG",
+        },
     },
 }
 
