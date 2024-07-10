@@ -115,9 +115,9 @@ class MembershipWebhookViewSet(
             client = NeonClient()
             neon_account = client.get_acount_by_id(account_id)
             contact_data = neon_account["primaryContact"]
-            users = User.objects.filter(email=contact_data["email1"]).order_by(
-                "-last_login"
-            )
+            users = User.objects.filter(
+                email__iexact=contact_data["email1"]
+            ).order_by("-last_login")
             if not users.exists():
                 address = self._get_address_from_neon_response(
                     contact_data["addresses"]

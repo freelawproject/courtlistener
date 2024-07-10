@@ -7308,6 +7308,26 @@ class LookupDocketsTest(TestCase):
             d.docket_number_core, self.docket_case_id.docket_number_core
         )
 
+    def test_case_id_and_docket_number_no_match(self):
+        """Confirm if when a lookup by pacer_case_id and docket_number doesn't
+        match a new Docket is created instead.
+        """
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 4)
+        d = async_to_sync(find_docket_object)(
+            self.court.pk, "12346", self.docket_data["docket_number"]
+        )
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
+        d.save()
+
+        # Docket didn't match. New one created.
+        self.assertEqual(dockets.count(), 5)
+        self.assertNotEqual(d.id, self.docket_case_id.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_case_id.docket_number_core
+        )
+
     def test_case_id_lookup(self):
         """Confirm if lookup by only pacer_case_id works properly."""
 
@@ -7328,7 +7348,7 @@ class LookupDocketsTest(TestCase):
 
         d = async_to_sync(find_docket_object)(
             self.court.pk,
-            self.docket_core_data["docket_entries"][0]["pacer_case_id"],
+            None,
             self.docket_core_data["docket_number"],
         )
         async_to_sync(update_docket_metadata)(d, self.docket_core_data)
@@ -7345,7 +7365,7 @@ class LookupDocketsTest(TestCase):
 
         d = async_to_sync(find_docket_object)(
             self.court.pk,
-            self.docket_no_core_data["docket_entries"][0]["pacer_case_id"],
+            None,
             self.docket_no_core_data["docket_number"],
         )
         async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
@@ -7426,7 +7446,7 @@ class LookupDocketsTest(TestCase):
         )
         new_d = async_to_sync(find_docket_object)(
             self.court_appellate.pk,
-            docket_data_lower_number["docket_entries"][0]["pacer_case_id"],
+            None,
             docket_data_lower_number["docket_number"],
         )
         async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)

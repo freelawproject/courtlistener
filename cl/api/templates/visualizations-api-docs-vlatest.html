@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Visualization APIs for Supreme Court Cases – CourtListener.com{% endblock %}
+{% block og_title %}Visualization APIs for Supreme Court Cases – CourtListener.com{% endblock %}
+
+{% block description %}Use these APIs to make and modify Supreme Court Visualizations.{% endblock %}
+{% block og_description %}Use these APIs to make and modify Supreme Court Visualizations.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+{% block navbar-o %}active{% endblock %}
+
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#creating">Creating Visualizations</a></li>
+      <li><a href="#editing">Editing Visualizations</a></li>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Supreme Court Visualization&nbsp;API</h1>
+  <h2><code>{% url "scotusmap-list" version="v3" %}</code></h2>
+  <p class="lead">Use this API to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener.
+  </p>
+  <p>All visualizations are associated with a user and are private by default. When you GET these endpoints, you will see data for visualizations that have been made public by their owners or that you have created yourself.
+  </p>
+  <p>To learn more about opinion clusters, see the <a href="{% url "case_law_api_help" %}">case law API documentation</a>. To learn more about citations between decisions see the <a href="{% url "citation_api_help" %}">citation API documentation</a>.
+  </p>
+  <h2 id="creating">Creating Visualizations</h2>
+  <p>To create a new visualization, send an HTTP <code>POST</code> with a title, a starting cluster ID, and an ending cluster ID:</p>
+  <pre class="scrollable">curl -X POST \
+  --data 'cluster_start=/api/rest/v3/clusters/105659/' \
+  --data 'cluster_end=/api/rest/v3/clusters/111891/' \
+  --data 'title=A map from Trop to Salerno' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "scotusmap-list" version="v3" %}"</pre>
+  <p>The <code>cluster_start</code> and <code>cluster_end</code> parameters use URLs instead of IDs.</p>
+  <p>The above command creates a visualization unless there are no connections between the start and end clusters or the network becomes too large to generate.
+  </p>
+  <p>Once created, the visualization will have nested JSON data representing the visualization itself, a list of clusters that are in it, and various other metadata.</p>
+
+  <h2 id="editing">Editing and Deleting Visualizations</h2>
+  <p>Changing data for an existing visualization can be done via an HTTP <code>PATCH</code> request. For example, to make a visualization publicly accessible:
+  </p>
+  <pre class="scrollable">curl -X PATCH \
+  --data 'published=True' \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "scotusmap-detail" version="v3" pk="1" %}"</pre>
+  <p>Similar commands can be used to update other non-readonly fields.</p>
+  <p>To soft-delete a visualization, flip the <code>deleted</code> field to <code>True</code>. To hard-delete, send an HTTP <code>DELETE</code> request.
+  </p>
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

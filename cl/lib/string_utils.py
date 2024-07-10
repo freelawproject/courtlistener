@@ -40,7 +40,7 @@ def filter_invalid_XML_chars(input: str) -> str:
 
     This strips out everything else.
 
-    See: http://stackoverflow.com/a/25920392/64911
+    See: https://stackoverflow.com/a/25920392/64911
     """
     if isinstance(input, str):
         # Only do str, unicode, etc.
