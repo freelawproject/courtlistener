@@ -2,7 +2,7 @@ import copy
 import datetime
 import time
 import traceback
-from typing import Any, Type
+from typing import Any, Literal, Type
 
 import pytz
 from asgiref.sync import async_to_sync
@@ -140,12 +140,21 @@ def index_daily_recap_documents(
     :return: The total number of documents re-indexed.
     """
 
-    if r.exists("alert_sweep:re_index_completed"):
+    if r.exists("alert_sweep:main_re_index_completed"):
         logger.info(
-            "The re-index task has been completed and will be omitted."
+            "The main re-index task has been completed and will be omitted."
         )
-        # The re-indexing has been completed for the day. Abort it and proceed
-        # with sending alerts.
+        # The main re-indexing has been completed for the day. Abort it and
+        # proceed with RECAPDocument re-index.
+        return 0
+
+    if r.exists("alert_sweep:rd_re_index_completed"):
+        logger.info(
+            "The RECAPDocument only re-index task has been completed and will "
+            "be omitted."
+        )
+        # The RECAPDocument re-indexing has been completed for the day. Abort
+        # it and proceed with sending alerts.
         return 0
 
     if not r.exists("alert_sweep:query_date"):
@@ -368,7 +377,7 @@ def index_daily_recap_documents(
 
 
 def should_docket_hit_be_included(
-    r: Redis, alert_id: int, docket_id: int
+    r: Redis, alert_id: int, docket_id: int, query_date: datetime.date
 ) -> bool:
     """Determine if a Docket alert should be triggered based on its
     date_modified and if the docket has triggered the alert previously.
@@ -376,21 +385,19 @@ def should_docket_hit_be_included(
     :param r: The Redis interface.
     :param alert_id: The ID of the alert.
     :param docket_id: The ID of the docket.
+    :param query_date: The daily re_index query date.
     :return: True if the Docket alert should be triggered, False otherwise.
     """
     docket = Docket.objects.filter(id=docket_id).only("date_modified").first()
     if not docket:
         return False
     if not has_document_alert_hit_been_triggered(r, alert_id, "d", docket_id):
-        local_midnight_localized = timezone.localtime(
-            timezone.make_aware(
-                datetime.datetime.fromisoformat(
-                    str(r.get("alert_sweep:query_date"))
-                )
-            )
-        )
+        # Confirm the docket has been modified during the day we’re sending
+        # alerts to avoid triggering docket-only alerts due to RECAPDocuments
+        # related to the case being indexed during the day since RD contains
+        # docket fields indexed which can trigger docket-only alerts.
         date_modified_localized = dt_as_local_date(docket.date_modified)
-        if date_modified_localized == local_midnight_localized.date():
+        if date_modified_localized == query_date:
             return True
     return False
 
@@ -464,6 +471,7 @@ def process_alert_hits(
     parent_results: Response | None,
     child_results: Response | None,
     alert_id: int,
+    query_date: datetime.date,
 ) -> list[Hit]:
     """Process alert hits by filtering and prepare the results to send based
     on alert conditions.
@@ -473,9 +481,9 @@ def process_alert_hits(
     :param parent_results: The ES Response for the docket-only query.
     :param child_results: The ES Response for the RECAPDocument-only query.
     :param alert_id: The ID of the alert being processed.
+    :param query_date: The daily re_index query date.
     :return: A list of Hit objects that are filtered and prepared to be sent.
     """
-
     docket_hits = parent_results.hits if parent_results else []
     docket_ids = [int(d.docket_id) for d in docket_hits]
 
@@ -490,32 +498,31 @@ def process_alert_hits(
                     r, alert_id, hit["child_docs"], rd_ids, check_rd_hl=True
                 )
                 if rds_to_send:
-                    # Cross-object query
+                    # Docket OR RECAPDocument alert.
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
                     if should_docket_hit_be_included(
-                        r, alert_id, hit.docket_id
+                        r, alert_id, hit.docket_id, query_date
                     ):
                         add_document_hit_to_alert_set(
                             r, alert_id, "d", hit.docket_id
                         )
 
-                # Docket-only alert
-                elif should_docket_hit_be_included(r, alert_id, hit.docket_id):
+                elif should_docket_hit_be_included(
+                    r, alert_id, hit.docket_id, query_date
+                ):
                     # Docket-only alert
                     hit["child_docs"] = []
                     results_to_send.append(hit)
                     add_document_hit_to_alert_set(
                         r, alert_id, "d", hit.docket_id
                     )
-
             else:
-                # RECAP-only alerts or cross-object alerts
+                # RECAPDocument-only alerts or cross-object alerts
                 rds_to_send = filter_rd_alert_hits(
                     r, alert_id, hit["child_docs"], rd_ids
                 )
                 if rds_to_send:
-                    # Cross-object alert
                     hit["child_docs"] = rds_to_send
                     results_to_send.append(hit)
     return results_to_send
@@ -541,7 +548,18 @@ def send_search_alert_webhooks(
         )
 
 
-def query_and_send_alerts(r: Redis, rate: str) -> None:
+def query_and_send_alerts(
+    r: Redis, rate: Literal["rt", "dly"], query_date: datetime.date
+) -> None:
+    """Query the sweep index and send alerts based on the specified rate
+    and date.
+
+    :param r: The Redis interface.
+    :param rate: The rate at which to query alerts.
+    :param query_date: The daily re_index query date.
+    :return: None.
+    """
+
     alert_users: UserProfile.user = User.objects.filter(
         alerts__rate=rate
     ).distinct()
@@ -566,11 +584,7 @@ def query_and_send_alerts(r: Redis, rate: str) -> None:
             alerts_to_update.append(alert.pk)
             search_type = search_params.get("type", SEARCH_TYPES.RECAP)
             results_to_send = process_alert_hits(
-                r,
-                results,
-                parent_results,
-                child_results,
-                alert.pk,
+                r, results, parent_results, child_results, alert.pk, query_date
             )
             if results_to_send:
                 hits.append(
@@ -600,7 +614,18 @@ def query_and_send_alerts(r: Redis, rate: str) -> None:
         logger.info(f"Sent {alerts_sent_count} {rate} email alerts.")
 
 
-def query_and_schedule_alerts(r: Redis, rate: str):
+def query_and_schedule_alerts(
+    r: Redis, rate: Literal["wly", "mly"], query_date: datetime.date
+) -> None:
+    """Query the sweep index and schedule alerts based on the specified rate
+    and date.
+
+    :param r: The Redis interface.
+    :param rate: The rate at which to query alerts.
+    :param query_date: The daily re_index query date.
+    :return: None.
+    """
+
     alert_users = User.objects.filter(alerts__rate=rate).distinct()
     for user in alert_users:
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
@@ -615,11 +640,7 @@ def query_and_schedule_alerts(r: Redis, rate: str):
                 continue
 
             results_to_send = process_alert_hits(
-                r,
-                results,
-                parent_results,
-                child_results,
-                alert.pk,
+                r, results, parent_results, child_results, alert.pk, query_date
             )
             if results_to_send:
                 for hit in results_to_send:
@@ -678,6 +699,10 @@ class Command(VerboseCommand):
             RECAPSweepDocument,
             testing=testing_mode,
         )
+        if not testing_mode:
+            # main_re_index_completed key so the main re_index task can be
+            # omitted in case of a failure.
+            r.set("alert_sweep:main_re_index_completed", 1, ex=3600 * 12)
         index_daily_recap_documents(
             r,
             DocketDocument._index._name,
@@ -686,11 +711,21 @@ class Command(VerboseCommand):
             only_rd=True,
         )
         if not testing_mode:
-            r.set("alert_sweep:re_index_completed", 1, ex=3600 * 12)
+            # rd_re_index_completed key so the RECAPDocument re_index task
+            # can be omitted in case of a failure.
+            r.set("alert_sweep:rd_re_index_completed", 1, ex=3600 * 12)
 
-        query_and_send_alerts(r, Alert.REAL_TIME)
-        query_and_send_alerts(r, Alert.DAILY)
-        query_and_schedule_alerts(r, Alert.WEEKLY)
-        query_and_schedule_alerts(r, Alert.MONTHLY)
-        r.delete("alert_sweep:re_index_completed")
+        query_date = timezone.localtime(
+            timezone.make_aware(
+                datetime.datetime.fromisoformat(
+                    str(r.get("alert_sweep:query_date"))
+                )
+            )
+        ).date()
+        query_and_send_alerts(r, Alert.REAL_TIME, query_date)
+        query_and_send_alerts(r, Alert.DAILY, query_date)
+        query_and_schedule_alerts(r, Alert.WEEKLY, query_date)
+        query_and_schedule_alerts(r, Alert.MONTHLY, query_date)
+        r.delete("alert_sweep:main_re_index_completed")
+        r.delete("alert_sweep:rd_re_index_completed")
         r.delete("alert_sweep:query_date")

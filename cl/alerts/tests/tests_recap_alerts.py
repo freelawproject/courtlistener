@@ -78,7 +78,9 @@ class RECAPAlertsSweepIndexTest(
         self.r = get_redis_interface("CACHE")
         self.r.delete("alert_sweep:query_date")
         self.r.delete("alert_sweep:task_id")
-        self.r.delete("alert_hits:")
+        keys = self.r.keys("alert_hits:*")
+        if keys:
+            self.r.delete(*keys)
 
     @staticmethod
     def get_html_content_from_email(email_content):
@@ -141,9 +143,7 @@ class RECAPAlertsSweepIndexTest(
         self.assertTrue(
             alert_element, msg=f"Not alert with title {alert_title} found."
         )
-
         alert_cases = self._extract_cases_from_alert(tree, alert_title)
-
         self.assertEqual(
             len(alert_cases),
             expected_hits,
@@ -152,21 +152,23 @@ class RECAPAlertsSweepIndexTest(
             % (alert_title, expected_hits, len(alert_cases)),
         )
         if case_title:
-            child_hit_count = 0
             for case in alert_cases:
-                case_text = " ".join(case.xpath(".//text()")).strip()
+                child_hit_count = 0
+                case_text = " ".join(
+                    [element.strip() for element in case.xpath(".//text()")]
+                )
                 if case_title in case_text:
                     child_hit_count = len(
                         case.xpath("following-sibling::ul[1]/li/a")
                     )
-
-            self.assertEqual(
-                child_hit_count,
-                expected_child_hits,
-                msg="Did not get the right number of child hits for the case %s. "
-                "Expected: %s - Got: %s\n\n"
-                % (case_title, expected_child_hits, child_hit_count),
-            )
+                self.assertEqual(
+                    child_hit_count,
+                    expected_child_hits,
+                    msg="Did not get the right number of child hits for the case %s. "
+                    "Expected: %s - Got: %s\n\n"
+                    % (case_title, expected_child_hits, child_hit_count),
+                )
+                break
 
     def _assert_child_hits_content(
         self,
@@ -865,17 +867,17 @@ class RECAPAlertsSweepIndexTest(
 
         docket.delete()
 
-    def test_special_cross_object_alerts(self) -> None:
+    def test_special_cross_object_alerts_or_clause(self) -> None:
         """This test confirms that hits are properly filtered out or included
         in alerts for special cross-object alerts that can match either a
         Docket-only hit and/or Docket + RDs simultaneously in the same hit.
         These cases include queries that use an OR clause combining
-        Docket field + RD fields or a text query that can match a Docket and
-        RD field simultaneously.
+        Docket field + RD fields.
         """
 
         # The following test confirms that an alert with a query that can match
-        # a Docket or RECAPDocuments simultaneously is properly filtered.
+        # a Docket or RECAPDocuments from different cases simultaneously are
+        # properly filtered.
         cross_object_alert_d_or_rd_field = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -897,34 +899,88 @@ class RECAPAlertsSweepIndexTest(
         )
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self._confirm_number_of_alerts(html_content, 1)
+
         # This hit should only display the Docket matched by its ID,
         # no RECAPDocument should be matched.
-        self._assert_child_hits_content(
+        self._count_alert_hits_and_child_hits(
             html_content,
             cross_object_alert_d_or_rd_field.name,
+            2,
             self.de.docket.case_name,
-            [],
+            0,
         )
-
-        # This hit should display the rd_2 nested below its parent docket.
+        # The second hit should display the rd_2 nested below its parent docket.
         self._assert_child_hits_content(
             html_content,
             cross_object_alert_d_or_rd_field.name,
             self.de_1.docket.case_name,
             [self.rd_2.description],
         )
-
         # Assert email text version:
         txt_email = mail.outbox[0].body
         self.assertIn(cross_object_alert_d_or_rd_field.name, txt_email)
         self.assertIn(self.rd_2.description, txt_email)
 
+        # This test confirms that we're able to trigger cross-object alerts
+        # that include an OR clause and match documents that belong to the
+        # same case.
+        cross_object_alert_d_or_rd_field_same_case = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object query",
+            query=f"q=docket_id:{self.de.docket.pk} OR pacer_doc_id:{self.rd.pacer_doc_id}&type=r",
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # A new alert should be triggered, containing the RD document nested
+        # below its parent docket.
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_d_or_rd_field.name,
+            1,
+            self.de.docket.case_name,
+            1,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_alert_d_or_rd_field_same_case.name,
+            self.de.docket.case_name,
+            [self.rd.description],
+        )
+
+    def test_special_cross_object_alerts_text_query(self) -> None:
+        """This test confirms that hits are properly filtered out or included
+        in alerts for special cross-object alerts that can match either a
+        Docket-only hit and/or Docket + RDs simultaneously in the same hit.
+        These cases include queries that use a text query that can match a
+        Docket and RD field simultaneously.
+        """
+
         # This test confirms a text query cross-object alert matches documents
         # according to trigger conditions like indexed date and previous triggers
         # by the same document.
+        cross_object_alert_text = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object text query",
+            query=f'q="United states"&type=r',
+        )
         two_days_before = self.mock_date - datetime.timedelta(days=2)
         mock_two_days_before = two_days_before.replace(hour=5)
-        with time_machine.travel(mock_two_days_before, tick=False):
+        with time_machine.travel(
+            mock_two_days_before, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="United States of America",
@@ -932,6 +988,22 @@ class RECAPAlertsSweepIndexTest(
                 source=Docket.RECAP,
             )
 
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # No alert should be triggered since the matched docket was not
+        # modified during the current day.
+        self.assertEqual(
+            len(mail.outbox), 0, msg="Outgoing emails don't match."
+        )
+
+        # Index new documents that match cross_object_alert_text, an RD, and
+        # an empty docket.
         with time_machine.travel(
             self.mock_date, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -951,17 +1023,11 @@ class RECAPAlertsSweepIndexTest(
 
             docket_2 = DocketFactory(
                 court=self.court,
-                case_name="United States of America vs Lorem",
+                case_name="United States vs Lorem",
                 docket_number="1:21-bk-1008",
                 source=Docket.RECAP,
             )
 
-        cross_object_alert_text = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert Cross-object query",
-            query=f'q="United states"&type=r',
-        )
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -970,14 +1036,21 @@ class RECAPAlertsSweepIndexTest(
         ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
-        # A new alert should be triggered containing two hits. One matched by
+        # An alert should be triggered containing two hits. One matched by
         # the rd_3 plain text description and one matched by docket_2 case_name
         self.assertEqual(
-            len(mail.outbox), 2, msg="Outgoing emails don't match."
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
-        html_content = self.get_html_content_from_email(mail.outbox[1])
-        # rd_3 should appear nested in this hit.
+        html_content = self.get_html_content_from_email(mail.outbox[0])
         self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_text.name,
+            2,
+            docket.case_name,
+            1,
+        )
+        # rd_3 should appear nested in this hit.
         self._assert_child_hits_content(
             html_content,
             cross_object_alert_text.name,
@@ -991,8 +1064,7 @@ class RECAPAlertsSweepIndexTest(
             docket_2.case_name,
             [],
         )
-
-        # Modify the docket today:
+        # Modify 1:21-bk-1009 docket today:
         with time_machine.travel(
             self.mock_date, tick=False
         ), self.captureOnCommitCallbacks(execute=True):
@@ -1008,11 +1080,19 @@ class RECAPAlertsSweepIndexTest(
         ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
 
-        # A new alert should be triggered containing docket as a hit with no
-        # nested RDs.
-        html_content = self.get_html_content_from_email(mail.outbox[2])
+        # A new alert should be triggered containing the docket as a hit with
+        # no nested RDs.
+        html_content = self.get_html_content_from_email(mail.outbox[1])
         self.assertEqual(
-            len(mail.outbox), 3, msg="Outgoing emails don't match."
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_text.name,
+            1,
+            docket.case_name,
+            0,
         )
         self._assert_child_hits_content(
             html_content,
@@ -1029,20 +1109,41 @@ class RECAPAlertsSweepIndexTest(
             ),
         ), time_machine.travel(self.mock_date, tick=False):
             call_command("cl_send_recap_alerts", testing_mode=True)
-
         # No new alerts should be triggered.
         self.assertEqual(
-            len(mail.outbox), 3, msg="Outgoing emails don't match."
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
+        # Index new documents that match cross_object_alert_text, an RD, and
+        # an empty docket.
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
+            rd_4 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Hearing new",
+                document_number="3",
+                pacer_doc_id="0180366528790",
+                plain_text="Lorem ipsum",
+            )
+            rd_5 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Hearing new 2",
+                document_number="4",
+                pacer_doc_id="018026657750",
+                plain_text="United states of america plain text",
+            )
+
         # This test confirms that we're able to trigger cross-object alerts
-        # that include an OR clause and match documents that belong to the
-        # same case.
-        cross_object_alert_d_or_rd_field_same_case = AlertFactory(
+        # that include an OR clause and a cross-object text query.
+        cross_object_alert_d_or_rd_field_text_query = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
-            name="Test Alert Cross-object query",
-            query=f"q=docket_id:{self.de.docket.pk} OR pacer_doc_id:{self.rd.pacer_doc_id}&type=r",
+            name="Test Alert Cross-object query combined.",
+            query=f"q=docket_id:{self.de.docket.pk} OR "
+            f"pacer_doc_id:{self.rd.pacer_doc_id} OR "
+            f'("United States of America" OR '
+            f"pacer_doc_id:{rd_3.pacer_doc_id})&type=r",
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -1054,16 +1155,80 @@ class RECAPAlertsSweepIndexTest(
 
         # A new alert should be triggered, containing the RD document nested below
         # its parent docket.
+        html_content = self.get_html_content_from_email(mail.outbox[2])
+        self.assertEqual(
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
+        )
+        # The email contains two alerts: one for cross_object_alert_text
+        # triggered by the new rd_5 added, and one for cross_object_alert_d_or_rd_field_text_query.
+        self._confirm_number_of_alerts(html_content, 2)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_text.name,
+            1,
+            docket.case_name,
+            1,
+        )
+        # The cross_object_alert_d_or_rd_field_text_query alert contains two
+        # hits. The first one matches "docket" and rd_3 and rd_5 nested below
+        # due to the OR clause in the text query, and the second hit matches
+        # self.de.docket and self.rd.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_d_or_rd_field_text_query.name,
+            2,
+            docket.case_name,
+            2,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_alert_d_or_rd_field_text_query.name,
+            docket.case_name,
+            [rd_3.description, rd_5.description],
+        )
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_alert_d_or_rd_field_text_query.name,
+            self.de.docket.case_name,
+            [self.rd.description],
+        )
+
+        # This test confirms that hits are properly filtered when using AND in
+        # the text query.
+        cross_object_alert_d_or_rd_field_text_query_and = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object query combined.",
+            query=f'q=("United States of America" AND '
+            f"pacer_doc_id:{rd_3.pacer_doc_id})&type=r",
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        # A new alert should be triggered, containing rd_3 document nested below
+        # its parent docket.
         html_content = self.get_html_content_from_email(mail.outbox[3])
         self.assertEqual(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
         )
         self._confirm_number_of_alerts(html_content, 1)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_d_or_rd_field_text_query_and.name,
+            1,
+            docket.case_name,
+            1,
+        )
         self._assert_child_hits_content(
             html_content,
-            cross_object_alert_d_or_rd_field_same_case.name,
-            self.de.docket.case_name,
-            [self.rd.description],
+            cross_object_alert_d_or_rd_field_text_query_and.name,
+            docket.case_name,
+            [rd_3.description],
         )
 
         docket.delete()
