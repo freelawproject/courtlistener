@@ -55,13 +55,19 @@ def get_dockets(options):
                     row["DOCKET"], row["OFFICE"]
                 ),
                 court_id="nywb",
-                cookies=pacer_session.cookies,
+                cookies_data=(
+                    pacer_session.cookies,
+                    pacer_session.proxy_address,
+                ),
                 office_number=row["OFFICE"],
                 docket_number_letters="bk",
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id="nywb",
-                cookies=pacer_session.cookies,
+                cookies_data=(
+                    pacer_session.cookies,
+                    pacer_session.proxy_address,
+                ),
                 tag_names=[TAG],
                 **{
                     "doc_num_start": 1,

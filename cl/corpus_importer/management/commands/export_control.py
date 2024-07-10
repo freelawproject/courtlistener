@@ -85,7 +85,7 @@ def get_data(options, row_transform, tags):
             row["docket_number"],
             row["court"],
             row["case_name"],
-            session.cookies,
+            (session.cookies, session.proxy_address),
             tags,
             q,
         )

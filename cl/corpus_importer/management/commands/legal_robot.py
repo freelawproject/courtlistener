@@ -79,9 +79,9 @@ def get_documents(options):
             continue
 
         chain(
-            get_pacer_doc_by_rd.s(rd.pk, session.cookies, tag=TAG).set(
-                queue=q
-            ),
+            get_pacer_doc_by_rd.s(
+                rd.pk, (session.cookies, session.proxy_address), tag=TAG
+            ).set(queue=q),
             extract_recap_pdf.si(rd.pk).set(queue=q),
             add_items_to_solr.si([rd.pk], "search.RECAPDocument").set(queue=q),
         ).apply_async()

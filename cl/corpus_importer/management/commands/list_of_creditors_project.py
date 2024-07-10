@@ -139,7 +139,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                 )
                 throttle.maybe_wait()
                 query_and_save_list_of_creditors.si(
-                    session.cookies,
+                    (session.cookies, session.proxy_address),
                     court_id,
                     d_number_file_name,
                     docket_number,

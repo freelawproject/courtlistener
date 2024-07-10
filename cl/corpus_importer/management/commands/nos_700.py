@@ -257,13 +257,13 @@ def get_dockets(options, items, tags, sample_size=0):
                 pass_through=None,
                 docket_number=row.docket_number,
                 court_id=row.district_id,
-                cookies=session.cookies,
+                cookies_data=(session.cookies, session.proxy_address),
                 **params,
             ).set(queue=q),
             filter_docket_by_tags.s(tags, row.district_id).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id=row.district_id,
-                cookies=session.cookies,
+                cookies_data=(session.cookies, session.proxy_address),
                 tag_names=tags,
                 **{
                     "show_parties_and_counsel": True,

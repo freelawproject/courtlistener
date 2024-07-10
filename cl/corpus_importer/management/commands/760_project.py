@@ -55,7 +55,7 @@ def get_dockets(options):
                 get_appellate_docket_by_docket_number.s(
                     docket_number=row["Cleaned case_No"],
                     court_id=row["fjc_court_id"],
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     tag_names=[TAG],
                     **{
                         "show_docket_entries": True,
@@ -75,12 +75,12 @@ def get_dockets(options):
                     pass_through=None,
                     docket_number=row["Cleaned case_No"],
                     court_id=row["fjc_court_id"],
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     case_name=row["Title"],
                 ).set(queue=q),
                 get_docket_by_pacer_case_id.s(
                     court_id=row["fjc_court_id"],
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     tag_names=[TAG],
                     **{
                         "show_parties_and_counsel": True,

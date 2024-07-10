@@ -142,7 +142,7 @@ class Command(VerboseCommand, CommandUtils):
                     pass_through=d.pk,
                     docket_number=d.idb_data.docket_number,
                     court_id=d.idb_data.district_id,
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     **params,
                 ).set(queue=q),
                 update_docket_from_hidden_api.s().set(queue=q),

@@ -41,7 +41,7 @@ def get_dockets(options):
             get_docket_by_pacer_case_id.s(
                 data={"pacer_case_id": d.pacer_case_id},
                 court_id=d.court_id,
-                cookies=session.cookies,
+                cookies_data=(session.cookies, session.proxy_address),
                 docket_pk=d.pk,
                 tag_names=[JACKSON_TAG],
                 **{

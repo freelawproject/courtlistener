@@ -78,12 +78,12 @@ def get_dockets(options: dict) -> None:
                     pass_through=None,
                     docket_number=item.docket_number,
                     court_id=item.district_id,
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     **params,
                 ).set(queue=q),
                 get_docket_by_pacer_case_id.s(
                     court_id=item.district_id,
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     tag_names=PATENT_TAGS,
                     **{
                         "show_parties_and_counsel": True,
@@ -101,7 +101,7 @@ def get_dockets(options: dict) -> None:
                 get_docket_by_pacer_case_id.s(
                     data={"pacer_case_id": d.pacer_case_id},
                     court_id=d.court_id,
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     docket_pk=d.pk,
                     tag_names=PATENT_TAGS,
                     **{

@@ -60,13 +60,19 @@ def get_dockets(options):
                     row["docket"], row["office"]
                 ),
                 court_id="ilnb",
-                cookies=pacer_session.cookies,
+                cookies_data=(
+                    pacer_session.cookies,
+                    pacer_session.proxy_address,
+                ),
                 office_number=row["office"],
                 docket_number_letters="bk",
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id="ilnb",
-                cookies=pacer_session.cookies,
+                cookies_data=(
+                    pacer_session.cookies,
+                    pacer_session.proxy_address,
+                ),
                 tag_names=[TAG],
                 **{
                     "show_parties_and_counsel": True,
@@ -118,7 +124,9 @@ def get_final_docs(options):
             throttle.maybe_wait()
             chain(
                 get_pacer_doc_by_rd.s(
-                    rd_pk, pacer_session.cookies, tag=TAG_FINALS
+                    rd_pk,
+                    (pacer_session.cookies, pacer_session.proxy_address),
+                    tag=TAG_FINALS,
                 ).set(queue=q),
                 extract_recap_pdf.si(rd_pk).set(queue=q),
                 add_items_to_solr.si([rd_pk], "search.RECAPDocument").set(

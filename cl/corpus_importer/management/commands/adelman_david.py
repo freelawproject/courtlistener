@@ -48,7 +48,7 @@ def download_dockets(options):
                 get_appellate_docket_by_docket_number.s(
                     docket_number=row["docket_no1"],
                     court_id=row["cl_court"],
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     tag_names=[PROJECT_TAG_NAME, row_tag],
                     # Do not get the docket entries for now. We're only
                     # interested in the date terminated. If it's an open case,
@@ -71,17 +71,17 @@ def download_dockets(options):
                     pass_through=None,
                     docket_number=row["docket_no1"],
                     court_id=row["cl_court"],
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     case_name=row["name"],
                 ).set(queue=q),
                 do_case_query_by_pacer_case_id.s(
                     court_id=row["cl_court"],
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     tag_names=[PROJECT_TAG_NAME, row_tag],
                 ).set(queue=q),
                 get_docket_by_pacer_case_id.s(
                     court_id=row["cl_court"],
-                    cookies=session.cookies,
+                    cookies_data=(session.cookies, session.proxy_address),
                     tag_names=[PROJECT_TAG_NAME, row_tag],
                     **{
                         # No docket entries
