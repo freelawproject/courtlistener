@@ -26,7 +26,6 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
@@ -112,7 +111,7 @@ async def find_docket_object(
             },
             {"pacer_case_id": pacer_case_id},
         ]
-    if docket_number_core:
+    if docket_number_core and not pacer_case_id:
         # Sometimes we don't know how to make core docket numbers. If that's
         # the case, we will have a blank value for the field. We must not do
         # lookups by blank values. See: freelawproject/courtlistener#1531
@@ -125,14 +124,13 @@ async def find_docket_object(
                 {"docket_number_core": docket_number_core},
             ]
         )
-    else:
+    elif docket_number and not pacer_case_id:
         # Finally, as a last resort, we can try the docket number. It might not
         # match b/c of punctuation or whatever, but we can try. Avoid lookups
         # by blank docket_number values.
-        if docket_number:
-            lookups.append(
-                {"pacer_case_id": None, "docket_number": docket_number},
-            )
+        lookups.append(
+            {"pacer_case_id": None, "docket_number": docket_number},
+        )
 
     for kwargs in lookups:
         ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)
@@ -1670,6 +1668,7 @@ def save_iquery_to_docket(
     d: Docket,
     tag_names: Optional[List[str]],
     add_to_solr: bool = False,
+    avoid_trigger_signal: bool = False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 
@@ -1678,9 +1677,13 @@ def save_iquery_to_docket(
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
     :param add_to_solr: Whether to save the completed docket to solr
+    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
+    d.avoid_trigger_signal = avoid_trigger_signal
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -1736,3 +1739,41 @@ async def process_orphan_documents(
             # exceptions that were previously raised for the
             # processing queue items a second time.
             pass
+
+
+@retry(IntegrityError, tries=3, delay=0.25, backoff=1)
+def process_case_query_report(
+    court_id: str,
+    pacer_case_id: int,
+    report_data: dict[str, Any],
+    avoid_trigger_signal: bool = False,
+) -> None:
+    """Process the case query report from probe_iquery_pages task.
+    Find and update/store the docket accordingly. This method is able to retry
+    on IntegrityError due to a race condition when saving the docket.
+
+    :param court_id:  A CL court ID where we'll look things up.
+    :param pacer_case_id: The internal PACER case ID number
+    :param report_data: A dictionary containing report data.
+    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
+    :return: None
+    """
+    d = async_to_sync(find_docket_object)(
+        court_id,
+        str(pacer_case_id),
+        report_data["docket_number"],
+        using="default",
+    )
+    d.pacer_case_id = pacer_case_id
+    d.add_recap_source()
+    d = async_to_sync(update_docket_metadata)(d, report_data)
+    d.avoid_trigger_signal = avoid_trigger_signal
+    d.save()
+    add_bankruptcy_data_to_docket(d, report_data)
+    add_items_to_solr([d.pk], "search.Docket")
+    logger.info(
+        f"Created/updated docket: {d} from court: {court_id} and pacer_case_id {pacer_case_id}"
+    )
+    return None

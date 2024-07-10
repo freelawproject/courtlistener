@@ -1279,8 +1279,13 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
                     {"no_citation_found": True, "private": False},
                     status=HTTPStatus.BAD_REQUEST,
                 )
-
-            kwargs = make_citation_url_dict(**case_law_citations[0].groups)
+            citation_groups = case_law_citations[0].groups
+            citation_dict = {
+                "reporter": citation_groups.get("reporter"),
+                "volume": citation_groups.get("volume", None),
+                "page": citation_groups.get("page", None),
+            }
+            kwargs = make_citation_url_dict(**citation_dict)
             return HttpResponseRedirect(
                 reverse("citation_redirector", kwargs=kwargs)
             )

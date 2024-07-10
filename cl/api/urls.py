@@ -45,21 +45,33 @@ router.register(r"search", search_views.SearchViewSet, basename="search")
 router.register(r"tag", search_views.TagViewSet, basename="tag")
 
 # People & Entities
-router.register(r"people", people_views.PersonViewSet)
+router.register(r"people", people_views.PersonViewSet, basename="person")
 router.register(
     r"disclosure-typeahead",
     people_views.PersonDisclosureViewSet,
     basename="disclosuretypeahead",
 )
-router.register(r"positions", people_views.PositionViewSet)
-router.register(r"retention-events", people_views.RetentionEventViewSet)
-router.register(r"educations", people_views.EducationViewSet)
-router.register(r"schools", people_views.SchoolViewSet)
 router.register(
-    r"political-affiliations", people_views.PoliticalAffiliationViewSet
+    r"positions", people_views.PositionViewSet, basename="position"
 )
-router.register(r"sources", people_views.SourceViewSet)
-router.register(r"aba-ratings", people_views.ABARatingViewSet)
+router.register(
+    r"retention-events",
+    people_views.RetentionEventViewSet,
+    basename="retentionevent",
+)
+router.register(
+    r"educations", people_views.EducationViewSet, basename="education"
+)
+router.register(r"schools", people_views.SchoolViewSet, basename="school")
+router.register(
+    r"political-affiliations",
+    people_views.PoliticalAffiliationViewSet,
+    basename="politicalaffiliation",
+)
+router.register(r"sources", people_views.SourceViewSet, basename="source")
+router.register(
+    r"aba-ratings", people_views.ABARatingViewSet, basename="abarating"
+)
 router.register(r"parties", people_views.PartyViewSet, basename="party")
 router.register(
     r"attorneys", people_views.AttorneyViewSet, basename="attorney"
@@ -158,7 +170,19 @@ API_TITLE = "CourtListener Legal Data API"
 router_v4 = DefaultRouter()
 router_v4.register(r"search", search_views.SearchV4ViewSet, basename="search")
 
+for prefix, viewset, basename in router.registry:
+    # Register all the URLs from the v3 router into the v4 router except for
+    # the "search" route.
+    if basename != "search":
+        router_v4.register(prefix, viewset, basename)
 
+# When we finally need to deprecate V3 of the API, the process to remove it, is:
+# - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
+# - The only ViewSet that requires removal is SearchViewSet and its related
+# helper methods should also be removed.
+# - Remove all references to "v3" in the code and tests and simplify them
+# accordingly, as no need to apply conditions based on the V3 API version.
+# - Remove V3 documentation.
 urlpatterns = [
     path(
         "api-auth/",
