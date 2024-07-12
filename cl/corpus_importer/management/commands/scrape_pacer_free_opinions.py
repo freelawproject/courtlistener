@@ -1,4 +1,5 @@
 import argparse
+import calendar
 import datetime
 import os
 from typing import Callable, Dict, List, Optional, Tuple, cast
@@ -6,6 +7,7 @@ from typing import Callable, Dict, List, Optional, Tuple, cast
 from celery.canvas import chain
 from django.conf import settings
 from django.utils.timezone import now
+from juriscraper.lib.date_utils import make_date_range_tuples
 from juriscraper.lib.exceptions import PacerLoginException
 from juriscraper.lib.string_utils import CaseNameTweaker
 from requests import RequestException
@@ -326,19 +328,116 @@ def ocr_available(options: OptionsType) -> None:
             logger.info(f"Sent {i + 1}/{count} tasks to celery so far.")
 
 
-def do_monthly():
-    # Run everything monthly range
-    pass
+def do_quarterly(options: OptionsType):
+    """Collect last quarter documents
+
+    Run it every three months (0 0 1 */3 *)
+
+    :return: None
+    """
+    first_day_current_month = datetime.datetime.now().replace(day=1)
+
+    # Calculate the first day of the month three months ago
+    if first_day_current_month.month <= 3:
+        start_year = first_day_current_month.year - 1
+        start_month = first_day_current_month.month + 9
+    else:
+        start_year = first_day_current_month.year
+        start_month = first_day_current_month.month - 3
+    start_date = datetime.date(start_year, start_month, 1)
+
+    # Calculate the last day of the month prior to today
+    last_month = first_day_current_month - datetime.timedelta(days=1)
+    end_day = calendar.monthrange(last_month.year, last_month.month)[1]
+    end_date = datetime.date(last_month.year, last_month.month, end_day)
+
+    dates = make_date_range_tuples(start_date, end_date, gap=7)
+
+    for _start, _end in dates:
+        # We run this in 7-day date ranges to ingest all the information on a weekly
+        # basis and not wait for all the responses from three months ago to now from
+        # each court. This also allows us to scrape each court every 7 day range to
+        # avoid possible blockages.
+        options["date_start"] = _start  # type: ignore
+        options["date_end"] = _end  # type: ignore
+        do_everything(options)
 
 
-def do_weekly():
-    # Run everything weekly range
-    pass
+def do_monthly(options: OptionsType):
+    """Collect last month's documents
+
+    Run it on the 3rd of each month to let them update the last days of the month
+    (15 2 3 * *)
+
+    :return: None
+    """
+    today = datetime.date.today()
+    prev_month, current_year = (
+        (today.month - 1, today.year)
+        if today.month != 1
+        else (12, today.year - 1)
+    )
+    month_last_day = calendar.monthrange(current_year, prev_month)[1]
+    start = datetime.date(current_year, prev_month, 1)
+    end = datetime.date(current_year, prev_month, month_last_day)
+
+    # Update options with start and end date of previous month
+    options["date_start"] = start  # type: ignore
+    options["date_end"] = end  # type: ignore
+
+    do_everything(options)
 
 
-def do_all():
-    # run all courts since first day started to query each court
-    pass
+def do_weekly(options: OptionsType):
+    """Collect last week's documents
+
+    Run it every wednesday (* * * * 3)
+
+    :return: None
+    """
+
+    today = datetime.date.today()
+    weekday = today.weekday()
+    start_of_this_week = today - datetime.timedelta(days=weekday)
+    start_of_previous_week = start_of_this_week - datetime.timedelta(weeks=1)
+    end_of_previous_week = start_of_previous_week + datetime.timedelta(days=6)
+
+    # Update options with start and end date of previous week
+    options["date_start"] = start_of_previous_week  # type: ignore
+    options["date_end"] = end_of_previous_week  # type: ignore
+
+    do_everything(options)
+
+
+def do_all(options: OptionsType):
+    """Collect all documents since the beginning of time
+
+    It was established on this date based on the PacerFreeDocumentLog table. The first
+    date queried is 1950-05-12 from ca9.
+
+    The command will be executed until the day on which it is executed.
+
+    To collect all documents, weekly, monthly and quarterly sweeps will be used to make
+    sure we don't miss anything.
+
+    Take note that documents could be missing if they were marked as free after these
+    periods.
+
+    :return: None
+    """
+    start = datetime.date(1950, 5, 1)
+    end = datetime.date.today()
+
+    dates = make_date_range_tuples(start, end, gap=7)
+
+    for _start, _end in dates:
+        # We run this in 7-day date ranges to ingest all the information on a weekly
+        # basis and not wait for all the responses from 1950 to now from each court (
+        # ~3900 weeks/requests until today). This also allows us to scrape each court
+        # every 7 day range to avoid possible blockages.
+        options["date_start"] = _start  # type: ignore
+        options["date_end"] = _end  # type: ignore
+        do_everything(options)
 
 
 def do_everything(options: OptionsType):
@@ -387,7 +486,7 @@ class Command(VerboseCommand):
             type=str,
             default=["all"],
             nargs="*",
-            help="The courts that you wish to parse.",
+            help="The courts that you wish to parse. Use cl ids.",
         )
         parser.add_argument(
             "--date-start",
@@ -421,6 +520,7 @@ class Command(VerboseCommand):
         "get-report-results": get_and_save_free_document_reports,
         "get-pdfs": get_pdfs,
         "ocr-available": ocr_available,
+        "do-quarterly": do_quarterly,
         "do-monthly": do_monthly,
         "do-weekly": do_weekly,
         "do-all": do_all,
