@@ -3351,6 +3351,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
 @override_settings(
     IQUERY_PROBE_DAEMON_ENABLED=True,
     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"],
 )
 class ScrapeIqueryPagesTest(TestCase):
     """Tests related to probe_iquery_pages_daemon command."""
