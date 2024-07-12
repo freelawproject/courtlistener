@@ -7,37 +7,44 @@ from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
 from django.urls import reverse
-from django.utils.html import strip_tags
 from django.utils.timezone import now
-from elasticsearch_dsl import Q
-from lxml import html
+from elasticsearch_dsl import Q, connections
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.management.commands.cl_send_recap_alerts import (
     index_daily_recap_documents,
 )
 from cl.alerts.models import SEARCH_TYPES, Alert, ScheduledAlertHit
-from cl.alerts.utils import recap_document_hl_matched
+from cl.alerts.utils import (
+    build_plain_percolator_query,
+    percolate_docket_or_recap_document,
+    recap_document_hl_matched,
+)
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.donate.models import NeonMembership
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
-from cl.search.documents import DocketDocument, RECAPSweepDocument
+from cl.search.documents import (
+    DocketDocument,
+    ESRECAPDocumentPlain,
+    RECAPPercolator,
+    RECAPSweepDocument,
+)
 from cl.search.factories import (
     DocketEntryWithParentsFactory,
     DocketFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import Docket
-from cl.tests.cases import ESIndexTestCase, TestCase
+from cl.tests.cases import ESIndexTestCase, RECAPAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 
 class RECAPAlertsSweepIndexTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase
+    RECAPSearchTestCase, ESIndexTestCase, TestCase, RECAPAlertsAssertions
 ):
     """
     RECAP Alerts Sweep Index Tests
@@ -81,165 +88,6 @@ class RECAPAlertsSweepIndexTest(
         keys = self.r.keys("alert_hits:*")
         if keys:
             self.r.delete(*keys)
-
-    @staticmethod
-    def get_html_content_from_email(email_content):
-        html_content = None
-        for content, content_type in email_content.alternatives:
-            if content_type == "text/html":
-                html_content = content
-                break
-        return html_content
-
-    def _confirm_number_of_alerts(self, html_content, expected_count):
-        """Test the number of alerts included in the email alert."""
-        tree = html.fromstring(html_content)
-        got = len(tree.xpath("//h2"))
-
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of alerts in the email. "
-            "Expected: %s - Got: %s\n\n" % (expected_count, got),
-        )
-
-    @staticmethod
-    def _extract_cases_from_alert(html_tree, alert_title):
-        """Extract the case elements (h3) under a specific alert (h2) from the
-        HTML tree.
-        """
-        alert_element = html_tree.xpath(
-            f"//h2[contains(text(), '{alert_title}')]"
-        )
-        h2_elements = html_tree.xpath("//h2")
-        alert_index = h2_elements.index(alert_element[0])
-        # Find the <h3> elements between this <h2> and the next <h2>
-        if alert_index + 1 < len(h2_elements):
-            next_alert_element = h2_elements[alert_index + 1]
-            alert_cases = html_tree.xpath(
-                f"//h2[contains(text(), '{alert_title}')]/following-sibling::*[following-sibling::h2[1] = '{next_alert_element.text}'][self::h3]"
-            )
-        else:
-            alert_cases = html_tree.xpath(
-                f"//h2[contains(text(), '{alert_title}')]/following-sibling::h3"
-            )
-        return alert_cases
-
-    def _count_alert_hits_and_child_hits(
-        self,
-        html_content,
-        alert_title,
-        expected_hits,
-        case_title,
-        expected_child_hits,
-    ):
-        """Confirm the following assertions for the email alert:
-        - An specific alert is included in the email alert.
-        - The specified alert contains the expected number of hits.
-        - The specified case contains the expected number of child hits.
-        """
-        tree = html.fromstring(html_content)
-        alert_element = tree.xpath(f"//h2[contains(text(), '{alert_title}')]")
-        self.assertTrue(
-            alert_element, msg=f"Not alert with title {alert_title} found."
-        )
-        alert_cases = self._extract_cases_from_alert(tree, alert_title)
-        self.assertEqual(
-            len(alert_cases),
-            expected_hits,
-            msg="Did not get the right number of hits for the alert %s. "
-            "Expected: %s - Got: %s\n\n"
-            % (alert_title, expected_hits, len(alert_cases)),
-        )
-        if case_title:
-            for case in alert_cases:
-                child_hit_count = 0
-                case_text = " ".join(
-                    [element.strip() for element in case.xpath(".//text()")]
-                )
-                if case_title in case_text:
-                    child_hit_count = len(
-                        case.xpath("following-sibling::ul[1]/li/a")
-                    )
-                self.assertEqual(
-                    child_hit_count,
-                    expected_child_hits,
-                    msg="Did not get the right number of child hits for the case %s. "
-                    "Expected: %s - Got: %s\n\n"
-                    % (case_title, expected_child_hits, child_hit_count),
-                )
-                break
-
-    def _assert_child_hits_content(
-        self,
-        html_content,
-        alert_title,
-        case_title,
-        expected_child_descriptions,
-    ):
-        """Confirm the child hits in a case are the expected ones, comparing
-        their descriptions.
-        """
-        tree = html.fromstring(html_content)
-        alert_element = tree.xpath(f"//h2[contains(text(), '{alert_title}')]")
-        # Find the corresponding case_title under the alert_element
-        alert_cases = self._extract_cases_from_alert(tree, alert_title)
-
-        def extract_child_descriptions(case_item):
-            child_documents = case_item.xpath("./following-sibling::ul[1]/li")
-            results = []
-            for li in child_documents:
-                a_tag = li.xpath(".//a")[0]
-                full_text = a_tag.text_content()
-                first_part = full_text.split("\u2014")[0].strip()
-                results.append(first_part)
-
-            return results
-
-        child_descriptions = set()
-        for case in alert_cases:
-            case_text = "".join(case.xpath(".//text()")).strip()
-            if case_title in case_text:
-                child_descriptions = set(extract_child_descriptions(case))
-                break
-
-        self.assertEqual(
-            child_descriptions,
-            set(expected_child_descriptions),
-            msg=f"Child hits didn't match for case {case_title}, Got {child_descriptions}, Expected: {expected_child_descriptions} ",
-        )
-
-    def _count_webhook_hits_and_child_hits(
-        self,
-        webhooks,
-        alert_title,
-        expected_hits,
-        case_title,
-        expected_child_hits,
-    ):
-        """Confirm the following assertions for the search alert webhook:
-        - An specific alert webhook was triggered.
-        - The specified alert contains the expected number of hits.
-        - The specified case contains the expected number of child hits.
-        """
-
-        for webhook in webhooks:
-            if webhook["payload"]["alert"]["name"] == alert_title:
-                webhook_cases = webhook["payload"]["results"]
-                self.assertEqual(
-                    len(webhook_cases),
-                    expected_hits,
-                    msg=f"Did not get the right number of hits for the alert %s. "
-                    % alert_title,
-                )
-                for case in webhook["payload"]["results"]:
-                    if case_title == strip_tags(case["caseName"]):
-                        self.assertEqual(
-                            len(case["recap_documents"]),
-                            expected_child_hits,
-                            msg=f"Did not get the right number of child documents for the case %s. "
-                            % case_title,
-                        )
 
     async def test_recap_document_hl_matched(self) -> None:
         """Test recap_document_hl_matched method that determines weather a hit
@@ -1691,3 +1539,406 @@ class RECAPAlertsSweepIndexTest(
 
         docket.delete()
         alert_de.docket.delete()
+
+
+class RECAPAlertsPercolatorTest(
+    RECAPSearchTestCase, ESIndexTestCase, TestCase, RECAPAlertsAssertions
+):
+    """
+    RECAP Alerts Percolator Tests
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("people_db.Person")
+        cls.rebuild_index("search.Docket")
+        cls.mock_date = now()
+        with time_machine.travel(cls.mock_date, tick=False):
+            RECAPPercolator._index.delete(ignore=404)
+            RECAPPercolator.init()
+            super().setUpTestData()
+
+            cls.docket_3 = DocketFactory(
+                court=cls.court,
+                case_name="SUBPOENAS SERVED OFF",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:21-bk-1235",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="'U.S. Government Defendant",
+                jury_demand="1,000,000",
+            )
+
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
+
+            cls.user_profile = UserProfileWithParentsFactory()
+            NeonMembership.objects.create(
+                level=NeonMembership.LEGACY, user=cls.user_profile.user
+            )
+            cls.user_profile_2 = UserProfileWithParentsFactory()
+            NeonMembership.objects.create(
+                level=NeonMembership.LEGACY, user=cls.user_profile_2.user
+            )
+            cls.user_profile_no_member = UserProfileWithParentsFactory()
+            cls.webhook_enabled = WebhookFactory(
+                user=cls.user_profile.user,
+                event_type=WebhookEventType.SEARCH_ALERT,
+                url="https://example.com/",
+                enabled=True,
+            )
+
+    def setUp(self):
+        self.r = get_redis_interface("CACHE")
+        keys = self.r.keys("alert_hits:*")
+        if keys:
+            self.r.delete(*keys)
+
+    @staticmethod
+    def confirm_query_matched(response, query_id) -> bool:
+        """Confirm if a percolator query matched."""
+
+        matched = False
+        for hit in response:
+            if hit.meta.id == query_id:
+                matched = True
+        return matched
+
+    @staticmethod
+    def save_percolator_query(cd):
+        query = build_plain_percolator_query(cd)
+        query_dict = query.to_dict()
+        percolator_query = RECAPPercolator(
+            percolator_query=query_dict, rate=Alert.REAL_TIME
+        )
+        percolator_query.save(refresh=True)
+
+        return percolator_query.meta.id
+
+    @staticmethod
+    def prepare_recap_document(document):
+        recap_doc = ESRECAPDocumentPlain()
+        return recap_doc.prepare(document)
+
+    @classmethod
+    def delete_documents_from_index(cls, index_alias, queries):
+        es_conn = connections.get_connection()
+        for query_id in queries:
+            es_conn.delete(index=index_alias, id=query_id)
+
+    def test_recap_document_cross_object_percolator_queries(self) -> None:
+        """Test if a variety of RECAPDocuments can trigger cross-object percolator
+        queries"""
+
+        created_queries_ids = []
+
+        # Test Percolate a RECAPDocument. It should match the query containing
+        # a Docket query terms + party filter + and RECAPDocument filter.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED ON",
+            "attachment_number": "2",
+            "party": "Defendant Jane Roe",
+            "order_by": "score desc",
+        }
+        query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
+        response = percolate_docket_or_recap_document(
+            str(self.rd_att.pk),
+        )
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        # Test Percolate a RECAPDocument. It should match the query containing
+        # a Docket query terms and RECAPDocument filter.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED ON",
+            "document_number": "1",
+            "order_by": "score desc",
+        }
+        query_id_1 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_1)
+        response = percolate_docket_or_recap_document(
+            str(self.rd.pk),
+        )
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_1), True
+        )
+
+        # Test Percolate a RECAPDocument. It should match the query containing
+        # Docket AND RD text query terms.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "(SUBPOENAS SERVED ON) AND (Amicus Curiae Lorem Served)",
+            "order_by": "score desc",
+        }
+        query_id_2 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_2)
+        response = percolate_docket_or_recap_document(
+            str(self.rd.pk),
+        )
+        expected_queries = 2
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_1), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_2), True
+        )
+
+        # Test Percolate a RECAPDocument. It should match the query containing
+        # Docket AND OR text query terms.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "(SUBPOENAS SERVED ON) OR (Amicus Curiae Lorem Served)",
+            "order_by": "score desc",
+        }
+        query_id_3 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_3)
+        response = percolate_docket_or_recap_document(
+            str(self.rd.pk),
+        )
+        expected_queries = 3
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_1), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_2), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_3), True
+        )
+
+        self.delete_documents_from_index(
+            RECAPPercolator._index._name, created_queries_ids
+        )
+
+    def test_recap_document_percolator(self) -> None:
+        """Test if a variety of RECAPDocument triggers a RD-only percolator
+        query."""
+
+        created_queries_ids = []
+        # Test percolate text query + different filters.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Mauris iaculis" AND pacer_doc_id:016156723121 AND '
+            "entry_date_filed:[2014-07-18T00:00:00Z TO 2014-07-20T00:00:00Z]",
+            "document_number": "3",
+            "description": "Leave to File",
+            "order_by": "score desc",
+        }
+        query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
+        response = percolate_docket_or_recap_document(
+            str(self.rd_2.pk),
+        )
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        # Test percolate only filters combination.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "document_number": "1",
+            "attachment_number": "2",
+            "description": "Amicus Curiae",
+            "order_by": "score desc",
+        }
+        query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
+        response = percolate_docket_or_recap_document(
+            str(self.rd_att.pk),
+        )
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        # Test percolate a different document targeting a different filters
+        # combination.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Leave to File",
+            "document_number": "1",
+            "order_by": "score desc",
+        }
+        query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
+        response = percolate_docket_or_recap_document(
+            str(self.rd.pk),
+        )
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+
+        # Test percolate the same document loosen the query.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Leave to File",
+            "order_by": "score desc",
+        }
+        query_id_2 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_2)
+        response = percolate_docket_or_recap_document(
+            str(self.rd.pk),
+        )
+        expected_queries = 2
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_2), True
+        )
+
+        self.delete_documents_from_index(
+            RECAPPercolator._index._name, created_queries_ids
+        )
+
+    def test_docket_percolator(self) -> None:
+        """Test if a variety of Docket documents triggers a percolator query."""
+
+        document_index_alias = DocketDocument._index._name
+        created_queries_ids = []
+
+        # Test Percolate a docket object. It shouldn't match the query
+        # containing a RECAPDocument filter
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED ON",
+            "document_number": "1",
+            "order_by": "score desc",
+        }
+        query_id = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id)
+        response = percolate_docket_or_recap_document(
+            str(self.de.docket.pk), document_index_alias
+        )
+        expected_queries = 0
+        self.assertEqual(len(response), expected_queries)
+
+        # Test Percolate a docket object. It shouldn't match the query
+        # containing text query terms contained only in a RD.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "(SUBPOENAS SERVED ON) AND (Amicus Curiae Lorem Served)",
+            "order_by": "score desc",
+        }
+        query_id_1 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_1)
+        response = percolate_docket_or_recap_document(
+            str(self.de.docket.pk), document_index_alias
+        )
+        expected_queries = 0
+        self.assertEqual(len(response), expected_queries)
+
+        # Test Percolate a docket object. Combining docket terms OR RECAPDocument
+        # fields. This query can be triggered only by the Docket document.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "(SUBPOENAS SERVED ON) OR (Amicus Curiae Lorem Served)",
+            "order_by": "score desc",
+        }
+        query_id_2 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_2)
+        response = percolate_docket_or_recap_document(
+            str(self.de.docket.pk), document_index_alias
+        )
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_2), True
+        )
+
+        # Test percolate text query + different filters.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": 'cause:"401 Civil"',
+            "case_name": "SUBPOENAS SERVED ON",
+            "party": "Defendant Jane Roe",
+            "filed_after": datetime.date(2015, 8, 16),
+            "order_by": "score desc",
+        }
+        query_id_3 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_3)
+        response = percolate_docket_or_recap_document(
+            str(self.de.docket.pk), document_index_alias
+        )
+        expected_queries = 2
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_2), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_3), True
+        )
+
+        # Test percolate text query + case_name filter.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"405 Civil"',
+            "case_name": "SUBPOENAS SERVED OFF",
+            "order_by": "score desc",
+        }
+        query_id_4 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_4)
+        response = percolate_docket_or_recap_document(
+            str(self.docket_3.pk), document_index_alias
+        )
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_4), True
+        )
+
+        # Test percolate one filter.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "SUBPOENAS SERVED OFF",
+            "order_by": "score desc",
+        }
+        query_id_5 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_5)
+        response = percolate_docket_or_recap_document(
+            str(self.de_1.docket.pk), document_index_alias
+        )
+        expected_queries = 1
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_5), True
+        )
+
+        # Test percolate text query.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "SUBPOENAS SERVED ON",
+            "order_by": "score desc",
+        }
+        query_id_6 = self.save_percolator_query(cd)
+        created_queries_ids.append(query_id_6)
+        response = percolate_docket_or_recap_document(
+            str(self.de.docket.pk), document_index_alias
+        )
+        expected_queries = 3
+        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_2), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_3), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(response, query_id_6), True
+        )
+
+        self.delete_documents_from_index(
+            RECAPPercolator._index._name, created_queries_ids
+        )

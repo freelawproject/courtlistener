@@ -7,8 +7,9 @@ from django import test
 from django.contrib.staticfiles import testing
 from django.core.management import call_command
 from django.urls import reverse
+from django.utils.html import strip_tags
 from django_elasticsearch_dsl.registries import registry
-from lxml import etree
+from lxml import etree, html
 from rest_framework.test import APITestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
@@ -384,3 +385,165 @@ class V4SearchAPIAssertions(SimpleTestCase):
                 msg="Previous page value didn't match",
             )
         return next_page, previous_page, current_page
+
+
+class RECAPAlertsAssertions:
+
+    @staticmethod
+    def get_html_content_from_email(email_content):
+        html_content = None
+        for content, content_type in email_content.alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+        return html_content
+
+    def _confirm_number_of_alerts(self, html_content, expected_count):
+        """Test the number of alerts included in the email alert."""
+        tree = html.fromstring(html_content)
+        got = len(tree.xpath("//h2"))
+
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of alerts in the email. "
+            "Expected: %s - Got: %s\n\n" % (expected_count, got),
+        )
+
+    @staticmethod
+    def _extract_cases_from_alert(html_tree, alert_title):
+        """Extract the case elements (h3) under a specific alert (h2) from the
+        HTML tree.
+        """
+        alert_element = html_tree.xpath(
+            f"//h2[contains(text(), '{alert_title}')]"
+        )
+        h2_elements = html_tree.xpath("//h2")
+        alert_index = h2_elements.index(alert_element[0])
+        # Find the <h3> elements between this <h2> and the next <h2>
+        if alert_index + 1 < len(h2_elements):
+            next_alert_element = h2_elements[alert_index + 1]
+            alert_cases = html_tree.xpath(
+                f"//h2[contains(text(), '{alert_title}')]/following-sibling::*[following-sibling::h2[1] = '{next_alert_element.text}'][self::h3]"
+            )
+        else:
+            alert_cases = html_tree.xpath(
+                f"//h2[contains(text(), '{alert_title}')]/following-sibling::h3"
+            )
+        return alert_cases
+
+    def _count_alert_hits_and_child_hits(
+        self,
+        html_content,
+        alert_title,
+        expected_hits,
+        case_title,
+        expected_child_hits,
+    ):
+        """Confirm the following assertions for the email alert:
+        - An specific alert is included in the email alert.
+        - The specified alert contains the expected number of hits.
+        - The specified case contains the expected number of child hits.
+        """
+        tree = html.fromstring(html_content)
+        alert_element = tree.xpath(f"//h2[contains(text(), '{alert_title}')]")
+        self.assertTrue(
+            alert_element, msg=f"Not alert with title {alert_title} found."
+        )
+        alert_cases = self._extract_cases_from_alert(tree, alert_title)
+        self.assertEqual(
+            len(alert_cases),
+            expected_hits,
+            msg="Did not get the right number of hits for the alert %s. "
+            "Expected: %s - Got: %s\n\n"
+            % (alert_title, expected_hits, len(alert_cases)),
+        )
+        if case_title:
+            for case in alert_cases:
+                child_hit_count = 0
+                case_text = " ".join(
+                    [element.strip() for element in case.xpath(".//text()")]
+                )
+                if case_title in case_text:
+                    child_hit_count = len(
+                        case.xpath("following-sibling::ul[1]/li/a")
+                    )
+                self.assertEqual(
+                    child_hit_count,
+                    expected_child_hits,
+                    msg="Did not get the right number of child hits for the case %s. "
+                    "Expected: %s - Got: %s\n\n"
+                    % (case_title, expected_child_hits, child_hit_count),
+                )
+                break
+
+    def _assert_child_hits_content(
+        self,
+        html_content,
+        alert_title,
+        case_title,
+        expected_child_descriptions,
+    ):
+        """Confirm the child hits in a case are the expected ones, comparing
+        their descriptions.
+        """
+        tree = html.fromstring(html_content)
+        alert_element = tree.xpath(f"//h2[contains(text(), '{alert_title}')]")
+        # Find the corresponding case_title under the alert_element
+        alert_cases = self._extract_cases_from_alert(tree, alert_title)
+
+        def extract_child_descriptions(case_item):
+            child_documents = case_item.xpath("./following-sibling::ul[1]/li")
+            results = []
+            for li in child_documents:
+                a_tag = li.xpath(".//a")[0]
+                full_text = a_tag.text_content()
+                first_part = full_text.split("\u2014")[0].strip()
+                results.append(first_part)
+
+            return results
+
+        child_descriptions = set()
+        for case in alert_cases:
+            case_text = "".join(case.xpath(".//text()")).strip()
+            if case_title in case_text:
+                child_descriptions = set(extract_child_descriptions(case))
+                break
+
+        self.assertEqual(
+            child_descriptions,
+            set(expected_child_descriptions),
+            msg=f"Child hits didn't match for case {case_title}, Got {child_descriptions}, Expected: {expected_child_descriptions} ",
+        )
+
+    def _count_webhook_hits_and_child_hits(
+        self,
+        webhooks,
+        alert_title,
+        expected_hits,
+        case_title,
+        expected_child_hits,
+    ):
+        """Confirm the following assertions for the search alert webhook:
+        - An specific alert webhook was triggered.
+        - The specified alert contains the expected number of hits.
+        - The specified case contains the expected number of child hits.
+        """
+
+        for webhook in webhooks:
+            if webhook["payload"]["alert"]["name"] == alert_title:
+                webhook_cases = webhook["payload"]["results"]
+                self.assertEqual(
+                    len(webhook_cases),
+                    expected_hits,
+                    msg=f"Did not get the right number of hits for the alert %s. "
+                    % alert_title,
+                )
+                for case in webhook["payload"]["results"]:
+                    if case_title == strip_tags(case["caseName"]):
+                        self.assertEqual(
+                            len(case["recap_documents"]),
+                            expected_child_hits,
+                            msg=f"Did not get the right number of child documents for the case %s. "
+                            % case_title,
+                        )

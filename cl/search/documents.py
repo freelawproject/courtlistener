@@ -1852,3 +1852,133 @@ class ESRECAPSweepDocument(ESRECAPBaseDocument):
             "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
             "analysis": settings.ELASTICSEARCH_DSL["analysis"],
         }
+
+
+class ESRECAPDocumentPlain(ESRECAPDocument):
+    # Parties
+    party_id = fields.ListField(fields.IntegerField(multi=True))
+    party = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    attorney_id = fields.ListField(fields.IntegerField(multi=True))
+    attorney = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    firm_id = fields.ListField(fields.IntegerField(multi=True))
+    firm = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+
+    def prepare_parties(self, instance):
+        out = {
+            "party_id": set(),
+            "party": set(),
+            "attorney_id": set(),
+            "attorney": set(),
+            "firm_id": set(),
+            "firm": set(),
+        }
+
+        # Extract only required parties values.
+        party_values = instance.docket_entry.docket.parties.values_list(
+            "pk", "name"
+        )
+        for pk, name in party_values.iterator():
+            out["party_id"].add(pk)
+            out["party"].add(name)
+
+        # Extract only required attorney values.
+        atty_values = (
+            Attorney.objects.filter(roles__docket=instance.docket_entry.docket)
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in atty_values.iterator():
+            out["attorney_id"].add(pk)
+            out["attorney"].add(name)
+
+        # Extract only required firm values.
+        firms_values = (
+            AttorneyOrganization.objects.filter(
+                attorney_organization_associations__docket=instance.docket_entry.docket
+            )
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in firms_values.iterator():
+            out["firm_id"].add(pk)
+            out["firm"].add(name)
+
+        return out
+
+    def prepare(self, instance):
+        data = super().prepare(instance)
+        parties_prepared = self.prepare_parties(instance)
+        data["party_id"] = list(parties_prepared["party_id"])
+        data["party"] = list(parties_prepared["party"])
+        data["attorney_id"] = list(parties_prepared["attorney_id"])
+        data["attorney"] = list(parties_prepared["attorney"])
+        data["firm_id"] = list(parties_prepared["firm_id"])
+        data["firm"] = list(parties_prepared["firm"])
+        return data
+
+
+class RECAPPercolator(DocketDocument, ESRECAPDocument):
+    rate = fields.KeywordField(attr="rate")
+    percolator_query = PercolatorField()
+
+    class Index:
+        name = "recap_percolator"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+    def prepare_percolator_query(self, instance):
+        qd = QueryDict(instance.query.encode(), mutable=True)
+        search_form = SearchForm(qd)
+        if not search_form.is_valid():
+            logger.warning(
+                f"The query {qd} associated with Alert ID {instance.pk} is "
+                "invalid and was not indexed."
+            )
+            return None
+
+        cd = search_form.cleaned_data
+        search_query = DocketDocument.search()
+        query, _, _ = build_es_base_query(search_query, cd)
+        return query.to_dict()["query"]

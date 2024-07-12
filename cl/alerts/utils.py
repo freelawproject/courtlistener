@@ -4,6 +4,7 @@ from datetime import date
 from django.conf import settings
 from django.http import QueryDict
 from elasticsearch_dsl import Q, Search
+from elasticsearch_dsl.query import Query
 from elasticsearch_dsl.response import Hit, Response
 from redis import Redis
 
@@ -14,16 +15,26 @@ from cl.alerts.models import (
     ScheduledAlertHit,
 )
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import add_es_highlighting
+from cl.lib.elasticsearch_utils import (
+    add_es_highlighting,
+    add_fields_boosting,
+    build_fulltext_query,
+    build_has_child_filters,
+    build_highlights_dict,
+    build_join_es_filters,
+)
 from cl.lib.types import CleanData
 from cl.search.constants import (
     ALERTS_HL_TAG,
     SEARCH_RECAP_CHILD_HL_FIELDS,
-    recap_document_filters,
-    recap_document_indexed_fields,
+    SEARCH_RECAP_CHILD_QUERY_FIELDS,
 )
-from cl.search.documents import AudioPercolator
-from cl.search.models import SEARCH_TYPES, Docket
+from cl.search.documents import (
+    AudioPercolator,
+    ESRECAPDocumentPlain,
+    RECAPPercolator,
+)
+from cl.search.models import SEARCH_TYPES, Docket, RECAPDocument
 
 
 @dataclass
@@ -208,3 +219,118 @@ def has_document_alert_hit_been_triggered(
     """
     alert_key = make_alert_set_key(alert_id, document_type)
     return r.sismember(alert_key, document_id)
+
+
+def build_plain_percolator_query(cd: CleanData) -> Query:
+    """Build a plain query based on the provided clean data for its use in the
+    Percolator
+
+    :param cd: The query CleanedData.
+    :return: An ES Query object representing the built query.
+    """
+
+    plain_query = []
+    match cd["type"]:
+        case (
+            SEARCH_TYPES.RECAP
+            | SEARCH_TYPES.DOCKETS
+            | SEARCH_TYPES.RECAP_DOCUMENT
+        ):
+            text_fields = SEARCH_RECAP_CHILD_QUERY_FIELDS.copy()
+            text_fields.extend(
+                add_fields_boosting(
+                    cd,
+                    [
+                        "description",
+                        # Docket Fields
+                        "docketNumber",
+                        "caseName",
+                    ],
+                )
+            )
+            child_filters = build_has_child_filters(cd)
+            parent_filters = build_join_es_filters(cd)
+            parent_filters.extend(child_filters)
+
+            string_query = build_fulltext_query(
+                text_fields, cd.get("q", ""), only_queries=True
+            )
+
+            match parent_filters, string_query:
+                case [], []:
+                    pass
+                case [], _:
+                    plain_query = Q(
+                        "bool",
+                        should=string_query,
+                        minimum_should_match=1,
+                    )
+                case _, []:
+                    plain_query = Q(
+                        "bool",
+                        filter=parent_filters,
+                    )
+                case _, _:
+                    plain_query = Q(
+                        "bool",
+                        filter=parent_filters,
+                        should=string_query,
+                        minimum_should_match=1,
+                    )
+
+    return plain_query
+
+
+def percolate_docket_or_recap_document(
+    document_id: str,
+    document_index: str | None = None,
+    search_after: int = 0,
+) -> Response:
+    """Percolate a document against a defined Elasticsearch Percolator query.
+
+    :param document_id: The document ID in ES index to be percolated.
+    :param document_index: The ES document index where the document lives.
+    :param search_after: The ES search_after param for deep pagination.
+    :return: The response from the Elasticsearch query.
+    """
+
+    s = Search(index=RECAPPercolator._index._name)
+    if document_index:
+        percolate_query = Q(
+            "percolate",
+            field="percolator_query",
+            index=document_index,
+            id=document_id,
+        )
+    else:
+        rd = RECAPDocument.objects.get(pk=document_id)
+        es_document = ESRECAPDocumentPlain().prepare(rd)
+        # Remove docket_child to avoid document parsing errors.
+        del es_document["docket_child"]
+        percolate_query = Q(
+            "percolate", field="percolator_query", document=es_document
+        )
+
+    exclude_rate_off = Q("term", rate=Alert.OFF)
+    final_query = Q(
+        "bool",
+        must=[percolate_query],
+        must_not=[exclude_rate_off],
+    )
+    s = s.query(final_query)
+
+    if document_index:
+        s = add_es_highlighting(s, {"type": SEARCH_TYPES.RECAP}, alerts=True)
+    else:
+        highlight_options, fields_to_exclude = build_highlights_dict(
+            SEARCH_RECAP_CHILD_HL_FIELDS, ALERTS_HL_TAG
+        )
+        extra_options = {"highlight": highlight_options}
+        s = s.extra(**extra_options)
+
+    s = s.source(excludes=["percolator_query"])
+    s = s.sort("date_created")
+    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
+    if search_after:
+        s = s.extra(search_after=search_after)
+    return s.execute()
