@@ -401,6 +401,9 @@ class CourtMatchingTest(SimpleTestCase):
             self.assertEqual(test["a"], got)
 
 
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
 @pytest.mark.django_db
 class PacerDocketParserTest(TestCase):
     """Can we parse RECAP dockets successfully?"""
