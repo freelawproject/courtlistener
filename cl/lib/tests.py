@@ -90,6 +90,9 @@ class TestPacerUtils(TestCase):
         )
 
 
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
 class TestPacerSessionUtils(TestCase):
 
     def setUp(self) -> None:
@@ -117,14 +120,6 @@ class TestPacerSessionUtils(TestCase):
             ex=60,
         )
 
-    def test_use_default_proxy_if_list_not_available(self) -> None:
-        """Does ProxyPacerSession uses the default proxy when no list is provided?"""
-        session = ProxyPacerSession(username="test", password="password")
-        self.assertEqual(session.proxy_address, settings.EGRESS_PROXY_HOST)
-
-    @override_settings(
-        EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
-    )
     def test_pick_random_proxy_when_list_is_available(self):
         """Does ProxyPacerSession choose a random proxy from the available list?"""
         session = ProxyPacerSession(username="test", password="password")
@@ -143,9 +138,6 @@ class TestPacerSessionUtils(TestCase):
         _, proxy = cookies_data
         self.assertEqual(proxy, settings.EGRESS_PROXY_HOST)
 
-    @override_settings(
-        EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
-    )
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_compute_new_cookies_with_new_format(self, mock_log_into_pacer):
         """Are we using the tuple format for new cookies?"""
@@ -169,9 +161,6 @@ class TestPacerSessionUtils(TestCase):
         _, proxy = cookies_data
         self.assertEqual(proxy, "http://proxy_1:9090")
 
-    @override_settings(
-        EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
-    )
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_compute_cookies_for_almost_expired_data(
         self, mock_log_into_pacer

@@ -47,17 +47,12 @@ class ProxyPacerSession(PacerSession):
         """
         Picks a proxy connection string from available options.
 
-        If the `settings.EGRESS_PROXY_HOSTS` list is empty, this function
-        returns the value from `settings.EGRESS_PROXY_HOST`. Otherwise, it
-        randomly chooses a string from the `settings.EGRESS_PROXY_HOSTS` list
-        and returns it.
+        this function randomly chooses a string from the
+        `settings.EGRESS_PROXY_HOSTS` list and returns it.
 
         Returns:
             str: The chosen proxy connection string.
         """
-        if not settings.EGRESS_PROXY_HOSTS:
-            return settings.EGRESS_PROXY_HOST
-
         return random.choice(settings.EGRESS_PROXY_HOSTS)
 
     def _change_protocol(self, url: str) -> str:
