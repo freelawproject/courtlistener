@@ -75,6 +75,7 @@ from cl.corpus_importer.utils import (
     ClusterSourceException,
     DocketSourceException,
     compare_documents,
+    compute_blocked_court_wait,
     compute_next_binary_probe,
     get_start_of_quarter,
     merge_case_names,
@@ -3362,6 +3363,7 @@ class ScrapeIqueryPagesTest(TestCase):
         cls.court_hib = CourtFactory(id="hib", jurisdiction="FB")
         cls.court_gand = CourtFactory(id="gand", jurisdiction="FB")
         cls.court_ca1 = CourtFactory(id="ca1", jurisdiction="F")
+        cls.court_cacd = CourtFactory(id="cacd", jurisdiction="FB")
 
     def setUp(self) -> None:
         self.r = get_redis_interface("CACHE")
@@ -3371,6 +3373,8 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery.probing.enqueued:*",
             "iquery:test_highest_known_pacer_case_id",
             "iquery:pacer_case_id_current",
+            "iquery:court_blocked_attempts:*",
+            "iquery:court_empty_probe_attempts:*",
         ]
         for key_to_clean in keys_to_clean:
             key = self.r.keys(key_to_clean)
@@ -3532,9 +3536,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:test_highest_known_pacer_case_id", self.court_gamb.pk
         )
         self.assertEqual(int(highest_known_pacer_case_id), 8)
-        # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
+        # court_wait is set to IQUERY_COURT_BLOCKED_WAIT
         court_wait = r.get(f"iquery:court_wait:{self.court_gamb.pk}")
-        self.assertEqual(int(court_wait), 2)
+        self.assertEqual(int(court_wait), settings.IQUERY_COURT_BLOCKED_WAIT)
 
     @patch(
         "cl.corpus_importer.tasks.CaseQuery",
@@ -3581,13 +3585,14 @@ class ScrapeIqueryPagesTest(TestCase):
         r.hset("iquery:highest_known_pacer_case_id", self.court_canb.pk, 0)
         r.hset("iquery:highest_known_pacer_case_id", self.court_cand.pk, 135)
 
-        # Set an highest_known_pacer_case_id outside cl.tests.fakes.test_patterns
-        # in order to abort them.
-        r.hset("iquery:highest_known_pacer_case_id", self.court_nysd.pk, 1000)
-        r.hset("iquery:highest_known_pacer_case_id", self.court_gamb.pk, 1000)
-        r.hset("iquery:highest_known_pacer_case_id", self.court_hib.pk, 1000)
-        r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 1000)
-        r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 1000)
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -3623,13 +3628,14 @@ class ScrapeIqueryPagesTest(TestCase):
         court_wait_hib = r.get(f"iquery:court_wait:{self.court_hib.pk}")
         self.assertEqual(court_wait_hib, None)
 
-        # Set an highest_known_pacer_case_id outside cl.tests.fakes.test_patterns
-        # in order to abort them.
-        r.hset("iquery:highest_known_pacer_case_id", self.court_cand.pk, 1000)
-        r.hset("iquery:highest_known_pacer_case_id", self.court_nysd.pk, 1000)
-        r.hset("iquery:highest_known_pacer_case_id", self.court_canb.pk, 1000)
-        r.hset("iquery:highest_known_pacer_case_id", self.court_gand.pk, 1000)
-        r.hset("iquery:highest_known_pacer_case_id", self.court_txed.pk, 1000)
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
 
         with patch("cl.lib.decorators.time.sleep") as mock_sleep:
             call_command(
@@ -3643,9 +3649,9 @@ class ScrapeIqueryPagesTest(TestCase):
             "iquery:highest_known_pacer_case_id", self.court_gamb.pk
         )
         self.assertEqual(int(highest_known_pacer_case_id), 8)
-        # court_wait is set to 2 (IQUERY_COURT_BLOCKED_WAIT)
+        # court_wait is set to IQUERY_COURT_BLOCKED_WAIT
         court_wait = r.get(f"iquery:court_wait:{self.court_gamb.pk}")
-        self.assertEqual(int(court_wait), 2)
+        self.assertEqual(int(court_wait), settings.IQUERY_COURT_BLOCKED_WAIT)
 
         # Assertions for court_hib timeouts.
         # 2 sleeps before aborting the task. The probe is retried 2 times
@@ -3893,3 +3899,172 @@ class ScrapeIqueryPagesTest(TestCase):
                 sender=Docket,
                 dispatch_uid=test_dispatch_uid,
             )
+
+    def test_compute_blocked_court_wait(self, mock_cookies):
+        """Confirm the method compute_blocked_court_wait generates the expected
+        waiting pattern based on the block attempt."""
+
+        wait_pattern = []
+        total_accumulated_time_pattern = []
+        for i in range(settings.IQUERY_COURT_BLOCKED_MAX_ATTEMPTS):
+            next_blocked_court_wait, total_accumulated_time = (
+                compute_blocked_court_wait(
+                    i + 1,
+                )
+            )
+            wait_pattern.append(next_blocked_court_wait)
+            total_accumulated_time_pattern.append(total_accumulated_time)
+
+        expected_wait_pattern = [600, 1200, 2400, 4800, 9600, 19200]
+        expected_total_accumulated_time_pattern = [
+            600,
+            1800,
+            4200,
+            9000,
+            18600,
+            37800,
+        ]
+        self.assertEqual(
+            expected_wait_pattern,
+            wait_pattern,
+            msg="The blocked court wait pattern didn't match",
+        )
+        self.assertEqual(
+            expected_total_accumulated_time_pattern,
+            total_accumulated_time_pattern,
+            msg="The total blocked court accumulated wait pattern didn't match",
+        )
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch("cl.corpus_importer.tasks.logger")
+    def test_probe_iquery_pages_daemon_court_blocked_max_attempts(
+        self, mock_logger, mock_cookies
+    ):
+        """Test probe_iquery_pages_daemon when a court has blocked us for
+        several hours. After IQUERY_COURT_BLOCKED_MAX_ATTEMPTS is reached, an
+        alert via an error should be triggered so manual intervention can be
+        taken.
+        """
+
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_gamb.pk, 0)
+
+        court_wait_gamb = r.get(f"iquery:court_wait:{self.court_gamb.pk}")
+        self.assertEqual(court_wait_gamb, None)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_cacd.pk}", 1000)
+
+        tests = [600, 1200, 2400, 4800, 9600, 19200]
+        for expected_wait in tests:
+            with self.subTest(expected_wait=expected_wait):
+                r.delete(f"iquery:court_wait:{self.court_gamb.pk}")
+                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                    call_command(
+                        "probe_iquery_pages_daemon",
+                        testing_iterations=1,
+                    )
+
+                # Assertions for court_gamb blocked.
+                # court_wait is set to IQUERY_COURT_BLOCKED_WAIT
+                court_wait = r.get(f"iquery:court_wait:{self.court_gamb.pk}")
+                self.assertEqual(int(court_wait), expected_wait)
+
+        # Test one more attempt. The alert error should be triggered.
+        r.delete(f"iquery:court_wait:{self.court_gamb.pk}")
+        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+            call_command(
+                "probe_iquery_pages_daemon",
+                testing_iterations=1,
+            )
+
+        mock_logger.error.assert_called_with(
+            "The court %s has blocked the iquery page probing "
+            "for around %s hours.",
+            self.court_gamb.pk,
+            10.5,
+        )
+        court_wait = r.get(f"iquery:court_wait:{self.court_gamb.pk}")
+        self.assertEqual(int(court_wait), 600)
+        court_blocked_attempts = r.get(
+            f"iquery:court_blocked_attempts:{self.court_gamb.pk}"
+        )
+        self.assertEqual(int(court_blocked_attempts), 0)
+
+    @patch(
+        "cl.corpus_importer.tasks.CaseQuery",
+        new=FakeCaseQueryReport,
+    )
+    @patch("cl.corpus_importer.tasks.logger")
+    @override_settings(
+        IQUERY_EMPTY_PROBES_LIMIT=5,
+    )
+    def test_probe_iquery_pages_daemon_court_got_stuck(
+        self, mock_logger, mock_cookies
+    ):
+        """Test probe_iquery_pages_daemon when the probe daemon got stuck in a
+        court after IQUERY_EMPTY_PROBES_LIMIT are reached.
+        """
+
+        r = get_redis_interface("CACHE")
+        r.hset("iquery:highest_known_pacer_case_id", self.court_cacd.pk, 0)
+
+        # Set a big court_wait for the following courts in order to abort them in
+        # this test.
+        r.set(f"iquery:court_wait:{self.court_cand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_nysd.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_canb.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_gand.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_txed.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_hib.pk}", 1000)
+        r.set(f"iquery:court_wait:{self.court_gamb.pk}", 1000)
+
+        court_wait_cacd = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
+        self.assertEqual(court_wait_cacd, None)
+
+        for test in range(1, 5):
+            with self.subTest(test=test):
+                r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
+                with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+                    call_command(
+                        "probe_iquery_pages_daemon",
+                        testing_iterations=1,
+                    )
+
+                # Assertions for court_cacd empty probe.
+                # court_wait is set to one hour.
+                empty_probe_attempts = r.get(
+                    f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
+                )
+                self.assertEqual(int(empty_probe_attempts), test)
+
+        # Test one more attempt. The alert error should be triggered.
+        r.delete(f"iquery:court_wait:{self.court_cacd.pk}")
+        with patch("cl.lib.decorators.time.sleep") as mock_sleep:
+            call_command(
+                "probe_iquery_pages_daemon",
+                testing_iterations=1,
+            )
+
+        mock_logger.error.assert_called_with(
+            "The court %s has accumulated %s empty probe attempts. "
+            "Probably the probe got stuck and manual intervention is required.",
+            self.court_cacd.pk,
+            settings.IQUERY_EMPTY_PROBES_LIMIT,
+        )
+        court_wait = r.get(f"iquery:court_wait:{self.court_cacd.pk}")
+        self.assertEqual(int(court_wait), 3600)
+        court_empty_attempts = r.get(
+            f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
+        )
+        self.assertEqual(int(court_empty_attempts), 0)
