@@ -999,10 +999,9 @@ def get_pacer_case_id_and_title(
             cookies, proxy_address = cookies_from_cache
         cookies, proxy_address = cookies_from_cache, settings.EGRESS_PROXY_HOST
     else:
-        # If the user_pk is unavailable, cookies cannot be retrieved from the
-        # cache.
-        self.request.chain = None
-        return None
+        raise Exception(
+            "user_pk is unavailable, cookies cannot be retrieved from cache"
+        )
 
     s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
