@@ -38,8 +38,14 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
     end_row = None
 
     if options["start_row"] and options["end_row"]:
-        start_row = options["start_row"] if options["start_row"] > 1 else 0
+        start_row = options["start_row"] - 1 if options["start_row"] > 1 else 0
         end_row = options["end_row"] - options["start_row"] + 1  # inclusive
+
+    if options["start_row"] and not options["end_row"]:
+        start_row = options["start_row"] - 1 if options["start_row"] > 1 else 0
+
+    if options["end_row"] and not options["start_row"]:
+        end_row = options["end_row"]
 
     if options["limit"]:
         end_row = options["limit"]
@@ -78,7 +84,18 @@ def process_csv_data(
             continue
 
         if cluster_id and citation_to_add:
-            add_citations_to_cluster([citation_to_add], cluster_id)
+            try:
+                add_citations_to_cluster([citation_to_add], cluster_id)
+            except Exception as e:
+                if "Field 'volume' expected" in str(e):
+                    # Fail silently, we already know this issue
+                    logger.info(
+                        f"Row: {index} - Invalid volume in citation: {citation_to_add} for cluster: {cluster_id}"
+                    )
+                    continue
+                else:
+                    # Unknown issue
+                    raise
 
 
 class Command(BaseCommand):
@@ -114,15 +131,15 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options["start_row"] and options["end_row"]:
             if options["start_row"] > options["end_row"]:
-                print("--start-row can't be greater than --end-row")
+                logger.info("--start-row can't be greater than --end-row")
                 return
 
         if not os.path.exists(options["csv"]):
-            print(f"Csv file: {options['csv']} doesn't exist.")
+            logger.info(f"Csv file: {options['csv']} doesn't exist.")
             return
 
         data = load_citations_file(options)
         if not data.empty:
             process_csv_data(data)
         else:
-            print("CSV file empty")
+            logger.info("CSV file is empty or start/end row returned no rows.")
