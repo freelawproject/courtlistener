@@ -786,7 +786,7 @@ class PersonDocument(PersonBaseDocument):
 
 
 # RECAP
-class DocketBaseDocument(Document):
+class RECAPBaseDocument(Document):
     docket_child = JoinField(relations={"docket": ["recap_document"]})
     timestamp = fields.DateField()
 
@@ -1032,7 +1032,7 @@ class ESRECAPBaseDocument(DSLDocument):
 
 
 @recap_index.document
-class ESRECAPDocument(DocketBaseDocument, ESRECAPBaseDocument):
+class ESRECAPDocument(RECAPBaseDocument, ESRECAPBaseDocument):
 
     class Django:
         model = RECAPDocument
@@ -1141,8 +1141,7 @@ class ESRECAPDocument(DocketBaseDocument, ESRECAPBaseDocument):
         return instance.docket_entry.docket.pacer_case_id
 
 
-@recap_index.document
-class DocketDocument(DocketBaseDocument):
+class DocketBaseDocument(DSLDocument):
     docket_slug = fields.KeywordField(attr="slug", index=False)
     docket_absolute_url = fields.KeywordField(index=False)
     court_exact = fields.KeywordField(attr="court.pk", index=False)
@@ -1190,6 +1189,10 @@ class DocketDocument(DocketBaseDocument):
             multi=True,
         )
     )
+
+
+@recap_index.document
+class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
 
     def prepare_caseName(self, instance):
         return best_case_name(instance)
@@ -1969,6 +1972,8 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
         return datetime.utcnow()
 
     def prepare_percolator_query(self, instance):
+        from cl.alerts.utils import build_plain_percolator_query
+
         qd = QueryDict(instance.query.encode(), mutable=True)
         search_form = SearchForm(qd)
         if not search_form.is_valid():
@@ -1979,6 +1984,5 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
             return None
 
         cd = search_form.cleaned_data
-        search_query = DocketDocument.search()
-        query, _, _ = build_es_base_query(search_query, cd)
-        return query.to_dict()["query"]
+        query = build_plain_percolator_query(cd)
+        return query.to_dict()

@@ -710,10 +710,16 @@ def es_save_alert_document(
     es_document = getattr(es_document_module, es_document_name)
     document = es_document()
     alert = Alert.objects.get(pk=alert_id)
-    doc = document.prepare(alert)
-    if not doc["percolator_query"]:
+    alert_doc = {"timestamp": document.prepare_timestamp(alert)}
+    alert_doc.update({"rate": alert.rate})
+    alert_doc.update({"date_created": alert.date_created})
+    alert_doc.update({"id": alert.pk})
+    alert_doc.update(
+        {"percolator_query": document.prepare_percolator_query(alert)}
+    )
+    if not alert_doc["percolator_query"]:
         return None
-    doc_indexed = es_document(meta={"id": alert.pk}, **doc).save(
+    doc_indexed = es_document(meta={"id": alert.pk}, **alert_doc).save(
         skip_empty=True, refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
     )
     if doc_indexed not in ["created", "updated"]:

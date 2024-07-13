@@ -2726,7 +2726,6 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             AudioPercolator._index._name,
             document_index,
         )
-
         ids_in_results = [result.id for result in percolator_response.hits]
 
         # Update the first in the previous batch.

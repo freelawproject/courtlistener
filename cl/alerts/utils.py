@@ -30,12 +30,8 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
 )
-from cl.search.documents import (
-    AudioPercolator,
-    ESRECAPDocumentPlain,
-    RECAPPercolator,
-)
-from cl.search.models import SEARCH_TYPES, Docket, RECAPDocument
+from cl.search.documents import ESRECAPDocumentPlain
+from cl.search.models import SEARCH_TYPES, Docket
 
 
 @dataclass
@@ -129,7 +125,6 @@ def percolate_document(
         must_not=[exclude_rate_off],
     )
     s = s.query(final_query)
-
     match app_label:
         case "search.RECAPDocument":
             highlight_options, fields_to_exclude = build_highlights_dict(

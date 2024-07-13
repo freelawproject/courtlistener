@@ -1554,10 +1554,7 @@ class RECAPAlertsPercolatorTest(
         cls.rebuild_index("search.Docket")
         cls.mock_date = now()
         with time_machine.travel(cls.mock_date, tick=False):
-            RECAPPercolator._index.delete(ignore=404)
-            RECAPPercolator.init()
             super().setUpTestData()
-
             cls.docket_3 = DocketFactory(
                 court=cls.court,
                 case_name="SUBPOENAS SERVED OFF",
@@ -1595,10 +1592,14 @@ class RECAPAlertsPercolatorTest(
             )
 
     def setUp(self):
+        RECAPPercolator.init()
         self.r = get_redis_interface("CACHE")
         keys = self.r.keys("alert_hits:*")
         if keys:
             self.r.delete(*keys)
+
+    def tearDown(self):
+        RECAPPercolator._index.delete(ignore=404)
 
     @staticmethod
     def confirm_query_matched(response, query_id) -> bool:
@@ -1615,10 +1616,11 @@ class RECAPAlertsPercolatorTest(
         query = build_plain_percolator_query(cd)
         query_dict = query.to_dict()
         percolator_query = RECAPPercolator(
-            percolator_query=query_dict, rate=Alert.REAL_TIME
+            percolator_query=query_dict,
+            rate=Alert.REAL_TIME,
+            date_created=now(),
         )
         percolator_query.save(refresh=True)
-
         return percolator_query.meta.id
 
     @staticmethod
@@ -1728,10 +1730,6 @@ class RECAPAlertsPercolatorTest(
             self.confirm_query_matched(response, query_id_3), True
         )
 
-        self.delete_documents_from_index(
-            RECAPPercolator._index._name, created_queries_ids
-        )
-
     def test_recap_document_percolator(self) -> None:
         """Test if a variety of RECAPDocument triggers a RD-only percolator
         query."""
@@ -1815,10 +1813,6 @@ class RECAPAlertsPercolatorTest(
             self.confirm_query_matched(response, query_id_2), True
         )
 
-        self.delete_documents_from_index(
-            RECAPPercolator._index._name, created_queries_ids
-        )
-
     def test_docket_percolator(self) -> None:
         """Test if a variety of Docket documents triggers a percolator query."""
 
@@ -1875,7 +1869,7 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(response), expected_queries, msg="error 1")
         self.assertEqual(
             self.confirm_query_matched(response, query_id_2), True
         )
@@ -1969,6 +1963,40 @@ class RECAPAlertsPercolatorTest(
             self.confirm_query_matched(response, query_id_6), True
         )
 
-        self.delete_documents_from_index(
-            RECAPPercolator._index._name, created_queries_ids
+    def test_index_recap_alerts(self) -> None:
+        """Test a RECAP alert is indexed into the RECAPPercolator index."""
+
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Alert Docket Only",
+            query='q="401 Civil"&type=r',
+        )
+
+        self.assertTrue(
+            RECAPPercolator.exists(id=docket_only_alert.pk),
+            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
+        )
+
+    def test_delete_recap_alerts_from_percolator(self) -> None:
+        """Test a RECAP alert is removed from the RECAPPercolator index."""
+
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Alert Docket Only",
+            query='q="401 Civil"&type=r',
+        )
+
+        self.assertTrue(
+            RECAPPercolator.exists(id=docket_only_alert.pk),
+            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
+        )
+
+        docket_only_alert_id = docket_only_alert.pk
+        # Remove the alert.
+        docket_only_alert.delete()
+        self.assertFalse(
+            RECAPPercolator.exists(id=docket_only_alert_id),
+            msg=f"Alert id: {docket_only_alert_id} was not indexed.",
         )
