@@ -35,6 +35,7 @@ from cl.lib.elasticsearch_utils import fetch_all_search_results
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
+from cl.search.documents import AudioPercolator
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
     ESDocumentNameType,
@@ -660,7 +661,9 @@ def send_or_schedule_alerts(
 
     document_id, document_content = response
     # Perform an initial percolator query and process its response.
-    percolator_response = percolate_document(document_id, document_index)
+    percolator_response = percolate_document(
+        document_id, AudioPercolator._index._name, document_index
+    )
     if not percolator_response:
         self.request.chain = None
         return None
@@ -674,6 +677,7 @@ def send_or_schedule_alerts(
         percolate_document,
         percolator_response,
         document_id,
+        AudioPercolator._index._name,
         document_index,
     )
     return alerts_triggered, document_content

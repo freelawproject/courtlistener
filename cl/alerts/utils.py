@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 
+from django.apps import apps
 from django.conf import settings
 from django.http import QueryDict
 from elasticsearch_dsl import Q, Search
@@ -75,24 +76,52 @@ class InvalidDateError(Exception):
 
 def percolate_document(
     document_id: str,
-    document_index: str,
+    percolator_index: str,
+    document_index: str | None = None,
+    app_label: str | None = None,
     search_after: int = 0,
 ) -> Response:
     """Percolate a document against a defined Elasticsearch Percolator query.
 
     :param document_id: The document ID in ES index to be percolated.
+    :param percolator_index: The ES percolator index name.
     :param document_index: The ES document index where the document lives.
+    :param app_label: The app label and model that belongs to the document
+    being percolated.
     :param search_after: The ES search_after param for deep pagination.
     :return: The response from the Elasticsearch query.
     """
 
-    s = Search(index=AudioPercolator._index._name)
-    percolate_query = Q(
-        "percolate",
-        field="percolator_query",
-        index=document_index,
-        id=document_id,
-    )
+    s = Search(index=percolator_index)
+    if document_index:
+        percolate_query = Q(
+            "percolate",
+            field="percolator_query",
+            index=document_index,
+            id=document_id,
+        )
+    elif app_label:
+        model = apps.get_model(app_label)
+        rd = model.objects.get(pk=document_id)
+        match app_label:
+            case "search.RECAPDocument":
+                es_document = ESRECAPDocumentPlain().prepare(rd)
+                # Remove docket_child to avoid document parsing errors.
+                del es_document["docket_child"]
+            case _:
+                raise NotImplementedError(
+                    "Percolator prepare method is not implemented for %s",
+                    app_label,
+                )
+
+        percolate_query = Q(
+            "percolate", field="percolator_query", document=es_document
+        )
+    else:
+        raise ValueError(
+            "Either 'document_index' or 'app_label' must be "
+            "provided to perform document percolation."
+        )
     exclude_rate_off = Q("term", rate=Alert.OFF)
     final_query = Q(
         "bool",
@@ -100,9 +129,19 @@ def percolate_document(
         must_not=[exclude_rate_off],
     )
     s = s.query(final_query)
-    s = add_es_highlighting(
-        s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
-    )
+
+    match app_label:
+        case "search.RECAPDocument":
+            highlight_options, fields_to_exclude = build_highlights_dict(
+                SEARCH_RECAP_CHILD_HL_FIELDS, ALERTS_HL_TAG
+            )
+            extra_options = {"highlight": highlight_options}
+            s = s.extra(**extra_options)
+        case _:
+            s = add_es_highlighting(
+                s, {"type": SEARCH_TYPES.RECAP}, alerts=True
+            )
+
     s = s.source(excludes=["percolator_query"])
     s = s.sort("date_created")
     s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
@@ -279,58 +318,3 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
                     )
 
     return plain_query
-
-
-def percolate_docket_or_recap_document(
-    document_id: str,
-    document_index: str | None = None,
-    search_after: int = 0,
-) -> Response:
-    """Percolate a document against a defined Elasticsearch Percolator query.
-
-    :param document_id: The document ID in ES index to be percolated.
-    :param document_index: The ES document index where the document lives.
-    :param search_after: The ES search_after param for deep pagination.
-    :return: The response from the Elasticsearch query.
-    """
-
-    s = Search(index=RECAPPercolator._index._name)
-    if document_index:
-        percolate_query = Q(
-            "percolate",
-            field="percolator_query",
-            index=document_index,
-            id=document_id,
-        )
-    else:
-        rd = RECAPDocument.objects.get(pk=document_id)
-        es_document = ESRECAPDocumentPlain().prepare(rd)
-        # Remove docket_child to avoid document parsing errors.
-        del es_document["docket_child"]
-        percolate_query = Q(
-            "percolate", field="percolator_query", document=es_document
-        )
-
-    exclude_rate_off = Q("term", rate=Alert.OFF)
-    final_query = Q(
-        "bool",
-        must=[percolate_query],
-        must_not=[exclude_rate_off],
-    )
-    s = s.query(final_query)
-
-    if document_index:
-        s = add_es_highlighting(s, {"type": SEARCH_TYPES.RECAP}, alerts=True)
-    else:
-        highlight_options, fields_to_exclude = build_highlights_dict(
-            SEARCH_RECAP_CHILD_HL_FIELDS, ALERTS_HL_TAG
-        )
-        extra_options = {"highlight": highlight_options}
-        s = s.extra(**extra_options)
-
-    s = s.source(excludes=["percolator_query"])
-    s = s.sort("date_created")
-    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
-    if search_after:
-        s = s.extra(search_after=search_after)
-    return s.execute()

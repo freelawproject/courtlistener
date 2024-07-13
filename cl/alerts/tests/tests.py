@@ -2722,7 +2722,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         # Percolate the document. First batch.
         document_index = AudioDocument._index._name
         percolator_response = percolate_document(
-            str(rt_oral_argument.pk), document_index
+            str(rt_oral_argument.pk),
+            AudioPercolator._index._name,
+            document_index,
         )
 
         ids_in_results = [result.id for result in percolator_response.hits]
@@ -2735,7 +2737,10 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         # Percolate the next page.
         search_after = percolator_response.hits[-1].meta.sort
         percolator_response = percolate_document(
-            str(rt_oral_argument.pk), document_index, search_after=search_after
+            str(rt_oral_argument.pk),
+            AudioPercolator._index._name,
+            document_index,
+            search_after=search_after,
         )
 
         # The document updated shouldn't be retrieved again.

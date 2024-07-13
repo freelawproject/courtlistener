@@ -17,7 +17,7 @@ from cl.alerts.management.commands.cl_send_recap_alerts import (
 from cl.alerts.models import SEARCH_TYPES, Alert, ScheduledAlertHit
 from cl.alerts.utils import (
     build_plain_percolator_query,
-    percolate_docket_or_recap_document,
+    percolate_document,
     recap_document_hl_matched,
 )
 from cl.api.factories import WebhookFactory
@@ -1649,8 +1649,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_docket_or_recap_document(
+        response = percolate_document(
             str(self.rd_att.pk),
+            RECAPPercolator._index._name,
+            app_label="search.RECAPDocument",
         )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -1666,8 +1668,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_1 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_1)
-        response = percolate_docket_or_recap_document(
+        response = percolate_document(
             str(self.rd.pk),
+            RECAPPercolator._index._name,
+            app_label="search.RECAPDocument",
         )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -1684,8 +1688,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        response = percolate_docket_or_recap_document(
+        response = percolate_document(
             str(self.rd.pk),
+            RECAPPercolator._index._name,
+            app_label="search.RECAPDocument",
         )
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
@@ -1705,8 +1711,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_3 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_3)
-        response = percolate_docket_or_recap_document(
+        response = percolate_document(
             str(self.rd.pk),
+            RECAPPercolator._index._name,
+            app_label="search.RECAPDocument",
         )
         expected_queries = 3
         self.assertEqual(len(response), expected_queries)
@@ -1740,8 +1748,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_docket_or_recap_document(
+        response = percolate_document(
             str(self.rd_2.pk),
+            RECAPPercolator._index._name,
+            app_label="search.RECAPDocument",
         )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -1757,8 +1767,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_docket_or_recap_document(
+        response = percolate_document(
             str(self.rd_att.pk),
+            RECAPPercolator._index._name,
+            app_label="search.RECAPDocument",
         )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -1774,8 +1786,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_docket_or_recap_document(
+        response = percolate_document(
             str(self.rd.pk),
+            RECAPPercolator._index._name,
+            app_label="search.RECAPDocument",
         )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -1789,8 +1803,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        response = percolate_docket_or_recap_document(
+        response = percolate_document(
             str(self.rd.pk),
+            RECAPPercolator._index._name,
+            app_label="search.RECAPDocument",
         )
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
@@ -1819,8 +1835,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_docket_or_recap_document(
-            str(self.de.docket.pk), document_index_alias
+        response = percolate_document(
+            str(self.de.docket.pk),
+            RECAPPercolator._index._name,
+            document_index_alias,
         )
         expected_queries = 0
         self.assertEqual(len(response), expected_queries)
@@ -1834,8 +1852,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_1 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_1)
-        response = percolate_docket_or_recap_document(
-            str(self.de.docket.pk), document_index_alias
+        response = percolate_document(
+            str(self.de.docket.pk),
+            RECAPPercolator._index._name,
+            document_index_alias,
         )
         expected_queries = 0
         self.assertEqual(len(response), expected_queries)
@@ -1849,8 +1869,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        response = percolate_docket_or_recap_document(
-            str(self.de.docket.pk), document_index_alias
+        response = percolate_document(
+            str(self.de.docket.pk),
+            RECAPPercolator._index._name,
+            document_index_alias,
         )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -1869,8 +1891,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_3 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_3)
-        response = percolate_docket_or_recap_document(
-            str(self.de.docket.pk), document_index_alias
+        response = percolate_document(
+            str(self.de.docket.pk),
+            RECAPPercolator._index._name,
+            document_index_alias,
         )
         expected_queries = 2
         self.assertEqual(len(response), expected_queries)
@@ -1890,8 +1914,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_4 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_4)
-        response = percolate_docket_or_recap_document(
-            str(self.docket_3.pk), document_index_alias
+        response = percolate_document(
+            str(self.docket_3.pk),
+            RECAPPercolator._index._name,
+            document_index_alias,
         )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -1907,8 +1933,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_5 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_5)
-        response = percolate_docket_or_recap_document(
-            str(self.de_1.docket.pk), document_index_alias
+        response = percolate_document(
+            str(self.de_1.docket.pk),
+            RECAPPercolator._index._name,
+            document_index_alias,
         )
         expected_queries = 1
         self.assertEqual(len(response), expected_queries)
@@ -1924,8 +1952,10 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_6 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_6)
-        response = percolate_docket_or_recap_document(
-            str(self.de.docket.pk), document_index_alias
+        response = percolate_document(
+            str(self.de.docket.pk),
+            RECAPPercolator._index._name,
+            document_index_alias,
         )
         expected_queries = 3
         self.assertEqual(len(response), expected_queries)
