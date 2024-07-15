@@ -425,7 +425,12 @@ def do_all(options: OptionsType):
 
     :return: None
     """
-    start = datetime.date(1950, 5, 1)
+
+    start = (
+        options["date_start"]
+        if options["date_start"]
+        else datetime.date(1950, 5, 1)
+    )
     end = datetime.date.today()
 
     dates = make_date_range_tuples(start, end, gap=7)
@@ -508,7 +513,7 @@ class Command(VerboseCommand):
 
         if options["date_start"] and options["date_end"]:
             if options["date_start"] > options["date_end"]:  # type: ignore
-                print(
+                logger.info(
                     "Error: date-end must be greater or equal than date-start option."
                 )
                 return

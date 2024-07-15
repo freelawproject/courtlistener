@@ -398,30 +398,25 @@ def get_and_save_free_document_report(
     if log_id:
         # We only save the html when the script is run automatically every day
         log = PACERFreeDocumentLog.objects.get(pk=log_id)
-        for result in report.responses:
-            if isinstance(result, dict):
-                response = result.get("response")
-                query_start = result.get("start")
-                query_end = result.get("end")
+        if hasattr(report, "responses_with_params"):
+            for result in report.responses_with_params:
+                # FreeOpinionReport now also returns a list of dicts with additional
+                # data instead of a list of requests responses. We do this to verify
+                # if we have the new version of juriscraper with the new attribute.
+                if isinstance(result, dict):
+                    response = result.get("response")
+                    query_start = result.get("start")
+                    query_end = result.get("end")
 
-                if response and query_start and query_end:
-                    pacer_file = PacerHtmlFiles(
-                        content_object=log,
-                        upload_type=UPLOAD_TYPE.FREE_OPINIONS_REPORT,
-                    )
-                    pacer_file.filepath.save(
-                        f"free_opinions_report_{court_id}_from_{query_start.replace('/', '-')}_to_{query_end.replace('/', '-')}.html",
-                        ContentFile(response.text.encode()),
-                    )
-            else:
-                # FreeOpinionReport now returns a list of dicts with additional data
-                # instead of a list of requests responses.
-                # This is temporary while the new version of juriscraper is added to
-                # courtlistener
-                logger.info(
-                    "New version of juriscraper not yet implemented. Can't "
-                    "save PacerHtmlFiles object."
-                )
+                    if response and query_start and query_end:
+                        pacer_file = PacerHtmlFiles(
+                            content_object=log,
+                            upload_type=UPLOAD_TYPE.FREE_OPINIONS_REPORT,
+                        )
+                        pacer_file.filepath.save(
+                            f"free_opinions_report_{court_id}_from_{query_start.replace('/', '-')}_to_{query_end.replace('/', '-')}.html",
+                            ContentFile(response.text.encode()),
+                        )
 
     document_rows_to_create = []
     for row in results:
