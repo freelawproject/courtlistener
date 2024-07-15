@@ -114,6 +114,7 @@ tiktoken = "^0.6.0"
 hyperscan = "^0.7.7"
 openai = "^1.31.1"
 seal-rookery = "^2.2.3"
+ada-url = "^1.15.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"
