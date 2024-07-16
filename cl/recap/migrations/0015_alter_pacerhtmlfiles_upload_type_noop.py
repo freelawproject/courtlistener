@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("recap", "0013_processingqueue_update"),
+        ("recap", "0014_add_acms_upload_type_noop"),
     ]
 
     operations = [
