@@ -292,8 +292,13 @@ async def redirect_og_lookup(request: HttpRequest) -> HttpResponse:
     If it hits an error, send the bot back to AWS to get the PDF, but set
     "no-og" parameter to be sure the file gets served.
     """
-    file_path = get_redirect_or_404(request, "file_path")
-
+    # Since implementing Ada, the `get_redirect_or_404` method now returns a
+    # valid path for redirection, always prefixed with a slash (/). However,
+    # FileField values cannot have a leading slash because it breaks how they
+    # interact with MEDIA_ROOT.
+    # To ensure compatibility, we're striping the leading slash from the
+    # returned redirect path before using it to retrieve the RD record.
+    file_path = get_redirect_or_404(request, "file_path").lstrip("/")
     rd_filter = RECAPDocument.objects.filter(
         filepath_local=file_path
     ).prefetch_related("docket_entry")
