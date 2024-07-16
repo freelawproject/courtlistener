@@ -8,6 +8,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView
@@ -45,7 +46,11 @@ from cl.lib.ratelimiter import (
     ratelimiter_unsafe_2000_per_h,
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
-from cl.lib.url_utils import get_redirect_or_login_url
+from cl.lib.url_utils import (
+    get_redirect_or_login_url,
+    is_safe_url,
+    parse_url_with_ada,
+)
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
@@ -828,3 +833,37 @@ class RateLimitedPasswordResetView(PasswordResetView):
     template_name = "register/password_reset_form.html"
     email_template_name = "register/password_reset_email.html"
     form_class = CustomPasswordResetForm
+
+
+class SafeRedirectLoginView(auth_views.LoginView):
+    """
+    Custom LoginView that validates and sanitizes the redirect URL after a
+    successful login.
+
+    This view inherits from Django's built-in LoginView but adds an extra layer
+    of security by ensuring the redirect URL submitted by the login form is safe
+    It prevents potential open redirect vulnerabilities.
+    """
+
+    def get_redirect_url(self):
+        """
+        Return the user-originating redirect URL if it's safe. otherwise falls
+        back to the default.
+
+        This method ensures users cannot be redirected to malicious URLs after
+        logging in, even if they attempt to provide one.
+        """
+        redirect_to = self.request.POST.get(
+            self.redirect_field_name,
+            self.request.GET.get(self.redirect_field_name),
+        )
+        if not redirect_to:
+            return settings.LOGIN_REDIRECT_URL
+
+        try:
+            cleaned_url = parse_url_with_ada(redirect_to)
+        except ValueError:
+            return settings.LOGIN_REDIRECT_URL
+
+        is_safe = is_safe_url(redirect_to, self.request)
+        return cleaned_url if is_safe else settings.LOGIN_REDIRECT_URL
