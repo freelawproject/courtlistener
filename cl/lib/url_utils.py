@@ -19,56 +19,52 @@ def parse_url_with_ada(url: str) -> str:
     parsed URL from the `href` attribute and attempts to remove the `BASE_URL`
     if it was added previously.
 
+    Returns an empty string If the input URL is invalid or cannot be parsed.
+
     :param url: The URL to parse.
-    :raises: ValidationError: If the input URL is invalid.
-    :return: The parsed URL.
+    :return: The parsed URL or an empty string if the input URL is invalid or
+    cannot be parsed.
     """
-    ada_url = URL(url, base=BASE_URL)
-    return ada_url.href.replace(BASE_URL, "")
-
-
-def get_redirect_or_login_url(request: HttpRequest, field_name: str) -> str:
-    """Get the redirect if it's safe, or send the user to the login page
-
-    :param request: The HTTP request
-    :param field_name: The field where the redirect is located
-    :return: Either the value requested or the default LOGIN_REDIRECT_URL, if
-    a sanity or security check failed.
-    """
-    url = request.GET.get(field_name, "")
     if not url:
-        return settings.LOGIN_REDIRECT_URL
+        return ""
 
     try:
-        cleaned_url = parse_url_with_ada(url)
+        ada_url = URL(url, base=BASE_URL)
+        return ada_url.href.replace(BASE_URL, "")
     except ValueError:
-        return settings.LOGIN_REDIRECT_URL
-
-    is_safe = is_safe_url(cleaned_url, request)
-    if not is_safe:
-        return settings.LOGIN_REDIRECT_URL
-    return cleaned_url
+        return ""
 
 
-def get_redirect_or_404(request: HttpRequest, field_name: str) -> str:
-    """Get the redirect if safe, or throw a 404
-
-    :param request: The HTTP request
-    :param field_name: The field where the redirect is located
-    :return: The URL if it was safe
+def get_redirect_or_abort(
+    request: HttpRequest, redirect_field_name: str, throw_404: bool = False
+) -> str:
     """
-    url = request.GET.get(field_name, "")
-    if not url:
-        raise Http404("No URL to redirect to.")
+    Retrieves a safe redirect URL from the request or returns the login URL.
 
-    try:
-        cleaned_url = parse_url_with_ada(url)
-    except ValueError:
-        raise Http404(f"Unsafe redirect URL: {url}")
+    This function checks for a redirect URL in both the POST and GET data of
+    the provided request object. It then parses the retrieved URL using the
+    `parse_url_with_ada` helper and performs safety checks using the
+    `is_safe_url` function.
 
-    is_safe = is_safe_url(cleaned_url, request)
-    if not is_safe:
-        raise Http404(f"Unsafe redirect URL: {url}")
+    :param request: The HTTP request object containing potential redirect data.
+    :param redirect_field_name: The name of the field containing the redirect
+    URL.
+    :param throw_404: Whether to raise an Http404 exception for unsafe URLs.
+    Defaults to False, in which case it returns the login redirect URL.
+    :raises Http404: If `throw_404` is True and the redirect URL is unsafe.
+    :return: The safe, parsed redirect URL if found, otherwise the configured
+    login URL.
+    """
+    redirect_url = request.POST.get(
+        redirect_field_name,
+        request.GET.get(redirect_field_name, ""),
+    )
+    cleaned_url = parse_url_with_ada(redirect_url)
+    safe = is_safe_url(cleaned_url, request)
+    if not safe:
+        if throw_404:
+            raise Http404("Missing or unsafe redirect URL.")
+        return settings.LOGIN_REDIRECT_URL
     return cleaned_url
 
 

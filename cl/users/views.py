@@ -46,11 +46,7 @@ from cl.lib.ratelimiter import (
     ratelimiter_unsafe_2000_per_h,
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
-from cl.lib.url_utils import (
-    get_redirect_or_login_url,
-    is_safe_url,
-    parse_url_with_ada,
-)
+from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
@@ -461,7 +457,7 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
 @never_cache
 def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
-    redirect_to = get_redirect_or_login_url(request, "next")
+    redirect_to = get_redirect_or_abort(request, "next")
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
@@ -549,7 +545,7 @@ def register(request: HttpRequest) -> HttpResponse:
 def register_success(request: HttpRequest) -> HttpResponse:
     """Tell the user they have been registered and allow them to continue where
     they left off."""
-    redirect_to = get_redirect_or_login_url(request, "next")
+    redirect_to = get_redirect_or_abort(request, "next")
     email = request.GET.get("email", "")
     default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
     return TemplateResponse(
@@ -853,17 +849,4 @@ class SafeRedirectLoginView(auth_views.LoginView):
         This method ensures users cannot be redirected to malicious URLs after
         logging in, even if they attempt to provide one.
         """
-        redirect_to = self.request.POST.get(
-            self.redirect_field_name,
-            self.request.GET.get(self.redirect_field_name),
-        )
-        if not redirect_to:
-            return settings.LOGIN_REDIRECT_URL
-
-        try:
-            cleaned_url = parse_url_with_ada(redirect_to)
-        except ValueError:
-            return settings.LOGIN_REDIRECT_URL
-
-        is_safe = is_safe_url(redirect_to, self.request)
-        return cleaned_url if is_safe else settings.LOGIN_REDIRECT_URL
+        return get_redirect_or_abort(self.request, self.redirect_field_name)
