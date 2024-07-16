@@ -2000,3 +2000,235 @@ class RECAPAlertsPercolatorTest(
             RECAPPercolator.exists(id=docket_only_alert_id),
             msg=f"Alert id: {docket_only_alert_id} was not indexed.",
         )
+
+    def test_percolate_document_on_ingestion(self) -> None:
+        """Confirm a Docket or RECAPDocument is percolated upon ingestion."""
+
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Docket Only",
+            query='q="SUBPOENAS SERVED CASE"&type=r',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-1234",
+                source=Docket.RECAP,
+            )
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(docket_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_only_alert.name,
+            1,
+            docket.case_name,
+            0,
+        )
+
+        recap_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert RECAP Only",
+            query='q="plain text for 018036652436"&type=r',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="SUBPOENAS SERVED OFF",
+                    docket_number="1:21-bk-1239",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652436",
+                plain_text="plain text for 018036652436",
+            )
+
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+
+        self.assertIn(rd.description, html_content)
+        self.assertIn(recap_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The RECAPDocument alert contain one nested child hit.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            recap_only_alert.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+
+        # Related DE. RD creation.
+        de_entry_field_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert RECAP Only",
+            query='q="Hearing for Leave"&type=r',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_de_2 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="SUBPOENAS SERVED ON",
+                    docket_number="1:21-bk-12876",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="Hearing for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=alert_de_2,
+                description="Motion to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="01803665477",
+                plain_text="plain text for 01803665477",
+            )
+
+        html_content = self.get_html_content_from_email(mail.outbox[2])
+        self.assertEqual(
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
+        )
+        self.assertIn(rd_2.description, html_content)
+        self.assertIn(de_entry_field_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The RECAPDocument alert contain one nested child hit.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            de_entry_field_alert.name,
+            1,
+            alert_de_2.docket.case_name,
+            1,
+        )
+
+        # RD update.
+        de_entry_field_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert RECAP Only",
+            query='q="Hearing to File Updated"&type=r',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_2.description = "Hearing to File Updated"
+            rd_2.save()
+
+        html_content = self.get_html_content_from_email(mail.outbox[3])
+        self.assertEqual(
+            len(mail.outbox), 4, msg="Outgoing emails don't match."
+        )
+        self.assertIn(rd_2.description, html_content)
+        self.assertIn(de_entry_field_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The RECAPDocument alert contain one nested child hit.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            de_entry_field_alert.name,
+            1,
+            alert_de_2.docket.case_name,
+            1,
+        )
+
+        # Docket update.
+        docket_update_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert RECAP Only",
+            query='q="SUBPOENAS SERVED LOREM"&type=r',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket.case_name = "SUBPOENAS SERVED LOREM"
+            docket.save()
+
+        html_content = self.get_html_content_from_email(mail.outbox[4])
+        self.assertEqual(
+            len(mail.outbox), 5, msg="Outgoing emails don't match."
+        )
+        self.assertIn(docket_update_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_update_alert.name,
+            1,
+            docket.case_name,
+            0,
+        )
+
+    def test_recap_alerts_highlighting(self) -> None:
+        """Confirm RECAP Search alerts are properly highlighted."""
+
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Docket Only",
+            query='q="SUBPOENAS SERVED CASE"&type=r',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-1234",
+                source=Docket.RECAP,
+            )
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(docket_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self.assertIn(f"<strong>{docket.case_name}</strong>", html_content)
+
+        recap_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert RECAP Only",
+            query='q="plain text for 018036652000"&type=r',
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="SUBPOENAS SERVED OFF",
+                    docket_number="1:21-bk-1239",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File",
+                document_number="1",
+                pacer_doc_id="018036652000",
+                plain_text="plain text for 018036652000",
+            )
+
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertIn(recap_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        self.assertIn(f"<strong>{rd.plain_text}</strong>", html_content)

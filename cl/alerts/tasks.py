@@ -18,9 +18,12 @@ from elasticsearch.exceptions import ConnectionError
 
 from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
+    add_document_hit_to_alert_set,
     alert_hits_limit_reached,
+    has_document_alert_hit_been_triggered,
     override_alert_query,
     percolate_document,
+    transform_percolator_child_document,
 )
 from cl.api.models import WebhookEventType
 from cl.api.tasks import (
@@ -32,10 +35,19 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import fetch_all_search_results
-from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
+from cl.lib.redis_utils import (
+    create_redis_semaphore,
+    delete_redis_semaphore,
+    get_redis_interface,
+)
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.documents import AudioPercolator
+from cl.search.documents import (
+    AudioDocument,
+    AudioPercolator,
+    DocketDocument,
+    RECAPPercolator,
+)
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
     ESDocumentNameType,
@@ -545,7 +557,9 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
     scheduled_hits_to_create = []
     email_alerts_to_send = []
     rt_alerts_to_send = []
-    alerts_triggered, document_content = response
+    alerts_triggered, document_content, app_label = response
+    schedule_alert = False
+    r = get_redis_interface("CACHE")
     for hit in alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
         # independent highlighting for each alert triggered.
@@ -559,6 +573,38 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
         alert_user: UserProfile.user = alert_triggered.user
         # Set highlight if available in response.
+        match app_label:
+            case "search.RECAPDocument":
+                # Filter out RECAPDocuments and set the document id to the
+                # RECAPDocument alert hits.
+                if has_document_alert_hit_been_triggered(
+                    r, alert_triggered.pk, "r", document_content_copy["id"]
+                ):
+                    continue
+                transform_percolator_child_document(
+                    document_content_copy, hit.meta
+                )
+                schedule_alert = True
+                add_document_hit_to_alert_set(
+                    r, alert_triggered.pk, "r", document_content_copy["id"]
+                )
+            case "search.Docket":
+                # Filter out Dockets and set the document id to the
+                # Docket alert hits.
+                if has_document_alert_hit_been_triggered(
+                    r,
+                    alert_triggered.pk,
+                    "d",
+                    document_content_copy["docket_id"],
+                ):
+                    continue
+                add_document_hit_to_alert_set(
+                    r,
+                    alert_triggered.pk,
+                    "d",
+                    document_content_copy["docket_id"],
+                )
+
         if hasattr(hit.meta, "highlight"):
             document_content_copy["meta"] = {}
             document_content_copy["meta"][
@@ -613,7 +659,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
     # Sent all the related document RT emails.
     if email_alerts_to_send:
-        send_search_alert_emails.delay(email_alerts_to_send)
+        send_search_alert_emails.delay(email_alerts_to_send, schedule_alert)
 
     # Update RT Alerts date_last_hit, increase stats and log RT alerts sent.
     if rt_alerts_to_send:
@@ -634,7 +680,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
     interval_start=5,
 )
 def send_or_schedule_alerts(
-    self: Task, response: SaveDocumentResponseType, document_index: str
+    self: Task, response: SaveDocumentResponseType | None
 ) -> PercolatorResponseType | None:
     """Send real-time alerts based on the Elasticsearch search response.
 
@@ -650,7 +696,6 @@ def send_or_schedule_alerts(
     :param self: The celery task
     :param response: A two tuple, the document ID to be percolated in
     ES index and the document data that triggered the alert.
-    :param document_index: The ES document index where the document lives.
     :return: A two tuple, a list of Alerts triggered and the document data that
     triggered the alert.
     """
@@ -659,10 +704,28 @@ def send_or_schedule_alerts(
         self.request.chain = None
         return None
 
-    document_id, document_content = response
+    document_id, document_content, app_label = response
     # Perform an initial percolator query and process its response.
+
+    es_document_index = None
+    match app_label:
+        case "audio.Audio":
+            percolator_index = AudioPercolator._index._name
+            es_document_index = AudioDocument._index._name
+            app_label = None
+        case "search.Docket":
+            percolator_index = RECAPPercolator._index._name
+            es_document_index = DocketDocument._index._name
+            app_label = None
+        case "search.RECAPDocument":
+            percolator_index = RECAPPercolator._index._name
+        case _:
+            raise NotImplementedError(
+                "Percolator search alerts not supported for %s", app_label
+            )
+
     percolator_response = percolate_document(
-        document_id, AudioPercolator._index._name, document_index
+        document_id, percolator_index, es_document_index, app_label
     )
     if not percolator_response:
         self.request.chain = None
@@ -677,10 +740,11 @@ def send_or_schedule_alerts(
         percolate_document,
         percolator_response,
         document_id,
-        AudioPercolator._index._name,
-        document_index,
+        percolator_index,
+        es_document_index,
+        app_label,
     )
-    return alerts_triggered, document_content
+    return alerts_triggered, document_content, app_label
 
 
 # New task

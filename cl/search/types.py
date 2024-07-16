@@ -97,9 +97,9 @@ ESDocumentNameType = Literal[
 
 ESDictDocument = dict[str, Any]
 
-PercolatorResponseType = tuple[list[Hit], ESDictDocument]
+PercolatorResponseType = tuple[list[Hit], ESDictDocument, str]
 
-SaveDocumentResponseType = tuple[str, ESDictDocument]
+SaveDocumentResponseType = tuple[str, ESDictDocument, str]
 
 SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 

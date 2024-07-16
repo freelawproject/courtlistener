@@ -1,5 +1,7 @@
+import copy
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 from django.apps import apps
 from django.conf import settings
@@ -23,6 +25,7 @@ from cl.lib.elasticsearch_utils import (
     build_has_child_filters,
     build_highlights_dict,
     build_join_es_filters,
+    merge_highlights_into_result,
 )
 from cl.lib.types import CleanData
 from cl.search.constants import (
@@ -32,6 +35,7 @@ from cl.search.constants import (
 )
 from cl.search.documents import ESRECAPDocumentPlain
 from cl.search.models import SEARCH_TYPES, Docket
+from cl.search.types import ESDictDocument
 
 
 @dataclass
@@ -313,3 +317,23 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
                     )
 
     return plain_query
+
+
+def transform_percolator_child_document(
+    es_document: ESDictDocument, hit_meta: dict[str, Any]
+) -> None:
+    """Transform the given ES document by adding a child document with
+    highlights.
+
+    :param es_document: The ES document to be transformed.
+    :param hit_meta: The hit meta from the percolator hit, containing highlights
+    :return: None, document is modified in place.
+    """
+
+    child_document = copy.deepcopy(es_document)
+    if hasattr(hit_meta, "highlight"):
+        merge_highlights_into_result(
+            hit_meta.highlight.to_dict(),
+            child_document,
+        )
+    es_document["child_docs"] = [child_document]

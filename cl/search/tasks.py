@@ -68,7 +68,7 @@ from cl.search.types import (
     SaveDocumentResponseType,
 )
 
-models_alert_support = [Audio]
+models_alert_support = [Audio, RECAPDocument, Docket]
 
 logger = logging.getLogger(__name__)
 
@@ -392,7 +392,7 @@ def es_save_document(
             # Disable ES Alerts if oa-es-alerts-active switch is not enabled
             self.request.chain = None
             return None
-        return response["_id"], doc
+        return response["_id"].split("_")[-1], doc, app_label
     else:
         self.request.chain = None
         return None
@@ -489,7 +489,7 @@ def update_es_document(
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
-) -> None:
+) -> SaveDocumentResponseType | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param es_document_name: The Elasticsearch document type name.
@@ -544,6 +544,13 @@ def update_es_document(
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+    if main_app_label in ["search.RECAPDocument", "search.Docket"]:
+        doc = es_doc.prepare(main_model_instance)
+        return str(main_instance_id), doc, main_app_label
+
+    # Abort subsequent percolation tasks for not supported models.
+    self.request.chain = None
+    return None
 
 
 def get_es_doc_id_and_parent_id(
