@@ -23,6 +23,7 @@ from cl.lib.utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
     get_child_court_ids_for_parents,
+    map_to_docket_entry_sorting,
 )
 from cl.search.constants import (
     BOOSTS,
@@ -355,7 +356,7 @@ def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
     and 44 F.2d 92. I.e., this ensures that queries don't span citations. This
     works because internally Solr uses proximity to create multiValue fields.
 
-    See: http://stackoverflow.com/a/33858649/64911 and
+    See: https://stackoverflow.com/a/33858649/64911 and
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
@@ -724,16 +725,6 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             main_params["fq"].extend(main_fq)
         else:
             main_params["fq"] = main_fq
-
-
-def map_to_docket_entry_sorting(sort_string: str) -> str:
-    """Convert a RECAP sorting param to a docket entry sorting parameter."""
-    if sort_string == "dateFiled asc":
-        return "entry_date_filed asc"
-    elif sort_string == "dateFiled desc":
-        return "entry_date_filed desc"
-    else:
-        return sort_string
 
 
 def add_grouping(main_params: SearchParam, cd: CleanData, group: bool) -> None:

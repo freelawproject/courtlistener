@@ -2,20 +2,44 @@
 Sets up all the overrides or additional CSS that the site uses.
 ---------------------------------------------------------------------------*/
 ::-moz-selection {
-  background: #AE0B0B;
+  background: #B53C2C;
   color: #fff;
   text-shadow: none;
 }
 
 ::selection {
-  background: #AE0B0B;
+  background: #B53C2C;
   color: #fff;
   text-shadow: none;
 }
 
 .navbar-brand {
   padding: 16px 15px 16px 30px;
-  height: 65px;
+  height: 135px;
+}
+
+/* CSS for the new full SVG CL logo */
+.cl-full-logo {
+    height: 115px;
+    display: block;
+}
+.cl-full-logo .free-law-link{
+  fill: transparent;
+}
+.cl-full-logo .cls-1 {
+  fill: #B53C2C;
+}
+.cl-full-logo .cls-1, .cls-2, .cls-3, .cls-4 {
+  stroke-width: 0px;
+}
+.cl-full-logo .cls-2 {
+  fill: #968f7f;
+}
+.cl-full-logo .cls-3 {
+  fill: #fff;
+}
+.cl-full-logo .cls-4 {
+  fill: #848582;
 }
 
 header {
@@ -52,7 +76,7 @@ header {
 
 .navbar-default .navbar-nav > li.active a {
   background-color: transparent;
-  border-bottom-color: #AE0B0B;
+  border-bottom-color: #B53C2C;
 }
 
 .subnav {
@@ -68,7 +92,7 @@ header {
   float: left;
 }
 
-#navbar-r a:after {
+#navbar-r > a:after {
   content: "PACER";
   display: block;
   position: absolute;
@@ -80,7 +104,7 @@ header {
   transition: opacity .4s, transform .4s;
 }
 
-#navbar-r:hover a:after {
+#navbar-r:hover > a:after {
   opacity: 1;
   transform: skewX(20deg) rotate(180deg) translateX(-3px);
   backface-visibility: hidden; /* Fixes jumpy transition */
@@ -89,7 +113,7 @@ header {
 .navbar-default .navbar-nav > li > a.donate,
 .navbar-default .navbar-nav > .active > a.donate,
 .navbar-default .navbar-nav > .active > a.donate:focus {
-  color: #AE0B0B;
+  color: #B53C2C;
   background-color: transparent;
   font-weight: bold;
   font-size: 110%;
@@ -97,7 +121,7 @@ header {
 
 .navbar-default .navbar-nav > .active > a.donate:hover {
   background-color: #e7e7e7;
-  color: #AE0B0B;
+  color: #B53C2C;
 }
 
 .navbar-default .navbar-nav > li > a.donate:hover {
@@ -192,6 +216,12 @@ a.button:active {
 }
 
 @media (max-width: 767px) {
+  .cl-full-logo{
+    height: 90px;
+  }
+  .navbar-brand {
+    height: 115px;
+  }
   .navbar-default .navbar-nav > li form button{
     padding: 5px 15px 5px 25px;
     color: #777777;
@@ -482,6 +512,9 @@ a.black-link:focus {
 
 .nowrap {
   white-space: nowrap;
+}
+.tall {
+  max-height: 740px;
 }
 
 .round-bottom {
@@ -891,7 +924,7 @@ input.court-checkbox, input.status-checkbox {
 
 /* Special case for Oregon, which has a name attr with a value of TOP on
    content that isn't a link. See example here:
-   http://www.publications.ojd.state.or.us/docs/S054822.htm#TOP
+   https://www.publications.ojd.state.or.us/docs/S054822.htm#TOP
 
    Idea here is to simply ignore the anchor element.
 */
@@ -1322,7 +1355,7 @@ body.embed .caseHoverText {
 
 .tt-suggestion:hover {
   color: #fff;
-  background-color: #AE0B0B;
+  background-color: #B53C2C;
 }
 
 .tt-suggestion.tt-is-under-cursor a {

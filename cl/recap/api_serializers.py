@@ -278,13 +278,21 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
             "pk", flat=True
         )
 
-        if attrs.get("court") or attrs.get("docket"):
+        if (
+            attrs.get("court")
+            or attrs.get("docket")
+            or attrs.get("recap_document")
+        ):
             # this check ensures the docket is not an appellate record.
-            court_id = (
-                attrs["court"].pk
-                if attrs.get("court")
-                else attrs["docket"].court_id
-            )
+            if attrs.get("recap_document"):
+                rd = attrs["recap_document"]
+                court_id = rd.docket_entry.docket.court_id
+            else:
+                court_id = (
+                    attrs["court"].pk
+                    if attrs.get("court")
+                    else attrs["docket"].court_id
+                )
             if court_id not in valid_court_ids:
                 raise ValidationError(f"Invalid court id: {court_id}")
 

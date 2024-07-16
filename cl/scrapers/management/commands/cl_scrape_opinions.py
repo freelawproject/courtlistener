@@ -114,9 +114,11 @@ def make_objects(
         source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
         nature_of_suit=item.get("nature_of_suit", ""),
+        summary=item.get("summary", ""),
         blocked=blocked,
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
+        disposition=item.get("disposition") or "",
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
@@ -134,6 +136,7 @@ def make_objects(
         type=Opinion.COMBINED,
         sha1=sha1_hash,
         download_url=url,
+        author_str=item.get("author_str") or "",
     )
 
     cf = ContentFile(content)
@@ -247,8 +250,8 @@ class Command(VerboseCommand):
         logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
-            # Minnesota currently rejects Courtlistener and Juriscraper as a User Agent
-            if court_str in ["minn", "minnctapp"]:
+            # Minn and Mass currently require browser specific user agents
+            if court_str in ["minn", "minnctapp", "mass", "massappct"]:
                 headers = site.headers
             else:
                 headers = {"User-Agent": "CourtListener"}

@@ -97,10 +97,6 @@ async def api_index(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def replication_docs(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "replication.html", {"private": False})
-
-
 async def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
     disclosure_coverage = await get_coverage_data_fds()
@@ -153,32 +149,6 @@ async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
             "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
             "private": False,
         },
-    )
-
-
-async def alert_api_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "alert-api-docs-vlatest.html",
-        {"private": False},
-    )
-
-
-async def financial_disclosures_api_help_help(
-    request: HttpRequest,
-) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "financial-disclosure-docs-vlatest.html",
-        {"private": False},
-    )
-
-
-async def search_api_help(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(
-        request,
-        "search-api-docs-vlatest.html",
-        {"private": False},
     )
 
 
@@ -362,16 +332,6 @@ async def deprecated_api(request, v):
         safe=False,
         status=HTTPStatus.GONE,
     )
-
-
-async def rest_change_log(request):
-    context = {"private": False}
-    return TemplateResponse(request, "rest-change-log.html", context)
-
-
-async def webhooks_getting_started(request):
-    context = {"private": False}
-    return TemplateResponse(request, "webhooks-getting-started.html", context)
 
 
 async def webhooks_docs(request, version=None):
