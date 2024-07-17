@@ -84,37 +84,11 @@
   <header class="row">
     <!-- Donate Banner -->
     {% if FUNDRAISING_MODE and not request.COOKIES.no_banner %}
-    <div class="navbar navbar-default subnav alert-info alert-dismissible" role="navigation">
-      <div class="container-fluid">
-        <div class="row">
-          <div class="col-xs-12 col-md-9 col-lg-10">
-            <div class="navbar-text lead">
-              <p>&#127873; A year in the making, today we are launching a huge new search engine for the RECAP Archive.</p>
-            </div>
-          </div>
-          <div class="col-xs-12 col-md-3 col-lg-2">
-            <div class="row">
-              <div class="col-xs-12">
-                <button type="button" class="close"
-                        data-cookie-name="no_banner"
-                        data-duration="20"
-                        aria-label="Close">
-                    <span aria-hidden="true"
-                          class="x-large">&times;</span></button>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-xs-12">
-                <p class="right">
-                  <a href="https://free.law/2024/01/18/new-recap-archive-search-is-live"
-                     class="btn btn-primary btn-lg v-offset-above-1"><i class="fa fa-search"></i>&nbsp;Learn More</a>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2024/01/18/new-recap-archive-search-is-live" text="A year in the making, today we are launching a huge new search engine for the RECAP Archive" emoji="&#127873;" cookie_name="no_banner"%}
+    {% endif %}
+
+    {% if not request.COOKIES.no_branding_banner %}
+      {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2024/07/05/new-branding-rip-flip" text="FLiP is retiring! New Logos for a New Era of CourtListener" emoji="&#128276;" cookie_name="no_branding_banner"%}
     {% endif %}
 
     <!-- Broken Email Banner -->
