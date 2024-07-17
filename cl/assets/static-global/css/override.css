@@ -185,6 +185,10 @@ header {
   display: flex;
 }
 
+.flex-column {
+  flex-direction: column;
+}
+
 ul.outdent {
   padding-left: 20px;
 }
@@ -1447,6 +1451,15 @@ emphasis {
   color: #333333;
 }
 
+.alert-dismissible .navbar-text {
+  margin: 10px 0px;
+
+}
+
+.alert-dismissible .navbar-text p {
+  margin-bottom: 0px;
+}
+
 .alert-dismissible .btn-default {
   border-color: #999999;
 }
@@ -1503,8 +1516,17 @@ emphasis {
   justify-content: flex-end;
 }
 
+.justify-content-between {
+  justify-content: space-between;
+}
+
+
 .justify-content-center{
   justify-content: center;
+}
+
+.align-items-center {
+  align-items: center;
 }
 
 .mr-1 {
@@ -1622,6 +1644,30 @@ textarea {
         position: relative;
         height: min-content;
     }
+}
+
+@media (min-width: 576px) {
+  .flex-sm-row {
+    flex-direction: row;
+  }
+
+  .justify-content-sm-end {
+    justify-content: end;
+  }
+
+  .alert-dismissible .navbar-text {
+    margin: 20px 0px;
+  }
+}
+
+@media (max-width: 576px) {
+  .alert-dismissible {
+    padding-right: 0px;
+  }
+
+  .alert-dismissible .close {
+    right: 0px;
+  }
 }
 
 .brusher {
