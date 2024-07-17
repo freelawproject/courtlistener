@@ -36,12 +36,14 @@
       </div>
     </div>
     <div class="row flex flex-column flex-sm-row align-items-center justify-content-between">
-      <div class="col-xs-9 navbar-text lead">
+      <div class="col-xs-12 col-sm-9 navbar-text lead">
         <p>{% if emoji %}{{emoji}}{% endif %} {{text}}</p>
       </div>
       <div class="col-xs-3 flex justify-content-center justify-content-sm-end">
         <a href="{{link}}"
-            class="btn btn-primary btn-lg"><i class="fa fa-search"></i>&nbsp;Learn More</a>
+            class="btn btn-primary btn-lg hidden-xs"><i class="fa fa-search"></i>&nbsp;Learn More</a>
+        <a href="{{link}}"
+            class="btn btn-primary btn-sm hidden-sm hidden-md hidden-lg"><i class="fa fa-search"></i>&nbsp;Learn More</a>
       </div>
     </div>
   </div>
