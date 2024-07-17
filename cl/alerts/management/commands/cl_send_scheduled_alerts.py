@@ -124,16 +124,12 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
 
 def send_scheduled_alerts(rate: str) -> None:
-    if rate == Alert.DAILY:
-        query_and_send_alerts_by_rate(Alert.DAILY)
-    elif rate == Alert.WEEKLY:
-        query_and_send_alerts_by_rate(Alert.WEEKLY)
-    elif rate == Alert.MONTHLY:
+    if rate == Alert.MONTHLY:
         if datetime.date.today().day > 28:
             raise InvalidDateError(
                 "Monthly alerts cannot be run on the 29th, 30th or 31st."
             )
-        query_and_send_alerts_by_rate(Alert.MONTHLY)
+    query_and_send_alerts_by_rate(rate)
 
 
 def delete_old_scheduled_alerts() -> int:

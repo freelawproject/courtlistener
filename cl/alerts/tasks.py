@@ -550,7 +550,6 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
     data that triggered the alert.
     :return: None
     """
-
     if not response:
         return None
 
@@ -630,7 +629,10 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         send_webhook_alert_hits(alert_user, hits)
 
         # Send RT Alerts
-        if alert_triggered.rate == Alert.REAL_TIME:
+        if (
+            alert_triggered.rate == Alert.REAL_TIME
+            and app_label == "audio.Audio"
+        ):
             if not alert_user.profile.is_member:
                 continue
 
@@ -653,6 +655,8 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
                     document_content=document_content_copy,
                 )
             )
+            if alert_triggered.rate == Alert.REAL_TIME:
+                rt_alerts_to_send.append(alert_triggered.pk)
 
     # Create scheduled DAILY, WEEKLY and MONTHLY Alerts in bulk.
     if scheduled_hits_to_create:
@@ -712,11 +716,9 @@ def send_or_schedule_alerts(
         case "audio.Audio":
             percolator_index = AudioPercolator._index._name
             es_document_index = AudioDocument._index._name
-            app_label = None
         case "search.Docket":
             percolator_index = RECAPPercolator._index._name
             es_document_index = DocketDocument._index._name
-            app_label = None
         case "search.RECAPDocument":
             percolator_index = RECAPPercolator._index._name
         case _:

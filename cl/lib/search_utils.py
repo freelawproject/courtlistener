@@ -103,7 +103,6 @@ def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
     citations = get_citations(cd["q"], tokenizer=HYPERSCAN_TOKENIZER)
 
     citations = [c for c in citations if isinstance(c, FullCaseCitation)]
-
     matches = None
     if len(citations) == 1:
         # If it's not exactly one match, user doesn't get special help.

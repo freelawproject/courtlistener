@@ -430,14 +430,17 @@ def update_reverse_related_documents(
         if isinstance(main_object, Person) and not main_object.is_judge:
             continue
         transaction.on_commit(
-            partial(
-                update_es_document.delay,
-                es_document.__name__,
-                affected_fields,
-                (compose_app_label(main_object), main_object.pk),
-                related_instance,
-                fields_map_to_pass,
-            )
+            lambda: chain(
+                update_es_document.si(
+                    es_document.__name__,
+                    affected_fields,
+                    (compose_app_label(main_object), main_object.pk),
+                    related_instance,
+                    fields_map_to_pass,
+                ),
+                send_or_schedule_alerts.s(),
+                process_percolator_response.s(),
+            ).apply_async()
         )
 
     match instance:

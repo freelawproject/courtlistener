@@ -8,6 +8,7 @@ from typing import Any, Generator
 import scorched
 import waffle
 from celery import Task
+from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -31,6 +32,10 @@ from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
 
+from cl.alerts.tasks import (
+    process_percolator_response,
+    send_or_schedule_alerts,
+)
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.lib.elasticsearch_utils import build_daterange_query
@@ -307,7 +312,6 @@ def es_save_document(
     :param es_document_name: A Elasticsearch DSL document name.
     :return: SaveDocumentResponseType or None
     """
-
     es_args = {}
     es_document = getattr(es_document_module, es_document_name)
 
@@ -518,6 +522,7 @@ def update_es_document(
 
     related_instance = None
     # If provided, get the related instance from DB to extract the latest values.
+    related_instance_app_label = None
     if related_instance_data:
         related_instance_app_label, related_instance_id = related_instance_data
         related_instance_model = apps.get_model(related_instance_app_label)
@@ -544,7 +549,11 @@ def update_es_document(
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
-    if main_app_label in ["search.RECAPDocument", "search.Docket"]:
+    if (
+        main_app_label in ["search.RECAPDocument", "search.Docket"]
+        and not related_instance_app_label == "search.DocketEntry"
+        or related_instance_app_label in ["search.BankruptcyInformation"]
+    ):
         doc = es_doc.prepare(main_model_instance)
         return str(main_instance_id), doc, main_app_label
 
@@ -849,9 +858,19 @@ def index_docket_parties_in_es(
     docket = get_instance_from_db(docket_id, Docket)
     if not docket:
         return
-    parties_prepared = DocketDocument().prepare_parties(docket)
+    docket_document = DocketDocument().prepare(docket)
+    party_fields = [
+        "party_id",
+        "party",
+        "attorney_id",
+        "attorney",
+        "firm_id",
+        "firm",
+    ]
     fields_to_update = {
-        key: list(set_values) for key, set_values in parties_prepared.items()
+        key: values
+        for key, values in docket_document.items()
+        if key in party_fields
     }
     docket_document = DocketDocument.get(id=docket_id)
     Document.update(
@@ -859,6 +878,13 @@ def index_docket_parties_in_es(
         **fields_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+    # Percolate Docket after parties are up-to-date.
+    chain(
+        send_or_schedule_alerts.s(
+            (str(docket_id), docket_document, "search.Docket")
+        ),
+        process_percolator_response.s(),
+    ).apply_async()
 
 
 def bulk_indexing_generator(
