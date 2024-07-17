@@ -173,12 +173,13 @@ def override_alert_query(
     return qd
 
 
-def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
+def alert_hits_limit_reached(alert_pk: int, user_pk: int, search_type:str|None = None) -> bool:
     """Check if the alert hits limit has been reached for a specific alert-user
      combination.
 
     :param alert_pk: The alert_id.
     :param user_pk: The user_id.
+    :param search_type: The related search type.
     :return: True if the limit has been reached, otherwise False.
     """
 
@@ -188,7 +189,8 @@ def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
         hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
     )
     hits_count = stored_hits.count()
-    if hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
+    hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT * settings.RECAP_CHILD_HITS_PER_RESULT if search_type == SEARCH_TYPES.RECAP else settings.SCHEDULED_ALERT_HITS_LIMIT
+    if hits_count >= hits_limit:
         logger.info(
             f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} hits stored for this alert."
         )

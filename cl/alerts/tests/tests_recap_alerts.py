@@ -1275,7 +1275,6 @@ class RECAPAlertsSweepIndexTest(
             "content", flat=True
         )
         self.assertEqual(len(webhook_events), 3)
-
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
@@ -1600,14 +1599,12 @@ class RECAPAlertsPercolatorTest(
             )
 
     def setUp(self):
+        RECAPPercolator._index.delete(ignore=404)
         RECAPPercolator.init()
         self.r = get_redis_interface("CACHE")
         keys = self.r.keys("alert_hits:*")
         if keys:
             self.r.delete(*keys)
-
-    def tearDown(self):
-        RECAPPercolator._index.delete(ignore=404)
 
     @staticmethod
     def confirm_query_matched(response, query_id) -> bool:
@@ -2307,6 +2304,7 @@ class RECAPAlertsPercolatorTest(
             f"<strong>{rd.docket_entry.description}</strong>", html_content
         )
 
+    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
     def test_group_percolator_alerts(self) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
 
@@ -2395,7 +2393,7 @@ class RECAPAlertsPercolatorTest(
             docket_only_alert.name,
             3,
             docket.case_name,
-            0,
+            2,
         )
         # Assert RECAP-only alert.
         self.assertIn(recap_only_alert.name, html_content)

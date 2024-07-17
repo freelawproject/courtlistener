@@ -48,7 +48,7 @@ from cl.search.documents import (
     DocketDocument,
     RECAPPercolator,
 )
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import Docket, DocketEntry, SEARCH_TYPES
 from cl.search.types import (
     ESDocumentNameType,
     PercolatorResponseType,
@@ -558,6 +558,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
     rt_alerts_to_send = []
     alerts_triggered, document_content, app_label = response
     schedule_alert = False
+    search_type = None
     r = get_redis_interface("CACHE")
     for hit in alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
@@ -587,6 +588,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
                 add_document_hit_to_alert_set(
                     r, alert_triggered.pk, "r", document_content_copy["id"]
                 )
+                search_type = SEARCH_TYPES.RECAP
             case "search.Docket":
                 # Filter out Dockets and set the document id to the
                 # Docket alert hits.
@@ -603,6 +605,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
                     "d",
                     document_content_copy["docket_id"],
                 )
+                search_type = SEARCH_TYPES.RECAP
 
         if hasattr(hit.meta, "highlight"):
             document_content_copy["meta"] = {}
@@ -641,9 +644,9 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
             rt_alerts_to_send.append(alert_triggered.pk)
 
         else:
-            # Schedule DAILY, WEEKLY and MONTHLY Alerts
+            # Schedule RT, DAILY, WEEKLY and MONTHLY Alerts
             if alert_hits_limit_reached(
-                alert_triggered.pk, alert_triggered.user.pk
+                alert_triggered.pk, alert_triggered.user.pk, search_type
             ):
                 # Skip storing hits for this alert-user combination because
                 # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
