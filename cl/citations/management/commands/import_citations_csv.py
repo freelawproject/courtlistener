@@ -15,6 +15,7 @@ Note: If --limit is greater than --end-row, end row will be ignored
 """
 
 import os.path
+import time
 
 import numpy as np
 import pandas as pd
@@ -64,12 +65,11 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
     return data
 
 
-def process_csv_data(
-    data: DataFrame | TextFileReader,
-) -> None:
+def process_csv_data(data: DataFrame | TextFileReader, options: dict) -> None:
     """Process citations from csv file
 
     :param data: rows from csv file
+    :param options: options passed to command
     :return: None
     """
 
@@ -84,18 +84,8 @@ def process_csv_data(
             continue
 
         if cluster_id and citation_to_add:
-            try:
-                add_citations_to_cluster([citation_to_add], cluster_id)
-            except Exception as e:
-                if "Field 'volume' expected" in str(e):
-                    # Fail silently, we already know this issue
-                    logger.info(
-                        f"Row: {index} - Invalid volume in citation: {citation_to_add} for cluster: {cluster_id}"
-                    )
-                    continue
-                else:
-                    # Unknown issue
-                    raise
+            add_citations_to_cluster([citation_to_add], cluster_id)
+            time.sleep(options["delay"])
 
 
 class Command(BaseCommand):
@@ -127,6 +117,12 @@ class Command(BaseCommand):
             help="Limit number of rows to process.",
             required=False,
         )
+        parser.add_argument(
+            "--delay",
+            type=float,
+            default=1.0,
+            help="How long to wait to add each citation (in seconds, allows floating numbers).",
+        )
 
     def handle(self, *args, **options):
         if options["start_row"] and options["end_row"]:
@@ -140,6 +136,6 @@ class Command(BaseCommand):
 
         data = load_citations_file(options)
         if not data.empty:
-            process_csv_data(data)
+            process_csv_data(data, options)
         else:
             logger.info("CSV file is empty or start/end row returned no rows.")

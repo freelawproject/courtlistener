@@ -641,9 +641,6 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
         ).exists():
             # Avoid adding a citation if we already have a citation from the
             # citation's reporter
-            logger.info(
-                f"We already have a citation from the reporter: {citation[0].corrected_reporter()} in the cluster id: {cluster_id}"
-            )
             continue
 
         try:
