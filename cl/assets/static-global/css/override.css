@@ -186,7 +186,7 @@ header {
 }
 
 .flex-column {
-  flex-direction: column !important;
+  flex-direction: column;
 }
 
 ul.outdent {
@@ -1648,25 +1648,25 @@ textarea {
 
 @media (min-width: 576px) {
   .flex-sm-row {
-    flex-direction: row !important;
+    flex-direction: row;
   }
 
   .justify-content-sm-end {
-    justify-content: end !important;
+    justify-content: end;
   }
 
   .alert-dismissible .navbar-text {
-    margin: 20px 0px !important;
+    margin: 20px 0px;
   }
 }
 
 @media (max-width: 576px) {
   .alert-dismissible {
-    padding-right: 0px !important;
+    padding-right: 0px;
   }
 
   .alert-dismissible .close {
-    right: 0px !important;
+    right: 0px;
   }
 }
 
