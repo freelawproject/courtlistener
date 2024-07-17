@@ -35,27 +35,20 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
     :return: loaded data
     """
 
-    start_row = None
     end_row = None
 
-    if options["start_row"] and options["end_row"]:
-        start_row = options["start_row"] - 1 if options["start_row"] > 1 else 0
-        end_row = options["end_row"] - options["start_row"] + 1  # inclusive
-
-    if options["start_row"] and not options["end_row"]:
-        start_row = options["start_row"] - 1 if options["start_row"] > 1 else 0
-
-    if options["end_row"] and not options["start_row"]:
-        end_row = options["end_row"]
-
-    if options["limit"]:
-        end_row = options["limit"]
+    if options["end_row"] or options["limit"]:
+        end_row = (
+            options["limit"]
+            if options["limit"] > options["end_row"]
+            else options["end_row"]
+        )
 
     data = pd.read_csv(
         options["csv"],
         names=["cluster_id", "citation_to_add"],
         delimiter=",",
-        skiprows=start_row,
+        skiprows=options["start_row"] - 1 if options["start_row"] else None,
         nrows=end_row,
     )
 
@@ -65,11 +58,11 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
     return data
 
 
-def process_csv_data(data: DataFrame | TextFileReader, options: dict) -> None:
+def process_csv_data(data: DataFrame | TextFileReader, delay_s: float) -> None:
     """Process citations from csv file
 
     :param data: rows from csv file
-    :param options: options passed to command
+    :param delay_s: how long to wait to add each citation
     :return: None
     """
 
@@ -78,14 +71,12 @@ def process_csv_data(data: DataFrame | TextFileReader, options: dict) -> None:
         citation_to_add = row.get("citation_to_add")
 
         if not OpinionCluster.objects.filter(id=cluster_id).exists():
-            logger.info(
-                f"Row: {index} - Opinion cluster doesn't exist: {cluster_id}"
-            )
+            logger.info(f"Opinion cluster doesn't exist: {cluster_id}")
             continue
 
         if cluster_id and citation_to_add:
             add_citations_to_cluster([citation_to_add], cluster_id)
-            time.sleep(options["delay"])
+            time.sleep(delay_s)
 
 
 class Command(BaseCommand):
@@ -102,11 +93,13 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--start-row",
+            default=0,
             type=int,
             help="Start row (inclusive).",
         )
         parser.add_argument(
             "--end-row",
+            default=0,
             type=int,
             help="End row (inclusive).",
         )
@@ -121,14 +114,14 @@ class Command(BaseCommand):
             "--delay",
             type=float,
             default=1.0,
-            help="How long to wait to add each citation (in seconds, allows floating numbers).",
+            help="How long to wait to add each citation (in seconds, allows floating "
+            "numbers).",
         )
 
     def handle(self, *args, **options):
-        if options["start_row"] and options["end_row"]:
-            if options["start_row"] > options["end_row"]:
-                logger.info("--start-row can't be greater than --end-row")
-                return
+        if options["end_row"] and options["start_row"] > options["end_row"]:
+            logger.info("--start-row can't be greater than --end-row")
+            return
 
         if not os.path.exists(options["csv"]):
             logger.info(f"Csv file: {options['csv']} doesn't exist.")
@@ -136,6 +129,6 @@ class Command(BaseCommand):
 
         data = load_citations_file(options)
         if not data.empty:
-            process_csv_data(data, options)
+            process_csv_data(data, options["delay"])
         else:
             logger.info("CSV file is empty or start/end row returned no rows.")
