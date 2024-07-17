@@ -10,15 +10,19 @@
     emoji: Insert an emoji next to your banner message using its decimal HTML entity
     code (like &#128077;).
 
-  It's advisable to wrap this template with a if template tag and use the parent
-  element to handle the conditions to render the banner. Here's an example:
+  It's advisable to wrap this template within an if tag and use the parent element to add
+  extra conditions to handle the visibility of the banner. The current template only checks
+  for a cookie presence. By nesting it within an if tag, you can combine this cookie check
+  with other factors from the parent element, such as user preferences or specific visibility
+  rules. For example:
 
-  {% if not request.COOKIES.cookie_to_hide_banner %}
+  {% if FUNDRAISING_MODE %}
     {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/contact/" text="Message for your banner" emoji="&#128077;" cookie_name="cookie_to_hide_banner"%}
   {% endif %}
 
 {% endcomment %}
 
+{% if cookie_name  not in request.COOKIES %}
 <div class="navbar navbar-default subnav alert-info alert-dismissible" role="navigation">
   <div class="container-fluid">
     <div class="row">
@@ -42,3 +46,4 @@
     </div>
   </div>
 </div>
+{% endif %}

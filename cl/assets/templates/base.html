@@ -83,13 +83,11 @@
   {% block header %}
   <header class="row">
     <!-- Donate Banner -->
-    {% if FUNDRAISING_MODE and not request.COOKIES.no_banner %}
+    {% if FUNDRAISING_MODE %}
       {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2024/01/18/new-recap-archive-search-is-live" text="A year in the making, today we are launching a huge new search engine for the RECAP Archive" emoji="&#127873;" cookie_name="no_banner"%}
     {% endif %}
 
-    {% if not request.COOKIES.no_branding_banner %}
-      {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2024/07/05/new-branding-rip-flip" text="FLiP is retiring! New Logos for a New Era of CourtListener" emoji="&#128276;" cookie_name="no_branding_banner"%}
-    {% endif %}
+    {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2024/07/05/new-branding-rip-flip" text="FLiP is retiring! New Logos for a New Era of CourtListener" emoji="&#128276;" cookie_name="no_branding_banner"%}
 
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
