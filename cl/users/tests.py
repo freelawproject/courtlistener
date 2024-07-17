@@ -173,6 +173,55 @@ class UserTest(LiveServerTestCase):
                         % next_param,
                     )
 
+    async def test_login_redirects(self) -> None:
+        """Do we allow good redirects in login while banning bad ones?"""
+        next_params = [
+            # A safe redirect
+            (reverse("faq"), False),
+            # Redirection to the register page
+            (reverse("register"), True),
+            # No open redirects (to a domain outside CL)
+            ("https://evil.com&email=e%40e.net", True),
+            # No javascript (!)
+            ("javascript:confirm(document.domain)", True),
+            # No spaces
+            ("/test test", True),
+            # CRLF injection attack
+            (
+                "/%0d/evil.com/&email=Your+Account+still+in+maintenance,please+click+Return+below",
+                True,
+            ),
+            # XSS vulnerabilities
+            (
+                "register/success/?next=java%0d%0ascript%0d%0a:alert(document.cookie)&email=Reflected+XSS+here",
+                True,
+            ),
+        ]
+        for next_param, is_not_safe in next_params:
+            bad_url = "{host}{path}?next={next}".format(
+                host=self.live_server_url,
+                path=reverse("sign-in"),
+                next=next_param,
+            )
+            response = await self.async_client.get(bad_url)
+            with self.subTest("Checking redirect in login", url=bad_url):
+                if is_not_safe:
+                    self.assertNotIn(
+                        f'value="{next_param}"',
+                        response.content.decode(),
+                        msg="'%s' found in HTML of response. This suggests it was "
+                        "not cleaned by the sanitize_redirection function."
+                        % next_param,
+                    )
+                else:
+                    self.assertIn(
+                        f'value="{next_param}"',
+                        response.content.decode(),
+                        msg="'%s' not found in HTML of response. This suggests it "
+                        "was sanitized when it should not have been."
+                        % next_param,
+                    )
+
 
 class UserDataTest(LiveServerTestCase):
     async def test_signing_in(self) -> None:

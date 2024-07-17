@@ -26,6 +26,7 @@ version = "0.14.24"
 cl-manage = "manage:main"
 
 [tool.poetry.dependencies]
+ada-url = "^1.15.0"
 argparse = "*"
 beautifulsoup4 = "==4.12.*"
 boto3 = "^1.34.17"

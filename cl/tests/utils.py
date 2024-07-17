@@ -14,7 +14,12 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
-from cl.recap.factories import DocketDataFactory, DocketEntryDataFactory
+from cl.recap.factories import (
+    ACMSAttachmentFactory,
+    ACMSAttachmentPageFactory,
+    DocketDataFactory,
+    DocketEntryDataFactory,
+)
 
 
 class AsyncAPIClient(AsyncClient, APIRequestFactory):
@@ -208,3 +213,53 @@ class MockACMSDocketReport:
             ],
         )
         self.data = acms_data
+
+
+class MockACMSAttachmentPage:
+    def __init__(self, court_id):
+        pass
+
+    def _parse_text(self, json):
+        self.data = ACMSAttachmentPageFactory(
+            entry_number=3,
+            description="NOTICE OF CRIMINAL APPEAL, on behalf of Appellant Mustapha Raji, OPENED. [Entered: 10/02/2023 11:23 AM]",
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+            pacer_doc_id="7fae3c58-1ced-ee11-904c-001dd83058b7",
+            date_filed=date(2023, 10, 2),
+            date_end=date(2023, 10, 2),
+            attachments=[
+                ACMSAttachmentFactory(
+                    attachment_number=1,
+                    description="T-1080 Form",
+                    pacer_doc_id="7fae3c58-1ced-ee11-904c-001dd83058b7",
+                    page_count=1,
+                    acms_document_guid="ea52cd72-1ced-ee11-904d-001dd8306e7a",
+                    cost=0.1,
+                    permission="Public",
+                    file_size=1330,
+                    date_filed=date(2024, 3, 28),
+                ),
+                ACMSAttachmentFactory(
+                    attachment_number=2,
+                    description="Affidavit",
+                    pacer_doc_id="7fae3c58-1ced-ee11-904c-001dd83058b7",
+                    page_count=3,
+                    acms_document_guid="d1f94280-1ced-ee11-904d-001dd83065dd",
+                    cost=0.3,
+                    permission="Public",
+                    file_size=337,
+                    date_filed=date(2024, 3, 28),
+                ),
+                ACMSAttachmentFactory(
+                    attachment_number=3,
+                    description="Exhibit",
+                    pacer_doc_id="7fae3c58-1ced-ee11-904c-001dd83058b7",
+                    page_count=2,
+                    acms_document_guid="b6a2a618-1ded-ee11-904d-001dd830668f",
+                    cost=0.2,
+                    permission="Public",
+                    file_size=112,
+                    date_filed=date(2024, 3, 28),
+                ),
+            ],
+        )
