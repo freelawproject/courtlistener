@@ -332,7 +332,10 @@ class Command(VerboseCommand):
                 index=False,
             )
             extract_doc_content.delay(
-                opinion.pk, ocr_available=ocr_available, citation_jitter=True
+                opinion.pk,
+                ocr_available=ocr_available,
+                citation_jitter=True,
+                juriscraper_module=site.court_id,
             )
 
             logger.info(
