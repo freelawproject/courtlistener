@@ -14,8 +14,8 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 
 .navbar-brand {
-  padding: 16px 15px 16px 30px;
-  height: 135px;
+  padding: 16px 15px 16px 15px;
+  height: 140px;
 }
 
 /* CSS for the new full SVG CL logo */
@@ -1453,7 +1453,6 @@ emphasis {
 
 .alert-dismissible .navbar-text {
   margin: 10px 0px;
-
 }
 
 .alert-dismissible .navbar-text p {
