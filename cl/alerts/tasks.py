@@ -9,6 +9,7 @@ from asgiref.sync import async_to_sync
 from celery import Task
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
@@ -48,7 +49,7 @@ from cl.search.documents import (
     DocketDocument,
     RECAPPercolator,
 )
-from cl.search.models import Docket, DocketEntry, SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
 from cl.search.types import (
     ESDocumentNameType,
     PercolatorResponseType,
@@ -556,9 +557,12 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
     scheduled_hits_to_create = []
     email_alerts_to_send = []
     rt_alerts_to_send = []
-    alerts_triggered, document_content, app_label = response
+    alerts_triggered, document_content, app_label_model = response
+    app_label_str, model_str = app_label_model.split(".")
+    instance_content_type = ContentType.objects.get(
+        app_label=app_label_str, model=model_str.lower()
+    )
     schedule_alert = False
-    search_type = None
     r = get_redis_interface("CACHE")
     for hit in alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
@@ -573,7 +577,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
         alert_user: UserProfile.user = alert_triggered.user
         # Set highlight if available in response.
-        match app_label:
+        match app_label_model:
             case "search.RECAPDocument":
                 # Filter out RECAPDocuments and set the document id to the
                 # RECAPDocument alert hits.
@@ -588,7 +592,8 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
                 add_document_hit_to_alert_set(
                     r, alert_triggered.pk, "r", document_content_copy["id"]
                 )
-                search_type = SEARCH_TYPES.RECAP
+                object_id = document_content_copy["docket_id"]
+                child_document = True
             case "search.Docket":
                 # Filter out Dockets and set the document id to the
                 # Docket alert hits.
@@ -605,7 +610,16 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
                     "d",
                     document_content_copy["docket_id"],
                 )
-                search_type = SEARCH_TYPES.RECAP
+                object_id = document_content_copy["docket_id"]
+                child_document = False
+            case "audio.Audio":
+                object_id = document_content_copy["id"]
+                child_document = False
+            case _:
+                raise NotImplementedError(
+                    "Percolator response processing not supported for: %s",
+                    app_label_model,
+                )
 
         if hasattr(hit.meta, "highlight"):
             document_content_copy["meta"] = {}
@@ -634,7 +648,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         # Send RT Alerts
         if (
             alert_triggered.rate == Alert.REAL_TIME
-            and app_label == "audio.Audio"
+            and app_label_model == "audio.Audio"
         ):
             if not alert_user.profile.is_member:
                 continue
@@ -646,22 +660,29 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         else:
             # Schedule RT, DAILY, WEEKLY and MONTHLY Alerts
             if alert_hits_limit_reached(
-                alert_triggered.pk, alert_triggered.user.pk, search_type
+                alert_triggered.pk,
+                alert_triggered.user.pk,
+                instance_content_type,
+                object_id,
+                child_document,
             ):
                 # Skip storing hits for this alert-user combination because
                 # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
                 continue
+
             scheduled_hits_to_create.append(
                 ScheduledAlertHit(
                     user=alert_triggered.user,
                     alert=alert_triggered,
                     document_content=document_content_copy,
+                    content_type=instance_content_type,
+                    object_id=object_id,
                 )
             )
             if alert_triggered.rate == Alert.REAL_TIME:
                 rt_alerts_to_send.append(alert_triggered.pk)
 
-    # Create scheduled DAILY, WEEKLY and MONTHLY Alerts in bulk.
+    # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
     if scheduled_hits_to_create:
         ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
     # Sent all the related document RT emails.

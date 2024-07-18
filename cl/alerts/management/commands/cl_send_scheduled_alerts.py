@@ -1,6 +1,6 @@
 import datetime
 from collections import defaultdict
-from typing import DefaultDict, Any
+from typing import Any, DefaultDict
 
 import waffle
 from asgiref.sync import async_to_sync
@@ -76,23 +76,26 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
     alerts_sent_count = 0
     now_time = datetime.datetime.now()
     # Get unique alert users with scheduled alert hits
-    user_ids = ScheduledAlertHit.objects.filter(
-        alert__rate=rate,
-        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
-    ).values_list("user", flat=True).distinct()
+    user_ids = (
+        ScheduledAlertHit.objects.filter(
+            alert__rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
+        )
+        .values_list("user", flat=True)
+        .distinct()
+    )
 
     for user_id in user_ids:
         # Query ScheduledAlertHits for every user.
         scheduled_hits = ScheduledAlertHit.objects.filter(
             user_id=user_id,
             alert__rate=rate,
-            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
         ).select_related("user", "alert")
 
         # Group scheduled hits by Alert and docket_id
         grouped_hits: DefaultDict[
-            Alert, DefaultDict[int, list[dict[str, Any]]]] = defaultdict(
-            lambda: defaultdict(list))
+            Alert, DefaultDict[int, list[dict[str, Any]]]
+        ] = defaultdict(lambda: defaultdict(list))
         alerts_to_update = set()
 
         for hit in scheduled_hits:
@@ -104,7 +107,8 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
         # Merge documents with the same docket_id
         merged_hits: DefaultDict[Alert, list[dict[str, Any]]] = defaultdict(
-            list)
+            list
+        )
         for alert, document_groups in grouped_hits.items():
             for documents in document_groups.values():
                 merged_hits[alert].append(merge_documents(documents))
@@ -121,13 +125,15 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             hits.append((alert, search_type, documents, len(documents)))
 
         if hits:
-            send_search_alert_emails.delay([(user_id, hits)],
-                                           scheduled_alert=True)
+            send_search_alert_emails.delay(
+                [(user_id, hits)], scheduled_alert=True
+            )
             alerts_sent_count += 1
 
         # Update Alert's date_last_hit in bulk for this user's alerts
         Alert.objects.filter(id__in=alerts_to_update).update(
-            date_last_hit=now_time)
+            date_last_hit=now_time
+        )
 
         # Update Scheduled alert hits status to "SENT" for this user
         scheduled_hits.update(hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT)

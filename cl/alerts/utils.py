@@ -5,6 +5,7 @@ from typing import Any
 
 from django.apps import apps
 from django.conf import settings
+from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from elasticsearch_dsl import Q, Search
 from elasticsearch_dsl.query import Query
@@ -32,6 +33,7 @@ from cl.search.constants import (
     ALERTS_HL_TAG,
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
+    SEARCH_RECAP_HL_FIELDS,
 )
 from cl.search.documents import ESRECAPDocumentPlain
 from cl.search.models import SEARCH_TYPES, Docket
@@ -131,10 +133,16 @@ def percolate_document(
     s = s.query(final_query)
     match app_label:
         case "search.RECAPDocument":
-            highlight_options, fields_to_exclude = build_highlights_dict(
+            child_highlight_options, _ = build_highlights_dict(
                 SEARCH_RECAP_CHILD_HL_FIELDS, ALERTS_HL_TAG
             )
-            extra_options = {"highlight": highlight_options}
+            parent_highlight_options, _ = build_highlights_dict(
+                SEARCH_RECAP_HL_FIELDS, ALERTS_HL_TAG
+            )
+            child_highlight_options["fields"].update(
+                parent_highlight_options["fields"]
+            )
+            extra_options = {"highlight": child_highlight_options}
             s = s.extra(**extra_options)
         case _:
             s = add_es_highlighting(
@@ -173,27 +181,62 @@ def override_alert_query(
     return qd
 
 
-def alert_hits_limit_reached(alert_pk: int, user_pk: int, search_type:str|None = None) -> bool:
+def alert_hits_limit_reached(
+    alert_pk: int,
+    user_pk: int,
+    content_type: ContentType | None = None,
+    object_id: int | None = None,
+    child_document: bool = False,
+) -> bool:
     """Check if the alert hits limit has been reached for a specific alert-user
      combination.
 
     :param alert_pk: The alert_id.
     :param user_pk: The user_id.
-    :param search_type: The related search type.
+    :param content_type: The related content_type.
+    :param object_id: The related object_id.
+    :param child_document: True if the document to schedule is a child document.
     :return: True if the limit has been reached, otherwise False.
     """
 
-    stored_hits = ScheduledAlertHit.objects.filter(
-        alert_id=alert_pk,
-        user_id=user_pk,
-        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
-    )
-    hits_count = stored_hits.count()
-    hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT * settings.RECAP_CHILD_HITS_PER_RESULT if search_type == SEARCH_TYPES.RECAP else settings.SCHEDULED_ALERT_HITS_LIMIT
-    if hits_count >= hits_limit:
-        logger.info(
-            f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} hits stored for this alert."
+    if child_document:
+        # To limit child hits in case, count ScheduledAlertHits related to the
+        # alert, user and parent document.
+        stored_hits = ScheduledAlertHit.objects.filter(
+            alert_id=alert_pk,
+            user_id=user_pk,
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+            content_type=content_type,
+            object_id=object_id,
         )
+        hits_limit = settings.RECAP_CHILD_HITS_PER_RESULT
+    else:
+        # To limit hits in an alert count ScheduledAlertHits related to the
+        # alert and user.
+        stored_hits = (
+            ScheduledAlertHit.objects.filter(
+                alert_id=alert_pk,
+                user_id=user_pk,
+                hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+                content_type=content_type,
+            )
+            .values("object_id")
+            .distinct()
+        )
+        hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT
+
+    hits_count = stored_hits.count()
+    if hits_count >= hits_limit:
+        if child_document:
+            logger.info(
+                f"Skipping child hit for Alert ID: {alert_pk} and object_id "
+                f"{object_id}, there are {hits_count} child hits stored for this alert-instance."
+            )
+        else:
+            logger.info(
+                f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} "
+                f"hits stored for this alert."
+            )
         return True
     return False
 

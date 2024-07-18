@@ -7,6 +7,7 @@ from typing import Any, Literal, Type
 import pytz
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
 from django.utils import timezone
 from elasticsearch import Elasticsearch
@@ -627,6 +628,9 @@ def query_and_schedule_alerts(
     """
 
     alert_users = User.objects.filter(alerts__rate=rate).distinct()
+    docket_content_type = ContentType.objects.get(
+        app_label="search", model="Docket"
+    )
     for user in alert_users:
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
         logger.info(f"Running '{rate}' alerts for user '{user}': {alerts}")
@@ -663,6 +667,8 @@ def query_and_schedule_alerts(
                             user=user,
                             alert=alert,
                             document_content=hit_copy.to_dict(),
+                            content_type=docket_content_type,
+                            object_id=hit_copy.docket_id,
                         )
                     )
                     # Send webhooks

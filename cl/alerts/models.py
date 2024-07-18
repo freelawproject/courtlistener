@@ -2,12 +2,12 @@ from datetime import datetime
 
 import pghistory
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.http import QueryDict
 from django.utils.crypto import get_random_string
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
 
 from cl.lib.models import AbstractDateTimeModel
 from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
@@ -204,7 +204,9 @@ class ScheduledAlertHit(AbstractDateTimeModel):
         default=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
         choices=SCHEDULED_ALERT_HIT_STATUS.STATUS,
     )
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, null=True
+    )
     object_id = models.PositiveIntegerField(null=True)
     content_object = GenericForeignKey("content_type", "object_id")
 

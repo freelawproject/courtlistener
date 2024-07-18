@@ -2023,6 +2023,14 @@ class RECAPAlertsPercolatorTest(
                 source=Docket.RECAP,
             )
 
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
@@ -2065,6 +2073,14 @@ class RECAPAlertsPercolatorTest(
                 pacer_doc_id="018036652436",
                 plain_text="plain text for 018036652436",
             )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
         self.assertEqual(
@@ -2112,6 +2128,13 @@ class RECAPAlertsPercolatorTest(
                 plain_text="plain text for 01803665477",
             )
 
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
         html_content = self.get_html_content_from_email(mail.outbox[2])
         self.assertEqual(
             len(mail.outbox), 3, msg="Outgoing emails don't match."
@@ -2139,6 +2162,14 @@ class RECAPAlertsPercolatorTest(
             alert_de_2.description = "Hearing to File Updated"
             alert_de_2.save()
 
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+
         # No alert should be triggered on DE updates.
         self.assertEqual(
             len(mail.outbox), 3, msg="Outgoing emails don't match."
@@ -2149,6 +2180,14 @@ class RECAPAlertsPercolatorTest(
         with self.captureOnCommitCallbacks(execute=True):
             rd_2.document_number = 1
             rd_2.save()
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
@@ -2178,6 +2217,13 @@ class RECAPAlertsPercolatorTest(
             docket.case_name = "SUBPOENAS SERVED LOREM"
             docket.save()
 
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
         html_content = self.get_html_content_from_email(mail.outbox[4])
         self.assertEqual(
             len(mail.outbox), 5, msg="Outgoing emails don't match."
@@ -2202,6 +2248,14 @@ class RECAPAlertsPercolatorTest(
         )
         with self.captureOnCommitCallbacks(execute=True):
             BankruptcyInformationFactory(docket=docket, chapter="7")
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         html_content = self.get_html_content_from_email(mail.outbox[5])
         self.assertEqual(
@@ -2235,6 +2289,14 @@ class RECAPAlertsPercolatorTest(
         )
         index_docket_parties_in_es.delay(docket.pk)
 
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+
         self.assertEqual(
             len(mail.outbox), 7, msg="Outgoing emails don't match."
         )
@@ -2258,6 +2320,14 @@ class RECAPAlertsPercolatorTest(
                 docket_number="1:21-bk-1234",
                 source=Docket.RECAP,
             )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -2292,6 +2362,14 @@ class RECAPAlertsPercolatorTest(
                 pacer_doc_id="018036652000",
                 plain_text="plain text for 018036652000",
             )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
@@ -2333,19 +2411,26 @@ class RECAPAlertsPercolatorTest(
                 date_filed=datetime.date(2024, 8, 19),
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
-            rd = RECAPDocumentFactory(
+
+            rd_1 = RECAPDocumentFactory(
                 docket_entry=alert_de,
-                description="Motion to File",
+                description="Motion to File 1",
                 document_number="1",
-                pacer_doc_id="018036652439",
-            )
-            rd_2 = RECAPDocumentFactory(
-                docket_entry=alert_de,
-                description="Motion to File 2",
-                document_number="2",
-                pacer_doc_id="018036652440",
+                pacer_doc_id="01803665981",
                 plain_text="plain text lorem",
             )
+            rd_descriptions = [rd_1.description]
+            for i in range(5):
+                rd = RECAPDocumentFactory(
+                    docket_entry=alert_de,
+                    description=f"Motion to File {i+2}",
+                    document_number=f"{i+2}",
+                    pacer_doc_id=f"018036652436{i+2}",
+                )
+                if i < 4:
+                    # Omit the last alert to compare. Only up to 5 should be
+                    # included in the case.
+                    rd_descriptions.append(rd.description)
 
             docket_only_alert = AlertFactory(
                 user=self.user_profile.user,
@@ -2358,6 +2443,16 @@ class RECAPAlertsPercolatorTest(
                 rate=Alert.REAL_TIME,
                 name="Test Alert RECAP Only Docket Entry",
                 query=f"q=docket_entry_id:{alert_de.pk}&type=r",
+            )
+
+            cross_object_alert_with_hl = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Cross-object",
+                query=f'q="File Amicus Curiae" AND "Motion to File 1" AND '
+                f'"plain text lorem" AND "410 Civil" AND '
+                f"id:{rd_1.pk}&docket_number={docket.docket_number}"
+                f'&case_name="{docket.case_name}"&type=r',
             )
 
         self.assertEqual(
@@ -2386,15 +2481,22 @@ class RECAPAlertsPercolatorTest(
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
-        self._confirm_number_of_alerts(html_content, 2)
+        self._confirm_number_of_alerts(html_content, 3)
         # The docket-only alert doesn't contain any nested child hits.
         self._count_alert_hits_and_child_hits(
             html_content,
             docket_only_alert.name,
             3,
             docket.case_name,
-            2,
+            5,
         )
+        self._assert_child_hits_content(
+            html_content,
+            docket_only_alert.name,
+            docket.case_name,
+            rd_descriptions,
+        )
+
         # Assert RECAP-only alert.
         self.assertIn(recap_only_alert.name, html_content)
         # The recap-only alert contain 2 child hits.
@@ -2403,12 +2505,56 @@ class RECAPAlertsPercolatorTest(
             recap_only_alert.name,
             1,
             alert_de.docket.case_name,
-            2,
+            5,
         )
-
         self._assert_child_hits_content(
             html_content,
             recap_only_alert.name,
             alert_de.docket.case_name,
-            [rd.description, rd_2.description],
+            rd_descriptions,
+        )
+
+        # Assert Cross-object alert.
+        # The cross-object alert only contain 1 child hit.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_with_hl.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            cross_object_alert_with_hl.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+        self._assert_child_hits_content(
+            html_content,
+            cross_object_alert_with_hl.name,
+            alert_de.docket.case_name,
+            [rd_1.description],
+        )
+
+        # Assert HL in the cross_object_alert_with_hl
+        self.assertIn(f"<strong>{docket.case_name}</strong>", html_content)
+        self.assertEqual(
+            html_content.count(f"<strong>{docket.case_name}</strong>"), 1
+        )
+        self.assertIn(f"<strong>{docket.docket_number}</strong>", html_content)
+        self.assertEqual(
+            html_content.count(f"<strong>{docket.docket_number}</strong>"), 1
+        )
+        self.assertIn(f"<strong>{rd_1.plain_text}</strong>", html_content)
+        self.assertEqual(
+            html_content.count(f"<strong>{rd_1.plain_text}</strong>"), 1
+        )
+        self.assertIn(f"<strong>{rd_1.description}</strong>", html_content)
+        self.assertEqual(
+            html_content.count(f"<strong>{rd_1.description}</strong>"), 1
+        )
+        self.assertIn("<strong>File Amicus Curiae</strong>", html_content)
+        self.assertEqual(
+            html_content.count("<strong>File Amicus Curiae</strong>"), 1
         )

@@ -1,7 +1,7 @@
 import time
 
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
-    send_scheduled_alerts,
+    query_and_send_alerts_by_rate,
 )
 from cl.alerts.models import Alert
 from cl.lib.command_utils import VerboseCommand
@@ -25,7 +25,7 @@ class Command(VerboseCommand):
         super().handle(*args, **options)
         testing_mode = options.get("testing_mode", False)
         while True:
-            send_scheduled_alerts(Alert.REAL_TIME)
+            query_and_send_alerts_by_rate(Alert.REAL_TIME)
             if testing_mode:
                 # Perform only 1 iteration for testing purposes.
                 break
