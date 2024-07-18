@@ -14,7 +14,7 @@ Sets up all the overrides or additional CSS that the site uses.
 }
 
 .navbar-brand {
-  padding: 16px 15px 16px 30px;
+  padding: 16px 15px 16px 15px;
   height: 135px;
 }
 
@@ -1453,7 +1453,6 @@ emphasis {
 
 .alert-dismissible .navbar-text {
   margin: 10px 0px;
-
 }
 
 .alert-dismissible .navbar-text p {
