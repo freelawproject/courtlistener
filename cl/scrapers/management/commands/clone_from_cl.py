@@ -27,6 +27,10 @@ permissions, for example:
 
 manage.py clone_from_cl --type search.Docket --id 17090923 --add-docket-entries
 
+You can also clone audio files (oral arguments) related to a docket. For example:
+
+manage.py clone_from_cl --type search.Docket --id 66635300 18473600 --add-audio-files
+
 Now you can clone people positions, for example:
 
 manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --clone-person-positions
@@ -46,6 +50,8 @@ This is still work in progress, some data is not cloned yet.
 import json
 import os
 import pathlib
+import sys
+from datetime import datetime
 
 import requests
 from django.apps import apps
@@ -58,8 +64,9 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from requests import Session
 
+from cl.audio.models import Audio
 from cl.people_db.models import Person
-from cl.search.models import Citation, Court, Opinion, RECAPDocument
+from cl.search.models import Citation, Court, Docket, Opinion, RECAPDocument
 from cl.search.tasks import add_items_to_solr
 
 VALID_TYPES = (
@@ -80,8 +87,29 @@ class CloneException(Exception):
 
 
 def get_id_from_url(api_url: str) -> str:
-    """Get the PK from an API url"""
+    """Get the PK from an API url
+
+    :param api_url: api url with a pk
+    :return: pk from url
+    """
     return api_url.split("/")[-2]
+
+
+def get_json_data(api_url: str, session: Session, timeout: int = 120) -> dict:
+    """Get the JSON data from endpoint
+
+    :param api_url: api url to send get request
+    :param session: a Requests session
+    :param timeout: timeout for get request
+    :return: list of opinion cluster objects
+    """
+    data = session.get(api_url, timeout=timeout)
+
+    if data.status_code == 401:
+        print("Error: Invalid token in CL_API_TOKEN variable.")
+        sys.exit(1)
+
+    return data.json()
 
 
 def clone_opinion_cluster(
@@ -95,6 +123,7 @@ def clone_opinion_cluster(
 ):
     """Download opinion cluster data from courtlistener.com and add it to
     local environment
+
     :param session: a Requests session
     :param cluster_ids: a list of opinion cluster ids
     :param download_cluster_files: True if it should download cluster files
@@ -130,7 +159,7 @@ def clone_opinion_cluster(
             kwargs={"version": "v3", "pk": cluster_id},
         )
         cluster_url = f"{domain}{cluster_path}"
-        cluster_datum = session.get(cluster_url, timeout=120).json()
+        cluster_datum = get_json_data(cluster_url, session)
         docket_id = get_id_from_url(cluster_datum["docket"])
         docket = clone_docket(
             session,
@@ -234,7 +263,7 @@ def clone_opinion_cluster(
 
         for op in sub_opinions_data:
             # Get opinion from api
-            op_data = session.get(op, timeout=120).json()
+            op_data = get_json_data(op, session)
             author = op_data["author"]
 
             # Delete fields with fk or m2m relations or unneeded fields
@@ -320,12 +349,14 @@ def clone_docket(
     session: Session,
     docket_ids: list,
     add_docket_entries: bool,
+    add_audio_files: bool,
     person_positions: bool = False,
     add_to_solr: bool = False,
     object_type="search.Docket",
 ):
     """Download docket data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param docket_ids: a list of docket ids
     :param add_docket_entries: flag to clone docket entries and recap docs
@@ -342,6 +373,12 @@ def clone_docket(
         print(f"Cloning docket id: {docket_id}")
 
         model = apps.get_model(object_type)
+        docket_path = reverse(
+            "docket-detail",
+            kwargs={"version": "v3", "pk": docket_id},
+        )
+        docket_url = f"{domain}{docket_path}"
+        docket_data = None
 
         try:
             docket = model.objects.get(pk=docket_id)
@@ -354,17 +391,19 @@ def clone_docket(
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
 
+            if add_audio_files:
+                docket_data = get_json_data(docket_url, session)
+                clone_audio_files(
+                    session, docket_data.get("audio_files", []), docket
+                )
+
             continue
         except model.DoesNotExist:
             pass
 
         # Create new Docket
-        docket_path = reverse(
-            "docket-detail",
-            kwargs={"version": "v3", "pk": docket_id},
-        )
-        docket_url = f"{domain}{docket_path}"
-        docket_data = session.get(docket_url, timeout=120).json()
+        if not docket_data:
+            docket_data = get_json_data(docket_url, session)
 
         # Remove unneeded fields
         for f in [
@@ -372,7 +411,6 @@ def clone_docket(
             "original_court_info",
             "absolute_url",
             "clusters",
-            "audio_files",
             "tags",
             "panel",
             "idb_data",
@@ -417,9 +455,14 @@ def clone_docket(
                 else None
             )
 
+            audio_files = docket_data.pop("audio_files", [])
+
             docket = model.objects.create(**docket_data)
 
             dockets.append(docket)
+
+            if add_audio_files:
+                clone_audio_files(session, audio_files, docket)
 
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
@@ -439,11 +482,72 @@ def clone_docket(
     return dockets
 
 
+def clone_audio_files(
+    session: Session, audio_files: list[str], docket: Docket
+):
+    """Clone audio_audio rows related to the docket
+    Also, clone the actual `local_mp3_path` files to the dev storage.
+    This is useful for testing the audio.transcribe command
+
+    :param session: session with authorization header
+    :param audio_files: api urls for the audio files
+    :param docket: docket object
+    """
+    remove_fields = [
+        "resource_uri",
+        "absolute_url",
+        "panel",
+        "stt_google_response",
+    ]
+
+    for audio_url in audio_files:
+        audio_id = int(get_id_from_url(audio_url))
+        if Audio.objects.filter(id=audio_id).exists():
+            print(f"Audio with id {audio_id} already exists")
+            continue
+
+        audio_json = get_json_data(audio_url, session)
+        for field in remove_fields:
+            audio_json.pop(field, "")
+
+        if not audio_json.get("stt_transcript"):
+            audio_json["stt_transcript"] = ""
+        audio_json["docket"] = docket
+
+        audio = Audio(**audio_json)
+
+        try:
+            if audio_json["local_path_mp3"] is not None:
+                # the file may already be in the dev storage
+                audio.local_path_mp3.size
+        except FileNotFoundError:
+            print("Cloning audio file from prod storage")
+            _, year, month, day, file_name = audio.local_path_mp3.name.split(
+                "/"
+            )
+            file_with_date = datetime(int(year), int(month), int(day))
+            setattr(audio, "file_with_date", file_with_date.date())
+
+            # This step will require AWS keys to be in the environment
+            prod_url = f"https://storage.courtlistener.com/{audio.local_path_mp3.name}"
+            audio_request = requests.get(prod_url)
+            audio_request.raise_for_status()
+            cf = ContentFile(audio_request.content)
+
+            audio.local_path_mp3.save(file_name, cf, save=False)
+
+        with transaction.atomic():
+            # Prevent solr from indexing the file
+            audio.save(index=False)
+            print(f"Cloned audio with id {audio_id}")
+
+
 def clone_docket_entries(
     session: Session, docket_id: int, object_type="search.DocketEntry"
 ) -> list:
     """Download docket entries data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param docket_id: docket id to clone docket entries
     :param object_type: Docket app name with model name
@@ -478,10 +582,7 @@ def clone_docket_entries(
     docket_entry_next_url = docket_entry_list_data.get("next")
 
     while docket_entry_next_url:
-        docket_entry_list_request = session.get(
-            docket_entry_next_url, timeout=120
-        )
-        docket_entry_list_data = docket_entry_list_request.json()
+        docket_entry_list_data = get_json_data(docket_entry_next_url, session)
         docket_entry_next_url = docket_entry_list_data.get("next")
         docket_entries_data.extend(docket_entry_list_data.get("results", []))
 
@@ -529,6 +630,7 @@ def clone_recap_documents(
 ) -> list:
     """Download recap documents data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param docket_entry_id: docket entry id to assign to recap document
     :param recap_documents_data: list with recap documents data to create
@@ -576,6 +678,7 @@ def clone_tag(
     session: Session, tag_ids: list, object_type="search.Tag"
 ) -> list:
     """Clone tags from docket entries or recap documents
+
     :param session: a Requests session
     :param tag_ids: list of tag ids to clone
     :param object_type: Tag app name with model name
@@ -603,7 +706,7 @@ def clone_tag(
             kwargs={"version": "v3", "pk": tag_id},
         )
         tag_url = f"{domain}{tag_path}"
-        tag_data = session.get(tag_url, timeout=120).json()
+        tag_data = get_json_data(tag_url, session)
 
         del tag_data["resource_uri"]
 
@@ -630,6 +733,7 @@ def clone_position(
     object_type="people_db.Position",
 ):
     """Download position data from courtlistener.com and add it to local environment
+
     :param session: a Requests session
     :param position_ids: a list of position ids
     :param person_id: id of the person the positions belong to
@@ -658,7 +762,7 @@ def clone_position(
             kwargs={"version": "v3", "pk": position_id},
         )
         position_url = f"{domain}{position_path}"
-        position_data = session.get(position_url, timeout=120).json()
+        position_data = get_json_data(position_url, session)
 
         # delete unneeded fields
         for f in [
@@ -754,6 +858,7 @@ def clone_person(
 ):
     """Download person data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param people_ids: a list of person ids
     :param positions: True if we should clone person positions
@@ -786,8 +891,9 @@ def clone_person(
             "person-detail",
             kwargs={"version": "v3", "pk": person_id},
         )
+
         person_url = f"{domain}{people_path}"
-        person_data = session.get(person_url, timeout=120).json()
+        person_data = get_json_data(person_url, session)
         # delete unneeded fields
         for f in [
             "resource_uri",
@@ -853,6 +959,7 @@ def clone_person(
 def clone_court(session: Session, court_ids: list, object_type="search.Court"):
     """Download court data from courtlistener.com and add it to local
     environment
+
     :param session: a Requests session
     :param court_ids: list of court ids
     :param object_type: Court app name with model name
@@ -883,7 +990,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
             kwargs={"version": "v3", "pk": court_id},
         )
         court_url = f"{domain}{court_path}"
-        court_data = session.get(court_url, timeout=120).json()
+        court_data = get_json_data(court_url, session)
         # delete resource_uri value generated by DRF
         del court_data["resource_uri"]
 
@@ -933,7 +1040,7 @@ def clone_court(session: Session, court_ids: list, object_type="search.Court"):
 class Command(BaseCommand):
     help = (
         "Clone data from CourtListener.com into dev environment. It "
-        "requires to set CL_API_TOKEN varible in the env file."
+        "requires to set CL_API_TOKEN varible in the .env file."
     )
 
     def __init__(self, *args, **kwargs):
@@ -942,6 +1049,7 @@ class Command(BaseCommand):
         self.ids = []
         self.download_cluster_files = False
         self.add_docket_entries = False
+        self.add_audio_files = False
         self.clone_person_positions = False
         self.add_to_solr = False
 
@@ -990,6 +1098,14 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--add-audio-files",
+            action="store_true",
+            default=False,
+            help="Use this flag to clone docket audio files when cloning "
+            "a docket.",
+        )
+
+        parser.add_argument(
             "--clone-person-positions",
             action="store_true",
             default=False,
@@ -1012,8 +1128,15 @@ class Command(BaseCommand):
         self.clone_person_positions = options.get("clone_person_positions")
         self.add_to_solr = options.get("add_to_solr")
 
+        if not os.environ.get("CL_API_TOKEN"):
+            self.stdout.write("Error: CL_API_TOKEN not set in .env file")
+            return
+
         if not settings.DEVELOPMENT:
-            self.stdout.write("Command not enabled for production environment")
+            self.stdout.write(
+                "Error: Command not enabled for production environment"
+            )
+            return
 
         match self.type:
             case "search.OpinionCluster":
@@ -1031,6 +1154,7 @@ class Command(BaseCommand):
                     self.s,
                     self.ids,
                     self.add_docket_entries,
+                    options["add_audio_files"],
                     self.clone_person_positions,
                     self.add_to_solr,
                     self.type,

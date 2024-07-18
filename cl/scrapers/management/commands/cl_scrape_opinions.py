@@ -115,10 +115,11 @@ def make_objects(
         source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
         nature_of_suit=item.get("nature_of_suit", ""),
+        summary=item.get("summary", ""),
         blocked=blocked,
         date_blocked=date_blocked,
         syllabus=item.get("summaries", ""),
-        disposition=item.get("dispositions", ""),
+        disposition=item.get("disposition") or item.get("dispositions", "")
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
@@ -136,9 +137,9 @@ def make_objects(
         type=item.get("types", Opinion.COMBINED),
         sha1=sha1_hash,
         download_url=url,
-        author_str=item.get("authors", ""),
         joined_by_str=item.get("joined_by", ""),
         per_curiam=item.get("per_curiam", False),
+        author_str=item.get("author_str") or item.get("authors", "")
     )
 
     cf = ContentFile(content)
@@ -252,8 +253,8 @@ class Command(VerboseCommand):
         logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
-            # Minnesota currently rejects Courtlistener and Juriscraper as a User Agent
-            if court_str in ["minn", "minnctapp"]:
+            # Minn and Mass currently require browser specific user agents
+            if court_str in ["minn", "minnctapp", "mass", "massappct"]:
                 headers = site.headers
             else:
                 headers = {"User-Agent": "CourtListener"}
@@ -334,7 +335,10 @@ class Command(VerboseCommand):
                 index=False,
             )
             extract_doc_content.delay(
-                opinion.pk, ocr_available=ocr_available, citation_jitter=True
+                opinion.pk,
+                ocr_available=ocr_available,
+                citation_jitter=True,
+                juriscraper_module=site.court_id,
             )
 
             logger.info(

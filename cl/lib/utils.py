@@ -66,7 +66,7 @@ def chunks(iterable, chunk_size: int):
 def previous_and_next(some_iterable):
     """Provide previous and next values while iterating a list.
 
-    This is from: http://stackoverflow.com/a/1012089/64911
+    This is from: https://stackoverflow.com/a/1012089/64911
 
     This will allow you to lazily iterate a list such that as you iterate, you
     get a tuple containing the previous, current, and next value.
@@ -78,14 +78,14 @@ def previous_and_next(some_iterable):
 
 
 def is_iter(item: Any) -> bool:
-    # See: http://stackoverflow.com/a/1952655/64911
+    # See: https://stackoverflow.com/a/1952655/64911
     return isinstance(item, Iterable)
 
 
 def remove_duplicate_dicts(l: list[dict]) -> list[dict]:
     """Given a list of dicts, remove any that are the same.
 
-    See: http://stackoverflow.com/a/9427216/64911
+    See: https://stackoverflow.com/a/9427216/64911
     """
     return [dict(t) for t in {tuple(d.items()) for d in l}]
 
@@ -304,7 +304,8 @@ def check_for_proximity_tokens(query: str) -> bool:
     Otherwise False
     """
 
-    return "/s" in query or "/p" in query
+    pattern = r"/s(?!\w)|/p(?!\w)"
+    return bool(re.search(pattern, query))
 
 
 def check_unbalanced_parenthesis(query: str) -> bool:
@@ -384,3 +385,13 @@ def sanitize_unbalanced_quotes(query: str) -> str:
             query, quotes_count, '"'
         )
     return query
+
+
+def map_to_docket_entry_sorting(sort_string: str) -> str:
+    """Convert a RECAP sorting param to a docket entry sorting parameter."""
+    if sort_string == "dateFiled asc":
+        return "entry_date_filed asc"
+    elif sort_string == "dateFiled desc":
+        return "entry_date_filed desc"
+    else:
+        return sort_string

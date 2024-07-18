@@ -2,10 +2,13 @@ from http import HTTPStatus
 from typing import Any, Dict, List, cast
 from unittest.mock import MagicMock, patch
 
+from asgiref.sync import sync_to_async
 from django.core import mail
+from django.core.cache import cache
 from django.urls import reverse
 from lxml.html import fromstring
 
+from cl.audio.factories import AudioWithParentsFactory
 from cl.lib.test_helpers import SimpleUserDataMixin
 from cl.tests.cases import TestCase
 
@@ -196,12 +199,21 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
             {"viewname": "recap_email_help"},
             {"viewname": "broken_email_help"},
             # API help pages
+            {"viewname": "case_law_api_help"},
+            {"viewname": "citation_api_help"},
+            {"viewname": "pacer_api_help"},
+            {"viewname": "recap_api_help"},
+            {"viewname": "judge_api_help"},
+            {"viewname": "field_api_help"},
+            {"viewname": "oral_argument_api_help"},
+            {"viewname": "visualization_api_help"},
             {"viewname": "webhooks_docs"},
             {"viewname": "webhooks_getting_started"},
             {"viewname": "citation_lookup_api"},
             {"viewname": "alert_api_help"},
             {"viewname": "financial_disclosures_api_help"},
             {"viewname": "search_api_help"},
+            {"viewname": "rest_change_log"},
             {"viewname": "old_terms", "args": ["1"]},
             {"viewname": "old_terms", "args": ["2"]},
         ]
@@ -232,3 +244,13 @@ class SimplePagesTest(SimpleUserDataMixin, TestCase):
         ]
         for reverse_param in reverse_params:
             await self.assert_page_loads_ok(reverse_param)
+
+    async def test_oa_minute_count_in_the_coverage_page(self) -> None:
+        "is the minute count rounded in the coverage page?"
+        cache.delete("coverage-data-v3")
+        await sync_to_async(AudioWithParentsFactory)(duration=250)
+        r = await self.async_client.get(reverse("coverage"))
+        self.assertIn("4 minutes of recordings.", r.content.decode())
+        self.assertIn(
+            "with 4 minutes of recordings (and counting).", r.content.decode()
+        )

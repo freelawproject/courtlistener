@@ -2,6 +2,7 @@ import copy
 import datetime
 from collections import OrderedDict
 
+from dateutil import parser
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
 from django_elasticsearch_dsl import Document, fields
@@ -22,21 +23,20 @@ class TimeStampField(serializers.Field):
         super().__init__(**kwargs)
 
     def to_representation(self, value):
-        if isinstance(value, datetime.datetime) and timezone.is_naive(value):
+
+        if isinstance(value, datetime.datetime):
             if self.timezone:
                 return serializers.DateTimeField(
                     default_timezone=self.timezone
                 ).to_representation(value)
             else:
-                date_time_aware = timezone.make_aware(
-                    value, datetime.timezone.utc
-                )
+                if timezone.is_naive(value):
+                    value = timezone.make_aware(value, datetime.timezone.utc)
                 return serializers.DateTimeField().to_representation(
-                    timezone.localtime(date_time_aware)
+                    timezone.localtime(value)
                 )
         if isinstance(value, str):
-            format_string = "%Y-%m-%dT%H:%M:%S.%f"
-            parsed_datetime = datetime.datetime.strptime(value, format_string)
+            parsed_datetime = parser.parse(value)
             return serializers.DateTimeField(
                 default_timezone=self.timezone
             ).to_representation(parsed_datetime)
@@ -92,7 +92,10 @@ class HighlightedField(serializers.Field):
 
 class NoneToListField(serializers.ListField):
     """A custom ListField that returns an empty list when the original value is
-    None; otherwise, it returns the original value."""
+    None; otherwise, it returns the original value.
+    This can be removed from some fields once a People re-index is done and
+    https://github.com/elastic/elasticsearch-dsl-py/issues/1819 solved.
+    """
 
     def get_attribute(self, instance):
         value = super().get_attribute(instance)

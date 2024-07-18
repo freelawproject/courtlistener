@@ -22,11 +22,13 @@ from cl.lib.elasticsearch_utils import (
     set_results_highlights,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
-from cl.lib.search_utils import map_to_docket_entry_sorting
+from cl.lib.utils import map_to_docket_entry_sorting
 from cl.search.constants import SEARCH_HL_TAG
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
+    ESRECAPDocument,
+    OpinionClusterDocument,
     OpinionDocument,
     PersonDocument,
 )
@@ -64,6 +66,10 @@ def get_object_list(request, cd, paginator):
     is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION and (
         waffle.flag_is_active(request, "o-es-search-api-active")
     )
+    is_recap_active = cd["type"] in [
+        SEARCH_TYPES.RECAP,
+        SEARCH_TYPES.DOCKETS,
+    ] and (waffle.flag_is_active(request, "r-es-search-api-active"))
 
     if is_oral_argument_active:
         search_query = AudioDocument.search()
@@ -71,6 +77,8 @@ def get_object_list(request, cd, paginator):
         search_query = PersonDocument.search()
     elif is_opinion_active:
         search_query = OpinionDocument.search()
+    elif is_recap_active:
+        search_query = ESRECAPDocument.search()
     else:
         search_query = None
 
@@ -80,11 +88,13 @@ def get_object_list(request, cd, paginator):
             child_docs_count_query,
             top_hits_limit,
         ) = build_es_main_query(search_query, cd)
-    elif search_query and is_opinion_active:
+    elif search_query and (is_opinion_active or is_recap_active):
         cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
             highlighting_fields = {"text": 500}
+        elif cd["type"] == SEARCH_TYPES.RECAP:
+            highlighting_fields = {"plain_text": 500}
         main_query, _ = do_es_api_query(
             search_query,
             cd,
@@ -98,10 +108,16 @@ def get_object_list(request, cd, paginator):
         )
         main_query["caller"] = "api_search"
 
-    if cd["type"] == SEARCH_TYPES.RECAP:
+    if not is_recap_active and cd["type"] == SEARCH_TYPES.RECAP:
+        # Convert the date_filed sorting to a docket entry sorting parameter.
         main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
-    if is_oral_argument_active or is_people_active or is_opinion_active:
+    if (
+        is_oral_argument_active
+        or is_people_active
+        or is_opinion_active
+        or is_recap_active
+    ):
         sl = ESList(
             main_query=main_query,
             offset=offset,
@@ -130,9 +146,11 @@ class ESList:
 
     def __len__(self):
         if self._length is None:
-            if self.type == SEARCH_TYPES.OPINION:
+            if self.type in [SEARCH_TYPES.OPINION, SEARCH_TYPES.DOCKETS]:
                 query = Q(self.main_query.to_dict(count=True)["query"])
-                self._length = do_collapse_count_query(self.main_query, query)
+                self._length = do_collapse_count_query(
+                    self.type, self.main_query, query
+                )
             else:
                 self._length = do_count_query(self.main_query)
         return self._length
@@ -159,7 +177,7 @@ class ESList:
         merge_unavailable_fields_on_parent_document(
             results,
             self.type,
-            "api",
+            "v3",
         )
         for result in results:
             self._item_cache.append(result)
@@ -275,6 +293,9 @@ class CursorESList:
         SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
         SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
         SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
+        SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
+        SEARCH_TYPES.PEOPLE: ("id", PersonDocument),
+        SEARCH_TYPES.ORAL_ARGUMENT: ("id", AudioDocument),
     }
 
     def __init__(
@@ -284,14 +305,12 @@ class CursorESList:
         page_size,
         search_after,
         clean_data,
-        version="v3",
     ):
         self.main_query = main_query
         self.child_docs_query = child_docs_query
         self.page_size = page_size
         self.search_after = search_after
         self.clean_data = clean_data
-        self.version = version
         self.cursor = None
         self.results = None
         self.reverse = False
@@ -396,7 +415,7 @@ class CursorESList:
         merge_unavailable_fields_on_parent_document(
             results,
             self.clean_data["type"],
-            "api",
+            "v4",
             self.clean_data["highlight"],
         )
         for result in results:
@@ -457,23 +476,15 @@ class CursorESList:
         default_unique_order = {
             "type": self.clean_data["type"],
         }
-        match self.clean_data["type"]:
-            case SEARCH_TYPES.RECAP_DOCUMENT:
-                # Use the 'id' field as a unique sorting key for the 'rd'
-                # search type.
-                default_unique_order.update(
-                    {
-                        "order_by": "id desc",
-                    }
-                )
-            case _:
-                # Use the 'docket_id' field as a unique sorting key for the
-                # 'd' and 'r' search type.
-                default_unique_order.update(
-                    {
-                        "order_by": "docket_id desc",
-                    }
-                )
+
+        unique_field, _ = self.cardinality_query[self.clean_data["type"]]
+        # Use a document unique field as a unique sorting key for the current
+        # search type.
+        default_unique_order.update(
+            {
+                "order_by": f"{unique_field} desc",
+            }
+        )
 
         unique_sorting = build_sort_results(
             default_unique_order, self.reverse, "v4"
@@ -493,8 +504,8 @@ class ResultObject:
 
 
 def limit_api_results_to_page(
-    results: Response | AttrList, cursor: ESCursor | None
-) -> Response | AttrList:
+    results: list[defaultdict], cursor: ESCursor | None
+) -> list[defaultdict]:
     """In ES Cursor pagination, an additional document is returned in each
     query response to determine whether to display the next page or previous
     pages. Here we limit the API results to the number defined in

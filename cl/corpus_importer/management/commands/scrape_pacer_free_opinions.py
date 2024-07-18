@@ -102,7 +102,7 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
     ).update(status=PACERFreeDocumentLog.SCRAPE_FAILED)
 
     cl_court_ids = (
-        Court.federal_courts.district_pacer_courts()
+        Court.federal_courts.district_or_bankruptcy_pacer_courts()
         .filter(
             in_use=True,
             end_date=None,
@@ -155,7 +155,8 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                 logger.error(
                     "Failed to get free document references for "
                     f"{pacer_court_id} between {next_start_d} and "
-                    f"{next_end_d} due to {reason}."
+                    f"{next_end_d} due to {reason}.",
+                    exc_info=True,
                 )
                 mark_court_done_on_date(
                     PACERFreeDocumentLog.SCRAPE_FAILED,
@@ -181,7 +182,8 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
                 logger.error(
                     "Encountered critical error on %s "
                     "(network error?). Marking as failed and "
-                    "pressing on." % pacer_court_id
+                    "pressing on." % pacer_court_id,
+                    exc_info=True,
                 )
                 # Break from while loop, onwards to next court
                 break

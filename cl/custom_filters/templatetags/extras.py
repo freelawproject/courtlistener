@@ -235,13 +235,11 @@ def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
     """
 
     hl_value = None
+    original_value = getattr(result, field, "")
     if isinstance(result, AttrDict) and hasattr(result.meta, "highlight"):
         hl_value = getattr(result.meta.highlight, field, None)
     elif isinstance(result, dict):
         hl_value = result.get("meta", {}).get("highlight", {}).get(field)
+        original_value = result.get(field, "")
 
-    return (
-        render_string_or_list(hl_value)
-        if hl_value
-        else getattr(result, field, "")
-    )
+    return render_string_or_list(hl_value) if hl_value else original_value

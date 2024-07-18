@@ -50,7 +50,7 @@
                     {% if perms.search.change_opinion %}
                         {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
-                               class="btn btn-primary btn-xs">{{ sub_opinion.type }} opinion</a>
+                               class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion</a>
                         {% endfor %}
                     {% endif %}
                     {% if request.user.is_superuser %}
@@ -293,6 +293,12 @@
                     {% endfor %}
                 </p>
             {% endif %}
+          {% if cluster.judges %}
+                <p class="bottom">
+                    <span class="meta-data-header">Judges:</span>
+                    {{ cluster.judges }}
+                </p>
+            {% endif %}
             {% if cluster.non_participating_judges.all.count > 0 %}
                 <p class="bottom">
                     <span class="meta-data-header">Non-Participating Judges:</span>
@@ -315,11 +321,6 @@
                         <span class="meta-data-header">Author:</span>
                         <span class="meta-data-value">{{ opinion.author_str }}</span>
                     </p>
-                {% elif cluster.judges %}
-                    <p class="bottom">
-                        <span class="meta-data-header">Judges:</span>
-                        <span class="meta-data-value">{{ cluster.judges }}</span>
-                    </p>
                 {% endif %}
 
                 {% if opinion.joined_by.all.count > 0 %}
@@ -340,7 +341,7 @@
             {% endif %}
 
             {# Download original? #}
-            {% if 'C' in cluster.source and has_downloads or 'D' in cluster.source%}
+            {% if 'C' in cluster.source and has_downloads or 'D' in cluster.source or "G" in cluster.source %}
                 <div class="btn-group v-offset-below-3 v-offset-above-1">
                     <button type="button"
                             class="btn btn-primary dropdown-toggle"
@@ -428,11 +429,6 @@
                                 <p class="bottom">
                                     <span class="meta-data-header">Author:</span>
                                     <span class="meta-data-value">{{ sub_opinion.author_str }}</span>
-                                </p>
-                            {% elif cluster.judges %}
-                                <p class="bottom">
-                                    <span class="meta-data-header">Judges:</span>
-                                    <span class="meta-data-value">{{ cluster.judges }}</span>
                                 </p>
                             {% endif %}
 

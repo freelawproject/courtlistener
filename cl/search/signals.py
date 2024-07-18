@@ -159,7 +159,7 @@ oa_field_mapping = {
                 "judges": ["judge"],
                 "sha1": ["sha1"],
                 "source": ["source"],
-                "stt_google_response": ["prepare"],
+                "stt_transcript": ["prepare"],
                 "docket_id": ["prepare"],
             },
         },

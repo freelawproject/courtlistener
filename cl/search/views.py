@@ -406,16 +406,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
             if not waffle.flag_is_active(request, "o-es-active"):
-                render_dict.update(
-                    {
-                        "results_o": do_search(
-                            mutable_GET,
-                            rows=5,
-                            override_params={"order_by": "dateFiled desc"},
-                            facet=False,
-                            cache_key="homepage-data-o",
-                        )["results"]
-                    }
+                search = do_search(
+                    mutable_GET,
+                    rows=5,
+                    override_params={"order_by": "dateFiled desc"},
+                    facet=False,
+                    cache_key="homepage-data-o",
                 )
             else:
                 mutable_GET.update(
@@ -424,16 +420,16 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         "type": SEARCH_TYPES.OPINION,
                     }
                 )
-                render_dict.update(
-                    {
-                        "results_o": do_es_search(
-                            mutable_GET,
-                            rows=5,
-                            facet=False,
-                            cache_key="homepage-data-o-es",
-                        )["results"]
-                    }
+                search = do_es_search(
+                    mutable_GET,
+                    rows=5,
+                    facet=False,
+                    cache_key="homepage-data-o-es",
                 )
+
+            render_dict.update(**search)
+            # Rename dictionary key "results" to "results_o" for consistency.
+            render_dict["results_o"] = render_dict.pop("results")
 
             # Get the results from the oral arguments as well
             # Check if waffle flag is active.
@@ -542,6 +538,8 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         render_dict.update(do_es_search(request.GET.copy()))
                     else:
                         render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.RECAP_DOCUMENT:
+                    render_dict.update(do_es_search(request.GET.copy()))
                 case _:
                     render_dict.update(do_search(request.GET.copy()))
 
@@ -713,7 +711,7 @@ def do_es_search(
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
 
-    if search_form.is_valid():
+    if search_form.is_valid() and document_type:
         cd = search_form.cleaned_data
         try:
             # Create necessary filters to execute ES query

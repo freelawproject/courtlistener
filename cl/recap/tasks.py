@@ -24,6 +24,7 @@ from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
 from juriscraper.pacer import (
+    ACMSAttachmentPage,
     ACMSDocketReport,
     AppellateDocketReport,
     AttachmentPage,
@@ -31,7 +32,6 @@ from juriscraper.pacer import (
     ClaimsRegister,
     DocketHistoryReport,
     DocketReport,
-    PacerSession,
     PossibleCaseNumberApi,
     S3NotificationEmail,
 )
@@ -60,6 +60,8 @@ from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
+    ProxyPacerSession,
+    delete_pacer_cookie_from_cache,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
 )
@@ -139,6 +141,8 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         await sync_to_async(process_recap_appellate_case_query_result_page)(
             pq.pk
         )
+    elif pq.upload_type == UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE:
+        await process_recap_acms_appellate_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.ACMS_DOCKET_JSON:
         docket = await process_recap_acms_docket(pq.pk)
 
@@ -1002,6 +1006,12 @@ def parse_appellate_text(court_id, text):
     return report.data
 
 
+def parse_acms_attachment_json(court_id, json):
+    report = ACMSAttachmentPage(court_id)
+    report._parse_text(json)
+    return report.data
+
+
 def parse_acms_json(court_id, json):
     report = ACMSDocketReport(court_id)
     report._parse_text(json)
@@ -1201,6 +1211,86 @@ async def process_recap_acms_docket(pk):
         "docket_pk": d.pk,
         "content_updated": bool(rds_created or content_updated),
     }
+
+
+async def process_recap_acms_appellate_attachment(
+    pk: int,
+) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
+    """Process an uploaded appellate attachment page.
+    :param pk: The primary key of the processing queue item you want to work on
+    :return: Tuple indicating the status of the processing, a related
+    message and the recap documents affected.
+    """
+    pq = await ProcessingQueue.objects.aget(pk=pk)
+    await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
+
+    try:
+        text = pq.filepath_local.read().decode()
+    except IOError as exc:
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
+        pq_status, msg = await mark_pq_status(
+            pq, msg, PROCESSING_STATUS.FAILED
+        )
+        return pq_status, msg, []
+
+    if process.current_process().daemon:
+        # yyy
+        data = parse_acms_attachment_json(
+            map_cl_to_pacer_id(pq.court_id), text
+        )
+    else:
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            data = await asyncio.get_running_loop().run_in_executor(
+                pool,
+                parse_acms_attachment_json,
+                map_cl_to_pacer_id(pq.court_id),
+                text,
+            )
+    logger.info(f"Parsing completed of item {pq}")
+
+    if data == {}:
+        # Not really a docket. Some sort of invalid document (see Juriscraper).
+        msg = "Not a valid acms appellate attachment page upload."
+        await mark_pq_status(pq, text, PROCESSING_STATUS.INVALID_CONTENT)
+        return None
+
+    if pq.pacer_case_id in ["undefined", "null"]:
+        # Bad data from the client. Fix it with parsed data.
+        pq.pacer_case_id = data.get("pacer_case_id")
+        await pq.asave()
+
+    try:
+        court = await Court.objects.aget(id=pq.court_id)
+        rds_affected, de = await merge_attachment_page_data(
+            court,
+            pq.pacer_case_id,
+            data["pacer_doc_id"],
+            data["entry_number"],
+            text,
+            data["attachments"],
+            pq.debug,
+            True,
+        )
+    except RECAPDocument.MultipleObjectsReturned:
+        msg = (
+            "Too many documents found when attempting to associate "
+            "attachment data"
+        )
+        pq_status, msg = await mark_pq_status(
+            pq, msg, PROCESSING_STATUS.FAILED
+        )
+        return pq_status, msg, []
+    except RECAPDocument.DoesNotExist as exc:
+        msg = "Could not find docket to associate with attachment metadata"
+        pq_status, msg = await mark_pq_status(
+            pq, msg, PROCESSING_STATUS.FAILED
+        )
+        return pq_status, msg, []
+
+    await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
+    pq_status, msg = await mark_pq_successful(pq)
+    return pq_status, msg, rds_affected
 
 
 async def process_recap_appellate_attachment(
@@ -1571,6 +1661,17 @@ def fetch_pacer_doc_by_rd(
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return
+    except PacerLoginException as exc:
+        msg = f"PacerLoginException while getting document for rd: {rd.pk}."
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            delete_pacer_cookie_from_cache(fq.user_id)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
+        raise self.retry(exc=exc)
 
     court_id = rd.docket_entry.docket.court_id
 
@@ -1668,6 +1769,17 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
             mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
             return
         logger.info("Ran into a RequestException. Retrying.")
+        raise self.retry(exc=exc)
+    except PacerLoginException as exc:
+        msg = "PacerLoginException while getting attachment page"
+        if self.request.retries == self.max_retries:
+            mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
+            delete_pacer_cookie_from_cache(fq.user_id)
+            self.request.chain = None
+            return None
+        mark_fq_status(
+            fq, f"{msg} Retrying.", PROCESSING_STATUS.QUEUED_FOR_RETRY
+        )
         raise self.retry(exc=exc)
 
     text = r.response.text
@@ -1813,7 +1925,7 @@ def fetch_docket(self, fq_pk):
         self.request.chain = None
         return None
 
-    s = PacerSession(cookies=cookies)
+    s = ProxyPacerSession(cookies=cookies)
     try:
         result = fetch_pacer_case_id_and_title(s, fq, court_id)
     except (requests.RequestException, ReadTimeoutError) as exc:
