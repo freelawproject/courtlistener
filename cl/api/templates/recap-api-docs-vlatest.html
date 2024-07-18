@@ -284,13 +284,13 @@
   </p>
 
   <h4 id="recap-pdf">Uploading PDFs</h4>
-  <p>To upload PDFs, include the <code>pacer_doc_id</code> and <code>document_number</code> fields. The fourth digit of the <code>pacer_doc_id</code> must always be normalized to a zero before uploading (see below).
+  <p>To upload PDFs, include the <code>pacer_doc_id</code> and <code>document_number</code> fields. For documents originating from courts outside the new Appellate Case Management System(ACMS), the fourth digit of the <code>pacer_doc_id</code> must always be normalized to a zero before uploading (see below).
   </p>
   <p>If you are uploading an attachment, you must also provide the <code>attachment_number</code> field. Because some cases share documents, the <code>pacer_case_id</code> field should also be provided, though it's not a required field if it's unknown.
   </p>
   <p><code>pacer_doc_id</code> is the number you see in URLs when purchasing documents on PACER and in the HTML when clicking document numbers on docket pages. For example, in the URL <code>ecf.flp.uscourts.gov/doc1/035021404350</code>, the <code>pacer_doc_id</code> is <code>035021404350</code>.
   </p>
-  <p>There are three variables embedded in each <code>pacer_doc_id</code> number:
+  <p><code>pacer_doc_id</code> numbers, excluding those associated with ACMS, all share a common structure: they embed three variables within their format.
   </p>
   <ul>
     <li>
@@ -308,6 +308,13 @@
       </p>
     </li>
   </ul>
+  <p> When uploading documents from a court that uses ACMS, you'll notice the <code>pacer_doc_id</code> for attachments is identical across all records within the same entry. To ensure proper uploads, you must include the <code>acms_document_guid</code> for each document originating from this system.
+  </p>
+  <p>Locating the <code>acms_document_guid</code> requires an additional step as its value is stored within the browser's <code>sessionStorage</code> object, accessible on the download page. The following script, executed in your browser's console, will help you retrieve this value:
+  </p>
+  <pre class=pre-scrollable">let downloadData =
+    document.getElementsByClassName('text-center')[0].parentElement.__vue__._data;
+console.log(downloadData.docketEntryDocuments[0].docketDocumentDetailsId);</pre>
   <p>PDF uploads will only succeed when they can be associated with a docket. If the RECAP Archive does not have a docket for the <code>pacer_doc_id</code> you uploaded, your upload will be re-queued and retried several times. If that fails, your PDF upload will be marked as an "orphan document." Later, when the docket is uploaded, your PDF will be automatically associated with it. Until then it's not visible in the system.
   </p>
 
