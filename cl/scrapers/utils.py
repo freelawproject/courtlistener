@@ -323,6 +323,7 @@ def update_or_create_docket(
         "ia_needs_upload": ia_needs_upload,
         "appeal_from_str": appeal_from_str,
         "date_blocked": date_blocked,
+        "date_argued": date_argued,
     }
 
     docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
@@ -330,25 +331,25 @@ def update_or_create_docket(
         # Update the existing docket with the new values
         docket.add_opinions_source(source)
 
-        # Prevent overwriting Docket.date_argued if it exists
-        if date_argued:
-            if docket.date_argued and date_argued != docket.date_argued:
+        for field, value in docket_fields.items():
+            if not value:
+                continue
+            if getattr(docket, field) and getattr(docket, field) != value:
+                # Prevent overwriting values that already exist, since default values
+                # to this function are empty strings or None
                 logger.error(
-                    "Docket %s already has a date_argued %s, different than new date %s",
+                    "Docket %s already has a %s %s, different than new value %s",
                     docket.pk,
-                    docket.date_argued,
-                    date_argued,
+                    field,
+                    getattr(docket, field),
+                    value,
                 )
             else:
-                docket.date_argued = date_argued
-
-        for field, value in docket_fields.items():
-            setattr(docket, field, value)
+                setattr(docket, field, value)
     else:
         # Create a new docket with docket_fields and additional fields
         docket = Docket(
             **docket_fields,
-            date_argued=date_argued,
             source=source,
             docket_number=docket_number,
             court_id=court_id,

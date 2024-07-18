@@ -83,6 +83,15 @@ def make_objects(
 ) -> Tuple[Docket, Opinion, OpinionCluster, List[Citation]]:
     """Takes the meta data from the scraper and associates it with objects.
 
+    The keys returned by juriscraper scrapers are defined by `self._all_attrs`
+    on OpinionSite and OralArgumentSite, where the legacy convention is to use
+    plural names.
+
+    However, this function is also used by importers and user pages, that
+    may not respect this convention, thus the duplication of singular and
+    plural names, like in
+    `item.get("disposition") or item.get("dispositions", "")`
+
     Returns the created objects.
     """
     blocked = item["blocked_statuses"]
@@ -106,20 +115,27 @@ def make_objects(
         appeal_from_str=item.get("lower_courts", ""),
     )
 
+    # Note that if opinion.author_str has no value, and cluster.judges find
+    # a single judge, opinion.author will be populated with that Person object
+    # Check `save_everything`
+
+    # For a discussion on syllabus vs summary, check
+    # https://github.com/freelawproject/juriscraper/issues/66
     cluster = OpinionCluster(
-        judges=item.get("judges", ""),
         date_filed=item["case_dates"],
         date_filed_is_approximate=item["date_filed_is_approximate"],
         case_name=item["case_names"],
         case_name_short=case_name_short,
         source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
-        nature_of_suit=item.get("nature_of_suit", ""),
-        summary=item.get("summary", ""),
         blocked=blocked,
         date_blocked=date_blocked,
+        judges=item.get("judges", ""),
+        nature_of_suit=item.get("nature_of_suit", ""),
+        disposition=item.get("disposition") or item.get("dispositions", ""),
+        other_dates=item.get("other_dates", ""),
+        summary=item.get("summary", ""),
         syllabus=item.get("summaries", ""),
-        disposition=item.get("disposition") or item.get("dispositions", "")
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
@@ -139,7 +155,7 @@ def make_objects(
         download_url=url,
         joined_by_str=item.get("joined_by", ""),
         per_curiam=item.get("per_curiam", False),
-        author_str=item.get("author_str") or item.get("authors", "")
+        author_str=item.get("author_str") or item.get("authors", ""),
     )
 
     cf = ContentFile(content)
@@ -168,14 +184,21 @@ def save_everything(
         citation.cluster_id = cluster.pk
         citation.save()
 
+    if opinion.author_str:
+        candidate = async_to_sync(lookup_judges_by_messy_str)(
+            opinion.author_str, docket.court.pk, cluster.date_filed
+        )
+        if candidate:
+            opinion.author = candidate[0]
+
     if cluster.judges:
         candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
             cluster.judges, docket.court.pk, cluster.date_filed
         )
-        if len(candidate_judges) == 1:
-            opinion.author = candidate_judges[0]
 
-        if len(candidate_judges) > 1:
+        if len(candidate_judges) == 1 and not opinion.author_str:
+            opinion.author = candidate_judges[0]
+        elif len(candidate_judges) > 1:
             for candidate in candidate_judges:
                 cluster.panel.add(candidate)
 
