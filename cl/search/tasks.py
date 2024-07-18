@@ -858,7 +858,7 @@ def index_docket_parties_in_es(
     docket = get_instance_from_db(docket_id, Docket)
     if not docket:
         return
-    docket_document = DocketDocument().prepare(docket)
+    docket_document_dict = DocketDocument().prepare(docket)
     party_fields = [
         "party_id",
         "party",
@@ -869,7 +869,7 @@ def index_docket_parties_in_es(
     ]
     fields_to_update = {
         key: values
-        for key, values in docket_document.items()
+        for key, values in docket_document_dict.items()
         if key in party_fields
     }
     docket_document = DocketDocument.get(id=docket_id)
@@ -881,7 +881,7 @@ def index_docket_parties_in_es(
     # Percolate Docket after parties are up-to-date.
     chain(
         send_or_schedule_alerts.s(
-            (str(docket_id), docket_document, "search.Docket")
+            (str(docket_id), docket_document_dict, "search.Docket")
         ),
         process_percolator_response.s(),
     ).apply_async()
