@@ -2,6 +2,7 @@ import datetime
 from http import HTTPStatus
 from unittest import mock
 
+import pytz
 import time_machine
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -58,6 +59,7 @@ from cl.search.management.commands.cl_index_parent_and_child_docs import (
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
+    Court,
     Docket,
     Opinion,
     OpinionCluster,
@@ -445,7 +447,11 @@ class OpinionV3APISearchTest(
         r = await self._test_api_results_count(search_params, 1, "API fields")
 
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(opinion_v3_search_api_keys))
+        self.assertEqual(
+            keys_count,
+            len(opinion_v3_search_api_keys),
+            msg="Wrong number of keys.",
+        )
         for (
             field,
             get_expected_value,
@@ -550,10 +556,10 @@ class OpinionV4APISearchTest(
     def setUpTestData(cls):
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
-            docket_empty = DocketFactory.create()
+            cls.docket_empty = DocketFactory.create()
             cls.empty_cluster = OpinionClusterFactory.create(
                 precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
-                docket=docket_empty,
+                docket=cls.docket_empty,
                 date_filed=datetime.date(2024, 2, 23),
             )
             cls.empty_opinion = OpinionFactory.create(
@@ -966,6 +972,46 @@ class OpinionV4APISearchTest(
             v4_meta_keys,
         )
 
+    def test_date_created_without_microseconds_parsing(self) -> None:
+        """Confirm a date_created filed without microseconds can be properly
+        parsed by TimeStampField"""
+
+        no_micro_second_cluster = OpinionClusterFactory.create(
+            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+            docket=self.docket_empty,
+            date_filed=datetime.date(2024, 2, 23),
+        )
+        date_created_no_microseconds = datetime.datetime(
+            2010, 4, 28, 16, 1, 19, tzinfo=pytz.UTC
+        )
+        no_micro_second_opinion = OpinionFactory.create(
+            cluster=no_micro_second_cluster, plain_text=""
+        )
+        # Override date_created
+        no_micro_second_opinion.date_created = date_created_no_microseconds
+        no_micro_second_opinion.save()
+
+        # Index the document into ES.
+        es_save_document.delay(
+            no_micro_second_opinion.pk,
+            "search.Opinion",
+            OpinionDocument.__name__,
+        )
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": f"id:{no_micro_second_opinion.pk}",
+            f"stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}": "on",
+        }
+        r = self.client.get(
+            reverse("search-list", kwargs={"version": "v4"}), search_params
+        )
+        self.assertEqual(
+            r.data["results"][0]["opinions"][0]["meta"]["date_created"],
+            date_created_no_microseconds.isoformat().replace("+00:00", "Z"),
+        )
+
+        no_micro_second_cluster.delete()
+
     @override_settings(OPINION_HITS_PER_RESULT=6)
     def test_nested_opinions_limit(self) -> None:
         """Test nested opinions limit for V4 Opinion Search API."""
@@ -1300,6 +1346,12 @@ class OpinionsESSearchTest(
             response.content.decode(),
             msg="Did not find the #homepage id when attempting to "
             "load the homepage",
+        )
+        court_count = await Court.objects.filter(in_use=True).acount()
+        self.assertIn(
+            f"{court_count} Jurisdictions",
+            response.content.decode(),
+            msg="Wrong number of Jurisdictions shown in Homepage",
         )
 
     async def test_fail_gracefully(self) -> None:

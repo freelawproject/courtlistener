@@ -62,7 +62,7 @@
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   '{% get_full_host %}{% url "search-list" version="v3" %}?q=foo'</pre>
   <p>That returns:</p>
-  <pre class="pre-scrollable">{
+  <pre class="pre-scrollable tall">{
   "count": 2369,
   "next": "https://www.courtlistener.com/api/rest/v3/search/?page=2&q=foo",
   "previous": null,
@@ -126,9 +126,13 @@
       "type": "010combined"
     },
     ...</pre>
+  <p>That's the simple version. Read on to learn the rest.</p>
+
 
   <h2 id="understanding">Understanding the API</h2>
-  <p>Unlike most APIs on CourtListener, this API is powered by our search engine, not our database. This means that it does not use the same approach to ordering, filtering, or field definitions as our other APIs.
+  <p>Unlike most APIs on CourtListener, this API is powered by our search engine, not our database.
+  </p>
+  <p>This means that it does not use the same approach to ordering, filtering, or field definitions as our other APIs, and sending an HTTP <code>OPTIONS</code> request won't be useful.
   </p>
 
   <h3 id="type">Setting the Result <code>type</code></h3>
@@ -137,7 +141,7 @@
   <table class="table">
     <thead>
     <tr>
-      <th><code>type</code></th>
+      <th>Type</th>
       <th>Definition</th>
     </tr>
     </thead>
@@ -152,7 +156,7 @@
     </tr>
     <tr>
       <td><code>d</code></td>
-      <td>Federal cases from PACER</td>
+      <td>Federal cases (dockets) from PACER</td>
     </tr>
     <tr>
       <td><code>p</code></td>
@@ -170,15 +174,18 @@
   <pre class="pre-scrollable">{% get_full_host %}/q=foo&type=r</pre>
   <p>If the <code>type</code> parameter is not provided, the default is to search case law.</p>
 
+
   <h3 id="ordering">Ordering Results</h3>
   <p>Each search <code>type</code> can be sorted by certain fields. These are available on the front end in the ordering drop down, which sets the <code>order_by</code> parameter.
   </p>
+
 
   <h3 id="filtering">Filtering Results</h3>
   <p>Results can be filtered with the input boxes provided on the front end or by <a href="{% url "advanced_search" %}">advanced query operators</a> provided to the <code>q</code> parameter.
   </p>
   <p>The best way to refine your query is to do so on the front end, and then copy the GET parameters to the API.
   </p>
+
 
   <h3 id="fields">Fields</h3>
   <p>Unlike most of the fields on CourtListener, many fields on this API are provided in camelCase instead of snake_case. This is to make it easier for users to place queries like:
@@ -205,6 +212,7 @@
   "help_text": "The docket numbers of a case, can be consolidated and quite long. In some instances they are too long to be indexed by postgres and we store the full docket in the correction field on the Opinion Cluster."
 }</pre>
 
+
   <h3 id="notes">Special Notes</h3>
   <p>A few fields deserve special consideration:</p>
   <ol>
@@ -219,6 +227,7 @@
       </p>
     </li>
   </ol>
+
 
   <h2 id="monitoring">Monitoring a Query for New&nbsp;Results</h2>
   <p>To monitor queries for new results, use the <a href="{% url "search_api_help" %}">Alert API</a>, which will send emails or webhook events when there are new results.

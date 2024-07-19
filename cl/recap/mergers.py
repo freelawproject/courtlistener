@@ -26,7 +26,6 @@ from cl.lib.pacer import (
     normalize_attorney_role,
 )
 from cl.lib.privacy_tools import anonymize
-from cl.lib.redis_utils import get_redis_interface
 from cl.lib.timezone_helpers import localize_date_and_time
 from cl.lib.utils import previous_and_next, remove_duplicate_dicts
 from cl.people_db.lookup_utils import lookup_judge_by_full_name_and_set_attr
@@ -112,7 +111,7 @@ async def find_docket_object(
             },
             {"pacer_case_id": pacer_case_id},
         ]
-    if docket_number_core:
+    if docket_number_core and not pacer_case_id:
         # Sometimes we don't know how to make core docket numbers. If that's
         # the case, we will have a blank value for the field. We must not do
         # lookups by blank values. See: freelawproject/courtlistener#1531
@@ -125,14 +124,13 @@ async def find_docket_object(
                 {"docket_number_core": docket_number_core},
             ]
         )
-    else:
+    elif docket_number and not pacer_case_id:
         # Finally, as a last resort, we can try the docket number. It might not
         # match b/c of punctuation or whatever, but we can try. Avoid lookups
         # by blank docket_number values.
-        if docket_number:
-            lookups.append(
-                {"pacer_case_id": None, "docket_number": docket_number},
-            )
+        lookups.append(
+            {"pacer_case_id": None, "docket_number": docket_number},
+        )
 
     for kwargs in lookups:
         ds = Docket.objects.filter(court_id=court_id, **kwargs).using(using)
@@ -1513,6 +1511,7 @@ async def merge_attachment_page_data(
     text: str | None,
     attachment_dicts: List[Dict[str, Union[int, str]]],
     debug: bool = False,
+    is_acms_attachment: bool = False,
 ) -> Tuple[List[RECAPDocument], DocketEntry]:
     """Merge attachment page data into the docket
 
@@ -1524,6 +1523,7 @@ async def merge_attachment_page_data(
     :param attachment_dicts: A list of Juriscraper-parsed dicts for each
     attachment.
     :param debug: Whether to do saves during this process.
+    :param is_acms_attachment: Whether the attachments come from ACMS.
     :return: A list of RECAPDocuments modified or created during the process,
     and the DocketEntry object associated with the RECAPDocuments
     :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
@@ -1535,9 +1535,27 @@ async def merge_attachment_page_data(
     if pacer_case_id:
         params["docket_entry__docket__pacer_case_id"] = pacer_case_id
     try:
-        main_rd = await RECAPDocument.objects.select_related(
-            "docket_entry", "docket_entry__docket"
-        ).aget(**params)
+        if is_acms_attachment:
+            # Recap documents on ACMS attachment pages share the same pacer_case_id
+            # which causes an issue when using the aget method. Since the aget
+            # method expects a unique identifier to retrieve a specific document,
+            # utilizing it in this scenario would inevitably result in the
+            # MultipleObjectsReturned exception.
+            #
+            # An alternative approach is to employ the filter method in conjunction
+            # with the afirst method. This combination allows for efficient retrieval
+            # of the main RD (record) of a docket entry.
+            main_rd = (
+                await RECAPDocument.objects.select_related(
+                    "docket_entry", "docket_entry__docket"
+                )
+                .filter(**params)
+                .afirst()
+            )
+        else:
+            main_rd = await RECAPDocument.objects.select_related(
+                "docket_entry", "docket_entry__docket"
+            ).aget(**params)
     except RECAPDocument.MultipleObjectsReturned as exc:
         if pacer_case_id:
             duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
@@ -1593,6 +1611,7 @@ async def merge_attachment_page_data(
     court_is_appellate = await appellate_court_ids.filter(
         pk=court.pk
     ).aexists()
+    main_rd_to_att = False
     for attachment in attachment_dicts:
         sanity_checks = [
             attachment["attachment_number"],
@@ -1606,29 +1625,33 @@ async def merge_attachment_page_data(
             continue
 
         # Appellate entries with attachments don't have a main RD, transform it
-        # to an attachment.
+        # to an attachment. In ACMS attachment pages, all the documents use the
+        # same pacer_doc_id, so we need to make sure only one is matched to the
+        # main RD, while the remaining ones are created separately.
         if (
             court_is_appellate
             and attachment["pacer_doc_id"] == main_rd.pacer_doc_id
+            and not main_rd_to_att
         ):
+            main_rd_to_att = True
             main_rd.document_type = RECAPDocument.ATTACHMENT
             main_rd.attachment_number = attachment["attachment_number"]
+            if "acms_document_guid" in attachment:
+                main_rd.acms_document_guid = attachment["acms_document_guid"]
             rd = main_rd
         else:
+            params = {
+                "docket_entry": de,
+                "document_number": document_number,
+                "attachment_number": attachment["attachment_number"],
+                "document_type": RECAPDocument.ATTACHMENT,
+            }
+            if "acms_document_guid" in attachment:
+                params["acms_document_guid"] = attachment["acms_document_guid"]
             try:
-                rd = await RECAPDocument.objects.aget(
-                    docket_entry=de,
-                    document_number=document_number,
-                    attachment_number=attachment["attachment_number"],
-                    document_type=RECAPDocument.ATTACHMENT,
-                )
+                rd = await RECAPDocument.objects.aget(**params)
             except RECAPDocument.DoesNotExist:
-                rd = RECAPDocument(
-                    docket_entry=de,
-                    document_number=document_number,
-                    attachment_number=attachment["attachment_number"],
-                    document_type=RECAPDocument.ATTACHMENT,
-                )
+                rd = RECAPDocument(**params)
                 rds_created.append(rd)
 
         rds_affected.append(rd)
@@ -1656,7 +1679,8 @@ async def merge_attachment_page_data(
         # Do *not* do this async — that can cause race conditions.
         await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
 
-    await clean_duplicate_attachment_entries(de, attachment_dicts)
+    if not is_acms_attachment:
+        await clean_duplicate_attachment_entries(de, attachment_dicts)
     await mark_ia_upload_needed(de.docket, save_docket=True)
     await process_orphan_documents(
         rds_created, court.pk, main_rd.docket_entry.docket.date_filed
@@ -1670,6 +1694,7 @@ def save_iquery_to_docket(
     d: Docket,
     tag_names: Optional[List[str]],
     add_to_solr: bool = False,
+    avoid_trigger_signal: bool = False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
 
@@ -1678,9 +1703,13 @@ def save_iquery_to_docket(
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
     :param add_to_solr: Whether to save the completed docket to solr
+    :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
     :return: The pk of the docket if successful. Else, None.
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
+    d.avoid_trigger_signal = avoid_trigger_signal
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -1736,3 +1765,41 @@ async def process_orphan_documents(
             # exceptions that were previously raised for the
             # processing queue items a second time.
             pass
+
+
+@retry(IntegrityError, tries=3, delay=0.25, backoff=1)
+def process_case_query_report(
+    court_id: str,
+    pacer_case_id: int,
+    report_data: dict[str, Any],
+    avoid_trigger_signal: bool = False,
+) -> None:
+    """Process the case query report from probe_iquery_pages task.
+    Find and update/store the docket accordingly. This method is able to retry
+    on IntegrityError due to a race condition when saving the docket.
+
+    :param court_id:  A CL court ID where we'll look things up.
+    :param pacer_case_id: The internal PACER case ID number
+    :param report_data: A dictionary containing report data.
+    :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
+    signal. Useful for ignoring reports added by the probe daemon or the iquery
+    sweep itself.
+    :return: None
+    """
+    d = async_to_sync(find_docket_object)(
+        court_id,
+        str(pacer_case_id),
+        report_data["docket_number"],
+        using="default",
+    )
+    d.pacer_case_id = pacer_case_id
+    d.add_recap_source()
+    d = async_to_sync(update_docket_metadata)(d, report_data)
+    d.avoid_trigger_signal = avoid_trigger_signal
+    d.save()
+    add_bankruptcy_data_to_docket(d, report_data)
+    add_items_to_solr([d.pk], "search.Docket")
+    logger.info(
+        f"Created/updated docket: {d} from court: {court_id} and pacer_case_id {pacer_case_id}"
+    )
+    return None

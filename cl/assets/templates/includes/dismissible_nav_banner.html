@@ -1,0 +1,51 @@
+{% comment %}
+  This template renders a dismissible nav banner that fills the horizontal space
+  available and takes up to four keyword arguments described below:
+
+  Parameters:
+    link: The URL for the "Learn More" button.
+    text: Text of the banner.
+    cookie_name: Name of the cookie used to remember if the user has already dismissed
+    the banner. This prevents them from seeing the same message repeatedly.
+    emoji: Insert an emoji next to your banner message using its decimal HTML entity
+    code (like &#128077;).
+
+  It's advisable to wrap this template within an if tag and use the parent element to add
+  extra conditions to handle the visibility of the banner. The current template only checks
+  for a cookie presence. By nesting it within an if tag, you can combine this cookie check
+  with other factors from the parent element, such as user preferences or specific visibility
+  rules. For example:
+
+  {% if FUNDRAISING_MODE %}
+    {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/contact/" text="Message for your banner" emoji="&#128077;" cookie_name="cookie_to_hide_banner"%}
+  {% endif %}
+
+{% endcomment %}
+
+{% if cookie_name  not in request.COOKIES %}
+<div class="navbar navbar-default subnav alert-info alert-dismissible" role="navigation">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-xs-12">
+        <button type="button" class="close"
+                data-cookie-name="{{cookie_name}}"
+                data-duration="20"
+                aria-label="Close">
+            <span aria-hidden="true"
+                  class="x-large">&times;</span></button>
+      </div>
+    </div>
+    <div class="row flex flex-column flex-sm-row align-items-center justify-content-between">
+      <div class="col-xs-12 col-sm-9 navbar-text lead">
+        <p>{% if emoji %}{{emoji}}{% endif %} {{text}}</p>
+      </div>
+      <div class="col-xs-3 flex justify-content-center justify-content-sm-end">
+        <a href="{{link}}"
+            class="btn btn-primary btn-lg hidden-xs"><i class="fa fa-search"></i>&nbsp;Learn More</a>
+        <a href="{{link}}"
+            class="btn btn-primary btn-sm hidden-sm hidden-md hidden-lg"><i class="fa fa-search"></i>&nbsp;Learn More</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
