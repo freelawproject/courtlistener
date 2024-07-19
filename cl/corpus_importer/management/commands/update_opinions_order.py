@@ -1,15 +1,20 @@
 import os.path
 import re
-from typing import Any, Optional
+from typing import Optional
 
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup
 from django.core.management import BaseCommand
 from django.db import transaction
 from django.db.models import Count
 
-from cl.corpus_importer.utils import compare_documents, similarity_scores
+from cl.corpus_importer.import_columbia.columbia_utils import (
+    extract_columbia_opinions,
+    map_opinion_types,
+    process_extracted_opinions,
+    read_xml_to_soup,
+)
+from cl.corpus_importer.utils import EmptyOpinionException, match_opinion_lists
 from cl.lib.command_utils import logger
-from cl.lib.string_diff import get_cosine_similarity
 from cl.search.models import SOURCES, Opinion, OpinionCluster
 
 VALID_COLUMBIA_SOURCES = [
@@ -21,393 +26,6 @@ VALID_COLUMBIA_SOURCES = [
 VALID_HARVARD_SOURCES = [
     key for key in dict(SOURCES.NAMES).keys() if SOURCES.HARVARD_CASELAW in key
 ]
-
-
-# TODO remove the funcitions below and import them from utils.py and columbia_utils.py when those changes get merged
-
-SIMPLE_TAGS = [
-    "attorneys",
-    "caption",
-    "citation",
-    "court",
-    "date",
-    "docket",
-    "hearing_date",
-    "panel",
-    "posture",
-    "reporter_caption",
-]
-
-
-class EmptyOpinionException(Exception):
-    """An exception for opinions that raise a ZeroDivisionError Exception due empty
-    opinion tag or empty opinion content in cl"""
-
-    def __init__(self, message: str) -> None:
-        self.message = message
-
-
-def read_xml_to_soup(filepath: str) -> BeautifulSoup:
-    """This function reads the xml file, fixes the bad tags in columbia xml
-    files and returns a BeautifulSoup object
-
-    :param filepath: path to xml file
-    :return: BeautifulSoup object of parsed content
-    """
-    with open(filepath, "r", encoding="utf-8") as f:
-        file_content = f.read()
-        # Sometimes opening and ending tag mismatch (e.g. ed7c6b39dcb29c9c.xml)
-        file_content = file_content.replace(
-            "</footnote_body></block_quote>", "</block_quote></footnote_body>"
-        )
-        # Fix opinion with invalid attribute
-        if "<opinion unpublished=true>" in file_content:
-            file_content = file_content.replace(
-                "<opinion unpublished=true>", "<opinion unpublished='true'>"
-            )
-            file_content = file_content.replace("<unpublished>", "").replace(
-                "</unpublished>", ""
-            )
-    return BeautifulSoup(file_content, "lxml")
-
-
-def add_floating_opinion(
-    opinions: list, floating_content: list, opinion_order: int
-) -> list:
-    """We have found floating opinions in bs object, we keep the opinion
-    content as a new opinion
-
-    :param opinions: a list with opinions found
-    :param floating_content: content that is not in known non-opinion tags
-    :param opinion_order: opinion position
-    :return: updated list of opinions
-    """
-    op_type = "opinion"
-    if opinions:
-        if opinions[-1].get("type"):
-            # Use type of previous opinion if exists
-            op_type = opinions[-1].get("type")
-
-    # Get rid of double spaces from floating content
-    opinion_content = re.sub(
-        " +", " ", "\n".join(floating_content)
-    ).strip()  # type: str
-    if opinion_content:
-        opinions.append(
-            {
-                "opinion": opinion_content,
-                "order": opinion_order,
-                "byline": "",
-                "type": op_type,
-            }
-        )
-    return opinions
-
-
-def extract_columbia_opinions(
-    outer_opinion: BeautifulSoup,
-) -> list[Optional[dict]]:
-    """We extract all possible opinions from BeautifulSoup, with and without
-    author, and we create new opinions if floating content exists(content that
-    is not explicitly defined within an opinion tag or doesn't have an author)
-
-    :param outer_opinion: element containing all xml tags
-    :return: list of opinion dicts
-    """
-    opinions: list = []
-    floating_content = []
-    order = 0
-
-    # We iterate all content to look for all possible opinions
-    for i, content in enumerate(outer_opinion):  # type: int, Tag
-        if isinstance(content, NavigableString):
-            # We found a raw string, store it
-            floating_content.append(str(content))
-        else:
-            if content.name in SIMPLE_TAGS + [
-                "citation_line",
-                "opinion_byline",
-                "dissent_byline",
-                "concurrence_byline",
-            ]:
-                # Ignore these tags, it will be processed later
-                continue
-            elif content.name in [
-                "opinion_text",
-                "dissent_text",
-                "concurrence_text",
-            ]:
-                if floating_content:
-                    # We have found an opinion, but there is floating
-                    # content, we create a dict with the opinion using the
-                    # floating content with default type = "opinion"
-                    opinions = add_floating_opinion(
-                        opinions, floating_content, order
-                    )
-                    floating_content = []
-
-                byline = content.find_previous_sibling()
-                opinion_author = ""
-                if byline and "_byline" in byline.name:
-                    opinion_author = byline.get_text()
-
-                opinion_content = re.sub(
-                    " +", " ", content.decode_contents()
-                ).strip()
-                if opinion_content:
-                    # Now we create a dict with current opinion
-                    opinions.append(
-                        {
-                            "opinion": opinion_content,
-                            "order": order,
-                            "byline": opinion_author,
-                            "type": content.name.replace("_text", ""),
-                        }
-                    )
-                    order = order + 1
-
-            else:
-                if content.name not in SIMPLE_TAGS + ["syllabus"]:
-                    # We store content that is not inside _text tag and is
-                    # not in one of the known non-opinion tags
-                    floating_content.append(str(content))
-
-    # Combine the new content into another opinion. great.
-    if floating_content:
-        # If we end to go through all the found opinions and if we still
-        # have floating content out there, we create a new opinion with the
-        # last type of opinion
-        opinions = add_floating_opinion(opinions, floating_content, order)
-    return opinions
-
-
-def is_per_curiam_opinion(
-    content: Optional[str], byline: Optional[str]
-) -> bool:
-    """Check if opinion author is per curiam
-    :param content: opinion content
-    :param byline: opinion text author
-    :return: True if opinion author is per curiam
-    """
-    if byline and "per curiam" in byline[:1000].lower():
-        return True
-    if content and "per curiam" in content[:1000].lower():
-        return True
-    return False
-
-
-def merge_opinions(
-    opinions: list, content: list, current_order: int
-) -> tuple[list, int]:
-    """Merge last and previous opinion if are the same type or create a new
-    opinion if merge is not possible
-
-    :param opinions: list of opinions that is being updated constantly
-    :param content: list of opinions without an author
-    :param current_order: opinion position
-    :return: updated list of opinions
-    """
-
-    # We check if the previous stored opinion matches the type of the
-    # content, and we store the opinion dict temporary
-    relevant_opinions = (
-        [opinions[-1]]
-        if opinions and opinions[-1]["type"] == content[0].get("type")
-        else []
-    )
-
-    if relevant_opinions:
-        relevant_opinions[-1]["opinion"] += "\n" + "\n".join(
-            [f.get("opinion") for f in content if f.get("opinion")]
-        )
-
-    else:
-        # No relevant opinions found, create a new opinion with the content
-        opinion_content = "\n".join(
-            [f.get("opinion") for f in content if f.get("opinion")]
-        )
-        new_opinion = {
-            "byline": None,
-            "type": content[0].get("type"),
-            "opinion": opinion_content,
-            "order": current_order,
-            "per_curiam": is_per_curiam_opinion(opinion_content, None),
-        }
-        opinions.append(new_opinion)
-        current_order = current_order + 1
-
-    return opinions, current_order
-
-
-def process_extracted_opinions(extracted_opinions: list) -> list:
-    """We read the extracted data in extract_opinions function to merge all
-    possible floating opinions (it is not explicitly defined within an opinion
-    tag or doesn't have an author)
-
-    :param extracted_opinions: list of opinions obtained from xml file
-    :return: a list with extracted and processed opinions
-    """
-
-    opinions: list = []
-    authorless_content = []
-    order = 0
-
-    for i, found_content in enumerate(extracted_opinions, start=1):
-        byline = found_content.get("byline")
-        if not byline:
-            # Opinion has no byline, store opinion content
-            authorless_content.append(found_content)
-
-        if byline:
-            # Opinion has byline, get opinion type and content
-            opinion_type = found_content.get("type")
-            opinion_content = found_content.get("opinion", "")
-            # Store content that doesn't match the current opinion type
-            alternative_authorless_content = [
-                content
-                for content in authorless_content
-                if content.get("type") != opinion_type
-            ]
-            # Keep content that matches the current type
-            authorless_content = [
-                op_content
-                for op_content in authorless_content
-                if op_content.get("type") == opinion_type
-            ]
-
-            if alternative_authorless_content:
-                # Keep floating text that are not from the same type,
-                # we need to create a separate opinion for those,
-                # for example: in 2713f39c5a8e8684.xml we have an opinion
-                # without an author, and the next opinion with an author is
-                # a dissent opinion, we can't combine both
-                opinions, order = merge_opinions(
-                    opinions, alternative_authorless_content, order
-                )
-
-            opinion_content = (
-                "\n".join(
-                    [
-                        f.get("opinion")
-                        for f in authorless_content
-                        if f.get("type") == opinion_type
-                    ]
-                )
-                + "\n\n"
-                + opinion_content
-            )
-
-            # Add new opinion
-            new_opinion = {
-                "byline": byline,
-                "type": opinion_type,
-                "opinion": opinion_content,
-                "order": order,
-                "per_curiam": is_per_curiam_opinion(opinion_content, byline),
-            }
-
-            opinions.append(new_opinion)
-            order = order + 1
-            authorless_content = []
-
-        if len(extracted_opinions) == i and authorless_content:
-            # If is the last opinion, and we still have opinions without
-            # byline, create an opinion without an author and the contents
-            # that couldn't be merged
-            opinions, order = merge_opinions(
-                opinions, authorless_content, order
-            )
-
-    return opinions
-
-
-def map_opinion_types(opinions=None) -> None:
-    """Map opinion type to model field choice
-
-    :param opinions: a list that contains all opinions as dict elements
-    :return: None
-    """
-
-    if opinions is None:
-        opinions = []
-    lead = False
-    for op in opinions:
-        op_type = op.get("type")
-        # Only first opinion with "opinion" type is a lead opinion, the next
-        # opinion with "opinion" type is an addendum
-        if not lead and op_type and op_type == "opinion":
-            lead = True
-            op["type"] = "020lead"
-            continue
-        elif lead and op_type and op_type == "opinion":
-            op["type"] = "050addendum"
-        elif op_type and op_type == "dissent":
-            op["type"] = "040dissent"
-        elif op_type and op_type == "concurrence":
-            op["type"] = "030concurrence"
-
-
-def match_opinion_lists(
-    file_opinions_list: list[Any], cl_opinions_list: list[Any]
-) -> dict[int, int]:
-    """Try to match the opinions on two lists and generate a dict with position of
-    matching opinions
-
-    Remove non-alphanumeric and non-whitespace characters from lowercased text,
-    this tries to make both texts in equal conditions to prove if both are similar or
-    equal
-
-    get_cosine_similarity works great when both texts are almost the same with very
-    small variations
-
-    Sometimes cosine similarity fails when there are small variations in text,
-    such as parties, attorneys, case name, or court that are included in the content
-    of the opinion, compare_documents() checks the percentage of the file opinion
-    text that it is in courtlistener opinion, having a large percentage means that
-    almost all the file opinion is in courtlistener opinion, but there is a
-    possibility that the courtlistener opinion contains some additional data in que
-    opinion content (such as case name, parties, etc.)
-
-    compare_documents works good when the opinion from the file is a subset of the
-    opinion in CL, the percentage represents how much of the opinion of the file is
-    in the opinion from cl (content in cl opinion can have other data in the body
-    like posture, attorneys, etc. e.g. in cluster id: 7643871 we have the posture and
-    the opinion text but in the xml file we only have the opinion text, cosine_sim:
-    0.1639075094124459 and percent_match: 73)
-
-    Sometimes one algorithm performs better than the other, this is due to some
-    additional text, such as editor's notes, or the author, page number or posture
-    added to the opinion
-
-    Key is opinion position from file, Value is opinion position from cl opinion e.g.
-    matches {0: 1, 1: 2} 0 is file opinion and 1 in cl opinion, 1 is file opinion and
-    2 is cl opinion
-
-    :param file_opinions_list: Opinions from file
-    :param cl_opinions_list: CL opinions
-    :return: Matches if found or empty dict
-    """
-
-    scores = similarity_scores(file_opinions_list, cl_opinions_list)
-
-    matches = {}
-    for i, row in enumerate(scores):
-        j = row.argmax()  # type: ignore
-        file_opinion = re.sub(
-            r"[^a-zA-Z0-9 ]", "", file_opinions_list[i].lower()
-        )
-        cl_opinion = re.sub(r"[^a-zA-Z0-9 ]", "", cl_opinions_list[j].lower())
-
-        cosine_sim = get_cosine_similarity(file_opinion, cl_opinion)
-
-        percent_match = compare_documents(file_opinion, cl_opinion)
-
-        if cosine_sim < 0.60 and percent_match < 60:
-            continue
-
-        matches[i] = j
-
-    return matches
 
 
 def clean_opinion_content(text: str) -> str:
@@ -422,9 +40,6 @@ def clean_opinion_content(text: str) -> str:
 
     # Remove non-alphanumeric and non-whitespace characters from lowercased text
     return re.sub(r"[^a-zA-Z0-9 ]", "", text.lower())
-
-
-# TODO ------------------------ remove until here -------------------------------
 
 
 def get_opinions_cleaned_content(
@@ -530,6 +145,8 @@ def get_opinions_columbia_file(xml_filepath: str) -> list:
 def sort_harvard_opinions(start_id: int, end_id: int) -> None:
     """We assume that harvard data is already ordered, we just need to fill the order
     field in each opinion
+
+    The harvard importer created the opinions in order of appearance in the file
 
     :param start_id: skip any id lower than this value
     :param end_id: skip any id greater than this value
@@ -795,25 +412,23 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        if options["process_harvard"] and options["process_columbia"]:
-            print(
-                "You can only select one option process-harvard or process-columbia"
+
+        if not options["process_harvard"] and not options["process_columbia"]:
+            logger.info(
+                "One option required: process-harvard or process-columbia"
             )
             return
 
-        if not options["process_harvard"] and not options["process_columbia"]:
-            print("One option required: process-harvard or process-columbia")
+        if options["process_harvard"] and options["process_columbia"]:
+            logger.info(
+                "You can only select one option process-harvard or process-columbia"
+            )
             return
 
         if options["process_harvard"]:
             sort_harvard_opinions(options["start_id"], options["end_id"])
 
-        if options["process_columbia"] and options["xml_dir"]:
+        if options["process_columbia"]:
             sort_columbia_opinions(
                 options["start_id"], options["end_id"], options["xml_dir"]
-            )
-
-        if options["process_columbia"] and not options["xml_dir"]:
-            print(
-                "Argument --xml-dir required to read xml files from mounted directory"
             )
