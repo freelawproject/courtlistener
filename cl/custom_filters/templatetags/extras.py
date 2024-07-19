@@ -10,7 +10,7 @@ from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
 from elasticsearch_dsl import AttrDict, AttrList
 
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import Court, Docket, DocketEntry
 
 register = template.Library()
 
@@ -243,3 +243,39 @@ def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
         original_value = result.get(field, "")
 
     return render_string_or_list(hl_value) if hl_value else original_value
+
+
+@register.filter
+def group_courts(courts: list[Court], num_columns: int) -> list:
+    """Divide courts in equal groupings while keeping related courts together
+
+    :param courts: Courts to group.
+    :param num_columns: Number of groups wanted
+    :return: The courts grouped together
+    """
+
+    column_len = len(courts) // num_columns
+    remainder = len(courts) % num_columns
+
+    groups = []
+    start = 0
+    for index in range(num_columns):
+        # Calculate the end index for this chunk
+        end = start + column_len + (1 if index < remainder else 0)
+
+        # Find the next 'TS' or 'S' starting point
+        while end < len(courts) and courts[end].jurisdiction not in [
+            "TS",
+            "S",
+        ]:
+            end += 1
+
+        # Adjust the chunk to start with 'TS' or 'S'
+        while start < end and courts[start].jurisdiction not in ["TS", "S"]:
+            start += 1
+
+        # Create the column and add it to result
+        groups.append(courts[start:end])
+        start = end
+
+    return groups
