@@ -765,7 +765,7 @@ class ParentheticalESSignalProcessorTest(
 
         # Update a ParentheticalGroup without changes.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -776,7 +776,7 @@ class ParentheticalESSignalProcessorTest(
 
         # Update a ParentheticalGroup tracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -807,7 +807,7 @@ class ParentheticalESSignalProcessorTest(
         self.assertFalse(ParentheticalGroupDocument.exists(id=pg_test.pk))
         # ParentheticalGroup creation on update.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),

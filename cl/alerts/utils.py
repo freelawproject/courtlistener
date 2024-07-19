@@ -202,18 +202,18 @@ def alert_hits_limit_reached(
     if child_document:
         # To limit child hits in case, count ScheduledAlertHits related to the
         # alert, user and parent document.
-        stored_hits = ScheduledAlertHit.objects.filter(
+        hits_count = ScheduledAlertHit.objects.filter(
             alert_id=alert_pk,
             user_id=user_pk,
             hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
             content_type=content_type,
             object_id=object_id,
-        )
+        ).count()
         hits_limit = settings.RECAP_CHILD_HITS_PER_RESULT
     else:
         # To limit hits in an alert count ScheduledAlertHits related to the
         # alert and user.
-        stored_hits = (
+        hits_count = (
             ScheduledAlertHit.objects.filter(
                 alert_id=alert_pk,
                 user_id=user_pk,
@@ -222,10 +222,9 @@ def alert_hits_limit_reached(
             )
             .values("object_id")
             .distinct()
-        )
+        ).count()
         hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT
 
-    hits_count = stored_hits.count()
     if hits_count >= hits_limit:
         if child_document:
             logger.info(
@@ -263,6 +262,13 @@ def recap_document_hl_matched(rd_hit: Hit) -> bool:
     return False
 
 
+def get_alerts_set_prefix() -> str:
+    """Simple tool for getting the prefix for the alert hits set.
+    Useful for avoiding test collisions.
+    """
+    return "alert_hits"
+
+
 def make_alert_set_key(alert_id: int, document_type: str) -> str:
     """Generate a Redis key for storing alert hits.
 
@@ -270,7 +276,7 @@ def make_alert_set_key(alert_id: int, document_type: str) -> str:
     :param document_type: The type of document associated with the alert.
     :return: A Redis key string in the format "alert_hits:{alert_id}.{document_type}".
     """
-    return f"alert_hits:{alert_id}.{document_type}"
+    return f"{get_alerts_set_prefix()}:{alert_id}.{document_type}"
 
 
 def add_document_hit_to_alert_set(

@@ -728,7 +728,7 @@ def send_or_schedule_alerts(
     triggered the alert.
     """
 
-    if not response:
+    if not response or not settings.PERCOLATOR_SEARCH_ALERTS_ENABLED:
         self.request.chain = None
         return None
 

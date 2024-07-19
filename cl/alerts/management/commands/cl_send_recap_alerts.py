@@ -629,7 +629,7 @@ def query_and_schedule_alerts(
 
     alert_users = User.objects.filter(alerts__rate=rate).distinct()
     docket_content_type = ContentType.objects.get(
-        app_label="search", model="Docket"
+        app_label="search", model="docket"
     )
     for user in alert_users:
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)

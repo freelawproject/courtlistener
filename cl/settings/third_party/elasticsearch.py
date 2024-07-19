@@ -222,10 +222,15 @@ ELASTICSEARCH_DSL_AUTO_REFRESH = env(
 #############################################################
 ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 
-###################################################
-# The maximum number of scheduled hits per alert. #
-###################################################
+###########################
+# Search Alerts settings #
+###########################
+# The maximum number of scheduled hits per alert.
 SCHEDULED_ALERT_HITS_LIMIT = 20
+
+PERCOLATOR_SEARCH_ALERTS_ENABLED = env(
+    "PERCOLATOR_SEARCH_ALERTS_ENABLED", default=False
+)
 
 ################################
 # ES bulk indexing batch size #

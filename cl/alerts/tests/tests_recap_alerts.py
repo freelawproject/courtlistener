@@ -51,6 +51,10 @@ from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
 
+@mock.patch(
+    "cl.alerts.utils.get_alerts_set_prefix",
+    return_value="alert_hits_sweep",
+)
 class RECAPAlertsSweepIndexTest(
     RECAPSearchTestCase, ESIndexTestCase, TestCase, RECAPAlertsAssertions
 ):
@@ -97,7 +101,7 @@ class RECAPAlertsSweepIndexTest(
         if keys:
             self.r.delete(*keys)
 
-    async def test_recap_document_hl_matched(self) -> None:
+    async def test_recap_document_hl_matched(self, mock_prefix) -> None:
         """Test recap_document_hl_matched method that determines weather a hit
         contains RECAPDocument HL fields."""
 
@@ -164,7 +168,7 @@ class RECAPAlertsSweepIndexTest(
             rd_field_matched = recap_document_hl_matched(rd)
             self.assertEqual(rd_field_matched, True)
 
-    def test_filter_recap_alerts_to_send(self) -> None:
+    def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:
         - RECAP type alert.
         - RT or DLY rate
@@ -214,7 +218,7 @@ class RECAPAlertsSweepIndexTest(
         html_content = self.get_html_content_from_email(mail.outbox[1])
         self.assertIn(dly_recap_alert.name, html_content)
 
-    def test_index_daily_recap_documents(self) -> None:
+    def test_index_daily_recap_documents(self, mock_prefix) -> None:
         """Test index_daily_recap_documents method over different documents
         conditions.
         """
@@ -447,7 +451,9 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         docket_2.delete()
 
-    def test_filter_out_alerts_to_send_by_query_and_hits(self) -> None:
+    def test_filter_out_alerts_to_send_by_query_and_hits(
+        self, mock_prefix
+    ) -> None:
         """Test RECAP alerts can be properly filtered out according to
         their query and hits matched conditions.
 
@@ -723,7 +729,7 @@ class RECAPAlertsSweepIndexTest(
 
         docket.delete()
 
-    def test_special_cross_object_alerts_or_clause(self) -> None:
+    def test_special_cross_object_alerts_or_clause(self, mock_prefix) -> None:
         """This test confirms that hits are properly filtered out or included
         in alerts for special cross-object alerts that can match either a
         Docket-only hit and/or Docket + RDs simultaneously in the same hit.
@@ -815,7 +821,7 @@ class RECAPAlertsSweepIndexTest(
             [self.rd.description],
         )
 
-    def test_special_cross_object_alerts_text_query(self) -> None:
+    def test_special_cross_object_alerts_text_query(self, mock_prefix) -> None:
         """This test confirms that hits are properly filtered out or included
         in alerts for special cross-object alerts that can match either a
         Docket-only hit and/or Docket + RDs simultaneously in the same hit.
@@ -834,14 +840,19 @@ class RECAPAlertsSweepIndexTest(
         )
         two_days_before = self.mock_date - datetime.timedelta(days=2)
         mock_two_days_before = two_days_before.replace(hour=5)
-        with time_machine.travel(
-            mock_two_days_before, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(mock_two_days_before, tick=False):
             docket = DocketFactory(
                 court=self.court,
                 case_name="United States of America",
                 docket_number="1:21-bk-1009",
                 source=Docket.RECAP,
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
             )
 
         with mock.patch(
@@ -860,9 +871,7 @@ class RECAPAlertsSweepIndexTest(
 
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(self.mock_date, tick=False):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -882,6 +891,13 @@ class RECAPAlertsSweepIndexTest(
                 case_name="United States vs Lorem",
                 docket_number="1:21-bk-1008",
                 source=Docket.RECAP,
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
             )
 
         with mock.patch(
@@ -921,11 +937,16 @@ class RECAPAlertsSweepIndexTest(
             [],
         )
         # Modify 1:21-bk-1009 docket today:
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(self.mock_date, tick=False):
             docket.cause = "405 Civil"
             docket.save()
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
 
         # Trigger the alert again:
         with mock.patch(
@@ -972,9 +993,7 @@ class RECAPAlertsSweepIndexTest(
 
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
-        with time_machine.travel(
-            self.mock_date, tick=False
-        ), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(self.mock_date, tick=False):
             rd_4 = RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Hearing new",
@@ -988,6 +1007,13 @@ class RECAPAlertsSweepIndexTest(
                 document_number="4",
                 pacer_doc_id="018026657750",
                 plain_text="United states of america plain text",
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
             )
 
         # This test confirms that we're able to trigger cross-object alerts
@@ -1090,7 +1116,7 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         docket_2.delete()
 
-    def test_limit_alert_case_child_hits(self) -> None:
+    def test_limit_alert_case_child_hits(self, mock_prefix) -> None:
         """Test limit case child hits up to 5 and display the "View additional
         results for this Case" button.
         """
@@ -1177,7 +1203,9 @@ class RECAPAlertsSweepIndexTest(
         alert_de.delete()
 
     @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
-    def test_multiple_alerts_email_hits_limit_per_alert(self) -> None:
+    def test_multiple_alerts_email_hits_limit_per_alert(
+        self, mock_prefix
+    ) -> None:
         """Test multiple alerts can be grouped in an email and hits within an
         alert are limited to SCHEDULED_ALERT_HITS_LIMIT (3) hits.
         """
@@ -1384,7 +1412,7 @@ class RECAPAlertsSweepIndexTest(
         for d in dockets_created:
             d.delete()
 
-    def test_schedule_wly_and_mly_recap_alerts(self) -> None:
+    def test_schedule_wly_and_mly_recap_alerts(self, mock_prefix) -> None:
         """Test Weekly and Monthly RECAP Search Alerts are scheduled daily
         before being sent later.
         """
@@ -1487,7 +1515,7 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(self.rd.description, txt_email)
         self.assertIn(self.rd_att.description, txt_email)
 
-    def test_alert_frequency_estimation(self):
+    def test_alert_frequency_estimation(self, mock_prefix) -> None:
         """Test alert frequency ES API endpoint for RECAP Alerts."""
 
         search_params = {
@@ -1548,6 +1576,11 @@ class RECAPAlertsSweepIndexTest(
         alert_de.docket.delete()
 
 
+@override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
+@mock.patch(
+    "cl.alerts.utils.get_alerts_set_prefix",
+    return_value="alert_hits_percolator",
+)
 class RECAPAlertsPercolatorTest(
     RECAPSearchTestCase, ESIndexTestCase, TestCase, RECAPAlertsAssertions
 ):
@@ -1639,7 +1672,9 @@ class RECAPAlertsPercolatorTest(
         for query_id in queries:
             es_conn.delete(index=index_alias, id=query_id)
 
-    def test_recap_document_cross_object_percolator_queries(self) -> None:
+    def test_recap_document_cross_object_percolator_queries(
+        self, mock_prefix
+    ) -> None:
         """Test if a variety of RECAPDocuments can trigger cross-object percolator
         queries"""
 
@@ -1735,7 +1770,7 @@ class RECAPAlertsPercolatorTest(
             self.confirm_query_matched(response, query_id_3), True
         )
 
-    def test_recap_document_percolator(self) -> None:
+    def test_recap_document_percolator(self, mock_prefix) -> None:
         """Test if a variety of RECAPDocument triggers a RD-only percolator
         query."""
 
@@ -1818,7 +1853,7 @@ class RECAPAlertsPercolatorTest(
             self.confirm_query_matched(response, query_id_2), True
         )
 
-    def test_docket_percolator(self) -> None:
+    def test_docket_percolator(self, mock_prefix) -> None:
         """Test if a variety of Docket documents triggers a percolator query."""
 
         document_index_alias = DocketDocument._index._name
@@ -1968,7 +2003,7 @@ class RECAPAlertsPercolatorTest(
             self.confirm_query_matched(response, query_id_6), True
         )
 
-    def test_index_recap_alerts(self) -> None:
+    def test_index_recap_alerts(self, mock_prefix) -> None:
         """Test a RECAP alert is indexed into the RECAPPercolator index."""
 
         docket_only_alert = AlertFactory(
@@ -1983,7 +2018,7 @@ class RECAPAlertsPercolatorTest(
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
         )
 
-    def test_delete_recap_alerts_from_percolator(self) -> None:
+    def test_delete_recap_alerts_from_percolator(self, mock_prefix) -> None:
         """Test a RECAP alert is removed from the RECAPPercolator index."""
 
         docket_only_alert = AlertFactory(
@@ -2006,7 +2041,7 @@ class RECAPAlertsPercolatorTest(
             msg=f"Alert id: {docket_only_alert_id} was not indexed.",
         )
 
-    def test_percolate_document_on_ingestion(self) -> None:
+    def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
         """Confirm a Docket or RECAPDocument is percolated upon ingestion."""
 
         docket_only_alert = AlertFactory(
@@ -2304,7 +2339,7 @@ class RECAPAlertsPercolatorTest(
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 1)
 
-    def test_recap_alerts_highlighting(self) -> None:
+    def test_recap_alerts_highlighting(self, mock_prefix) -> None:
         """Confirm RECAP Search alerts are properly highlighted."""
 
         docket_only_alert = AlertFactory(
@@ -2383,7 +2418,7 @@ class RECAPAlertsPercolatorTest(
         )
 
     @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
-    def test_group_percolator_alerts(self) -> None:
+    def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
 
         with self.captureOnCommitCallbacks(execute=True):

@@ -1,3 +1,4 @@
+import re
 import sys
 from io import StringIO
 from unittest import mock
@@ -222,7 +223,7 @@ class CountESTasksTestCase(SimpleTestCase):
         self.task_call_count += 1
 
         # Call the task
-        if task.__name__ == "es_save_document":
+        if task.__name__ in ["es_save_document", "update_es_document"]:
             return task.s(*args, **kwargs)
         else:
             task.apply_async(args=args, kwargs=kwargs)
@@ -432,6 +433,21 @@ class RECAPAlertsAssertions:
             )
         return alert_cases
 
+    @staticmethod
+    def clean_case_title(case_title):
+        """Clean the case text to get the case name to compare it.
+        Input: 1. SUBPOENAS SERVED CASE ()
+        Output: SUBPOENAS SERVED CASE
+        """
+
+        # Split the string by the dot and take everything after it.
+        parts = case_title.split(".", 1)
+        if len(parts) > 1:
+            case_title = parts[1].strip()
+        # Remove everything from the first open parenthesis to the end
+        case_title = re.split(r"\s*\(", case_title)[0].strip()
+        return case_title
+
     def _count_alert_hits_and_child_hits(
         self,
         html_content,
@@ -460,22 +476,22 @@ class RECAPAlertsAssertions:
         )
         if case_title:
             for case in alert_cases:
-                child_hit_count = 0
                 case_text = " ".join(
                     [element.strip() for element in case.xpath(".//text()")]
                 )
-                if case_title in case_text:
+                case_text_cleaned = self.clean_case_title(case_text)
+                if case_title == case_text_cleaned:
                     child_hit_count = len(
                         case.xpath("following-sibling::ul[1]/li/a")
                     )
-                self.assertEqual(
-                    child_hit_count,
-                    expected_child_hits,
-                    msg="Did not get the right number of child hits for the case %s. "
-                    "Expected: %s - Got: %s\n\n"
-                    % (case_title, expected_child_hits, child_hit_count),
-                )
-                break
+                    self.assertEqual(
+                        child_hit_count,
+                        expected_child_hits,
+                        msg="Did not get the right number of child hits for the case %s. "
+                        "Expected: %s - Got: %s\n\n"
+                        % (case_title, expected_child_hits, child_hit_count),
+                    )
+                    break
 
     def _assert_child_hits_content(
         self,
@@ -488,8 +504,7 @@ class RECAPAlertsAssertions:
         their descriptions.
         """
         tree = html.fromstring(html_content)
-        alert_element = tree.xpath(f"//h2[contains(text(), '{alert_title}')]")
-        # Find the corresponding case_title under the alert_element
+        # Get the alert cases from the HTML.
         alert_cases = self._extract_cases_from_alert(tree, alert_title)
 
         def extract_child_descriptions(case_item):
@@ -506,7 +521,8 @@ class RECAPAlertsAssertions:
         child_descriptions = set()
         for case in alert_cases:
             case_text = "".join(case.xpath(".//text()")).strip()
-            if case_title in case_text:
+            case_text_cleaned = self.clean_case_title(case_text)
+            if case_title == case_text_cleaned:
                 child_descriptions = set(extract_child_descriptions(case))
                 break
 

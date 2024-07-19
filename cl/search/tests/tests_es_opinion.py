@@ -2554,7 +2554,7 @@ class EsOpinionsIndexingTest(
         self.reset_and_assert_task_count(expected=2)
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2567,7 +2567,7 @@ class EsOpinionsIndexingTest(
 
         # Update an opinion untracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2642,7 +2642,7 @@ class EsOpinionsIndexingTest(
         )
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2659,7 +2659,7 @@ class EsOpinionsIndexingTest(
         self.assertEqual(es_doc.cites, [opinion_2.pk])
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2745,7 +2745,7 @@ class EsOpinionsIndexingTest(
         )
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2761,7 +2761,7 @@ class EsOpinionsIndexingTest(
 
         # Update a opinion_cluster untracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2836,7 +2836,7 @@ class EsOpinionsIndexingTest(
         )
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),

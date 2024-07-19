@@ -563,6 +563,7 @@ class AlertAPITests(APITestCase):
 
 
 @override_switch("o-es-alerts-active", active=True)
+@override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
 class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
     """Test Search Alerts Webhooks"""
 
@@ -1821,6 +1822,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
+@override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
 @override_switch("oa-es-alerts-active", active=True)
 @mock.patch(
     "cl.lib.es_signal_processor.allow_es_audio_indexing",

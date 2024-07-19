@@ -26,7 +26,7 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
     match instance.alert_type:
         case SEARCH_TYPES.ORAL_ARGUMENT:
             es_save_alert_document.delay(instance.pk, AudioPercolator.__name__)
-        case SEARCH_TYPES.RECAP:
+        case SEARCH_TYPES.RECAP if settings.PERCOLATOR_SEARCH_ALERTS_ENABLED:
             es_save_alert_document.delay(instance.pk, RECAPPercolator.__name__)
 
 

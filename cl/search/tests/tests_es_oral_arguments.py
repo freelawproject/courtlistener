@@ -2536,7 +2536,7 @@ class OralArgumentIndexingTest(
 
         # Update an Audio without changes.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2547,7 +2547,7 @@ class OralArgumentIndexingTest(
 
         # Update an Audio tracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2560,7 +2560,7 @@ class OralArgumentIndexingTest(
         self.assertEqual(a_doc.caseName, "Bank vs America")
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2580,7 +2580,7 @@ class OralArgumentIndexingTest(
         self.assertFalse(AudioDocument.exists(id=audio.pk))
         # Audio creation on update.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
