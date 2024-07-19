@@ -10,14 +10,20 @@ The csv file must have the following structure, the file should not have a heade
 How to run the command:
 manage.py import_citations_csv --csv /opt/courtlistener/cl/assets/media/wl_citations_1.csv
 
+# Add all citations from the file and reindex existing ones
+manage.py import_citations_csv --csv /opt/courtlistener/cl/assets/media/wl_citations_1.csv --reindex
+
+# Add and index all citations from the file starting from row 2600000 and reindex existing ones
+manage.py import_citations_csv --csv /opt/courtlistener/cl/assets/media/x.csv --start-row 2600000 --delay 0.1
+
 Note: If --limit is greater than --end-row, end row will be ignored
 
 """
 
+import argparse
 import os.path
 import time
 
-import numpy as np
 import pandas as pd
 from django.core.management import BaseCommand
 from pandas import DataFrame
@@ -37,6 +43,8 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
 
     end_row = None
 
+    dtype_mapping = {"cluster_id": "int", "citation_to_add": "str"}
+
     if options["end_row"] or options["limit"]:
         end_row = (
             options["limit"]
@@ -47,27 +55,30 @@ def load_citations_file(options: dict) -> DataFrame | TextFileReader:
     data = pd.read_csv(
         options["csv"],
         names=["cluster_id", "citation_to_add"],
+        dtype=dtype_mapping,
         delimiter=",",
         skiprows=options["start_row"] - 1 if options["start_row"] else None,
         nrows=end_row,
+        na_filter=False,
     )
 
-    # Replace nan in dataframe
-    data = data.replace(np.nan, "", regex=True)
     logger.info(f"Found {len(data.index)} rows in csv file: {options['csv']}")
     return data
 
 
-def process_csv_data(data: DataFrame | TextFileReader, delay_s: float) -> None:
+def process_csv_data(
+    data: DataFrame | TextFileReader, delay_s: float, reindex: bool
+) -> None:
     """Process citations from csv file
 
     :param data: rows from csv file
     :param delay_s: how long to wait to add each citation
+    :param reindex: force reindex of citations
     :return: None
     """
 
     for index, row in data.iterrows():
-        cluster_id = int(row.get("cluster_id"))
+        cluster_id = row.get("cluster_id")
         citation_to_add = row.get("citation_to_add")
 
         if not OpinionCluster.objects.filter(id=cluster_id).exists():
@@ -75,7 +86,7 @@ def process_csv_data(data: DataFrame | TextFileReader, delay_s: float) -> None:
             continue
 
         if cluster_id and citation_to_add:
-            add_citations_to_cluster([citation_to_add], cluster_id)
+            add_citations_to_cluster([citation_to_add], cluster_id, reindex)
             time.sleep(delay_s)
 
 
@@ -85,9 +96,22 @@ class Command(BaseCommand):
     def __init__(self, *args, **kwargs):
         super(Command, self).__init__(*args, **kwargs)
 
+    def existing_path_type(self, path: str):
+        """Validate file path exists
+
+        :param path: path to validate
+        :return: valid path
+        """
+        if not os.path.exists(path):
+            raise argparse.ArgumentTypeError(
+                f"Csv file: {path} doesn't exist."
+            )
+        return path
+
     def add_arguments(self, parser):
         parser.add_argument(
             "--csv",
+            type=self.existing_path_type,
             help="Absolute path to a CSV file containing the citations to add.",
             required=True,
         )
@@ -117,18 +141,22 @@ class Command(BaseCommand):
             help="How long to wait to add each citation (in seconds, allows floating "
             "numbers).",
         )
+        parser.add_argument(
+            "--reindex",
+            action="store_true",
+            default=False,
+            help="Reindex citations if they are already in the system",
+        )
 
     def handle(self, *args, **options):
         if options["end_row"] and options["start_row"] > options["end_row"]:
             logger.info("--start-row can't be greater than --end-row")
             return
 
-        if not os.path.exists(options["csv"]):
-            logger.info(f"Csv file: {options['csv']} doesn't exist.")
+        data = load_citations_file(options)
+
+        if data.empty:
+            logger.info("CSV file is empty or start/end row returned no rows.")
             return
 
-        data = load_citations_file(options)
-        if not data.empty:
-            process_csv_data(data, options["delay"])
-        else:
-            logger.info("CSV file is empty or start/end row returned no rows.")
+        process_csv_data(data, options["delay"], options["reindex"])
