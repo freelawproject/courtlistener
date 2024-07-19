@@ -97,6 +97,7 @@ from cl.recap.tasks import (
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
+    process_recap_acms_appellate_attachment,
     process_recap_acms_docket,
     process_recap_appellate_attachment,
     process_recap_appellate_docket,
@@ -124,7 +125,12 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.tests.utils import AsyncAPIClient, MockACMSDocketReport, MockResponse
+from cl.tests.utils import (
+    AsyncAPIClient,
+    MockACMSAttachmentPage,
+    MockACMSDocketReport,
+    MockResponse,
+)
 from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
@@ -238,6 +244,25 @@ class RecapUploadsTest(TestCase):
         self.data.update(
             {
                 "upload_type": UPLOAD_TYPE.ATTACHMENT_PAGE,
+                "document_number": "",
+            }
+        )
+        r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = await self.async_client.get(path)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    async def test_uploading_an_acms_attachment_page(self, mock):
+        """Can we upload an ACMS attachment page and have it be saved correctly?"""
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+                "court": self.court_appellate.id,
                 "document_number": "",
             }
         )
@@ -613,6 +638,7 @@ class RecapUploadsTest(TestCase):
                 "upload_type": UPLOAD_TYPE.ACMS_DOCKET_JSON,
                 "document_number": "",
                 "pacer_case_id": "34cacf7f-52d5-4d1f-b4f0-0542b429f674",
+                "court": self.court_appellate.id,
             }
         )
         del self.data["pacer_doc_id"]
@@ -669,6 +695,69 @@ class RecapUploadsTest(TestCase):
         de_2 = DocketEntry.objects.get(docket__court=self.ca2, entry_number=2)
         self.assertEqual(de_2.date_filed, date(2023, 10, 2))
         self.assertEqual(de_2.time_filed, time(11, 20, 0))
+
+    def test_processing_an_acms_attachment_page(self, mock_upload):
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.ca2,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+        )
+        de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="7fae3c58-1ced-ee11-904c-001dd83058b7",
+                    document_number=22,
+                )
+            ],
+        )
+        async_to_sync(add_docket_entries)(d, de_data["docket_entries"])
+
+        pq = ProcessingQueue.objects.create(
+            court=self.ca2,
+            uploader=self.user,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+            upload_type=UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        main_rd = recap_documents[0]
+
+        # After adding 1 docket entry, it should only exist its main RD.
+        self.assertEqual(recap_documents.count(), 1)
+        with mock.patch(
+            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+        ):
+            # Process the acms attachment page containing 3 attachments.
+            async_to_sync(process_recap_acms_appellate_attachment)(pq.pk)
+
+        # After adding attachments, it should only exist 3 RD attachments.
+        self.assertEqual(recap_documents.count(), 3)
+
+        # Confirm that the main RD is transformed into an attachment.
+        main_attachment = RECAPDocument.objects.filter(pk=main_rd.pk)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+
+        # Process the attachment page again, no new attachments should be added
+        pq_1 = ProcessingQueue.objects.create(
+            court=self.ca2,
+            uploader=self.user,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+            upload_type=UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+        ):
+            # Process the acms attachment page containing 3 attachments.
+            async_to_sync(process_recap_acms_appellate_attachment)(pq_1.pk)
+
+        self.assertEqual(recap_documents.count(), 3)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
@@ -7308,6 +7397,26 @@ class LookupDocketsTest(TestCase):
             d.docket_number_core, self.docket_case_id.docket_number_core
         )
 
+    def test_case_id_and_docket_number_no_match(self):
+        """Confirm if when a lookup by pacer_case_id and docket_number doesn't
+        match a new Docket is created instead.
+        """
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 4)
+        d = async_to_sync(find_docket_object)(
+            self.court.pk, "12346", self.docket_data["docket_number"]
+        )
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
+        d.save()
+
+        # Docket didn't match. New one created.
+        self.assertEqual(dockets.count(), 5)
+        self.assertNotEqual(d.id, self.docket_case_id.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_case_id.docket_number_core
+        )
+
     def test_case_id_lookup(self):
         """Confirm if lookup by only pacer_case_id works properly."""
 
@@ -7328,7 +7437,7 @@ class LookupDocketsTest(TestCase):
 
         d = async_to_sync(find_docket_object)(
             self.court.pk,
-            self.docket_core_data["docket_entries"][0]["pacer_case_id"],
+            None,
             self.docket_core_data["docket_number"],
         )
         async_to_sync(update_docket_metadata)(d, self.docket_core_data)
@@ -7345,7 +7454,7 @@ class LookupDocketsTest(TestCase):
 
         d = async_to_sync(find_docket_object)(
             self.court.pk,
-            self.docket_no_core_data["docket_entries"][0]["pacer_case_id"],
+            None,
             self.docket_no_core_data["docket_number"],
         )
         async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
@@ -7426,7 +7535,7 @@ class LookupDocketsTest(TestCase):
         )
         new_d = async_to_sync(find_docket_object)(
             self.court_appellate.pk,
-            docket_data_lower_number["docket_entries"][0]["pacer_case_id"],
+            None,
             docket_data_lower_number["docket_number"],
         )
         async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)

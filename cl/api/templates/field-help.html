@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Advanced Help for API Fields – CourtListener.com{% endblock %}
+{% block og_title %}Advanced Help for API <Fields></Fields> – CourtListener.com{% endblock %}
+
+{% block description %}Learn more about specific fields in the CourtListener API.{% endblock %}
+{% block og_description %}Learn more about specific fields in the CourtListener API.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#fields">Fields</a>
+      <ul>
+        <li><a href="#case-names">Case Names</a></li>
+        <li><a href="#absolute-url">Absolute URLs</a></li>
+        <li><a href="#downloads">Download URLs</a></li>
+      </ul>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Advanced Help for Specific&nbsp;Fields</h1>
+  <p class="lead">Some fields in the API can be complicated. This page goes into greater detail about this topic.</p>
+
+  <h2 id="fields">Fields</h2>
+  <h3 id="case-names">Case Names</h3>
+  <p>Case names are a complicated topic, and there are a few common misconceptions about them:
+  </p>
+  <ol>
+    <li><strong>Case names are not unique.</strong> There's nothing stopping a court from using <em>Johnson v. State</em> every time a person named Johnson sues the State. Indeed, this is common.
+    </li>
+    <li><strong>Case names are not stable.</strong> Many cases begin their lives by suing the governor or the attorney general. But these people change as a result of elections or appointments, and so the names of these cases often change too.
+    </li>
+    <li><strong>Case names don't always contain v.</strong> Instead, many cases start with <em>In Re</em> or other abbreviations.
+    </li>
+  </ol>
+  <p>We've done our best to normalize case names wherever we can, following Blue Book conventions. Some things we regularly do include:
+  </p>
+  <ol>
+    <li>We normalize all the different ways people write "United States" (U.S.A., United States of America, U.S., etc.) All of these variations simply become "United States", as the Blue Book requires.
+    </li>
+    <li>We remove some abbreviations, like <em>Et al</em>.</li>
+    <li>We replace any instance of vs. with v.</li>
+    <li>We do our best to make the case names Title Case rather than UPPERCASE, as many courts publish them.</li>
+  </ol>
+  <p>The result of all this work is that we have pretty good case names.</p>
+  <p>In the API, you'll see case names in a variety of places due to the fact that they can change over time. For example, there are <code>case_name</code> fields on the <code>Docket</code> object and also on the <code>Opinion Cluster</code> objects. In almost all instances, these values are the same but some cases have different values for the <code>Docket</code> than for an <code>Opinion Cluster</code>, so we keep this data in duplicate.
+  </p>
+  <p>Case names can also vary considerably in length, and we've identified three different types of case names:
+  </p>
+  <ol>
+    <li><code>case_name</code>: This is a typical case name that can be used in almost all references. An example might be <em>Roe v. Wade</em>.
+    </li>
+    <li><code>case_name_short</code>: This is a shortened one or two word case name that can be used in legal writing after the standard case name has been provided by the author. An example of this might be simply <em>Roe</em> used, "As was stated in <em>Roe</em>&hellip;"
+    </li>
+    <li><code>case_name_full</code>: This is the full list of plaintiffs and defendants in a case, sometimes going on for hundreds of words, and often including titles or other information. For example: <em>Roe Et Al v. Wade, District Attorney of Dallas County</em>.
+    </li>
+  </ol>
+  <p>All cases have at least one of these values, many have two values, and some have all three. A <code>case_name_short</code> was generated algorithmically for every case possible, but about 40% of cases were too complicated for our program to process and so they were left blank. Human editors have ensured that every Supreme Court case from 1945 to 2018 has a <code>case_name_short</code> value.
+  </p>
+  <p><code>case_name</code> is available for the majority of cases, except those that were imported from Resource.org, which only provided <code>case_name_full</code> values. When that happened, there was no way for us to condense a <code>case_name_full</code>, so until a human editor is available to review them, they will lack this value. All cases have either a <code>case_name</code> or a <code>case_name_full</code> value.
+  </p>
+  <p>Our advice is to use a <code>case_name</code> if it is available and to fall back on the <code>case_name_full</code> if it is not. If you are interested in sponsoring trained humans to improve this data, please <a href="{% url "contact" %}">get in touch</a>.
+  </p>
+
+
+  <h3 id="absolute-url">The <code>absolute_url</code> Field</h3>
+  <p>The <code>absolute_url</code> field shows the URL where a resource can be seen live on the site. It is absolute in the sense that it should never change and will always be backwards compatible if changes are ever needed.
+  </p>
+  <p>In some cases you might start with a URL from CourtListener, and you might want to look up the item in the API. Generally, CourtListener URLs are designed to contain an ID that can be used in the API to look it up, following a pattern like:
+  </p>
+  <pre class="scrollable">/$type/$id/$name-of-the-case/</pre>
+  <p>There are three sections:</p>
+  <ol>
+    <li>
+      <strong>$type</strong>: This is the type of object that has been returned, for example, "docket" indicates that you have gotten a docket as your result.
+    </li>
+    <li>
+      <strong>$id</strong>: This is a numeric ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not always sequential, but they will never be duplicated within an document type.
+    </li>
+    <li>
+      <p><strong>$name-of-the-case</strong>: This is the "<a href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and generally mirrors its case name. This value can change if we clean up a case name, but provided it is not omitted completely, this part of the URL can be any value without affecting the page that is loaded.
+      </p>
+      <p>Put another way, we load pages based on the <code>$id</code> and <code>$type</code>, not by the name of the case.
+      </p>
+    </li>
+  </ol>
+
+  <h3 id="downloads">File Download Fields</h3>
+  <p>API responses will give you the URL path to a resource such as a PDF or MP3, but not the domain. These are often in a field named <code>local_path</code> or similar.
+  </p>
+  <p>To download a resource, create a full URL by concatenating the path from the API response with <code>https://storage.courtlistener.com/</code>.
+  </p>
+
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

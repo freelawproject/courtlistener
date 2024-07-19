@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from typing import Iterable, Literal, Mapping, cast
 
@@ -175,7 +176,9 @@ class Command(VerboseCommand):
         self.sweep_indexer_action = settings.ELASTICSEARCH_SWEEP_INDEXER_ACTION
         self.queue = settings.ELASTICSEARCH_SWEEP_INDEXER_QUEUE
         self.chunk_size = settings.ELASTICSEARCH_SWEEP_INDEXER_CHUNK_SIZE
-        self.poll_interval = settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL
+        self.head_requests_rate = (
+            settings.ELASTICSEARCH_SWEEP_INDEXER_HEADS_RATE
+        )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -363,7 +366,7 @@ class Command(VerboseCommand):
         processed_count = 0
         accumulated_chunk = 0
         throttle = CeleryThrottle(
-            poll_interval=self.poll_interval,
+            poll_interval=10,
             min_items=self.chunk_size,
             queue_name=self.queue,
         )
@@ -384,6 +387,12 @@ class Command(VerboseCommand):
                     id=doc_id, routing=parent_document_id
                 ):
                     chunk.append(item_id)
+                # Wait for a bit. Defaults to 1/60 seconds. This is a rate of
+                # 60 requests per second, which is a slow rate for checking
+                # document existence and sufficient to process around ~470M
+                # documents in ~3 months.
+                if not testing_mode:
+                    time.sleep(1 / self.head_requests_rate)
             else:
                 chunk.append(item_id)
             if processed_count % self.chunk_size == 0 or last_item:
