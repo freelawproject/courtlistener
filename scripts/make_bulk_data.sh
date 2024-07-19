@@ -306,7 +306,7 @@ people_db_partytype_csv_filename="people_db_partytype-$(date -I).csv"
 fjcintegrateddatabase_fields='(
 	       id, dataset_source, date_created, date_modified, office, docket_number, origin, date_filed,
 		   jurisdiction, nature_of_suit, title, section, subsection, diversity_of_residence, class_action,
-		   monetary_demand, county_of_residence, arbitrarion_at_filing, arbitration_at_termination, 
+		   monetary_demand, county_of_residence, arbitrarion_at_filing, arbitration_at_termination,
 		   multidistrict_litigation_docket_number, plaintiff, defendant, date_transfer, transfer_office,
 		   transfer_docket_number, transfer_oprigin, date_terminated, termination_class_action_status,
 		   procedural_progress, disposition, nature_of_judgement, amount_recieved, judgment, pro_se,
