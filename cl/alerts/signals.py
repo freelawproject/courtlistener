@@ -1,11 +1,17 @@
 from django.conf import settings
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
+from django.http import QueryDict
 
 from cl.alerts.models import Alert
 from cl.alerts.tasks import es_save_alert_document
-from cl.lib.command_utils import logger
-from cl.search.documents import AudioPercolator, RECAPPercolator
+from cl.alerts.utils import avoid_indexing_auxiliary_alert
+from cl.search.documents import (
+    AudioPercolator,
+    DocketDocumentPercolator,
+    RECAPDocumentPercolator,
+    RECAPPercolator,
+)
 from cl.search.models import SEARCH_TYPES
 from cl.search.tasks import remove_document_from_es_index
 
@@ -28,6 +34,19 @@ def create_or_update_alert_in_es_index(sender, instance=None, **kwargs):
             es_save_alert_document.delay(instance.pk, AudioPercolator.__name__)
         case SEARCH_TYPES.RECAP if settings.PERCOLATOR_SEARCH_ALERTS_ENABLED:
             es_save_alert_document.delay(instance.pk, RECAPPercolator.__name__)
+            qd = QueryDict(instance.query.encode(), mutable=True)
+            if not avoid_indexing_auxiliary_alert(
+                RECAPDocumentPercolator.__name__, qd
+            ):
+                es_save_alert_document.delay(
+                    instance.pk, RECAPDocumentPercolator.__name__
+                )
+            if not avoid_indexing_auxiliary_alert(
+                DocketDocumentPercolator.__name__, qd
+            ):
+                es_save_alert_document.delay(
+                    instance.pk, DocketDocumentPercolator.__name__
+                )
 
 
 @receiver(
@@ -51,4 +70,10 @@ def remove_alert_from_es_index(sender, instance=None, **kwargs):
         case SEARCH_TYPES.RECAP:
             remove_document_from_es_index.delay(
                 RECAPPercolator.__name__, instance.pk, None
+            )
+            remove_document_from_es_index.delay(
+                RECAPDocumentPercolator.__name__, instance.pk, None
+            )
+            remove_document_from_es_index.delay(
+                DocketDocumentPercolator.__name__, instance.pk, None
             )

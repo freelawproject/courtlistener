@@ -316,3 +316,16 @@ recap_document_filters = [
     "document_number",
     "attachment_number",
 ]
+docket_document_filters = [
+    "court",
+    "case_name",
+    "docket_number",
+    "nature_of_suit",
+    "cause",
+    "assigned_to",
+    "referred_to",
+    "party_name",
+    "atty_name",
+    "filed_before",
+    "filed_after",
+]

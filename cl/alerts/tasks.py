@@ -21,7 +21,9 @@ from cl.alerts.models import Alert, DocketAlert, ScheduledAlertHit
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
     alert_hits_limit_reached,
+    fetch_all_search_alerts_results,
     has_document_alert_hit_been_triggered,
+    include_recap_document_hit,
     override_alert_query,
     percolate_document,
     transform_percolator_child_document,
@@ -35,7 +37,6 @@ from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import fetch_all_search_results
 from cl.lib.redis_utils import (
     create_redis_semaphore,
     delete_redis_semaphore,
@@ -557,14 +558,22 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
     scheduled_hits_to_create = []
     email_alerts_to_send = []
     rt_alerts_to_send = []
-    alerts_triggered, document_content, app_label_model = response
+    (
+        main_alerts_triggered,
+        rd_alerts_triggered,
+        d_alerts_triggered,
+        document_content,
+        app_label_model,
+    ) = response
     app_label_str, model_str = app_label_model.split(".")
     instance_content_type = ContentType.objects.get(
         app_label=app_label_str, model=model_str.lower()
     )
     schedule_alert = False
     r = get_redis_interface("CACHE")
-    for hit in alerts_triggered:
+    recap_document_hits = [hit.id for hit in rd_alerts_triggered]
+    docket_hits = [hit.id for hit in d_alerts_triggered]
+    for hit in main_alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
         # independent highlighting for each alert triggered.
         document_content_copy = copy.deepcopy(document_content)
@@ -581,7 +590,9 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
             case "search.RECAPDocument":
                 # Filter out RECAPDocuments and set the document id to the
                 # RECAPDocument alert hits.
-                if has_document_alert_hit_been_triggered(
+                if not include_recap_document_hit(
+                    alert_triggered.pk, recap_document_hits, docket_hits
+                ) or has_document_alert_hit_been_triggered(
                     r, alert_triggered.pk, "r", document_content_copy["id"]
                 ):
                     continue
@@ -750,10 +761,10 @@ def send_or_schedule_alerts(
                 "Percolator search alerts not supported for %s", app_label
             )
 
-    percolator_response = percolate_document(
+    percolator_responses = percolate_document(
         document_id, percolator_index, es_document_index, app_label
     )
-    if not percolator_response:
+    if not percolator_responses[0]:
         self.request.chain = None
         return None
 
@@ -762,15 +773,22 @@ def send_or_schedule_alerts(
     # Remember, percolator results are alerts, not documents, so what you're
     # paginating are user alerts that the document matched, not documents that
     # an alert matched. 🙃.
-    alerts_triggered = fetch_all_search_results(
-        percolate_document,
-        percolator_response,
-        document_id,
-        percolator_index,
-        es_document_index,
+    main_alerts_triggered, rd_alerts_triggered, d_alerts_triggered = (
+        fetch_all_search_alerts_results(
+            percolator_responses,
+            document_id,
+            percolator_index,
+            es_document_index,
+            app_label,
+        )
+    )
+    return (
+        main_alerts_triggered,
+        rd_alerts_triggered,
+        d_alerts_triggered,
+        document_content,
         app_label,
     )
-    return alerts_triggered, document_content, app_label
 
 
 # New task

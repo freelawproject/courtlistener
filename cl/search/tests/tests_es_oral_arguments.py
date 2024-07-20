@@ -2248,14 +2248,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2266,14 +2268,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2283,14 +2287,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.audio_1.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2302,14 +2308,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.audio_5.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2322,14 +2330,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.audio_1.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2341,14 +2351,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
         )
         expected_queries = 3
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2360,14 +2372,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.audio_4.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         self.delete_documents_from_index(
             AudioPercolator._index._name, created_queries_ids

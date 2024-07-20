@@ -16,6 +16,7 @@ from cl.alerts.management.commands.cl_send_recap_alerts import (
 )
 from cl.alerts.models import SEARCH_TYPES, Alert, ScheduledAlertHit
 from cl.alerts.utils import (
+    avoid_indexing_auxiliary_alert,
     build_plain_percolator_query,
     percolate_document,
     recap_document_hl_matched,
@@ -34,7 +35,9 @@ from cl.people_db.factories import (
 )
 from cl.search.documents import (
     DocketDocument,
+    DocketDocumentPercolator,
     ESRECAPDocumentPlain,
+    RECAPDocumentPercolator,
     RECAPPercolator,
     RECAPSweepDocument,
 )
@@ -1634,6 +1637,10 @@ class RECAPAlertsPercolatorTest(
     def setUp(self):
         RECAPPercolator._index.delete(ignore=404)
         RECAPPercolator.init()
+        RECAPDocumentPercolator._index.delete(ignore=404)
+        RECAPDocumentPercolator.init()
+        DocketDocumentPercolator._index.delete(ignore=404)
+        DocketDocumentPercolator.init()
         self.r = get_redis_interface("CACHE")
         keys = self.r.keys("alert_hits:*")
         if keys:
@@ -1659,6 +1666,25 @@ class RECAPAlertsPercolatorTest(
             date_created=now(),
         )
         percolator_query.save(refresh=True)
+
+        if not avoid_indexing_auxiliary_alert(
+            DocketDocumentPercolator.__name__, cd
+        ):
+            d_percolator_query = DocketDocumentPercolator(
+                percolator_query=query_dict,
+                rate=Alert.REAL_TIME,
+                date_created=now(),
+            )
+            d_percolator_query.save(refresh=True)
+        if not avoid_indexing_auxiliary_alert(
+            RECAPDocumentPercolator.__name__, cd
+        ):
+            rd_percolator_query = RECAPDocumentPercolator(
+                percolator_query=query_dict,
+                rate=Alert.REAL_TIME,
+                date_created=now(),
+            )
+            rd_percolator_query.save(refresh=True)
         return percolator_query.meta.id
 
     @staticmethod
@@ -1691,14 +1717,16 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.rd_att.pk),
             RECAPPercolator._index._name,
             app_label="search.RECAPDocument",
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         # Test Percolate a RECAPDocument. It should match the query containing
         # a Docket query terms and RECAPDocument filter.
@@ -1710,15 +1738,15 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_1 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_1)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.rd.pk),
             RECAPPercolator._index._name,
             app_label="search.RECAPDocument",
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_1), True
+            self.confirm_query_matched(responses[0], query_id_1), True
         )
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -1730,18 +1758,18 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.rd.pk),
             RECAPPercolator._index._name,
             app_label="search.RECAPDocument",
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_1), True
+            self.confirm_query_matched(responses[0], query_id_1), True
         )
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_2), True
+            self.confirm_query_matched(responses[0], query_id_2), True
         )
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -1753,21 +1781,25 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_3 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_3)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.rd.pk),
             RECAPPercolator._index._name,
             app_label="search.RECAPDocument",
         )
         expected_queries = 3
-        self.assertEqual(len(response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_1), True
+            len(responses[0]),
+            expected_queries,
+            msg="Wrong number of queries matched.",
         )
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_2), True
+            self.confirm_query_matched(responses[0], query_id_1), True
         )
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_3), True
+            self.confirm_query_matched(responses[0], query_id_2), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id_3), True
         )
 
     def test_recap_document_percolator(self, mock_prefix) -> None:
@@ -1786,14 +1818,16 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.rd_2.pk),
             RECAPPercolator._index._name,
             app_label="search.RECAPDocument",
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         # Test percolate only filters combination.
         cd = {
@@ -1805,14 +1839,16 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.rd_att.pk),
             RECAPPercolator._index._name,
             app_label="search.RECAPDocument",
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         # Test percolate a different document targeting a different filters
         # combination.
@@ -1824,14 +1860,16 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.rd.pk),
             RECAPPercolator._index._name,
             app_label="search.RECAPDocument",
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         # Test percolate the same document loosen the query.
         cd = {
@@ -1841,16 +1879,18 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.rd.pk),
             RECAPPercolator._index._name,
             app_label="search.RECAPDocument",
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_2), True
+            self.confirm_query_matched(responses[0], query_id), True
+        )
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id_2), True
         )
 
     def test_docket_percolator(self, mock_prefix) -> None:
@@ -1869,13 +1909,13 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
         )
         expected_queries = 0
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(responses[0]), expected_queries)
 
         # Test Percolate a docket object. It shouldn't match the query
         # containing text query terms contained only in a RD.
@@ -1886,13 +1926,13 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_1 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_1)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
         )
         expected_queries = 0
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(responses[0]), expected_queries)
 
         # Test Percolate a docket object. Combining docket terms OR RECAPDocument
         # fields. This query can be triggered only by the Docket document.
@@ -1903,15 +1943,15 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries, msg="error 1")
+        self.assertEqual(len(responses[0]), expected_queries, msg="error 1")
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_2), True
+            self.confirm_query_matched(responses[0], query_id_2), True
         )
 
         # Test percolate text query + different filters.
@@ -1925,18 +1965,18 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_3 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_3)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_2), True
+            self.confirm_query_matched(responses[0], query_id_2), True
         )
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_3), True
+            self.confirm_query_matched(responses[0], query_id_3), True
         )
 
         # Test percolate text query + case_name filter.
@@ -1948,15 +1988,15 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_4 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_4)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.docket_3.pk),
             RECAPPercolator._index._name,
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_4), True
+            self.confirm_query_matched(responses[0], query_id_4), True
         )
 
         # Test percolate one filter.
@@ -1967,15 +2007,15 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_5 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_5)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.de_1.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_5), True
+            self.confirm_query_matched(responses[0], query_id_5), True
         )
 
         # Test percolate text query.
@@ -1986,21 +2026,21 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_6 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_6)
-        response = percolate_document(
+        responses = percolate_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
         )
         expected_queries = 3
-        self.assertEqual(len(response), expected_queries)
+        self.assertEqual(len(responses[0]), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_2), True
+            self.confirm_query_matched(responses[0], query_id_2), True
         )
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_3), True
+            self.confirm_query_matched(responses[0], query_id_3), True
         )
         self.assertEqual(
-            self.confirm_query_matched(response, query_id_6), True
+            self.confirm_query_matched(responses[0], query_id_6), True
         )
 
     def test_index_recap_alerts(self, mock_prefix) -> None:
@@ -2015,6 +2055,14 @@ class RECAPAlertsPercolatorTest(
 
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert.pk),
+            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
+        )
+        self.assertTrue(
+            RECAPDocumentPercolator.exists(id=docket_only_alert.pk),
+            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
+        )
+        self.assertTrue(
+            DocketDocumentPercolator.exists(id=docket_only_alert.pk),
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
         )
 
@@ -2032,12 +2080,28 @@ class RECAPAlertsPercolatorTest(
             RECAPPercolator.exists(id=docket_only_alert.pk),
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
         )
+        self.assertTrue(
+            RECAPDocumentPercolator.exists(id=docket_only_alert.pk),
+            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
+        )
+        self.assertTrue(
+            DocketDocumentPercolator.exists(id=docket_only_alert.pk),
+            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
+        )
 
         docket_only_alert_id = docket_only_alert.pk
         # Remove the alert.
         docket_only_alert.delete()
         self.assertFalse(
             RECAPPercolator.exists(id=docket_only_alert_id),
+            msg=f"Alert id: {docket_only_alert_id} was not indexed.",
+        )
+        self.assertFalse(
+            RECAPDocumentPercolator.exists(id=docket_only_alert_id),
+            msg=f"Alert id: {docket_only_alert_id} was not indexed.",
+        )
+        self.assertFalse(
+            DocketDocumentPercolator.exists(id=docket_only_alert_id),
             msg=f"Alert id: {docket_only_alert_id} was not indexed.",
         )
 
@@ -2050,7 +2114,12 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert Docket Only 1",
             query='q="SUBPOENAS SERVED CASE"&type=r',
         )
-        with self.captureOnCommitCallbacks(execute=True):
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -2087,7 +2156,12 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert RECAP Only 2",
             query='q="plain text for 018036652436"&type=r',
         )
-        with self.captureOnCommitCallbacks(execute=True):
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2141,7 +2215,12 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert RECAP Only 3",
             query='q="Hearing for Leave"&type=r',
         )
-        with self.captureOnCommitCallbacks(execute=True):
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
             alert_de_2 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2322,7 +2401,13 @@ class RECAPAlertsPercolatorTest(
             ),
             docket=docket,
         )
-        index_docket_parties_in_es.delay(docket.pk)
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ):
+            index_docket_parties_in_es.delay(docket.pk)
 
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2348,7 +2433,12 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert Docket Only",
             query='q="SUBPOENAS SERVED CASE"&docket_number="1:21-bk-1234"&type=r',
         )
-        with self.captureOnCommitCallbacks(execute=True):
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -2379,7 +2469,12 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert RECAP Only",
             query='q="plain text for 018036652000"&description="Affidavit Of Compliance"&type=r',
         )
-        with self.captureOnCommitCallbacks(execute=True):
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2421,7 +2516,12 @@ class RECAPAlertsPercolatorTest(
     def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
 
-        with self.captureOnCommitCallbacks(execute=True):
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name=f"SUBPOENAS SERVED CASE",
@@ -2501,6 +2601,7 @@ class RECAPAlertsPercolatorTest(
         self.assertEqual(
             len(webhook_events), 4, msg="Webhook events didn't match."
         )
+
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -2523,13 +2624,7 @@ class RECAPAlertsPercolatorTest(
             docket_only_alert.name,
             3,
             docket.case_name,
-            5,
-        )
-        self._assert_child_hits_content(
-            html_content,
-            docket_only_alert.name,
-            docket.case_name,
-            rd_descriptions,
+            0,
         )
 
         # Assert RECAP-only alert.
@@ -2593,3 +2688,121 @@ class RECAPAlertsPercolatorTest(
         self.assertEqual(
             html_content.count("<strong>File Amicus Curiae</strong>"), 1
         )
+
+    def test_filter_out_alerts_to_send_by_query_and_hits(
+        self, mock_prefix
+    ) -> None:
+        """Test RECAP alerts can be properly filtered out according to
+        their query and hits matched conditions.
+
+        - Docket-only Alerts should be triggered only upon a Docket ingestion.
+          commiting RECAPDocument ingestion that can match the alert.
+        - The Docket or RD shouldn’t have triggered the alert previously.
+        - RECAP-only Alerts should only include RDs that have not triggered the
+          same alert previously.
+        """
+
+        # The following test should match the Docket-only query on docket
+        # ingestion
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Docket Only Not Triggered",
+            query='q="405 Civil"&type=r',
+        )
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:21-bk-1234",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="'U.S. Government Defendant",
+                jury_demand="1,000,000",
+            )
+
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        # Assert docket-only alert.
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(docket_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_only_alert.name,
+            1,
+            docket.case_name,
+            0,
+        )
+
+        # Test "AND" and "OR" cross object alert queries.
+        cross_object_alert_d_and_rd_field = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object query AND",
+            query=f'q="405 Civil" AND pacer_doc_id:018036652436&type=r',
+        )
+        cross_object_alert_d_or_rd_field = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object query OR",
+            query=f'q="405 Civil" OR pacer_doc_id:018036652436&type=r',
+        )
+        # RD ingestion.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
+            alert_de = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File",
+                document_number="1",
+                is_available=True,
+                page_count=5,
+                pacer_doc_id="018036652436",
+                plain_text="plain text for 018036652436",
+            )
+
+        # The RD ingestion's shouldn't match the docket-only alert.
+        # It should only match the cross_object_alert_d_and_rd_field and
+        # cross_object_alert_d_or_rd_field alerts.
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self._confirm_number_of_alerts(html_content, 2)
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_d_and_rd_field.name,
+            1,
+            docket.case_name,
+            1,
+        )
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_d_or_rd_field.name,
+            1,
+            docket.case_name,
+            1,
+        )
+        docket.delete()

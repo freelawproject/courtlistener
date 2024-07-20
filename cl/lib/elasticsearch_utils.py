@@ -2808,45 +2808,6 @@ def make_es_stats_variable(
     return facet_fields
 
 
-def fetch_all_search_results(
-    fetch_method: Callable, initial_response: Response, *args
-) -> list[Hit]:
-    """Fetches all search results based on a given search method and an
-    initial response. It retrieves all the search results that exceed the
-    initial batch size by iteratively calling the provided fetch method with
-    the necessary pagination parameters.
-
-    :param fetch_method: A callable that executes the search query.
-    :param initial_response: The initial ES Response object.
-    :param args: Additional arguments to pass to the fetch method.
-
-    :return: A list of `Hit` objects representing all search results.
-    """
-
-    all_search_hits = []
-    all_search_hits.extend(initial_response.hits)
-    total_hits = initial_response.hits.total.value
-    results_returned = len(initial_response.hits.hits)
-    if total_hits > settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE:
-        documents_retrieved = results_returned
-        search_after = initial_response.hits[-1].meta.sort
-        while True:
-            response = fetch_method(*args, search_after=search_after)
-            if not response:
-                break
-
-            all_search_hits.extend(response.hits)
-            results_returned = len(response.hits.hits)
-            documents_retrieved += results_returned
-            # Check if all results have been retrieved. If so break the loop
-            # Otherwise, increase search_after.
-            if documents_retrieved >= total_hits or results_returned == 0:
-                break
-            else:
-                search_after = response.hits[-1].meta.sort
-    return all_search_hits
-
-
 def do_es_api_query(
     search_query: Search,
     cd: CleanData,

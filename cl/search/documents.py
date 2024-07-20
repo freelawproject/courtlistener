@@ -1986,3 +1986,67 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
         cd = search_form.cleaned_data
         query = build_plain_percolator_query(cd)
         return query.to_dict()
+
+
+class RECAPDocumentPercolator(Document, ESRECAPBaseDocument):
+    rate = fields.KeywordField(attr="rate")
+    percolator_query = PercolatorField()
+
+    class Index:
+        name = "recap_document_percolator"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+    def prepare_percolator_query(self, instance):
+        from cl.alerts.utils import build_plain_percolator_query
+
+        qd = QueryDict(instance.query.encode(), mutable=True)
+        search_form = SearchForm(qd)
+        if not search_form.is_valid():
+            logger.warning(
+                f"The query {qd} associated with Alert ID {instance.pk} is "
+                "invalid and was not indexed."
+            )
+            return None
+
+        cd = search_form.cleaned_data
+        query = build_plain_percolator_query(cd)
+        return query.to_dict()
+
+
+class DocketDocumentPercolator(DocketDocument):
+    rate = fields.KeywordField(attr="rate")
+    percolator_query = PercolatorField()
+
+    class Index:
+        name = "docket_document_percolator"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+    def prepare_percolator_query(self, instance):
+        from cl.alerts.utils import build_plain_percolator_query
+
+        qd = QueryDict(instance.query.encode(), mutable=True)
+        search_form = SearchForm(qd)
+        if not search_form.is_valid():
+            logger.warning(
+                f"The query {qd} associated with Alert ID {instance.pk} is "
+                "invalid and was not indexed."
+            )
+            return None
+
+        cd = search_form.cleaned_data
+        query = build_plain_percolator_query(cd)
+        return query.to_dict()

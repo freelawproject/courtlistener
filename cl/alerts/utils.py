@@ -7,7 +7,7 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.http import QueryDict
-from elasticsearch_dsl import Q, Search
+from elasticsearch_dsl import MultiSearch, Q, Search
 from elasticsearch_dsl.query import Query
 from elasticsearch_dsl.response import Hit, Response
 from redis import Redis
@@ -34,8 +34,14 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
+    docket_document_filters,
+    recap_document_filters,
 )
-from cl.search.documents import ESRECAPDocumentPlain
+from cl.search.documents import (
+    DocketDocumentPercolator,
+    ESRECAPDocumentPlain,
+    RECAPDocumentPercolator,
+)
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import ESDictDocument
 
@@ -76,13 +82,36 @@ class InvalidDateError(Exception):
     pass
 
 
+def create_percolator_search_query(
+    index_name: str, final_query: Query, search_after: int | None = None
+):
+    """Create an Elasticsearch search query with pagination.
+
+    :param index_name: The name of the Elasticsearch index to search.
+    :param final_query: Elasticsearch DSL Query object.
+    :param search_after: An optional parameter for search_after pagination.
+    :return: An Elasticsearch search object with the specified query and pagination settings.
+    """
+
+    s = Search(index=index_name)
+    s = s.query(final_query)
+    s = s.source(includes=["id"])
+    s = s.sort("date_created")
+    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
+    if search_after:
+        s = s.extra(search_after=search_after)
+    return s
+
+
 def percolate_document(
     document_id: str,
     percolator_index: str,
     document_index: str | None = None,
     app_label: str | None = None,
-    search_after: int = 0,
-) -> Response:
+    main_search_after: int | None = None,
+    rd_search_after: int | None = None,
+    d_search_after: int | None = None,
+) -> tuple[Response, Response | None, Response | None]:
     """Percolate a document against a defined Elasticsearch Percolator query.
 
     :param document_id: The document ID in ES index to be percolated.
@@ -90,11 +119,17 @@ def percolate_document(
     :param document_index: The ES document index where the document lives.
     :param app_label: The app label and model that belongs to the document
     being percolated.
-    :param search_after: The ES search_after param for deep pagination.
-    :return: The response from the Elasticsearch query.
+    :param main_search_after: Optional the ES main percolator query
+    search_after param  for deep pagination.
+    :param rd_search_after: Optional the ES RECAPDocument percolator query
+    search_after param  for deep pagination.
+    :param d_search_after: Optional the ES Docket document percolator query
+    search_after param  for deep pagination.
+    :return: A three-tuple containing the main percolator response, the
+    RECAPDocument percolator response (if applicable), and the Docket
+    percolator response (if applicable).
     """
 
-    s = Search(index=percolator_index)
     if document_index:
         percolate_query = Q(
             "percolate",
@@ -130,7 +165,10 @@ def percolate_document(
         must=[percolate_query],
         must_not=[exclude_rate_off],
     )
-    s = s.query(final_query)
+    s_rd = s_d = None
+    s = create_percolator_search_query(
+        percolator_index, final_query, search_after=main_search_after
+    )
     match app_label:
         case "search.RECAPDocument":
             child_highlight_options, _ = build_highlights_dict(
@@ -144,17 +182,127 @@ def percolate_document(
             )
             extra_options = {"highlight": child_highlight_options}
             s = s.extra(**extra_options)
+
+            # Prepare filter percolator queries for RECAP and Docket documents.
+            recap_document_percolator_index = (
+                RECAPDocumentPercolator._index._name
+            )
+            docket_document_percolator_index = (
+                DocketDocumentPercolator._index._name
+            )
+            if (main_search_after is None) == (rd_search_after is None):
+                s_rd = create_percolator_search_query(
+                    recap_document_percolator_index,
+                    final_query,
+                    search_after=rd_search_after,
+                )
+            if (main_search_after is None) == (d_search_after is None):
+                s_d = create_percolator_search_query(
+                    docket_document_percolator_index,
+                    final_query,
+                    search_after=d_search_after,
+                )
         case _:
             s = add_es_highlighting(
                 s, {"type": SEARCH_TYPES.RECAP}, alerts=True
             )
 
     s = s.source(excludes=["percolator_query"])
-    s = s.sort("date_created")
-    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
-    if search_after:
-        s = s.extra(search_after=search_after)
-    return s.execute()
+
+    # Perform the main percolator query, the RECAP query, and the Docket
+    # percolator query in a single request.
+    multi_search = MultiSearch()
+    multi_search = multi_search.add(s)
+    if s_rd:
+        multi_search = multi_search.add(s_rd)
+    if s_d:
+        multi_search = multi_search.add(s_d)
+    responses = multi_search.execute()
+
+    rd_response = d_response = None
+    main_response = responses[0]
+    if s_rd:
+        rd_response = responses[1]
+    if s_d:
+        d_response = responses[2]
+    return main_response, rd_response, d_response
+
+
+def fetch_all_search_alerts_results(
+    initial_responses: tuple[Response, Response | None, Response | None], *args
+) -> tuple[list[Hit], list[Hit], list[Hit]]:
+    """Fetches all search alerts results based on a given percolator query and
+    the initial responses. It retrieves all the search results that exceed the
+    initial batch size by iteratively calling percolate_document method with
+    the necessary pagination parameters.
+    :param initial_responses: The initial ES Responses tuple.
+    :param args: Additional arguments to pass to the percolate_document method.
+    :return: A three-tuple containing the main percolator results, the
+    RECAPDocument percolator results (if applicable), and the Docket
+    percolator results (if applicable).
+    """
+
+    all_main_alert_hits = []
+    all_rd_alert_hits = []
+    all_d_alert_hits = []
+
+    main_response = initial_responses[0]
+    all_main_alert_hits.extend(main_response.hits)
+    main_total_hits = main_response.hits.total.value
+    main_alerts_returned = len(main_response.hits.hits)
+    rd_response = d_response = None
+    if initial_responses[1]:
+        rd_response = initial_responses[1]
+        all_rd_alert_hits.extend(rd_response.hits)
+    if initial_responses[2]:
+        d_response = initial_responses[2]
+        all_d_alert_hits.extend(d_response.hits)
+
+    if main_total_hits > settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE:
+        alerts_retrieved = main_alerts_returned
+        main_search_after = main_response.hits[-1].meta.sort
+        rd_search_after = (
+            rd_response.hits[-1].meta.sort if rd_response else None
+        )
+        d_search_after = d_response.hits[-1].meta.sort if d_response else None
+        while True:
+            search_after_params = {
+                "main_search_after": main_search_after,
+                "rd_search_after": rd_search_after,
+                "d_search_after": d_search_after,
+            }
+            responses = percolate_document(*args, **search_after_params)
+            if not responses[0]:
+                break
+
+            all_main_alert_hits.extend(responses[0].hits)
+            main_alerts_returned = len(responses[0].hits.hits)
+            alerts_retrieved += main_alerts_returned
+
+            if responses[1]:
+                all_rd_alert_hits.extend(responses[1].hits)
+            if responses[2]:
+                all_d_alert_hits.extend(responses[2].hits)
+            # Check if all results have been retrieved. If so break the loop
+            # Otherwise, increase search_after.
+            if (
+                alerts_retrieved >= main_total_hits
+                or main_alerts_returned == 0
+            ):
+                break
+            else:
+                main_search_after = responses[0].hits[-1].meta.sort
+                rd_search_after = (
+                    responses[1].hits[-1].meta.sort
+                    if responses[1] and len(responses[1].hits.hits)
+                    else None
+                )
+                d_search_after = (
+                    responses[2].hits[-1].meta.sort
+                    if responses[2] and len(responses[2].hits.hits)
+                    else None
+                )
+    return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
 
 def override_alert_query(
@@ -388,3 +536,65 @@ def transform_percolator_child_document(
             child_document,
         )
     es_document["child_docs"] = [child_document]
+
+
+def include_recap_document_hit(
+    alert_id: int, recap_document_hits: list[int], docket_hits: list[int]
+) -> bool:
+    """Determine if an alert should include the percolated RECAP document
+     based on its presence in the given lists:
+
+    If an alert hit reached this method it was found in the main percolator request.
+    So we just need to confirm the following conditions to avoid including a
+    RECAPDocument into a Docket-only query alert.
+
+    alert_in_docket_hits     alert_in_rd_hits   Output
+        False                    False           True  AND Cross-object queries
+        False                    True            True  RD-only queries.
+        True                     False           False Docket-only queries.
+        True                     True            True  OR Cross-object queries
+
+    :param alert_id: The ID of the alert to check.
+    :param recap_document_hits: A list RECAPDocument alert hits IDs.
+    :param docket_hits:  A list Docket alert hits IDs.
+    :return: True if the alert should include a RECAP document hit, otherwise False.
+    """
+
+    alert_in_rd_hits = alert_id in recap_document_hits
+    alert_in_docket_hits = alert_id in docket_hits
+    if not alert_in_docket_hits and not alert_in_rd_hits:
+        return True
+    elif not alert_in_docket_hits and alert_in_rd_hits:
+        return True
+    elif alert_in_docket_hits and not alert_in_rd_hits:
+        return False
+    elif alert_in_docket_hits and alert_in_rd_hits:
+        return True
+    return False
+
+
+def avoid_indexing_auxiliary_alert(
+    index_name: str, alert_query: QueryDict
+) -> bool:
+    """Determine if an alert should be avoided for indexing in the auxiliary
+    percolator index based on the index_name and query filters.
+
+    :param index_name: The name of the Elasticsearch index to check.
+    :param alert_query: QueryDict containing the alert query parameters.
+    :return: True if the alert should be avoided for indexing, otherwise False.
+    """
+
+    if index_name == DocketDocumentPercolator.__name__:
+        # Avoid indexing alerts that contains RECAPDocument filters into the
+        # DocketDocumentPercolator, otherwise it'll throw a parsing error.
+        for rd_filter in recap_document_filters:
+            if alert_query.get(rd_filter, ""):
+                return True
+
+    if index_name == RECAPDocumentPercolator.__name__:
+        # Avoid indexing alerts that contains Docket filters into the
+        # RECAPDocumentPercolator, otherwise it'll throw a parsing error.
+        for d_filter in docket_document_filters:
+            if alert_query.get(d_filter, ""):
+                return True
+    return False
