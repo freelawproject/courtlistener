@@ -3070,14 +3070,14 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         cls.search_alert_7 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
-            name="Test Alert R",
-            query="q=Test+O&type=r",
+            name="Test Alert D",
+            query="q=Test+O&type=d",
         )
         cls.search_alert_8 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.DAILY,
-            name="Test Alert R",
-            query="q=Test+O&type=r",
+            name="Test Alert D",
+            query="q=Test+O&type=d",
         )
 
     def tearDown(self) -> None:
