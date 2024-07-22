@@ -18,7 +18,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -27,7 +27,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -69,18 +69,18 @@
   </p>
 
 
-  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version="v3" %}</code></small></h3>
+  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version=version %}</code></small></h3>
   {% include "includes/docket-endpoint.html" %}
   <p>Ideally, docket entries, parties, and attorneys would be nested within the docket object you request, but this is not possible because some dockets have a vast number of these objects. Listing so many values in a single response from the server is impractical. To access docket entries, parties, or attorneys for a specific docket, use the docket entry, party, or attorney endpoints and filter by docket ID.
   </p>
   <p>The court fields are references to our Court API, described below.</p>
 
 
-  <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version="v3" %}</code></small></h3>
+  <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version=version %}</code></small></h3>
   {% include "includes/court-endpoint.html" %}
 
 
-  <h3 id="docket-entry-endpoint">Docket Entries <small> — <code>{% url "docketentry-list" version="v3" %}</code></small></h3>
+  <h3 id="docket-entry-endpoint">Docket Entries <small> — <code>{% url "docketentry-list" version=version %}</code></small></h3>
   <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.
   </p>
   <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
@@ -89,7 +89,7 @@
   </p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docketentry-list" version="v3" %}?docket=4214664"</pre>
+  "{% get_full_host %}{% url "docketentry-list" version=version %}?docket=4214664"</pre>
   <p>Such a request will return up to 20 docket entries per page. Each docket entry returned can contain a number of nested documents in the <code>recap_document</code> key, including their full extracted text (see details in the next section below). As a result, this response can be quite large.
   </p>
   <p>A few field-level notes:</p>
@@ -131,7 +131,7 @@
     </p>
   {% endif %}
 
-  <h3 id="recap-document-endpoint">Documents <small> — <code>{% url "recapdocument-list" version="v3" %}</code></small></h3>
+  <h3 id="recap-document-endpoint">Documents <small> — <code>{% url "recapdocument-list" version=version %}</code></small></h3>
   <p>Each docket entry contains several documents, which we call <code>RECAP Document</code> objects.
   </p>
   <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
@@ -174,7 +174,7 @@
 
 
 
-  <h2 id="party-endpoint">Parties <small> — <code>{% url "party-list" version="v3" %}</code></small></h2>
+  <h2 id="party-endpoint">Parties <small> — <code>{% url "party-list" version=version %}</code></small></h2>
   <p>The <code>Party</code> endpoint provides details about parties that have been involved in federal cases in PACER, and contains nested attorney information.
   </p>
   <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
@@ -186,37 +186,37 @@
   <p>For example, this query returns the parties for docket number <code>123</code>:</p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "party-list" version="v3" %}?docket=123"</pre>
+  "{% get_full_host %}{% url "party-list" version=version %}?docket=123"</pre>
   <p>It returns something like:</p>
   <pre class="pre-scrollable tall">{
 ① "count": 35,
-  "next": "https://www.courtlistener.com/api/rest/v3/parties/?docket=123&page=2",
+  "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&page=2",
   "previous": null,
   "results": [
     {
-      "resource_uri": "https://www.courtlistener.com/api/rest/v3/parties/42/",
+      "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/parties/42/",
       "id": 42,
 ②    "attorneys": [
         {
-          "attorney": "https://www.courtlistener.com/api/rest/v3/attorneys/1/",
+          "attorney": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/1/",
           "attorney_id": 1,
           "date_action": null,
-          "docket": "https://www.courtlistener.com/api/rest/v3/dockets/123/",
+          "docket": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/123/",
           "docket_id": 123,
           "role": 10
         },
         {
-          "attorney": "https://www.courtlistener.com/api/rest/v3/attorneys/2/",
+          "attorney": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/2/",
           "attorney_id": 2,
           "date_action": null,
-          "docket": "https://www.courtlistener.com/api/rest/v3/dockets/456/",
+          "docket": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/456/",
           "docket_id": 456,
           "role": 2
         }
       ],
 ③    "party_types": [
         {
-          "docket": "https://www.courtlistener.com/api/rest/v3/dockets/123/",
+          "docket": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/123/",
           "docket_id": 123,
           "name": "Plaintiff",
           "date_terminated": null,
@@ -257,28 +257,28 @@
   {% endif %}
 
 
-  <h2 id="attorney-endpoint">Attorneys <small> — <code>{% url "attorney-list" version="v3" %}</code></small></h2>
+  <h2 id="attorney-endpoint">Attorneys <small> — <code>{% url "attorney-list" version=version %}</code></small></h2>
   <p>Use this API to look up an attorney in our system.</p>
   <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP OPTIONS request.</p>
   <p>Like docket entries and parties, attorneys can be filtered to a particular docket. For example:
   </p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "attorney-list" version="v3" %}?docket=4214664"</pre>
+  "{% get_full_host %}{% url "attorney-list" version=version %}?docket=4214664"</pre>
   <p>Returns:</p>
   <pre class="pre-scrollable tall">{
     "count": 108,
-    "next": "https://www.courtlistener.com/api/rest/v3/attorneys/?docket=4214664&page=2",
+    "next": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/?docket=4214664&page=2",
     "previous": null,
     "results": [
         {
-            "resource_uri": "https://www.courtlistener.com/api/rest/v3/attorneys/9247906/",
+            "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/9247906/",
             "id": 9247906,
             "parties_represented": [
                 {
                     "role": 10,
-                    "docket": "https://www.courtlistener.com/api/rest/v3/dockets/4214664/",
-                    "party": "https://www.courtlistener.com/api/rest/v3/parties/13730908/",
+                    "docket": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/4214664/",
+                    "party": "https://www.courtlistener.com/api/rest/{{ version }}/parties/13730908/",
                     "date_action": null
                 }
             ],
@@ -299,7 +299,7 @@
   {% endif %}
 
 
-  <h2 id="og-court-info-endpoint">Originating Court <small> — <code><nobr>{% url 'originatingcourtinformation-list' version="v3" %}</nobr></code></small></h2>
+  <h2 id="og-court-info-endpoint">Originating Court <small> — <code><nobr>{% url 'originatingcourtinformation-list' version=version %}</nobr></code></small></h2>
   <p><code>Originating Court Information</code> represents the information gathered at an appellate court about a case when it was in a lower court or administrative body.
   </p>
   <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.
@@ -308,7 +308,7 @@
   </p>
 
 
-  <h2 id="idb-data-endpoint">Integrated Database <small> — <code><nobr>{% url 'fjcintegrateddatabase-list' version='v3' %}</nobr></code></small></h2>
+  <h2 id="idb-data-endpoint">Integrated Database <small> — <code><nobr>{% url 'fjcintegrateddatabase-list' version=version %}</nobr></code></small></h2>
   <p><code>FJC Integrated Database</code> objects represent the information available in the <a href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:
   </p>
   <ul>
@@ -322,14 +322,14 @@
   </p>
 
 
-  <h2 id="recap-query">Fast Document Lookup <small> — <code>{% url "fast-recapdocument-list" version="v3" %}</code></small></h2>
+  <h2 id="recap-query">Fast Document Lookup <small> — <code>{% url "fast-recapdocument-list" version=version %}</code></small></h2>
   <p>This API is used to check if documents with known IDs are available in our system.
   </p>
   <p>To use it, provide a court ID and a comma-separated list of <code>pacer_doc_id</code>'s:
   </p>
   <pre class="pre-scrollable">curl \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  '{% get_full_host %}{% url "fast-recapdocument-list" version="v3" %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
+  '{% get_full_host %}{% url "fast-recapdocument-list" version=version %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
   </pre>
   <p>This will return one entry for each document found, up to a maximum of 300 items:</p>
   <pre class="pre-scrollable tall">{

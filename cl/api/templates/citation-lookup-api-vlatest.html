@@ -17,7 +17,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -26,7 +26,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -48,7 +48,7 @@
 
 <div class="col-xs-12 col-md-8 col-lg-6">
   <h1 id="about">Citation Lookup and Verification&nbsp;API</h1>
-  <h2><code>{% url "citation-lookup-list" version="v3" %}</code></h2>
+  <h2><code>{% url "citation-lookup-list" version=version %}</code></h2>
   <p class="lead v-offset-above-3">Use this API to look up citations in CourtListener's database of {{ cite_count|intcomma }} citations.</p>
   <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
   </p>
@@ -60,13 +60,13 @@
   <h2 id="usage">Usage</h2>
   <p>The simplest way to query this API is to send it a blob of text. If the text does not have any citations, it will simply return an empty JSON object:
   </p>
-  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'text=Put some text here'\
 []</pre>
   <p>If the text contains valid citations, it will return a list of the citations, analyzing each. This example contains a single citation that is found:
   </p>
-  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'text=Obergefell v. Hodges (576 U.S. 644) established the right to marriage among same-sex couples'
 [
@@ -84,7 +84,7 @@
 ]</pre>
   <p>If you have the volume, reporter, and page for a citation, you can look it up as follows:
   </p>
-  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'volume=576' \
   --data 'reporter=U.S.' \
@@ -133,7 +133,7 @@
   <h2 id="examples">API Examples</h2>
   <h3 id="basic">Basic, Valid Lookup</h3>
   <p>The following is a basic lookup using the <code>text</code> parameter and a block of text:</p>
-  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'text=Obergefell v. Hodges (576 U.S. 644) established the right to marriage among same-sex couples'
 [
@@ -151,7 +151,7 @@
 ]</pre>
   <h3 id="failed">Failed Lookup</h3>
   <p>This query uses the volume-reporter-page triad, but fails because the citation does not exist:</p>
-  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'volume=1' \
   --data 'reporter=U.S.' \
@@ -178,7 +178,7 @@
   <h3 id="throttled">Throttled Citations</h3>
   <p>If your request contains more than {{max_citation_per_request}} citations, the {{max_citation_per_request|add:1}}<sup>st</sup> and subsequent citations will be returned with 429 <code>status</code> fields:
   </p>
-  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'text=Imagine a very long blob here, with {{max_citation_per_request|add:1}} citations.'
 [
@@ -205,7 +205,7 @@
   <h3 id="typoed">Typoed/Non-Canonical Reporter Abbreviation</h3>
   <p>If you query the non-canonical reporter abbreviation or if your reporter contains a known typo, we will provide the corrected citation in the <code>normalized_citations</code> key. The following example looks up a citation using "US" instead of the correct "U.S.":
   </p>
-  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'text=576 US 644'
 [
@@ -225,7 +225,7 @@
   <h3 id="ambiguous">Ambiguous Citation</h3>
   <p>This lookup is for an ambiguous citation abbreviated as "H." This reporter abbreviation can refer to Handy's Ohio Reports, the Hawaii Reports, or Hill’s New York Reports. Only two of those reporter series have cases at the queried volume and page number, so the API returns two possible matches for the citation:
   </p>
-  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version="v3" %}" \
+  <pre class="pre-scrollable">curl -X POST "{% get_full_host %}{% url "citation-lookup-list" version=version %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   --data 'text=1 H. 150'
 [

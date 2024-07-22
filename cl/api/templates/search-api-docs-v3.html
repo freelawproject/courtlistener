@@ -17,7 +17,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -26,7 +26,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -47,7 +47,7 @@
 
 <div class="col-xs-12 col-md-8 col-lg-6">
   <h1 id="about">Legal Search&nbsp;API</h1>
-  <h2><code>{% url "search-list" version=version %}</code></h2>
+  <h2><code>{% url "search-list" version="v3" %}</code></h2>
   <p class="lead v-offset-above-3">Use this API to search case law, PACER data, judges, and oral argument audio recordings.</p>
   <p>To get the most out of this API, see our <a href="{% url "coverage" %}">coverage</a> and <a href="{% url "advanced_search" %}">advanced operators</a> documentation.
   </p>
@@ -60,11 +60,11 @@
   </p>
   <pre class="pre-scrollable">curl -X GET \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  '{% get_full_host %}{% url "search-list" version=version %}?q=foo'</pre>
+  '{% get_full_host %}{% url "search-list" version="v3" %}?q=foo'</pre>
   <p>That returns:</p>
   <pre class="pre-scrollable tall">{
   "count": 2369,
-  "next": "https://www.courtlistener.com/api/rest/{{ version }}/search/?page=2&q=foo",
+  "next": "https://www.courtlistener.com/api/rest/v3/search/?page=2&q=foo",
   "previous": null,
   "results": [
     {
@@ -201,7 +201,7 @@
   </p>
   <pre class="pre-scrollable">curl -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version=version %}" \
+  "{% get_full_host %}{% url "docket-list" version="v3" %}" \
   | jq '.actions.POST.docket_number</pre>
   <p>After filtering through <a href="https://github.com/jqlang/jq"><code>jq</code></a>, that returns:</p>
   <pre class="pre-scrollable">{

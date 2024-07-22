@@ -18,7 +18,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -27,7 +27,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -49,14 +49,14 @@
   <p>To look up specific citations, see our <a href="{% url "citation_lookup_api" %}">citation lookup and verification API</a>.</p>
 
 
-  <h2 id="cites-endpoint">Opinions Cited/Citing API<br><small><code>{% url "opinionscited-list" version="v3" %}</code></small></h2>
+  <h2 id="cites-endpoint">Opinions Cited/Citing API<br><small><code>{% url "opinionscited-list" version=version %}</code></small></h2>
   <p>This endpoint provides an interface into the citation graph that CourtListener provides between opinions in <a href="{% url "case_law_api_help" %}">our case law database</a>.
   <p>You can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:
   </p>
   <pre class="pre-scrollable">curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinionscited-list" version="v3" %}"</pre>
+  "{% get_full_host %}{% url "opinionscited-list" version=version %}"</pre>
   <p>That query will return the following filter options:</p>
   <pre class="pre-scrollable tall">{
   "id": {
@@ -79,49 +79,49 @@
     "lookup_types": "See available filters for 'Opinions'"
   }
 }</pre>
-  <p>To understand <code>RelatedFilters</code>, see our <a href="{% url "rest_docs" version="v3" %}">filtering documentation</a>.</p>
+  <p>To understand <code>RelatedFilters</code>, see our <a href="{% url "rest_docs" version=version %}">filtering documentation</a>.</p>
   <p>These filters allow you to filter to the opinions that an opinion cites (it's "Authorities") or the opinions that cite it.
   </p>
   <p>For example, opinion <code>2812209</code> is the decision in <em>Obergefell v. Hodges</em>. To see what it cites:</p>
   <pre class="pre-scrollable tall">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinionscited-list" version="v3" %}?citing_opinion=2812209"</pre>
+  "{% get_full_host %}{% url "opinionscited-list" version=version %}?citing_opinion=2812209"</pre>
   <p>Which returns (in part):</p>
   <pre class="pre-scrollable tall">{
   "count": 75,
-  "next": "https://www.courtlistener.com/api/rest/v3/opinions-cited/?citing_opinion=2812209&page=2",
+  "next": "https://www.courtlistener.com/api/rest/{{ version }}/opinions-cited/?citing_opinion=2812209&page=2",
   "previous": null,
   "results": [
     {
-      "resource_uri": "https://www.courtlistener.com/api/rest/v3/opinions-cited/167909003/",
+      "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/opinions-cited/167909003/",
       "id": 167909003,
-      "citing_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/2812209/",
-      "cited_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/96405/",
+      "citing_opinion": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/2812209/",
+      "cited_opinion": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/96405/",
       "depth": 1
     },
     {
-      "resource_uri": "https://www.courtlistener.com/api/rest/v3/opinions-cited/167909002/",
+      "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/opinions-cited/167909002/",
       "id": 167909002,
-      "citing_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/2812209/",
-      "cited_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/2264443/",
+      "citing_opinion": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/2812209/",
+      "cited_opinion": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/2264443/",
       "depth": 1
     },
 …</pre>
   <p>To go the other direction, and see what cites <em>Obergefell</em>, use the <code>cited_opinion</code> parameter instead:</p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinionscited-list" version="v3" %}?cited_opinion=2812209"</pre>
+  "{% get_full_host %}{% url "opinionscited-list" version=version %}?cited_opinion=2812209"</pre>
   <p>That returns (in part):</p>
   <pre class="pre-scrollable tall">{
   "count": 403,
-  "next": "https://www.courtlistener.com/api/rest/v3/opinions-cited/?cited_opinion=2812209&page=2",
+  "next": "https://www.courtlistener.com/api/rest/{{ version }}/opinions-cited/?cited_opinion=2812209&page=2",
   "previous": null,
   "results": [
     {
-      "resource_uri": "https://www.courtlistener.com/api/rest/v3/opinions-cited/213931728/",
+      "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/opinions-cited/213931728/",
       "id": 213931728,
-      "citing_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/10008139/",
-      "cited_opinion": "https://www.courtlistener.com/api/rest/v3/opinions/2812209/",
+      "citing_opinion": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/10008139/",
+      "cited_opinion": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/2812209/",
       "depth": 4
     },
 …</pre>

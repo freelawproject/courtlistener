@@ -19,7 +19,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -28,7 +28,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -74,34 +74,34 @@
   <h2 id="apis">Available APIs</h2>
   <p>The Ethics in Government Act details the types of information required, and prescribes the general format and procedures for the reports themselves.</p>
   <p>The APIs described below mirror the Act's language, with APIs corresponding to each required disclosure type.</p>
-  <h3 id="disclosure-api">Disclosures <small>— <code>{% url "financialdisclosure-list" version="v3" %}</code></small></h3>
+  <h3 id="disclosure-api">Disclosures <small>— <code>{% url "financialdisclosure-list" version=version %}</code></small></h3>
   <p>This API contains information about the main document itself and is the link between the other financial disclosure endpoints and the judges in our system.
   </p>
-  <h3 id="investment-api">Investments <small>— <code>{% url "investment-list" version="v3" %}</code></small></h3>
+  <h3 id="investment-api">Investments <small>— <code>{% url "investment-list" version=version %}</code></small></h3>
   <p>This API lists the source and type of investment income held by a judge, including dividends, rents, interest, capital gains, or income from qualified or excepted trusts.</p>
-  <h3 id="position-api">Positions <small>— <code>{% url "disclosureposition-list" version="v3" %}</code></small></h3>
+  <h3 id="position-api">Positions <small>— <code>{% url "disclosureposition-list" version=version %}</code></small></h3>
   <p>This API lists the positions held as an officer, director, trustee, general partner, proprietor, representative, executor, employee, or consultant of any corporation, company, firm, partnership, trust, or other business enterprise, any nonprofit organization, any labor organization, or any educational or other institution other than the United States.
   </p>
-  <h3 id="agreement-api">Agreements <small>— <code>{% url "agreement-list" version="v3" %}</code></small></h3>
+  <h3 id="agreement-api">Agreements <small>— <code>{% url "agreement-list" version=version %}</code></small></h3>
   <p>This API lists any agreements or arrangements of the filer in existence at any time during the reporting period.</p>
-  <h3 id="non-investment-api">Non-Investment Income<br><small><code>{% url "noninvestmentincome-list" version="v3" %}</code></small></h3>
+  <h3 id="non-investment-api">Non-Investment Income<br><small><code>{% url "noninvestmentincome-list" version=version %}</code></small></h3>
   <p>This API lists the source, type, and the amount or value of earned or other non-investment income aggregating $200 or more from any one source that is received during the reporting period.</p>
-  <h3 id="spouse-non-investment-income-api">Non-Investment Income (Spouse)<br><small><code>{% url "spouseincome-list" version="v3" %}</code></small></h3>
+  <h3 id="spouse-non-investment-income-api">Non-Investment Income (Spouse)<br><small><code>{% url "spouseincome-list" version=version %}</code></small></h3>
   <p>This API lists the source and type earned of non-investment income from the spouse of the filer.</p>
-  <h3 id="reimbursement-api">Reimbursements <small>— <code>{% url "reimbursement-list" version="v3" %}</code></small>
+  <h3 id="reimbursement-api">Reimbursements <small>— <code>{% url "reimbursement-list" version=version %}</code></small>
 </h3>
   <p>This API lists the source identity and description (including travel locations, dates, and nature of expenses provided) of any travel-related reimbursements aggregating more than $415 in value that are received by the filer from one source during the reporting period.
   </p>
-  <h3 id="gift-api">Gifts <small>— <code>{% url "gift-list" version="v3" %}</code></small></h3>
+  <h3 id="gift-api">Gifts <small>— <code>{% url "gift-list" version=version %}</code></small></h3>
   <p>This API lists the source, a brief description, and the value of all gifts aggregating more than $415 in value that are received by the filer during the reporting period from any one source.</p>
-  <h3 id="debt-api">Debts <small>— <code>{% url "debt-list" version="v3" %}</code></small></h3>
+  <h3 id="debt-api">Debts <small>— <code>{% url "debt-list" version=version %}</code></small></h3>
   <p>All liabilities specified by that section that are owed during the period beginning on January 1 of the preceding calendar year and ending fewer than 31 days before the date on which the report is filed.</p>
 
   <h2 id="fields">Fields</h2>
   <h3 id="understanding">Understanding the Fields</h3>
   <p>Like most of our APIs, field definitions can be obtained by sending an HTTP <code>OPTIONS</code> request to any of the APIs. For example, this request, piped through <a href="https://github.com/jqlang/jq"><code>jq</code></a>, shows you the fields of the Gifts API:
   </p>
-  <pre class="pre-scrollable tall">curl -X OPTIONS "{% get_full_host %}{% url "gift-list" version="v3" %}" \
+  <pre class="pre-scrollable tall">curl -X OPTIONS "{% get_full_host %}{% url "gift-list" version=version %}" \
     | jq '.actions.POST'
 
 {
@@ -181,15 +181,15 @@
   </p>
   <p>This field can be used as a filter. For example, here are all the investments with redacted information:
   </p>
-  <pre class="pre-scrollable tall">curl "{% get_full_host %}{% url "investment-list" version="v3" %}?redacted=True" \
+  <pre class="pre-scrollable tall">curl "{% get_full_host %}{% url "investment-list" version=version %}?redacted=True" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
 {
   "count": 27404,
-  "next": "https://www.courtlistener.com/api/rest/v3/investments/?page=2&redacted=True",
+  "next": "https://www.courtlistener.com/api/rest/{{ version }}/investments/?page=2&redacted=True",
   "previous": null,
   "results": [
     {
-      "resource_uri": "https://www.courtlistener.com/api/rest/v3/investments/5385644/",
+      "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/investments/5385644/",
       "id": 5385644,
       "date_created": "2023-04-17T11:03:22.404170-07:00",
       "date_modified": "2023-04-17T11:03:22.404185-07:00",
@@ -207,7 +207,7 @@
       "transaction_gain_code": "",
       "transaction_partner": "",
       "has_inferred_values": false,
-      "financial_disclosure": "https://www.courtlistener.com/api/rest/v3/financial-disclosures/34187/"
+      "financial_disclosure": "https://www.courtlistener.com/api/rest/{{ version }}/financial-disclosures/34187/"
     },
 ...</pre>
 
@@ -248,10 +248,10 @@
   <h2 id="examples">API Examples</h2>
   <p>You can query for investments by stock name, transaction dates and even gross values. For example, the following query is for financial disclosures with individual investments valued above $50,000,000.00. Note that this uses a value code as explained in the general notes above:
   </p>
-  <pre class="pre-scrollable">curl "{% get_full_host %}{% url "investment-list" version="v3" %}?gross_value_code=P4&fields=investments" \
+  <pre class="pre-scrollable">curl "{% get_full_host %}{% url "investment-list" version=version %}?gross_value_code=P4&fields=investments" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
   <p>Additionally, you could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a href="{% url "view_person" 1213 "ruth-bader-ginsberg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
-  <pre class="pre-scrollable">curl "{% get_full_host %}{% url "financialdisclosure-list" version="v3" %}?person=1213&fields=gifts" \
+  <pre class="pre-scrollable">curl "{% get_full_host %}{% url "financialdisclosure-list" version=version %}?person=1213&fields=gifts" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
   <p>In 2024, we presented these APIs at the NICAR conference and created <a href="https://github.com/freelawproject/talks/tree/main/talks/2024/march/NICAR/cracking_the_courts_panel/examples">many more examples</a> you can explore.</p>
 
