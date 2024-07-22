@@ -170,6 +170,12 @@ class Command(VerboseCommand):
             default=False,
             help="Use this flag to run the queries in the replica db",
         )
+        parser.add_argument(
+            "--file-name",
+            type=str,
+            default=None,
+            help="Custom name for the output files. If not provided, a default name will be used.",
+        )
 
     def handle(self, *args, **options):
         r = get_redis_interface("CACHE")
@@ -199,6 +205,11 @@ class Command(VerboseCommand):
         counter = int(
             r.hget(f"{record_type}_import_status", "next_iteration_counter")
             or 0
+        )
+        file_name = (
+            options["file_name"]
+            if options["file_name"]
+            else f"{record_type}_filelist"
         )
         while True:
             query, params = get_custom_query(
@@ -237,7 +248,7 @@ class Command(VerboseCommand):
                     writer.writerow(query_dict)
 
                 s3_client.put_object(
-                    Key=f"{record_type}_filelist_{counter}.csv",
+                    Key=f"{file_name}_{counter}.csv",
                     Bucket=bucket_name,
                     Body=csvfile.getvalue().encode("utf-8"),
                 )
