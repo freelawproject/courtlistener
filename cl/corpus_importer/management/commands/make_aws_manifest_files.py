@@ -54,7 +54,11 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
         percentage = options["random_sample_percentage"]
         base_query = f"{base_query} TABLESAMPLE SYSTEM ({percentage})"
 
-    query = f"{base_query}\n {filter_clause}\n"
+    query = (
+        f"{base_query}\n"
+        if options["all_records"]
+        else f"{base_query}\n {filter_clause}\n"
+    )
     with connections[
         "replica" if options["use_replica"] else "default"
     ].cursor() as cursor:
@@ -108,11 +112,26 @@ def get_custom_query(
     if random_sample:
         base_query = f"{base_query} TABLESAMPLE SYSTEM ({random_sample})"
 
+    if options["all_records"]:
+        filter_clause = ""
+
+    # Using a WHERE clause with `id > last_pk` and a LIMIT clause for batch
+    # retrieval is not suitable for random sampling. The following logic
+    # removes these clauses when retrieving a random sample to ensure all rows
+    # have an equal chance of being selected.
     if last_pk and not random_sample:
-        filter_clause = f"{filter_clause} AND id > %s"
+        filter_clause = (
+            f"WHERE id > %s"
+            if not filter_clause
+            else f"{filter_clause} AND id > %s"
+        )
         params.append(last_pk)
 
-    query = f"{base_query}\n {filter_clause}\n ORDER BY id\n LIMIT %s"
+    query = (
+        f"{base_query}\n {filter_clause}"
+        if random_sample
+        else f"{base_query}\n {filter_clause}\n ORDER BY id\n LIMIT %s"
+    )
 
     return query, params
 
@@ -176,6 +195,13 @@ class Command(VerboseCommand):
             default=None,
             help="Specifies the proportion of the table to be sampled (between "
             "0.0 and 100.0). Use this flag to retrieve a random set of records.",
+        )
+        parser.add_argument(
+            "--all-records",
+            action="store_true",
+            default=False,
+            help="Use this flag to retrieve all records from the table without"
+            " applying any filters.",
         )
 
     def handle(self, *args, **options):
