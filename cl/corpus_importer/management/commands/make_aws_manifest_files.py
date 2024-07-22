@@ -174,7 +174,15 @@ class Command(VerboseCommand):
             "--file-name",
             type=str,
             default=None,
-            help="Custom name for the output files. If not provided, a default name will be used.",
+            help="Custom name for the output files. If not provided, a default "
+            "name will be used.",
+        )
+        parser.add_argument(
+            "--random-sample-percentage",
+            type=float,
+            default=None,
+            help="Specifies the proportion of the table to be sampled (between "
+            "0.0 and 100.0). Use this flag to retrieve a random set of records.",
         )
 
     def handle(self, *args, **options):
@@ -216,7 +224,8 @@ class Command(VerboseCommand):
                 options["record_type"],
                 last_pk,
             )
-            params.append(options["query_batch_size"])
+            if not options["random_sample_percentage"]:
+                params.append(options["query_batch_size"])
 
             with connections[
                 "replica" if options["use_replica"] else "default"
@@ -237,13 +246,20 @@ class Command(VerboseCommand):
                     extrasaction="ignore",
                 )
                 for row in batched(rows, options["lambda_record_size"]):
-                    query_dict = {
-                        "bucket": bucket_name,
-                        "file_name": (
+                    if options["random_sample_percentage"]:
+                        # Create an underscore-separated file name that lambda
+                        # can split and use as part of batch processing.
+                        ids = [str(r[0]) for r in row]
+                        content = "_".join(ids)
+                    else:
+                        content = (
                             f"{row[0][0]}_{row[-1][0]}"
                             if len(row) > 1
                             else f"{row[0][0]}"
-                        ),
+                        )
+                    query_dict = {
+                        "bucket": bucket_name,
+                        "file_name": content,
                     }
                     writer.writerow(query_dict)
 
@@ -252,6 +268,14 @@ class Command(VerboseCommand):
                     Bucket=bucket_name,
                     Body=csvfile.getvalue().encode("utf-8"),
                 )
+
+            if options["random_sample_percentage"]:
+                # Due to the non-deterministic nature of random sampling,
+                # storing data to recover the query for future executions
+                # wouldn't be meaningful. Random queries are unlikely to
+                # produce the same results on subsequent runs.
+                logger.info(f"Finished processing {record_count} records")
+                break
 
             counter += 1
             last_pk = rows[-1][0]
