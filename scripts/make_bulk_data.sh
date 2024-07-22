@@ -195,18 +195,6 @@ people_db_person_race_fields='(
 people_db_person_race_csv_filename="people-db-races-$(date -I).csv"
 
 
-people_db_attorneyorganization_fields='(
-	       id, date_created, date_modified, lookup_key, name, address1, address2, city, state, zip_code
-	   )'
-people_db_attorneyorganization_csv_filename="people_db_attorneyorganization-$(date -I).csv"
-
-
-people_db_attorney_fields='(
-	       id, date_created, date_modified, name, contact_raw, phone, fax, email
-	   )'
-people_db_attorney_csv_filename="people_db_attorney-$(date -I).csv"
-
-
 docket_fields='(
 	       id, date_created, date_modified, date_cert_granted, date_cert_denied, date_argued,
 		   date_reargued, date_reargument_denied, case_name_short, case_name, case_name_full, slug,
@@ -233,25 +221,6 @@ fjcintegrateddatabase_fields='(
 fjcintegrateddatabase_csv_filename="recap_fjcintegrateddatabase-$(date -I).csv"
 
 
-people_db_role_fields='(
-	       id, role, date_action, attorney_id, docket_id, party_id, role_raw
-	   )'
-people_db_role_csv_filename="people_db_role-$(date -I).csv"
-
-
-people_db_attorneyorganizationassociation_fields='(
-	       id, attorney_id, attorney_organization_id, docket_id
-	   )'
-people_db_attorneyorganizationassociation_csv_filename="people_db_attorneyorganizationassociation-$(date -I).csv"
-
-
-search_docketentry_fields='(
-	       id, date_created_date_modified, date_filed, entry_number, description, docket_id,
-		   pacer_sequence_number, recap_sequence_number
-	   )'
-search_docketentry_csv_filename="search_docketentry-$(date -I).csv"
-
-
 search_opinioncluster_panel_fields='(
 	       id, opinioncluster_id, person_id
 	   )'
@@ -276,14 +245,8 @@ declare -a t_5=("people_db_position" "$people_db_position_fields" "$people_db_po
 declare -a t_6=("recap_fjcintegrateddatabase" "$fjcintegrateddatabase_fields" "$fjcintegrateddatabase_csv_filename")
 declare -a t_7=("search_originatingcourtinformation" "$originatingcourtinformation_fields" "$originatingcourtinformation_csv_filename")
 
-declare -a t_8=("people_db_attorneyorganization" "$people_db_attorneyorganization_fields" "$people_db_attorneyorganization_csv_filename")
-declare -a t_9=("people_db_attorney" "$people_db_attorney_fields" "$people_db_attorney_csv_filename")
 declare -a t_10=("search_docket" "$docket_fields" "$dockets_csv_filename")
 declare -a t_11=("search_opinioncluster" "$opinioncluster_fields" "$opinioncluster_csv_filename")
-declare -a t_12=("recap_fjcintegrateddatabase" "$fjcintegrateddatabase_fields" "$fjcintegrateddatabase_csv_filename")
-declare -a t_13=("people_db_role" "$people_db_role_fields" "$people_db_role_csv_filename")
-declare -a t_14=("people_db_attorneyorganizationassociation" "$people_db_attorneyorganizationassociation_fields" "$people_db_attorneyorganizationassociation_csv_filename")
-declare -a t_15=("search_docketentry" "$search_docketentry_fields" "$search_docketentry_csv_filename")
 declare -a t_16=("search_opinioncluster_panel" "$search_opinioncluster_panel_fields" "$search_opinioncluster_panel_csv_filename")
 declare -a t_17=("search_opinioncluster_non_participating_judges" "$search_opinioncluster_non_participating_judges_fields" "$search_opinioncluster_non_participating_judges_csv_filename")
 
