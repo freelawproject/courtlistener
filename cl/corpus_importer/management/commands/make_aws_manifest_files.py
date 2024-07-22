@@ -64,7 +64,9 @@ def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
     return int(result[0])
 
 
-def get_custom_query(type: str, last_pk: str) -> tuple[str, list[Any]]:
+def get_custom_query(
+    type: str, last_pk: str, options: dict[str, Any]
+) -> tuple[str, list[Any]]:
     """
     Generates a custom SQL query based on the provided type and optional last
     pk.
@@ -73,6 +75,10 @@ def get_custom_query(type: str, last_pk: str) -> tuple[str, list[Any]]:
         type (str): Type of data to retrieve.
         last_pk (int, optional): Last primary key retrieved in a previous
             query. Defaults to None.
+        options (dict[str, Any]): A dictionary containing options for filtering
+            the results.
+            - 'random_sample_percentage' (float, optional): The percentage of
+            records to include in a random sample.
 
     Returns:
         tuple[str, list[Any]]: A tuple containing the constructed SQL
@@ -80,47 +86,30 @@ def get_custom_query(type: str, last_pk: str) -> tuple[str, list[Any]]:
             the query.
     """
     params = []
-
+    random_sample = options["random_sample_percentage"]
     match type:
         case SEARCH_TYPES.RECAP_DOCUMENT:
             base_query = "SELECT id from search_recapdocument"
             filter_clause = (
                 "WHERE is_available=True AND page_count>0 AND ocr_status!=1"
-                if not last_pk
-                else (
-                    "WHERE id > %s AND is_available = True AND page_count > 0"
-                    " AND ocr_status != 1"
-                )
             )
         case SEARCH_TYPES.OPINION:
             base_query = "SELECT id from search_opinion"
-            filter_clause = (
-                "WHERE extracted_by_ocr != true"
-                if not last_pk
-                else "WHERE id > %s AND extracted_by_ocr != true"
-            )
+            filter_clause = "WHERE extracted_by_ocr != true"
         case SEARCH_TYPES.ORAL_ARGUMENT:
             base_query = "SELECT id from audio_audio"
-            no_argument_where_clause = """
+            filter_clause = """
             WHERE local_path_mp3 != '' AND
                 download_url != 'https://www.cadc.uscourts.gov/recordings/recordings.nsf/' AND
                 position('Unavailable' in download_url) = 0 AND
                 duration > 30
             """
-            where_clause_with_argument = """
-            WHERE id > %s AND
-                local_path_mp3 != '' AND
-                download_url != 'https://www.cadc.uscourts.gov/recordings/recordings.nsf/' AND
-                position('Unavailable' in download_url) = 0 AND
-                duration > 30
-            """
-            filter_clause = (
-                no_argument_where_clause
-                if not last_pk
-                else where_clause_with_argument
-            )
 
-    if last_pk:
+    if random_sample:
+        base_query = f"{base_query} TABLESAMPLE SYSTEM ({random_sample})"
+
+    if last_pk and not random_sample:
+        filter_clause = f"{filter_clause} AND id > %s"
         params.append(last_pk)
 
     query = f"{base_query}\n {filter_clause}\n ORDER BY id\n LIMIT %s"
@@ -225,8 +214,7 @@ class Command(VerboseCommand):
         )
         while True:
             query, params = get_custom_query(
-                options["record_type"],
-                last_pk,
+                options["record_type"], last_pk, options
             )
             if not options["random_sample_percentage"]:
                 params.append(options["query_batch_size"])
