@@ -17,6 +17,10 @@ class VerboseCommand(BaseCommand):
             logger.setLevel(logging.INFO)
         elif verbosity > 1:
             logger.setLevel(logging.DEBUG)
+            # This will make juriscraper's logger, called "Logger"
+            # accept most logger calls.
+            juriscraper_logger = logging.getLogger("Logger")
+            juriscraper_logger.setLevel(logging.DEBUG)
 
 
 class CommandUtils:
