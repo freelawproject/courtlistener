@@ -151,6 +151,15 @@ test_patterns = {
     },
     "gamb": HTTPError,
     "hib": Timeout,
+    "cacd": {
+        1: False,
+        2: False,
+        4: False,
+        8: False,
+        16: False,
+        32: False,
+        64: False,
+    },
 }
 
 

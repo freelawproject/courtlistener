@@ -145,6 +145,8 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
             "pk",
             "filepath_local",
             "pacer_doc_id",
+            # Field below is needed for the ACMS attachment page.
+            "acms_document_guid",
             # Fields below needed for absolute_url, if we add that back.
             # 'document_number',
             # 'document_type',
