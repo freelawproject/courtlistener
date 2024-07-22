@@ -194,74 +194,6 @@ people_db_person_race_fields='(
 	   )'
 people_db_person_race_csv_filename="people-db-races-$(date -I).csv"
 
-# disclosures_financialdisclosure
-financialdisclosure_fields='(
-	       id, date_created, date_modified, year, download_filepath, filepath, thumbnail,
-	       thumbnail_status, page_count, sha1, report_type, is_amended, addendum_content_raw,
-	       addendum_redacted, has_been_extracted, person_id
-	   )'
-financialdisclosure_csv_filename="financial-disclosures-$(date -I).csv"
-
-# disclosures_investment
-investment_fields='(
-	       id, date_created, date_modified, page_number, description, redacted,
-	       income_during_reporting_period_code, income_during_reporting_period_type,
-	       gross_value_code, gross_value_method,
-	       transaction_during_reporting_period, transaction_date_raw,
-	       transaction_date, transaction_value_code, transaction_gain_code,
-	       transaction_partner, has_inferred_values, financial_disclosure_id
-	   )'
-investment_csv_filename="financial-disclosure-investments-$(date -I).csv"
-
-# disclosures_position
-disclosures_position_fields='(
-	       id, date_created, date_modified, position, organization_name,
-	       redacted, financial_disclosure_id
-	   )'
-disclosures_position_csv_filename="financial-disclosures-positions-$(date -I).csv"
-
-# disclosures_agreement
-disclosures_agreement_fields='(
-	       id, date_created, date_modified, date_raw, parties_and_terms,
-	       redacted, financial_disclosure_id
-	   )'
-disclosures_agreement_csv_filename="financial-disclosures-agreements-$(date -I).csv"
-
-# disclosures_noninvestmentincome
-noninvestmentincome_fields='(
-	       id, date_created, date_modified, date_raw, source_type,
-	       income_amount, redacted, financial_disclosure_id
-	   )'
-noninvestmentincome_csv_filename="financial-disclosures-non-investment-income-$(date -I).csv"
-
-# disclosures_spouseincome
-spouseincome_fields='(
-	       id, date_created, date_modified, source_type, date_raw, redacted,
-	       financial_disclosure_id
-	   )'
-spouseincome_csv_filename="financial-disclosures-spousal-income-$(date -I).csv"
-
-# disclosures_reimbursement
-disclosures_reimbursement_fields='(
-	       id, date_created, date_modified, source, date_raw, location,
-	       purpose, items_paid_or_provided, redacted, financial_disclosure_id
-	   )'
-disclosures_reimbursement_csv_filename="financial-disclosures-reimbursements-$(date -I).csv"
-
-# disclosures_gift
-disclosures_gift_fields='(
-	       id, date_created, date_modified, source, description, value,
-	       redacted, financial_disclosure_id
-	   )'
-disclosures_gift_csv_filename="financial-disclosures-gifts-$(date -I).csv"
-
-# disclosures_debt
-disclosures_debt_fields='(
-	       id, date_created, date_modified, creditor_name, description,
-	       value_code, redacted, financial_disclosure_id
-	   )'
-disclosures_debt_csv_filename="financial-disclosures-debts-$(date -I).csv"
-
 
 people_db_attorneyorganization_fields='(
 	       id, date_created, date_modified, lookup_key, name, address1, address2, city, state, zip_code
@@ -273,12 +205,6 @@ people_db_attorney_fields='(
 	       id, date_created, date_modified, name, contact_raw, phone, fax, email
 	   )'
 people_db_attorney_csv_filename="people_db_attorney-$(date -I).csv"
-
-
-people_db_party_fields='(
-	       id, date_created, date_modified, name, extra_info
-	   )'
-people_db_party_csv_filename="people_db_party-$(date -I).csv"
 
 
 docket_fields='(
@@ -295,14 +221,6 @@ docket_fields='(
 dockets_csv_filename="search_docket-$(date -I).csv"
 
 
-
-people_db_partytype_fields='(
-	       id, name, docket_id, party_id, date_terminated, extra_info,
-		   highest_offense_level_opening, highest_offense_level_terminated
-	   )'
-people_db_partytype_csv_filename="people_db_partytype-$(date -I).csv"
-
-
 fjcintegrateddatabase_fields='(
 	       id, dataset_source, date_created, date_modified, office, docket_number, origin, date_filed,
 		   jurisdiction, nature_of_suit, title, section, subsection, diversity_of_residence, class_action,
@@ -313,19 +231,6 @@ fjcintegrateddatabase_fields='(
 		   year_of_tape, circuit_id, district_id, nature_of_offense, version
 	   )'
 fjcintegrateddatabase_csv_filename="recap_fjcintegrateddatabase-$(date -I).csv"
-
-
-people_db_criminalcount_fields='(
-	       id, date_created, date_modified, creditor_name, description,
-	       value_code, redacted, financial_disclosure_id
-	   )'
-people_db_criminalcount_csv_filename="people_db_criminalcount-$(date -I).csv"
-
-
-people_db_criminalcomplaint_fields='(
-	       id, name, disposition, status, party_type_id
-	   )'
-people_db_criminalcomplaint_csv_filename="people_db_criminalcomplaint-$(date -I).csv"
 
 
 people_db_role_fields='(
@@ -359,7 +264,7 @@ search_opinioncluster_non_participating_judges_fields='(
 search_opinioncluster_non_participating_judges_csv_filename="search_opinioncluster_non_participating_judges-$(date -I).csv"
 
 # If you add or remove a table, you need to update this number
-NUM_TABLES=42
+NUM_TABLES=29
 
 # Every new table added to bulk script should be added as an associative array
 # This ordering is important. Tables with foreign key constraints must be loaded in order.
@@ -373,40 +278,27 @@ declare -a t_7=("search_originatingcourtinformation" "$originatingcourtinformati
 
 declare -a t_8=("people_db_attorneyorganization" "$people_db_attorneyorganization_fields" "$people_db_attorneyorganization_csv_filename")
 declare -a t_9=("people_db_attorney" "$people_db_attorney_fields" "$people_db_attorney_csv_filename")
-declare -a t_10=("people_db_party" "$people_db_party_fields" "$people_db_party_csv_filename")
-declare -a t_11=("search_docket" "$docket_fields" "$dockets_csv_filename")
-declare -a t_12=("search_opinioncluster" "$opinioncluster_fields" "$opinioncluster_csv_filename")
-declare -a t_13=("people_db_partytype" "$people_db_partytype_fields" "$people_db_partytype_csv_filename")
-declare -a t_14=("recap_fjcintegrateddatabase" "$fjcintegrateddatabase_fields" "$fjcintegrateddatabase_csv_filename")
-declare -a t_15=("people_db_criminalcount" "$people_db_criminalcount_fields" "$people_db_criminalcount_csv_filename")
-declare -a t_16=("people_db_criminalcomplaint" "$people_db_criminalcomplaint_fields" "$people_db_criminalcomplaint_csv_filename")
-declare -a t_17=("people_db_role" "$people_db_role_fields" "$people_db_role_csv_filename")
-declare -a t_18=("people_db_attorneyorganizationassociation" "$people_db_attorneyorganizationassociation_fields" "$people_db_attorneyorganizationassociation_csv_filename")
-declare -a t_19=("search_docketentry" "$search_docketentry_fields" "$search_docketentry_csv_filename")
-declare -a t_20=("search_opinioncluster_panel" "$search_opinioncluster_panel_fields" "$search_opinioncluster_panel_csv_filename")
-declare -a t_21=("search_opinioncluster_non_participating_judges" "$search_opinioncluster_non_participating_judges_fields" "$search_opinioncluster_non_participating_judges_csv_filename")
+declare -a t_10=("search_docket" "$docket_fields" "$dockets_csv_filename")
+declare -a t_11=("search_opinioncluster" "$opinioncluster_fields" "$opinioncluster_csv_filename")
+declare -a t_12=("recap_fjcintegrateddatabase" "$fjcintegrateddatabase_fields" "$fjcintegrateddatabase_csv_filename")
+declare -a t_13=("people_db_role" "$people_db_role_fields" "$people_db_role_csv_filename")
+declare -a t_14=("people_db_attorneyorganizationassociation" "$people_db_attorneyorganizationassociation_fields" "$people_db_attorneyorganizationassociation_csv_filename")
+declare -a t_15=("search_docketentry" "$search_docketentry_fields" "$search_docketentry_csv_filename")
+declare -a t_16=("search_opinioncluster_panel" "$search_opinioncluster_panel_fields" "$search_opinioncluster_panel_csv_filename")
+declare -a t_17=("search_opinioncluster_non_participating_judges" "$search_opinioncluster_non_participating_judges_fields" "$search_opinioncluster_non_participating_judges_csv_filename")
 
-declare -a t_22=("search_opinion" "$opinion_fields" "$opinions_csv_filename")
-declare -a t_23=("search_opinion_joined_by" "$search_opinion_joined_by_fields" "$search_opinion_joined_by_csv_filename")
-declare -a t_24=("search_courthouse" "$courthouse_fields" "$courthouse_csv_filename")
-declare -a t_25=("search_court_appeals_to" "$court_appeals_to_fields" "$court_appeals_to_csv_filename")
-declare -a t_26=("search_opinionscited" "$opinionscited_fields" "$opinionscited_csv_filename")
-declare -a t_27=("search_citation" "$citation_fields" "$citations_csv_filename")
-declare -a t_28=("search_parenthetical" "$parentheticals_fields" "$parentheticals_csv_filename")
-declare -a t_29=("audio_audio" "$oralarguments_fields" "$oralarguments_csv_filename")
-declare -a t_30=("people_db_retentionevent" "$people_db_retentionevent_fields" "$people_db_retentionevent_csv_filename")
-declare -a t_31=("people_db_education" "$people_db_education_fields" "$people_db_education_csv_filename")
-declare -a t_32=("people_db_politicalaffiliation" "$politicalaffiliation_fields" "$politicalaffiliation_csv_filename")
-declare -a t_33=("people_db_person_race" "$people_db_person_race_fields" "$people_db_person_race_csv_filename")
-declare -a t_34=("disclosures_financialdisclosure" "$financialdisclosure_fields" "$financialdisclosure_csv_filename")
-declare -a t_35=("disclosures_investment" "$investment_fields" "$investment_csv_filename")
-declare -a t_36=("disclosures_position" "$disclosures_position_fields" "$disclosures_position_csv_filename")
-declare -a t_37=("disclosures_agreement" "$disclosures_agreement_fields" "$disclosures_agreement_csv_filename")
-declare -a t_38=("disclosures_noninvestmentincome" "$noninvestmentincome_fields" "$noninvestmentincome_csv_filename")
-declare -a t_39=("disclosures_spouseincome" "$spouseincome_fields" "$spouseincome_csv_filename")
-declare -a t_40=("disclosures_reimbursement" "$disclosures_reimbursement_fields" "$disclosures_reimbursement_csv_filename")
-declare -a t_41=("disclosures_gift" "$disclosures_gift_fields" "$disclosures_gift_csv_filename")
-declare -a t_42=("disclosures_debt" "$disclosures_debt_fields" "$disclosures_debt_csv_filename")
+declare -a t_18=("search_opinion" "$opinion_fields" "$opinions_csv_filename")
+declare -a t_19=("search_opinion_joined_by" "$search_opinion_joined_by_fields" "$search_opinion_joined_by_csv_filename")
+declare -a t_20=("search_courthouse" "$courthouse_fields" "$courthouse_csv_filename")
+declare -a t_21=("search_court_appeals_to" "$court_appeals_to_fields" "$court_appeals_to_csv_filename")
+declare -a t_22=("search_opinionscited" "$opinionscited_fields" "$opinionscited_csv_filename")
+declare -a t_23=("search_citation" "$citation_fields" "$citations_csv_filename")
+declare -a t_24=("search_parenthetical" "$parentheticals_fields" "$parentheticals_csv_filename")
+declare -a t_25=("audio_audio" "$oralarguments_fields" "$oralarguments_csv_filename")
+declare -a t_26=("people_db_retentionevent" "$people_db_retentionevent_fields" "$people_db_retentionevent_csv_filename")
+declare -a t_27=("people_db_education" "$people_db_education_fields" "$people_db_education_csv_filename")
+declare -a t_28=("people_db_politicalaffiliation" "$politicalaffiliation_fields" "$politicalaffiliation_csv_filename")
+declare -a t_29=("people_db_person_race" "$people_db_person_race_fields" "$people_db_person_race_csv_filename")
 
 # Create a new array with the data of each associative array
 declare -a listOfLists
