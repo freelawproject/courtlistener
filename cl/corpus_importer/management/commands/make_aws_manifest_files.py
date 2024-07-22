@@ -14,45 +14,49 @@ from cl.search.models import SEARCH_TYPES
 s3_client = boto3.client("s3")
 
 
-def get_total_number_of_records(type: str, use_replica: bool = False) -> int:
+def get_total_number_of_records(type: str, options: dict[str, Any]) -> int:
     """
     Retrieves the total number of records for a specific data type.
 
     Args:
         type (str): The type of data to count. Must be one of the valid values
             from the `SEARCH_TYPES` class.
-        use_replica (bool, optional): Whether to use the replica database
-            connection (default: False).
+        options (dict[str, Any]): A dictionary containing options for filtering
+            the results.
+            - 'use_replica' (bool, optional): Whether to use the replica database
+              connection (default: False).
+            - 'random_sample_percentage' (float, optional): The percentage of
+            records  to include in a random sample.
 
     Returns:
         int: The total number of records matching the specified data type.
     """
     match type:
         case SEARCH_TYPES.RECAP_DOCUMENT:
-            query = """
-            SELECT count(*) AS exact_count
-            FROM search_recapdocument
+            base_query = (
+                "SELECT count(*) AS exact_count FROM search_recapdocument"
+            )
+            filter_clause = """
             WHERE is_available=True AND page_count>0 AND ocr_status!=1
             """
         case SEARCH_TYPES.OPINION:
-            query = """
-            SELECT count(*) AS exact_count
-            FROM search_opinion
-            WHERE extracted_by_ocr != true
-            """
+            base_query = "SELECT count(*) AS exact_count FROM search_opinion"
+            filter_clause = "WHERE extracted_by_ocr != true"
         case SEARCH_TYPES.ORAL_ARGUMENT:
-            query = """
-            SELECT count(*) AS exact_count
-            FROM audio_audio
-            WHERE
-                local_path_mp3 != '' AND
+            base_query = "SELECT count(*) AS exact_count FROM audio_audio"
+            filter_clause = """WHERE local_path_mp3 != '' AND
                 download_url != 'https://www.cadc.uscourts.gov/recordings/recordings.nsf/' AND
                 position('Unavailable' in download_url) = 0 AND
                 duration > 30
             """
 
+    if options["random_sample_percentage"]:
+        percentage = options["random_sample_percentage"]
+        base_query = f"{base_query} TABLESAMPLE SYSTEM ({percentage})"
+
+    query = f"{base_query}\n {filter_clause}\n"
     with connections[
-        "replica" if use_replica else "default"
+        "replica" if options["use_replica"] else "default"
     ].cursor() as cursor:
         cursor.execute(query, [])
         result = cursor.fetchone()
@@ -202,7 +206,7 @@ class Command(VerboseCommand):
         )
         if not total_number_of_records:
             total_number_of_records = get_total_number_of_records(
-                record_type, options["use_replica"]
+                record_type, options
             )
             r.hset(
                 f"{record_type}_import_status",
