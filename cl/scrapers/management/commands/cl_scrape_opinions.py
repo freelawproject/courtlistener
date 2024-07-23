@@ -110,6 +110,7 @@ def make_objects(
         court.pk,
         item.get("docket_numbers", ""),
         item.get("source") or Docket.SCRAPER,
+        overwrite_existing_data=False,
         blocked=blocked,
         date_blocked=date_blocked,
         appeal_from_str=item.get("lower_courts", ""),

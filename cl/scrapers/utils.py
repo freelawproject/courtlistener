@@ -291,6 +291,7 @@ def update_or_create_docket(
     court_id: str,
     docket_number: str,
     source: int,
+    overwrite_existing_data: bool,
     blocked: bool = False,
     case_name_full: str = "",
     date_blocked: date | None = None,
@@ -306,6 +307,10 @@ def update_or_create_docket(
     :param court_id: The court id the docket belongs to.
     :param docket_number: The docket number.
     :param source: The docket source.
+    :param overwrite_existing_data: should be True when this function is
+        called from the Harvard importer; the Harvard data is considered
+        more trustable  and should overwrite an existing docket's data
+        Should be False when called from scrapers.
     :param blocked: If the docket should be blocked, default False.
     :param case_name_full: The docket case_name_full.
     :param date_blocked: The docket date_blocked if it's blocked.
@@ -334,7 +339,11 @@ def update_or_create_docket(
         for field, value in docket_fields.items():
             if not value:
                 continue
-            if getattr(docket, field) and getattr(docket, field) != value:
+            if (
+                not overwrite_existing_data
+                and getattr(docket, field)
+                and getattr(docket, field) != value
+            ):
                 # Prevent overwriting values that already exist, since default values
                 # to this function are empty strings or None
                 logger.error(
