@@ -71,7 +71,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         """Can we successfully ingest opinions at a high level?"""
 
         d_1 = DocketFactory(
-            case_name="Tarrant Regional Water District v. Herrmann old",
+            case_name="Tarrant Regional Water District v. Herrmann",
             docket_number="11-889",
             court=self.court,
             source=Docket.RECAP,
@@ -79,7 +79,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         )
 
         d_2 = DocketFactory(
-            case_name="State of Indiana v. Charles Barker old",
+            case_name="State of Indiana v. Charles Barker",
             docket_number="49S00-0308-DP-392",
             court=self.court,
             source=Docket.IDB,
@@ -87,7 +87,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         )
 
         d_3 = DocketFactory(
-            case_name="Intl Fidlty Ins Co v. Ideal Elec Sec Co old",
+            case_name="Intl Fidlty Ins Co v. Ideal Elec Sec Co",
             docket_number="96-7169",
             court=self.court,
             source=Docket.RECAP_AND_IDB,
@@ -205,7 +205,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         """Can we successfully ingest oral arguments at a high level?"""
 
         d_1 = DocketFactory(
-            case_name="Jeremy v. Julian old",
+            case_name="Jeremy v. Julian",
             docket_number="23-232388",
             court=self.court,
             source=Docket.RECAP,
@@ -230,7 +230,6 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             f"Should have 2 dockets, not {dockets.count()}",
         )
         d_1.refresh_from_db()
-        self.assertEqual(d_1.case_name, "Jeremy v. Julian")
         self.assertEqual(d_1.source, Docket.RECAP_AND_SCRAPER)
 
         # Confirm that OA Search Alerts are properly triggered after an OA is

@@ -337,8 +337,11 @@ def update_or_create_docket(
         docket.add_opinions_source(source)
 
         for field, value in docket_fields.items():
-            if not value:
+            # do not use blanket `if not value:`, since
+            # blocked and ia_needs_upload are booleans and would be skipped
+            if value is None or value == "":
                 continue
+
             if (
                 not overwrite_existing_data
                 and getattr(docket, field)
