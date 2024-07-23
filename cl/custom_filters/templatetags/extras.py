@@ -263,16 +263,10 @@ def group_courts(courts: list[Court], num_columns: int) -> list:
         # Calculate the end index for this chunk
         end = start + column_len + (1 if index < remainder else 0)
 
-        # Find the next 'TS' or 'S' starting point
-        while end < len(courts) and courts[end].jurisdiction not in [
-            "TS",
-            "S",
-        ]:
+        # Find the next COLR as a starting point (Court of last resort)
+        COLRs = [Court.TERRITORY_SUPREME, Court.STATE_SUPREME]
+        while end < len(courts) and courts[end].jurisdiction not in COLRs:
             end += 1
-
-        # Adjust the chunk to start with 'TS' or 'S'
-        while start < end and courts[start].jurisdiction not in ["TS", "S"]:
-            start += 1
 
         # Create the column and add it to result
         groups.append(courts[start:end])
