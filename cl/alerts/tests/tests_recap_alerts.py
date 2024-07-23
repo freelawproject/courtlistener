@@ -71,15 +71,8 @@ class RECAPAlertsSweepIndexTest(
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         cls.mock_date = now()
-        with time_machine.travel(cls.mock_date, tick=False):
+        with time_machine.travel(cls.mock_date, tick=False), cls.captureOnCommitCallbacks(execute=True):
             super().setUpTestData()
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
-            )
 
             cls.user_profile = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
@@ -268,25 +261,18 @@ class RECAPAlertsSweepIndexTest(
 
         # Index Docket changed today + their RECAPDocuments indexed on
         # previous days
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
                 docket_number="1:21-bk-1234",
                 source=Docket.RECAP,
             )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
-            )
 
         # Its related RD is ingested two days before.
         two_days_before = now() - datetime.timedelta(days=2)
         mock_two_days_before = two_days_before.replace(hour=5)
-        with time_machine.travel(mock_two_days_before, tick=False):
+        with time_machine.travel(mock_two_days_before, tick=False), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -298,13 +284,6 @@ class RECAPAlertsSweepIndexTest(
                 description="Motion to File",
                 document_number="1",
                 is_available=True,
-            )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
             )
 
         # Run the indexer.
@@ -321,23 +300,16 @@ class RECAPAlertsSweepIndexTest(
 
         # Index a RECAPDocument changed today including its parent Docket
         # indexed on previous days.
-        with time_machine.travel(mock_two_days_before, tick=False):
+        with time_machine.travel(mock_two_days_before, tick=False), self.captureOnCommitCallbacks(execute=True):
             docket_2 = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE OFF",
                 docket_number="1:21-bk-1250",
                 source=Docket.RECAP,
             )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
-            )
 
         # Its related RD is ingested today.
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
             alert_de_2 = DocketEntryWithParentsFactory(
                 docket=docket_2,
                 entry_number=1,
@@ -348,13 +320,6 @@ class RECAPAlertsSweepIndexTest(
                 docket_entry=alert_de_2,
                 description="Motion to File Lorem",
                 document_number="2",
-            )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
             )
 
         # Run the indexer.
@@ -520,7 +485,7 @@ class RECAPAlertsSweepIndexTest(
         )
         # Simulate docket is ingested a day before.
         one_day_before = self.mock_date - datetime.timedelta(days=1)
-        with time_machine.travel(one_day_before, tick=False):
+        with time_machine.travel(one_day_before, tick=False), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -534,7 +499,7 @@ class RECAPAlertsSweepIndexTest(
             )
 
         # Its related RD is ingested today.
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -549,13 +514,6 @@ class RECAPAlertsSweepIndexTest(
                 page_count=5,
                 pacer_doc_id="018036652436",
                 plain_text="plain text for 018036652436",
-            )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
             )
 
         with mock.patch(
@@ -623,7 +581,7 @@ class RECAPAlertsSweepIndexTest(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
             # Create a new RD for the same DocketEntry to confirm this new RD is
             # properly included in the alert email.
             rd_2 = RECAPDocumentFactory(
@@ -634,13 +592,6 @@ class RECAPAlertsSweepIndexTest(
                 page_count=3,
                 pacer_doc_id="018036652436",
                 plain_text="plain text for 018036652436",
-            )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
             )
 
         with mock.patch(
@@ -844,19 +795,12 @@ class RECAPAlertsSweepIndexTest(
         )
         two_days_before = self.mock_date - datetime.timedelta(days=2)
         mock_two_days_before = two_days_before.replace(hour=5)
-        with time_machine.travel(mock_two_days_before, tick=False):
+        with time_machine.travel(mock_two_days_before, tick=False), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="United States of America",
                 docket_number="1:21-bk-1009",
                 source=Docket.RECAP,
-            )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
             )
 
         with mock.patch(
@@ -875,7 +819,7 @@ class RECAPAlertsSweepIndexTest(
 
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -895,13 +839,6 @@ class RECAPAlertsSweepIndexTest(
                 case_name="United States vs Lorem",
                 docket_number="1:21-bk-1008",
                 source=Docket.RECAP,
-            )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
             )
 
         with mock.patch(
@@ -941,16 +878,9 @@ class RECAPAlertsSweepIndexTest(
             [],
         )
         # Modify 1:21-bk-1009 docket today:
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
             docket.cause = "405 Civil"
             docket.save()
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
-            )
 
         # Trigger the alert again:
         with mock.patch(
@@ -997,7 +927,7 @@ class RECAPAlertsSweepIndexTest(
 
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
             rd_4 = RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Hearing new",
@@ -1011,13 +941,6 @@ class RECAPAlertsSweepIndexTest(
                 document_number="4",
                 pacer_doc_id="018026657750",
                 plain_text="United states of america plain text",
-            )
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
             )
 
         # This test confirms that we're able to trigger cross-object alerts
@@ -1125,7 +1048,7 @@ class RECAPAlertsSweepIndexTest(
         results for this Case" button.
         """
 
-        with time_machine.travel(self.mock_date, tick=False):
+        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=self.de.docket,
                 entry_number=1,
@@ -1145,13 +1068,6 @@ class RECAPAlertsSweepIndexTest(
                     # included in the case.
                     rd_descriptions.append(rd.description)
 
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
-            )
         recap_only_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
@@ -1214,43 +1130,44 @@ class RECAPAlertsSweepIndexTest(
         alert are limited to SCHEDULED_ALERT_HITS_LIMIT (3) hits.
         """
 
-        docket = DocketFactory(
-            court=self.court,
-            case_name=f"SUBPOENAS SERVED CASE",
-            docket_number=f"1:21-bk-123",
-            source=Docket.RECAP,
-            cause="410 Civil",
-        )
-        dockets_created = []
-        for i in range(3):
-            docket_created = DocketFactory(
+        with self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
                 court=self.court,
-                case_name=f"SUBPOENAS SERVED CASE {i}",
-                docket_number=f"1:21-bk-123{i}",
+                case_name=f"SUBPOENAS SERVED CASE",
+                docket_number=f"1:21-bk-123",
                 source=Docket.RECAP,
                 cause="410 Civil",
             )
-            dockets_created.append(docket_created)
+            dockets_created = []
+            for i in range(3):
+                docket_created = DocketFactory(
+                    court=self.court,
+                    case_name=f"SUBPOENAS SERVED CASE {i}",
+                    docket_number=f"1:21-bk-123{i}",
+                    source=Docket.RECAP,
+                    cause="410 Civil",
+                )
+                dockets_created.append(docket_created)
 
-        alert_de = DocketEntryWithParentsFactory(
-            docket=docket,
-            entry_number=1,
-            date_filed=datetime.date(2024, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem Served",
-        )
-        rd = RECAPDocumentFactory(
-            docket_entry=alert_de,
-            description="Motion to File",
-            document_number="1",
-            pacer_doc_id="018036652439",
-        )
-        rd_2 = RECAPDocumentFactory(
-            docket_entry=alert_de,
-            description="Motion to File 2",
-            document_number="2",
-            pacer_doc_id="018036652440",
-            plain_text="plain text lorem",
-        )
+            alert_de = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            rd = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File",
+                document_number="1",
+                pacer_doc_id="018036652439",
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 2",
+                document_number="2",
+                pacer_doc_id="018036652440",
+                plain_text="plain text lorem",
+            )
 
         docket_only_alert = AlertFactory(
             user=self.user_profile.user,
@@ -1283,13 +1200,6 @@ class RECAPAlertsSweepIndexTest(
             f'&case_name="{docket.case_name}"&type=r',
         )
 
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.RECAP,
-            queue="celery",
-            pk_offset=0,
-            testing_mode=True,
-        )
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -1597,7 +1507,7 @@ class RECAPAlertsPercolatorTest(
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         cls.mock_date = now()
-        with time_machine.travel(cls.mock_date, tick=False):
+        with time_machine.travel(cls.mock_date, tick=False), cls.captureOnCommitCallbacks(execute=True):
             super().setUpTestData()
             cls.docket_3 = DocketFactory(
                 court=cls.court,
@@ -1609,14 +1519,6 @@ class RECAPAlertsPercolatorTest(
                 cause="405 Civil",
                 jurisdiction_type="'U.S. Government Defendant",
                 jury_demand="1,000,000",
-            )
-
-            call_command(
-                "cl_index_parent_and_child_docs",
-                search_type=SEARCH_TYPES.RECAP,
-                queue="celery",
-                pk_offset=0,
-                testing_mode=True,
             )
 
             cls.user_profile = UserProfileWithParentsFactory()
@@ -2123,13 +2025,8 @@ class RECAPAlertsPercolatorTest(
                 source=Docket.RECAP,
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
-            ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -2179,13 +2076,7 @@ class RECAPAlertsPercolatorTest(
                 plain_text="plain text for 018036652436",
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
-            ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
         self.assertEqual(
@@ -2238,13 +2129,8 @@ class RECAPAlertsPercolatorTest(
                 plain_text="plain text for 01803665477",
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
-            ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+
         html_content = self.get_html_content_from_email(mail.outbox[2])
         self.assertEqual(
             len(mail.outbox), 3, msg="Outgoing emails don't match."
@@ -2268,17 +2154,16 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert RECAP Only 4",
             query='q="Hearing to File Updated"&type=r',
         )
-        with self.captureOnCommitCallbacks(execute=True):
-            alert_de_2.description = "Hearing to File Updated"
-            alert_de_2.save()
-
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        ), self.captureOnCommitCallbacks(execute=True):
+            alert_de_2.description = "Hearing to File Updated"
+            alert_de_2.save()
+
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         # No alert should be triggered on DE updates.
         self.assertEqual(
@@ -2287,17 +2172,16 @@ class RECAPAlertsPercolatorTest(
 
         # Alert is triggered only after a RECAPDocument creation/update to avoid
         # percolating the same document twice.
-        with self.captureOnCommitCallbacks(execute=True):
-            rd_2.document_number = 1
-            rd_2.save()
-
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        ), self.captureOnCommitCallbacks(execute=True):
+            rd_2.document_number = 1
+            rd_2.save()
+
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
@@ -2323,17 +2207,17 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert Docket Only 5",
             query='q="SUBPOENAS SERVED LOREM"&type=r',
         )
-        with self.captureOnCommitCallbacks(execute=True):
-            docket.case_name = "SUBPOENAS SERVED LOREM"
-            docket.save()
-
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket.case_name = "SUBPOENAS SERVED LOREM"
+            docket.save()
+
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+
         html_content = self.get_html_content_from_email(mail.outbox[4])
         self.assertEqual(
             len(mail.outbox), 5, msg="Outgoing emails don't match."
@@ -2356,16 +2240,15 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert Docket Only 6",
             query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
         )
-        with self.captureOnCommitCallbacks(execute=True):
-            BankruptcyInformationFactory(docket=docket, chapter="7")
-
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        ), self.captureOnCommitCallbacks(execute=True):
+            BankruptcyInformationFactory(docket=docket, chapter="7")
+
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         html_content = self.get_html_content_from_email(mail.outbox[5])
         self.assertEqual(
@@ -2402,16 +2285,15 @@ class RECAPAlertsPercolatorTest(
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
-        ):
-            index_docket_parties_in_es.delay(docket.pk)
-
-        with mock.patch(
+        ), mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
                 200, mock_raw=True
             ),
         ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+            index_docket_parties_in_es.delay(docket.pk)
+
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 7, msg="Outgoing emails don't match."
@@ -2442,13 +2324,7 @@ class RECAPAlertsPercolatorTest(
                 source=Docket.RECAP,
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
-            ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -2489,13 +2365,7 @@ class RECAPAlertsPercolatorTest(
                 plain_text="plain text for 018036652000",
             )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
-            ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
