@@ -195,20 +195,6 @@ people_db_person_race_fields='(
 people_db_person_race_csv_filename="people-db-races-$(date -I).csv"
 
 
-docket_fields='(
-	       id, date_created, date_modified, date_cert_granted, date_cert_denied, date_argued,
-		   date_reargued, date_reargument_denied, case_name_short, case_name, case_name_full, slug,
-		   docket_number, blocked, court_id, assigned_to_id, cause, date_filed, date_list_filing,
-		   date_terminated, filepath_ia, filepath_local, jurisdiction_type, jury_demand,
-		   nature_of_suit, pacer_case_id, referred_to_id, source, assigned_to_str, view_count,
-		   date_last_index, appeal_from_str, appellate_case_type_information,
-		   appellate_fee_status, panel_str, originating_court_information_id, mdl_status,
-		   filepath_ia_json, ia_date_first_change, ia_needs_upload, ia_upload_failure_count,
-		   docket_number_core, idb_data_id
-	   )'
-dockets_csv_filename="search_docket-$(date -I).csv"
-
-
 fjcintegrateddatabase_fields='(
 	       id, dataset_source, date_created, date_modified, office, docket_number, origin, date_filed,
 		   jurisdiction, nature_of_suit, title, section, subsection, diversity_of_residence, class_action,
