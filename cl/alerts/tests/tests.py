@@ -564,6 +564,7 @@ class AlertAPITests(APITestCase):
 
 @override_switch("o-es-alerts-active", active=True)
 @override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
+@mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
     """Test Search Alerts Webhooks"""
 
@@ -661,15 +662,19 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             gender="m",
         )
         cls.mock_date = now().replace(day=15, hour=0)
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.search.tasks.percolator_alerts_models_supported",
+                new=[Audio],
             ),
-        ), time_machine.travel(
-            cls.mock_date, tick=False
-        ), cls.captureOnCommitCallbacks(
-            execute=True
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(cls.mock_date, tick=False),
+            cls.captureOnCommitCallbacks(execute=True),
         ):
             cls.dly_opinion = OpinionWithParentsFactory.create(
                 cluster__case_name="California vs Lorem",
@@ -1824,6 +1829,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
 
 @override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
 @override_switch("oa-es-alerts-active", active=True)
+@mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 @mock.patch(
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,

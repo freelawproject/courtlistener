@@ -637,6 +637,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         # "View Full Results" button.
         qd = override_alert_query(alert_triggered)
         alert_triggered.query_run = qd.urlencode()  # type: ignore
+
         # Compose RT hit to send.
         hits = [
             (
@@ -649,6 +650,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         # Send real time Webhooks for all users regardless of alert rate and
         # user's donations.
         send_webhook_alert_hits(alert_user, hits)
+
         # Send RT Alerts
         if (
             alert_triggered.rate == Alert.REAL_TIME

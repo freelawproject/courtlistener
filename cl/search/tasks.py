@@ -73,7 +73,7 @@ from cl.search.types import (
     SaveDocumentResponseType,
 )
 
-models_alert_support = [Audio, RECAPDocument, Docket]
+percolator_alerts_models_supported = [Audio, RECAPDocument, Docket]
 
 logger = logging.getLogger(__name__)
 
@@ -387,7 +387,10 @@ def es_save_document(
         return_doc_meta=True,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
-    if type(instance) in models_alert_support and response["_version"] == 1:
+    if (
+        type(instance) in percolator_alerts_models_supported
+        and response["_version"] == 1
+    ):
         # Only send search alerts when a new instance of a model that support
         # Alerts is indexed in ES _version:1
         if es_document == AudioDocument and not waffle.switch_is_active(

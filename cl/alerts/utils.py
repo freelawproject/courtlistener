@@ -137,6 +137,8 @@ def percolate_document(
     """
 
     if document_index:
+        # If document_index is provided, use it along with the document_id to refer
+        # to the document to percolate.
         percolate_query = Q(
             "percolate",
             field="percolator_query",
@@ -144,6 +146,7 @@ def percolate_document(
             id=document_id,
         )
     else:
+        # Otherwise, use the document_dict to perform the percolation query.
         percolate_query = Q(
             "percolate",
             field="percolator_query",
