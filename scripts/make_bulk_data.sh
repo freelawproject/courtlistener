@@ -195,18 +195,6 @@ people_db_person_race_fields='(
 people_db_person_race_csv_filename="people-db-races-$(date -I).csv"
 
 
-fjcintegrateddatabase_fields='(
-	       id, dataset_source, date_created, date_modified, office, docket_number, origin, date_filed,
-		   jurisdiction, nature_of_suit, title, section, subsection, diversity_of_residence, class_action,
-		   monetary_demand, county_of_residence, arbitrarion_at_filing, arbitration_at_termination,
-		   multidistrict_litigation_docket_number, plaintiff, defendant, date_transfer, transfer_office,
-		   transfer_docket_number, transfer_oprigin, date_terminated, termination_class_action_status,
-		   procedural_progress, disposition, nature_of_judgement, amount_recieved, judgment, pro_se,
-		   year_of_tape, circuit_id, district_id, nature_of_offense, version
-	   )'
-fjcintegrateddatabase_csv_filename="recap_fjcintegrateddatabase-$(date -I).csv"
-
-
 search_opinioncluster_panel_fields='(
 	       id, opinioncluster_id, person_id
 	   )'
