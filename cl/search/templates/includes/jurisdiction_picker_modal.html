@@ -1,4 +1,5 @@
 {% load partition_util %}
+{% load extras %}
 
 <div class="modal" id="court-picker" role="dialog" aria-hidden="true">
     <div class="modal-dialog" id="modal-court-picker">
@@ -166,24 +167,31 @@
                     {% endif %}
 
                     {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.PEOPLE %}
-                      <div class="tab-pane" id="tab-state">
-                        <div class="row">
-                          {% for col_bundle in courts.state %}
-                            <div class="col-sm-4">
-                                {% for court_bundle in col_bundle %}
-                                  {% for court in court_bundle %}
-                                    {% if court.jurisdiction == 'S' %}
-                                      {% include "includes/court_checkbox.html" %}
-                                    {% else %}
-                                      {% include "includes/court_checkbox.html" with indent=True %}
-                                    {% endif %}
-                                  {% endfor %}
+                        <div class="tab-pane" id="tab-state">
+                            {% for group in courts.state %}
+                                {% if forloop.counter == 1 %}
+                                    <h3 class="bottom inline">State Courts</h3>
+                                {% elif forloop.counter == 2 %}
+                                    <hr>
+                                    <h3 class="bottom inline">U.S. Territory Courts</h3>
+                                {% endif %}
+                            <div class="row">
+                                {% for col_bundle in group|group_courts:3 %}
+                                    <div class="col-sm-4">
+                                    {% for court in col_bundle %}
+                                        {% if court.jurisdiction == 'S' %}
+                                            {% include "includes/court_checkbox.html" %}
+                                        {% else %}
+                                            {% include "includes/court_checkbox.html" with indent=True %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    </div>
                                 {% endfor %}
                             </div>
-                          {% endfor %}
+                            {% endfor %}
                         </div>
-                      </div>
                     {% endif %}
+
                     {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
                         <div class="tab-pane" id="tab-special">
                             {# Regroup into closed/open courts #}
