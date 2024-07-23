@@ -26,6 +26,7 @@ from cl.alerts.utils import (
     include_recap_document_hit,
     override_alert_query,
     percolate_document,
+    prepare_percolator_content,
     transform_percolator_child_document,
 )
 from cl.api.models import WebhookEventType
@@ -44,13 +45,7 @@ from cl.lib.redis_utils import (
 )
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.documents import (
-    AudioDocument,
-    AudioPercolator,
-    DocketDocument,
-    RECAPPercolator,
-)
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
+from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
     ESDocumentNameType,
     PercolatorResponseType,
@@ -576,8 +571,8 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
     for hit in main_alerts_triggered:
         # Create a deep copy of the original 'document_content' to allow
         # independent highlighting for each alert triggered.
-        document_content_copy = copy.deepcopy(document_content)
 
+        document_content_copy = copy.deepcopy(document_content)
         alert_triggered = (
             Alert.objects.filter(pk=hit.meta.id).select_related("user").first()
         )
@@ -642,7 +637,6 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         # "View Full Results" button.
         qd = override_alert_query(alert_triggered)
         alert_triggered.query_run = qd.urlencode()  # type: ignore
-
         # Compose RT hit to send.
         hits = [
             (
@@ -655,7 +649,6 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         # Send real time Webhooks for all users regardless of alert rate and
         # user's donations.
         send_webhook_alert_hits(alert_user, hits)
-
         # Send RT Alerts
         if (
             alert_triggered.rate == Alert.REAL_TIME
@@ -744,25 +737,18 @@ def send_or_schedule_alerts(
         return None
 
     document_id, document_content, app_label = response
-    # Perform an initial percolator query and process its response.
 
-    es_document_index = None
-    match app_label:
-        case "audio.Audio":
-            percolator_index = AudioPercolator._index._name
-            es_document_index = AudioDocument._index._name
-        case "search.Docket":
-            percolator_index = RECAPPercolator._index._name
-            es_document_index = DocketDocument._index._name
-        case "search.RECAPDocument":
-            percolator_index = RECAPPercolator._index._name
-        case _:
-            raise NotImplementedError(
-                "Percolator search alerts not supported for %s", app_label
-            )
+    # Perform an initial percolator query and process its response.
+    percolator_index, es_document_index, document_content = (
+        prepare_percolator_content(app_label, document_id, document_content)
+    )
 
     percolator_responses = percolate_document(
-        document_id, percolator_index, es_document_index, app_label
+        document_id,
+        percolator_index,
+        es_document_index,
+        document_content,
+        app_label,
     )
     if not percolator_responses[0]:
         self.request.chain = None
@@ -779,9 +765,11 @@ def send_or_schedule_alerts(
             document_id,
             percolator_index,
             es_document_index,
+            document_content,
             app_label,
         )
     )
+
     return (
         main_alerts_triggered,
         rd_alerts_triggered,

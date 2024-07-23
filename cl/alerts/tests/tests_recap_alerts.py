@@ -19,6 +19,7 @@ from cl.alerts.utils import (
     avoid_indexing_auxiliary_alert,
     build_plain_percolator_query,
     percolate_document,
+    prepare_percolator_content,
     recap_document_hl_matched,
 )
 from cl.api.factories import WebhookFactory
@@ -1688,9 +1689,18 @@ class RECAPAlertsPercolatorTest(
         return percolator_query.meta.id
 
     @staticmethod
-    def prepare_recap_document(document):
-        recap_doc = ESRECAPDocumentPlain()
-        return recap_doc.prepare(document)
+    def prepare_and_percolate_document(app_label, document_id):
+        percolator_index, es_document_index, document_content = (
+            prepare_percolator_content(app_label, document_id, None)
+        )
+        responses = percolate_document(
+            str(document_id),
+            percolator_index,
+            es_document_index,
+            document_content,
+            app_label=app_label,
+        )
+        return responses
 
     @classmethod
     def delete_documents_from_index(cls, index_alias, queries):
@@ -1717,10 +1727,9 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
-            str(self.rd_att.pk),
-            RECAPPercolator._index._name,
-            app_label="search.RECAPDocument",
+        app_label = "search.RECAPDocument"
+        responses = self.prepare_and_percolate_document(
+            app_label, str(self.rd_att.pk)
         )
         expected_queries = 1
         self.assertEqual(len(responses[0]), expected_queries)
@@ -1738,10 +1747,8 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_1 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_1)
-        responses = percolate_document(
-            str(self.rd.pk),
-            RECAPPercolator._index._name,
-            app_label="search.RECAPDocument",
+        responses = self.prepare_and_percolate_document(
+            app_label, str(self.rd.pk)
         )
         expected_queries = 1
         self.assertEqual(len(responses[0]), expected_queries)
@@ -1758,10 +1765,8 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        responses = percolate_document(
-            str(self.rd.pk),
-            RECAPPercolator._index._name,
-            app_label="search.RECAPDocument",
+        responses = self.prepare_and_percolate_document(
+            app_label, str(self.rd.pk)
         )
         expected_queries = 2
         self.assertEqual(len(responses[0]), expected_queries)
@@ -1781,10 +1786,8 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_3 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_3)
-        responses = percolate_document(
-            str(self.rd.pk),
-            RECAPPercolator._index._name,
-            app_label="search.RECAPDocument",
+        responses = self.prepare_and_percolate_document(
+            app_label, str(self.rd.pk)
         )
         expected_queries = 3
         self.assertEqual(
@@ -1818,10 +1821,9 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
-            str(self.rd_2.pk),
-            RECAPPercolator._index._name,
-            app_label="search.RECAPDocument",
+        app_label = "search.RECAPDocument"
+        responses = self.prepare_and_percolate_document(
+            app_label, str(self.rd_2.pk)
         )
         expected_queries = 1
         self.assertEqual(len(responses[0]), expected_queries)
@@ -1839,10 +1841,8 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
-            str(self.rd_att.pk),
-            RECAPPercolator._index._name,
-            app_label="search.RECAPDocument",
+        responses = self.prepare_and_percolate_document(
+            app_label, str(self.rd_att.pk)
         )
         expected_queries = 1
         self.assertEqual(len(responses[0]), expected_queries)
@@ -1860,10 +1860,8 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
-            str(self.rd.pk),
-            RECAPPercolator._index._name,
-            app_label="search.RECAPDocument",
+        responses = self.prepare_and_percolate_document(
+            app_label, str(self.rd.pk)
         )
         expected_queries = 1
         self.assertEqual(len(responses[0]), expected_queries)
@@ -1879,10 +1877,8 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        responses = percolate_document(
-            str(self.rd.pk),
-            RECAPPercolator._index._name,
-            app_label="search.RECAPDocument",
+        responses = self.prepare_and_percolate_document(
+            app_label, str(self.rd.pk)
         )
         expected_queries = 2
         self.assertEqual(len(responses[0]), expected_queries)
@@ -2555,6 +2551,7 @@ class RECAPAlertsPercolatorTest(
                 plain_text="plain text lorem",
             )
             rd_descriptions = [rd_1.description]
+            rd_ids = [rd_1.pk]
             for i in range(5):
                 rd = RECAPDocumentFactory(
                     docket_entry=alert_de,
@@ -2567,6 +2564,7 @@ class RECAPAlertsPercolatorTest(
                     # included in the case.
                     rd_descriptions.append(rd.description)
 
+                rd_ids.append(rd.pk)
             docket_only_alert = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
@@ -2598,17 +2596,25 @@ class RECAPAlertsPercolatorTest(
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True
         )
+        # 11 webhooks should be triggered one for each document ingested that
+        # matched each alert.
         self.assertEqual(
-            len(webhook_events), 4, msg="Webhook events didn't match."
+            len(webhook_events), 11, msg="Webhook events didn't match."
+        )
+        # 4 Webhooks for docket_only_alert without any nested recap_documents.
+        self._count_percolator_webhook_hits_and_child_hits(
+            webhook_events, docket_only_alert.name, 4, 0, None
+        )
+        # 6 Webhooks for recap_only_alert each one with 1 recap_document nested.
+        self._count_percolator_webhook_hits_and_child_hits(
+            webhook_events, recap_only_alert.name, 6, 6, rd_ids
+        )
+        # 1 Webhook for cross_object_alert_with_hl with 1 recap_document nested.
+        self._count_percolator_webhook_hits_and_child_hits(
+            webhook_events, cross_object_alert_with_hl.name, 1, 1, [rd_1.pk]
         )
 
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
-            ),
-        ):
-            call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -2616,6 +2622,7 @@ class RECAPAlertsPercolatorTest(
 
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
+
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 3)
         # The docket-only alert doesn't contain any nested child hits.

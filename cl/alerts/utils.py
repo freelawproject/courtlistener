@@ -38,9 +38,13 @@ from cl.search.constants import (
     recap_document_filters,
 )
 from cl.search.documents import (
+    AudioDocument,
+    AudioPercolator,
+    DocketDocument,
     DocketDocumentPercolator,
     ESRECAPDocumentPlain,
     RECAPDocumentPercolator,
+    RECAPPercolator,
 )
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import ESDictDocument
@@ -107,6 +111,7 @@ def percolate_document(
     document_id: str,
     percolator_index: str,
     document_index: str | None = None,
+    document_dict: dict | None = None,
     app_label: str | None = None,
     main_search_after: int | None = None,
     rd_search_after: int | None = None,
@@ -117,6 +122,7 @@ def percolate_document(
     :param document_id: The document ID in ES index to be percolated.
     :param percolator_index: The ES percolator index name.
     :param document_index: The ES document index where the document lives.
+    :param document_dict: The document dictionary to be percolated.
     :param app_label: The app label and model that belongs to the document
     being percolated.
     :param main_search_after: Optional the ES main percolator query
@@ -137,28 +143,13 @@ def percolate_document(
             index=document_index,
             id=document_id,
         )
-    elif app_label:
-        model = apps.get_model(app_label)
-        rd = model.objects.get(pk=document_id)
-        match app_label:
-            case "search.RECAPDocument":
-                es_document = ESRECAPDocumentPlain().prepare(rd)
-                # Remove docket_child to avoid document parsing errors.
-                del es_document["docket_child"]
-            case _:
-                raise NotImplementedError(
-                    "Percolator prepare method is not implemented for %s",
-                    app_label,
-                )
-
-        percolate_query = Q(
-            "percolate", field="percolator_query", document=es_document
-        )
     else:
-        raise ValueError(
-            "Either 'document_index' or 'app_label' must be "
-            "provided to perform document percolation."
+        percolate_query = Q(
+            "percolate",
+            field="percolator_query",
+            document=document_dict,
         )
+
     exclude_rate_off = Q("term", rate=Alert.OFF)
     final_query = Q(
         "bool",
@@ -598,3 +589,46 @@ def avoid_indexing_auxiliary_alert(
             if alert_query.get(d_filter, ""):
                 return True
     return False
+
+
+def prepare_percolator_content(
+    app_label: str, document_id: str, document_content: ESDictDocument
+) -> tuple[str, str | None, ESDictDocument]:
+    """Prepare percolator content for different according to the app_label.
+
+    It returns the percolator index name and the ES document index where the
+    document lives. For RECAPDocument, instead of an ES document index, the
+    document to percolate is prepared based on the ESRECAPDocumentPlain mapping
+    that includes docket fields like parties.
+
+    :param app_label: The label of the app to determine the percolator and
+    document indices.
+    :param document_id: The ID of the document to fetch and prepare, used for
+    RECAP documents.
+    :param document_content: The initial content of the document, which may be
+    modified for RECAPDocument.
+    :return: A three tuple containing the percolator index name, document index
+    name, and the document_content.
+    """
+
+    es_document_index = None
+    match app_label:
+        case "audio.Audio":
+            percolator_index = AudioPercolator._index._name
+            es_document_index = AudioDocument._index._name
+        case "search.Docket":
+            percolator_index = RECAPPercolator._index._name
+            es_document_index = DocketDocument._index._name
+        case "search.RECAPDocument":
+            percolator_index = RECAPPercolator._index._name
+            model = apps.get_model(app_label)
+            rd = model.objects.get(pk=document_id)
+            document_content = ESRECAPDocumentPlain().prepare(rd)
+            # Remove docket_child to avoid document parsing errors.
+            del document_content["docket_child"]
+        case _:
+            raise NotImplementedError(
+                "Percolator search alerts not supported for %s", app_label
+            )
+
+    return percolator_index, es_document_index, document_content

@@ -563,3 +563,59 @@ class RECAPAlertsAssertions:
                             msg=f"Did not get the right number of child documents for the case %s. "
                             % case_title,
                         )
+
+    def _count_percolator_webhook_hits_and_child_hits(
+        self,
+        webhooks,
+        alert_title,
+        expected_hits,
+        expected_child_hits,
+        expected_child_descriptions,
+    ):
+        """Confirm the following assertions for the percolator search alert
+        webhook:
+        - The specified alert was triggered the expected number of times.
+        - The specified alert contains only 1 hit.
+        - If the specified case contains child documents it must be 1.
+        """
+
+        alert_title_webhooks = 0
+        alert_child_hits = 0
+        alert_child_ids = set()
+        for webhook in webhooks:
+            if webhook["payload"]["alert"]["name"] == alert_title:
+                alert_title_webhooks += 1
+
+                hits = webhook["payload"]["results"]
+
+                self.assertEqual(
+                    1,
+                    len(hits),
+                    msg=f"Did not get the right number of hits for the case %s. "
+                    % webhook["payload"]["results"][0]["caseName"],
+                )
+                alert_child_hits = alert_child_hits + len(
+                    webhook["payload"]["results"][0]["recap_documents"]
+                )
+                for rd in webhook["payload"]["results"][0]["recap_documents"]:
+                    alert_child_ids.add(rd["id"])
+
+        self.assertEqual(
+            alert_title_webhooks,
+            expected_hits,
+            msg=f"Did not get the right number of webhooks for alert %s. "
+            % alert_title,
+        )
+        self.assertEqual(
+            alert_child_hits,
+            expected_child_hits,
+            msg=f"Did not get the right number of child hits for alert %s. "
+            % alert_title,
+        )
+        if expected_child_descriptions:
+            self.assertEqual(
+                alert_child_ids,
+                set(expected_child_descriptions),
+                msg=f"Did not get the right child hits IDs for alert %s. "
+                % alert_title,
+            )

@@ -1858,6 +1858,8 @@ class ESRECAPSweepDocument(ESRECAPBaseDocument):
 
 
 class ESRECAPDocumentPlain(ESRECAPDocument):
+    docket_absolute_url = fields.KeywordField(index=False)
+
     # Parties
     party_id = fields.ListField(fields.IntegerField(multi=True))
     party = fields.ListField(
@@ -1943,6 +1945,9 @@ class ESRECAPDocumentPlain(ESRECAPDocument):
             out["firm"].add(name)
 
         return out
+
+    def prepare_docket_absolute_url(self, instance):
+        return instance.docket_entry.docket.get_absolute_url()
 
     def prepare(self, instance):
         data = super().prepare(instance)
