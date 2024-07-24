@@ -686,13 +686,13 @@ files = [
 
 [[package]]
 name = "courts-db"
-version = "0.10.22"
+version = "0.10.25"
 description = "Database of Courts"
 optional = false
 python-versions = "*"
 files = [
-    {file = "courts-db-0.10.22.tar.gz", hash = "sha256:65f5bf1fe3e82b368572403097061f2b7b82ee86f11a0bebdff0176bef4e0288"},
-    {file = "courts_db-0.10.22-py2.py3-none-any.whl", hash = "sha256:f2152826e584e3885baa1fe8e6c98aeb4172462032ce9c9cbcf8abb2d153a42a"},
+    {file = "courts_db-0.10.25-py2.py3-none-any.whl", hash = "sha256:b61783bdee2d7afd549ce767d09b4883d835242f73eab9061e74efc2f19c6f64"},
+    {file = "courts_db-0.10.25.tar.gz", hash = "sha256:f96b4ef3227e6844b3d2d12970373f2f05cdda66a9f15cbe69527ff66649b9d9"},
 ]
 
 [[package]]
