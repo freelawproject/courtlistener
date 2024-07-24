@@ -14,7 +14,12 @@ from cl.alerts.factories import AlertFactory
 from cl.alerts.management.commands.cl_send_recap_alerts import (
     index_daily_recap_documents,
 )
-from cl.alerts.models import SEARCH_TYPES, Alert, ScheduledAlertHit
+from cl.alerts.models import (
+    SCHEDULED_ALERT_HIT_STATUS,
+    SEARCH_TYPES,
+    Alert,
+    ScheduledAlertHit,
+)
 from cl.alerts.utils import (
     avoid_indexing_auxiliary_alert,
     build_plain_percolator_query,
@@ -96,7 +101,7 @@ class RECAPAlertsSweepIndexTest(
         self.r = get_redis_interface("CACHE")
         self.r.delete("alert_sweep:query_date")
         self.r.delete("alert_sweep:task_id")
-        keys = self.r.keys("alert_hits:*")
+        keys = self.r.keys("alert_hits_sweep:*")
         if keys:
             self.r.delete(*keys)
 
@@ -1515,6 +1520,165 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         alert_de.docket.delete()
 
+    @override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
+    def test_percolator_plus_sweep_alerts_integration(
+        self, mock_prefix
+    ) -> None:
+        """Integration test to confirm alerts missing by the percolator approach
+        are properly send by the sweep index without duplicating alerts.
+        """
+
+        # Rename percolator index for this test to avoid collisions.
+        RECAPPercolator._index._name = "recap_percolator_sweep"
+        RECAPPercolator._index.delete(ignore=404)
+        RECAPPercolator.init()
+        RECAPDocumentPercolator._index._name = "recap_doc_percolator_sweep"
+        RECAPDocumentPercolator._index.delete(ignore=404)
+        RECAPDocumentPercolator.init()
+        DocketDocumentPercolator._index._name = "docket_doc_percolator_sweep"
+        DocketDocumentPercolator._index.delete(ignore=404)
+        DocketDocumentPercolator.init()
+
+        docket_only_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Docket Only",
+            query='q="410 Civil"&type=r',
+        )
+        cross_object_alert = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object",
+            query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE"&type=r',
+        )
+        cross_object_alert_after_update = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Cross-object 2",
+            query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE UPDATED"&type=r',
+        )
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name=f"SUBPOENAS SERVED CASE",
+                docket_number=f"1:21-bk-227",
+                source=Docket.RECAP,
+                cause="410 Civil",
+            )
+            alert_de = DocketEntryWithParentsFactory(
+                docket=docket,
+                entry_number=1,
+                date_filed=datetime.date(2024, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=alert_de,
+                description="Motion to File 1",
+                document_number="1",
+                pacer_doc_id="0190645981",
+                plain_text="plain text lorem",
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
+        # Assert webhooks.
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        # 2 webhooks should be triggered one for each document ingested that
+        # matched each alert.
+        self.assertEqual(
+            len(webhook_events), 2, msg="Webhook events didn't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self.assertIn(docket_only_alert.name, html_content)
+        self._confirm_number_of_alerts(html_content, 2)
+        # The docket-only alert doesn't contain any nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            docket_only_alert.name,
+            1,
+            docket.case_name,
+            0,
+        )
+
+        # The cross_object_alert-only alert contain q nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert.name,
+            1,
+            docket.case_name,
+            1,
+        )
+
+        # Now update the docket case_name to match cross_object_alert_after_update
+        with time_machine.travel(self.mock_date, tick=False), mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket.case_name = "SUBPOENAS SERVED CASE UPDATED"
+            docket.save()
+
+        # No new alerts triggered by the percolator.
+        # cross_object_alert_after_update alert is missed by the percolator.
+        # due to the related RECAPDocument is not being percolated after the
+        # Docket field update.
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
+        # The missing alert should be sent by the Sweep index alert approach.
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), time_machine.travel(self.mock_date, tick=False):
+            call_command("cl_send_recap_alerts", testing_mode=True)
+
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+
+        # Assert webhooks.
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        # 3 webhooks should be triggered one for each document ingested that
+        # matched each alert.
+        self.assertEqual(
+            len(webhook_events), 3, msg="Webhook events didn't match."
+        )
+
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self.assertIn(cross_object_alert_after_update.name, html_content)
+        self._confirm_number_of_alerts(html_content, 1)
+
+        # The cross_object_alert_after_update alert contain 1 nested child hits.
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            cross_object_alert_after_update.name,
+            1,
+            docket.case_name,
+            1,
+        )
+
+        docket.delete()
+
 
 @override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
 @mock.patch(
@@ -1533,9 +1697,7 @@ class RECAPAlertsPercolatorTest(
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         cls.mock_date = now()
-        with time_machine.travel(
-            cls.mock_date, tick=False
-        ), cls.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(cls.mock_date, tick=False):
             super().setUpTestData()
             cls.docket_3 = DocketFactory(
                 court=cls.court,
@@ -1547,6 +1709,13 @@ class RECAPAlertsPercolatorTest(
                 cause="405 Civil",
                 jurisdiction_type="'U.S. Government Defendant",
                 jury_demand="1,000,000",
+            )
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
             )
 
             cls.user_profile = UserProfileWithParentsFactory()
@@ -1573,7 +1742,7 @@ class RECAPAlertsPercolatorTest(
         DocketDocumentPercolator._index.delete(ignore=404)
         DocketDocumentPercolator.init()
         self.r = get_redis_interface("CACHE")
-        keys = self.r.keys("alert_hits:*")
+        keys = self.r.keys("alert_hits_percolator:*")
         if keys:
             self.r.delete(*keys)
 
@@ -2053,7 +2222,7 @@ class RECAPAlertsPercolatorTest(
                 source=Docket.RECAP,
             )
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -2103,7 +2272,7 @@ class RECAPAlertsPercolatorTest(
                 plain_text="plain text for 018036652436",
             )
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
         self.assertEqual(
@@ -2156,7 +2325,7 @@ class RECAPAlertsPercolatorTest(
                 plain_text="plain text for 01803665477",
             )
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         html_content = self.get_html_content_from_email(mail.outbox[2])
         self.assertEqual(
@@ -2190,7 +2359,7 @@ class RECAPAlertsPercolatorTest(
             alert_de_2.description = "Hearing to File Updated"
             alert_de_2.save()
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         # No alert should be triggered on DE updates.
         self.assertEqual(
@@ -2208,7 +2377,7 @@ class RECAPAlertsPercolatorTest(
             rd_2.document_number = 1
             rd_2.save()
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 4, msg="Outgoing emails don't match."
@@ -2243,7 +2412,7 @@ class RECAPAlertsPercolatorTest(
             docket.case_name = "SUBPOENAS SERVED LOREM"
             docket.save()
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         html_content = self.get_html_content_from_email(mail.outbox[4])
         self.assertEqual(
@@ -2275,7 +2444,7 @@ class RECAPAlertsPercolatorTest(
         ), self.captureOnCommitCallbacks(execute=True):
             BankruptcyInformationFactory(docket=docket, chapter="7")
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         html_content = self.get_html_content_from_email(mail.outbox[5])
         self.assertEqual(
@@ -2320,7 +2489,7 @@ class RECAPAlertsPercolatorTest(
         ):
             index_docket_parties_in_es.delay(docket.pk)
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 7, msg="Outgoing emails don't match."
@@ -2351,7 +2520,7 @@ class RECAPAlertsPercolatorTest(
                 source=Docket.RECAP,
             )
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -2392,7 +2561,7 @@ class RECAPAlertsPercolatorTest(
                 plain_text="plain text for 018036652000",
             )
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
@@ -2423,6 +2592,7 @@ class RECAPAlertsPercolatorTest(
                 cause="410 Civil",
             )
             dockets_created = []
+            docket_case_names = [docket.case_name]
             for i in range(3):
                 docket_created = DocketFactory(
                     court=self.court,
@@ -2432,6 +2602,8 @@ class RECAPAlertsPercolatorTest(
                     cause="410 Civil",
                 )
                 dockets_created.append(docket_created)
+                if i < 2:
+                    docket_case_names.append(docket_created.case_name)
 
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
@@ -2511,7 +2683,7 @@ class RECAPAlertsPercolatorTest(
             webhook_events, cross_object_alert_with_hl.name, 1, 1, [rd_1.pk]
         )
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -2519,7 +2691,7 @@ class RECAPAlertsPercolatorTest(
 
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
-
+        txt_email = mail.outbox[0].body
         self.assertIn(docket_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 3)
         # The docket-only alert doesn't contain any nested child hits.
@@ -2530,6 +2702,13 @@ class RECAPAlertsPercolatorTest(
             docket.case_name,
             0,
         )
+        # Assert email text version.
+        self.assertIn(docket_only_alert.name, txt_email)
+        for case_name in docket_case_names:
+            with self.subTest(
+                alert=case_name, msg="Assert case_name in email."
+            ):
+                self.assertIn(case_name, txt_email)
 
         # Assert RECAP-only alert.
         self.assertIn(recap_only_alert.name, html_content)
@@ -2552,6 +2731,16 @@ class RECAPAlertsPercolatorTest(
         self.assertEqual(
             html_content.count("View Additional Results for this Case"), 1
         )
+
+        # Assert email text version.
+        self.assertIn(recap_only_alert.name, txt_email)
+        self.assertIn("View Additional Results for this Case", txt_email)
+        for rd_description in rd_descriptions:
+            with self.subTest(
+                alert=rd_description,
+                msg="Assert RECAPDocument description in email.",
+            ):
+                self.assertIn(rd_description, txt_email)
 
         # Assert Cross-object alert.
         # The cross-object alert only contain 1 child hit.
@@ -2576,6 +2765,9 @@ class RECAPAlertsPercolatorTest(
             [rd_1.description],
         )
 
+        # Assert email text version.
+        self.assertIn(cross_object_alert_with_hl.name, txt_email)
+
         # Assert HL in the cross_object_alert_with_hl
         self.assertIn(f"<strong>{docket.case_name}</strong>", html_content)
         self.assertEqual(
@@ -2598,6 +2790,9 @@ class RECAPAlertsPercolatorTest(
             html_content.count("<strong>File Amicus Curiae</strong>"), 1
         )
 
+        for docket in dockets_created:
+            docket.delete()
+
     def test_filter_out_alerts_to_send_by_query_and_hits(
         self, mock_prefix
     ) -> None:
@@ -2610,6 +2805,9 @@ class RECAPAlertsPercolatorTest(
         - RECAP-only Alerts should only include RDs that have not triggered the
           same alert previously.
         """
+
+        scheduled_hits = ScheduledAlertHit.objects.all()
+        self.assertEqual(len(scheduled_hits), 0)
 
         # The following test should match the Docket-only query on docket
         # ingestion
@@ -2637,7 +2835,7 @@ class RECAPAlertsPercolatorTest(
                 jury_demand="1,000,000",
             )
 
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
@@ -2694,7 +2892,7 @@ class RECAPAlertsPercolatorTest(
         # The RD ingestion's shouldn't match the docket-only alert.
         # It should only match the cross_object_alert_d_and_rd_field and
         # cross_object_alert_d_or_rd_field alerts.
-        call_command("cl_send_rt_recap_alerts", testing_mode=True)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
@@ -2714,4 +2912,97 @@ class RECAPAlertsPercolatorTest(
             docket.case_name,
             1,
         )
+
+        # Call cl_send_rt_percolator_alerts again. No alerts should be sent this time.
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        scheduled_hits = ScheduledAlertHit.objects.filter(
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT
+        )
+        self.assertEqual(len(scheduled_hits), 3)
+        docket.delete()
+
+    @override_settings(ELASTICSEARCH_PAGINATION_BATCH_SIZE=3)
+    def test_retrieve_all_the_matched_alerts_in_batches(self, mock_prefix):
+        """Confirm that we can retrieve all the matched alerts by the
+        percolator if the number of alerts matched exceeds the initial query
+        ELASTICSEARCH_PAGINATION_BATCH_SIZE.
+        Also assert that no RT alerts are scheduled to be sent according to its
+        rate.
+        """
+
+        alerts_created_user_1 = []
+        alerts_created_user_2 = []
+        for i in range(6):
+            docket_only_alert = AlertFactory(
+                user=self.user_profile.user,
+                rate=Alert.WEEKLY,
+                name=f"Test Alert Docket Only {i}",
+                query='q="405 Civil"&type=r',
+            )
+            alerts_created_user_1.append(docket_only_alert)
+            docket_only_alert_2 = AlertFactory(
+                user=self.user_profile_2.user,
+                rate=Alert.REAL_TIME,
+                name=f"Test Alert Docket Only {i}",
+                query='q="405 Civil"&type=r',
+            )
+            alerts_created_user_2.append(docket_only_alert_2)
+
+        with mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(execute=True):
+            docket = DocketFactory(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                case_name_full="Jackson & Sons Holdings vs. Bank",
+                docket_number="1:21-bk-1234",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+                cause="405 Civil",
+                jurisdiction_type="'U.S. Government Defendant",
+                jury_demand="1,000,000",
+            )
+
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        # 6 webhook events should be triggered, all of them for user_profile
+        # # and none for user_profile_2 since it doesn't have a webhook enabled
+        self.assertEqual(
+            len(webhook_events), 6, msg="Webhook events didn't match."
+        )
+
+        # 1 email should be sent for user_profile
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+
+        # Assert 6 alerts are contained in the email for user_profile
+        html_content = self.get_html_content_from_email(mail.outbox[0])
+        self._confirm_number_of_alerts(html_content, 6)
+        for alert in alerts_created_user_1:
+            with self.subTest(alert=alert, msg="Assert alert in email."):
+                self.assertIn(alert.name, html_content)
+
+        # Send scheduled Weekly alerts and check assertions.
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+        # 1 additional email should be sent for user_profile_2
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        # Assert 6 alerts are contained in the email for user_profile_2
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        self._confirm_number_of_alerts(html_content, 6)
+        for alert in alerts_created_user_2:
+            with self.subTest(alert=alert, msg="Assert alert in email."):
+                self.assertIn(alert.name, html_content)
+
         docket.delete()

@@ -45,8 +45,8 @@ case "$1" in
 'probe-iquery-pages-daemon')
     exec /opt/courtlistener/manage.py probe_iquery_pages_daemon
     ;;
-'cl-send-rt-recap-alerts')
-    exec /opt/courtlistener/manage.py cl_send_rt_recap_alerts
+'cl-send-rt-percolator-alerts')
+    exec /opt/courtlistener/manage.py cl_send_rt_percolator_alerts
     ;;
 *)
     echo "Unknown command"

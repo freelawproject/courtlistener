@@ -8,7 +8,9 @@ from cl.lib.command_utils import VerboseCommand
 
 
 class Command(VerboseCommand):
-    help = """Send RT Alerts for RECAP every 5 minutes. """
+    help = """Send real-time alerts scheduled by the Percolator every 5 minutes.
+     This process is performed to accumulate alerts that can be grouped into a
+     single email if they belong to the same user. """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
