@@ -14,6 +14,7 @@ from cl.alerts.models import (
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import InvalidDateError, override_alert_query
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.search.types import ESDictDocument
 from cl.stats.utils import tally_stat
 
 DAYS_TO_DELETE = 90
@@ -51,14 +52,14 @@ def get_cut_off_date(rate: str, d: datetime.date) -> datetime.date | None:
     return cut_off_date
 
 
-def merge_documents(documents: list[dict[str, Any]]) -> dict[str, Any]:
+def merge_documents(documents: list[ESDictDocument]) -> ESDictDocument:
     """Merge multiple RECAPDocuments with the same Docket.
     :param documents: A list of document hits.
     :return: A document dictionary where documents has been merged.
     """
 
     main_document = documents[0].copy()
-    child_docs = []
+    child_docs: list[ESDictDocument] = []
     for doc in documents:
         if "child_docs" in doc:
             if len(child_docs) >= settings.RECAP_CHILD_HITS_PER_RESULT:
