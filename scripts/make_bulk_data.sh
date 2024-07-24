@@ -93,6 +93,12 @@ opinioncluster_fields='(
 	   )'
 opinioncluster_csv_filename="opinion-clusters-$(date -I).csv"
 
+search_opinion_joined_by_fields='(
+			id, opinion_id, person_id
+)'
+search_opinion_joined_by_csv_filename="search_opinion_joined_by-$(date -I).csv"
+
+
 # search_opinion
 opinion_fields='(
 	       id, date_created, date_modified, author_str, per_curiam, joined_by_str,
