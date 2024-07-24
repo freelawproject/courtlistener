@@ -4,6 +4,7 @@ from typing import Any, DefaultDict
 
 import waffle
 from asgiref.sync import async_to_sync
+from django.conf import settings
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -60,9 +61,15 @@ def merge_documents(documents: list[dict[str, Any]]) -> dict[str, Any]:
     child_docs = []
     for doc in documents:
         if "child_docs" in doc:
+            if len(child_docs) >= settings.RECAP_CHILD_HITS_PER_RESULT:
+                # Nested child limits reached. Omit the child hit.
+                continue
             child_docs.extend(doc["child_docs"])
     if child_docs:
         main_document["child_docs"] = child_docs
+        if len(child_docs) >= settings.RECAP_CHILD_HITS_PER_RESULT:
+            # Nested child limits reached. Show the view additional hits button
+            main_document["child_remaining"] = True
     return main_document
 
 

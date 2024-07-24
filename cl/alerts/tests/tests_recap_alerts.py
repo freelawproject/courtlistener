@@ -71,7 +71,9 @@ class RECAPAlertsSweepIndexTest(
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         cls.mock_date = now()
-        with time_machine.travel(cls.mock_date, tick=False), cls.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            cls.mock_date, tick=False
+        ), cls.captureOnCommitCallbacks(execute=True):
             super().setUpTestData()
 
             cls.user_profile = UserProfileWithParentsFactory()
@@ -261,7 +263,9 @@ class RECAPAlertsSweepIndexTest(
 
         # Index Docket changed today + their RECAPDocuments indexed on
         # previous days
-        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -272,7 +276,9 @@ class RECAPAlertsSweepIndexTest(
         # Its related RD is ingested two days before.
         two_days_before = now() - datetime.timedelta(days=2)
         mock_two_days_before = two_days_before.replace(hour=5)
-        with time_machine.travel(mock_two_days_before, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            mock_two_days_before, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -300,7 +306,9 @@ class RECAPAlertsSweepIndexTest(
 
         # Index a RECAPDocument changed today including its parent Docket
         # indexed on previous days.
-        with time_machine.travel(mock_two_days_before, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            mock_two_days_before, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             docket_2 = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE OFF",
@@ -309,7 +317,9 @@ class RECAPAlertsSweepIndexTest(
             )
 
         # Its related RD is ingested today.
-        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             alert_de_2 = DocketEntryWithParentsFactory(
                 docket=docket_2,
                 entry_number=1,
@@ -485,7 +495,9 @@ class RECAPAlertsSweepIndexTest(
         )
         # Simulate docket is ingested a day before.
         one_day_before = self.mock_date - datetime.timedelta(days=1)
-        with time_machine.travel(one_day_before, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            one_day_before, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="SUBPOENAS SERVED CASE",
@@ -499,7 +511,9 @@ class RECAPAlertsSweepIndexTest(
             )
 
         # Its related RD is ingested today.
-        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -581,7 +595,9 @@ class RECAPAlertsSweepIndexTest(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
-        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             # Create a new RD for the same DocketEntry to confirm this new RD is
             # properly included in the alert email.
             rd_2 = RECAPDocumentFactory(
@@ -795,7 +811,9 @@ class RECAPAlertsSweepIndexTest(
         )
         two_days_before = self.mock_date - datetime.timedelta(days=2)
         mock_two_days_before = two_days_before.replace(hour=5)
-        with time_machine.travel(mock_two_days_before, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            mock_two_days_before, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             docket = DocketFactory(
                 court=self.court,
                 case_name="United States of America",
@@ -819,7 +837,9 @@ class RECAPAlertsSweepIndexTest(
 
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
-        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=docket,
                 entry_number=1,
@@ -878,7 +898,9 @@ class RECAPAlertsSweepIndexTest(
             [],
         )
         # Modify 1:21-bk-1009 docket today:
-        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             docket.cause = "405 Civil"
             docket.save()
 
@@ -927,7 +949,9 @@ class RECAPAlertsSweepIndexTest(
 
         # Index new documents that match cross_object_alert_text, an RD, and
         # an empty docket.
-        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             rd_4 = RECAPDocumentFactory(
                 docket_entry=alert_de,
                 description="Hearing new",
@@ -1048,7 +1072,9 @@ class RECAPAlertsSweepIndexTest(
         results for this Case" button.
         """
 
-        with time_machine.travel(self.mock_date, tick=False), self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             alert_de = DocketEntryWithParentsFactory(
                 docket=self.de.docket,
                 entry_number=1,
@@ -1507,7 +1533,9 @@ class RECAPAlertsPercolatorTest(
         cls.rebuild_index("people_db.Person")
         cls.rebuild_index("search.Docket")
         cls.mock_date = now()
-        with time_machine.travel(cls.mock_date, tick=False), cls.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            cls.mock_date, tick=False
+        ), cls.captureOnCommitCallbacks(execute=True):
             super().setUpTestData()
             cls.docket_3 = DocketFactory(
                 court=cls.court,
@@ -2025,7 +2053,6 @@ class RECAPAlertsPercolatorTest(
                 source=Docket.RECAP,
             )
 
-
         call_command("cl_send_rt_recap_alerts", testing_mode=True)
 
         self.assertEqual(
@@ -2519,6 +2546,11 @@ class RECAPAlertsPercolatorTest(
             recap_only_alert.name,
             alert_de.docket.case_name,
             rd_descriptions,
+        )
+        # Assert the View more results button is present in the alert.
+        self.assertIn("View Additional Results for this Case", html_content)
+        self.assertEqual(
+            html_content.count("View Additional Results for this Case"), 1
         )
 
         # Assert Cross-object alert.

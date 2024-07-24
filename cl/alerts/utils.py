@@ -351,7 +351,7 @@ def alert_hits_limit_reached(
             content_type=content_type,
             object_id=object_id,
         ).count()
-        hits_limit = settings.RECAP_CHILD_HITS_PER_RESULT
+        hits_limit = settings.RECAP_CHILD_HITS_PER_RESULT + 1
     else:
         # To limit hits in an alert count ScheduledAlertHits related to the
         # alert and user.
