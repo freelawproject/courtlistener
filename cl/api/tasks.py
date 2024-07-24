@@ -12,6 +12,7 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
+from cl.lib.elasticsearch_utils import merge_highlights_into_result
 from cl.search.api_serializers import (
     RECAPESResultSerializer,
     V3OAESResultSerializer,
@@ -130,6 +131,13 @@ def send_es_search_alert_webhook(
                             )
 
                 result["child_docs"] = child_result_objects
+                # Merge HL into the parent document from percolator response.
+                if isinstance(result, dict):
+                    meta_hl = result.get("meta", {}).get("highlight", {})
+                    merge_highlights_into_result(
+                        meta_hl,
+                        result,
+                    )
             serialized_results = RECAPESResultSerializer(
                 results, many=True
             ).data

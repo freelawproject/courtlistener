@@ -619,3 +619,32 @@ class RECAPAlertsAssertions:
                 msg=f"Did not get the right child hits IDs for alert %s. "
                 % alert_title,
             )
+
+    def _assert_webhook_hit_hl(
+        self,
+        webhooks,
+        alert_title,
+        field_name,
+        hl_expected,
+        child_field,
+    ):
+        """Assert Hl in webhook fields."""
+        for webhook in webhooks:
+            if webhook["payload"]["alert"]["name"] == alert_title:
+                hit = webhook["payload"]["results"][0]
+                if child_field:
+                    child_field_content = hit["recap_documents"][0][field_name]
+                    self.assertIn(
+                        hl_expected,
+                        child_field_content,
+                        msg=f"Did not get the HL content in field: %s. "
+                        % field_name,
+                    )
+                else:
+                    parent_field_content = hit[field_name]
+                    self.assertIn(
+                        hl_expected,
+                        parent_field_content,
+                        msg=f"Did not get the HL content in field: %s. "
+                        % field_name,
+                    )

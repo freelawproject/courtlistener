@@ -1338,6 +1338,43 @@ class RECAPAlertsSweepIndexTest(
             html_content.count("<strong>File Amicus Curiae</strong>"), 1
         )
 
+        # Assert HL content in webhooks.
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "caseName",
+            f"<strong>{docket.case_name}</strong>",
+            child_field=False,
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "docketNumber",
+            f"<strong>{docket.docket_number}</strong>",
+            child_field=False,
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "snippet",
+            f"<strong>{rd_2.plain_text}</strong>",
+            child_field=True,
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "short_description",
+            f"<strong>{rd_2.description}</strong>",
+            child_field=True,
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "description",
+            "<strong>File Amicus Curiae</strong>",
+            child_field=True,
+        )
+
         # Assert email text version:
         txt_email = mail.outbox[0].body
         self.assertIn(recap_only_alert.name, txt_email)
@@ -2788,6 +2825,43 @@ class RECAPAlertsPercolatorTest(
         self.assertIn("<strong>File Amicus Curiae</strong>", html_content)
         self.assertEqual(
             html_content.count("<strong>File Amicus Curiae</strong>"), 1
+        )
+
+        # Assert HL content in webhooks.
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "caseName",
+            f"<strong>{docket.case_name}</strong>",
+            child_field=False,
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "docketNumber",
+            f"<strong>{docket.docket_number}</strong>",
+            child_field=False,
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "snippet",
+            f"<strong>{rd_1.plain_text}</strong>",
+            child_field=True,
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "short_description",
+            f"<strong>{rd_1.description}</strong>",
+            child_field=True,
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            cross_object_alert_with_hl.name,
+            "description",
+            "<strong>File Amicus Curiae</strong>",
+            child_field=True,
         )
 
         for docket in dockets_created:
