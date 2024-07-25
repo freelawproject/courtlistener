@@ -14,7 +14,7 @@ from django.utils.safestring import SafeString, mark_safe
 from elasticsearch_dsl import AttrDict, AttrList
 
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
-from cl.search.models import SEARCH_TYPES, Docket, DocketEntry
+from cl.search.models import SEARCH_TYPES, Court, Docket, DocketEntry
 
 register = template.Library()
 
@@ -297,3 +297,33 @@ def alerts_supported(context: RequestContext, search_type: str) -> str:
             and waffle.flag_is_active(request, "recap-alerts-active")
         )
     )
+
+
+@register.filter
+def group_courts(courts: list[Court], num_columns: int) -> list:
+    """Divide courts in equal groupings while keeping related courts together
+
+    :param courts: Courts to group.
+    :param num_columns: Number of groups wanted
+    :return: The courts grouped together
+    """
+
+    column_len = len(courts) // num_columns
+    remainder = len(courts) % num_columns
+
+    groups = []
+    start = 0
+    for index in range(num_columns):
+        # Calculate the end index for this chunk
+        end = start + column_len + (1 if index < remainder else 0)
+
+        # Find the next COLR as a starting point (Court of last resort)
+        COLRs = [Court.TERRITORY_SUPREME, Court.STATE_SUPREME]
+        while end < len(courts) and courts[end].jurisdiction not in COLRs:
+            end += 1
+
+        # Create the column and add it to result
+        groups.append(courts[start:end])
+        start = end
+
+    return groups
