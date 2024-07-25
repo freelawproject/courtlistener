@@ -25,7 +25,7 @@ from cl.alerts.utils import (
     recap_document_hl_matched,
 )
 from cl.api.models import WebhookEventType
-from cl.api.tasks import send_es_search_alert_webhook
+from cl.api.tasks import send_search_alert_webhook_es
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.date_time import dt_as_local_date
 from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
@@ -543,7 +543,7 @@ def send_search_alert_webhooks(
         event_type=WebhookEventType.SEARCH_ALERT, enabled=True
     )
     for user_webhook in user_webhooks:
-        send_es_search_alert_webhook.delay(
+        send_search_alert_webhook_es.delay(
             results_to_send, user_webhook.pk, alert_id
         )
 
