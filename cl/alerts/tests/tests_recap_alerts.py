@@ -55,6 +55,7 @@ from cl.search.factories import (
 )
 from cl.search.models import Docket
 from cl.search.tasks import index_docket_parties_in_es
+from cl.stats.models import Stat
 from cl.tests.cases import ESIndexTestCase, RECAPAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
@@ -1628,6 +1629,12 @@ class RECAPAlertsSweepIndexTest(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
 
+        # Confirm Stat object is properly created and updated.
+        stats_objects = Stat.objects.all()
+        self.assertEqual(stats_objects.count(), 1)
+        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
+        self.assertEqual(stats_objects[0].count, 1)
+
         # Assert webhooks.
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True
@@ -1713,6 +1720,11 @@ class RECAPAlertsSweepIndexTest(
             docket.case_name,
             1,
         )
+
+        # Confirm Stat object is properly updated.
+        self.assertEqual(stats_objects.count(), 1)
+        self.assertEqual(stats_objects[0].name, "alerts.sent.rt")
+        self.assertEqual(stats_objects[0].count, 2)
 
         docket.delete()
 

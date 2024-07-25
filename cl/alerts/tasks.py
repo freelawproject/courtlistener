@@ -789,8 +789,6 @@ def percolator_response_processing(response: PercolatorResponsesType) -> None:
                     object_id=object_id,
                 )
             )
-            if alert_triggered.rate == Alert.REAL_TIME:
-                rt_alerts_to_send.append(alert_triggered.pk)
 
     # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
     if scheduled_hits_to_create:
