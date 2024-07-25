@@ -14,6 +14,7 @@ from cl.alerts.models import (
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import InvalidDateError, override_alert_query
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.search.models import SEARCH_TYPES
 from cl.search.types import ESDictDocument
 from cl.stats.utils import tally_stat
 
@@ -52,8 +53,10 @@ def get_cut_off_date(rate: str, d: datetime.date) -> datetime.date | None:
     return cut_off_date
 
 
-def merge_documents(documents: list[ESDictDocument]) -> ESDictDocument:
-    """Merge multiple RECAPDocuments with the same Docket.
+def merge_alert_child_documents(
+    documents: list[ESDictDocument],
+) -> ESDictDocument:
+    """Merge multiple child hits within the same main document.
     :param documents: A list of document hits.
     :return: A document dictionary where documents has been merged.
     """
@@ -62,15 +65,15 @@ def merge_documents(documents: list[ESDictDocument]) -> ESDictDocument:
     child_docs: list[ESDictDocument] = []
     for doc in documents:
         if "child_docs" in doc:
-            if len(child_docs) >= settings.RECAP_CHILD_HITS_PER_RESULT:
-                # Nested child limits reached. Omit the child hit.
-                continue
             child_docs.extend(doc["child_docs"])
+            if len(child_docs) >= settings.RECAP_CHILD_HITS_PER_RESULT:
+                # Nested child limits reached. Set child_remaining True to show
+                # the "Show the view additional hits button"
+                main_document["child_remaining"] = True
+                break
+
     if child_docs:
         main_document["child_docs"] = child_docs
-        if len(child_docs) >= settings.RECAP_CHILD_HITS_PER_RESULT:
-            # Nested child limits reached. Show the view additional hits button
-            main_document["child_remaining"] = True
     return main_document
 
 
@@ -100,26 +103,35 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
             hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
         ).select_related("user", "alert")
 
-        # Group scheduled hits by Alert and docket_id
+        # Group scheduled hits by Alert and the main_doc_id
         grouped_hits: DefaultDict[
             Alert, DefaultDict[int, list[dict[str, Any]]]
         ] = defaultdict(lambda: defaultdict(list))
         alerts_to_update = set()
-
         for hit in scheduled_hits:
             alert = hit.alert
             doc_content = json_date_parser(hit.document_content)
-            docket_id = doc_content.get("docket_id")
-            grouped_hits[alert][docket_id].append(doc_content)
+            match hit.alert.alert_type:
+                case SEARCH_TYPES.RECAP:
+                    main_doc_id = doc_content.get("docket_id")
+                case SEARCH_TYPES.ORAL_ARGUMENT:
+                    main_doc_id = doc_content.get("id")
+                case _:
+                    # Not supported alert type.
+                    continue
+            grouped_hits[alert][main_doc_id].append(doc_content)
             alerts_to_update.add(alert.pk)
 
-        # Merge documents with the same docket_id
+        # Merge child documents with the same main_doc_id if the document dict
+        # contains the child_docs key.
         merged_hits: DefaultDict[Alert, list[dict[str, Any]]] = defaultdict(
             list
         )
         for alert, document_groups in grouped_hits.items():
             for documents in document_groups.values():
-                merged_hits[alert].append(merge_documents(documents))
+                merged_hits[alert].append(
+                    merge_alert_child_documents(documents)
+                )
 
         hits = []
         for alert, documents in merged_hits.items():

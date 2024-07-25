@@ -584,7 +584,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         match app_label_model:
             case "search.RECAPDocument":
                 # Filter out RECAPDocuments and set the document id to the
-                # RECAPDocument alert hits.
+                # Redis RECAPDocument alert hits set.
                 if not include_recap_document_hit(
                     alert_triggered.pk, recap_document_hits, docket_hits
                 ) or has_document_alert_hit_been_triggered(
@@ -602,7 +602,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
                 child_document = True
             case "search.Docket":
                 # Filter out Dockets and set the document id to the
-                # Docket alert hits.
+                # Redis Docket alert hits set.
                 if has_document_alert_hit_been_triggered(
                     r,
                     alert_triggered.pk,
@@ -651,7 +651,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         # user's donations.
         send_webhook_alert_hits(alert_user, hits)
 
-        # Send RT Alerts
+        # Send RT Alerts for Audio.
         if (
             alert_triggered.rate == Alert.REAL_TIME
             and app_label_model == "audio.Audio"

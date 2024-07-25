@@ -2175,30 +2175,9 @@ class RECAPAlertsPercolatorTest(
             self.confirm_query_matched(responses[0], query_id_6), True
         )
 
-    def test_index_recap_alerts(self, mock_prefix) -> None:
-        """Test a RECAP alert is indexed into the RECAPPercolator index."""
-
-        docket_only_alert = AlertFactory(
-            user=self.user_profile.user,
-            rate=Alert.WEEKLY,
-            name="Test Alert Docket Only",
-            query='q="401 Civil"&type=r',
-        )
-
-        self.assertTrue(
-            RECAPPercolator.exists(id=docket_only_alert.pk),
-            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
-        )
-        self.assertTrue(
-            RECAPDocumentPercolator.exists(id=docket_only_alert.pk),
-            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
-        )
-        self.assertTrue(
-            DocketDocumentPercolator.exists(id=docket_only_alert.pk),
-            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
-        )
-
-    def test_delete_recap_alerts_from_percolator(self, mock_prefix) -> None:
+    def test_index_and_delete_recap_alerts_from_percolator(
+        self, mock_prefix
+    ) -> None:
         """Test a RECAP alert is removed from the RECAPPercolator index."""
 
         docket_only_alert = AlertFactory(
@@ -2235,6 +2214,41 @@ class RECAPAlertsPercolatorTest(
         self.assertFalse(
             DocketDocumentPercolator.exists(id=docket_only_alert_id),
             msg=f"Alert id: {docket_only_alert_id} was not indexed.",
+        )
+
+        # Index an alert with Docket filters.
+        docket_only_alert_filter = AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.WEEKLY,
+            name="Test Alert Docket Only",
+            query='q="401 Civil"&case_name="Lorem Ipsum"&type=r',
+        )
+
+        self.assertTrue(
+            RECAPPercolator.exists(id=docket_only_alert_filter.pk),
+            msg=f"Alert id: {docket_only_alert_filter.pk} was not indexed.",
+        )
+        # The docket_only_alert_filter shouldn't be indexed into the
+        # RECAPDocumentPercolator due to its incompatibility.
+        self.assertFalse(
+            RECAPDocumentPercolator.exists(id=docket_only_alert_filter.pk),
+            msg=f"Alert id: {docket_only_alert_filter.pk} was not indexed.",
+        )
+        self.assertTrue(
+            DocketDocumentPercolator.exists(id=docket_only_alert_filter.pk),
+            msg=f"Alert id: {docket_only_alert_filter.pk} was not indexed.",
+        )
+
+        docket_only_alert_filter_id = docket_only_alert_filter.pk
+        # Remove the alert.
+        docket_only_alert_filter.delete()
+        self.assertFalse(
+            RECAPPercolator.exists(id=docket_only_alert_filter_id),
+            msg=f"Alert id: {docket_only_alert_filter_id} was not indexed.",
+        )
+        self.assertFalse(
+            DocketDocumentPercolator.exists(id=docket_only_alert_filter_id),
+            msg=f"Alert id: {docket_only_alert_filter_id} was not indexed.",
         )
 
     def test_percolate_document_on_ingestion(self, mock_prefix) -> None:
