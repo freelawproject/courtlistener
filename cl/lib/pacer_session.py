@@ -143,7 +143,7 @@ def get_or_cache_pacer_cookies(
         # cookies were found in cache and ttl >= 5 minutes, return them
         if isinstance(cookies_data, tuple):
             return cookies_data
-        return cookies_data, settings.EGRESS_PROXY_HOST
+        return cookies_data, settings.EGRESS_PROXY_HOSTS[0]
 
     # Unable to find cookies in cache, are about to expire or refresh needed
     # Login and cache new values.

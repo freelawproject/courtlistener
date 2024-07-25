@@ -5407,7 +5407,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: ("Cookie", settings.EGRESS_PROXY_HOST),
+    side_effect=lambda x, y, z: ("Cookie", settings.EGRESS_PROXY_HOSTS[0]),
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",

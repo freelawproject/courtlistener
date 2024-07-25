@@ -123,7 +123,6 @@ class TestPacerSessionUtils(TestCase):
     def test_pick_random_proxy_when_list_is_available(self):
         """Does ProxyPacerSession choose a random proxy from the available list?"""
         session = ProxyPacerSession(username="test", password="password")
-        self.assertNotEqual(session.proxy_address, settings.EGRESS_PROXY_HOST)
         self.assertIn(
             session.proxy_address,
             ["http://proxy_1:9090", "http://proxy_2:9090"],
@@ -136,7 +135,7 @@ class TestPacerSessionUtils(TestCase):
         )
         self.assertIsInstance(cookies_data, tuple)
         _, proxy = cookies_data
-        self.assertEqual(proxy, settings.EGRESS_PROXY_HOST)
+        self.assertEqual(proxy, settings.EGRESS_PROXY_HOSTS[0])
 
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_compute_new_cookies_with_new_format(self, mock_log_into_pacer):

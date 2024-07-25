@@ -1,4 +1,5 @@
 import json
+import random
 
 import requests
 from django.conf import settings
@@ -38,7 +39,7 @@ def send_webhook_event(
     the webhook is sent.
     """
     proxy_server = {
-        "http": settings.EGRESS_PROXY_HOST,  # type: ignore
+        "http": random.choice(settings.EGRESS_PROXY_HOSTS),  # type: ignore
     }
     headers = {
         "Content-type": "application/json",

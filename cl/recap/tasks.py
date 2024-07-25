@@ -1650,7 +1650,7 @@ def fetch_pacer_doc_by_rd(
     cookies_data = (
         cookies
         if isinstance(cookies, tuple)
-        else (cookies, settings.EGRESS_PROXY_HOST)
+        else (cookies, settings.EGRESS_PROXY_HOSTS[0])
     )
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     try:
@@ -1753,7 +1753,7 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
     cookies_data = (
         cookies
         if isinstance(cookies, tuple)
-        else (cookies, settings.EGRESS_PROXY_HOST)
+        else (cookies, settings.EGRESS_PROXY_HOSTS[0])
     )
     try:
         r = get_att_report_by_rd(rd, cookies_data)
@@ -1938,7 +1938,7 @@ def fetch_docket(self, fq_pk):
     cookies, proxy_address = (
         cookies_data
         if isinstance(cookies_data, tuple)
-        else (cookies_data, settings.EGRESS_PROXY_HOST)
+        else (cookies_data, settings.EGRESS_PROXY_HOSTS[0])
     )
     s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
     try:
@@ -2282,7 +2282,7 @@ def get_and_copy_recap_attachment_docs(
     cookies_data = (
         cookies
         if isinstance(cookies, tuple)
-        else (cookies, settings.EGRESS_PROXY_HOST)
+        else (cookies, settings.EGRESS_PROXY_HOSTS[0])
     )
     appellate = False
     unique_pqs = []
@@ -2398,7 +2398,7 @@ def get_and_merge_rd_attachments(
     cookies_data = (
         cookies
         if isinstance(cookies, tuple)
-        else (cookies, settings.EGRESS_PROXY_HOST)
+        else (cookies, settings.EGRESS_PROXY_HOSTS[0])
     )
     # Try to get the attachment page without being logged into PACER
     att_report_text = get_attachment_page_by_url(document_url, court_id)

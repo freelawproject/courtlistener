@@ -998,7 +998,10 @@ def get_pacer_case_id_and_title(
         cookies_from_cache = get_pacer_cookie_from_cache(user_pk)
         if isinstance(cookies_from_cache, tuple):
             cookies, proxy_address = cookies_from_cache
-        cookies, proxy_address = cookies_from_cache, settings.EGRESS_PROXY_HOST
+        cookies, proxy_address = (
+            cookies_from_cache,
+            settings.EGRESS_PROXY_HOSTS[0],
+        )
     else:
         raise Exception(
             "user_pk is unavailable, cookies cannot be retrieved from cache"
