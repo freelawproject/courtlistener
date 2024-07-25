@@ -545,6 +545,40 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         db_index=True,
     )
+    office_code = models.CharField(
+        help_text="A one digit statistical code (either alphabetic or numeric) "
+        "of the office within the district. In this "
+        "example, 2:07-cv-34911-MJL, the 2 preceding "
+        "the : is the office code.",
+        max_length=1,
+        blank=True,
+        db_index=True,
+    )
+    case_type = models.CharField(
+        help_text="Case type, e.g., civil (cv), magistrate (mj), criminal (cr), "
+        "petty offense (po), and miscellaneous (mc). These codes "
+        "can be upper case or lower case, and may vary in number of "
+        "characters.",
+        max_length=5,
+        blank=True,
+        db_index=True,
+    )
+    judge_initials = models.CharField(
+        help_text="A typically three-letter upper cased abbreviation "
+        "of the judge's initials. In the example 2:07-cv-34911-MJL, "
+        "MJL is the judge's initials. Judge initials change if a "
+        "new judge takes over a case.",
+        max_length=4,
+        blank=True,
+        db_index=True,
+    )
+    defendant_number = models.SmallIntegerField(
+        help_text="A unique number assigned to each defendant in a case, "
+        "typically found in pacer criminal cases as a -1, -2 after "
+        "the judge initials. Example: 1:14-cr-10363-RGS-1.",
+        null=True,
+        db_index=True,
+    )
     # Nullable for unique constraint requirements.
     pacer_case_id = fields.CharNullField(
         help_text="The case ID provided by PACER.",
