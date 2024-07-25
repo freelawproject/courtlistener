@@ -26,7 +26,7 @@ urlpatterns = [
     path(
         "sign-in/",
         ratelimiter_unsafe_10_per_m(
-            auth_views.LoginView.as_view(
+            views.SafeRedirectLoginView.as_view(
                 **{
                     "template_name": "register/login.html",
                     "authentication_form": ConfirmedEmailAuthenticationForm,
