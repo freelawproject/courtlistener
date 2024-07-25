@@ -365,6 +365,17 @@ class Docket(AbstractDateTimeModel, DocketSources):
         blank=True,
         null=True,
     )
+    parent_docket = models.ForeignKey(
+        "self",
+        help_text="In criminal cases (and some magistrate) PACER creates "
+        "a parent docket and one or more child dockets. Child dockets "
+        "contain docket information for each individual defendant "
+        "while parent dockets are a superset of all docket entries.",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="child_dockets",
+    )
     appeal_from_str = models.TextField(
         help_text=(
             "In appellate cases, this is the lower court or "
