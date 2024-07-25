@@ -33,8 +33,8 @@ from requests import Session
 from scorched.exc import SolrError
 
 from cl.alerts.tasks import (
-    process_percolator_response,
-    send_or_schedule_alerts,
+    percolator_response_processing,
+    send_or_schedule_search_alerts,
 )
 from cl.audio.models import Audio
 from cl.celery_init import app
@@ -70,7 +70,7 @@ from cl.search.types import (
     ESModelClassType,
     ESModelType,
     EventTable,
-    SaveDocumentResponseType,
+    SaveESDocumentReturnType,
 )
 
 percolator_alerts_models_supported = [Audio, RECAPDocument, Docket]
@@ -302,7 +302,7 @@ def es_save_document(
     instance_id: int,
     app_label: str,
     es_document_name: ESDocumentNameType,
-) -> SaveDocumentResponseType | None:
+) -> SaveESDocumentReturnType | None:
     """Save a document in Elasticsearch using a provided callable.
 
     :param self: The celery task
@@ -310,8 +310,9 @@ def es_save_document(
     :param app_label: The app label and model that belongs to the document
     being added.
     :param es_document_name: A Elasticsearch DSL document name.
-    :return: SaveDocumentResponseType or None
+    :return: SaveESDocumentReturnType or None
     """
+
     es_args = {}
     es_document = getattr(es_document_module, es_document_name)
 
@@ -496,7 +497,7 @@ def update_es_document(
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
-) -> SaveDocumentResponseType | None:
+) -> SaveESDocumentReturnType | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param es_document_name: The Elasticsearch document type name.
@@ -883,10 +884,10 @@ def index_docket_parties_in_es(
     )
     # Percolate Docket after parties are up-to-date.
     chain(
-        send_or_schedule_alerts.s(
+        send_or_schedule_search_alerts.s(
             (str(docket_id), docket_document_dict, "search.Docket")
         ),
-        process_percolator_response.s(),
+        percolator_response_processing.s(),
     ).apply_async()
 
 

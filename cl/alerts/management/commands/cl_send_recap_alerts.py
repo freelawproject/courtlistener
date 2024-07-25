@@ -21,9 +21,9 @@ from cl.alerts.models import Alert, ScheduledAlertHit
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import (
     add_document_hit_to_alert_set,
-    alert_hits_limit_reached,
     has_document_alert_hit_been_triggered,
     recap_document_hl_matched,
+    scheduled_alert_hits_limit_reached,
 )
 from cl.api.models import WebhookEventType
 from cl.api.tasks import send_es_search_alert_webhook
@@ -649,7 +649,7 @@ def query_and_schedule_alerts(
             if results_to_send:
                 for hit in results_to_send:
                     # Schedule DAILY, WEEKLY and MONTHLY Alerts
-                    if alert_hits_limit_reached(alert.pk, user.pk):
+                    if scheduled_alert_hits_limit_reached(alert.pk, user.pk):
                         # Skip storing hits for this alert-user combination because
                         # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
                         continue

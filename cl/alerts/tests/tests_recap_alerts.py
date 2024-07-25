@@ -23,7 +23,7 @@ from cl.alerts.models import (
 from cl.alerts.utils import (
     avoid_indexing_auxiliary_alert,
     build_plain_percolator_query,
-    percolate_document,
+    percolate_es_document,
     prepare_percolator_content,
     recap_document_hl_matched,
 )
@@ -1829,7 +1829,7 @@ class RECAPAlertsPercolatorTest(
         percolator_index, es_document_index, document_content = (
             prepare_percolator_content(app_label, document_id, None)
         )
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(document_id),
             percolator_index,
             es_document_index,
@@ -2041,7 +2041,7 @@ class RECAPAlertsPercolatorTest(
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
@@ -2058,7 +2058,7 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_1 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_1)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
@@ -2075,7 +2075,7 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_2 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_2)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
@@ -2097,7 +2097,7 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_3 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_3)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
@@ -2120,7 +2120,7 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_4 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_4)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.docket_3.pk),
             RECAPPercolator._index._name,
             document_index_alias,
@@ -2139,7 +2139,7 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_5 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_5)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.de_1.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,
@@ -2158,7 +2158,7 @@ class RECAPAlertsPercolatorTest(
         }
         query_id_6 = self.save_percolator_query(cd)
         created_queries_ids.append(query_id_6)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.de.docket.pk),
             RECAPPercolator._index._name,
             document_index_alias,

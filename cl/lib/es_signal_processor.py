@@ -7,8 +7,8 @@ from django.db.models.signals import m2m_changed, post_delete, post_save
 from model_utils.tracker import FieldInstanceTracker
 
 from cl.alerts.tasks import (
-    process_percolator_response,
-    send_or_schedule_alerts,
+    percolator_response_processing,
+    send_or_schedule_search_alerts,
 )
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import elasticsearch_enabled
@@ -202,8 +202,8 @@ def update_es_documents(
                             (compose_app_label(instance), instance.pk),
                             fields_map,
                         ),
-                        send_or_schedule_alerts.s(),
-                        process_percolator_response.s(),
+                        send_or_schedule_search_alerts.s(),
+                        percolator_response_processing.s(),
                     ).apply_async()
                 )
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
@@ -436,8 +436,8 @@ def update_reverse_related_documents(
                     related_instance,
                     fields_map_to_pass,
                 ),
-                send_or_schedule_alerts.s(),
-                process_percolator_response.s(),
+                send_or_schedule_search_alerts.s(),
+                percolator_response_processing.s(),
             ).apply_async()
         )
 
@@ -770,8 +770,8 @@ class ESSignalProcessor:
                         compose_app_label(instance),
                         self.es_document.__name__,
                     ),
-                    send_or_schedule_alerts.s(),
-                    process_percolator_response.s(),
+                    send_or_schedule_search_alerts.s(),
+                    percolator_response_processing.s(),
                 ).apply_async()
             )
             return

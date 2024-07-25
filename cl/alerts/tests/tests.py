@@ -41,7 +41,7 @@ from cl.alerts.tasks import (
     get_docket_notes_and_tags_by_user,
     send_alert_and_webhook,
 )
-from cl.alerts.utils import InvalidDateError, percolate_document
+from cl.alerts.utils import InvalidDateError, percolate_es_document
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -2729,7 +2729,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Percolate the document. First batch.
         document_index = AudioDocument._index._name
-        percolator_responses = percolate_document(
+        percolator_responses = percolate_es_document(
             str(rt_oral_argument.pk),
             AudioPercolator._index._name,
             document_index,
@@ -2743,7 +2743,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Percolate the next page.
         search_after = percolator_responses[0].hits[-1].meta.sort
-        percolator_responses = percolate_document(
+        percolator_responses = percolate_es_document(
             str(rt_oral_argument.pk),
             AudioPercolator._index._name,
             document_index,

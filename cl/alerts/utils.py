@@ -107,7 +107,46 @@ def create_percolator_search_query(
     return s
 
 
+# TODO: Remove after scheduled OA alerts have been processed.
 def percolate_document(
+    document_id: str,
+    document_index: str,
+    search_after: int = 0,
+) -> Response:
+    """Percolate a document against a defined Elasticsearch Percolator query.
+
+    :param document_id: The document ID in ES index to be percolated.
+    :param document_index: The ES document index where the document lives.
+    :param search_after: The ES search_after param for deep pagination.
+    :return: The response from the Elasticsearch query.
+    """
+
+    s = Search(index=AudioPercolator._index._name)
+    percolate_query = Q(
+        "percolate",
+        field="percolator_query",
+        index=document_index,
+        id=document_id,
+    )
+    exclude_rate_off = Q("term", rate=Alert.OFF)
+    final_query = Q(
+        "bool",
+        must=[percolate_query],
+        must_not=[exclude_rate_off],
+    )
+    s = s.query(final_query)
+    s = add_es_highlighting(
+        s, {"type": SEARCH_TYPES.ORAL_ARGUMENT}, alerts=True
+    )
+    s = s.source(excludes=["percolator_query"])
+    s = s.sort("date_created")
+    s = s[: settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE]
+    if search_after:
+        s = s.extra(search_after=search_after)
+    return s.execute()
+
+
+def percolate_es_document(
     document_id: str,
     percolator_index: str,
     document_index: str | None = None,
@@ -227,10 +266,10 @@ def fetch_all_search_alerts_results(
 ) -> tuple[list[Hit], list[Hit], list[Hit]]:
     """Fetches all search alerts results based on a given percolator query and
     the initial responses. It retrieves all the search results that exceed the
-    initial batch size by iteratively calling percolate_document method with
+    initial batch size by iteratively calling percolate_es_document method with
     the necessary pagination parameters.
     :param initial_responses: The initial ES Responses tuple.
-    :param args: Additional arguments to pass to the percolate_document method.
+    :param args: Additional arguments to pass to the percolate_es_document method.
     :return: A three-tuple containing the main percolator results, the
     RECAPDocument percolator results (if applicable), and the Docket
     percolator results (if applicable).
@@ -265,7 +304,7 @@ def fetch_all_search_alerts_results(
                 "rd_search_after": rd_search_after,
                 "d_search_after": d_search_after,
             }
-            responses = percolate_document(*args, **search_after_params)
+            responses = percolate_es_document(*args, **search_after_params)
             if not responses[0]:
                 break
 
@@ -323,7 +362,31 @@ def override_alert_query(
     return qd
 
 
-def alert_hits_limit_reached(
+# TODO: Remove after scheduled OA alerts have been processed.
+def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
+    """Check if the alert hits limit has been reached for a specific alert-user
+     combination.
+
+    :param alert_pk: The alert_id.
+    :param user_pk: The user_id.
+    :return: True if the limit has been reached, otherwise False.
+    """
+
+    stored_hits = ScheduledAlertHit.objects.filter(
+        alert_id=alert_pk,
+        user_id=user_pk,
+        hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+    )
+    hits_count = stored_hits.count()
+    if hits_count >= settings.SCHEDULED_ALERT_HITS_LIMIT:
+        logger.info(
+            f"Skipping hit for Alert ID: {alert_pk}, there are {hits_count} hits stored for this alert."
+        )
+        return True
+    return False
+
+
+def scheduled_alert_hits_limit_reached(
     alert_pk: int,
     user_pk: int,
     content_type: ContentType | None = None,

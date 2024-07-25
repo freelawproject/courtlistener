@@ -14,7 +14,7 @@ from lxml import html
 from waffle.testutils import override_flag
 
 from cl.alerts.models import Alert
-from cl.alerts.utils import percolate_document
+from cl.alerts.utils import percolate_es_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import (
@@ -2248,7 +2248,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
@@ -2268,7 +2268,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
@@ -2287,7 +2287,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.audio_1.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
@@ -2308,7 +2308,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.audio_5.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
@@ -2330,7 +2330,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.audio_1.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
@@ -2351,7 +2351,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.audio_2.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
@@ -2372,7 +2372,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        responses = percolate_document(
+        responses = percolate_es_document(
             str(self.audio_4.pk),
             AudioPercolator._index._name,
             oral_argument_index_alias,
