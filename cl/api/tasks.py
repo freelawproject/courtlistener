@@ -83,8 +83,50 @@ def send_docket_alert_webhook_events(
         send_webhook_event(webhook_event, json_bytes)
 
 
+# TODO: Remove after scheduled OA alerts have been processed.
 @app.task()
 def send_es_search_alert_webhook(
+    results: list[dict[str, Any]],
+    webhook_pk: int,
+    alert: Alert,
+) -> None:
+    """Send a search alert webhook event containing search results from a
+    search alert object.
+
+    :param results: The search results returned by SOLR for this alert.
+    :param webhook_pk: The webhook endpoint ID object to send the event to.
+    :param alert: The search alert object.
+    """
+
+    webhook = Webhook.objects.get(pk=webhook_pk)
+    serialized_alert = SearchAlertSerializerModel(alert).data
+    es_results = []
+    for result in results:
+        result["snippet"] = result["text"]
+        es_results.append(ResultObject(initial=result))
+    serialized_results = V3OAESResultSerializer(es_results, many=True).data
+
+    post_content = {
+        "webhook": generate_webhook_key_content(webhook),
+        "payload": {
+            "results": serialized_results,
+            "alert": serialized_alert,
+        },
+    }
+    renderer = JSONRenderer()
+    json_bytes = renderer.render(
+        post_content,
+        accepted_media_type="application/json;",
+    )
+    webhook_event = WebhookEvent.objects.create(
+        webhook=webhook,
+        content=post_content,
+    )
+    send_webhook_event(webhook_event, json_bytes)
+
+
+@app.task()
+def send_search_alert_webhook_es(
     results: list[dict[str, Any]] | list[Hit],
     webhook_pk: int,
     alert_pk: int,

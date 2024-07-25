@@ -34,7 +34,7 @@ from cl.alerts.utils import (
 from cl.api.models import WebhookEventType
 from cl.api.tasks import (
     send_docket_alert_webhook_events,
-    send_es_search_alert_webhook,
+    send_search_alert_webhook_es,
 )
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -473,7 +473,7 @@ def send_webhook_alert_hits(
             event_type=WebhookEventType.SEARCH_ALERT, enabled=True
         )
         for user_webhook in user_webhooks:
-            send_es_search_alert_webhook.delay(
+            send_search_alert_webhook_es.delay(
                 documents,
                 user_webhook.pk,
                 alert.pk,
