@@ -1117,17 +1117,6 @@ files = [
 Django = ">=3.2"
 
 [[package]]
-name = "django-ordered-model"
-version = "3.7.4"
-description = "Allows Django models to be ordered and provides a simple admin interface for reordering them."
-optional = false
-python-versions = "*"
-files = [
-    {file = "django-ordered-model-3.7.4.tar.gz", hash = "sha256:f258b9762525c00a53009e82f8b8bf2a3aa315e8b453e281e8fdbbfe2b8cb3ba"},
-    {file = "django_ordered_model-3.7.4-py3-none-any.whl", hash = "sha256:dfcd3183fe0749dad1c9971cba1d6240ce7328742a30ddc92feca41107bb241d"},
-]
-
-[[package]]
 name = "django-override-storage"
 version = "0.3.2"
 description = "Django test helpers to manage file storage side effects."
@@ -2245,13 +2234,13 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.6.10"
+version = "2.6.12"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.6.10-py27-none-any.whl", hash = "sha256:10edd6d6d524cb4d01ba29d22d85bfe99c5d5dd0eedd13c9788583c4bbcad389"},
-    {file = "juriscraper-2.6.10.tar.gz", hash = "sha256:b374359b21f817af5ad916d0653dd87420dc2b4a588df1b51a42083f3c0fff03"},
+    {file = "juriscraper-2.6.12-py27-none-any.whl", hash = "sha256:7a9b28d149e476eec654b0ea8ad4f04375a7597cc8d32bc169dff31bb8a5e63c"},
+    {file = "juriscraper-2.6.12.tar.gz", hash = "sha256:b70dd3c441e91c80414fc0fce32f78c1c0e6d480996784f94ea94aa4ce033644"},
 ]
 
 [package.dependencies]
@@ -5472,4 +5461,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "5334f16d006f7486a5f9b905906f2a9a68e7f524684c04af3d0994ebd0999384"
+content-hash = "e6d34875888f1687912d03d33ea68038bba6c6d487037c6454d5b18449ec6d0c"

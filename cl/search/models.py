@@ -22,7 +22,6 @@ from eyecite.tokenizers import HyperscanTokenizer
 from localflavor.us.models import USPostalCodeField, USZipCodeField
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
-from ordered_model.models import OrderedModel
 
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -3149,7 +3148,7 @@ def sort_cites(c):
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class Opinion(OrderedModel, AbstractDateTimeModel):
+class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
     LEAD = "020lead"
@@ -3321,10 +3320,10 @@ class Opinion(OrderedModel, AbstractDateTimeModel):
             "sha1",
         ]
     )
-    order_with_respect_to = "cluster"
+    order = models.IntegerField(null=True, blank=True)
 
     class Meta:
-        ordering = ("order",)
+        unique_together = ("cluster", "order")
 
     @property
     def siblings(self) -> QuerySet:
