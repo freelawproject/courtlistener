@@ -309,7 +309,7 @@
       "html_lawbox": "",
       "per_curiam": false,
       "type": "010combined",
-      "order": 1
+      "order": 2
     },
     "model": "search.opinion",
     "pk": 4
@@ -332,7 +332,7 @@
       "html_lawbox": "",
       "per_curiam": false,
       "type": "010combined",
-      "order": 2
+      "order": 3
     },
     "model": "search.opinion",
     "pk": 5
@@ -355,7 +355,7 @@
       "html_lawbox": "",
       "per_curiam": false,
       "type": "010combined",
-      "order": 3
+      "order": 4
     },
     "model": "search.opinion",
     "pk": 6
