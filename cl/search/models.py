@@ -3323,7 +3323,11 @@ class Opinion(AbstractDateTimeModel):
     order = models.IntegerField(null=True, blank=True)
 
     class Meta:
-        unique_together = ("cluster", "order")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cluster_id", "order"], name="unique_opinion_order"
+            )
+        ]
 
     @property
     def siblings(self) -> QuerySet:
@@ -3350,6 +3354,12 @@ class Opinion(AbstractDateTimeModel):
         *args: List,
         **kwargs: Dict,
     ) -> None:
+        if self.pk is None and self.order is None:
+            # Add order in new opinions with no defined order value
+            last_position = Opinion.objects.filter(
+                cluster=self.cluster
+            ).aggregate(models.Max("order"))["order__max"]
+            self.order = (last_position or 0) + 1
         super().save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr

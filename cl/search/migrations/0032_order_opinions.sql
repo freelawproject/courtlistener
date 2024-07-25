@@ -16,10 +16,6 @@ ALTER TABLE "search_opinion" ADD COLUMN "order" integer NULL;
 --
 ALTER TABLE "search_opinionevent" ADD COLUMN "order" integer NULL;
 --
--- Alter unique_together for opinion (1 constraint(s))
---
-ALTER TABLE "search_opinion" ADD CONSTRAINT "search_opinion_cluster_id_order_8426d97d_uniq" UNIQUE ("cluster_id", "order");
---
 -- Create trigger update_or_delete_snapshot_update on model opinion
 --
 
@@ -123,4 +119,8 @@ ALTER TABLE "search_opinion" ADD CONSTRAINT "search_opinion_cluster_id_order_842
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_1f4fd ON "search_opinion" IS '79bebd7cda3c6ed3bc40f28799cf9c0f2638e2ad';
         
+--
+-- Create constraint unique_opinion_order on model opinion
+--
+ALTER TABLE "search_opinion" ADD CONSTRAINT "unique_opinion_order" UNIQUE ("cluster_id", "order");
 COMMIT;

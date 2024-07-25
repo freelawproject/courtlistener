@@ -65,7 +65,6 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionFactory,
-    OpinionsCitedWithParentsFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
@@ -301,7 +300,7 @@ class ModelTest(TestCase):
         self.assertEqual(cluster_count, expected_count)
 
     def test_opinions_order(self) -> None:
-        """Test django-ordered-model library"""
+        """Test opinions order"""
 
         # Create court
         court = CourtFactory(id="nyappdiv")
@@ -336,32 +335,34 @@ class ModelTest(TestCase):
 
         # Test that the value of the order field matches the order in which
         # they were created
-        self.assertEqual(op_1.order, 0)
-        self.assertEqual(op_2.order, 1)
-        self.assertEqual(op_3.order, 2)
-
-        # Use library method to move lead opinion to first position, we can
-        # use this function to easily reorder existing opinions
-        op_3.to(0)
-
-        # The position of the elements was modified, we refresh the objects
-        op_1.refresh_from_db()
-        op_2.refresh_from_db()
-        op_3.refresh_from_db()
-
-        # Test new order
-        self.assertEqual(op_3.order, 0)
         self.assertEqual(op_1.order, 1)
         self.assertEqual(op_2.order, 2)
+        self.assertEqual(op_3.order, 3)
 
-        # Add new opinion to cluster
-        op_4 = OpinionFactory(
-            cluster=cluster,
-            type="Dissent",
+        # Can we update an opinion using an existing position?
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                op_3.order = 2
+                op_3.save()
+
+        # Can we create an opinion using an existing position?
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                op_4 = OpinionFactory(
+                    cluster=cluster, type="Lead Opinion", order=1
+                )
+
+        # Can we use negative positions?
+        op_4 = OpinionFactory(cluster=cluster, type="Lead Opinion", order=-1)
+        self.assertEqual(op_4.order, -1)
+
+        # Can we order the opinions from a cluster using the field?
+        qs = (
+            cluster.sub_opinions.all()
+            .order_by("order")
+            .values_list("order", flat=True)
         )
-
-        # Test that the new opinion is in last place
-        self.assertEqual(op_4.order, 3)
+        self.assertEqual(list(qs), [-1, 1, 2, 3])
 
 
 class DocketValidationTest(TestCase):
