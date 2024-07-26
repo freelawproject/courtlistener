@@ -1771,13 +1771,19 @@ class RECAPAlertsPercolatorTest(
             NeonMembership.objects.create(
                 level=NeonMembership.LEGACY, user=cls.user_profile.user
             )
+            cls.webhook_enabled = WebhookFactory(
+                user=cls.user_profile.user,
+                event_type=WebhookEventType.SEARCH_ALERT,
+                url="https://example.com/",
+                enabled=True,
+            )
             cls.user_profile_2 = UserProfileWithParentsFactory()
             NeonMembership.objects.create(
                 level=NeonMembership.LEGACY, user=cls.user_profile_2.user
             )
             cls.user_profile_no_member = UserProfileWithParentsFactory()
             cls.webhook_enabled = WebhookFactory(
-                user=cls.user_profile.user,
+                user=cls.user_profile_no_member.user,
                 event_type=WebhookEventType.SEARCH_ALERT,
                 url="https://example.com/",
                 enabled=True,
@@ -2703,13 +2709,18 @@ class RECAPAlertsPercolatorTest(
                 name="Test Alert Docket Only",
                 query='q="410 Civil"&type=r',
             )
+            docket_only_alert_no_member = AlertFactory(
+                user=self.user_profile_no_member.user,
+                rate=Alert.REAL_TIME,
+                name="Test Alert Docket Only",
+                query='q="410 Civil"&type=r',
+            )
             recap_only_alert = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
                 name="Test Alert RECAP Only Docket Entry",
                 query=f"q=docket_entry_id:{alert_de.pk}&type=r",
             )
-
             cross_object_alert_with_hl = AlertFactory(
                 user=self.user_profile.user,
                 rate=Alert.REAL_TIME,
@@ -2725,11 +2736,11 @@ class RECAPAlertsPercolatorTest(
         )
 
         # Assert webhooks.
-        webhook_events = WebhookEvent.objects.all().values_list(
-            "content", flat=True
-        )
-        # 11 webhooks should be triggered one for each document ingested that
-        # matched each alert.
+        webhook_events = WebhookEvent.objects.filter(
+            webhook__user=self.user_profile.user
+        ).values_list("content", flat=True)
+        # 11 webhooks for user_profile should be triggered one for each
+        # document ingested that matched each alert.
         self.assertEqual(
             len(webhook_events), 11, msg="Webhook events didn't match."
         )
@@ -2745,9 +2756,29 @@ class RECAPAlertsPercolatorTest(
         self._count_percolator_webhook_hits_and_child_hits(
             webhook_events, cross_object_alert_with_hl.name, 1, 1, [rd_1.pk]
         )
+        webhook_events_no_member_user = WebhookEvent.objects.filter(
+            webhook__user=self.user_profile_no_member.user
+        ).values_list("content", flat=True)
+        # 5 webhooks for user_profile should be triggered one for each
+        # document ingested that matched docket_only_alert_no_member
+        self.assertEqual(
+            len(webhook_events_no_member_user),
+            4,
+            msg="Webhook events didn't match.",
+        )
+        # 4 Webhooks for docket_only_alert without any nested recap_documents.
+        self._count_percolator_webhook_hits_and_child_hits(
+            webhook_events_no_member_user,
+            docket_only_alert_no_member.name,
+            4,
+            0,
+            None,
+        )
 
         call_command("cl_send_rt_percolator_alerts", testing_mode=True)
 
+        # Only one email should be triggered because email alerts for
+        # non-members are omitted.
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
@@ -2964,7 +2995,7 @@ class RECAPAlertsPercolatorTest(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query OR",
-            query=f'q="405 Civil" OR pacer_doc_id:018036652436&type=r',
+            query=f'q="plain text for 018036652436" OR cause:"405 Civil"&type=r',
         )
         # RD ingestion.
         with mock.patch(
@@ -2996,6 +3027,7 @@ class RECAPAlertsPercolatorTest(
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
+
         html_content = self.get_html_content_from_email(mail.outbox[1])
         self._confirm_number_of_alerts(html_content, 2)
         self._count_alert_hits_and_child_hits(
@@ -3044,8 +3076,8 @@ class RECAPAlertsPercolatorTest(
             )
             alerts_created_user_1.append(docket_only_alert)
             docket_only_alert_2 = AlertFactory(
-                user=self.user_profile_2.user,
-                rate=Alert.REAL_TIME,
+                user=self.user_profile_no_member.user,
+                rate=Alert.WEEKLY,
                 name=f"Test Alert Docket Only {i}",
                 query='q="405 Civil"&type=r',
             )
@@ -3069,20 +3101,21 @@ class RECAPAlertsPercolatorTest(
                 jury_demand="1,000,000",
             )
 
-        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
-
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True
         )
-        # 6 webhook events should be triggered, all of them for user_profile
-        # # and none for user_profile_2 since it doesn't have a webhook enabled
+        # 12 webhook events should be triggered, 6 for user_profile
+        # 6 for user_profile_no_member since it does have a webhook enabled
         self.assertEqual(
-            len(webhook_events), 6, msg="Webhook events didn't match."
+            len(webhook_events), 12, msg="Webhook events didn't match."
         )
 
-        # 1 email should be sent for user_profile
+        # Send scheduled Weekly alerts and check assertions.
+        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
+
+        # 2 emails should be sent for user_profile_no_member and user_profile
         self.assertEqual(
-            len(mail.outbox), 1, msg="Outgoing emails don't match."
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
 
         # Assert 6 alerts are contained in the email for user_profile
@@ -3092,13 +3125,7 @@ class RECAPAlertsPercolatorTest(
             with self.subTest(alert=alert, msg="Assert alert in email."):
                 self.assertIn(alert.name, html_content)
 
-        # Send scheduled Weekly alerts and check assertions.
-        call_command("cl_send_scheduled_alerts", rate=Alert.WEEKLY)
-        # 1 additional email should be sent for user_profile_2
-        self.assertEqual(
-            len(mail.outbox), 2, msg="Outgoing emails don't match."
-        )
-        # Assert 6 alerts are contained in the email for user_profile_2
+        # Assert 6 alerts are contained in the email for user_profile_no_member
         html_content = self.get_html_content_from_email(mail.outbox[1])
         self._confirm_number_of_alerts(html_content, 6)
         for alert in alerts_created_user_2:

@@ -768,6 +768,12 @@ def percolator_response_processing(response: PercolatorResponsesType) -> None:
             rt_alerts_to_send.append(alert_triggered.pk)
 
         else:
+            if (
+                alert_triggered.rate == Alert.REAL_TIME
+                and not alert_user.profile.is_member
+            ):
+                # Omit scheduling an RT alert if the user is not a member.
+                continue
             # Schedule RT, DAILY, WEEKLY and MONTHLY Alerts
             if scheduled_alert_hits_limit_reached(
                 alert_triggered.pk,

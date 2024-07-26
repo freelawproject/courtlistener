@@ -1996,7 +1996,7 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
 class RECAPDocumentPercolator(Document, ESRECAPBaseDocument):
     rate = fields.KeywordField(attr="rate")
     percolator_query = PercolatorField()
-    date_created = fields.DateField(attr="date_created")
+    date_created = fields.DateField()
 
     class Index:
         name = "recap_document_percolator"
