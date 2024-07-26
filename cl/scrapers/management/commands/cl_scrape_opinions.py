@@ -189,7 +189,7 @@ def save_everything(
         candidate = async_to_sync(lookup_judges_by_messy_str)(
             opinion.author_str, docket.court.pk, cluster.date_filed
         )
-        if candidate:
+        if len(candidate) == 1:
             opinion.author = candidate[0]
 
     if cluster.judges:
