@@ -291,11 +291,13 @@ def update_or_create_docket(
     court_id: str,
     docket_number: str,
     source: int,
+    overwrite_existing_data: bool,
     blocked: bool = False,
     case_name_full: str = "",
     date_blocked: date | None = None,
     date_argued: date | None = None,
     ia_needs_upload: bool | None = None,
+    appeal_from_str: str = "",
 ) -> Docket:
     """Look for an existing Docket and update it or create a new one if it's
     not found.
@@ -305,11 +307,16 @@ def update_or_create_docket(
     :param court_id: The court id the docket belongs to.
     :param docket_number: The docket number.
     :param source: The docket source.
+    :param overwrite_existing_data: should be True when this function is
+        called from the Harvard importer; the Harvard data is considered
+        more trustable  and should overwrite an existing docket's data
+        Should be False when called from scrapers.
     :param blocked: If the docket should be blocked, default False.
     :param case_name_full: The docket case_name_full.
     :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
+    :param appeal_from_str: Name (not standardized id) of the lower level court.
     :return: The docket.
     """
 
@@ -319,7 +326,9 @@ def update_or_create_docket(
         "case_name_full": case_name_full,
         "blocked": blocked,
         "ia_needs_upload": ia_needs_upload,
+        "appeal_from_str": appeal_from_str,
         "date_blocked": date_blocked,
+        "date_argued": date_argued,
     }
 
     docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
@@ -327,25 +336,32 @@ def update_or_create_docket(
         # Update the existing docket with the new values
         docket.add_opinions_source(source)
 
-        # Prevent overwriting Docket.date_argued if it exists
-        if date_argued:
-            if docket.date_argued and date_argued != docket.date_argued:
+        for field, value in docket_fields.items():
+            # do not use blanket `if not value:`, since
+            # blocked and ia_needs_upload are booleans and would be skipped
+            if value is None or value == "":
+                continue
+
+            if (
+                not overwrite_existing_data
+                and getattr(docket, field)
+                and getattr(docket, field) != value
+            ):
+                # Prevent overwriting values that already exist, since default values
+                # to this function are empty strings or None
                 logger.error(
-                    "Docket %s already has a date_argued %s, different than new date %s",
+                    "Docket %s already has a %s %s, different than new value %s",
                     docket.pk,
-                    docket.date_argued,
-                    date_argued,
+                    field,
+                    getattr(docket, field),
+                    value,
                 )
             else:
-                docket.date_argued = date_argued
-
-        for field, value in docket_fields.items():
-            setattr(docket, field, value)
+                setattr(docket, field, value)
     else:
         # Create a new docket with docket_fields and additional fields
         docket = Docket(
             **docket_fields,
-            date_argued=date_argued,
             source=source,
             docket_number=docket_number,
             court_id=court_id,
