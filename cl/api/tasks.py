@@ -12,6 +12,7 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
+from cl.lib.elasticsearch_utils import merge_highlights_into_result
 from cl.search.api_serializers import (
     RECAPESResultSerializer,
     V3OAESResultSerializer,
@@ -153,14 +154,32 @@ def send_search_alert_webhook_es(
         case SEARCH_TYPES.RECAP:
             for result in results:
                 child_result_objects = []
-                if hasattr(result, "child_docs"):
-                    for child_doc in result.child_docs:
-                        child_result_objects.append(
-                            defaultdict(
-                                lambda: None, child_doc["_source"].to_dict()
+                child_docs = None
+                if isinstance(result, dict):
+                    child_docs = result.get("child_docs")
+                elif hasattr(result, "child_docs"):
+                    child_docs = result.child_docs
+
+                if child_docs:
+                    for child_doc in child_docs:
+                        if isinstance(result, dict):
+                            child_result_objects.append(child_doc)
+                        else:
+                            child_result_objects.append(
+                                defaultdict(
+                                    lambda: None,
+                                    child_doc["_source"].to_dict(),
+                                )
                             )
-                        )
+
                 result["child_docs"] = child_result_objects
+                # Merge HL into the parent document from percolator response.
+                if isinstance(result, dict):
+                    meta_hl = result.get("meta", {}).get("highlight", {})
+                    merge_highlights_into_result(
+                        meta_hl,
+                        result,
+                    )
             serialized_results = RECAPESResultSerializer(
                 results, many=True
             ).data

@@ -1,9 +1,10 @@
 import datetime
 from collections import defaultdict
-from typing import DefaultDict
+from typing import Any, DefaultDict
 
 import waffle
 from asgiref.sync import async_to_sync
+from django.conf import settings
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -13,6 +14,8 @@ from cl.alerts.models import (
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import InvalidDateError, override_alert_query
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.search.models import SEARCH_TYPES
+from cl.search.types import ESDictDocument
 from cl.stats.utils import tally_stat
 
 DAYS_TO_DELETE = 90
@@ -50,6 +53,30 @@ def get_cut_off_date(rate: str, d: datetime.date) -> datetime.date | None:
     return cut_off_date
 
 
+def merge_alert_child_documents(
+    documents: list[ESDictDocument],
+) -> ESDictDocument:
+    """Merge multiple child hits within the same main document.
+    :param documents: A list of document hits.
+    :return: A document dictionary where documents has been merged.
+    """
+
+    main_document = documents[0].copy()
+    child_docs: list[ESDictDocument] = []
+    for doc in documents:
+        if "child_docs" in doc:
+            child_docs.extend(doc["child_docs"])
+            if len(child_docs) >= settings.RECAP_CHILD_HITS_PER_RESULT:
+                # Nested child limits reached. Set child_remaining True to show
+                # the "Show the view additional hits button"
+                main_document["child_remaining"] = True
+                break
+
+    if child_docs:
+        main_document["child_docs"] = child_docs
+    return main_document
+
+
 def query_and_send_alerts_by_rate(rate: str) -> None:
     """Query and send alerts per user.
 
@@ -59,58 +86,77 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
     alerts_sent_count = 0
     now_time = datetime.datetime.now()
-    alerts_to_update = []
-    scheduled_hits_rate = ScheduledAlertHit.objects.filter(
-        alert__rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
-    ).select_related("user", "alert")
+    # Get unique alert users with scheduled alert hits
+    user_ids = (
+        ScheduledAlertHit.objects.filter(
+            alert__rate=rate, hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED
+        )
+        .values_list("user", flat=True)
+        .distinct()
+    )
 
-    # Create a nested dictionary structure to hold the groups.
-    grouped_hits: DefaultDict[
-        int, DefaultDict[Alert, list[ScheduledAlertHit]]
-    ] = defaultdict(lambda: defaultdict(list))
+    for user_id in user_ids:
+        # Query ScheduledAlertHits for every user.
+        scheduled_hits = ScheduledAlertHit.objects.filter(
+            user_id=user_id,
+            alert__rate=rate,
+            hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
+        ).select_related("user", "alert")
 
-    # Group scheduled hits by User and Alert.
-    for hit in scheduled_hits_rate:
-        user_id = hit.user.pk
-        alert = hit.alert
-        grouped_hits[user_id][alert].append(hit)
+        # Group scheduled hits by Alert and the main_doc_id
+        grouped_hits: DefaultDict[
+            Alert, DefaultDict[int, list[dict[str, Any]]]
+        ] = defaultdict(lambda: defaultdict(list))
+        alerts_to_update = set()
+        for hit in scheduled_hits:
+            alert = hit.alert
+            doc_content = json_date_parser(hit.document_content)
+            match hit.alert.alert_type:
+                case SEARCH_TYPES.RECAP:
+                    main_doc_id = doc_content.get("docket_id")
+                case SEARCH_TYPES.ORAL_ARGUMENT:
+                    main_doc_id = doc_content.get("id")
+                case _:
+                    # Not supported alert type.
+                    continue
+            grouped_hits[alert][main_doc_id].append(doc_content)
+            alerts_to_update.add(alert.pk)
 
-    for user_id, alerts in grouped_hits.items():
+        # Merge child documents with the same main_doc_id if the document dict
+        # contains the child_docs key.
+        merged_hits: DefaultDict[Alert, list[dict[str, Any]]] = defaultdict(
+            list
+        )
+        for alert, document_groups in grouped_hits.items():
+            for documents in document_groups.values():
+                merged_hits[alert].append(
+                    merge_alert_child_documents(documents)
+                )
+
         hits = []
-        for alert, results in alerts.items():
+        for alert, documents in merged_hits.items():
             search_type = alert.alert_type
-            documents = []
-            for result in results:
-                documents.append(json_date_parser(result.document_content))
-
-            alerts_to_update.append(alert.pk)
 
             # Override order_by to show the latest items when clicking the
             # "View Full Results" button.
             cut_off_date = get_cut_off_date(rate, now_time.date())
             qd = override_alert_query(alert, cut_off_date)
             alert.query_run = qd.urlencode()  # type: ignore
-            hits.append(
-                (
-                    alert,
-                    search_type,
-                    documents,
-                    len(documents),
-                )
-            )
+            hits.append((alert, search_type, documents, len(documents)))
+
         if hits:
             send_search_alert_emails.delay(
                 [(user_id, hits)], scheduled_alert=True
             )
             alerts_sent_count += 1
 
-    # Update Alert's date_last_hit in bulk.
-    Alert.objects.filter(id__in=alerts_to_update).update(
-        date_last_hit=now_time
-    )
+        # Update Alert's date_last_hit in bulk for this user's alerts
+        Alert.objects.filter(id__in=alerts_to_update).update(
+            date_last_hit=now_time
+        )
 
-    # Update Scheduled alert hits status to "SENT".
-    scheduled_hits_rate.update(hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT)
+        # Update Scheduled alert hits status to "SENT" for this user
+        scheduled_hits.update(hit_status=SCHEDULED_ALERT_HIT_STATUS.SENT)
 
     # Remove old Scheduled alert hits sent, daily.
     if rate == Alert.DAILY:
@@ -124,16 +170,12 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
 
 
 def send_scheduled_alerts(rate: str) -> None:
-    if rate == Alert.DAILY:
-        query_and_send_alerts_by_rate(Alert.DAILY)
-    elif rate == Alert.WEEKLY:
-        query_and_send_alerts_by_rate(Alert.WEEKLY)
-    elif rate == Alert.MONTHLY:
+    if rate == Alert.MONTHLY:
         if datetime.date.today().day > 28:
             raise InvalidDateError(
                 "Monthly alerts cannot be run on the 29th, 30th or 31st."
             )
-        query_and_send_alerts_by_rate(Alert.MONTHLY)
+    query_and_send_alerts_by_rate(rate)
 
 
 def delete_old_scheduled_alerts() -> int:

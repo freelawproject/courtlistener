@@ -2808,6 +2808,7 @@ def make_es_stats_variable(
     return facet_fields
 
 
+# TODO: Remove after scheduled OA alerts have been processed.
 def fetch_all_search_results(
     fetch_method: Callable, initial_response: Response, *args
 ) -> list[Hit]:

@@ -7,6 +7,7 @@ from unittest import TestCase, mock
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from cl.alerts.factories import AlertFactory
@@ -201,6 +202,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                             msg="The source does not match.",
                         )
 
+    @override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
 
@@ -237,7 +239,9 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         # scraped and its MP3 file is processed.
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 2)
+        self.assertEqual(
+            len(webhook_events), 2, msg="Wrong number of webhook events."
+        )
 
         cases_names = ["Jeremy v. Julian", "Ander v. Leo"]
         for webhook_sent in webhook_events:

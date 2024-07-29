@@ -309,10 +309,3 @@ recap_document_indexed_fields = [
     "page_count",
     "cites",
 ]
-
-recap_document_filters = [
-    "available_only",
-    "description",
-    "document_number",
-    "attachment_number",
-]
