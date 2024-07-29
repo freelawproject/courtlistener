@@ -21,7 +21,6 @@ from cl.alerts.models import (
     ScheduledAlertHit,
 )
 from cl.alerts.utils import (
-    avoid_indexing_auxiliary_alert,
     build_plain_percolator_query,
     percolate_es_document,
     prepare_percolator_content,
@@ -41,9 +40,6 @@ from cl.people_db.factories import (
 )
 from cl.search.documents import (
     DocketDocument,
-    DocketDocumentPercolator,
-    ESRECAPDocumentPlain,
-    RECAPDocumentPercolator,
     RECAPPercolator,
     RECAPSweepDocument,
 )
@@ -1570,12 +1566,6 @@ class RECAPAlertsSweepIndexTest(
         RECAPPercolator._index._name = "recap_percolator_sweep"
         RECAPPercolator._index.delete(ignore=404)
         RECAPPercolator.init()
-        RECAPDocumentPercolator._index._name = "recap_doc_percolator_sweep"
-        RECAPDocumentPercolator._index.delete(ignore=404)
-        RECAPDocumentPercolator.init()
-        DocketDocumentPercolator._index._name = "docket_doc_percolator_sweep"
-        DocketDocumentPercolator._index.delete(ignore=404)
-        DocketDocumentPercolator.init()
 
         docket_only_alert = AlertFactory(
             user=self.user_profile.user,
@@ -1792,10 +1782,7 @@ class RECAPAlertsPercolatorTest(
     def setUp(self):
         RECAPPercolator._index.delete(ignore=404)
         RECAPPercolator.init()
-        RECAPDocumentPercolator._index.delete(ignore=404)
-        RECAPDocumentPercolator.init()
-        DocketDocumentPercolator._index.delete(ignore=404)
-        DocketDocumentPercolator.init()
+
         self.r = get_redis_interface("CACHE")
         keys = self.r.keys("alert_hits_percolator:*")
         if keys:
@@ -1822,36 +1809,18 @@ class RECAPAlertsPercolatorTest(
         )
         percolator_query.save(refresh=True)
 
-        if not avoid_indexing_auxiliary_alert(
-            DocketDocumentPercolator.__name__, cd
-        ):
-            d_percolator_query = DocketDocumentPercolator(
-                percolator_query=query_dict,
-                rate=Alert.REAL_TIME,
-                date_created=now(),
-            )
-            d_percolator_query.save(refresh=True)
-        if not avoid_indexing_auxiliary_alert(
-            RECAPDocumentPercolator.__name__, cd
-        ):
-            rd_percolator_query = RECAPDocumentPercolator(
-                percolator_query=query_dict,
-                rate=Alert.REAL_TIME,
-                date_created=now(),
-            )
-            rd_percolator_query.save(refresh=True)
         return percolator_query.meta.id
 
     @staticmethod
     def prepare_and_percolate_document(app_label, document_id):
-        percolator_index, es_document_index, document_content = (
-            prepare_percolator_content(app_label, document_id, None)
+        percolator_index, es_document_index, documents_to_percolate = (
+            prepare_percolator_content(app_label, document_id)
         )
         responses = percolate_es_document(
             str(document_id),
             percolator_index,
             es_document_index,
-            document_content,
+            documents_to_percolate,
             app_label=app_label,
         )
         return responses
@@ -2204,17 +2173,8 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert Docket Only",
             query='q="401 Civil"&type=r',
         )
-
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert.pk),
-            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
-        )
-        self.assertTrue(
-            RECAPDocumentPercolator.exists(id=docket_only_alert.pk),
-            msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
-        )
-        self.assertTrue(
-            DocketDocumentPercolator.exists(id=docket_only_alert.pk),
             msg=f"Alert id: {docket_only_alert.pk} was not indexed.",
         )
 
@@ -2225,14 +2185,6 @@ class RECAPAlertsPercolatorTest(
             RECAPPercolator.exists(id=docket_only_alert_id),
             msg=f"Alert id: {docket_only_alert_id} was not indexed.",
         )
-        self.assertFalse(
-            RECAPDocumentPercolator.exists(id=docket_only_alert_id),
-            msg=f"Alert id: {docket_only_alert_id} was not indexed.",
-        )
-        self.assertFalse(
-            DocketDocumentPercolator.exists(id=docket_only_alert_id),
-            msg=f"Alert id: {docket_only_alert_id} was not indexed.",
-        )
 
         # Index an alert with Docket filters.
         docket_only_alert_filter = AlertFactory(
@@ -2241,19 +2193,8 @@ class RECAPAlertsPercolatorTest(
             name="Test Alert Docket Only",
             query='q="401 Civil"&case_name="Lorem Ipsum"&type=r',
         )
-
         self.assertTrue(
             RECAPPercolator.exists(id=docket_only_alert_filter.pk),
-            msg=f"Alert id: {docket_only_alert_filter.pk} was not indexed.",
-        )
-        # The docket_only_alert_filter shouldn't be indexed into the
-        # RECAPDocumentPercolator due to its incompatibility.
-        self.assertFalse(
-            RECAPDocumentPercolator.exists(id=docket_only_alert_filter.pk),
-            msg=f"Alert id: {docket_only_alert_filter.pk} was not indexed.",
-        )
-        self.assertTrue(
-            DocketDocumentPercolator.exists(id=docket_only_alert_filter.pk),
             msg=f"Alert id: {docket_only_alert_filter.pk} was not indexed.",
         )
 
@@ -2262,10 +2203,6 @@ class RECAPAlertsPercolatorTest(
         docket_only_alert_filter.delete()
         self.assertFalse(
             RECAPPercolator.exists(id=docket_only_alert_filter_id),
-            msg=f"Alert id: {docket_only_alert_filter_id} was not indexed.",
-        )
-        self.assertFalse(
-            DocketDocumentPercolator.exists(id=docket_only_alert_filter_id),
             msg=f"Alert id: {docket_only_alert_filter_id} was not indexed.",
         )
 
@@ -2971,6 +2908,7 @@ class RECAPAlertsPercolatorTest(
         self.assertEqual(
             len(mail.outbox), 1, msg="Outgoing emails don't match."
         )
+
         # Assert docket-only alert.
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(docket_only_alert.name, html_content)
@@ -2995,7 +2933,7 @@ class RECAPAlertsPercolatorTest(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert Cross-object query OR",
-            query=f'q="plain text for 018036652436" OR cause:"405 Civil"&type=r',
+            query=f'q="018036652436" OR cause:405&type=r',
         )
         # RD ingestion.
         with mock.patch(

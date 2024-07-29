@@ -903,15 +903,18 @@ def send_or_schedule_search_alerts(
     document_id, document_content, app_label = response
 
     # Perform an initial percolator query and process its response.
-    percolator_index, es_document_index, document_content = (
-        prepare_percolator_content(app_label, document_id, document_content)
+    percolator_index, es_document_index, documents_to_percolate = (
+        prepare_percolator_content(app_label, document_id)
     )
-
+    if documents_to_percolate:
+        # If documents_to_percolate is returned by prepare_percolator_content,
+        # use the main document as the content to render in alerts.
+        document_content, _, _ = documents_to_percolate
     percolator_responses = percolate_es_document(
         document_id,
         percolator_index,
         es_document_index,
-        document_content,
+        documents_to_percolate,
         app_label,
     )
     if not percolator_responses[0]:
@@ -929,7 +932,7 @@ def send_or_schedule_search_alerts(
             document_id,
             percolator_index,
             es_document_index,
-            document_content,
+            documents_to_percolate,
             app_label,
         )
     )

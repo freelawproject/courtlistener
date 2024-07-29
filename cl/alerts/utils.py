@@ -1,7 +1,7 @@
 import copy
 from dataclasses import dataclass
 from datetime import date
-from typing import Any
+from typing import Any, Set
 
 from django.apps import apps
 from django.conf import settings
@@ -41,9 +41,8 @@ from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
-    DocketDocumentPercolator,
+    ESRECAPBaseDocument,
     ESRECAPDocumentPlain,
-    RECAPDocumentPercolator,
     RECAPPercolator,
 )
 from cl.search.models import SEARCH_TYPES, Docket
@@ -146,11 +145,30 @@ def percolate_document(
     return s.execute()
 
 
+def select_es_document_fields(
+    es_document: ESDictDocument, fields_to_select: Set[str]
+) -> ESDictDocument:
+    """Select specific required fields from an ES document.
+
+    :param es_document: The Elasticsearch document from which fields are to be
+    selected.
+    :param fields_to_select: A set of field names to be selected from the
+    document.
+    :return: A new ESDictDocument document containing only the selected fields.
+    """
+
+    return {
+        key: es_document[key] for key in fields_to_select if key in es_document
+    }
+
+
 def percolate_es_document(
     document_id: str,
     percolator_index: str,
     document_index: str | None = None,
-    document_dict: dict | None = None,
+    documents_to_percolate: (
+        tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None
+    ) = None,
     app_label: str | None = None,
     main_search_after: int | None = None,
     rd_search_after: int | None = None,
@@ -161,7 +179,9 @@ def percolate_es_document(
     :param document_id: The document ID in ES index to be percolated.
     :param percolator_index: The ES percolator index name.
     :param document_index: The ES document index where the document lives.
-    :param document_dict: The document dictionary to be percolated.
+    :param documents_to_percolate:A three-tuple containing the documents to
+    percolate: the full document, the document with only child fields,
+    and the document with only parent fields.
     :param app_label: The app label and model that belongs to the document
     being percolated.
     :param main_search_after: Optional the ES main percolator query
@@ -184,12 +204,30 @@ def percolate_es_document(
             index=document_index,
             id=document_id,
         )
-    else:
+    elif documents_to_percolate:
+        main_document_content_plain, child_document, parent_document = (
+            documents_to_percolate
+        )
         # Otherwise, use the document_dict to perform the percolation query.
         percolate_query = Q(
             "percolate",
             field="percolator_query",
-            document=document_dict,
+            document=main_document_content_plain,
+        )
+        percolate_query_child = Q(
+            "percolate",
+            field="percolator_query",
+            document=child_document,
+        )
+        percolate_query_parent = Q(
+            "percolate",
+            field="percolator_query",
+            document=parent_document,
+        )
+    else:
+        raise NotImplementedError(
+            "A document_index or documents_to_percolate must be provided to "
+            "build the percolator query."
         )
 
     exclude_rate_off = Q("term", rate=Alert.OFF)
@@ -216,23 +254,16 @@ def percolate_es_document(
             extra_options = {"highlight": child_highlight_options}
             s = s.extra(**extra_options)
 
-            # Prepare filter percolator queries for RECAP and Docket documents.
-            recap_document_percolator_index = (
-                RECAPDocumentPercolator._index._name
-            )
-            docket_document_percolator_index = (
-                DocketDocumentPercolator._index._name
-            )
             if (main_search_after is None) == (rd_search_after is None):
                 s_rd = create_percolator_search_query(
-                    recap_document_percolator_index,
-                    final_query,
+                    percolator_index,
+                    percolate_query_child,
                     search_after=rd_search_after,
                 )
             if (main_search_after is None) == (d_search_after is None):
                 s_d = create_percolator_search_query(
-                    docket_document_percolator_index,
-                    final_query,
+                    percolator_index,
+                    percolate_query_parent,
                     search_after=d_search_after,
                 )
         case _:
@@ -598,7 +629,7 @@ def transform_percolator_child_document(
 def include_recap_document_hit(
     alert_id: int, recap_document_hits: list[int], docket_hits: list[int]
 ) -> bool:
-    """Determine if an alert should include the percolated RECAP document
+    """Determine if an alert should include the percolated RECAPDocument
      based on its presence in the given lists:
 
     If an alert hit reached this method it was found in the main percolator request.
@@ -630,36 +661,22 @@ def include_recap_document_hit(
     return False
 
 
-def avoid_indexing_auxiliary_alert(
-    index_name: str, alert_query: QueryDict
-) -> bool:
-    """Determine if an alert should be avoided for indexing in the auxiliary
-    percolator index based on the index_name and query filters.
-
-    :param index_name: The name of the Elasticsearch index to check.
-    :param alert_query: QueryDict containing the alert query parameters.
-    :return: True if the alert should be avoided for indexing, otherwise False.
-    """
-
-    if index_name == DocketDocumentPercolator.__name__:
-        # Avoid indexing alerts that contains RECAPDocument filters into the
-        # DocketDocumentPercolator, otherwise it'll throw a parsing error.
-        for rd_filter in recap_document_filters:
-            if alert_query.get(rd_filter, ""):
-                return True
-
-    if index_name == RECAPDocumentPercolator.__name__:
-        # Avoid indexing alerts that contains Docket filters into the
-        # RECAPDocumentPercolator, otherwise it'll throw a parsing error.
-        for d_filter in docket_document_filters:
-            if alert_query.get(d_filter, ""):
-                return True
-    return False
+def get_field_names(mapping_dict):
+    field_names = []
+    for key, value in mapping_dict["properties"].items():
+        field_names.append(key)
+        if "fields" in value:
+            for subfield in value["fields"]:
+                if not subfield.endswith(("exact", "raw")):
+                    field_names.append(f"{key}.{subfield}")
+    return field_names
 
 
-def prepare_percolator_content(
-    app_label: str, document_id: str, document_content: ESDictDocument
-) -> tuple[str, str | None, ESDictDocument]:
+def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
+    str,
+    str | None,
+    tuple[ESDictDocument, ESDictDocument, ESDictDocument] | None,
+]:
     """Prepare percolator content for different according to the app_label.
 
     It returns the percolator index name and the ES document index where the
@@ -671,13 +688,14 @@ def prepare_percolator_content(
     document indices.
     :param document_id: The ID of the document to fetch and prepare, used for
     RECAP documents.
-    :param document_content: The initial content of the document, which may be
-    modified for RECAPDocument.
     :return: A three tuple containing the percolator index name, document index
-    name, and the document_content.
+    name, and a tuple containing the documents to percolate: the full document,
+    the document with only child fields, and the document with only parent fields
+    or None if no dict documents to percolate.
     """
 
     es_document_index = None
+    documents_to_percolate = None
     match app_label:
         case "audio.Audio":
             percolator_index = AudioPercolator._index._name
@@ -689,12 +707,43 @@ def prepare_percolator_content(
             percolator_index = RECAPPercolator._index._name
             model = apps.get_model(app_label)
             rd = model.objects.get(pk=document_id)
-            document_content = ESRECAPDocumentPlain().prepare(rd)
+            document_content_plain = ESRECAPDocumentPlain().prepare(rd)
             # Remove docket_child to avoid document parsing errors.
-            del document_content["docket_child"]
+            del document_content_plain["docket_child"]
+
+            rd_mapping_dict = ESRECAPBaseDocument._doc_type.mapping.to_dict()
+
+            rd_field_names = set(get_field_names(rd_mapping_dict))
+            r_fields_to_ignore = {"absolute_url"}
+            rd_field_names = rd_field_names - r_fields_to_ignore
+
+            child_document_content = select_es_document_fields(
+                document_content_plain, rd_field_names
+            )
+
+            d_mapping_dict = DocketDocument._doc_type.mapping.to_dict()
+            d_field_names = set(get_field_names(d_mapping_dict))
+            d_fields_to_ignore = {
+                "docket_slug",
+                "docket_absolute_url",
+                "court_exact",
+                "docket_child",
+                "timestamp",
+            }
+            d_field_names = d_field_names - d_fields_to_ignore
+
+            parent_document_content = select_es_document_fields(
+                document_content_plain, d_field_names
+            )
+            documents_to_percolate = (
+                document_content_plain,
+                child_document_content,
+                parent_document_content,
+            )
+
         case _:
             raise NotImplementedError(
                 "Percolator search alerts not supported for %s", app_label
             )
 
-    return percolator_index, es_document_index, document_content
+    return percolator_index, es_document_index, documents_to_percolate
