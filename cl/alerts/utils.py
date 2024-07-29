@@ -34,8 +34,6 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
-    docket_document_filters,
-    recap_document_filters,
 )
 from cl.search.documents import (
     AudioDocument,
@@ -46,7 +44,7 @@ from cl.search.documents import (
     RECAPPercolator,
 )
 from cl.search.models import SEARCH_TYPES, Docket
-from cl.search.types import ESDictDocument
+from cl.search.types import ESDictDocument, ESModelClassType
 
 
 @dataclass
@@ -143,23 +141,6 @@ def percolate_document(
     if search_after:
         s = s.extra(search_after=search_after)
     return s.execute()
-
-
-def select_es_document_fields(
-    es_document: ESDictDocument, fields_to_select: Set[str]
-) -> ESDictDocument:
-    """Select specific required fields from an ES document.
-
-    :param es_document: The Elasticsearch document from which fields are to be
-    selected.
-    :param fields_to_select: A set of field names to be selected from the
-    document.
-    :return: A new ESDictDocument document containing only the selected fields.
-    """
-
-    return {
-        key: es_document[key] for key in fields_to_select if key in es_document
-    }
 
 
 def percolate_es_document(
@@ -672,6 +653,31 @@ def get_field_names(mapping_dict):
     return field_names
 
 
+def select_es_document_fields(
+    es_document_class: ESModelClassType,
+    main_document: ESDictDocument,
+    fields_to_ignore: Set[str],
+) -> ESDictDocument:
+    """Select specific required fields from an Elasticsearch document.
+
+    :param es_document_class: The class of the ES document mapping.
+    :param main_document: The main ES document from which fields are to be
+    selected.
+    :param fields_to_ignore: A set of field names to be ignored when selecting
+    fields from the document.
+    :return: A new ESDictDocument containing only the selected fields.
+    """
+
+    mapping_dict = es_document_class._doc_type.mapping.to_dict()
+    fields_to_select = set(get_field_names(mapping_dict))
+    fields_to_select -= set(fields_to_ignore)
+    return {
+        key: main_document[key]
+        for key in fields_to_select
+        if key in main_document
+    }
+
+
 def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
     str,
     str | None,
@@ -711,18 +717,11 @@ def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
             # Remove docket_child to avoid document parsing errors.
             del document_content_plain["docket_child"]
 
-            rd_mapping_dict = ESRECAPBaseDocument._doc_type.mapping.to_dict()
-
-            rd_field_names = set(get_field_names(rd_mapping_dict))
             r_fields_to_ignore = {"absolute_url"}
-            rd_field_names = rd_field_names - r_fields_to_ignore
-
             child_document_content = select_es_document_fields(
-                document_content_plain, rd_field_names
+                ESRECAPBaseDocument, document_content_plain, r_fields_to_ignore
             )
 
-            d_mapping_dict = DocketDocument._doc_type.mapping.to_dict()
-            d_field_names = set(get_field_names(d_mapping_dict))
             d_fields_to_ignore = {
                 "docket_slug",
                 "docket_absolute_url",
@@ -730,10 +729,8 @@ def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
                 "docket_child",
                 "timestamp",
             }
-            d_field_names = d_field_names - d_fields_to_ignore
-
             parent_document_content = select_es_document_fields(
-                document_content_plain, d_field_names
+                DocketDocument, document_content_plain, d_fields_to_ignore
             )
             documents_to_percolate = (
                 document_content_plain,

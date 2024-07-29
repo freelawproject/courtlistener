@@ -13,6 +13,7 @@ from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
+    ESRECAPBaseDocument,
     ESRECAPDocument,
     OpinionClusterDocument,
     OpinionDocument,
@@ -58,6 +59,7 @@ ESModelClassType = Union[
     Type[Position],
     Type[Education],
     Type[RECAPDocument],
+    Type[ESRECAPBaseDocument],
 ]
 
 ESDocumentInstanceType = Union[
