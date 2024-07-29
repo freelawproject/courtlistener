@@ -1608,7 +1608,9 @@ class RECAPAlertsSweepIndexTest(
         self.assertIn(self.rd.description, txt_email)
 
         # Send  scheduled Monthly alerts and check assertions.
-        call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
+        current_date = now().replace(day=28, hour=0)
+        with time_machine.travel(current_date, tick=False):
+            call_command("cl_send_scheduled_alerts", rate=Alert.MONTHLY)
         self.assertEqual(
             len(mail.outbox), 2, msg="Outgoing emails don't match."
         )
