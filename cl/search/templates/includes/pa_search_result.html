@@ -4,7 +4,7 @@
 {% load humanize %}
 
 {% for result in results.object_list %}
-  {% with opinion=result.grouped_by_opinion_cluster_id.hits.hits.0|get_attrdict:"_source" %}
+  {% with opinion=result.grouped_by_opinion_cluster_id.hits.hits.0|get_es_doc_content %}
   <article>
     <h3 class="bottom serif">
       <a href="{% url 'view_case' opinion.cluster_id opinion.opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
@@ -30,7 +30,7 @@
 
       {% for parenthetical_group in result.grouped_by_opinion_cluster_id.hits.hits %}
         <div class="col-md-offset-half">
-        {% with pa_group=parenthetical_group|get_attrdict:"_source" %}
+        {% with pa_group=parenthetical_group|get_es_doc_content %}
           <h4>
             <a href="{% url 'view_case' pa_group.describing_opinion_cluster_id pa_group.describing_opinion_cluster_slug %}?{{ request.META.QUERY_STRING }}" class="visitable">
               {{ pa_group.representative_text|safe }}

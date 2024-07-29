@@ -10,6 +10,7 @@ from django.urls import reverse
 from django_elasticsearch_dsl.registries import registry
 from lxml import etree
 from rest_framework.test import APITestCase
+from rest_framework.utils.serializer_helpers import ReturnList
 
 from cl.lib.redis_utils import get_redis_interface
 from cl.search.models import SEARCH_TYPES
@@ -267,7 +268,10 @@ class V4SearchAPIAssertions(SimpleTestCase):
             get_expected_value,
         ) in fields_to_compare.items():
             with self.subTest(field=field):
-                parent_document = api_response.data["results"][0]
+                if isinstance(api_response, ReturnList):
+                    parent_document = api_response[0]
+                else:
+                    parent_document = api_response.data["results"][0]
                 actual_value = parent_document.get(field)
                 if field in ["recap_documents", "opinions", "positions"]:
                     child_document = actual_value[0]

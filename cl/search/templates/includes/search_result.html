@@ -163,7 +163,7 @@
     {% endif %}
 
     {% for doc in result.child_docs %}
-      {% with doc=doc|get_attrdict:"_source" %}
+      {% with doc=doc|get_es_doc_content %}
         <div class="col-md-offset-half">
           <h4>
             <a href="{% if doc.absolute_url %}{{ doc.absolute_url }}{% else %}{{ result.docket_absolute_url }}#minute-entry-{{ doc.docket_entry_id }}{% endif %}" class="visitable">{% if doc.short_description %}{{ doc.short_description|render_string_or_list|safe }}<span class="gray">&nbsp;&mdash;&nbsp;</span>{% endif %}Document #{% if doc.document_number %}{{ doc.document_number }}{% endif %}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
@@ -395,7 +395,7 @@
 
   {% if type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION and simple == False %}
     {% for doc in result.child_docs %}
-      {% with doc=doc|get_attrdict:"_source" %}
+      {% with doc=doc|get_es_doc_content %}
         <div class="col-md-offset-half">
           {% if result.child_docs|length > 1 or doc.type != 'combined-opinion' %}
             <h4>
