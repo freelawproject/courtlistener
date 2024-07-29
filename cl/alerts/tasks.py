@@ -655,8 +655,6 @@ def percolator_response_processing(response: PercolatorResponsesType) -> None:
         return None
 
     scheduled_hits_to_create = []
-    email_alerts_to_send = []
-    rt_alerts_to_send = []
     (
         main_alerts_triggered,
         rd_alerts_triggered,
@@ -755,64 +753,37 @@ def percolator_response_processing(response: PercolatorResponsesType) -> None:
         # user's donations.
         send_webhook_alert_hits(alert_user, hits)
 
-        # Send RT Alerts for Audio.
         if (
             alert_triggered.rate == Alert.REAL_TIME
-            and app_label_model == "audio.Audio"
+            and not alert_user.profile.is_member
         ):
-            if not alert_user.profile.is_member:
-                continue
+            # Omit scheduling an RT alert if the user is not a member.
+            continue
+        # Schedule RT, DAILY, WEEKLY and MONTHLY Alerts
+        if scheduled_alert_hits_limit_reached(
+            alert_triggered.pk,
+            alert_triggered.user.pk,
+            instance_content_type,
+            object_id,
+            child_document,
+        ):
+            # Skip storing hits for this alert-user combination because
+            # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
+            continue
 
-            # Append alert RT email to be sent.
-            email_alerts_to_send.append((alert_user.pk, hits))
-            rt_alerts_to_send.append(alert_triggered.pk)
-
-        else:
-            if (
-                alert_triggered.rate == Alert.REAL_TIME
-                and not alert_user.profile.is_member
-            ):
-                # Omit scheduling an RT alert if the user is not a member.
-                continue
-            # Schedule RT, DAILY, WEEKLY and MONTHLY Alerts
-            if scheduled_alert_hits_limit_reached(
-                alert_triggered.pk,
-                alert_triggered.user.pk,
-                instance_content_type,
-                object_id,
-                child_document,
-            ):
-                # Skip storing hits for this alert-user combination because
-                # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
-                continue
-
-            scheduled_hits_to_create.append(
-                ScheduledAlertHit(
-                    user=alert_triggered.user,
-                    alert=alert_triggered,
-                    document_content=document_content_copy,
-                    content_type=instance_content_type,
-                    object_id=object_id,
-                )
+        scheduled_hits_to_create.append(
+            ScheduledAlertHit(
+                user=alert_triggered.user,
+                alert=alert_triggered,
+                document_content=document_content_copy,
+                content_type=instance_content_type,
+                object_id=object_id,
             )
+        )
 
     # Create scheduled RT, DAILY, WEEKLY and MONTHLY Alerts in bulk.
     if scheduled_hits_to_create:
         ScheduledAlertHit.objects.bulk_create(scheduled_hits_to_create)
-    # Sent all the related document RT emails.
-    if email_alerts_to_send:
-        send_search_alert_emails.delay(email_alerts_to_send, schedule_alert)
-
-    # Update RT Alerts date_last_hit, increase stats and log RT alerts sent.
-    if rt_alerts_to_send:
-        Alert.objects.filter(pk__in=rt_alerts_to_send).update(
-            date_last_hit=now()
-        )
-        alerts_sent = len(rt_alerts_to_send)
-        async_to_sync(tally_stat)(
-            f"alerts.sent.{Alert.REAL_TIME}", inc=alerts_sent
-        )
-        logger.info(f"Sent {alerts_sent} {Alert.REAL_TIME} email alerts.")
 
 
 # TODO: Remove after scheduled OA alerts have been processed.
