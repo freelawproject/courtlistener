@@ -163,6 +163,13 @@ test_patterns = {
 }
 
 
+class FakeCaseQueryResponse:
+    """Mock a Fake CaseQuery Request Response"""
+
+    def __init__(self, text):
+        self.text = text
+
+
 class FakeCaseQueryReport:
 
     def __init__(self, court_id, pacer_session=None):
@@ -183,3 +190,7 @@ class FakeCaseQueryReport:
         if test_pattern and test_pattern.get(self.pacer_case_id):
             return CaseQueryDataFactory()
         return None
+
+    @property
+    def response(self):
+        return FakeCaseQueryResponse("<span>Test</span>")
