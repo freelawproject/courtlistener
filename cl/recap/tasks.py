@@ -38,7 +38,6 @@ from juriscraper.pacer import (
 from juriscraper.pacer.email import DocketType
 from redis import ConnectionError as RedisConnectionError
 from requests import HTTPError
-from requests.cookies import RequestsCookieJar
 from requests.packages.urllib3.exceptions import ReadTimeoutError
 
 from cl.alerts.tasks import enqueue_docket_alert, send_alert_and_webhook
@@ -61,6 +60,7 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import is_pacer_court_accessible, map_cl_to_pacer_id
 from cl.lib.pacer_session import (
     ProxyPacerSession,
+    SessionData,
     delete_pacer_cookie_from_cache,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
@@ -1647,13 +1647,24 @@ def fetch_pacer_doc_by_rd(
         self.request.chain = None
         return
 
+    # Ensures session data is a `SessionData` instance for consistent handling.
+    #
+    # Currently, handles potential legacy data by converting them to
+    # `SessionData`. This defensive check can be removed in future versions
+    # once all data is guaranteed to be in the expected format.
+    #
+    # This approach prevents disruptions during processing of enqueued data
+    # after deployment.
+    session_data = (
+        cookies if isinstance(cookies, SessionData) else SessionData(cookies)
+    )
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     try:
         r, r_msg = download_pacer_pdf_by_rd(
             rd.pk,
             pacer_case_id,
             rd.pacer_doc_id,
-            cookies,
+            session_data,
             magic_number,
         )
     except (requests.RequestException, HTTPError):
@@ -1745,8 +1756,14 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         return
 
+    # Ensures session data is a `SessionData` instance for consistent handling.
+    # This approach prevents disruptions during processing of enqueued data
+    # after deployment.
+    session_data = (
+        cookies if isinstance(cookies, SessionData) else SessionData(cookies)
+    )
     try:
-        r = get_att_report_by_rd(rd, cookies)
+        r = get_att_report_by_rd(rd, session_data)
     except HTTPError as exc:
         msg = "Failed to get attachment page from network."
         if exc.response.status_code in [
@@ -1918,14 +1935,21 @@ def fetch_docket(self, fq_pk):
 
     async_to_sync(mark_pq_status)(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
-    cookies = get_pacer_cookie_from_cache(fq.user_id)
-    if cookies is None:
+    cookies_data = get_pacer_cookie_from_cache(fq.user_id)
+    if cookies_data is None:
         msg = f"Cookie cache expired before task could run for user: {fq.user_id}"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return None
 
-    s = ProxyPacerSession(cookies=cookies)
+    session_data = (
+        cookies_data
+        if isinstance(cookies_data, SessionData)
+        else SessionData(cookies_data)
+    )
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     try:
         result = fetch_pacer_case_id_and_title(s, fq, court_id)
     except (requests.RequestException, ReadTimeoutError) as exc:
@@ -2164,7 +2188,7 @@ def save_pacer_doc_from_pq(
 
 def download_pacer_pdf_and_save_to_pq(
     court_id: str,
-    cookies: RequestsCookieJar,
+    session_data: SessionData,
     cutoff_date: datetime,
     magic_number: str | None,
     pacer_case_id: str,
@@ -2180,7 +2204,8 @@ def download_pacer_pdf_and_save_to_pq(
     PQ object. Increasing the reliability of saving PACER documents.
 
     :param court_id: A CourtListener court ID to query the free document.
-    :param cookies: The cookies of a logged in PACER session
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param cutoff_date: The datetime from which we should query
      ProcessingQueue objects. For the main RECAPDocument the datetime the
      EmailProcessingQueue was created. For attachments the datetime the
@@ -2217,7 +2242,7 @@ def download_pacer_pdf_and_save_to_pq(
                 court_id,
                 pacer_doc_id,
                 pacer_case_id,
-                cookies,
+                session_data,
                 magic_number,
                 appellate,
             )
@@ -2264,13 +2289,16 @@ def get_and_copy_recap_attachment_docs(
     """
 
     cookies = get_pacer_cookie_from_cache(user_pk)
+    session_data = (
+        cookies if isinstance(cookies, SessionData) else SessionData(cookies)
+    )
     appellate = False
     unique_pqs = []
     for rd_att in att_rds:
         cutoff_date = rd_att.date_created
         pq = download_pacer_pdf_and_save_to_pq(
             court_id,
-            cookies,
+            session_data,
             cutoff_date,
             magic_number,
             pacer_case_id,
@@ -2375,6 +2403,12 @@ def get_and_merge_rd_attachments(
 
     all_attachment_rds = []
     cookies = get_pacer_cookie_from_cache(user_pk)
+    # Ensures session data is a `SessionData` instance for consistent handling.
+    # This approach prevents disruptions during processing of enqueued data
+    # after deployment.
+    session_data = (
+        cookies if isinstance(cookies, SessionData) else SessionData(cookies)
+    )
     # Try to get the attachment page without being logged into PACER
     att_report_text = get_attachment_page_by_url(document_url, court_id)
     if att_report_text:
@@ -2386,7 +2420,7 @@ def get_and_merge_rd_attachments(
             .recap_documents.earliest("date_created")
         )
         # Get the attachment page being logged into PACER
-        att_report = get_att_report_by_rd(main_rd, cookies)
+        att_report = get_att_report_by_rd(main_rd, session_data)
 
     for docket_entry in dockets_updated:
         # Merge the attachments for each docket/recap document
@@ -2472,7 +2506,7 @@ def process_recap_email(
 
     start_time = now()
     # Ensures we have PACER cookies ready to go.
-    cookies = get_or_cache_pacer_cookies(
+    cookies_data = get_or_cache_pacer_cookies(
         user_pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
     appellate = data["appellate"]
@@ -2480,7 +2514,7 @@ def process_recap_email(
     # its future processing.
     pq = download_pacer_pdf_and_save_to_pq(
         epq.court_id,
-        cookies,
+        cookies_data,
         epq.date_created,
         magic_number,
         pacer_case_id,
