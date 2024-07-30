@@ -1691,6 +1691,7 @@ async def merge_attachment_page_data(
 def save_iquery_to_docket(
     self,
     iquery_data: Dict[str, str],
+    iquery_text: str,
     d: Docket,
     tag_names: Optional[List[str]],
     add_to_solr: bool = False,
@@ -1700,6 +1701,7 @@ def save_iquery_to_docket(
 
     :param self: The celery task calling this function
     :param iquery_data: The data from a successful iquery response
+    :param iquery_text: The HTML text data from a successful iquery response
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
     :param add_to_solr: Whether to save the completed docket to solr
@@ -1725,6 +1727,16 @@ def save_iquery_to_docket(
     if add_to_solr:
         add_items_to_solr([d.pk], "search.Docket")
     logger.info(f"Created/updated docket: {d}")
+
+    # Add the CASE_QUERY_PAGE to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles.objects.create(
+        content_object=d, upload_type=UPLOAD_TYPE.CASE_QUERY_PAGE
+    )
+    pacer_file.filepath.save(
+        "case_report.html",  # We only care about the ext w/S3PrivateUUIDStorageTest
+        ContentFile(iquery_text.encode()),
+    )
+
     return d.pk
 
 
@@ -1772,6 +1784,7 @@ def process_case_query_report(
     court_id: str,
     pacer_case_id: int,
     report_data: dict[str, Any],
+    report_text: str,
     avoid_trigger_signal: bool = False,
 ) -> None:
     """Process the case query report from probe_iquery_pages task.
@@ -1781,6 +1794,7 @@ def process_case_query_report(
     :param court_id:  A CL court ID where we'll look things up.
     :param pacer_case_id: The internal PACER case ID number
     :param report_data: A dictionary containing report data.
+    :param report_text: The HTML text data from a successful iquery response
     :param avoid_trigger_signal:  Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
@@ -1801,5 +1815,15 @@ def process_case_query_report(
     add_items_to_solr([d.pk], "search.Docket")
     logger.info(
         f"Created/updated docket: {d} from court: {court_id} and pacer_case_id {pacer_case_id}"
+    )
+
+    # Add the CASE_QUERY_PAGE to the docket in case we need it someday.
+    pacer_file = PacerHtmlFiles.objects.create(
+        content_object=d, upload_type=UPLOAD_TYPE.CASE_QUERY_PAGE
+    )
+    pacer_file.filepath.save(
+        "case_report.html",
+        # We only care about the ext w/S3PrivateUUIDStorageTest
+        ContentFile(report_text.encode()),
     )
     return None

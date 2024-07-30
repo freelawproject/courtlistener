@@ -94,7 +94,7 @@ from cl.people_db.lookup_utils import (
     find_just_name,
 )
 from cl.people_db.models import Attorney, AttorneyOrganization, Party
-from cl.recap.models import UPLOAD_TYPE
+from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.recap_rss.models import RssItemCache
 from cl.scrapers.models import PACERFreeDocumentRow
 from cl.search.factories import (
@@ -3690,6 +3690,7 @@ class ScrapeIqueryPagesTest(TestCase):
             dispatch_uid=test_dispatch_uid,
         )
         try:
+            pacer_files = PacerHtmlFiles.objects.all()
             dockets = Docket.objects.filter(court_id=self.court_gand)
             self.assertEqual(dockets.count(), 0)
 
@@ -3795,6 +3796,9 @@ class ScrapeIqueryPagesTest(TestCase):
             self.assertEqual(
                 dockets.count(), 5, msg="Wrong number of dockets returned."
             )
+            # Two PACER HTML files should be stored by now via iquery sweep.
+            self.assertEqual(2, pacer_files.count())
+
             highest_known_pacer_case_id = r.hget(
                 "iquery:highest_known_pacer_case_id", self.court_gand.pk
             )
@@ -3856,6 +3860,14 @@ class ScrapeIqueryPagesTest(TestCase):
             # Probing will add 3 dockets (12, 16, 24) + 2 added for the sweep task (13,18).
             self.assertEqual(
                 dockets.count(), 5, msg="Docket number doesn't match."
+            )
+            # 7 additional PACER HTML files should be stored by now, 3 added by the
+            # probing task + 4 added by the sweep task.
+            pacer_files = PacerHtmlFiles.objects.all()
+            self.assertEqual(9, pacer_files.count())
+            # Assert HTML content was properly stored in one of them.
+            self.assertEqual(
+                "<span>Test</span>", pacer_files[0].filepath.read().decode()
             )
 
             ### Integration test probing task + sweep
