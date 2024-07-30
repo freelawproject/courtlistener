@@ -1,10 +1,13 @@
 import argparse
 import datetime
+import inspect
 import os
-from typing import Callable, Dict, List, Optional, Tuple, cast
+import time
+from typing import Callable, Dict, List, Optional, cast
 
 from celery.canvas import chain
 from django.conf import settings
+from django.db.models import Q
 from django.utils.timezone import now
 from juriscraper.lib.date_utils import make_date_range_tuples
 from juriscraper.lib.exceptions import PacerLoginException
@@ -33,11 +36,10 @@ PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
-def get_next_date_range(
+def get_last_complete_date(
     court_id: str,
-    span: int = 7,
-) -> Tuple[Optional[datetime.date], Optional[datetime.date]]:
-    """Get the next start and end query dates for a court.
+) -> Optional[datetime.date]:
+    """Get the next start query date for a court.
 
     Check the DB for the last date for a court that was completed. Return the
     day after that date + span days into the future as the range to query for
@@ -46,7 +48,6 @@ def get_next_date_range(
     If the court is still in progress, return (None, None).
 
     :param court_id: A PACER Court ID
-    :param span: The number of days to go forward from the last completed date
     """
     court_id = map_pacer_to_cl_id(court_id)
     try:
@@ -60,7 +61,7 @@ def get_next_date_range(
         raise
 
     if last_completion_log.status == PACERFreeDocumentLog.SCRAPE_IN_PROGRESS:
-        return None, None
+        return None
 
     # Ensure that we go back five days from the last time we had success if
     # that success was in the last few days.
@@ -68,32 +69,46 @@ def get_next_date_range(
         now().date() - datetime.timedelta(days=5),
         last_completion_log.date_queried,
     )
-    next_end_date = min(
-        now().date(), last_complete_date + datetime.timedelta(days=span)
-    )
-    return last_complete_date, next_end_date
+    return last_complete_date
 
 
 def mark_court_in_progress(
     court_id: str, d: datetime.date
 ) -> PACERFreeDocumentLog:
-    log = PACERFreeDocumentLog.objects.create(
+    """Create row with data of queried court
+
+    Stores the pacer's court id, scraping status, and the last date queried.
+
+    :param court_id: Pacer court id
+    :param d: Last date queried
+    :return: PACERFreeDocumentLog object
+    """
+    return PACERFreeDocumentLog.objects.create(
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
         date_queried=d,
         court_id=map_pacer_to_cl_id(court_id),
     )
-    return log
 
 
 def fetch_doc_report(
-    pacer_court_id: int,
-    start: Optional[datetime.date],
-    end: Optional[datetime.date],
-    log_id: int = 0,
-):
+    pacer_court_id: str,
+    start: datetime.date,
+    end: datetime.date,
+) -> bool:
+    """Get free documents from pacer
+
+    Get free documents from pacer and save each using PACERFreeDocumentRow model
+
+    :param pacer_court_id: Pacer court id to fetch
+    :param start: start date to query
+    :param end: end date to query
+    :return: true if an exception occurred
+    """
     exception_raised = False
     status = PACERFreeDocumentLog.SCRAPE_FAILED
     rows_to_create = 0
+
+    log = mark_court_in_progress(pacer_court_id, end)
 
     logger.info(
         "Attempting to get latest document references for "
@@ -103,7 +118,7 @@ def fetch_doc_report(
         end,
     )
     try:
-        status, rows_to_create = get_and_save_free_document_report(pacer_court_id, start, end, log_id)  # type: ignore
+        status, rows_to_create = get_and_save_free_document_report(pacer_court_id, start, end, log.pk)  # type: ignore
     except (
         RequestException,
         ReadTimeoutError,
@@ -130,18 +145,30 @@ def fetch_doc_report(
         )
         exception_raised = True
 
-    logger.info(
-        "Got %s document references for " "%s between %s and %s",
-        rows_to_create,
-        pacer_court_id,
-        start,
-        end,
-    )
+        mark_court_done_on_date(
+            log.pk,
+            PACERFreeDocumentLog.SCRAPE_FAILED,
+        )
 
-    return exception_raised, status
+    if not exception_raised:
+        logger.info(
+            "Got %s document references for " "%s between %s and %s",
+            rows_to_create,
+            pacer_court_id,
+            start,
+            end,
+        )
+        # Scrape successful
+        mark_court_done_on_date(log.pk, status)
+
+    return exception_raised
 
 
-def get_and_save_free_document_reports(options: OptionsType) -> None:
+def get_and_save_free_document_reports(
+    courts: list[Optional[str]],
+    date_start: Optional[datetime.date],
+    date_end: Optional[datetime.date],
+) -> None:
     """Query the Free Doc Reports on PACER and get a list of all the free
     documents. Do not download those items, as that step is done later. For now
     just get the list.
@@ -153,6 +180,12 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
 
     This is a simpler version, though a slower one, but it should get the job
     done.
+
+    :param courts: optionally a list of courts to scrape
+    :param date_start: optionally a start date to query all the specified courts or all
+    courts
+    :param date_end: optionally a end date to query all the specified courts or all
+    courts
     """
     # Kill any *old* logs that report they're in progress. (They've failed.)
     three_hrs_ago = now() - datetime.timedelta(hours=3)
@@ -163,111 +196,56 @@ def get_and_save_free_document_reports(options: OptionsType) -> None:
 
     excluded_court_ids = ["casb", "gub", "ilnb", "innb", "miwb", "ohsb", "prb"]
 
-    if options["courts"] != ["all"]:
-        cl_court_ids = (
-            Court.federal_courts.district_or_bankruptcy_pacer_courts()
-            .filter(
-                in_use=True,
-                end_date=None,
-                pk__in=options["courts"],
-            )
-            .exclude(pk__in=excluded_court_ids)
-            .values_list("pk", flat=True)
-        )
-    else:
-        cl_court_ids = (
-            Court.federal_courts.district_or_bankruptcy_pacer_courts()
-            .filter(
-                in_use=True,
-                end_date=None,
-            )
-            .exclude(pk__in=excluded_court_ids)
-            .values_list("pk", flat=True)
-        )
+    base_filter = Q(in_use=True, end_date=None) & ~Q(pk__in=excluded_court_ids)
+    if courts:
+        base_filter &= Q(pk__in=courts)
+
+    cl_court_ids = (
+        Court.federal_courts.district_or_bankruptcy_pacer_courts()
+        .filter(base_filter)
+        .values_list("pk", flat=True)
+    )
 
     pacer_court_ids = [map_cl_to_pacer_id(v) for v in cl_court_ids]
 
-    if options["date_start"] and options["date_end"]:
+    dates = None
+    if date_start and date_end:
         # The first date queried is 1950-05-12 from ca9, that should be the starting
         # point
-        dates = make_date_range_tuples(
-            options["date_start"], options["date_end"], gap=7
-        )
+        dates = make_date_range_tuples(date_start, date_end, gap=7)
+
+    for pacer_court_id in pacer_court_ids:
+        court_failed = False
+        if not dates:
+            date_end = now()
+            date_start = get_last_complete_date(pacer_court_id)
+            dates = make_date_range_tuples(date_start, date_end, gap=7)
+
+        # Iterate through the gap in dates either short or long
         for _start, _end in dates:
-            # Running sweep in intervals of 7 days for each court to try to avoid any
-            # blocking
-            for pacer_court_id in pacer_court_ids:
-                log = mark_court_in_progress(pacer_court_id, _end)
+            exc = fetch_doc_report(
+                pacer_court_id, _start, _end  # type: ignore
+            )
+            if exc:
+                # Something happened with the queried date range, abort process for
+                # that court
+                court_failed = True
+                break
 
-                exc, status = fetch_doc_report(
-                    pacer_court_id, _start, _end, log.pk  # type: ignore
-                )
-                if exc:
-                    mark_court_done_on_date(
-                        log.pk,
-                        PACERFreeDocumentLog.SCRAPE_FAILED,
-                    )
-                    # Continue running the sweep but log the date range and court
-                    # where it failed to rerun it later for that specific data.
-                    logger.error(
-                        f"Sweep failed for {pacer_court_id} in the range from {options['date_start']} to {options['date_end']}",
-                        exc_info=True,
-                    )
-                    continue
+            # Wait between queries to try to avoid a possible throttling/blockage
+            time.sleep(1)
 
-                mark_court_done_on_date(log.pk, status)
-    else:
-        today = now()
-        for pacer_court_id in pacer_court_ids:
-            while True:
-                next_start_d, next_end_d = get_next_date_range(pacer_court_id)
-                if next_end_d is None:
-                    logger.warning(
-                        f"Free opinion scraper for {pacer_court_id} still "
-                        "in progress."
-                    )
-                    break
-
-                log = mark_court_in_progress(pacer_court_id, next_end_d)
-
-                exc, status = fetch_doc_report(
-                    pacer_court_id, next_start_d, next_end_d, log.pk
-                )
-                if exc:
-                    # Something failed
-                    mark_court_done_on_date(
-                        log.pk,
-                        PACERFreeDocumentLog.SCRAPE_FAILED,
-                    )
-                    break
-
-                # Scrape successful
-                mark_court_done_on_date(log.pk, status)
-
-                if status == PACERFreeDocumentLog.SCRAPE_SUCCESSFUL:
-                    if next_end_d >= today.date():
-                        logger.info(
-                            "Got all document references for '%s'.",
-                            pacer_court_id,
-                        )
-                        # Break from while loop, onwards to next court
-                        break
-                    else:
-                        # More dates to do; let it continue
-                        continue
-
-                elif status == PACERFreeDocumentLog.SCRAPE_FAILED:
-                    logger.error(
-                        "Encountered critical error on %s "
-                        "(network error?). Marking as failed and "
-                        "pressing on." % pacer_court_id,
-                        exc_info=True,
-                    )
-                    # Break from while loop, onwards to next court
-                    break
+        if court_failed:
+            continue
 
 
-def get_pdfs(options: OptionsType) -> None:
+def get_pdfs(
+    courts: list[Optional[str]],
+    date_start: datetime.date,
+    date_end: datetime.date,
+    index: bool,
+    queue: str,
+) -> None:
     """Get PDFs for the results of the Free Document Report queries.
 
     At this stage, we have rows in the PACERFreeDocumentRow table, each of
@@ -279,18 +257,17 @@ def get_pdfs(options: OptionsType) -> None:
 
     :return: None
     """
-    q = cast(str, options["queue"])
-    index = options["index"]
+    q = cast(str, queue)
     cnt = CaseNameTweaker()
     rows = PACERFreeDocumentRow.objects.filter(error_msg="")
 
-    if options["courts"] != ["all"]:
-        rows = rows.filter(court_id__in=options["courts"])
+    if courts != ["all"]:
+        rows = rows.filter(court_id__in=courts)
 
-    if options["date_start"] and options["date_end"]:
+    if date_start and date_end:
         rows = rows.filter(
-            date_filed__gte=options["date_start"],
-            date_filed__lte=options["date_end"],
+            date_filed__gte=date_start,
+            date_filed__lte=date_end,
         )
 
     rows = rows.only("pk")
@@ -322,9 +299,9 @@ def get_pdfs(options: OptionsType) -> None:
             )
 
 
-def ocr_available(options: OptionsType) -> None:
+def ocr_available(queue: str, index: bool) -> None:
     """Do the OCR for any items that need it, then save to the solr index."""
-    q = cast(str, options["queue"])
+    q = cast(str, queue)
     rds = (
         RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_NEEDED)
         .values_list("pk", flat=True)
@@ -334,7 +311,7 @@ def ocr_available(options: OptionsType) -> None:
     throttle = CeleryThrottle(queue_name=q)
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
-        if options["index"]:
+        if index:
             extract_recap_pdf.si(pk, ocr_available=True).set(
                 queue=q
             ).apply_async()
@@ -347,13 +324,13 @@ def ocr_available(options: OptionsType) -> None:
             logger.info(f"Sent {i + 1}/{count} tasks to celery so far.")
 
 
-def do_everything(options: OptionsType):
+def do_everything(courts, date_start, date_end, index, queue):
     logger.info("Running and compiling free document reports.")
-    get_and_save_free_document_reports(options)
+    get_and_save_free_document_reports(courts, date_start, date_end)
     logger.info("Getting PDFs from free document reports")
-    get_pdfs(options)
+    get_pdfs(courts, date_start, date_end, index, queue)
     logger.info("Doing OCR and saving items to Solr.")
-    ocr_available(options)
+    ocr_available(index, queue)
 
 
 class Command(VerboseCommand):
@@ -367,6 +344,38 @@ class Command(VerboseCommand):
             )
 
         return self.VALID_ACTIONS[s]
+
+    def validate_date_args(self, opts):
+        """Validate dates arguments if any
+
+        :param opts: dictionary with arguments from the command
+        :return: true if the date validations are satisfied else false
+        """
+        if not opts.get("date_start") and not opts.get("date_end"):
+            return True
+        elif not opts.get("date_start") or not opts.get("date_end"):
+            logger.error(
+                "Both --date-start and --date-end must be specified together."
+            )
+            return False
+        elif opts.get("date_start") > opts.get("date_end"):
+            logger.error(
+                "--date-end must be greater than or equal to --date-start."
+            )
+            return False
+        return True
+
+    def filter_kwargs(self, func, kwargs):
+        """Keep only the params required to call the function
+
+        :param func: function to be called by the command
+        :param kwargs: dictionary with arguments from the command
+        :return: dictionary with params required for the function
+        """
+        valid_params = inspect.signature(func).parameters.keys()
+        return {
+            key: value for key, value in kwargs.items() if key in valid_params
+        }
 
     def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
@@ -391,7 +400,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--courts",
             type=str,
-            default=["all"],
+            default="",
             nargs="*",
             help="The courts that you wish to parse. Use cl ids.",
         )
@@ -413,20 +422,12 @@ class Command(VerboseCommand):
     def handle(self, *args: List[str], **options: OptionsType) -> None:
         super().handle(*args, **options)
 
-        if options["date_start"] and not options["date_end"]:
-            logger.info(
-                "Error: date-end must be specified to use date-start option."
-            )
+        if not self.validate_date_args(options):
             return
 
-        if options["date_start"] and options["date_end"]:
-            if options["date_start"] > options["date_end"]:  # type: ignore
-                logger.info(
-                    "Error: date-end must be greater or equal than date-start option."
-                )
-                return
         action = cast(Callable, options["action"])
-        action(options)
+        filtered_kwargs = self.filter_kwargs(action, options)
+        action(**filtered_kwargs)
 
     VALID_ACTIONS: Dict[str, Callable] = {
         "do-everything": do_everything,
