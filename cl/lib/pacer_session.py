@@ -1,4 +1,6 @@
 import pickle
+import random
+from dataclasses import dataclass
 from typing import Union
 from urllib.parse import urlparse
 
@@ -10,6 +12,27 @@ from requests.cookies import RequestsCookieJar
 from cl.lib.redis_utils import get_redis_interface
 
 session_key = "session:pacer:cookies:user.%s"
+
+
+@dataclass
+class SessionData:
+    """
+    The goal of this class is to encapsulate data required for PACER requests.
+
+    This class serves as a lightweight container for PACER session data,
+    excluding authentication details for efficient caching.
+
+    Handles default values for the `proxy` attribute when not explicitly
+    provided, indicating session data was not generated using the
+    `ProxyPacerSession` class.
+    """
+
+    cookies: RequestsCookieJar
+    proxy_address: str = ""
+
+    def __post_init__(self):
+        if not self.proxy_address:
+            self.proxy_address = settings.EGRESS_PROXY_HOSTS[0]
 
 
 class ProxyPacerSession(PacerSession):
@@ -28,13 +51,31 @@ class ProxyPacerSession(PacerSession):
     """
 
     def __init__(
-        self, cookies=None, username=None, password=None, client_code=None
+        self,
+        cookies=None,
+        username=None,
+        password=None,
+        client_code=None,
+        proxy=None,
     ):
         super().__init__(cookies, username, password, client_code)
+        self.proxy_address = proxy if proxy else self._pick_proxy_connection()
         self.proxies = {
-            "http": settings.EGRESS_PROXY_HOST,
+            "http": self.proxy_address,
         }
         self.headers["X-WhSentry-TLS"] = "true"
+
+    def _pick_proxy_connection(self) -> str:
+        """
+        Picks a proxy connection string from available options.
+
+        this function randomly chooses a string from the
+        `settings.EGRESS_PROXY_HOSTS` list and returns it.
+
+        Returns:
+            str: The chosen proxy connection string.
+        """
+        return random.choice(settings.EGRESS_PROXY_HOSTS)
 
     def _change_protocol(self, url: str) -> str:
         """Converts a URL from HTTPS to HTTP protocol.
@@ -75,13 +116,14 @@ def log_into_pacer(
     username: str,
     password: str,
     client_code: str | None = None,
-) -> RequestsCookieJar:
-    """Log into PACER and return the cookie jar
+) -> SessionData:
+    """Log into PACER and returns a SessionData object containing the session's
+    cookies and proxy information.
 
     :param username: A PACER username
     :param password: A PACER password
     :param client_code: A PACER client_code
-    :return: Request.CookieJar
+    :return: A SessionData object containing the session's cookies and proxy.
     """
     s = ProxyPacerSession(
         username=username,
@@ -89,7 +131,7 @@ def log_into_pacer(
         client_code=client_code,
     )
     s.login()
-    return s.cookies
+    return SessionData(s.cookies, s.proxy_address)
 
 
 def get_or_cache_pacer_cookies(
@@ -98,7 +140,7 @@ def get_or_cache_pacer_cookies(
     password: str,
     client_code: str | None = None,
     refresh: bool = False,
-) -> RequestsCookieJar:
+) -> SessionData:
     """Get PACER cookies for a user or create and cache fresh ones
 
     For the PACER Fetch API, we store users' PACER cookies in Redis with a
@@ -107,7 +149,7 @@ def get_or_cache_pacer_cookies(
 
     This function attempts to get cookies for a user from Redis. If it finds
     them, it returns them. If not, it attempts to log the user in and then
-    returns the fresh cookies (after caching them).
+    returns the fresh cookies and the proxy used to login(after caching them).
 
     :param user_pk: The PK of the user attempting to store their credentials.
     Needed to create the key in Redis.
@@ -115,21 +157,27 @@ def get_or_cache_pacer_cookies(
     :param password: The PACER password of the user
     :param client_code: The PACER client code of the user
     :param refresh: If True, refresh the cookies even if they're already cached
-    :return: Cookies for the PACER user
+    :return: A SessionData object containing the session's cookies and proxy.
     """
     r = get_redis_interface("CACHE", decode_responses=False)
-    cookies = get_pacer_cookie_from_cache(user_pk, r=r)
+    cookies_data = get_pacer_cookie_from_cache(user_pk, r=r)
     ttl_seconds = r.ttl(session_key % user_pk)
-    if cookies and ttl_seconds >= 300 and not refresh:
+    if cookies_data and ttl_seconds >= 300 and not refresh:
         # cookies were found in cache and ttl >= 5 minutes, return them
-        return cookies
+        if isinstance(cookies_data, SessionData):
+            return cookies_data
+        return SessionData(cookies_data)
 
     # Unable to find cookies in cache, are about to expire or refresh needed
     # Login and cache new values.
-    cookies = log_into_pacer(username, password, client_code)
+    session_data = log_into_pacer(username, password, client_code)
     cookie_expiration = 60 * 60
-    r.set(session_key % user_pk, pickle.dumps(cookies), ex=cookie_expiration)
-    return cookies
+    r.set(
+        session_key % user_pk,
+        pickle.dumps(session_data),
+        ex=cookie_expiration,
+    )
+    return session_data
 
 
 def get_pacer_cookie_from_cache(

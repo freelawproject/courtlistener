@@ -8,7 +8,7 @@ from cl.corpus_importer.task_canvases import get_docket_and_claims
 from cl.corpus_importer.tasks import save_ia_docket_to_disk
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.search.models import Court, Docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -85,7 +85,7 @@ def get_data(options, row_transform, tags):
             row["docket_number"],
             row["court"],
             row["case_name"],
-            session.cookies,
+            SessionData(session.cookies, session.proxy_address),
             tags,
             q,
         )

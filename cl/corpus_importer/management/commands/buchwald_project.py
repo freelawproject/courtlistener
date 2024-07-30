@@ -13,7 +13,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.search.models import Docket
 from cl.search.tasks import add_or_update_recap_docket
 
@@ -59,7 +59,7 @@ def add_all_nysd_to_cl(options):
         throttle.maybe_wait()
         logger.info("Doing pacer_case_id: %s", pacer_case_id)
         make_docket_by_iquery.apply_async(
-            args=("nysd", pacer_case_id, session.cookies, [NYSD_TAG]),
+            args=("nysd", pacer_case_id, "default", [NYSD_TAG]),
             queue=q,
         )
 
@@ -104,7 +104,9 @@ def get_dockets(options):
             get_docket_by_pacer_case_id.s(
                 data={"pacer_case_id": d.pacer_case_id},
                 court_id=d.court_id,
-                cookies=session.cookies,
+                session_data=SessionData(
+                    session.cookies, session.proxy_address
+                ),
                 docket_pk=d.pk,
                 tag_names=[BUCKWALD_TAG],
                 **{
