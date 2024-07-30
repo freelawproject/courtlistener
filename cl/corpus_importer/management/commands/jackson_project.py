@@ -6,7 +6,7 @@ from django.conf import settings
 from cl.corpus_importer.tasks import get_docket_by_pacer_case_id
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.search.models import Docket
 from cl.search.tasks import add_or_update_recap_docket
 
@@ -41,7 +41,9 @@ def get_dockets(options):
             get_docket_by_pacer_case_id.s(
                 data={"pacer_case_id": d.pacer_case_id},
                 court_id=d.court_id,
-                cookies_data=(session.cookies, session.proxy_address),
+                session_data=SessionData(
+                    session.cookies, session.proxy_address
+                ),
                 docket_pk=d.pk,
                 tag_names=[JACKSON_TAG],
                 **{

@@ -11,7 +11,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.recap.constants import PATENT, PATENT_ANDA
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import Docket
@@ -44,7 +44,7 @@ def get_dockets(options: dict) -> None:
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     session.login()
-
+    session_data = SessionData(session.cookies, session.proxy_address)
     NOS_CODES = [PATENT, PATENT_ANDA]
     DISTRICTS = ["ded", "txwd"]
     START_DATE = "2012-01-01"
@@ -78,12 +78,12 @@ def get_dockets(options: dict) -> None:
                     pass_through=None,
                     docket_number=item.docket_number,
                     court_id=item.district_id,
-                    cookies_data=(session.cookies, session.proxy_address),
+                    session_data=session_data,
                     **params,
                 ).set(queue=q),
                 get_docket_by_pacer_case_id.s(
                     court_id=item.district_id,
-                    cookies_data=(session.cookies, session.proxy_address),
+                    session_data=session_data,
                     tag_names=PATENT_TAGS,
                     **{
                         "show_parties_and_counsel": True,
@@ -101,7 +101,7 @@ def get_dockets(options: dict) -> None:
                 get_docket_by_pacer_case_id.s(
                     data={"pacer_case_id": d.pacer_case_id},
                     court_id=d.court_id,
-                    cookies_data=(session.cookies, session.proxy_address),
+                    session_data=session_data,
                     docket_pk=d.pk,
                     tag_names=PATENT_TAGS,
                     **{

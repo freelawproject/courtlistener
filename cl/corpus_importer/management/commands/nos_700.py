@@ -12,7 +12,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.recap.constants import (
     AIRPLANE_PERSONAL_INJURY,
     AIRPLANE_PRODUCT_LIABILITY,
@@ -251,19 +251,20 @@ def get_dockets(options, items, tags, sample_size=0):
         logger.info("Doing row %s: %s", i, row)
 
         throttle.maybe_wait()
+        session_data = SessionData(session.cookies, session.proxy_address)
         params = make_fjc_idb_lookup_params(row)
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
                 docket_number=row.docket_number,
                 court_id=row.district_id,
-                cookies_data=(session.cookies, session.proxy_address),
+                session_data=session_data,
                 **params,
             ).set(queue=q),
             filter_docket_by_tags.s(tags, row.district_id).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id=row.district_id,
-                cookies_data=(session.cookies, session.proxy_address),
+                session_data=session_data,
                 tag_names=tags,
                 **{
                     "show_parties_and_counsel": True,

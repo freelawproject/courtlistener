@@ -14,7 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.recap.tasks import process_recap_attachment
@@ -84,7 +84,8 @@ def get_attachment_pages(options):
             chain(
                 # Query the attachment page and process it
                 get_attachment_page_by_rd.s(
-                    result["id"], (session.cookies, session.proxy_address)
+                    result["id"],
+                    SessionData(session.cookies, session.proxy_address),
                 ).set(queue=q),
                 # Take that in a new task and make a PQ object
                 make_attachment_pq_object.s(result["id"], recap_user.pk).set(
@@ -152,7 +153,7 @@ def get_documents(options):
         chain(
             get_pacer_doc_by_rd.s(
                 rd.pk,
-                (session.cookies, session.proxy_address),
+                SessionData(session.cookies, session.proxy_address),
                 tag=TAG_PHASE_2,
             ).set(queue=q),
             extract_recap_pdf.si(rd.pk).set(queue=q),

@@ -28,6 +28,7 @@ from cl.lib.pacer import (
 )
 from cl.lib.pacer_session import (
     ProxyPacerSession,
+    SessionData,
     get_or_cache_pacer_cookies,
     session_key,
 )
@@ -97,6 +98,11 @@ class TestPacerSessionUtils(TestCase):
 
     def setUp(self) -> None:
         r = get_redis_interface("CACHE", decode_responses=False)
+        # clean keys to make sure we dont have it in the cache from
+        # previous executions
+        key = r.keys(session_key % "test_user_new_cookie")
+        if key:
+            r.delete(*key)
         self.test_cookies = RequestsCookieJar()
         self.test_cookies.set("PacerSession", "this-is-a-test")
         r.set(
@@ -106,7 +112,9 @@ class TestPacerSessionUtils(TestCase):
         )
         r.set(
             session_key % "test_user_new_format",
-            pickle.dumps((self.test_cookies, "http://proxy_1:9090")),
+            pickle.dumps(
+                SessionData(self.test_cookies, "http://proxy_1:9090")
+            ),
             ex=60 * 60,
         )
         r.set(
@@ -116,7 +124,9 @@ class TestPacerSessionUtils(TestCase):
         )
         r.set(
             session_key % "test_new_format_almost_expired",
-            pickle.dumps((self.test_cookies, "http://proxy_1:9090")),
+            pickle.dumps(
+                SessionData(self.test_cookies, "http://proxy_1:9090")
+            ),
             ex=60,
         )
 
@@ -130,74 +140,70 @@ class TestPacerSessionUtils(TestCase):
 
     def test_use_default_proxy_host_for_old_cookie_format(self):
         """Can we handle the old cookie format properly?"""
-        cookies_data = get_or_cache_pacer_cookies(
+        session_data = get_or_cache_pacer_cookies(
             "test_user_old_format", username="test", password="password"
         )
-        self.assertIsInstance(cookies_data, tuple)
-        _, proxy = cookies_data
-        self.assertEqual(proxy, settings.EGRESS_PROXY_HOSTS[0])
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_compute_new_cookies_with_new_format(self, mock_log_into_pacer):
-        """Are we using the tuple format for new cookies?"""
-        mock_log_into_pacer.return_value = (
+        """Are we using the dataclass for new cookies?"""
+        mock_log_into_pacer.return_value = SessionData(
             self.test_cookies,
             "http://proxy_1:9090",
         )
-        cookies_data = get_or_cache_pacer_cookies(
+        session_data = get_or_cache_pacer_cookies(
             "test_user_new_cookie", username="test", password="password"
         )
-        self.assertIsInstance(cookies_data, tuple)
-        _, proxy = cookies_data
-        self.assertEqual(proxy, "http://proxy_1:9090")
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
-    def test_parse_cookie_proxy_pair_properly(self):
-        """Can we parse the tuple format from cache properly?"""
-        cookies_data = get_or_cache_pacer_cookies(
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_parse_cookie_proxy_pair_properly(self, mock_log_into_pacer):
+        """Can we parse the dataclass from cache properly?"""
+        session_data = get_or_cache_pacer_cookies(
             "test_user_new_format", username="test", password="password"
         )
-        self.assertIsInstance(cookies_data, tuple)
-        _, proxy = cookies_data
-        self.assertEqual(proxy, "http://proxy_1:9090")
+        self.assertEqual(mock_log_into_pacer.call_count, 0)
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_compute_cookies_for_almost_expired_data(
         self, mock_log_into_pacer
     ):
-        """Are we using the tuple format when re-computing session?"""
-        mock_log_into_pacer.return_value = (
-            self.test_cookies,
-            "http://proxy_1:9090",
+        """Are we using the dataclass when re-computing session?"""
+        mock_log_into_pacer.return_value = SessionData(
+            self.test_cookies, "http://proxy_1:9090"
         )
 
         # Attempts to get almost expired cookies with the old format from cache
         # Expects refresh.
-        cookies = get_or_cache_pacer_cookies(
+        session_data = get_or_cache_pacer_cookies(
             "test_old_format_almost_expired",
             username="test",
             password="password",
         )
-        self.assertIsInstance(cookies, tuple)
-        _, proxy = cookies
         self.assertEqual(mock_log_into_pacer.call_count, 1)
-        self.assertEqual(proxy, "http://proxy_1:9090")
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
-        mock_log_into_pacer.return_value = (
-            self.test_cookies,
-            "http://proxy_2:9090",
+        mock_log_into_pacer.return_value = SessionData(
+            self.test_cookies, "http://proxy_2:9090"
         )
 
         # Attempts to get almost expired cookies with the new format from cache
         # Expects refresh.
-        cookies = get_or_cache_pacer_cookies(
+        session_data = get_or_cache_pacer_cookies(
             "test_new_format_almost_expired",
             username="test",
             password="password",
         )
-        self.assertIsInstance(cookies, tuple)
-        _, proxy = cookies
+        self.assertIsInstance(session_data, SessionData)
         self.assertEqual(mock_log_into_pacer.call_count, 2)
-        self.assertEqual(proxy, "http://proxy_2:9090")
+        self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
 
 
 class TestStringUtils(SimpleTestCase):

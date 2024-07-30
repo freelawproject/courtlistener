@@ -46,7 +46,6 @@ from juriscraper.pacer.reports import BaseReport
 from pyexpat import ExpatError
 from redis import ConnectionError as RedisConnectionError
 from requests import Response
-from requests.cookies import RequestsCookieJar
 from requests.exceptions import (
     ConnectionError,
     HTTPError,
@@ -83,6 +82,7 @@ from cl.lib.pacer import (
 )
 from cl.lib.pacer_session import (
     ProxyPacerSession,
+    SessionData,
     get_or_cache_pacer_cookies,
     get_pacer_cookie_from_cache,
 )
@@ -336,16 +336,16 @@ def get_and_save_free_document_report(
     :param end: a date object representing the last day to get results.
     :return: The status code of the scrape
     """
-    cookies, proxy_address = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     s = ProxyPacerSession(
-        cookies=cookies,
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
-        proxy=proxy_address,
+        proxy=session_data.proxy_address,
     )
     report = FreeOpinionReport(court_id, s)
     msg = ""
@@ -940,7 +940,7 @@ def get_pacer_case_id_and_title(
     pass_through: Any,
     docket_number: str,
     court_id: str,
-    cookies_data: tuple[RequestsCookieJar, str] | None = None,
+    session_data: SessionData | None = None,
     user_pk: int | None = None,
     case_name: str | None = None,
     office_number: str | None = None,
@@ -961,9 +961,8 @@ def get_pacer_case_id_and_title(
     :param docket_number: The docket number to look up. This is a flexible
     field that accepts a variety of docket number styles.
     :param court_id: The CourtListener court ID for the docket number
-    :param cookies_data: A tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address (optional)
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param user_pk: The PK of a user making the request. This can be provided
     instead of the cookies parameter. If so, this will get the user's cookies
     from redis instead of passing them in as an argument.
@@ -992,22 +991,21 @@ def get_pacer_case_id_and_title(
         court_id,
     )
 
-    if cookies_data:
-        cookies, proxy_address = cookies_data
-    elif user_pk:
+    if not session_data and user_pk:
         cookies_from_cache = get_pacer_cookie_from_cache(user_pk)
-        if isinstance(cookies_from_cache, tuple):
-            cookies, proxy_address = cookies_from_cache
-        cookies, proxy_address = (
-            cookies_from_cache,
-            settings.EGRESS_PROXY_HOSTS[0],
+        session_data = (
+            cookies_from_cache
+            if isinstance(cookies_from_cache, SessionData)
+            else SessionData(cookies_from_cache)
         )
     else:
         raise Exception(
             "user_pk is unavailable, cookies cannot be retrieved from cache"
         )
 
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = PossibleCaseNumberApi(map_cl_to_pacer_id(court_id), s)
     msg = ""
     try:
@@ -1056,7 +1054,7 @@ def do_case_query_by_pacer_case_id(
     self: Task,
     data: TaskData,
     court_id: str,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     tag_names: List[str] | None = None,
 ) -> TaskData | None:
     """Run a case query (iquery.pl) query on a case and save the data
@@ -1066,14 +1064,15 @@ def do_case_query_by_pacer_case_id(
         'pacer_case_id': The internal pacer case ID for the item.
     }
     :param court_id: A courtlistener court ID
-    :param cookies: A requests.cookies.RequestsCookieJar with the cookies of a
-    logged-in PACER user.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param tag_names: A list of tag names to associate with the docket when
     saving it in the DB.
     :return: A dict with the pacer_case_id and docket_pk values.
     """
-    cookies, proxy_address = cookies_data
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
         self.request.chain = None
@@ -1182,16 +1181,16 @@ def query_case_query_report(
     :return: The report.data.
     """
 
-    cookies, proxy_address = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     s = ProxyPacerSession(
-        cookies=cookies,
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
-        proxy=proxy_address,
+        proxy=session_data.proxy_address,
     )
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
     report.query(pacer_case_id)
@@ -1550,7 +1549,7 @@ def get_docket_by_pacer_case_id(
     self: Task,
     data: TaskData,
     court_id: str,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     docket_pk: Optional[int] = None,
     tag_names: Optional[str] = None,
     **kwargs,
@@ -1566,9 +1565,8 @@ def get_docket_by_pacer_case_id(
         Optional: 'docket_pk': The ID of the docket to work on to avoid lookups
                   if it's known in advance.
     :param court_id: A courtlistener court ID.
-    :param cookies_data: A tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param docket_pk: The PK of the docket to update. Can also be provided in
     the data param, above.
     :param tag_names: A list of tag names that should be stored with the item
@@ -1602,8 +1600,9 @@ def get_docket_by_pacer_case_id(
 
     logging_id = f"{court_id}.{pacer_case_id}"
     logger.info("Querying docket report %s", logging_id)
-    cookies, proxy_address = cookies_data
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = DocketReport(map_cl_to_pacer_id(court_id), s)
     try:
         report.query(pacer_case_id, **kwargs)
@@ -1654,7 +1653,7 @@ def get_appellate_docket_by_docket_number(
     self: Task,
     docket_number: str,
     court_id: str,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     tag_names: Optional[List[str]] = None,
     **kwargs,
 ) -> Optional[TaskData]:
@@ -1666,15 +1665,16 @@ def get_appellate_docket_by_docket_number(
     :param self: The celery task
     :param docket_number: The docket number of the case.
     :param court_id: A courtlistener/PACER appellate court ID.
-    :param cookies_data: A tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param tag_names: The tag name that should be stored with the item in the
     DB, if desired.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
     """
-    cookies, proxy_address = cookies_data
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = AppellateDocketReport(court_id, s)
     logging_id = f"{court_id} - {docket_number}"
     logger.info("Querying docket report %s", logging_id)
@@ -1724,21 +1724,21 @@ def get_appellate_docket_by_docket_number(
 
 def get_att_report_by_rd(
     rd: RECAPDocument,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
 ) -> Optional[AttachmentPage]:
     """Method to get the attachment report for the item in PACER.
 
     :param rd: The RECAPDocument object to use as a source.
-    :param cookies_data: A tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :return: The attachment report populated with the results
     """
     if not rd.pacer_doc_id:
         return None
 
-    cookies, proxy_address = cookies_data
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
     att_report = AttachmentPage(pacer_court_id, s)
     att_report.query(rd.pacer_doc_id)
@@ -1756,15 +1756,14 @@ def get_att_report_by_rd(
 def get_attachment_page_by_rd(
     self: Task,
     rd_pk: int,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
 ) -> Optional[AttachmentPage]:
     """Get the attachment page for the item in PACER.
 
     :param self: The celery task
     :param rd_pk: The PK of a RECAPDocument object to use as a source.
-    :param cookies_data: tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :return: The attachment report populated with the results
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
@@ -1773,7 +1772,7 @@ def get_attachment_page_by_rd(
         self.request.chain = None
         return None
     try:
-        att_report = get_att_report_by_rd(rd, cookies_data)
+        att_report = get_att_report_by_rd(rd, session_data)
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
             HTTPStatus.INTERNAL_SERVER_ERROR,
@@ -1811,7 +1810,7 @@ def get_attachment_page_by_rd(
 def get_bankr_claims_registry(
     self: Task,
     data: TaskData,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     tag_names: List[str] | None = None,
 ) -> TaskData | None:
     """Get the bankruptcy claims registry for a docket
@@ -1820,14 +1819,15 @@ def get_bankr_claims_registry(
     :param data: A dict of data containing, primarily, a key to 'docket_pk' for
     the docket for which we want to get the registry. Other keys will be
     ignored.
-    :param cookies_data: A tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param tag_names: A list of tag names that should be stored with the claims
     registry information in the DB.
     """
-    cookies, proxy_address = cookies_data
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     if data is None or data.get("docket_pk") is None:
         logger.warning(
             "Empty data argument or parameter. Terminating chains "
@@ -1925,7 +1925,7 @@ def download_pacer_pdf_by_rd(
     rd_pk: int,
     pacer_case_id: str,
     pacer_doc_id: int,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     magic_number: str | None = None,
 ) -> tuple[Response | None, str]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
@@ -1934,19 +1934,19 @@ def download_pacer_pdf_by_rd(
     :param rd_pk: The PK of the RECAPDocument to download
     :param pacer_case_id: The internal PACER case ID number
     :param pacer_doc_id: The internal PACER document ID to download
-    :param cookies_data: A tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param magic_number: The magic number to fetch PACER documents for free
     this is an optional field, only used by RECAP Email documents
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
     """
-    cookies, proxy_address = cookies_data
     rd = RECAPDocument.objects.get(pk=rd_pk)
     pacer_court_id = map_cl_to_pacer_id(rd.docket_entry.docket.court_id)
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = FreeOpinionReport(pacer_court_id, s)
 
     r, r_msg = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
@@ -1958,7 +1958,7 @@ def download_pdf_by_magic_number(
     court_id: str,
     pacer_doc_id: str,
     pacer_case_id: str,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     magic_number: str,
     appellate: bool = False,
 ) -> tuple[Response | None, str]:
@@ -1967,17 +1967,17 @@ def download_pdf_by_magic_number(
     :param court_id: A CourtListener court ID to query the free document.
     :param pacer_doc_id: The pacer_doc_id to query the free document.
     :param pacer_case_id: The pacer_case_id to query the free document.
-    :param cookies_data: tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param magic_number: The magic number to fetch PACER documents for free.
     :param appellate: Whether the download belongs to an appellate court.
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
     """
-    cookies, proxy_address = cookies_data
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = FreeOpinionReport(court_id, s)
     r, r_msg = report.download_pdf(
         pacer_case_id, pacer_doc_id, magic_number, appellate
@@ -1996,10 +1996,12 @@ def get_document_number_from_confirmation_page(
     """
 
     recap_email_user = User.objects.get(username="recap-email")
-    cookies, proxy_address = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     doc_num_report = DownloadConfirmationPage(court_id, s)
     doc_num_report.query(pacer_doc_id)
     data = doc_num_report.data
@@ -2070,10 +2072,12 @@ def is_pacer_doc_sealed(court_id: str, pacer_doc_id: str) -> bool:
     """
 
     recap_email_user = User.objects.get(username="recap-email")
-    cookies, proxy_address = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     receipt_report = DownloadConfirmationPage(court_id, s)
     receipt_report.query(pacer_doc_id)
     data = receipt_report.data
@@ -2100,11 +2104,13 @@ def is_docket_entry_sealed(
         return False
 
     recap_email_user = User.objects.get(username="recap-email")
-    cookies, proxy_address = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         recap_email_user.pk, settings.PACER_USERNAME, settings.PACER_PASSWORD
     )
 
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     report = BaseReport(court_id, s)
     return report.is_entry_sealed(case_id, doc_id)
 
@@ -2207,16 +2213,15 @@ def add_tags(rd: RECAPDocument, tag_name: Optional[str]) -> None:
 def get_pacer_doc_by_rd(
     self: Task,
     rd_pk: int,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     tag: Optional[str] = None,
 ) -> Optional[int]:
     """A simple method for getting the PDF associated with a RECAPDocument.
 
     :param self: The bound celery task
     :param rd_pk: The PK for the RECAPDocument object
-    :param cookies_data: tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param tag: The name of a tag to apply to any modified items
     :return: The RECAPDocument PK
     """
@@ -2229,7 +2234,7 @@ def get_pacer_doc_by_rd(
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     r, r_msg = download_pacer_pdf_by_rd(
-        rd.pk, pacer_case_id, rd.pacer_doc_id, cookies_data
+        rd.pk, pacer_case_id, rd.pacer_doc_id, session_data
     )
     court_id = rd.docket_entry.docket.court_id
 
@@ -2267,7 +2272,7 @@ def get_pacer_doc_by_rd_and_description(
     self: Task,
     rd_pk: int,
     description_re: Pattern,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     fallback_to_main_doc: bool = False,
     tag_name: Optional[List[str]] = None,
 ) -> None:
@@ -2281,16 +2286,15 @@ def get_pacer_doc_by_rd_and_description(
     :param rd_pk: The PK of a RECAPDocument object to use as a source.
     :param description_re: A compiled regular expression to search against the
     description provided by the attachment page.
-    :param cookies_data: tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param fallback_to_main_doc: Should we grab the main doc if none of the
     attachments match the regex?
     :param tag_name: A tag name to apply to any downloaded content.
     :return: None
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
-    att_report = get_attachment_page_by_rd(self, rd_pk, cookies_data)
+    att_report = get_attachment_page_by_rd(self, rd_pk, session_data)
 
     att_found = None
     for attachment in att_report.data.get("attachments", []):
@@ -2339,7 +2343,7 @@ def get_pacer_doc_by_rd_and_description(
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     r, r_msg = download_pacer_pdf_by_rd(
-        rd.pk, pacer_case_id, att_found["pacer_doc_id"], cookies_data
+        rd.pk, pacer_case_id, att_found["pacer_doc_id"], session_data
     )
     court_id = rd.docket_entry.docket.court_id
 
@@ -2377,20 +2381,20 @@ def get_pacer_doc_by_rd_and_description(
 def get_pacer_doc_id_with_show_case_doc_url(
     self: Task,
     rd_pk: int,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
 ) -> None:
     """use the show_case_doc URL to get pacer_doc_id values.
 
     :param self: The celery task
     :param rd_pk: The pk of the RECAPDocument you want to get.
-    :param cookies_data: tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     """
     rd = RECAPDocument.objects.get(pk=rd_pk)
     d = rd.docket_entry.docket
-    cookies, proxy_address = cookies_data
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     pacer_court_id = map_cl_to_pacer_id(d.court_id)
     report = ShowCaseDocApi(pacer_court_id, s)
     last_try = self.request.retries == self.max_retries
@@ -2480,7 +2484,7 @@ def make_list_of_creditors_key(court_id: str, d_number_file_name: str) -> str:
 @throttle_task("1/s", key="court_id")
 def query_and_save_list_of_creditors(
     self: Task,
-    cookies_data: tuple[RequestsCookieJar, str],
+    session_data: SessionData,
     court_id: str,
     d_number_file_name: str,
     docket_number: str,
@@ -2492,9 +2496,8 @@ def query_and_save_list_of_creditors(
     HTML and pipe-limited text files and convert them to CSVs.
 
     :param self: The celery task
-    :param cookies_data: tuple containing the PACER user's cookies
-    (`requests.cookies.RequestsCookieJar`) and the proxy address used to login
-    as a string.
+    :param session_data: A SessionData object containing the session's cookies
+    and proxy.
     :param court_id: The court_id for the bankruptcy court.
     :param d_number_file_name: The docket number to use as file name.
     :param docket_number: The docket number of the case.
@@ -2504,8 +2507,9 @@ def query_and_save_list_of_creditors(
 
     :return: None
     """
-    cookies, proxy_address = cookies_data
-    s = ProxyPacerSession(cookies=cookies, proxy=proxy_address)
+    s = ProxyPacerSession(
+        cookies=session_data.cookies, proxy=session_data.proxy_address
+    )
     try:
         report = ListOfCreditors(court_id, s)
     except AssertionError:

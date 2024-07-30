@@ -410,16 +410,16 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     :param court_id: The court of the docket. Needed for throttling by court.
     :return: None
     """
-    cookies, proxy = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     s = ProxyPacerSession(
-        cookies=cookies,
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
-        proxy=proxy,
+        proxy=session_data.proxy_address,
     )
     d = Docket.objects.get(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)

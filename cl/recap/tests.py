@@ -1295,10 +1295,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.RecapEmailSESStorage.open",
         side_effect=mock_bucket_open,
     )
-    @mock.patch(
-        "cl.recap.tasks.get_or_cache_pacer_cookies",
-        side_effect=lambda x, y, z: (None, None),
-    )
+    @mock.patch("cl.recap.tasks.get_or_cache_pacer_cookies")
     @mock.patch(
         "cl.recap.tasks.is_docket_entry_sealed",
         return_value=False,
