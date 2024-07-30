@@ -1158,12 +1158,12 @@ def filter_docket_by_tags(
 
 def query_case_query_report(
     court_id: str, pacer_case_id: int
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], str]:
     """Query the iquery page for a given PACER case ID.
 
     :param court_id: A CL court ID where we'll look things up.
     :param pacer_case_id: The Pacer Case ID to lookup.
-    :return: The report.data.
+    :return: A two tuple, the report data and the report HTML text.
     """
 
     cookies = get_or_cache_pacer_cookies(
@@ -1178,7 +1178,7 @@ def query_case_query_report(
     )
     report = CaseQuery(map_cl_to_pacer_id(court_id), s)
     report.query(pacer_case_id)
-    return report.data
+    return report.data, report.response.text
 
 
 def make_docket_by_iquery_base(
@@ -1207,7 +1207,9 @@ def make_docket_by_iquery_base(
     """
 
     try:
-        report_data = query_case_query_report(court_id, pacer_case_id)
+        report_data, report_text = query_case_query_report(
+            court_id, pacer_case_id
+        )
     except (requests.Timeout, requests.RequestException) as exc:
         logger.warning(
             "Timeout or unknown RequestException on iquery crawl. "
@@ -1245,6 +1247,7 @@ def make_docket_by_iquery_base(
     return save_iquery_to_docket(
         self,
         report_data,
+        report_text,
         d,
         tag_names,
         add_to_solr=True,
@@ -1348,24 +1351,25 @@ def make_docket_by_iquery_sweep(
 @retry((requests.Timeout, PacerLoginException), tries=3, delay=0.25, backoff=1)
 def query_iquery_page(
     court_id: str, pacer_case_id: int
-) -> bool | dict[str, Any]:
+) -> tuple[bool, None] | tuple[dict[str, Any], str]:
     """A small wrapper to query the iquery page for a given PACER case ID to
     support retries via the @retry decorator in case of a failure.
 
     :param court_id: A CL court ID where we'll look things up.
     :param pacer_case_id: The Pacer Case ID to lookup.
-    :return: False if not valid report, otherwise the report.data.
+    :return: A two tuple, False and None if not a valid report or the report data
+    and the report HTML text.
     """
 
-    report_data = query_case_query_report(court_id, pacer_case_id)
+    report_data, report_text = query_case_query_report(court_id, pacer_case_id)
     if not report_data:
         logger.info(
             "No valid data found in iquery page for %s.%s",
             court_id,
             pacer_case_id,
         )
-        return False
-    return report_data
+        return False, None
+    return report_data, report_text
 
 
 @app.task(
@@ -1402,7 +1406,9 @@ def probe_iquery_pages(
         )
         probe_iteration += 1
         try:
-            report_data = query_iquery_page(court_id, pacer_case_id_to_lookup)
+            report_data, report_text = query_iquery_page(
+                court_id, pacer_case_id_to_lookup
+            )
         except HTTPError:
             # Set expiration accordingly and value to 2 to difference from
             # other waiting times.
@@ -1456,7 +1462,9 @@ def probe_iquery_pages(
 
         if report_data:
             # Find and update/store the Docket.
-            reports_data.append((pacer_case_id_to_lookup, report_data))
+            reports_data.append(
+                (pacer_case_id_to_lookup, report_data, report_text)
+            )
             latest_match = pacer_case_id_to_lookup
             found_match = True
             # Restart court_blocked_attempts and court_empty_probe_attempts.
@@ -1496,15 +1504,17 @@ def probe_iquery_pages(
     # Process all the reports retrieved during the probing.
     # Avoid triggering the iQuery sweep signal except for the latest hit.
     avoid_trigger_signal = True
-    for index, report_data in enumerate(reports_data):
+    for index, report_content in enumerate(reports_data):
+        pacer_case_id, report_data, report_text = report_content
         if index == len(reports_data) - 1:
             # Only trigger the sweep signal on the last hit.
             avoid_trigger_signal = False
         try:
             process_case_query_report(
                 court_id,
-                pacer_case_id=report_data[0],
-                report_data=report_data[1],
+                pacer_case_id=pacer_case_id,
+                report_data=report_data,
+                report_text=report_text,
                 avoid_trigger_signal=avoid_trigger_signal,
             )
         except IntegrityError:

@@ -438,6 +438,7 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     save_iquery_to_docket(
         self,
         report.data,
+        report.response.text,
         d,
         tag_names=None,
         add_to_solr=True,
