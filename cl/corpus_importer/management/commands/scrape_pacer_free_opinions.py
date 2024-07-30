@@ -48,6 +48,7 @@ def get_last_complete_date(
     If the court is still in progress, return (None, None).
 
     :param court_id: A PACER Court ID
+    :return: last date queried for the specified court or None if it is in progress
     """
     court_id = map_pacer_to_cl_id(court_id)
     try:
@@ -81,7 +82,7 @@ def mark_court_in_progress(
 
     :param court_id: Pacer court id
     :param d: Last date queried
-    :return: PACERFreeDocumentLog object
+    :return: new PACERFreeDocumentLog object
     """
     return PACERFreeDocumentLog.objects.create(
         status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS,
@@ -102,7 +103,7 @@ def fetch_doc_report(
     :param pacer_court_id: Pacer court id to fetch
     :param start: start date to query
     :param end: end date to query
-    :return: true if an exception occurred
+    :return: true if an exception occurred else false
     """
     exception_raised = False
     status = PACERFreeDocumentLog.SCRAPE_FAILED
@@ -184,7 +185,7 @@ def get_and_save_free_document_reports(
     :param courts: optionally a list of courts to scrape
     :param date_start: optionally a start date to query all the specified courts or all
     courts
-    :param date_end: optionally a end date to query all the specified courts or all
+    :param date_end: optionally an end date to query all the specified courts or all
     courts
     """
     # Kill any *old* logs that report they're in progress. (They've failed.)
@@ -210,15 +211,24 @@ def get_and_save_free_document_reports(
 
     dates = None
     if date_start and date_end:
+        # If we pass the dates in the command then we generate the range on those dates
         # The first date queried is 1950-05-12 from ca9, that should be the starting
-        # point
+        # point for the sweep
         dates = make_date_range_tuples(date_start, date_end, gap=7)
 
     for pacer_court_id in pacer_court_ids:
         court_failed = False
         if not dates:
-            date_end = now()
+            # We don't pass the dates in the command, so we generate the range based
+            # on each court
+            date_end = datetime.date.today()
             date_start = get_last_complete_date(pacer_court_id)
+            if not date_start:
+                logger.warning(
+                    f"Free opinion scraper for {pacer_court_id} still "
+                    "in progress."
+                )
+                continue
             dates = make_date_range_tuples(date_start, date_end, gap=7)
 
         # Iterate through the gap in dates either short or long
@@ -232,7 +242,8 @@ def get_and_save_free_document_reports(
                 court_failed = True
                 break
 
-            # Wait between queries to try to avoid a possible throttling/blockage
+            # Wait 1s between queries to try to avoid a possible throttling/blocking
+            # from the court
             time.sleep(1)
 
         if court_failed:
@@ -255,22 +266,26 @@ def get_pdfs(
     In this function, we iterate over the entire table of results, merge it
     into our normal tables, and then download and extract the PDF.
 
+    :param courts: optionally a list of courts to scrape
+    :param date_start: optionally a start date to query all the specified courts or all
+    courts
+    :param date_end: optionally an end date to query all the specified courts or all
+    courts
+    :param index: true if we should index as we process the data or do it later
+    :param queue: the queue name
     :return: None
     """
     q = cast(str, queue)
     cnt = CaseNameTweaker()
-    rows = PACERFreeDocumentRow.objects.filter(error_msg="")
+    base_filter = Q(error_msg="")
 
-    if courts != ["all"]:
-        rows = rows.filter(court_id__in=courts)
+    if courts:
+        base_filter &= Q(court_id__in=courts)
 
     if date_start and date_end:
-        rows = rows.filter(
-            date_filed__gte=date_start,
-            date_filed__lte=date_end,
-        )
+        base_filter &= Q(date_filed__gte=date_start, date_filed__lte=date_end)
 
-    rows = rows.only("pk")
+    rows = PACERFreeDocumentRow.objects.filter(base_filter).only("pk")
     count = rows.count()
     task_name = "downloading"
     if index:
@@ -300,7 +315,11 @@ def get_pdfs(
 
 
 def ocr_available(queue: str, index: bool) -> None:
-    """Do the OCR for any items that need it, then save to the solr index."""
+    """Do the OCR for any items that need it, then save to the solr index.
+
+    :param queue: the queue name
+    :param index: true if we should index as we process the data or do it later
+    """
     q = cast(str, queue)
     rds = (
         RECAPDocument.objects.filter(ocr_status=RECAPDocument.OCR_NEEDED)
@@ -325,6 +344,17 @@ def ocr_available(queue: str, index: bool) -> None:
 
 
 def do_everything(courts, date_start, date_end, index, queue):
+    """Execute the entire process of obtaining the metadata of the free documents,
+    downloading them and ingesting them into the system
+
+    :param courts: optionally a list of courts to scrape
+    :param date_start: optionally a start date to query all the specified courts or all
+    courts
+    :param date_end: optionally an end date to query all the specified courts or all
+    courts
+    :param index: true if we should index as we process the data or do it later
+    :param queue: the queue name
+    """
     logger.info("Running and compiling free document reports.")
     get_and_save_free_document_reports(courts, date_start, date_end)
     logger.info("Getting PDFs from free document reports")
