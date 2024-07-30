@@ -1163,7 +1163,7 @@ def query_case_query_report(
 
     :param court_id: A CL court ID where we'll look things up.
     :param pacer_case_id: The Pacer Case ID to lookup.
-    :return: A twp tuple, the report data and the report HTML text.
+    :return: A two tuple, the report data and the report HTML text.
     """
 
     cookies = get_or_cache_pacer_cookies(
