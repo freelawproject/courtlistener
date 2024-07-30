@@ -29,6 +29,7 @@ from cl.recap.mergers import (
     add_bankruptcy_data_to_docket,
     add_docket_entries,
     find_docket_object,
+    set_skip_percolation_if_bankruptcy_data,
     update_docket_metadata,
 )
 from cl.recap_rss.models import RssFeedData, RssFeedStatus, RssItemCache
@@ -347,6 +348,10 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
             async_to_sync(update_docket_metadata)(d, docket)
             if not d.pacer_case_id:
                 d.pacer_case_id = docket["pacer_case_id"]
+
+            # Skip the percolator request for this save if bankruptcy data will
+            # be merged afterward.
+            set_skip_percolation_if_bankruptcy_data(docket, d)
             try:
                 d.save()
                 add_bankruptcy_data_to_docket(d, docket)
