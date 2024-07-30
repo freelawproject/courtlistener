@@ -402,6 +402,9 @@ class CourtMatchingTest(SimpleTestCase):
             self.assertEqual(test["a"], got)
 
 
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
 @pytest.mark.django_db
 class PacerDocketParserTest(TestCase):
     """Can we parse RECAP dockets successfully?"""
@@ -496,10 +499,7 @@ class PacerDocketParserTest(TestCase):
         self.assertEqual(godfrey_llp.city, "Seattle")
         self.assertEqual(godfrey_llp.state, "WA")
 
-    @patch(
-        "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
-        return_value=None,
-    )
+    @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
     def test_get_and_save_free_document_report(self, mock_cookies) -> None:
         """Test the retrieval and storage of free document report data."""
 
@@ -3341,13 +3341,11 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
             )
 
 
-@patch(
-    "cl.corpus_importer.tasks.get_or_cache_pacer_cookies",
-    return_value=None,
-)
+@patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
 @override_settings(
     IQUERY_PROBE_DAEMON_ENABLED=True,
     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"],
 )
 class ScrapeIqueryPagesTest(TestCase):
     """Tests related to probe_iquery_pages_daemon command."""
