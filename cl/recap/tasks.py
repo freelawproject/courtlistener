@@ -603,13 +603,16 @@ async def process_recap_docket(pk):
         ContentFile(text.encode()),
     )
 
-    items_returned, rds_created, content_updated = await add_docket_entries(
-        d, data["docket_entries"]
-    )
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     if data["parties"]:
         # Index or re-index parties only if the docket has parties.
         await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+
+    items_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
@@ -1117,13 +1120,16 @@ async def process_recap_appellate_docket(pk):
         ContentFile(text.encode()),
     )
 
-    items_returned, rds_created, content_updated = await add_docket_entries(
-        d, data["docket_entries"]
-    )
+    # Merge parties before adding docket entries, so they can access parties'
+    # data when the RECAPDocuments are percolated.
     await sync_to_async(add_parties_and_attorneys)(d, data["parties"])
     if data["parties"]:
         # Index or re-index parties only if the docket has parties.
         await sync_to_async(index_docket_parties_in_es.delay)(d.pk)
+
+    items_returned, rds_created, content_updated = await add_docket_entries(
+        d, data["docket_entries"]
+    )
     await process_orphan_documents(rds_created, pq.court_id, d.date_filed)
     if content_updated:
         newly_enqueued = enqueue_docket_alert(d.pk)
