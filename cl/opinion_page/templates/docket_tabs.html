@@ -126,8 +126,6 @@
       </p>
     {% endif %}
 
-    {% with og_info=docket.originating_court_information %}
-    {% with bankr_info=docket.bankruptcy_information %}
     {% if docket.panel_str %}
       <p class="bottom">
         <span class="meta-data-header">Panel:</span>
@@ -282,6 +280,7 @@
       </p>
     {% endif %}
 
+    {% with bankr_info=docket.bankruptcy_information %}
     {% if bankr_info %}
       <h3 class="v-offset-above-3">Bankruptcy Information</h3>
       <hr class="top">
@@ -327,7 +326,10 @@
         </p>
       {% endif %}
     {% endif %}
+    {% endwith %}{# No more bankr_info variable #}
 
+
+    {% with og_info=docket.originating_court_information %}
     {% if og_info %}
       <h3 class="v-offset-above-3">Originating Court Information</h3>
       <hr class="top">
@@ -423,7 +425,6 @@
         <span class="meta-data-value">{{ og_info.date_received_coa }}</span>
       </p>
     {% endif %}
-    {% endwith %}{# No more bankr_info variable #}
     {% endwith %}{# No more og_info variable #}
   </div>
 

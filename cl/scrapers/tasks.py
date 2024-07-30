@@ -37,7 +37,9 @@ logger = logging.getLogger(__name__)
 ExtractProcessResult = Tuple[str, Optional[str]]
 
 
-def update_document_from_text(opinion: Opinion) -> None:
+def update_document_from_text(
+    opinion: Opinion, juriscraper_module: str = ""
+) -> None:
     """Extract additional metadata from document text
 
     We use this code with BIA decisions. Previously Tax.
@@ -51,12 +53,14 @@ def update_document_from_text(opinion: Opinion) -> None:
     the calling function.
 
     :param opinion: Opinion object
+    :param juriscraper_module: full module to get Site object
     :return: None
     """
     court = opinion.cluster.docket.court.pk
-    site = get_scraper_object_by_name(court)
+    site = get_scraper_object_by_name(court, juriscraper_module)
     if site is None:
         return
+
     metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
         ModelClass = apps.get_model(f"search.{model_name}")
@@ -84,6 +88,7 @@ def update_document_from_text(opinion: Opinion) -> None:
 def extract_doc_content(
     self,
     pk: int,
+    juriscraper_module: str = "",
     ocr_available: bool = False,
     citation_jitter: bool = False,
 ) -> None:
@@ -117,6 +122,7 @@ def extract_doc_content(
 
     :param self: The Celery task
     :param pk: The opinion primary key to work on
+    :param juriscraper_module: the full module string to re-import a Site object
     :param ocr_available: Whether the PDF converting function should use OCR
     :param citation_jitter: Whether to apply jitter before running the citation
     parsing code. This can be useful do spread these tasks out when doing a
@@ -174,7 +180,7 @@ def extract_doc_content(
     ), f"content must be of type str, not {type(content)}"
 
     set_blocked_status(opinion, content, extension)
-    update_document_from_text(opinion)
+    update_document_from_text(opinion, juriscraper_module)
 
     if data["err"]:
         logger.error(
@@ -404,15 +410,16 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     :param court_id: The court of the docket. Needed for throttling by court.
     :return: None
     """
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
     s = ProxyPacerSession(
-        cookies=cookies,
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
+        proxy=session_data.proxy_address,
     )
     d = Docket.objects.get(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
@@ -432,6 +439,7 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     save_iquery_to_docket(
         self,
         report.data,
+        report.response.text,
         d,
         tag_names=None,
         add_to_solr=True,

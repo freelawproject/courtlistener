@@ -4,15 +4,20 @@ import pkgutil
 import juriscraper
 
 
-def get_scraper_object_by_name(court_id):
+def get_scraper_object_by_name(court_id: str, juriscraper_module: str = ""):
     """Identify and instantiate a Site() object given the name of a court
 
     :param court_id: The ID of a site; must correspond with the name of a
     module without the underscore suffix.
-    :type court_id: str
+    :param juriscraper_module: full module name. Helps avoiding conflicts when
+        there is more than 1 scraper for the same court id. For example,
+        those on the united_states_backscrapers folders
     :return: An instantiated Site() object from the module requested
     :rtype: juriscraper.AbstractSite.Site
     """
+    if juriscraper_module:
+        return importlib.import_module(juriscraper_module).Site()
+
     for _, full_module_path, _ in pkgutil.walk_packages(
         juriscraper.__path__, f"{juriscraper.__name__}."
     ):

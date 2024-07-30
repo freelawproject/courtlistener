@@ -78,6 +78,15 @@ LOGGING = {
         },
         # This is the one that's used practically everywhere in the code.
         "cl": {"handlers": ["console"], "level": "INFO", "propagate": True},
+        # CRITICAL is the highest log level, which will make the logger
+        # reject most logger calls from juriscraper: debug, info and warning
+        # This level may be modified on a VerboseCommand call with the
+        # proper verbosity value
+        "juriscraper": {
+            "handlers": ["console"],
+            "propagate": True,
+            "level": "CRITICAL",
+        },
     },
 }
 

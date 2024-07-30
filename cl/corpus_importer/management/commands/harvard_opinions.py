@@ -501,6 +501,7 @@ def add_new_case(
             court_id,
             docket_string,
             Docket.HARVARD,
+            overwrite_existing_data=True,
             case_name_full=case_name_full,
             ia_needs_upload=False,
         )

@@ -29,6 +29,7 @@ class UPLOAD_TYPE:
     CASE_QUERY_RESULT_PAGE = 14
     APPELLATE_CASE_QUERY_RESULT_PAGE = 15
     ACMS_DOCKET_JSON = 16
+    ACMS_ATTACHMENT_PAGE = 17
     NAMES = (
         (DOCKET, "HTML Docket"),
         (ATTACHMENT_PAGE, "HTML attachment page"),
@@ -46,6 +47,7 @@ class UPLOAD_TYPE:
         (CASE_QUERY_RESULT_PAGE, "Case query result page"),
         (APPELLATE_CASE_QUERY_RESULT_PAGE, "Appellate Case query result page"),
         (ACMS_DOCKET_JSON, "ACMS docket JSON object"),
+        (ACMS_ATTACHMENT_PAGE, "ACMS attachmente page JSON object"),
     )
 
 
@@ -203,6 +205,7 @@ class ProcessingQueue(AbstractDateTimeModel):
             UPLOAD_TYPE.APPELLATE_DOCKET,
             UPLOAD_TYPE.DOCUMENT_ZIP,
             UPLOAD_TYPE.ACMS_DOCKET_JSON,
+            UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
         ]:
             return "ProcessingQueue %s: %s case #%s (%s)" % (
                 self.pk,
