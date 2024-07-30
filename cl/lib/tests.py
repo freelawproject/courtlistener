@@ -98,8 +98,7 @@ class TestPacerSessionUtils(TestCase):
 
     def setUp(self) -> None:
         r = get_redis_interface("CACHE", decode_responses=False)
-        # clean keys to make sure we dont have it in the cache from
-        # previous executions
+        # Clear cached session keys to prevent data inconsistencies.
         key = r.keys(session_key % "test_user_new_cookie")
         if key:
             r.delete(*key)
