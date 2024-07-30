@@ -157,13 +157,6 @@ ALTER TABLE "search_docketevent" ADD COLUMN "parent_docket_id" integer NULL;
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_7294f ON "search_docket" IS '5b02a9c2cedd3b32a8c455a966bf31b02576d67f';
 
-CREATE INDEX "search_docket_case_type_f76fd404" ON "search_docket" ("case_type");
-CREATE INDEX "search_docket_case_type_f76fd404_like" ON "search_docket" ("case_type" varchar_pattern_ops);
-CREATE INDEX "search_docket_defendant_number_04074363" ON "search_docket" ("defendant_number");
-CREATE INDEX "search_docket_judge_initials_2513584d" ON "search_docket" ("judge_initials");
-CREATE INDEX "search_docket_judge_initials_2513584d_like" ON "search_docket" ("judge_initials" varchar_pattern_ops);
-CREATE INDEX "search_docket_office_code_51016743" ON "search_docket" ("office_code");
-CREATE INDEX "search_docket_office_code_51016743_like" ON "search_docket" ("office_code" varchar_pattern_ops);
 CREATE INDEX "search_docket_parent_docket_id_1a514426" ON "search_docket" ("parent_docket_id");
 CREATE INDEX "search_docketevent_parent_docket_id_c7c9c9ad" ON "search_docketevent" ("parent_docket_id");
 COMMIT;
