@@ -22,9 +22,12 @@ from cl.alerts.models import (
 )
 from cl.alerts.utils import (
     build_plain_percolator_query,
+    has_document_alert_hit_been_triggered,
     percolate_es_document,
     prepare_percolator_content,
     recap_document_hl_matched,
+    set_skip_percolation_if_bankruptcy_data,
+    set_skip_percolation_if_parties_data,
 )
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
@@ -37,6 +40,11 @@ from cl.people_db.factories import (
     AttorneyOrganizationFactory,
     PartyFactory,
     PartyTypeFactory,
+)
+from cl.recap.factories import DocketWithBankruptcyDataFactory
+from cl.recap.mergers import (
+    add_bankruptcy_data_to_docket,
+    add_parties_and_attorneys,
 )
 from cl.search.documents import (
     DocketDocument,
@@ -1790,6 +1798,26 @@ class RECAPAlertsPercolatorTest(
         if keys:
             self.r.delete(*keys)
 
+        self.percolator_call_count = 0
+
+    def count_percolator_calls(self, method, *args, **kwargs) -> None:
+        """Wraps the helper percolator method to count its calls and assert
+        the expected count."""
+        # Increment the call count
+        self.percolator_call_count += 1
+
+        # Call the method
+        return method(*args, **kwargs)
+
+    def reset_and_assert_percolator_count(self, expected) -> None:
+        """Resets the helper percolator method count and asserts the expected
+        number of calls."""
+
+        assert (
+            self.percolator_call_count == expected
+        ), f"Expected {expected} method calls, but got {self.percolator_call_count}"
+        self.percolator_call_count = 0
+
     @staticmethod
     def confirm_query_matched(response, query_id) -> bool:
         """Confirm if a percolator query matched."""
@@ -3073,3 +3101,188 @@ class RECAPAlertsPercolatorTest(
                 self.assertIn(alert.name, html_content)
 
         docket.delete()
+
+    def test_count_percolator_requests_on_related_documents(
+        self, mock_prefix
+    ) -> None:
+        """Confirm a percolator request is performed only once when adding or
+        updating related documents like BankruptcyInformation or Parties.
+        """
+
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Docket Only 7",
+            query="q=(SUBPOENAS SERVED) AND chapter:7&type=r",
+        )
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Docket Only 8",
+            query="q=(SUBPOENAS SERVED) AND chapter:8&type=r",
+        )
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Docket Only 9",
+            query='q="American vs Lorem"&type=r',
+        )
+
+        # Confirm that only one percolation request is performed upon a Docket
+        # creation and a subsequent BankruptcyData merge.
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ), mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(
+            execute=True
+        ):
+            docket = Docket(
+                court=self.court,
+                case_name="SUBPOENAS SERVED CASE",
+                docket_number="1:21-bk-1234",
+                source=Docket.RECAP,
+                pacer_case_id="999555",
+            )
+            docket_data = DocketWithBankruptcyDataFactory(
+                court_id=docket.court_id,
+                case_name=docket.case_name,
+                chapter=7,
+            )
+            set_skip_percolation_if_bankruptcy_data(docket_data, docket)
+            docket.save()
+            add_bankruptcy_data_to_docket(docket, docket_data)
+        self.reset_and_assert_percolator_count(expected=1)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 1, msg="Outgoing emails don't match."
+        )
+        # Restore skip_percolator_request flag.
+        docket.skip_percolator_request = False
+
+        # Confirm that only one percolation request is performed upon a Docket
+        # Update and a subsequent BankruptcyData merge.
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ), mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(
+            execute=True
+        ):
+            docket.docket_number = "1:21-bk-1235"
+            docket_data = DocketWithBankruptcyDataFactory(
+                court_id=docket.court_id,
+                case_name=docket.case_name,
+                chapter=8,
+            )
+            set_skip_percolation_if_bankruptcy_data(docket_data, docket)
+            docket.save()
+            add_bankruptcy_data_to_docket(docket, docket_data)
+        self.reset_and_assert_percolator_count(expected=1)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Outgoing emails don't match."
+        )
+        # Restore skip_percolator_request flag.
+        docket.skip_percolator_request = False
+
+        # Confirm that a regular Docket update with no subsequent BankruptcyData
+        # merge triggers the percolation request.
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ), mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(
+            execute=True
+        ):
+            docket.case_name = "American vs Lorem"
+            docket_data = {"docket_number": "1:21-bk-1238"}
+            set_skip_percolation_if_bankruptcy_data(docket_data, docket)
+            docket.save()
+            add_bankruptcy_data_to_docket(docket, docket_data)
+        self.reset_and_assert_percolator_count(expected=1)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 3, msg="Outgoing emails don't match."
+        )
+        # Restore skip_percolator_request flag.
+        docket.skip_percolator_request = False
+
+        # Confirm that only one percolation request is performed upon a Docket
+        # Update and a subsequent parties merge.
+        AlertFactory(
+            user=self.user_profile.user,
+            rate=Alert.REAL_TIME,
+            name="Test Alert Docket Only 10",
+            query='atty_name="John Lorem"&type=r',
+        )
+        data = {
+            "parties": [
+                {
+                    "attorneys": [
+                        {
+                            "contact": "Lane Powell",
+                            "name": "John Lorem",
+                            "roles": [],
+                        }
+                    ],
+                    "date_terminated": None,
+                    "extra_info": "",
+                    "name": "Insurance Company",
+                    "type": "Plaintiff",
+                },
+            ]
+        }
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ), mock.patch(
+            "cl.api.webhooks.requests.post",
+            side_effect=lambda *args, **kwargs: MockResponse(
+                200, mock_raw=True
+            ),
+        ), self.captureOnCommitCallbacks(
+            execute=True
+        ):
+            docket.refresh_from_db()
+            docket.case_name = "Lorem Parties"
+            set_skip_percolation_if_parties_data(data["parties"], docket)
+            docket.save()
+        # No percolation on docket update.
+        self.reset_and_assert_percolator_count(expected=0)
+
+        with mock.patch(
+            "cl.alerts.tasks.has_document_alert_hit_been_triggered",
+            side_effect=lambda *args, **kwargs: self.count_percolator_calls(
+                has_document_alert_hit_been_triggered, *args, **kwargs
+            ),
+        ):
+            add_parties_and_attorneys(docket, data["parties"])
+            index_docket_parties_in_es.delay(docket.pk)
+
+        # Percolation is performed upon the merging of parties.
+        self.reset_and_assert_percolator_count(expected=1)
+        call_command("cl_send_rt_percolator_alerts", testing_mode=True)
+        self.assertEqual(
+            len(mail.outbox), 4, msg="Outgoing emails don't match."
+        )

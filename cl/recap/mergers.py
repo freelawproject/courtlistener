@@ -14,6 +14,10 @@ from django.utils.timezone import now
 from juriscraper.lib.string_utils import CaseNameTweaker
 from juriscraper.pacer import AppellateAttachmentPage, AttachmentPage
 
+from cl.alerts.utils import (
+    set_skip_percolation_if_bankruptcy_data,
+    set_skip_percolation_if_parties_data,
+)
 from cl.corpus_importer.utils import mark_ia_upload_needed
 from cl.lib.decorators import retry
 from cl.lib.filesizes import convert_size_to_bytes
@@ -39,6 +43,7 @@ from cl.people_db.models import (
     PartyType,
     Role,
 )
+from cl.recap.constants import bankruptcy_data_fields
 from cl.recap.models import (
     PROCESSING_STATUS,
     UPLOAD_TYPE,
@@ -1214,16 +1219,8 @@ def add_bankruptcy_data_to_docket(d: Docket, metadata: Dict[str, str]) -> None:
     except BankruptcyInformation.DoesNotExist:
         bankr_data = BankruptcyInformation(docket=d)
 
-    fields = [
-        "date_converted",
-        "date_last_to_file_claims",
-        "date_last_to_file_govt",
-        "date_debtor_dismissed",
-        "chapter",
-        "trustee_str",
-    ]
     do_save = False
-    for field in fields:
+    for field in bankruptcy_data_fields:
         if metadata.get(field):
             do_save = True
             setattr(bankr_data, field, metadata[field])
@@ -1410,6 +1407,10 @@ def merge_pacer_docket_into_cl_docket(
 
     d.add_recap_source()
     async_to_sync(update_docket_metadata)(d, docket_data)
+
+    # Skip the percolator request for this save if parties data will be merged
+    # afterward.
+    set_skip_percolation_if_parties_data(docket_data["parties"], d)
     d.save()
 
     if appellate:
@@ -1710,6 +1711,9 @@ def save_iquery_to_docket(
     """
     d = async_to_sync(update_docket_metadata)(d, iquery_data)
     d.avoid_trigger_signal = avoid_trigger_signal
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(iquery_data, d)
     try:
         d.save()
         add_bankruptcy_data_to_docket(d, iquery_data)
@@ -1796,6 +1800,9 @@ def process_case_query_report(
     d.add_recap_source()
     d = async_to_sync(update_docket_metadata)(d, report_data)
     d.avoid_trigger_signal = avoid_trigger_signal
+    # Skip the percolator request for this save if bankruptcy data will
+    # be merged afterward.
+    set_skip_percolation_if_bankruptcy_data(report_data, d)
     d.save()
     add_bankruptcy_data_to_docket(d, report_data)
     add_items_to_solr([d.pk], "search.Docket")
