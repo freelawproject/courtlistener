@@ -16,7 +16,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
@@ -1234,6 +1234,9 @@ def mock_bucket_open(message_id, r, read_file=False):
     return recap_mail_example
 
 
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
 class RecapEmailToEmailProcessingQueueTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
 
@@ -1292,10 +1295,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.RecapEmailSESStorage.open",
         side_effect=mock_bucket_open,
     )
-    @mock.patch(
-        "cl.recap.tasks.get_or_cache_pacer_cookies",
-        side_effect=lambda x, y, z: None,
-    )
+    @mock.patch("cl.recap.tasks.get_or_cache_pacer_cookies")
     @mock.patch(
         "cl.recap.tasks.is_docket_entry_sealed",
         return_value=False,
@@ -2946,7 +2946,7 @@ class IdbMergeTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: None,
+    side_effect=lambda x, y, z: (None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -5404,7 +5404,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: "Cookie",
+    side_effect=lambda x, y, z: ("Cookie", settings.EGRESS_PROXY_HOSTS[0]),
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
@@ -5778,7 +5778,7 @@ class CheckCourtConnectivityTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: None,
+    side_effect=lambda x, y, z: (None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
