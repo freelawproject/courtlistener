@@ -683,7 +683,6 @@ def do_es_search(
     other location.
     """
     paged_results = None
-    # One court?
     courts = Court.objects.filter(in_use=True)
     query_time = total_query_results = 0
     top_hits_limit = 5
@@ -816,6 +815,7 @@ def do_es_search(
         "cited_cluster": cited_cluster,
         "query_citation": query_citation,
         "facet_fields": facet_fields,
+        "estimated_count_threshold": settings.ELASTICSEARCH_CARDINALITY_PRECISION,
     }
 
 

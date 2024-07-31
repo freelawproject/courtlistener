@@ -70,6 +70,7 @@ from cl.search.constants import (
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     api_child_highlight_map,
+    cardinality_query_unique_ids,
 )
 from cl.search.exception import (
     BadProximityQuery,
@@ -1938,12 +1939,19 @@ def fetch_es_results(
         # Set size to 0 to avoid retrieving documents in the count queries for
         # better performance. Set track_total_hits to True to consider all the
         # documents.
-        main_doc_count_query = main_doc_count_query.extra(
-            size=0, track_total_hits=True
+
+        search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+        parent_unique_field = cardinality_query_unique_ids[search_type]
+        main_doc_count_query = build_cardinality_count(
+            main_doc_count_query, parent_unique_field
         )
+
         if child_docs_count_query:
-            child_total_query = child_docs_count_query.extra(
-                size=0, track_total_hits=True
+            child_unique_field = cardinality_query_unique_ids[
+                SEARCH_TYPES.RECAP_DOCUMENT
+            ]
+            child_total_query = build_cardinality_count(
+                child_docs_count_query, child_unique_field
             )
 
         # Execute the ES main query + count queries in a single request.
@@ -1955,10 +1963,14 @@ def fetch_es_results(
 
         main_response = responses[0]
         main_doc_count_response = responses[1]
-        parent_total = main_doc_count_response.hits.total.value
+        parent_total = simplify_estimated_count(
+            main_doc_count_response.hits.total.value
+        )
         if child_total_query:
             child_doc_count_response = responses[2]
-            child_total = child_doc_count_response.hits.total.value
+            child_total = simplify_estimated_count(
+                child_doc_count_response.hits.total.value
+            )
 
         query_time = main_response.took
         search_type = get_params.get("type", SEARCH_TYPES.OPINION)
@@ -2927,31 +2939,28 @@ def do_es_api_query(
     return main_query, child_docs_query
 
 
-def build_cardinality_count(
-    base_query: Search, query: Query, unique_field: str
-) -> Search:
+def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
     """Build an Elasticsearch cardinality aggregation.
     This aggregation estimates the count of unique documents based on the
     specified unique field. The precision_threshold, set by
     ELASTICSEARCH_CARDINALITY_PRECISION, determines the point at which the
     count begins to trade accuracy for performance.
 
-    :param base_query: The Elasticsearch DSL Search object.
-    :param query: The ES Query object to perform the count query.
+    :param count_query: The Elasticsearch DSL Search object containing the
+    count query.
     :param unique_field: The field name on which the cardinality aggregation
     will be based to estimate uniqueness.
 
     :return: The ES cardinality aggregation query.
     """
 
-    search_query = base_query.query(query)
-    search_query.aggs.bucket(
+    count_query.aggs.bucket(
         "unique_documents",
         "cardinality",
         field=unique_field,
         precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
     )
-    return search_query.extra(size=0, track_total_hits=True)
+    return count_query.extra(size=0, track_total_hits=True)
 
 
 def do_collapse_count_query(
@@ -2970,7 +2979,8 @@ def do_collapse_count_query(
     unique_field = (
         "cluster_id" if search_type == SEARCH_TYPES.OPINION else "docket_id"
     )
-    search_query = build_cardinality_count(main_query, query, unique_field)
+    count_query = main_query.query(query)
+    search_query = build_cardinality_count(count_query, unique_field)
     try:
         total_results = (
             search_query.execute().aggregations.unique_documents.value
@@ -3014,3 +3024,20 @@ def do_es_alert_estimation_query(
     estimation_query, _ = build_es_base_query(search_query, cd)
 
     return estimation_query.count()
+
+
+def simplify_estimated_count(search_count: int) -> int:
+    """Simplify the estimated search count to the nearest rounded figure.
+    It only applies this rounding if the search_count exceeds the
+    ELASTICSEARCH_CARDINALITY_PRECISION threshold.
+
+    :param search_count: The original search count.
+    :return: The simplified search_count, rounded to the nearest significant
+    figure or the original search_count if below the threshold.
+    """
+    if search_count > settings.ELASTICSEARCH_CARDINALITY_PRECISION:
+        search_count_str = str(search_count)
+        first_two = search_count_str[:2]
+        zeroes = (len(search_count_str) - 2) * "0"
+        return int(first_two + zeroes)
+    return search_count

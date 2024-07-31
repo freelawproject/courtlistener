@@ -1950,6 +1950,34 @@ class OpinionsESSearchTest(
         )
         cluster.delete()
 
+    def test_frontend_opinions_count(self) -> None:
+        """Assert Opinions search results counts in the fronted. Below and
+        above the estimation threshold.
+        """
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        counts_text = self._get_frontend_counts_text(r)
+        # 2 cases and 3 Docket entries in counts are returned
+        self.assertIn("4 Opinions", counts_text)
+
+        # Assert estimated counts above the threshold.
+        with mock.patch(
+            "cl.lib.elasticsearch_utils.simplify_estimated_count",
+            return_value=2300,
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        counts_text = self._get_frontend_counts_text(r)
+        self.assertIn("About 2,300 Opinions", counts_text)
+
 
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
