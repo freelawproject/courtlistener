@@ -6,7 +6,7 @@ from requests import Session
 from cl.corpus_importer.tasks import get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.scrapers.tasks import extract_recap_pdf
@@ -75,10 +75,10 @@ def get_petitions(
     )
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = ProxyPacerSession(
+    session = ProxyPacerSession(
         username=pacer_username, password=pacer_password
     )
-    pacer_session.login()
+    session.login()
     for i, rd_pk in enumerate(rds):
         if i < options["offset"]:
             i += 1
@@ -87,17 +87,18 @@ def get_petitions(
             break
 
         if i % 1000 == 0:
-            pacer_session = ProxyPacerSession(
+            session = ProxyPacerSession(
                 username=pacer_username, password=pacer_password
             )
-            pacer_session.login()
+            session.login()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
-
         chain(
             get_pacer_doc_by_rd.s(
-                rd_pk, pacer_session.cookies, tag=tag_petitions
+                rd_pk,
+                SessionData(session.cookies, session.proxy_address),
+                tag=tag_petitions,
             ).set(queue=q),
             extract_recap_pdf.si(rd_pk).set(queue=q),
             add_items_to_solr.si([rd_pk], "search.RECAPDocument").set(queue=q),
