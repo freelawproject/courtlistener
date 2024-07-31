@@ -381,7 +381,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             r = async_to_sync(self.async_client.get)("/", params)
         counts_text = self._get_frontend_counts_text(r)
         self.assertIn(
-            "About 2,300 Cases and about 2,300 Docket Entries", counts_text
+            "About 2,300 Cases and 2,300 Docket Entries", counts_text
         )
         with self.captureOnCommitCallbacks(execute=True):
             empty_docket.delete()

@@ -237,7 +237,7 @@
                     {% endif %}
 
                     <h2 id="result-count" class="bottom">
-                        {% if  results_details.1 > estimated_count_threshold  %}About{% endif %}
+                        {% if  results_details.1 > estimated_count_threshold or results_details.3 > estimated_count_threshold %}About{% endif %}
                         {% if type == SEARCH_TYPES.OPINION %}
                           {% flag "o-es-active" %}
                             {{ results_details.1|intcomma }} Opinion{{ results_details.1|pluralize }}
@@ -258,7 +258,6 @@
                               {{ count|intcomma }} Case{{ count|pluralize }}
                               {% if matches %}
                                 <span class="gray">and</span>
-                                {% if  matches > estimated_count_threshold  %} about{% endif %}
                                 {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
                               {% endif %}
                             {% endwith %}
