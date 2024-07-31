@@ -321,16 +321,19 @@ class ModelTest(TestCase):
         op_1 = OpinionFactory(
             cluster=cluster,
             type="Concurrence Opinion",
+            ordering_key=1,
         )
 
         op_2 = OpinionFactory(
             cluster=cluster,
             type="Dissent",
+            ordering_key=2,
         )
 
         op_3 = OpinionFactory(
             cluster=cluster,
             type="Lead Opinion",
+            ordering_key=3,
         )
 
         # Test that the value of the order field matches the order in which
@@ -349,11 +352,13 @@ class ModelTest(TestCase):
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
                 op_4 = OpinionFactory(
-                    cluster=cluster, type="Lead Opinion", order=1
+                    cluster=cluster, type="Lead Opinion", ordering_key=1
                 )
 
         # Can we use negative positions?
-        op_4 = OpinionFactory(cluster=cluster, type="Lead Opinion", order=-1)
+        op_4 = OpinionFactory(
+            cluster=cluster, type="Lead Opinion", ordering_key=-1
+        )
         self.assertEqual(op_4.ordering_key, -1)
 
         # Can we order the opinions from a cluster using the field?
@@ -363,6 +368,10 @@ class ModelTest(TestCase):
             .values_list("ordering_key", flat=True)
         )
         self.assertEqual(list(qs), [-1, 1, 2, 3])
+
+        # Order default value is null
+        op_5 = OpinionFactory(cluster=cluster, type="Lead Opinion")
+        self.assertEqual(op_5.ordering_key, None)
 
 
 class DocketValidationTest(TestCase):
