@@ -3359,7 +3359,7 @@ class Opinion(AbstractDateTimeModel):
             # Add order in new opinions with no defined order value
             last_position = Opinion.objects.filter(
                 cluster=self.cluster
-            ).aggregate(models.Max("order"))["order__max"]
+            ).aggregate(models.Max("ordering_key"))["ordering_key__max"]
             self.ordering_key = (last_position or 0) + 1
         super().save(*args, **kwargs)
         if index:
