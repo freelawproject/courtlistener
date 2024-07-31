@@ -335,14 +335,14 @@ class ModelTest(TestCase):
 
         # Test that the value of the order field matches the order in which
         # they were created
-        self.assertEqual(op_1.order, 1)
-        self.assertEqual(op_2.order, 2)
-        self.assertEqual(op_3.order, 3)
+        self.assertEqual(op_1.ordering_key, 1)
+        self.assertEqual(op_2.ordering_key, 2)
+        self.assertEqual(op_3.ordering_key, 3)
 
         # Can we update an opinion using an existing position?
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
-                op_3.order = 2
+                op_3.ordering_key = 2
                 op_3.save()
 
         # Can we create an opinion using an existing position?
@@ -354,13 +354,13 @@ class ModelTest(TestCase):
 
         # Can we use negative positions?
         op_4 = OpinionFactory(cluster=cluster, type="Lead Opinion", order=-1)
-        self.assertEqual(op_4.order, -1)
+        self.assertEqual(op_4.ordering_key, -1)
 
         # Can we order the opinions from a cluster using the field?
         qs = (
             cluster.sub_opinions.all()
-            .order_by("order")
-            .values_list("order", flat=True)
+            .order_by("ordering_key")
+            .values_list("ordering_key", flat=True)
         )
         self.assertEqual(list(qs), [-1, 1, 2, 3])
 

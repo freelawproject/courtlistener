@@ -65,7 +65,7 @@
       "html_lawbox": "",
       "per_curiam": false,
       "type": "010combined",
-      "order": 1
+      "ordering_key": 1
     },
     "model": "search.opinion",
     "pk": 10
@@ -88,7 +88,7 @@
       "html_lawbox": "",
       "per_curiam": false,
       "type": "020lead",
-      "order": 2
+      "ordering_key": 2
     },
     "model": "search.opinion",
     "pk": 11

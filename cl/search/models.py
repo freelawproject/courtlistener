@@ -3320,12 +3320,13 @@ class Opinion(AbstractDateTimeModel):
             "sha1",
         ]
     )
-    order = models.IntegerField(null=True, blank=True)
+    ordering_key = models.IntegerField(null=True, blank=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["cluster_id", "order"], name="unique_opinion_order"
+                fields=["cluster_id", "ordering_key"],
+                name="unique_opinion_ordering_key",
             )
         ]
 

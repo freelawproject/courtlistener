@@ -38,38 +38,29 @@ def clean_opinion_content(text: str) -> str:
     # Replace line breaks with spaces and get rid of double spaces
     text = re.sub(" +", " ", " ".join(text.split("\n"))).strip()
 
-    # Remove non-alphanumeric and non-whitespace characters from lowercased text
+    # Remove non-alphanumeric and non-whitespace characters from lowercase text
     return re.sub(r"[^a-zA-Z0-9 ]", "", text.lower())
 
 
 def get_opinions_cleaned_content(
     cluster_id,
-) -> tuple[Optional[str], list[dict], int, bool]:
+) -> tuple[Optional[str], list[dict]]:
     """Get cleaned opinions content for a cluster object
 
     :param cluster_id: Cluster ID for a set of opinions
-    :return: (xml path, list of extracted opinions, start position, True if combined
-    opinions exists in cluster)
+    :return: (xml path, list of extracted opinions)
     """
     cl_cleaned_opinions = []
     # by default the opinions are ordered by pk
-    opinions_from_cluster = Opinion.objects.filter(
-        cluster_id=cluster_id
-    ).order_by("id")
-    combined_opinions_cluster = opinions_from_cluster.filter(
-        type="010combined"
+    opinions_from_cluster = (
+        Opinion.objects.filter(cluster_id=cluster_id)
+        .order_by("id")
+        .exclude(type="010combined")
     )
-    xml_path = None
-    cluster_has_combined_opinion = False
-    if combined_opinions_cluster:
-        # the combined opinion will be displayed at beginning
-        start_position = combined_opinions_cluster.count()
-        cluster_has_combined_opinion = True
-    else:
-        # we don't have combined opinions, we start ordering from 0 to n
-        start_position = 0
 
-    for i, op in enumerate(opinions_from_cluster.exclude(type="010combined")):
+    xml_path = None
+
+    for i, op in enumerate(opinions_from_cluster):
         if op.local_path and not xml_path:
             xml_path = str(op.local_path)
 
@@ -101,8 +92,6 @@ def get_opinions_cleaned_content(
     return (
         xml_path,
         cl_cleaned_opinions,
-        start_position,
-        cluster_has_combined_opinion,
     )
 
 
@@ -170,26 +159,12 @@ def sort_harvard_opinions(start_id: int, end_id: int) -> None:
     # cluster_id: 4697264, the combined opinion will go to the last position
     for oc in clusters:
         logger.info(f"Processing cluster id: {oc}")
-        combined_opinions_cluster = oc.sub_opinions.filter(
-            type="010combined"
-        ).order_by("id")
-        if combined_opinions_cluster:
-            # the combined opinion will be displayed at first
-            start_position = combined_opinions_cluster.count()
-        else:
-            # we don't have combined opinions, we start ordering from 0 to n
-            start_position = 0
 
         for opinion_order, cluster_op in enumerate(
             oc.sub_opinions.exclude(type="010combined").order_by("id"),
-            start=start_position,
+            start=1,
         ):
-            cluster_op.order = opinion_order
-            cluster_op.save()
-
-        # Show combined opinions at beginning
-        for opinion_order, cluster_op in enumerate(combined_opinions_cluster):
-            cluster_op.order = opinion_order
+            cluster_op.ordering_key = opinion_order
             cluster_op.save()
 
         logger.info(msg=f"Opinions reordered for cluster id: {oc.id}")
@@ -200,18 +175,13 @@ def update_opinions(
     cl_opinions: list,
     columbia_opinions: list,
     matches: dict,
-    cluster_has_combined_opinion: bool,
-    start_position: int,
 ):
     """Update opinions with correct order
 
     :param cluster_id:
     :param cl_opinions: a list with cleaned opinions from cl
-    :param columbia_opinions: a ordered list with cleaned opinions from xml file
+    :param columbia_opinions: an ordered list with cleaned opinions from xml file
     :param matches: a dict with the matches of each opinion of both lists
-    :param cluster_has_combined_opinion: True if the cluster has combined opinions
-    :param start_position: the number from where the order should begin for
-    non-combined opinions
     :return: None
     """
     update_failed = False
@@ -221,7 +191,7 @@ def update_opinions(
             # file_pos is the correct index to find the opinion id to update
             file_opinion = columbia_opinions[file_pos]
             # the order was calculated using the xml file
-            file_order = file_opinion.get("order") + start_position
+            file_order = file_opinion.get("order")
             cl_opinion = cl_opinions[cl_pos]
             opinion_id_to_update = cl_opinion.get("id")
 
@@ -229,29 +199,16 @@ def update_opinions(
                 try:
                     # Update opinion order
                     op = Opinion.objects.get(id=opinion_id_to_update)
-                    op.order = file_order
+                    op.ordering_key = file_order
                     op.save()
                 except Opinion.DoesNotExist:
-                    # This should not happen, but it is better to be
-                    # cautious
+                    # This should not happen, but it is better to be cautious
                     logger.warning(
                         f"We can't update opinion, opinion doesn't exist "
                         f"with id: {opinion_id_to_update}"
                     )
                     update_failed = True
                     break
-
-        if cluster_has_combined_opinion and not update_failed:
-            combined_opinions_cluster = Opinion.objects.filter(
-                cluster_id=cluster_id, type="010combined"
-            ).order_by("id")
-
-            # Show combined opinions at beginning
-            for opinion_order, cluster_op in enumerate(
-                combined_opinions_cluster
-            ):
-                cluster_op.order = opinion_order
-                cluster_op.save()
 
         if update_failed:
             # There was an error updating an opinion, rollback all changes for
@@ -294,12 +251,9 @@ def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
         logger.info(f"Processing cluster id: {cluster_id}")
 
         try:
-            (
-                xml_path,
-                cl_cleaned_opinions,
-                start_position,
-                cluster_has_combined_opinion,
-            ) = get_opinions_cleaned_content(cluster_id)
+            xml_path, cl_cleaned_opinions = get_opinions_cleaned_content(
+                cluster_id
+            )
         except EmptyOpinionException:
             logger.warning(
                 f"At least one of the opinions from cluster id: {cluster_id} is empty."
@@ -321,7 +275,9 @@ def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
                     fixed_xml_filepath
                 )
             except UnicodeDecodeError:
-                logger.warning(f"Cannot decode file: {fixed_xml_filepath}")
+                logger.warning(
+                    f"Cannot decode file: {fixed_xml_filepath}, cluster id: {cluster_id}"
+                )
                 continue
 
         if cl_cleaned_opinions and extracted_columbia_opinions:
@@ -336,6 +292,13 @@ def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
                 if op.get("opinion")
             ]
 
+            if len(columbia_opinions_content) != len(cl_opinions_content):
+                logger.warning(
+                    f"The number of opinions in cl and the number of opinions in the xml is different, cluster id: {cluster_id}"
+                )
+                continue
+
+            # Try to match content between cl and xml
             matches = match_opinion_lists(
                 columbia_opinions_content,
                 cl_opinions_content,
@@ -360,14 +323,12 @@ def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
                     # Go to next cluster id
                     continue
 
-                # Update all opinions order
+                # All opinions matched, update all opinions order
                 update_opinions(
                     cluster_id,
                     cl_cleaned_opinions,
                     extracted_columbia_opinions,
                     matches,
-                    cluster_has_combined_opinion,
-                    start_position,
                 )
 
 

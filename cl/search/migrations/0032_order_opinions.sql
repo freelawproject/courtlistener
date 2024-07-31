@@ -8,13 +8,13 @@ DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_delete_1f4fd ON "sear
 --
 DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_67ecd ON "search_opinion";
 --
--- Add field order to opinion
+-- Add field ordering_key to opinion
 --
-ALTER TABLE "search_opinion" ADD COLUMN "order" integer NULL;
+ALTER TABLE "search_opinion" ADD COLUMN "ordering_key" integer NULL;
 --
--- Add field order to opinionevent
+-- Add field ordering_key to opinionevent
 --
-ALTER TABLE "search_opinionevent" ADD COLUMN "order" integer NULL;
+ALTER TABLE "search_opinionevent" ADD COLUMN "ordering_key" integer NULL;
 --
 -- Create trigger update_or_delete_snapshot_update on model opinion
 --
@@ -53,7 +53,7 @@ ALTER TABLE "search_opinionevent" ADD COLUMN "order" integer NULL;
                             RETURN NEW;
                         END IF;
                     END IF;
-                    INSERT INTO "search_opinionevent" ("author_id", "author_str", "cluster_id", "date_created", "date_modified", "download_url", "extracted_by_ocr", "html", "html_anon_2020", "html_columbia", "html_lawbox", "html_with_citations", "id", "joined_by_str", "local_path", "order", "page_count", "per_curiam", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "plain_text", "sha1", "type", "xml_harvard") VALUES (OLD."author_id", OLD."author_str", OLD."cluster_id", OLD."date_created", OLD."date_modified", OLD."download_url", OLD."extracted_by_ocr", OLD."html", OLD."html_anon_2020", OLD."html_columbia", OLD."html_lawbox", OLD."html_with_citations", OLD."id", OLD."joined_by_str", OLD."local_path", OLD."order", OLD."page_count", OLD."per_curiam", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id", OLD."plain_text", OLD."sha1", OLD."type", OLD."xml_harvard"); RETURN NULL;
+                    INSERT INTO "search_opinionevent" ("author_id", "author_str", "cluster_id", "date_created", "date_modified", "download_url", "extracted_by_ocr", "html", "html_anon_2020", "html_columbia", "html_lawbox", "html_with_citations", "id", "joined_by_str", "local_path", "ordering_key", "page_count", "per_curiam", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "plain_text", "sha1", "type", "xml_harvard") VALUES (OLD."author_id", OLD."author_str", OLD."cluster_id", OLD."date_created", OLD."date_modified", OLD."download_url", OLD."extracted_by_ocr", OLD."html", OLD."html_anon_2020", OLD."html_columbia", OLD."html_lawbox", OLD."html_with_citations", OLD."id", OLD."joined_by_str", OLD."local_path", OLD."ordering_key", OLD."page_count", OLD."per_curiam", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id", OLD."plain_text", OLD."sha1", OLD."type", OLD."xml_harvard"); RETURN NULL;
                 END;
             $$ LANGUAGE plpgsql;
 
@@ -62,10 +62,10 @@ ALTER TABLE "search_opinionevent" ADD COLUMN "order" integer NULL;
                 AFTER UPDATE ON "search_opinion"
                 
                 
-                FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."cluster_id" IS DISTINCT FROM (NEW."cluster_id") OR OLD."author_id" IS DISTINCT FROM (NEW."author_id") OR OLD."author_str" IS DISTINCT FROM (NEW."author_str") OR OLD."per_curiam" IS DISTINCT FROM (NEW."per_curiam") OR OLD."joined_by_str" IS DISTINCT FROM (NEW."joined_by_str") OR OLD."type" IS DISTINCT FROM (NEW."type") OR OLD."sha1" IS DISTINCT FROM (NEW."sha1") OR OLD."page_count" IS DISTINCT FROM (NEW."page_count") OR OLD."download_url" IS DISTINCT FROM (NEW."download_url") OR OLD."local_path" IS DISTINCT FROM (NEW."local_path") OR OLD."plain_text" IS DISTINCT FROM (NEW."plain_text") OR OLD."html" IS DISTINCT FROM (NEW."html") OR OLD."html_lawbox" IS DISTINCT FROM (NEW."html_lawbox") OR OLD."html_columbia" IS DISTINCT FROM (NEW."html_columbia") OR OLD."html_anon_2020" IS DISTINCT FROM (NEW."html_anon_2020") OR OLD."xml_harvard" IS DISTINCT FROM (NEW."xml_harvard") OR OLD."html_with_citations" IS DISTINCT FROM (NEW."html_with_citations") OR OLD."extracted_by_ocr" IS DISTINCT FROM (NEW."extracted_by_ocr") OR OLD."order" IS DISTINCT FROM (NEW."order"))
+                FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."cluster_id" IS DISTINCT FROM (NEW."cluster_id") OR OLD."author_id" IS DISTINCT FROM (NEW."author_id") OR OLD."author_str" IS DISTINCT FROM (NEW."author_str") OR OLD."per_curiam" IS DISTINCT FROM (NEW."per_curiam") OR OLD."joined_by_str" IS DISTINCT FROM (NEW."joined_by_str") OR OLD."type" IS DISTINCT FROM (NEW."type") OR OLD."sha1" IS DISTINCT FROM (NEW."sha1") OR OLD."page_count" IS DISTINCT FROM (NEW."page_count") OR OLD."download_url" IS DISTINCT FROM (NEW."download_url") OR OLD."local_path" IS DISTINCT FROM (NEW."local_path") OR OLD."plain_text" IS DISTINCT FROM (NEW."plain_text") OR OLD."html" IS DISTINCT FROM (NEW."html") OR OLD."html_lawbox" IS DISTINCT FROM (NEW."html_lawbox") OR OLD."html_columbia" IS DISTINCT FROM (NEW."html_columbia") OR OLD."html_anon_2020" IS DISTINCT FROM (NEW."html_anon_2020") OR OLD."xml_harvard" IS DISTINCT FROM (NEW."xml_harvard") OR OLD."html_with_citations" IS DISTINCT FROM (NEW."html_with_citations") OR OLD."extracted_by_ocr" IS DISTINCT FROM (NEW."extracted_by_ocr") OR OLD."ordering_key" IS DISTINCT FROM (NEW."ordering_key"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_67ecd();
 
-            COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_67ecd ON "search_opinion" IS '89fec08f03e567ec8ecc7cd1e8ec5f665abf9d3b';
+            COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_67ecd ON "search_opinion" IS '7137855274503cc2c50a17729f82e150d2b7d872';
         
 --
 -- Create trigger update_or_delete_snapshot_delete on model opinion
@@ -105,7 +105,7 @@ ALTER TABLE "search_opinionevent" ADD COLUMN "order" integer NULL;
                             RETURN NEW;
                         END IF;
                     END IF;
-                    INSERT INTO "search_opinionevent" ("author_id", "author_str", "cluster_id", "date_created", "date_modified", "download_url", "extracted_by_ocr", "html", "html_anon_2020", "html_columbia", "html_lawbox", "html_with_citations", "id", "joined_by_str", "local_path", "order", "page_count", "per_curiam", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "plain_text", "sha1", "type", "xml_harvard") VALUES (OLD."author_id", OLD."author_str", OLD."cluster_id", OLD."date_created", OLD."date_modified", OLD."download_url", OLD."extracted_by_ocr", OLD."html", OLD."html_anon_2020", OLD."html_columbia", OLD."html_lawbox", OLD."html_with_citations", OLD."id", OLD."joined_by_str", OLD."local_path", OLD."order", OLD."page_count", OLD."per_curiam", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id", OLD."plain_text", OLD."sha1", OLD."type", OLD."xml_harvard"); RETURN NULL;
+                    INSERT INTO "search_opinionevent" ("author_id", "author_str", "cluster_id", "date_created", "date_modified", "download_url", "extracted_by_ocr", "html", "html_anon_2020", "html_columbia", "html_lawbox", "html_with_citations", "id", "joined_by_str", "local_path", "ordering_key", "page_count", "per_curiam", "pgh_context_id", "pgh_created_at", "pgh_label", "pgh_obj_id", "plain_text", "sha1", "type", "xml_harvard") VALUES (OLD."author_id", OLD."author_str", OLD."cluster_id", OLD."date_created", OLD."date_modified", OLD."download_url", OLD."extracted_by_ocr", OLD."html", OLD."html_anon_2020", OLD."html_columbia", OLD."html_lawbox", OLD."html_with_citations", OLD."id", OLD."joined_by_str", OLD."local_path", OLD."ordering_key", OLD."page_count", OLD."per_curiam", _pgh_attach_context(), NOW(), 'update_or_delete_snapshot', OLD."id", OLD."plain_text", OLD."sha1", OLD."type", OLD."xml_harvard"); RETURN NULL;
                 END;
             $$ LANGUAGE plpgsql;
 
@@ -117,10 +117,10 @@ ALTER TABLE "search_opinionevent" ADD COLUMN "order" integer NULL;
                 FOR EACH ROW 
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_delete_1f4fd();
 
-            COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_1f4fd ON "search_opinion" IS '79bebd7cda3c6ed3bc40f28799cf9c0f2638e2ad';
+            COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_delete_1f4fd ON "search_opinion" IS '98fb52aa60fd8e89a83f8f7ac77ba5892739fb37';
         
 --
--- Create constraint unique_opinion_order on model opinion
+-- Create constraint unique_opinion_ordering_key on model opinion
 --
-ALTER TABLE "search_opinion" ADD CONSTRAINT "unique_opinion_order" UNIQUE ("cluster_id", "order");
+ALTER TABLE "search_opinion" ADD CONSTRAINT "unique_opinion_ordering_key" UNIQUE ("cluster_id", "ordering_key");
 COMMIT;
