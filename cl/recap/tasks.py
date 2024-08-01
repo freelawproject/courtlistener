@@ -2279,7 +2279,7 @@ def get_and_copy_recap_attachment_docs(
     magic_number: str | None,
     pacer_case_id: str,
     user_pk: int,
-    de_seq_num: str | None,
+    de_seq_num: str | None = None,
 ) -> None:
     """Download and copy the corresponding PACER PDF to all the notification
     RECAPDocument attachments, including support for multi-docket NEFs.
