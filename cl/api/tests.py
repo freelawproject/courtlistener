@@ -59,6 +59,8 @@ from cl.people_db.api_views import (
     SchoolViewSet,
     SourceViewSet,
 )
+from cl.people_db.factories import PartyFactory, PartyTypeFactory
+from cl.people_db.models import Attorney
 from cl.recap.factories import ProcessingQueueFactory
 from cl.recap.views import (
     EmailProcessingQueueViewSet,
@@ -757,6 +759,21 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         self.q = {"parties_represented__name__contains": "Honker"}
         await self.assertCountInResults(1)
         self.q = {"parties_represented__name__contains": "Honker-Nope"}
+        await self.assertCountInResults(0)
+
+        # Adds extra role to the existing attorney
+        docket = await Docket.objects.afirst()
+        attorney = await Attorney.objects.afirst()
+        await sync_to_async(PartyTypeFactory.create)(
+            party=await sync_to_async(PartyFactory)(
+                docket=docket,
+                attorneys=[attorney],
+            ),
+            docket=docket,
+        )
+        self.q = {"docket__date_created__range": "2017-04-14,2017-04-15"}
+        await self.assertCountInResults(1)
+        self.q = {"docket__date_created__range": "2017-04-15,2017-04-16"}
         await self.assertCountInResults(0)
 
     async def test_party_filters(self) -> None:

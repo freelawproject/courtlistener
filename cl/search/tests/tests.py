@@ -27,6 +27,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
 
 from cl.audio.factories import AudioFactory
+from cl.lib.elasticsearch_utils import simplify_estimated_count
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import clobbering_get_name
@@ -983,6 +984,30 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             r.content.decode(),
         )
         self.assertNotIn("Did you mean", r.content.decode())
+
+    def test_round_estimated_search_counts(self) -> None:
+        """Confirm search counts above the threshold are properly rounded"""
+
+        tests = [
+            (13, 13),  # Below ELASTICSEARCH_CARDINALITY_PRECISION threshold
+            (109, 109),
+            (809, 809),
+            (1_074, 1_074),
+            (1_768, 1_768),
+            (1_881, 1_800),  # Above ELASTICSEARCH_CARDINALITY_PRECISION * 0.94
+            # threshold
+            (
+                11_740,
+                11_000,
+            ),
+            (367_740, 360_000),
+            (7_867_740, 7_800_000),
+            (95_367_740, 95_000_000),
+            (436_307_740, 430_000_000),
+        ]
+        for test in tests:
+            with self.subTest(test=test, msg="Test estimated search counts."):
+                self.assertEqual(simplify_estimated_count(test[0]), test[1])
 
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
