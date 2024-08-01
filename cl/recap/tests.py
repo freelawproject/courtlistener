@@ -3125,7 +3125,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3200,7 +3200,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3293,7 +3293,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3356,7 +3356,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3447,7 +3447,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
@@ -3494,7 +3494,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3650,7 +3650,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3720,7 +3720,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3814,7 +3814,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3965,7 +3965,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -4051,7 +4051,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4208,7 +4208,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -4254,7 +4254,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4309,7 +4309,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4381,7 +4381,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4452,7 +4452,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),
@@ -4623,7 +4623,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -4709,7 +4709,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             None,
             "Document not available from magic link.",
         ),
@@ -4757,7 +4757,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -5075,7 +5075,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -5240,7 +5240,7 @@ class GetAndCopyRecapAttachments(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b"Hello World from magic"),
             "OK",
         ),
@@ -5473,7 +5473,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
@@ -5511,7 +5511,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -5558,7 +5558,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -5604,7 +5604,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -5643,7 +5643,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -5693,7 +5693,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             None,
             "Document not available from magic link.",
         ),
@@ -6089,7 +6089,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_update_webhook_after_http_error(
         self,
@@ -6161,7 +6161,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_update_webhook_after_network_error(
         self,
@@ -6234,7 +6234,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_success_webhook_delivery(
         self,
@@ -6300,7 +6300,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_retry_webhooks_integration(
         self,

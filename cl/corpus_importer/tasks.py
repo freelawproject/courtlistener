@@ -1986,6 +1986,7 @@ def download_pdf_by_magic_number(
     session_data: SessionData,
     magic_number: str,
     appellate: bool = False,
+    de_seq_num: str | None = None,
 ) -> tuple[Response | None, str]:
     """Small wrapper to fetch a PACER PDF document by magic number.
 
@@ -1996,6 +1997,8 @@ def download_pdf_by_magic_number(
     and proxy.
     :param magic_number: The magic number to fetch PACER documents for free.
     :param appellate: Whether the download belongs to an appellate court.
+    :param de_seq_num: The sequential number assigned by the PACER system to
+     identify the docket entry within a case.
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
@@ -2005,7 +2008,7 @@ def download_pdf_by_magic_number(
     )
     report = FreeOpinionReport(court_id, s)
     r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, appellate
+        pacer_case_id, pacer_doc_id, magic_number, appellate, de_seq_num
     )
     return r, r_msg
 

@@ -2196,6 +2196,7 @@ def download_pacer_pdf_and_save_to_pq(
     user_pk: int,
     appellate: bool,
     attachment_number: int = None,
+    de_seq_num: str | None = None,
 ) -> ProcessingQueue:
     """Try to download a PACER document from the notification via the magic
     link and store it in a ProcessingQueue object. So it can be copied to every
@@ -2218,6 +2219,8 @@ def download_pacer_pdf_and_save_to_pq(
     :param appellate: Whether the download belongs to an appellate court.
     :param attachment_number: The RECAPDocument attachment_number in case the
      request belongs to an attachment document.
+    :param de_seq_num: The sequential number assigned by the PACER system to
+     identify the docket entry within a case.
     :return: The ProcessingQueue object that's created or returned if existed.
     """
 
@@ -2245,6 +2248,7 @@ def download_pacer_pdf_and_save_to_pq(
                 session_data,
                 magic_number,
                 appellate,
+                de_seq_num,
             )
             if response:
                 file_name = get_document_filename(
@@ -2495,6 +2499,7 @@ def process_recap_email(
             pacer_doc_id = docket_entry["pacer_doc_id"]
             pacer_case_id = docket_entry["pacer_case_id"]
             document_url = docket_entry["document_url"]
+            pacer_seq_no = docket_entry["pacer_seq_no"]
             break
 
     # Some notifications don't contain a magic number at all, assign the
@@ -2503,6 +2508,7 @@ def process_recap_email(
         pacer_doc_id = dockets[0]["docket_entries"][0]["pacer_doc_id"]
         pacer_case_id = dockets[0]["docket_entries"][0]["pacer_case_id"]
         document_url = dockets[0]["docket_entries"][0]["document_url"]
+        pacer_seq_no = dockets[0]["docket_entries"][0]["pacer_seq_no"]
 
     start_time = now()
     # Ensures we have PACER cookies ready to go.
@@ -2521,6 +2527,7 @@ def process_recap_email(
         pacer_doc_id,
         user_pk,
         appellate,
+        de_seq_num=pacer_seq_no,
     )
     is_potentially_sealed_entry = (
         is_docket_entry_sealed(epq.court_id, pacer_case_id, pacer_doc_id)
