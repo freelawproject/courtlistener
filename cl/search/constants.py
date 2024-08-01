@@ -293,3 +293,13 @@ o_type_index_map = {
     Opinion.ON_MOTION_TO_STRIKE: "on-motion-to-strike",
     Opinion.TRIAL_COURT: "trial-court-document",
 }
+
+cardinality_query_unique_ids = {
+    SEARCH_TYPES.RECAP: "docket_id",
+    SEARCH_TYPES.DOCKETS: "docket_id",
+    SEARCH_TYPES.RECAP_DOCUMENT: "id",
+    SEARCH_TYPES.OPINION: "cluster_id",
+    SEARCH_TYPES.PEOPLE: "id",
+    SEARCH_TYPES.ORAL_ARGUMENT: "id",
+    SEARCH_TYPES.PARENTHETICAL: "id",
+}
