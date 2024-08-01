@@ -19,9 +19,11 @@ from waffle.testutils import override_flag
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
+    simplify_estimated_count,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -340,9 +342,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # The View Additional Results button is shown.
         self.assertIn("View Additional Results for", r.content.decode())
 
-    def test_match_all_query_and_docket_entries_count(self) -> None:
-        """Confirm a RECAP search with no params return a match all query.
-        The case and docket entries count is available.
+    def test_frontend_docket_and_docket_entries_count(self) -> None:
+        """Assert RECAP search results counts in the fronted. Below and
+        above the estimation threshold.
         """
 
         # Perform a RECAP match all search.
@@ -351,10 +353,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             params, 2, "match all query"
         )
-        # Two cases are returned.
-        self.assertIn("2 Cases", r.content.decode())
-        # 3 Docket entries in count.
-        self.assertIn("3 Docket", r.content.decode())
+        counts_text = self._get_frontend_counts_text(r)
+        # 2 cases and 3 Docket entries in counts are returned
+        self.assertIn("2 Cases and 3 Docket Entries", counts_text)
 
         with self.captureOnCommitCallbacks(execute=True):
             # Confirm an empty docket is shown in a match_all query.
@@ -370,10 +371,24 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             params, 3, "match all query"
         )
-        # 3 cases are returned.
-        self.assertIn("3 Cases", r.content.decode())
-        # 3 Docket entries in count.
-        self.assertIn("3 Docket", r.content.decode())
+        counts_text = self._get_frontend_counts_text(r)
+        # 3 cases and 3 Docket entries in counts are returned
+        self.assertIn("3 Cases and 3 Docket Entries", counts_text)
+
+        # Assert estimated counts above the threshold.
+        with mock.patch(
+            "cl.lib.elasticsearch_utils.simplify_estimated_count",
+            return_value=simplify_estimated_count(
+                compute_lowest_possible_estimate(
+                    settings.ELASTICSEARCH_CARDINALITY_PRECISION
+                )
+            ),
+        ):
+            r = async_to_sync(self.async_client.get)("/", params)
+        counts_text = self._get_frontend_counts_text(r)
+        self.assertIn(
+            "About 1,800 Cases and 1,800 Docket Entries", counts_text
+        )
         with self.captureOnCommitCallbacks(execute=True):
             empty_docket.delete()
 
