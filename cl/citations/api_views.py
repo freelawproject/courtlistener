@@ -188,7 +188,9 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
     def _get_clusters_for_canonical_list(
         self, reporters: list[SafeString], volume: int, page: str
-    ) -> tuple[QuerySet[OpinionCluster] | None, int, list[str]]:
+    ) -> tuple[
+        QuerySet[OpinionCluster, OpinionCluster] | None, int, list[str]
+    ]:
         """
         Retrieves opinion clusters associated with a list of reporter slugs.
 
@@ -227,7 +229,7 @@ class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
 
     def _format_cluster_response(
         self,
-        clusters: QuerySet[OpinionCluster],
+        clusters: QuerySet[OpinionCluster, OpinionCluster],
         cluster_count: int,
     ) -> CitationAPIResponse:
         """

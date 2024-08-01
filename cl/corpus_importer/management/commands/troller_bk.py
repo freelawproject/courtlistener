@@ -669,7 +669,7 @@ class Command(VerboseCommand):
                 "The 'file' argument is required for that action."
             )
 
-        threads: list[threading.Thread] = []
+        threads = []
         try:
             iterate_and_import_files(options, threads)
         except KeyboardInterrupt:

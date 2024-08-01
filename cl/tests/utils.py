@@ -101,7 +101,7 @@ class AsyncAPIClient(AsyncClient, APIRequestFactory):
 
 def make_client(user_pk: int) -> AsyncAPIClient:
     user = User.objects.get(pk=user_pk)
-    token, created = Token.objects.get_or_create(user=user)
+    token, created = Token.objects.get_or_create(user=user)  # type: ignore[attr-defined]
     token_header = f"Token {token}"
     client = AsyncAPIClient()
     client.credentials(HTTP_AUTHORIZATION=token_header)
