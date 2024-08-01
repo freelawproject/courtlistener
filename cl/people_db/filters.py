@@ -276,9 +276,13 @@ class AttorneyFilter(NoEmptyFilterSet):
         "cl.search.filters.DocketFilter",
         field_name="roles__docket",
         queryset=Docket.objects.all(),
+        distinct=True,
     )
     parties_represented = filters.RelatedFilter(
-        PartyFilter, field_name="roles__party", queryset=Party.objects.all()
+        PartyFilter,
+        field_name="roles__party",
+        queryset=Party.objects.all(),
+        distinct=True,
     )
 
     class Meta:
