@@ -5,7 +5,7 @@ from typing import Optional
 from bs4 import BeautifulSoup
 from django.core.management import BaseCommand
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
     extract_columbia_opinions,
@@ -142,28 +142,38 @@ def sort_harvard_opinions(start_id: int, end_id: int) -> None:
     :return: None
     """
 
+    # The filepath_json_harvard field can only be filled by the harvard importer,
+    # this helps us confirm that it was imported from a Harvard json
+    base_filter = Q(
+        opinions_count__gt=1, source__in=VALID_HARVARD_SOURCES
+    ) & ~Q(filepath_json_harvard="")
+
+    if start_id:
+        base_filter &= Q(pk__gte=start_id)
+
+    if end_id:
+        base_filter &= Q(pk__lte=end_id)
+
     # Get all harvard clusters with more than one opinion
     clusters = (
         OpinionCluster.objects.prefetch_related("sub_opinions")
         .annotate(opinions_count=Count("sub_opinions"))
-        .filter(opinions_count__gt=1, source__in=VALID_HARVARD_SOURCES)
+        .filter(base_filter)
         .order_by("id")
     )
 
-    if start_id:
-        clusters = clusters.filter(pk__gte=start_id)
-
-    if end_id:
-        clusters = clusters.filter(pk__lte=end_id)
-
-    # cluster_id: 4697264, the combined opinion will go to the last position
     for oc in clusters:
         logger.info(f"Processing cluster id: {oc}")
 
-        for opinion_order, cluster_op in enumerate(
-            oc.sub_opinions.exclude(type="010combined").order_by("id"),
-            start=1,
-        ):
+        cluster_opinions = oc.sub_opinions.exclude(
+            type="010combined"
+        ).order_by("id")
+
+        if not cluster_opinions:
+            logger.info(f"No opinions left to order for cluster id: {oc}")
+            continue
+
+        for opinion_order, cluster_op in enumerate(cluster_opinions, start=1):
             cluster_op.ordering_key = opinion_order
             cluster_op.save()
 
@@ -344,27 +354,23 @@ class Command(BaseCommand):
             action="store_true",
             help="Fix harvard opinions order",
         )
-
         parser.add_argument(
             "--process-columbia",
             action="store_true",
             help="Fix columbia opinions order",
         )
-
         parser.add_argument(
             "--xml-dir",
             default="/opt/courtlistener/_columbia",
             required=False,
             help="The absolute path to the directory with columbia xml files",
         )
-
         parser.add_argument(
             "--start-id",
             type=int,
             default=0,
             help="Start id for a range of clusters (inclusive)",
         )
-
         parser.add_argument(
             "--end-id",
             type=int,
@@ -372,18 +378,32 @@ class Command(BaseCommand):
             help="End id for a range of clusters (inclusive)",
         )
 
-    def handle(self, *args, **options):
+    def validate_args(self, opts):
+        """Validate arguments passed to the command
 
-        if not options["process_harvard"] and not options["process_columbia"]:
-            logger.info(
+        :param opts: dictionary with arguments from the command
+        :return: true if validations are satisfied else false
+        """
+        if opts["end_id"] > opts["start_id"]:
+            logger.error("end-id should be greater or equal than start-id")
+            return False
+
+        if not opts["process_harvard"] and not opts["process_columbia"]:
+            logger.error(
                 "One option required: process-harvard or process-columbia"
             )
-            return
+            return False
 
-        if options["process_harvard"] and options["process_columbia"]:
-            logger.info(
+        if opts["process_harvard"] and opts["process_columbia"]:
+            logger.error(
                 "You can only select one option process-harvard or process-columbia"
             )
+            return False
+        return True
+
+    def handle(self, *args, **options):
+
+        if not self.validate_args(options):
             return
 
         if options["process_harvard"]:
