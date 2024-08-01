@@ -19,9 +19,11 @@ from waffle.testutils import override_flag
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
+    simplify_estimated_count,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
@@ -376,12 +378,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Assert estimated counts above the threshold.
         with mock.patch(
             "cl.lib.elasticsearch_utils.simplify_estimated_count",
-            return_value=2300,
+            return_value=simplify_estimated_count(
+                compute_lowest_possible_estimate(
+                    settings.ELASTICSEARCH_CARDINALITY_PRECISION
+                )
+            ),
         ):
             r = async_to_sync(self.async_client.get)("/", params)
         counts_text = self._get_frontend_counts_text(r)
         self.assertIn(
-            "About 2,300 Cases and 2,300 Docket Entries", counts_text
+            "About 1,800 Cases and 1,800 Docket Entries", counts_text
         )
         with self.captureOnCommitCallbacks(execute=True):
             empty_docket.delete()

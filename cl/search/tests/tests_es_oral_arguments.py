@@ -2378,14 +2378,14 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         # Assert estimated counts above the threshold.
         with mock.patch(
             "cl.lib.elasticsearch_utils.simplify_estimated_count",
-            return_value=2300,
+            return_value=1900,
         ):
             r = self.client.get(
                 reverse("show_results"),
                 search_params,
             )
         counts_text = self._get_frontend_counts_text(r)
-        self.assertIn("About 2,300 Oral Arguments", counts_text)
+        self.assertIn("About 1,900 Oral Arguments", counts_text)
 
     def test_search_transcript(self) -> None:
         """Test search transcript."""

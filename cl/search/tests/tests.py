@@ -918,15 +918,18 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             (13, 13),  # Below ELASTICSEARCH_CARDINALITY_PRECISION threshold
             (109, 109),
             (809, 809),
-            (1074, 1074),
+            (1_074, 1_074),
+            (1_768, 1_768),
+            (1_881, 1_800),  # Above ELASTICSEARCH_CARDINALITY_PRECISION * 0.94
+            # threshold
             (
-                11740,
-                11000,
-            ),  # Above ELASTICSEARCH_CARDINALITY_PRECISION threshold
-            (367740, 360000),
-            (7867740, 7800000),
-            (95367740, 95000000),
-            (436307740, 430000000),
+                11_740,
+                11_000,
+            ),
+            (367_740, 360_000),
+            (7_867_740, 7_800_000),
+            (95_367_740, 95_000_000),
+            (436_307_740, 430_000_000),
         ]
         for test in tests:
             with self.subTest(test=test, msg="Test estimated search counts."):

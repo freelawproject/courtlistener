@@ -32,6 +32,7 @@ from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
     get_facet_dict_for_search_query,
@@ -40,6 +41,7 @@ from cl.lib.elasticsearch_utils import (
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
+    simplify_estimated_count,
 )
 from cl.lib.paginators import ESPaginator
 from cl.lib.redis_utils import get_redis_interface
@@ -815,7 +817,11 @@ def do_es_search(
         "cited_cluster": cited_cluster,
         "query_citation": query_citation,
         "facet_fields": facet_fields,
-        "estimated_count_threshold": settings.ELASTICSEARCH_CARDINALITY_PRECISION,
+        "estimated_count_threshold": simplify_estimated_count(
+            compute_lowest_possible_estimate(
+                settings.ELASTICSEARCH_CARDINALITY_PRECISION
+            )
+        ),
     }
 
 

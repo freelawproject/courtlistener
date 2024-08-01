@@ -2944,7 +2944,9 @@ def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
     This aggregation estimates the count of unique documents based on the
     specified unique field. The precision_threshold, set by
     ELASTICSEARCH_CARDINALITY_PRECISION, determines the point at which the
-    count begins to trade accuracy for performance.
+    count begins to trade accuracy for performance. The error in the
+    approximation count using this method ranges from 1% to 6%.
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-cardinality-aggregation.html#_counts_are_approximate
 
     :param count_query: The Elasticsearch DSL Search object containing the
     count query.
@@ -3026,6 +3028,13 @@ def do_es_alert_estimation_query(
     return estimation_query.count()
 
 
+def compute_lowest_possible_estimate(precision_threshold: int) -> int:
+    """Estimates can be below reality by as much as 6%. Round numbers below that threshold.
+    :return: The lowest possible estimate.
+    """
+    return int(precision_threshold * 0.94)
+
+
 def simplify_estimated_count(search_count: int) -> int:
     """Simplify the estimated search count to the nearest rounded figure.
     It only applies this rounding if the search_count exceeds the
@@ -3035,7 +3044,10 @@ def simplify_estimated_count(search_count: int) -> int:
     :return: The simplified search_count, rounded to the nearest significant
     figure or the original search_count if below the threshold.
     """
-    if search_count > settings.ELASTICSEARCH_CARDINALITY_PRECISION:
+
+    if search_count >= compute_lowest_possible_estimate(
+        settings.ELASTICSEARCH_CARDINALITY_PRECISION
+    ):
         search_count_str = str(search_count)
         first_two = search_count_str[:2]
         zeroes = (len(search_count_str) - 2) * "0"

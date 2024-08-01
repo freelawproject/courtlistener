@@ -1969,14 +1969,14 @@ class OpinionsESSearchTest(
         # Assert estimated counts above the threshold.
         with mock.patch(
             "cl.lib.elasticsearch_utils.simplify_estimated_count",
-            return_value=2300,
+            return_value=5300,
         ):
             r = self.client.get(
                 reverse("show_results"),
                 search_params,
             )
         counts_text = self._get_frontend_counts_text(r)
-        self.assertIn("About 2,300 Opinions", counts_text)
+        self.assertIn("About 5,300 Opinions", counts_text)
 
 
 class RelatedSearchTest(
