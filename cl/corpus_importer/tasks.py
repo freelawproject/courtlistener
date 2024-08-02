@@ -635,7 +635,11 @@ def get_and_process_free_pdf(
     )
     try:
         r, r_msg = download_pacer_pdf_by_rd(
-            rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies_data
+            rd.pk,
+            result.pacer_case_id,
+            result.pacer_doc_id,
+            cookies_data,
+            de_seq_num=rd.docket_entry.pacer_sequence_number,
         )
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
@@ -1952,6 +1956,7 @@ def download_pacer_pdf_by_rd(
     pacer_doc_id: int,
     session_data: SessionData,
     magic_number: str | None = None,
+    de_seq_num: str | None = None,
 ) -> tuple[Response | None, str]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
@@ -1974,7 +1979,9 @@ def download_pacer_pdf_by_rd(
     )
     report = FreeOpinionReport(pacer_court_id, s)
 
-    r, r_msg = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
+    r, r_msg = report.download_pdf(
+        pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
+    )
 
     return r, r_msg
 
@@ -2261,8 +2268,13 @@ def get_pacer_doc_by_rd(
         return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    de_seq_num = rd.docket_entry.pacer_sequence_number
     r, r_msg = download_pacer_pdf_by_rd(
-        rd.pk, pacer_case_id, rd.pacer_doc_id, session_data
+        rd.pk,
+        pacer_case_id,
+        rd.pacer_doc_id,
+        session_data,
+        de_seq_num=de_seq_num,
     )
     court_id = rd.docket_entry.docket.court_id
 
@@ -2370,8 +2382,13 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    de_seq_num = rd.docket_entry.pacer_sequence_number
     r, r_msg = download_pacer_pdf_by_rd(
-        rd.pk, pacer_case_id, att_found["pacer_doc_id"], session_data
+        rd.pk,
+        pacer_case_id,
+        att_found["pacer_doc_id"],
+        session_data,
+        de_seq_num=de_seq_num,
     )
     court_id = rd.docket_entry.docket.court_id
 

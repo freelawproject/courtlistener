@@ -7113,7 +7113,7 @@ class RecapFetchWebhooksTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: (
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
             MockResponse(
                 200,
                 mock_bucket_open(

@@ -1659,6 +1659,7 @@ def fetch_pacer_doc_by_rd(
         cookies if isinstance(cookies, SessionData) else SessionData(cookies)
     )
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    de_seq_num = rd.docket_entry.pacer_sequence_number
     try:
         r, r_msg = download_pacer_pdf_by_rd(
             rd.pk,
@@ -1666,6 +1667,7 @@ def fetch_pacer_doc_by_rd(
             rd.pacer_doc_id,
             session_data,
             magic_number,
+            de_seq_num=de_seq_num,
         )
     except (requests.RequestException, HTTPError):
         msg = "Failed to get PDF from network."
