@@ -323,17 +323,15 @@ def download_recap_item(
     soft_time_limit=240,
 )
 def get_and_save_free_document_report(
-    self: Task,
-    court_id: str,
-    start: date,
-    end: date,
-) -> int:
+    self: Task, court_id: str, start: date, end: date, log_id: int = 0
+) -> Tuple[int, int]:
     """Download the Free document report and save it to the DB.
 
     :param self: The Celery task.
     :param court_id: A pacer court id.
     :param start: a date object representing the first day to get results.
     :param end: a date object representing the last day to get results.
+    :param log_id: a PACERFreeDocumentLog object id
     :return: The status code of the scrape
     """
     session_data = get_or_cache_pacer_cookies(
@@ -399,6 +397,29 @@ def get_and_save_free_document_report(
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
 
+    if log_id:
+        # We only save the html when the script is run automatically every day
+        log = PACERFreeDocumentLog.objects.get(pk=log_id)
+        if hasattr(report, "responses_with_params"):
+            for result in report.responses_with_params:
+                # FreeOpinionReport now also returns a list of dicts with additional
+                # data instead of a list of requests responses. We do this to verify
+                # if we have the new version of juriscraper with the new attribute.
+                if isinstance(result, dict):
+                    response = result.get("response")
+                    query_start = result.get("start")
+                    query_end = result.get("end")
+
+                    if response and query_start and query_end:
+                        pacer_file = PacerHtmlFiles(
+                            content_object=log,
+                            upload_type=UPLOAD_TYPE.FREE_OPINIONS_REPORT,
+                        )
+                        pacer_file.filepath.save(
+                            f"free_opinions_report_{court_id}_from_{query_start.replace('/', '-')}_to_{query_end.replace('/', '-')}.html",
+                            ContentFile(response.text.encode()),
+                        )
+
     document_rows_to_create = []
     for row in results:
         document_row = PACERFreeDocumentRow(
@@ -419,7 +440,7 @@ def get_and_save_free_document_report(
     # Create PACERFreeDocumentRow in bulk
     PACERFreeDocumentRow.objects.bulk_create(document_rows_to_create)
 
-    return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL
+    return PACERFreeDocumentLog.SCRAPE_SUCCESSFUL, len(document_rows_to_create)
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
@@ -614,7 +635,11 @@ def get_and_process_free_pdf(
     )
     try:
         r, r_msg = download_pacer_pdf_by_rd(
-            rd.pk, result.pacer_case_id, result.pacer_doc_id, cookies_data
+            rd.pk,
+            result.pacer_case_id,
+            result.pacer_doc_id,
+            cookies_data,
+            de_seq_num=rd.docket_entry.pacer_sequence_number,
         )
     except HTTPError as exc:
         if exc.response and exc.response.status_code in [
@@ -868,18 +893,12 @@ def upload_to_ia(
 
 
 @app.task
-def mark_court_done_on_date(
-    status: int, court_id: str, d: date
-) -> Optional[int]:
-    court_id = map_pacer_to_cl_id(court_id)
+def mark_court_done_on_date(log_id: int, status: int) -> Optional[int]:
     try:
-        doc_log = PACERFreeDocumentLog.objects.filter(
-            status=PACERFreeDocumentLog.SCRAPE_IN_PROGRESS, court_id=court_id
-        ).latest("date_queried")
+        doc_log = PACERFreeDocumentLog.objects.get(pk=log_id)
     except PACERFreeDocumentLog.DoesNotExist:
         return None
     else:
-        doc_log.date_queried = d
         doc_log.status = status
         doc_log.date_completed = now()
         doc_log.save()
@@ -1937,6 +1956,7 @@ def download_pacer_pdf_by_rd(
     pacer_doc_id: int,
     session_data: SessionData,
     magic_number: str | None = None,
+    de_seq_num: str | None = None,
 ) -> tuple[Response | None, str]:
     """Using a RECAPDocument object ID, download the PDF if it doesn't already
     exist.
@@ -1959,7 +1979,9 @@ def download_pacer_pdf_by_rd(
     )
     report = FreeOpinionReport(pacer_court_id, s)
 
-    r, r_msg = report.download_pdf(pacer_case_id, pacer_doc_id, magic_number)
+    r, r_msg = report.download_pdf(
+        pacer_case_id, pacer_doc_id, magic_number, de_seq_num=de_seq_num
+    )
 
     return r, r_msg
 
@@ -1971,6 +1993,7 @@ def download_pdf_by_magic_number(
     session_data: SessionData,
     magic_number: str,
     appellate: bool = False,
+    de_seq_num: str | None = None,
 ) -> tuple[Response | None, str]:
     """Small wrapper to fetch a PACER PDF document by magic number.
 
@@ -1981,6 +2004,8 @@ def download_pdf_by_magic_number(
     and proxy.
     :param magic_number: The magic number to fetch PACER documents for free.
     :param appellate: Whether the download belongs to an appellate court.
+    :param de_seq_num: The sequential number assigned by the PACER system to
+     identify the docket entry within a case.
     :return: A two-tuple of requests.Response object usually containing a PDF,
     or None if that wasn't possible, and a string representing the error if
     there was one.
@@ -1990,7 +2015,7 @@ def download_pdf_by_magic_number(
     )
     report = FreeOpinionReport(court_id, s)
     r, r_msg = report.download_pdf(
-        pacer_case_id, pacer_doc_id, magic_number, appellate
+        pacer_case_id, pacer_doc_id, magic_number, appellate, de_seq_num
     )
     return r, r_msg
 
@@ -2243,8 +2268,13 @@ def get_pacer_doc_by_rd(
         return None
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    de_seq_num = rd.docket_entry.pacer_sequence_number
     r, r_msg = download_pacer_pdf_by_rd(
-        rd.pk, pacer_case_id, rd.pacer_doc_id, session_data
+        rd.pk,
+        pacer_case_id,
+        rd.pacer_doc_id,
+        session_data,
+        de_seq_num=de_seq_num,
     )
     court_id = rd.docket_entry.docket.court_id
 
@@ -2352,8 +2382,13 @@ def get_pacer_doc_by_rd_and_description(
         return
 
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
+    de_seq_num = rd.docket_entry.pacer_sequence_number
     r, r_msg = download_pacer_pdf_by_rd(
-        rd.pk, pacer_case_id, att_found["pacer_doc_id"], session_data
+        rd.pk,
+        pacer_case_id,
+        att_found["pacer_doc_id"],
+        session_data,
+        de_seq_num=de_seq_num,
     )
     court_id = rd.docket_entry.docket.court_id
 

@@ -42,7 +42,7 @@ async def core_docket_data(
     pk: int,
 ) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, NoteForm]]]:
     """Gather the core data for a docket, party, or IDB page."""
-    docket = await aget_object_or_404(Docket, pk=pk)
+    docket: Docket = await aget_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
 
     try:
@@ -60,7 +60,7 @@ async def core_docket_data(
     else:
         note_form = NoteForm(instance=note)
 
-    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[attr-defined]
+    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
 
     return (
         docket,

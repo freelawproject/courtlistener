@@ -1,5 +1,6 @@
 import importlib
 import pkgutil
+import re
 
 import juriscraper
 
@@ -16,6 +17,12 @@ def get_scraper_object_by_name(court_id: str, juriscraper_module: str = ""):
     :rtype: juriscraper.AbstractSite.Site
     """
     if juriscraper_module:
+        if re.search(r"\.del$", juriscraper_module):
+            # edge case where the module name is not the same as the court id
+            juriscraper_module = juriscraper_module.replace(
+                ".del", ".delaware"
+            )
+
         return importlib.import_module(juriscraper_module).Site()
 
     for _, full_module_path, _ in pkgutil.walk_packages(
