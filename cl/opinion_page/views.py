@@ -222,8 +222,8 @@ async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
             "Mississippi Supreme Court and Mississippi Court of Appeals."
         )
     # Validate the user has permission
-    user = await request.auser()  # type: ignore[attr-defined]
-    if not user.is_staff and not user.is_superuser:
+    user = await request.auser()
+    if not user.is_staff and not user.is_superuser:  # type: ignore[union-attr]
         if not await user.groups.filter(  # type: ignore
             name__in=[f"uploaders_{pk}"]
         ).aexists():
@@ -328,7 +328,7 @@ async def redirect_docket_recap(
     court: Court,
     pacer_case_id: str,
 ) -> HttpResponseRedirect:
-    docket = await aget_object_or_404(
+    docket: Docket = await aget_object_or_404(
         Docket, pacer_case_id=pacer_case_id, court=court
     )
     return HttpResponseRedirect(
@@ -745,7 +745,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     unbound form.
     """
     # Look up the court, cluster, title and note information
-    cluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
     title = ", ".join(
         [
             s
@@ -866,7 +866,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
 async def view_summaries(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
-    cluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
     parenthetical_groups = [
         parenthetical_group
@@ -899,7 +899,7 @@ async def view_summaries(
 async def view_authorities(
     request: HttpRequest, pk: int, slug: str, doc_type=0
 ) -> HttpResponse:
-    cluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
 
     return TemplateResponse(
         request,
@@ -918,7 +918,7 @@ async def view_authorities(
 async def cluster_visualizations(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
-    cluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
     return TemplateResponse(
         request,
         "opinion_visualizations.html",
@@ -1322,7 +1322,7 @@ async def citation_homepage(request: HttpRequest) -> HttpResponse:
 async def block_item(request: HttpRequest) -> HttpResponse:
     """Block an item from search results using AJAX"""
     user = await request.auser()  # type: ignore[attr-defined]
-    if is_ajax(request) and user.is_superuser:
+    if is_ajax(request) and user.is_superuser:  # type: ignore[union-attr]
         obj_type = request.POST["type"]
         pk = request.POST["id"]
 
@@ -1331,13 +1331,14 @@ async def block_item(request: HttpRequest) -> HttpResponse:
                 "This view can not handle the provided type"
             )
 
-        cluster = None
+        cluster: OpinionCluster | None = None
         if obj_type == "cluster":
             # Block the cluster
             cluster = await aget_object_or_404(OpinionCluster, pk=pk)
-            cluster.blocked = True
-            cluster.date_blocked = now()
-            await cluster.asave(index=False)
+            if cluster is not None:
+                cluster.blocked = True
+                cluster.date_blocked = now()
+                await cluster.asave(index=False)
 
         docket_pk = (
             pk
@@ -1347,7 +1348,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
         if not docket_pk:
             return HttpResponse("It worked")
 
-        d = await aget_object_or_404(Docket, pk=docket_pk)
+        d: Docket = await aget_object_or_404(Docket, pk=docket_pk)
         d.blocked = True
         d.date_blocked = now()
         await d.asave()
