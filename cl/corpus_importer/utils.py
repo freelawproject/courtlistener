@@ -612,11 +612,14 @@ def merge_overlapping_data(
     return data_to_update
 
 
-def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
+def add_citations_to_cluster(
+    cites: list[str], cluster_id: int, save_again_if_exists: bool = False
+) -> None:
     """Add string citations to OpinionCluster if it has not yet been added
 
     :param cites: citation list
     :param cluster_id: cluster id related to citations
+    :param save_again_if_exists: force save citation if it already exists
     :return: None
     """
     for cite in cites:
@@ -636,29 +639,46 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
             cite_type_str = citation[0].all_editions[0].reporter.cite_type
             reporter_type = map_reporter_db_cite_type(cite_type_str)
 
-        if Citation.objects.filter(
-            cluster_id=cluster_id, reporter=citation[0].corrected_reporter()
-        ).exists():
-            # Avoid adding a citation if we already have a citation from the
-            # citation's reporter
-            continue
-
-        try:
-            o, created = Citation.objects.get_or_create(
-                volume=citation[0].groups["volume"],
-                reporter=citation[0].corrected_reporter(),
-                page=citation[0].groups["page"],
-                type=reporter_type,
+        citation_params = {
+            "volume": citation[0].groups["volume"],
+            "reporter": citation[0].corrected_reporter(),
+            "page": citation[0].groups["page"],
+            "type": reporter_type,
+            "cluster_id": cluster_id,
+        }
+        citation_obj = Citation.objects.filter(**citation_params).first()
+        if citation_obj:
+            if save_again_if_exists:
+                # We already have the citation for the cluster and want to reindex it
+                citation_obj.save()
+                logger.info(
+                    f"Reindexing: {cite} added to cluster id: {cluster_id}"
+                )
+            else:
+                # Ignore and go to the next citation in the list
+                continue
+        else:
+            if Citation.objects.filter(
                 cluster_id=cluster_id,
-            )
-            if created:
+                reporter=citation[0].corrected_reporter(),
+            ).exists():
+                # Avoid adding a citation if we already have a citation from the
+                # citation's reporter.
+                logger.info(
+                    f"Can't add: {cite} to cluster id: {cluster_id}. There is already "
+                    f"a citation from that reporter."
+                )
+                continue
+            try:
+                # We don't have the citation or any citation from the reporter
+                Citation.objects.create(**citation_params)
                 logger.info(
                     f"New citation: {cite} added to cluster id: {cluster_id}"
                 )
-        except IntegrityError:
-            logger.warning(
-                f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
-            )
+            except IntegrityError:
+                logger.warning(
+                    f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
+                )
 
 
 def update_cluster_panel(
