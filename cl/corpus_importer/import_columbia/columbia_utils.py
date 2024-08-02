@@ -224,7 +224,6 @@ def extract_columbia_opinions(
     """
     opinions: list = []
     floating_content = []
-    order = 1  # The opinion count starts from 1
 
     # We iterate all content to look for all possible opinions
     for i, content in enumerate(outer_opinion):  # type: int, Tag
@@ -363,7 +362,6 @@ def process_extracted_opinions(extracted_opinions: list) -> list:
 
     opinions: list = []
     authorless_content = []
-    order = 1  # The opinion count starts from 1
 
     for i, found_content in enumerate(extracted_opinions, start=1):
         byline = found_content.get("byline")
