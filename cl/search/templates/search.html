@@ -237,8 +237,13 @@
                     {% endif %}
 
                     <h2 id="result-count" class="bottom">
+                        {% if  results_details.1 >= estimated_count_threshold or results_details.3 >= estimated_count_threshold %}About{% endif %}
                         {% if type == SEARCH_TYPES.OPINION %}
+                          {% flag "o-es-active" %}
+                            {{ results_details.1|intcomma }} Opinion{{ results_details.1|pluralize }}
+                          {% else %}
                             {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
+                          {% endflag %}
                           {% if cited_cluster %}
                             <span class="gray alt">cite{{ results.paginator.count|pluralize:"s," }}</span> {{ cited_cluster.caption|safe|v_wrapper }}
                           {% endif %}
@@ -252,7 +257,7 @@
                             {% with matches=results_details.3 count=results_details.1 %}
                               {{ count|intcomma }} Case{{ count|pluralize }}
                               {% if matches %}
-                                <span class="gray">&mdash;</span>
+                                <span class="gray">and</span>
                                 {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
                               {% endif %}
                             {% endwith %}
