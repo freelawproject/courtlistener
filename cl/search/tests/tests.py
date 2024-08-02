@@ -321,19 +321,17 @@ class ModelTest(TestCase):
         # Create three opinions
         op_1 = OpinionFactory(
             cluster=cluster,
-            type="Concurrence Opinion",
+            type=Opinion.LEAD,
             ordering_key=1,
         )
-
         op_2 = OpinionFactory(
             cluster=cluster,
-            type="Dissent",
+            type=Opinion.CONCURRENCE,
             ordering_key=2,
         )
-
         op_3 = OpinionFactory(
             cluster=cluster,
-            type="Lead Opinion",
+            type=Opinion.DISSENT,
             ordering_key=3,
         )
 
@@ -343,24 +341,38 @@ class ModelTest(TestCase):
         self.assertEqual(op_2.ordering_key, 2)
         self.assertEqual(op_3.ordering_key, 3)
 
+        # Can we swap orders?
+        op_1.ordering_key = None
+        op_1.save()
+
+        op_2.ordering_key = 1
+        op_2.save()
+
+        op_1.ordering_key = 2
+        op_1.save()
+
         # Can we update an opinion using an existing position?
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
                 op_3.ordering_key = 2
                 op_3.save()
 
-        # Can we create an opinion using an existing position?
+        # Validate unique cluster/order
         with transaction.atomic():
             with self.assertRaises(IntegrityError):
-                op_4 = OpinionFactory(
-                    cluster=cluster, type="Lead Opinion", ordering_key=1
+                op = OpinionFactory(
+                    cluster=cluster,
+                    type=Opinion.ADDENDUM,
                 )
+                op.ordering_key = 3
+                op.save()
 
-        # Can we use negative positions?
-        op_4 = OpinionFactory(
-            cluster=cluster, type="Lead Opinion", ordering_key=-1
-        )
-        self.assertEqual(op_4.ordering_key, -1)
+        # Can we use avoid negative positions?
+        with transaction.atomic():
+            with self.assertRaises(ValidationError):
+                op = OpinionFactory(cluster=cluster, type=Opinion.LEAD)
+                op.ordering_key = -1
+                op.save()
 
         # Can we order the opinions from a cluster using the field?
         qs = (
@@ -368,7 +380,7 @@ class ModelTest(TestCase):
             .order_by("ordering_key")
             .values_list("ordering_key", flat=True)
         )
-        self.assertEqual(list(qs), [-1, 1, 2, 3])
+        self.assertEqual(list(qs), [1, 2, 3, None])
 
         # Order default value is null
         op_5 = OpinionFactory(cluster=cluster, type="Lead Opinion")
