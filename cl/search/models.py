@@ -3347,6 +3347,11 @@ class Opinion(AbstractDateTimeModel):
     def clean(self) -> None:
         if self.type == "":
             raise ValidationError("'type' is a required field.")
+        if self.ordering_key is not None and self.ordering_key != "":
+            if self.ordering_key < 1:
+                raise ValidationError(
+                    {"ordering_key": "Ordering key cannot be zero or negative"}
+                )
 
     def save(
         self,
@@ -3355,6 +3360,7 @@ class Opinion(AbstractDateTimeModel):
         *args: List,
         **kwargs: Dict,
     ) -> None:
+        self.clean()
         super().save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
