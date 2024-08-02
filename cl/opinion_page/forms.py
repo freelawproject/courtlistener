@@ -651,13 +651,13 @@ class TennWorkCompAppUploadForm(BaseCourtUploadForm):
     """Form for Tennessee Workers' Compensation Appeals Board (tennworkcompapp)
     Upload Portal"""
 
-    second_judge = forms.ModelChoiceField(
+    second_judge: forms.ModelChoiceField = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
         label="Second Panelist",
         widget=forms.Select(attrs={"class": "form-control"}),
     )
-    third_judge = forms.ModelChoiceField(
+    third_judge: forms.ModelChoiceField = forms.ModelChoiceField(
         queryset=Person.objects.none(),
         required=False,
         label="Third Panelist",

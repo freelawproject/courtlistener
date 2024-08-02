@@ -274,7 +274,7 @@ async def new_docket_alert(request: AuthenticatedHttpRequest) -> HttpResponse:
         ).aearliest("date_created")
 
     title = f"New Docket Alert for {make_docket_title(docket)}"
-    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[attr-defined]
+    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
     return TemplateResponse(
         request,
         "docket_alert_new.html",

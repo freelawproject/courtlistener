@@ -1663,7 +1663,7 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
 
 
 def fill_position_mapping(
-    positions: QuerySet[Position],
+    positions: QuerySet[Position, Position],
     request_type: Literal["frontend", "v3", "v4"] = "frontend",
 ) -> BasePositionMapping | ApiPositionMapping:
     """Extract all the data from the position queryset and
