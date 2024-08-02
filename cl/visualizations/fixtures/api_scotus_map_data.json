@@ -122,7 +122,7 @@
       "html_lawbox": "",
       "per_curiam": false,
       "type": "020lead",
-      "ordering_key": 1
+      "ordering_key": null
     },
     "model": "search.opinion",
     "pk": 1
@@ -145,7 +145,7 @@
       "html_lawbox": "",
       "per_curiam": false,
       "type": "010combined",
-      "ordering_key": 1
+      "ordering_key": null
     },
     "model": "search.opinion",
     "pk": 2

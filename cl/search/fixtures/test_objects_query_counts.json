@@ -301,7 +301,7 @@
          "html_lawbox":"",
          "per_curiam":false,
          "type":"020lead",
-         "ordering_key": 1
+         "ordering_key": null
       },
       "model":"search.opinion",
       "pk":1
@@ -326,7 +326,7 @@
          "html_lawbox":"",
          "per_curiam":false,
          "type":"010combined",
-         "ordering_key": 1
+         "ordering_key": null
       },
       "model":"search.opinion",
       "pk":2
@@ -351,7 +351,7 @@
          "html_lawbox":"",
          "per_curiam":false,
          "type":"010combined",
-         "ordering_key": 1
+         "ordering_key": null
       },
       "model":"search.opinion",
       "pk":3
@@ -375,7 +375,7 @@
          "html_lawbox":"",
          "per_curiam":false,
          "type":"010combined",
-         "ordering_key": 2
+         "ordering_key": null
       },
       "model":"search.opinion",
       "pk":4
@@ -400,7 +400,7 @@
          "html_lawbox":"",
          "per_curiam":false,
          "type":"010combined",
-         "ordering_key": 3
+         "ordering_key": null
       },
       "model":"search.opinion",
       "pk":5
@@ -424,7 +424,7 @@
          "html_lawbox":"",
          "per_curiam":false,
          "type":"010combined",
-         "ordering_key": 4
+         "ordering_key": null
       },
       "model":"search.opinion",
       "pk":6
