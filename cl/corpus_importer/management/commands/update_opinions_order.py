@@ -5,7 +5,7 @@ from django.db import transaction
 from django.db.models import Count
 
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.search.models import Opinion, OpinionCluster
+from cl.search.models import SOURCES, Opinion, OpinionCluster
 
 
 def sort_harvard_opinions(options) -> None:
@@ -24,12 +24,14 @@ def sort_harvard_opinions(options) -> None:
     limit = options.get("limit", None)
 
     # The filepath_json_harvard field can only be filled by the harvard importer,
-    # this helps us confirm that it was imported from a Harvard json
+    # this helps us confirm that it was imported from a Harvard json. We exclude
+    # clusters merged with columbia because those may need some extra verification
     harvard_clusters = (
         OpinionCluster.objects.exclude(filepath_json_harvard="")
         .prefetch_related("sub_opinions")
         .annotate(opinions_count=Count("sub_opinions"))
         .filter(opinions_count__gt=1)
+        .exclude(source__contains=SOURCES.COLUMBIA_ARCHIVE)
         .order_by("id")
     )
     if skip_until:
