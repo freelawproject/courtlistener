@@ -2624,6 +2624,13 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    filepath_pdf_harvard = models.FileField(
+        help_text="The case PDF from the Caselaw Access Project for this cluster",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+        null=True,
+    )
     arguments = models.TextField(
         help_text="The attorney(s) and legal arguments presented as HTML text. "
         "This is primarily seen in older opinions and can contain "
