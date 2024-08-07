@@ -2561,6 +2561,40 @@ class RecapDocketTaskTest(TestCase):
                 )
         d.delete()
 
+    def test_merge_docket_number_components(
+        self,
+    ) -> None:
+        """Confirm docket_number components are properly merged into the
+        docket instance.
+        """
+
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+        )
+
+        docket_data = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00070-TKW-MAL-1",
+            federal_dn_office_code="3",
+            federal_dn_case_type="cr",
+            federal_dn_judge_initials_assigned="TKW",
+            federal_dn_judge_initials_referred="MAL",
+            federal_defendant_number="1",
+        )
+        async_to_sync(update_docket_metadata)(d, docket_data)
+        d.save()
+        d.refresh_from_db()
+
+        self.assertEqual(d.federal_dn_office_code, "3")
+        self.assertEqual(d.federal_dn_case_type, "cr")
+        self.assertEqual(d.federal_dn_judge_initials_assigned, "TKW")
+        self.assertEqual(d.federal_dn_judge_initials_referred, "MAL")
+        self.assertEqual(d.federal_defendant_number, 1)
+
+        d.delete()
+
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")
 class RecapDocketAttachmentTaskTest(TestCase):
