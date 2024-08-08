@@ -633,7 +633,7 @@ class ScraperContentTypeTest(TestCase):
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = ["text/html"]
 
-        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        msg, _ = get_binary_content("/dummy/url/", self.site)
         self.assertIn("UnexpectedContentTypeError:", msg)
 
     @mock.patch("requests.Session.get")
@@ -642,14 +642,14 @@ class ScraperContentTypeTest(TestCase):
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = ["application/pdf"]
 
-        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        msg, _ = get_binary_content("/dummy/url/", self.site)
         self.assertEqual("", msg)
 
         self.mock_response.headers = {
             "Content-Type": "application/pdf;charset=utf-8"
         }
         mock_get.return_value = self.mock_response
-        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        msg, _ = get_binary_content("/dummy/url/", self.site)
         self.assertEqual("", msg)
 
     @mock.patch("requests.Session.get")
@@ -658,5 +658,5 @@ class ScraperContentTypeTest(TestCase):
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = None
 
-        msg, _ = get_binary_content("/dummy/url/", self.site, headers={})
+        msg, _ = get_binary_content("/dummy/url/", self.site)
         self.assertEqual("", msg)
