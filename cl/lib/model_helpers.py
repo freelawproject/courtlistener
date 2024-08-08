@@ -207,12 +207,14 @@ def make_upload_path(instance, filename):
         d = instance.file_with_date
     except AttributeError:
         from cl.audio.models import Audio
-        from cl.search.models import Opinion
+        from cl.search.models import Opinion, OpinionCluster
 
         if type(instance) == Audio:
             d = instance.docket.date_argued
         elif type(instance) == Opinion:
             d = instance.cluster.date_filed
+        elif type(instance) == OpinionCluster:
+            d = instance.date_filed
 
     return "%s/%s/%02d/%02d/%s" % (
         filename.split(".")[-1],
