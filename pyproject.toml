@@ -34,7 +34,7 @@ celery = "^5.3.6"
 certifi = "^2024.7.4"
 courts-db = "*"
 disposable-email-domains = "*"
-Django = "^5.0.7"
+Django = "^5.0.8"
 django-cache-memoize = "==0.*"
 django-cors-headers = "^4.4.0"
 django-csp = "^3.8"
@@ -116,6 +116,7 @@ openai = "^1.31.1"
 seal-rookery = "^2.2.3"
 types-pytz = "^2024.1.0.20240417"
 juriscraper = "^2.6.15"
+
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.7.0"

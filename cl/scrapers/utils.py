@@ -155,7 +155,6 @@ def get_extension(content: bytes) -> str:
 def get_binary_content(
     download_url: str,
     site: AbstractSite,
-    headers: dict,
     method: str = "GET",
 ) -> Tuple[str, Optional[Response]]:
     """Downloads the file, covering a few special cases such as invalid SSL
@@ -163,7 +162,6 @@ def get_binary_content(
 
     :param download_url: The URL for the item you wish to download.
     :param site: Site object used to download data
-    :param headers: Headers that might be necessary to download the item.
     :param method: The HTTP method used to get the item, or "LOCAL" to get an
     item during testing
     :return: Two values. The first is a msg indicating any errors encountered.
@@ -187,6 +185,11 @@ def get_binary_content(
         # custom ssl_context and `verify = False`
         has_cipher = hasattr(site, "cipher")
         s = site.request["session"] if has_cipher else requests.session()
+
+        if site.needs_special_headers:
+            headers = site.request["headers"]
+        else:
+            headers = {"User-Agent": "CourtListener"}
 
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
