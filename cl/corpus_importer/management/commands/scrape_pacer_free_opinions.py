@@ -327,6 +327,7 @@ def ocr_available(queue: str, index: bool) -> None:
         .order_by()
     )
     count = rds.count()
+    logger.info(f"Total documents requiring OCR: {count}")
     throttle = CeleryThrottle(queue_name=q)
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
