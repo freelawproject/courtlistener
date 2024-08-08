@@ -3376,6 +3376,15 @@ class Opinion(AbstractDateTimeModel):
             "sha1",
         ]
     )
+    ordering_key = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cluster_id", "ordering_key"],
+                name="unique_opinion_ordering_key",
+            )
+        ]
 
     @property
     def siblings(self) -> QuerySet:
@@ -3394,6 +3403,10 @@ class Opinion(AbstractDateTimeModel):
     def clean(self) -> None:
         if self.type == "":
             raise ValidationError("'type' is a required field.")
+        if isinstance(self.ordering_key, int) and self.ordering_key < 1:
+            raise ValidationError(
+                {"ordering_key": "Ordering key cannot be zero or negative"}
+            )
 
     def save(
         self,
@@ -3402,6 +3415,7 @@ class Opinion(AbstractDateTimeModel):
         *args: List,
         **kwargs: Dict,
     ) -> None:
+        self.clean()
         super().save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr

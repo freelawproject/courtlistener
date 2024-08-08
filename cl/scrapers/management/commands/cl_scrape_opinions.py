@@ -277,16 +277,9 @@ class Command(VerboseCommand):
         logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
-            # Minn and Mass currently require browser specific user agents
-            if court_str in ["minn", "minnctapp", "mass", "massappct"]:
-                headers = site.headers
-            else:
-                headers = {"User-Agent": "CourtListener"}
-
             msg, r = get_binary_content(
                 item["download_urls"],
                 site,
-                headers,
                 method=site.method,
             )
             if msg:
