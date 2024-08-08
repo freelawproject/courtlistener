@@ -28,10 +28,10 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_recap_path,
     make_upload_path,
-    linkify_orig_docket_number,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
 from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
@@ -330,7 +330,9 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
 
     @property
     def administrative_link(self):
-        return linkify_orig_docket_number(self.docket.appeal_from_str, self.docket_number)
+        return linkify_orig_docket_number(
+            self.docket.appeal_from_str, self.docket_number
+        )
 
     def get_absolute_url(self) -> str:
         return self.docket.get_absolute_url()

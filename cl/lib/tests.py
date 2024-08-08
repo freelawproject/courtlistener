@@ -16,9 +16,9 @@ from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
     is_docket_number,
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_upload_path,
-    linkify_orig_docket_number,
 )
 from cl.lib.pacer import (
     get_blocked_status,
@@ -1258,67 +1258,63 @@ class TestRedisUtils(SimpleTestCase):
         result = release_redis_lock(r, lock_key, identifier)
         self.assertEqual(result, 1)
 
+
 class TestLinkifyOrigDocketNumber(SimpleTestCase):
     def test_linkify_orig_docket_number(self):
         test_pairs = [
             (
                 "National Labor Relations Board",
                 "19-CA-289275",
-                "https://www.nlrb.gov/case/19-CA-289275"
+                "https://www.nlrb.gov/case/19-CA-289275",
             ),
             (
                 "National Labor Relations Board",
                 "NLRB-09CA110508",
-                "https://www.nlrb.gov/case/09-CA-110508"
+                "https://www.nlrb.gov/case/09-CA-110508",
             ),
             (
                 "EPA",
                 "85 FR 20688",
-                "https://www.federalregister.gov/citation/85-FR-20688"
+                "https://www.federalregister.gov/citation/85-FR-20688",
             ),
             (
                 "Other Agency",
                 "85 Fed. Reg. 12345",
-                "https://www.federalregister.gov/citation/85-FR-12345"
+                "https://www.federalregister.gov/citation/85-FR-12345",
             ),
             (
                 "National Labor Relations Board",
                 "85 Fed. Reg. 12345",
-                "https://www.federalregister.gov/citation/85-FR-12345"
+                "https://www.federalregister.gov/citation/85-FR-12345",
             ),
             (
                 "Bureau of Land Managemnet",
                 "88FR20688",
-                "https://www.federalregister.gov/citation/88-FR-20688"
+                "https://www.federalregister.gov/citation/88-FR-20688",
             ),
             (
                 "Bureau of Land Managemnet",
                 "88 Fed Reg 34523",
-                "https://www.federalregister.gov/citation/88-FR-34523"
+                "https://www.federalregister.gov/citation/88-FR-34523",
             ),
-            (
-                "Federal Communications Commission",
-                "19-CA-289275",
-                None
-            ),
+            ("Federal Communications Commission", "19-CA-289275", None),
             (
                 "National Labor Relations Board",
                 "This is not an NLRB case",
-                None
+                None,
             ),
-            (
-                "Other Agency",
-                "This is not a Federal Register citation",
-                None
-            ),
+            ("Other Agency", "This is not a Federal Register citation", None),
         ]
 
-        for i, (agency, docket_number, expected_output) in enumerate(test_pairs):
-            with self.subTest( 
-            f"Testing description text cleaning for {agency, docket_number}...", i=i 
-        ): 
-                self.assertEqual( 
-                    linkify_orig_docket_number(agency, docket_number), 
-                    expected_output, 
-                    f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}", 
+        for i, (agency, docket_number, expected_output) in enumerate(
+            test_pairs
+        ):
+            with self.subTest(
+                f"Testing description text cleaning for {agency, docket_number}...",
+                i=i,
+            ):
+                self.assertEqual(
+                    linkify_orig_docket_number(agency, docket_number),
+                    expected_output,
+                    f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}",
                 )
