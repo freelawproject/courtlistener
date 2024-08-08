@@ -1297,13 +1297,13 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 "88 Fed Reg 34523",
                 "https://www.federalregister.gov/citation/88-FR-34523",
             ),
-            ("Federal Communications Commission", "19-CA-289275", None),
+            ("Federal Communications Commission", "19-CA-289275", ""),
             (
                 "National Labor Relations Board",
                 "This is not an NLRB case",
-                None,
+                "",
             ),
-            ("Other Agency", "This is not a Federal Register citation", None),
+            ("Other Agency", "This is not a Federal Register citation", ""),
         ]
 
         for i, (agency, docket_number, expected_output) in enumerate(
