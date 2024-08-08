@@ -487,3 +487,29 @@ def suppress_autotime(model, fields):
                 field.auto_now_add = _original_values[field.name][
                     "auto_now_add"
                 ]
+
+def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
+    """Make an originating docket number for an appellate case into a link (MVP version)
+
+    :param agency: The administrative agency the case originated from
+    :param og_docket_number: The docket number where the case was originally heard.
+    :returns: A linkified version of the docket number for the user to click on, or the original if no link can be made.
+    """
+    # Simple pattern for Federal Register citations
+    fr_match = re.search(r'(\d{1,3})\s*(?:FR|Fed\.?\s*Reg\.?)\s*(\d{1,5})', og_docket_number)
+    if fr_match:
+        volume, page = fr_match.groups()
+        return f"https://www.federalregister.gov/citation/{volume}-FR-{page}"
+    
+    # NLRB pattern
+    if agency == 'National Labor Relations Board':
+        match = re.match(r'^(?:NLRB-)?(\d{1,2})-?([A-Z]{2})-?(\d{1,6})$', og_docket_number)
+        if match:
+            region, case_type, number = match.groups()
+            formatted_number = f"{region.zfill(2)}-{case_type}-{number.zfill(6)}"
+            return f"https://www.nlrb.gov/case/{formatted_number}"
+    
+    """Add other agencies as feasible. Note that the Federal Register link should cover multiple agencies.
+    """
+    # If no match is found, return None
+    return None
