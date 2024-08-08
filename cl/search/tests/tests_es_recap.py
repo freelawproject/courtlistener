@@ -146,7 +146,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         col_md_offset_half_elem = col_md_offset_half_elements[child_index]
         inline_element = col_md_offset_half_elem.xpath(
-            ".//div[contains(@class, 'inline-block')]"
+            ".//div[contains(@class, 'date-block')]"
         )[0]
         date = inline_element.xpath(".//time[@class='meta-data-value']")
         meta_data_value = date[0].text.strip()
