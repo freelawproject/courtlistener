@@ -518,5 +518,5 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
     """Add other agencies as feasible. Note that the Federal Register link should cover multiple agencies.
     """
-    # If no match is found, return None
-    return None
+    # If no match is found, return empty str
+    return ""
