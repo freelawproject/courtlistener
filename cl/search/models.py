@@ -2629,7 +2629,6 @@ class OpinionCluster(AbstractDateTimeModel):
         upload_to=make_upload_path,
         storage=IncrementingAWSMediaStorage(),
         blank=True,
-        null=True,
     )
     arguments = models.TextField(
         help_text="The attorney(s) and legal arguments presented as HTML text. "

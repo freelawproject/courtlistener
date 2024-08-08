@@ -90,8 +90,8 @@ opinioncluster_fields='(
        scdb_votes_minority, source, procedural_history, attorneys,
        nature_of_suit, posture, syllabus, headnotes, summary, disposition,
        history, other_dates, cross_reference, correction, citation_count,
-       precedential_status, date_blocked, blocked, filepath_json_harvard, filepath_pdf_harvard, docket_id,
-       arguments, headmatter
+       precedential_status, date_blocked, blocked, filepath_json_harvard,
+			 filepath_pdf_harvard, docket_id, arguments, headmatter
    )'
 opinioncluster_csv_filename="opinion-clusters-$(date -I).csv"
 
