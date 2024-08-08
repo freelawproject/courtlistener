@@ -9,7 +9,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("search", "0032_update_docket_numbering_fields"),
+        ("search", "0033_order_opinions"),
     ]
 
     operations = [
