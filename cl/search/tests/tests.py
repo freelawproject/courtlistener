@@ -300,6 +300,92 @@ class ModelTest(TestCase):
         )
         self.assertEqual(cluster_count, expected_count)
 
+    def test_opinions_order(self) -> None:
+        """Test opinions order"""
+
+        # Create court
+        court = CourtFactory(id="nyappdiv")
+
+        # Create cluster
+        cluster = OpinionClusterFactory(
+            case_name="Foo v. Bar",
+            case_name_short="Foo v. Bar",
+            docket=DocketFactory(
+                court=court,
+            ),
+            date_filed=date(1978, 3, 10),
+            source="U",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+
+        # Create three opinions
+        op_1 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.LEAD,
+            ordering_key=1,
+        )
+        op_2 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.CONCURRENCE,
+            ordering_key=2,
+        )
+        op_3 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.DISSENT,
+            ordering_key=3,
+        )
+
+        # Test that the value of the order field matches the order in which
+        # they were created
+        self.assertEqual(op_1.ordering_key, 1)
+        self.assertEqual(op_2.ordering_key, 2)
+        self.assertEqual(op_3.ordering_key, 3)
+
+        # Can we swap orders?
+        op_1.ordering_key = None
+        op_1.save()
+
+        op_2.ordering_key = 1
+        op_2.save()
+
+        op_1.ordering_key = 2
+        op_1.save()
+
+        # Can we update an opinion using an existing position?
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                op_3.ordering_key = 2
+                op_3.save()
+
+        # Validate unique cluster/order
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                op = OpinionFactory(
+                    cluster=cluster,
+                    type=Opinion.ADDENDUM,
+                )
+                op.ordering_key = 3
+                op.save()
+
+        # Can we use avoid negative positions?
+        with transaction.atomic():
+            with self.assertRaises(ValidationError):
+                op = OpinionFactory(cluster=cluster, type=Opinion.LEAD)
+                op.ordering_key = -1
+                op.save()
+
+        # Can we order the opinions from a cluster using the field?
+        qs = (
+            cluster.sub_opinions.all()
+            .order_by("ordering_key")
+            .values_list("ordering_key", flat=True)
+        )
+        self.assertEqual(list(qs), [1, 2, 3, None])
+
+        # Order default value is null
+        op_5 = OpinionFactory(cluster=cluster, type="Lead Opinion")
+        self.assertEqual(op_5.ordering_key, None)
+
 
 class DocketValidationTest(TestCase):
     @classmethod

@@ -327,6 +327,7 @@ def ocr_available(queue: str, index: bool) -> None:
         .order_by()
     )
     count = rds.count()
+    logger.info(f"Total documents requiring OCR: {count}")
     throttle = CeleryThrottle(queue_name=q)
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
@@ -360,7 +361,7 @@ def do_everything(courts, date_start, date_end, index, queue):
     logger.info("Getting PDFs from free document reports")
     get_pdfs(courts, date_start, date_end, index, queue)
     logger.info("Doing OCR and saving items to Solr.")
-    ocr_available(index, queue)
+    ocr_available(queue, index)
 
 
 class Command(VerboseCommand):
