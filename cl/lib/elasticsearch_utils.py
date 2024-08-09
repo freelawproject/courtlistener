@@ -1934,11 +1934,11 @@ def fetch_es_results(
     es_from = (page - 1) * rows_per_page
     error = True
     try:
-        main_query = search_query.extra(from_=es_from, size=rows_per_page)
+        # Set track_total_hits False to avoid retrieving the hit count in the main query.
+        main_query = search_query.extra(
+            from_=es_from, size=rows_per_page, track_total_hits=False
+        )
         main_doc_count_query = clean_count_query(search_query)
-        # Set size to 0 to avoid retrieving documents in the count queries for
-        # better performance. Set track_total_hits to True to consider all the
-        # documents.
 
         search_type = get_params.get("type", SEARCH_TYPES.OPINION)
         parent_unique_field = cardinality_query_unique_ids[search_type]
