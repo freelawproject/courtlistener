@@ -18,7 +18,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -27,7 +27,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -101,7 +101,7 @@
 
 
   <h2 id="apis">The APIs</h2>
-  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version="v3" %}</code></small></h3>
+  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version=version %}</code></small></h3>
   {% include "includes/docket-endpoint.html" %}
   <p>The name of a docket can change in response to the outside world, but the names of clusters do not change. Therefore, we have <code>case_name</code> fields on both the docket and the cluster.
   </p>
@@ -110,7 +110,7 @@
   <p>For more information on case names, see the <a href="{% url "field_api_help" %}#case-names">help article on this topic</a>.</p>
 
 
-  <h3 id="cluster-endpoint">Clusters <small> — <code>{% url "opinioncluster-list" version="v3" %}</code></small></h3>
+  <h3 id="cluster-endpoint">Clusters <small> — <code>{% url "opinioncluster-list" version=version %}</code></small></h3>
   <p>This is a major API that provides the millions of <code>Opinion Clusters</code> that are available on CourtListener.
   </p>
   <p>As with all other APIs, you can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:
@@ -118,7 +118,7 @@
   <pre class="pre-scrollable">curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}"</pre>
+  "{% get_full_host %}{% url "opinioncluster-list" version=version %}"</pre>
   <p>A few notes:</p>
   <ul>
     <li>
@@ -136,7 +136,7 @@
   </ul>
 
 
-  <h3 id="opinion-endpoint">Opinions <small> — <code>{% url "opinion-list" version="v3" %}</code></small></h3>
+  <h3 id="opinion-endpoint">Opinions <small> — <code>{% url "opinion-list" version=version %}</code></small></h3>
   <p>This API contains the text and other metadata about specific decisions.
   </p>
   <p>As with all other APIs, you can look up the field descriptions, filtering, ordering, and rendering options by making an <code>OPTIONS</code> request:
@@ -144,7 +144,7 @@
   <pre class="pre-scrollable">curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinion-list" version="v3" %}"</pre>
+  "{% get_full_host %}{% url "opinion-list" version=version %}"</pre>
   <p>A few notes:</p>
   <ul>
     <li>
@@ -195,7 +195,7 @@
   </ul>
 
 
-  <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version="v3" %}</code></small></h3>
+  <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version=version %}</code></small></h3>
   {% include "includes/court-endpoint.html" %}
 
 
@@ -205,15 +205,15 @@
   </p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinion-list" version="v3" %}?cluster__docket__court=scotus"</pre>
+  "{% get_full_host %}{% url "opinion-list" version=version %}?cluster__docket__court=scotus"</pre>
   <p>That returns:</p>
   <pre class="pre-scrollable">{
   "count": 521329,
-  "next": "https://www.courtlistener.com/api/rest/v3/opinions/?cluster__docket__court=scotus&page=2",
+  "next": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/?cluster__docket__court=scotus&page=2",
   "previous": null,
   "results": [
       {
-          "resource_uri": "https://www.courtlistener.com/api/rest/v3/opinions/9973155/",
+          "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/9973155/",
           "id": 9973155,
   ...</pre>
   <p>Such an approach is fine if all you want is the opinion object, but often you'll want the docket and the cluster too.
@@ -223,25 +223,25 @@
   <p>For example, this gets the dockets from SCOTUS:</p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version="v3" %}?court=scotus"</pre>
+  "{% get_full_host %}{% url "docket-list" version=version %}?court=scotus"</pre>
   <p>The first result contains a <code>clusters</code> key like:</p>
   <pre class="pre-scrollable">"clusters": [
-    "{% get_full_host %}{% url "opinioncluster-detail" version="v3" pk="9502621" %}"
+    "{% get_full_host %}{% url "opinioncluster-detail" version=version pk="9502621" %}"
 ],</pre>
   <p>So we can simply get that URL:</p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinioncluster-detail" version="v3" pk="9502621" %}"</pre>
+  "{% get_full_host %}{% url "opinioncluster-detail" version=version pk="9502621" %}"</pre>
   <p>That returns a cluster, which has the following keys:</p>
-  <pre class="pre-scrollable">"docket": "{% get_full_host %}{% url "docket-detail" version="v3" pk="68533094" %}",
+  <pre class="pre-scrollable">"docket": "{% get_full_host %}{% url "docket-detail" version=version pk="68533094" %}",
 "sub_opinions": [
-    "{% get_full_host %}{% url "opinion-detail" version="v3" pk="9969234" %}"
+    "{% get_full_host %}{% url "opinion-detail" version=version pk="9969234" %}"
 ],</pre>
   <p>Finally, GET the links in the <code>sub_opinions</code> field to have the complete object:
   </p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinion-detail" version="v3" pk="9969234" %}"</pre>
+  "{% get_full_host %}{% url "opinion-detail" version=version pk="9969234" %}"</pre>
 
 
   <h3 id="filtering-dn">Filtering by Docket Number</h3>
@@ -250,15 +250,15 @@
   <p>A docket by docket number:</p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version="v3" %}?docket_number=23A994"</pre>
+  "{% get_full_host %}{% url "docket-list" version=version %}?docket_number=23A994"</pre>
   <p>A cluster by docket number:</p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}?docket__docket_number=23A994"</pre>
+  "{% get_full_host %}{% url "opinioncluster-list" version=version %}?docket__docket_number=23A994"</pre>
   <p>An opinion by docket number:</p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinion-list" version="v3" %}?cluster__docket__docket_number=23A994"</pre>
+  "{% get_full_host %}{% url "opinion-list" version=version %}?cluster__docket__docket_number=23A994"</pre>
   <p>Docket numbers are not unique, so you'll want to add a court filter too:
   </p>
   <ul>
@@ -281,7 +281,7 @@
   <p>This case can be found in the cluster API using that same ID:</p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "opinioncluster-detail" version="v3" pk="2812209" %}"</pre>
+  "{% get_full_host %}{% url "opinioncluster-detail" version=version pk="2812209" %}"</pre>
   <p>Opinion IDs do not reliably match cluster IDs.</p>
 
 

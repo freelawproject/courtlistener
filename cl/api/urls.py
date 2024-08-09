@@ -194,98 +194,98 @@ urlpatterns = [
     path("help/api/", views.api_index, name="api_index"),
     path("help/api/jurisdictions/", views.court_index, name="court_index"),
     re_path(
-        r"^help/api/rest/(?P<version>v[123])?/?$",
+        r"^help/api/rest/(?P<version>v[1234])?/?$",
         views.rest_docs,
         name="rest_docs",
     ),
-    path(
-        "help/api/rest/v3/citation-lookup/",
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?citation-lookup/$",
         views.citation_lookup_api,
         name="citation_lookup_api",
     ),
-    path(
-        "help/api/rest/v3/case-law/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?case-law/$",
+        views.VersionedTemplateView.as_view(
             template_name="case-law-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="case_law_api_help",
     ),
-    path(
-        "help/api/rest/v3/citations/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?citations/$",
+        views.VersionedTemplateView.as_view(
             template_name="citation-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="citation_api_help",
     ),
-    path(
-        "help/api/rest/v3/pacer/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?pacer/$",
+        views.VersionedTemplateView.as_view(
             template_name="pacer-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="pacer_api_help",
     ),
-    path(
-        "help/api/rest/v3/recap/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?recap/$",
+        views.VersionedTemplateView.as_view(
             template_name="recap-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="recap_api_help",
     ),
-    path(
-        "help/api/rest/v3/judges/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?judges/$",
+        views.VersionedTemplateView.as_view(
             template_name="judge-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="judge_api_help",
     ),
-    path(
-        "help/api/rest/v3/oral-arguments/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?oral-arguments/$",
+        views.VersionedTemplateView.as_view(
             template_name="oral-argument-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="oral_argument_api_help",
     ),
-    path(
-        "help/api/rest/v3/visualizations/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?visualizations/$",
+        views.VersionedTemplateView.as_view(
             template_name="visualizations-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="visualization_api_help",
     ),
-    path(
-        "help/api/rest/v3/financial-disclosures/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?financial-disclosures/$",
+        views.VersionedTemplateView.as_view(
             template_name="financial-disclosure-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="financial_disclosures_api_help",
     ),
-    path(
-        "help/api/rest/v3/search/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?search/$",
+        views.VersionedTemplateView.as_view(
             template_name="search-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="search_api_help",
     ),
-    path(
-        "help/api/rest/v3/alerts/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?alerts/$",
+        views.VersionedTemplateView.as_view(
             template_name="alert-api-docs-vlatest.html",
             extra_context={"private": False},
         ),
         name="alert_api_help",
     ),
-    path(
-        "help/api/rest/v3/fields/",
-        TemplateView.as_view(
+    re_path(
+        r"^help/api/rest/(?:(?P<version>v[34])/)?fields/$",
+        views.VersionedTemplateView.as_view(
             template_name="field-help.html",
             extra_context={"private": True},
         ),

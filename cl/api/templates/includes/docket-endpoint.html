@@ -8,23 +8,23 @@
 <pre class="pre-scrollable">curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version="v3" %}"</pre>
+  "{% get_full_host %}{% url "docket-list" version=version %}"</pre>
 <p>To look up a particular docket, use its ID:</p>
 <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-detail" version="v3" pk="4214664" %}"</pre>
+  "{% get_full_host %}{% url "docket-detail" version=version pk="4214664" %}"</pre>
 <p>The response you get will not list the docket entries, parties, or attorneys for the docket (doing so doesn't scale), but will have many other metadata fields:
 </p>
 <pre class="pre-scrollable tall">{
-  "resource_uri": "https://www.courtlistener.com/api/rest/v3/dockets/4214664/",
+  "resource_uri": "https://www.courtlistener.com/api/rest/{{ version }}/dockets/4214664/",
   "id": 4214664,
-  "court": "https://www.courtlistener.com/api/rest/v3/courts/dcd/",
+  "court": "https://www.courtlistener.com/api/rest/{{ version }}/courts/dcd/",
   "court_id": "dcd",
   "original_court_info": null,
   "idb_data": null,
   "clusters": [],
   "audio_files": [],
-  "assigned_to": "https://www.courtlistener.com/api/rest/v3/people/1124/",
+  "assigned_to": "https://www.courtlistener.com/api/rest/{{ version }}/people/1124/",
   "referred_to": null,
   "absolute_url": "/docket/4214664/national-veterans-legal-services-program-v-united-states/",
   "date_created": "2016-08-20T07:25:37.448945-07:00",
@@ -66,7 +66,7 @@
   "blocked": false,
   "appeal_from": null,
   "tags": [
-    "https://www.courtlistener.com/api/rest/v3/tag/1316/"
+    "https://www.courtlistener.com/api/rest/{{ version }}/tag/1316/"
   ],
   "panel": []
 }</pre>

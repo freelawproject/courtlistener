@@ -2,7 +2,7 @@
 {% load static %}
 {% load extras %}
 
-{% block title %}REST API, v4 &ndash; CourtListener.com{% endblock %}
+{% block title %}REST API, v3.15 &ndash; CourtListener.com{% endblock %}
 {% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 {% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
@@ -25,7 +25,7 @@
     {% include "includes/toc_sidebar.html" %}
   </div>
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <h1 id="about">REST API &ndash; v4.0</h1>
+    <h1 id="about">REST API &ndash; v3.15</h1>
 
     <p class="lead">APIs for developers and researchers that need granular legal data.
     </p>
@@ -33,12 +33,12 @@
     </p>
     <p>Let's get started. To see and browse all the API URLs, click the button below:
     </p>
-    <p><a href="{% url "api-root" version="v4" %}"
+    <p><a href="{% url "api-root" version="v3" %}"
           target="_blank"
           class="btn btn-lg btn-primary">Show the APIs</a>
     </p>
     <p>We could have also pulled up that same information using curl, with a command like:</p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "api-root" version="v4" %}"</pre>
+    <pre class="scrollable">curl "{% get_full_host %}{% url "api-root" version="v3" %}"</pre>
     <p>Note that when you press the button in your browser, you get an HTML result, but when you run <code>curl</code> you get a JSON object. This is <a href="#formats">discussed in more depth below</a>.
     </p>
     <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up!</strong> Something else that's curious just happened. You didn't authenticate to the API. To encourage experimentation, many of our APIs are open by default. The biggest gotcha people have is that they forget to enable authentication before deploying their code. Don't make this mistake! Remember to add <a href="#authentication">authentication</a>.
@@ -47,7 +47,7 @@
     </p>
     <p>To learn more about an API, you can send an <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/OPTIONS">HTTP OPTIONS</a> request to it, like so:
     </p>
-    <pre class="scrollable">curl -X OPTIONS "{% get_full_host %}{% url "api-root" version="v4" %}"</pre>
+    <pre class="scrollable">curl -X OPTIONS "{% get_full_host %}{% url "api-root" version="v3" %}"</pre>
     <p>An <code>OPTIONS</code> request is one of the best ways to understand the API.
     </p>
 
@@ -155,7 +155,7 @@
     </p>
     <pre class="scrollable">Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</pre>
     <p>Using curl, this looks like:</p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "opinioncluster-list" version="v4" %}" \
+    <pre class="scrollable">curl "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
     <p>Note that quotes are used to enclose the whitespace in the header.</p>
     <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Careful!</strong> A common mistake is to forget the word "Token" in the header.
@@ -178,9 +178,9 @@
     <p>To do HTTP Basic Authentication using curl, you might do something like this:
     </p>
     <pre class="scrollable">curl --user "harvey:your-password" \
-  "{% get_full_host %}{% url "opinioncluster-list" version="v4" %}"</pre>
+  "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}"</pre>
     <p>You can also do it in your browser with a url like:</p>
-    <pre class="scrollable">{% get_full_host username='harvey' password='your-password' %}{% url "opinioncluster-list" version="v4" %}</pre>
+    <pre class="scrollable">{% get_full_host username='harvey' password='your-password' %}{% url "opinioncluster-list" version="v3" %}</pre>
     <p>But if you're using your browser, <a href="{% url 'sign-in' %}">you might as well just log in</a>.
     </p>
 
@@ -204,7 +204,7 @@
     <p>If you wish to set the <code>Accept</code> header using a tool like cURL, you can do so using the <code>--header</code> flag:
     </p>
     <pre class="scrollable">curl --header "Accept: application/xml" \
-  "{% get_full_host %}{% url "opinioncluster-list" version="v4" %}"</pre>
+  "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}"</pre>
     <p>All data is serialized using the utf-8 charset.</p>
 
 
@@ -223,7 +223,7 @@
     <p>For example, this uses <code>jq</code> to look at the filters on the docket API:</p>
     <pre class="pre-scrollable">curl -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version="v4" %}" | jq '.filters'</pre>
+  "{% get_full_host %}{% url "docket-list" version="v3" %}" | jq '.filters'</pre>
     <p>That returns something like:</p>
     <pre class="pre-scrollable tall">{
   "id": {
@@ -243,12 +243,12 @@
     <p>You can use these filters with a double underscore. For example, this gets IDs greater than 500 and less than 1,000:</p>
     <pre class="pre-scrollable">curl \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version="v4" %}?id__gt=500&id__lt=1000" | jq '.count'
+  "{% get_full_host %}{% url "docket-list" version="v3" %}?id__gt=500&id__lt=1000" | jq '.count'
 499</pre>
     <p>It also allows ranges (inclusive):</p>
     <pre class="pre-scrollable">curl \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version="v4" %}?id__range=500,1000" | jq '.count'
+  "{% get_full_host %}{% url "docket-list" version="v3" %}?id__range=500,1000" | jq '.count'
 501</pre>
     <p>Filters can be combined using multiple <code>GET</code> parameters.</p>
     <p>There are a few special types of filters. The first are <code>Related Filters</code>, which allow you to join filters across APIs. For example, when you are using the docket API, you'll see that it has a filter for the court API:
@@ -262,7 +262,7 @@
     </p>
     <pre class="pre-scrollable">curl -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "court-list" version="v4" %}" | jq '.filters'</pre>
+  "{% get_full_host %}{% url "court-list" version="v3" %}" | jq '.filters'</pre>
     <p>Again, one of the fitlers is the ID field, but it only allows exact values on this API:</p>
     <pre>
 "id": {
@@ -275,7 +275,7 @@
     </p>
     <pre class="pre-scrollable">curl \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-list" version="v4" %}?court=scotus&id__range=500,1000" | jq '.count'
+  "{% get_full_host %}{% url "docket-list" version="v3" %}?court=scotus&id__range=500,1000" | jq '.count'
 36</pre>
     <p>This opens up many possibilities. For example, another filter on the <code>Court</code> endpoint is for <code>jurisdictions</code>. To use it, you would use a GET parameter like <code>court__jurisdictions=FD</code>. In this case, the double underscore allows you to join the filter from the other court API to the docket API.
     </p>
@@ -283,14 +283,14 @@
     </p>
     <p><code>RelatedFilters</code> can span many objects. For example, if you want to get all the Supreme Court <code>Opinion</code> objects, you will need to do that with a query such as:
     </p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cluster__docket__court=scotus"</pre>
+    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v3" %}?cluster__docket__court=scotus"</pre>
     <p>This uses the <code>Opinion</code> API to get <code>Opinions</code> that are part of <code>Opinion Clusters</code> that are on <code>Dockets</code> in the <code>Court</code> with the ID of <code>scotus</code>. To understand this data model better, see the <a href="{% url "case_law_api_help" %}">case law API documentation</a>.
     </p>
     <p>To use date filters, supply dates in <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank">ISO-8601 format</a>.
     </p>
     <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Dockets</code> from non-Federal Appellate jurisdictions:
     </p>
-    <pre class=pre-scrollable>curl "{% get_full_host %}{% url "docket-list" version="v4" %}?court__jurisdiction!=F"</pre>
+    <pre class=pre-scrollable>curl "{% get_full_host %}{% url "docket-list" version="v3" %}?court__jurisdiction!=F"</pre>
     <p>You can see more examples of filters in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/api/tests.py" target="_blank">our automated tests</a>.
     </p>
 
@@ -319,7 +319,7 @@
     </p>
     <p>Descending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Positions</code> ordered by the most recently modified, then by the most recently elected:
     </p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "position-list" version="v4" %}?order_by=-date_modified,-date_elected"</pre>
+    <pre class="scrollable">curl "{% get_full_host %}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected"</pre>
     <p>Ordering by fields with duplicate values is non-deterministic. If you wish to order by such a field, you should provide a second field as a tie-breaker to consistently order results. For example, ordering by <code>date_filed</code> will not return consistent ordering for items that have the same date, but this can be fixed by ordering by <code>date_filed,id</code>. In that case, if two items have the same <code>date_filed</code> value, the tie will be broken by the <code>id</code> field.
     </p>
 
@@ -329,14 +329,14 @@
     </p>
     <p>For example, to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
     </p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "person-list" version="v4" %}?fields=educations,date_modified"
+    <pre class="scrollable">curl "{% get_full_host %}{% url "person-list" version="v3" %}?fields=educations,date_modified"
 {
   "educations": [
     {
-      "resource_uri": "https://www.courtlistener.com/api/rest/v4/educations/12856/",
+      "resource_uri": "https://www.courtlistener.com/api/rest/v3/educations/12856/",
       "id": 12856,
       "school": {
-        "resource_uri": "https://www.courtlistener.com/api/rest/v4/schools/4240/",
+        "resource_uri": "https://www.courtlistener.com/api/rest/v3/schools/4240/",
         "id": 4240,
         "is_alias_of": null,
         "date_created": "2010-06-07T17:00:00-07:00",
@@ -344,7 +344,7 @@
         "name": "University of Maine",
         "ein": 16000769
       },
-      "person": "https://www.courtlistener.com/api/rest/v4/people/16214/",
+      "person": "https://www.courtlistener.com/api/rest/v3/people/16214/",
       "date_created": "2023-03-31T07:15:28.556198-07:00",
       "date_modified": "2023-03-31T07:15:28.556222-07:00",
       "degree_level": "jd",
