@@ -1934,11 +1934,11 @@ def fetch_es_results(
     es_from = (page - 1) * rows_per_page
     error = True
     try:
-        main_query = search_query.extra(from_=es_from, size=rows_per_page)
+        # Set track_total_hits False to avoid retrieving the hit count in the main query.
+        main_query = search_query.extra(
+            from_=es_from, size=rows_per_page, track_total_hits=False
+        )
         main_doc_count_query = clean_count_query(search_query)
-        # Set size to 0 to avoid retrieving documents in the count queries for
-        # better performance. Set track_total_hits to True to consider all the
-        # documents.
 
         search_type = get_params.get("type", SEARCH_TYPES.OPINION)
         parent_unique_field = cardinality_query_unique_ids[search_type]
@@ -1964,12 +1964,12 @@ def fetch_es_results(
         main_response = responses[0]
         main_doc_count_response = responses[1]
         parent_total = simplify_estimated_count(
-            main_doc_count_response.hits.total.value
+            main_doc_count_response.aggregations.unique_documents.value
         )
         if child_total_query:
             child_doc_count_response = responses[2]
             child_total = simplify_estimated_count(
-                child_doc_count_response.hits.total.value
+                child_doc_count_response.aggregations.unique_documents.value
             )
 
         query_time = main_response.took
@@ -2962,7 +2962,7 @@ def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
         field=unique_field,
         precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
     )
-    return count_query.extra(size=0, track_total_hits=True)
+    return count_query.extra(size=0, track_total_hits=False)
 
 
 def do_collapse_count_query(
