@@ -1964,12 +1964,12 @@ def fetch_es_results(
         main_response = responses[0]
         main_doc_count_response = responses[1]
         parent_total = simplify_estimated_count(
-            main_doc_count_response.hits.total.value
+            main_doc_count_response.aggregations.unique_documents.value
         )
         if child_total_query:
             child_doc_count_response = responses[2]
             child_total = simplify_estimated_count(
-                child_doc_count_response.hits.total.value
+                child_doc_count_response.aggregations.unique_documents.value
             )
 
         query_time = main_response.took
@@ -2962,7 +2962,7 @@ def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
         field=unique_field,
         precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
     )
-    return count_query.extra(size=0, track_total_hits=True)
+    return count_query.extra(size=0, track_total_hits=False)
 
 
 def do_collapse_count_query(
