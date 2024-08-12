@@ -593,11 +593,16 @@ async def download_docket_entries_csv(
         columns = []
 
 
+        columns = de_list[0].get_csv_columns(get_column_name=True)
+        columns += de_list[0].recap_documents.first().get_csv_columns(get_column_name=True)
+        csvwriter.writerow(columns)
+
         for docket_entry in de_list:
-            if not columns:
-                columns = docket_entry.get_csv_columns()
-                csvwriter.writerow(columns)
-            csvwriter.writerow(docket_entry.to_csv_row())
+            row = docket_entry.to_csv_row()
+            for recap_doc in docket_entry.recap_documents.all():
+                row += recap_doc.to_csv_row()
+                csvwriter.writerow(row)
+
 
         csv_content: str = output.getvalue()
         output.close()

@@ -1128,8 +1128,48 @@ class DocketPanel(Docket.panel.through):
         proxy = True
 
 
+# @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+class CSVExportMixin:
+
+    def get_csv_columns(self, get_column_name=False) -> List[str]:
+        """Get list of column names required in a csv file.
+        If get column name is True. It will add class name to id
+
+        :param: get_column_name: bool. Whether add class name to primary attr name
+
+        :return: list of attrs of class to get into csv file"""
+        raise NotImplementedError(
+            "Subclass must implement get_csv_columns method"
+        )
+
+    def get_column_fuction(self) -> List[str]:
+        """Get dict of attrs: fucntion to apply on field value if it needs
+        to be pre-processed before being add to csv
+
+        returns: dict -- > {attr1: function}"""
+        raise NotImplementedError(
+            "Subclass must implement get_column_fuction method"
+        )
+
+    def to_csv_row(self) -> List[str]:
+        """Get fields in model based on attrs column names.
+        Apply function to attr value if required.
+        Return list of modified values for csv row"""
+        row = []
+        functions = self.get_column_fuction()
+        for field in self.get_csv_columns(get_column_name=False):
+            attr = getattr(self, field)
+            if not attr:
+                attr: ""
+            function = functions.get(field)
+            if function:
+                attr = function(field)
+            row.append(attr)
+        return row
+
+
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class DocketEntry(AbstractDateTimeModel):
+class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
         Docket,
         help_text=(
@@ -1250,19 +1290,29 @@ class DocketEntry(AbstractDateTimeModel):
             )
         return None
 
-    def get_csv_columns(self):
-        return [
-            "id",
+    def get_csv_columns(self, get_column_name=False):
+        columns = []
+        if get_column_name:
+            columns.append(self.__class__.__name__.lower() + "_id")
+        else:
+            columns.append("id")
+        columns.extend([
             "entry_number",
             "date_filed",
             "time_filed",
             "pacer_sequence_number",
             "recap_sequence_number",
             "description"
-        ]
+        ])
+        return columns
 
-    def to_csv_row(self) -> List[str]:
-        return [getattr(self, field) for field in self.get_csv_columns()]
+    def get_column_fuction(self):
+        """Get dict of attrs: fucntion to apply on field value if it needs
+        to be pre-processed before being add to csv
+
+        returns: dict -- > {attr1: function}"""
+        return {}
+
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
@@ -1325,7 +1375,10 @@ class AbstractPacerDocument(models.Model):
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
+class RECAPDocument(AbstractPacerDocument,
+                    AbstractPDF,
+                    AbstractDateTimeModel,
+                    CSVExportMixin):
     """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
@@ -1742,6 +1795,49 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         out["text"] = text_template.render({"item": self}).translate(null_map)
 
         return normalize_search_dicts(out)
+
+    def get_csv_columns(self, get_column_name=False):
+        columns = []
+        if get_column_name:
+            columns.append(self.__class__.__name__.lower() + "_id")
+        else:
+            columns.append("id")
+        columns.extend([
+            "document_type",
+            "description",
+            "acms_document_guid",
+            "date_upload",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "is_free_on_pacer",
+            "is_available",
+            "is_sealed",
+            "sha1",
+            "page_count",
+            "file_size",
+            "filepath_local",
+            "filepath_ia",
+            "ocr_status"
+        ])
+        return columns
+
+    def _get_readable_document_type(self, *args, **kwargs):
+        return self.get_document_type_display()
+
+    def _get_readable_ocr_status(self, *args, **kwargs):
+        return self.get_ocr_status_display()
+
+    def get_column_fuction(self):
+        """Get dict of attrs: function to apply on field value if it needs
+        to be pre-processed before being add to csv
+        If not functions returns empty dict
+
+        returns: dict -- > {attr1: function}"""
+        return {
+            "document_type": self._get_readable_document_type,
+            "ocr_status": self._get_readable_ocr_status,
+        }
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
