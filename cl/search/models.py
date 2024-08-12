@@ -1250,6 +1250,20 @@ class DocketEntry(AbstractDateTimeModel):
             )
         return None
 
+    def get_csv_columns(self):
+        return [
+            "id",
+            "entry_number",
+            "date_filed",
+            "time_filed",
+            "pacer_sequence_number",
+            "recap_sequence_number",
+            "description"
+        ]
+
+    def to_csv_row(self) -> List[str]:
+        return [getattr(self, field) for field in self.get_csv_columns()]
+
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketEntryTags(DocketEntry.tags.through):

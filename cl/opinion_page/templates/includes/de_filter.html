@@ -1,7 +1,8 @@
+{% load extras %}
 <div class="well well-sm">
   <div class="row filter-box">
     <!-- Search -->
-    <div class="col-xs-12 col-md-2">
+    <div class="col-xs-2 col-md-2">
       {% if docket_entries %}
         <div class="row" id="main-query-box">
           <div id="search-container" class="col-xs-12 text-center">
@@ -24,7 +25,8 @@
         </div>
       {% endif %}
     </div>
-    <form action="">
+    <div class="col-xs-8 col-md-8">
+      <form action="" >
       <div class="form-inline">
         {% if form.errors %}
           <div class="col-xs-12">
@@ -83,7 +85,7 @@
         </div>
         <!-- Navigate buttons -->
         <div class="tight-input col-xs-6 hidden-sm col-sm-6 col-md-1 col-lg-2" >
-          <div class="pull-right" >
+          <div>
             {% if docket_entries.has_previous %}
               <a class="btn btn-default" href="?{{ get_string }}page={{ docket_entries.previous_page_number }}" rel="prev" >
                 <i class="fa fa-caret-left" ></i><span class="hidden-md" >&nbsp;Prev.</span>
@@ -102,10 +104,26 @@
                 <span class="hidden-md" >Next&nbsp;</span><i class="fa fa-caret-right"></i>
               </a>
             {% endif %}
-          </div>
         </div>
         <button type="submit" class="sr-only">Filter</button>
       </div>
     </form>
+    </div>
+    <div class="pull-right col-xs-2 col-md-2" >
+      <form action="{% url 'view_download_docket' %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="court_id" value="{{ docket.court_id }}">
+        <input type="hidden" name="case_name" value="{{ docket.slug }}">
+        <input type="hidden" name="court_listener_id" value="{{ docket.id }}">
+        <input type="hidden" name="docket_id" value="{{ docket.id }}">
+
+        <input type="hidden" name="docket_entries" value="{{ docket_entries }}">
+        <button type="submit" class="btn btn-primary">
+            <i class="fa fa-download"></i>&nbsp;<span class="hidden-md">Download</span>
+        </button>
+      </form>
+
+    </div>
   </div>
 </div>
+

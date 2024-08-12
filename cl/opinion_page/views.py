@@ -1,7 +1,10 @@
+import csv
 import datetime
+import logging
 from collections import OrderedDict, defaultdict
 from http import HTTPStatus
-from typing import Any, Dict, Union
+from io import StringIO
+from typing import Any, Dict, Union, List
 from urllib.parse import urlencode
 
 import eyecite
@@ -336,35 +339,49 @@ async def redirect_docket_recap(
     )
 
 
+async def fetch_docket_entries(request, docket, form=None):
+    """ Fetch docket entries asociated to docket
+
+    param request: current HttpRequest.
+    param docket: docket.id to get related docket_entries.
+
+    returns: DocketEntry list.
+    """
+    de_list = docket.docket_entries.all().prefetch_related(
+      Prefetch("recap_documents", queryset=RECAPDocument.objects.defer("plain_text"))
+    )
+    if await sync_to_async(form.is_valid)():
+        if not form:
+            cd = form.cleaned_data
+
+            if cd.get("entry_gte"):
+              de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
+            if cd.get("entry_lte"):
+              de_list = de_list.filter(entry_number__lte=cd["entry_lte"])
+            if cd.get("filed_after"):
+              de_list = de_list.filter(date_filed__gte=cd["filed_after"])
+            if cd.get("filed_before"):
+              de_list = de_list.filter(date_filed__lte=cd["filed_before"])
+            if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
+              de_list = de_list.order_by(
+                  "-recap_sequence_number", "-entry_number"
+              )
+    return de_list
+
+
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
+
+    sort_order_asc = True
+    form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
     await increment_view_count(docket, request)
-    sort_order_asc = True
+
+    de_list = await fetch_docket_entries(request, docket, form)
 
     page = request.GET.get("page", 1)
-    rd_queryset = RECAPDocument.objects.defer("plain_text")
-    de_list = docket.docket_entries.all().prefetch_related(
-        Prefetch("recap_documents", queryset=rd_queryset)
-    )
-    form = DocketEntryFilterForm(request.GET, request=request)
-    if await sync_to_async(form.is_valid)():
-        cd = form.cleaned_data
 
-        if cd.get("entry_gte"):
-            de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
-        if cd.get("entry_lte"):
-            de_list = de_list.filter(entry_number__lte=cd["entry_lte"])
-        if cd.get("filed_after"):
-            de_list = de_list.filter(date_filed__gte=cd["filed_after"])
-        if cd.get("filed_before"):
-            de_list = de_list.filter(date_filed__lte=cd["filed_before"])
-        if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
-            sort_order_asc = False
-            de_list = de_list.order_by(
-                "-recap_sequence_number", "-entry_number"
-            )
 
     @sync_to_async
     def paginate_docket_entries(docket_entries, docket_page):
@@ -561,6 +578,56 @@ async def make_thumb_if_needed(
         )
         await rd.arefresh_from_db()
     return rd
+
+
+async def download_docket_entries_csv(
+    request: HttpRequest
+) -> HttpResponse:
+    """Download csv file containing list of DocketEntry for specific Docket
+    """
+    def generate_csv(de_list, filename):
+        # Create file in memory. Should I create it in /tmp?
+        output: StringIO = StringIO()
+        csvwriter = csv.writer(output, quotechar='"',
+                               quoting=csv.QUOTE_ALL)
+        columns = []
+
+
+        for docket_entry in de_list:
+            if not columns:
+                columns = docket_entry.get_csv_columns()
+                csvwriter.writerow(columns)
+            csvwriter.writerow(docket_entry.to_csv_row())
+
+        csv_content: str = output.getvalue()
+        output.close()
+
+        response: HttpResponse = HttpResponse(
+            csv_content,
+            content_type='text/csv'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        logger = logging.getLogger("cl.opinion_page")
+        logger.debug(f"HERE: {filename}")
+        return response
+
+    if request.method == 'POST':
+        case_name = request.POST.get("case_name", "lala")
+        court_id = request.POST.get("court_id", "lele")
+        court_listener_id = request.POST.get("court_listener_id", "lili")
+        docket_id = request.POST.get("docket_id")
+
+        form = DocketEntryFilterForm(request.POST, request=request)
+        docket, _ = await core_docket_data(request, docket_id)
+        de_list = await fetch_docket_entries(request, docket, form)
+
+        date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        filename = f"{case_name}.{court_id}.{court_listener_id}_{date_str}.csv"
+
+        response = await sync_to_async(generate_csv)(de_list, filename)
+        return response
+    return HttpResponseBadRequest("Invalid request method.")
+
 
 
 async def view_recap_document(

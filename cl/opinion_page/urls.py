@@ -19,7 +19,7 @@ from cl.opinion_page.views import (
     view_recap_authorities,
     view_recap_document,
     view_summaries,
-)
+    download_docket_entries_csv)
 
 urlpatterns = [
     # Court pages
@@ -53,6 +53,11 @@ urlpatterns = [
     path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),  # type: ignore[arg-type]
     path(
         "docket/<int:pk>/<blank-slug:slug>/", view_docket, name="view_docket"  # type: ignore[arg-type]
+    ),
+    path(
+        "docket/download/",
+        download_docket_entries_csv, # type: ignore[arg-type]
+        name="view_download_docket"
     ),
     path(
         "recap/gov.uscourts.<str:court>.<str:pacer_case_id>/",
