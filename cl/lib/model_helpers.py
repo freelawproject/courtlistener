@@ -492,6 +492,22 @@ def suppress_autotime(model, fields):
 def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
     """Make an originating docket number for an appellate case into a link (MVP version)
 
+    **NOTE: These links are presented to users and should be subject to strict security checks.**
+
+    For example, each regex should be carefully written so it accepts only the narrowest of
+    matches. The risk is that:
+
+      - Mallory uploads a bad document via the RECAP APIs (these are open APIs).
+      - The code here parses that upload in a way to create a redirect on the federalregister.gov
+        website. 
+      - federalregsiter.gov has an open redirect vulnerability (these are common).
+      - The user clicks a link on our site that goes to federalregister.gov, which redirects the
+        user to evilsite.com (b/c evilsite.com got through our checks here).
+      - The user is tricked on that site into doing something bad.
+  
+    This is all quite unlikely, but we can ensure it doesn't happen by being strict about 
+    the inputs our regular expressions capture.
+
     :param agency: The administrative agency the case originated from
     :param og_docket_number: The docket number where the case was originally heard.
     :returns: A linkified version of the docket number for the user to click on, or the original if no link can be made.
