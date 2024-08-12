@@ -499,13 +499,13 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
       - Mallory uploads a bad document via the RECAP APIs (these are open APIs).
       - The code here parses that upload in a way to create a redirect on the federalregister.gov
-        website. 
+        website.
       - federalregsiter.gov has an open redirect vulnerability (these are common).
       - The user clicks a link on our site that goes to federalregister.gov, which redirects the
         user to evilsite.com (b/c evilsite.com got through our checks here).
       - The user is tricked on that site into doing something bad.
-  
-    This is all quite unlikely, but we can ensure it doesn't happen by being strict about 
+
+    This is all quite unlikely, but we can ensure it doesn't happen by being strict about
     the inputs our regular expressions capture.
 
     :param agency: The administrative agency the case originated from
