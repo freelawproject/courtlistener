@@ -771,7 +771,6 @@ class RecapUploadsTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
-    side_effect=lambda x: True,
 )
 class RecapDocketFetchApiTest(TestCase):
     """Tests for the RECAP docket Fetch API
@@ -1046,10 +1045,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
     "cl.corpus_importer.tasks.FreeOpinionReport",
     new=fakes.FakeFreeOpinionReport,
 )
-@mock.patch(
-    "cl.recap.tasks.get_pacer_cookie_from_cache",
-    return_value={"cookie": "foo"},
-)
+@mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
@@ -1151,7 +1147,6 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
-        return_value={"pacer_cookie": "foo"},
     )
     @mock.patch(
         "cl.corpus_importer.tasks.AttachmentPage",
@@ -6999,7 +6994,6 @@ class WebhooksRetries(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
-    side_effect=lambda x: True,
 )
 class RecapFetchWebhooksTest(TestCase):
     """Test RECAP Fetch Webhooks"""
