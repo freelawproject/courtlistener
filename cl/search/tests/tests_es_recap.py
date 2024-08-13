@@ -1315,7 +1315,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "child filter + text query"
         )
 
-    @override_settings(VIEW_MORE_CHILD_HITS=6)
+    @override_settings(VIEW_MORE_CHILD_HITS=6, RECAP_CHILD_HITS_PER_RESULT=5)
     def test_docket_child_documents(self) -> None:
         """Confirm results contain the right number of child documents"""
         # Get results for a broad filter
