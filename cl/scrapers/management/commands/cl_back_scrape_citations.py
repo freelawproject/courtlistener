@@ -11,12 +11,12 @@ we ingest it as in a regular scrape
 
 from django.utils.encoding import force_bytes
 
+from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.scrapers.management.commands import cl_back_scrape_opinions
 from cl.scrapers.management.commands.cl_scrape_opinions import make_citation
 from cl.scrapers.utils import get_binary_content
-from cl.search.models import Opinion, Citation, OpinionCluster
-from cl.lib.command_utils import logger
+from cl.search.models import Citation, Opinion, OpinionCluster
 
 
 class Command(cl_back_scrape_opinions.Command):
@@ -86,8 +86,7 @@ class Command(cl_back_scrape_opinions.Command):
     def citation_is_duplicated(
         self, citation_candidate: Citation, cluster: OpinionCluster, cite: str
     ) -> bool:
-        """Checks for exact or reporter duplication of citation in the cluster
-        """
+        """Checks for exact or reporter duplication of citation in the cluster"""
         citation_params = citation_candidate.__dict__
         citation_params.pop("_state", "")
         citation_params.pop("id", "")
