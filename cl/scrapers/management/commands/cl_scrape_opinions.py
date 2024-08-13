@@ -277,17 +277,9 @@ class Command(VerboseCommand):
         logger.debug(f"#{len(site)} opinions found.")
         added = 0
         for i, item in enumerate(site):
-            msg, r = get_binary_content(
-                item["download_urls"],
-                site,
-                method=site.method,
-            )
-            if msg:
-                fingerprint = [f"{court_str}-unexpected-content-type"]
-                logger.error(msg, extra={"fingerprint": fingerprint})
+            content = get_binary_content(item["download_urls"], site)
+            if not content:
                 continue
-
-            content = site.cleanup_content(r.content)
 
             current_date = item["case_dates"]
             try:

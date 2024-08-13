@@ -155,25 +155,29 @@ def get_extension(content: bytes) -> str:
 def get_binary_content(
     download_url: str,
     site: AbstractSite,
-    method: str = "GET",
-) -> Tuple[str, Optional[Response]]:
+) -> Optional[bytes | str]:
     """Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
     :param site: Site object used to download data
-    :param method: The HTTP method used to get the item, or "LOCAL" to get an
-    item during testing
+
     :return: Two values. The first is a msg indicating any errors encountered.
     If blank, that indicates success. The second value is the response object
     containing the downloaded file.
     """
+    court_str = site.court_id.split(".")[-1].split("_")[0]
+    fingerprint = [f"{court_str}-unexpected-content-type"]
+
     if not download_url:
         # Occurs when a DeferredList fetcher fails.
-        msg = f"NoDownloadUrlError: {download_url}\n{traceback.format_exc()}"
-        return msg, None
+        error = f"NoDownloadUrlError: {download_url}\n{traceback.format_exc()}"
+        logger.error(error, extra={"fingerprint": fingerprint})
+        return
+
     # noinspection PyBroadException
-    if method == "LOCAL":
+    if site.method == "LOCAL":
+        # "LOCAL" is the method when testing
         url = os.path.join(settings.MEDIA_ROOT, download_url)
         mr = MockRequest(url=url)
         r = mr.get()
@@ -203,8 +207,9 @@ def get_binary_content(
 
         # test for empty files (thank you CA1)
         if len(r.content) == 0:
-            msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
-            return msg, None
+            error = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
+            logger.error(error, extra={"fingerprint": fingerprint})
+            return
 
         # test for expected content type (thanks mont for nil)
         if site.expected_content_types:
@@ -218,18 +223,20 @@ def get_binary_content(
                 for mime in site.expected_content_types
             )
             if not m:
-                msg = (
+                error = (
                     f"UnexpectedContentTypeError: {download_url}\n"
                     f'\'"{content_type}" not in {site.expected_content_types}'
                 )
-                return msg, None
+                logger.error(error, extra={"fingerprint": fingerprint})
+                return
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)
         r.raise_for_status()
 
-    # Success!
-    return "", r
+    content = site.cleanup_content(r.content)
+
+    return content
 
 
 def signal_handler(signal, frame):
