@@ -8,6 +8,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.timezone import now
+from juriscraper.AbstractSite import logger
 
 from cl.alerts.factories import AlertFactory
 from cl.alerts.models import Alert
@@ -626,16 +627,19 @@ class ScraperContentTypeTest(TestCase):
         self.mock_response.content = b"not empty"
         self.mock_response.headers = {"Content-Type": "application/pdf"}
         self.site = test_opinion_scraper.Site()
+        self.site.method = "GET"
+        self.logger = logger
 
     @mock.patch("requests.Session.get")
     def test_unexpected_content_type(self, mock_get):
         """Test when content type doesn't match scraper expectation."""
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = ["text/html"]
-
-        with self.assertLogs(level="ERROR") as cm:
+        with mock.patch.object(self.logger, "error") as error_mock:
             get_binary_content("/dummy/url/", self.site)
-        self.assertIn("UnexpectedContentTypeError:", cm.output[0])
+        self.assertIn(
+            "UnexpectedContentTypeError:", error_mock.call_args_list[0][0][0]
+        )
 
     @mock.patch("requests.Session.get")
     def test_correct_content_type(self, mock_get):
@@ -643,7 +647,7 @@ class ScraperContentTypeTest(TestCase):
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = ["application/pdf"]
 
-        with self.assertNoLogs(level="ERROR"):
+        with mock.patch.object(self.logger, "error") as error_mock:
             _ = get_binary_content("/dummy/url/", self.site)
 
             self.mock_response.headers = {
@@ -651,6 +655,7 @@ class ScraperContentTypeTest(TestCase):
             }
             mock_get.return_value = self.mock_response
             _ = get_binary_content("/dummy/url/", self.site)
+            error_mock.assert_not_called()
 
     @mock.patch("requests.Session.get")
     def test_no_content_type(self, mock_get):
@@ -658,5 +663,6 @@ class ScraperContentTypeTest(TestCase):
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = None
 
-        with self.assertNoLogs(level="ERROR"):
+        with mock.patch.object(self.logger, "error") as error_mock:
             _ = get_binary_content("/dummy/url/", self.site)
+            error_mock.assert_not_called()

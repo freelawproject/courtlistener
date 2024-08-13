@@ -181,8 +181,7 @@ def get_binary_content(
         url = os.path.join(settings.MEDIA_ROOT, download_url)
         mr = MockRequest(url=url)
         r = mr.get()
-        r = follow_redirections(r, requests.Session())
-        r.raise_for_status()
+        s = requests.Session()
     else:
         # some sites require a custom ssl_context, contained in the Site's
         # session. However, we can't send a request with both a
@@ -222,6 +221,7 @@ def get_binary_content(
                 content_type in mime.lower()
                 for mime in site.expected_content_types
             )
+
             if not m:
                 error = (
                     f"UnexpectedContentTypeError: {download_url}\n"
