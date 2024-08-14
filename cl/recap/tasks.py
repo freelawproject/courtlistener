@@ -1670,24 +1670,13 @@ def fetch_pacer_doc_by_rd(
         self.request.chain = None
         return
 
-    cookies = get_pacer_cookie_from_cache(fq.user_id)
-    if not cookies:
+    session_data = get_pacer_cookie_from_cache(fq.user_id)
+    if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return
 
-    # Ensures session data is a `SessionData` instance for consistent handling.
-    #
-    # Currently, handles potential legacy data by converting them to
-    # `SessionData`. This defensive check can be removed in future versions
-    # once all data is guaranteed to be in the expected format.
-    #
-    # This approach prevents disruptions during processing of enqueued data
-    # after deployment.
-    session_data = (
-        cookies if isinstance(cookies, SessionData) else SessionData(cookies)
-    )
     pacer_case_id = rd.docket_entry.docket.pacer_case_id
     de_seq_num = rd.docket_entry.pacer_sequence_number
     try:
@@ -1782,18 +1771,12 @@ def fetch_attachment_page(self: Task, fq_pk: int) -> None:
         mark_fq_status(fq, msg, PROCESSING_STATUS.NEEDS_INFO)
         return
 
-    cookies = get_pacer_cookie_from_cache(fq.user_id)
-    if not cookies:
+    session_data = get_pacer_cookie_from_cache(fq.user_id)
+    if not session_data:
         msg = "Unable to find cached cookies. Aborting request."
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         return
 
-    # Ensures session data is a `SessionData` instance for consistent handling.
-    # This approach prevents disruptions during processing of enqueued data
-    # after deployment.
-    session_data = (
-        cookies if isinstance(cookies, SessionData) else SessionData(cookies)
-    )
     try:
         r = get_att_report_by_rd(rd, session_data)
     except HTTPError as exc:
@@ -1972,18 +1955,13 @@ def fetch_docket(self, fq_pk):
 
     async_to_sync(mark_pq_status)(fq, "", PROCESSING_STATUS.IN_PROGRESS)
 
-    cookies_data = get_pacer_cookie_from_cache(fq.user_id)
-    if cookies_data is None:
+    session_data = get_pacer_cookie_from_cache(fq.user_id)
+    if session_data is None:
         msg = f"Cookie cache expired before task could run for user: {fq.user_id}"
         mark_fq_status(fq, msg, PROCESSING_STATUS.FAILED)
         self.request.chain = None
         return None
 
-    session_data = (
-        cookies_data
-        if isinstance(cookies_data, SessionData)
-        else SessionData(cookies_data)
-    )
     s = ProxyPacerSession(
         cookies=session_data.cookies, proxy=session_data.proxy_address
     )
@@ -2332,10 +2310,7 @@ def get_and_copy_recap_attachment_docs(
     :return: None
     """
 
-    cookies = get_pacer_cookie_from_cache(user_pk)
-    session_data = (
-        cookies if isinstance(cookies, SessionData) else SessionData(cookies)
-    )
+    session_data = get_pacer_cookie_from_cache(user_pk)
     appellate = False
     unique_pqs = []
     for rd_att in att_rds:
@@ -2447,13 +2422,7 @@ def get_and_merge_rd_attachments(
     """
 
     all_attachment_rds = []
-    cookies = get_pacer_cookie_from_cache(user_pk)
-    # Ensures session data is a `SessionData` instance for consistent handling.
-    # This approach prevents disruptions during processing of enqueued data
-    # after deployment.
-    session_data = (
-        cookies if isinstance(cookies, SessionData) else SessionData(cookies)
-    )
+    session_data = get_pacer_cookie_from_cache(user_pk)
     # Try to get the attachment page without being logged into PACER
     att_report_text = get_attachment_page_by_url(document_url, court_id)
     if att_report_text:
