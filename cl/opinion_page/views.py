@@ -581,7 +581,7 @@ async def make_thumb_if_needed(
 
 
 async def download_docket_entries_csv(
-    request: HttpRequest
+    request: HttpRequest, docket_id: int
 ) -> HttpResponse:
     """Download csv file containing list of DocketEntry for specific Docket
     """
@@ -616,22 +616,19 @@ async def download_docket_entries_csv(
         logger.debug(f"HERE: {filename}")
         return response
 
-    if request.method == 'POST':
-        case_name = request.POST.get("case_name", "lala")
-        court_id = request.POST.get("court_id", "lele")
-        court_listener_id = request.POST.get("court_listener_id", "lili")
-        docket_id = request.POST.get("docket_id")
+    #FIXME delete form without modifying solution
+    form = DocketEntryFilterForm(request.POST, request=request)
+    docket, _ = await core_docket_data(request, docket_id)
+    de_list = await fetch_docket_entries(request, docket, form)
+    court_id = docket.court_id
+    case_name = docket.slug
 
-        form = DocketEntryFilterForm(request.POST, request=request)
-        docket, _ = await core_docket_data(request, docket_id)
-        de_list = await fetch_docket_entries(request, docket, form)
 
-        date_str = datetime.datetime.now().strftime("%Y-%m-%d")
-        filename = f"{case_name}.{court_id}.{court_listener_id}_{date_str}.csv"
+    date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+    filename = f"{case_name}.{court_id}.{docket_id}_{date_str}.csv"
 
-        response = await sync_to_async(generate_csv)(de_list, filename)
-        return response
-    return HttpResponseBadRequest("Invalid request method.")
+    response = await sync_to_async(generate_csv)(de_list, filename)
+    return response
 
 
 

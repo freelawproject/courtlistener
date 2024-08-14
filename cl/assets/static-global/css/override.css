@@ -881,11 +881,11 @@ input.court-checkbox, input.status-checkbox {
 
 /* Docket page */
 #id_entry_gte, #id_entry_lte {
-  width: 60px;
+  width: 45px;
 }
 
 #id_filed_after, #id_filed_before {
-  width: 95px;
+  width: 90px;
 }
 
 #docket-entry-table .row {
@@ -1606,8 +1606,8 @@ textarea {
 }
 
 .tight-input input, .tight-input a {
-  padding: 6px 6px;
-  margin: 0px 0px;
+  padding: 5px 5px !important;
+  margin: 0px 0px !important;
 }
 
 @media (max-width: 768px) {
