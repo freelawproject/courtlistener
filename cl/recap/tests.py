@@ -771,7 +771,6 @@ class RecapUploadsTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
-    side_effect=lambda x: True,
 )
 class RecapDocketFetchApiTest(TestCase):
     """Tests for the RECAP docket Fetch API
@@ -1046,10 +1045,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
     "cl.corpus_importer.tasks.FreeOpinionReport",
     new=fakes.FakeFreeOpinionReport,
 )
-@mock.patch(
-    "cl.recap.tasks.get_pacer_cookie_from_cache",
-    return_value={"cookie": "foo"},
-)
+@mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
@@ -1151,7 +1147,6 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
-        return_value={"pacer_cookie": "foo"},
     )
     @mock.patch(
         "cl.corpus_importer.tasks.AttachmentPage",
@@ -2559,6 +2554,40 @@ class RecapDocketTaskTest(TestCase):
                     ),
                     msg="The nature_of_suit does not match.",
                 )
+        d.delete()
+
+    def test_merge_docket_number_components(
+        self,
+    ) -> None:
+        """Confirm docket_number components are properly merged into the
+        docket instance.
+        """
+
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+        )
+
+        docket_data = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00070-TKW-MAL-1",
+            federal_dn_office_code="3",
+            federal_dn_case_type="cr",
+            federal_dn_judge_initials_assigned="TKW",
+            federal_dn_judge_initials_referred="MAL",
+            federal_defendant_number="1",
+        )
+        async_to_sync(update_docket_metadata)(d, docket_data)
+        d.save()
+        d.refresh_from_db()
+
+        self.assertEqual(d.federal_dn_office_code, "3")
+        self.assertEqual(d.federal_dn_case_type, "cr")
+        self.assertEqual(d.federal_dn_judge_initials_assigned, "TKW")
+        self.assertEqual(d.federal_dn_judge_initials_referred, "MAL")
+        self.assertEqual(d.federal_defendant_number, 1)
+
         d.delete()
 
 
@@ -6965,7 +6994,6 @@ class WebhooksRetries(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
-    side_effect=lambda x: True,
 )
 class RecapFetchWebhooksTest(TestCase):
     """Test RECAP Fetch Webhooks"""

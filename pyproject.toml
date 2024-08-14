@@ -87,7 +87,7 @@ django-waffle = "^4.1.0"
 nameparser = "^1.1.3"
 eyecite = "*"
 scipy = "^1.11.4"
-scikit-learn = "^1.4.0"
+scikit-learn = "^1.5.1"
 numpy = "^1.26.3"
 datasketch = "^1.6.0"
 PyStemmer = "^2.2.0.1"
@@ -110,12 +110,12 @@ psycopg = {extras = ["binary"], version = "^3.1.17"}
 httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.5.1"
 django-permissions-policy = "^4.19.0"
-juriscraper = "^2.6.0"
 tiktoken = "^0.6.0"
 hyperscan = "^0.7.7"
 openai = "^1.31.1"
 seal-rookery = "^2.2.3"
 types-pytz = "^2024.1.0.20240417"
+juriscraper = "^2.6.15"
 
 
 [tool.poetry.group.dev.dependencies]

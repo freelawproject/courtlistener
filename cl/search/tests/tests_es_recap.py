@@ -135,6 +135,29 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "     Got: %s\n\n" % (field_name, expected_count, got),
         )
 
+    def _compare_child_entry_date_filed(
+        self, article, html_content, child_index, expected_date
+    ):
+        """Assert entry date filed in child results."""
+        tree = html.fromstring(html_content)
+        article = tree.xpath("//article")[article]
+        col_md_offset_half_elements = article.xpath(
+            f".//div[@class='bottom']//div[@class='col-md-offset-half']"
+        )
+        col_md_offset_half_elem = col_md_offset_half_elements[child_index]
+        inline_element = col_md_offset_half_elem.xpath(
+            ".//div[contains(@class, 'date-block')]"
+        )[0]
+        date = inline_element.xpath(".//time[@class='meta-data-value']")
+        meta_data_value = date[0].text.strip()
+        self.assertEqual(
+            meta_data_value,
+            expected_date,
+            msg="Did not get the right expected entry date filed \n"
+            "Expected: %s\n"
+            "     Got: %s\n\n" % (expected_date, meta_data_value),
+        )
+
     def _assert_results_header_content(self, html_content, expected_text):
         h2_element = html.fromstring(html_content).xpath(
             '//h2[@id="result-count"]'
@@ -1292,7 +1315,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "child filter + text query"
         )
 
-    @override_settings(VIEW_MORE_CHILD_HITS=6)
+    @override_settings(VIEW_MORE_CHILD_HITS=6, RECAP_CHILD_HITS_PER_RESULT=5)
     def test_docket_child_documents(self) -> None:
         """Confirm results contain the right number of child documents"""
         # Get results for a broad filter
@@ -2004,6 +2027,20 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed  desc.",
         )
 
+        # Confirm entry date filed are properly displayed.
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 0, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 1, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            1, r.content.decode(), 0, "July 19th, 2014"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 0, "February 23th, 1732"
+        )
+
         # Order by entry_date_filed asc
         # Ordering by a child field, dockets without entries should come last.
         params = {
@@ -2022,6 +2059,20 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1236")
             < r.content.decode().index("12-1237"),
             msg="'12-0000' should come BEFORE '12-1235' when order_by entry_date_filed asc.",
+        )
+
+        # Confirm entry date filed are properly displayed.
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 0, "February 23th, 1732"
+        )
+        self._compare_child_entry_date_filed(
+            1, r.content.decode(), 0, "July 19th, 2014"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 0, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 1, "August 19th, 2015"
         )
 
         # Order by entry_date_filed desc in match all queries.

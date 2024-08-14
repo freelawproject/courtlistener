@@ -28,6 +28,7 @@ from waffle.decorators import waffle_flag
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.citations.match_citations_queries import es_get_query_citation
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
@@ -746,7 +747,7 @@ def do_es_search(
                 SEARCH_TYPES.RECAP,
                 SEARCH_TYPES.DOCKETS,
             ]:
-                query_citation = get_query_citation(cd)
+                query_citation = es_get_query_citation(cd)
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
