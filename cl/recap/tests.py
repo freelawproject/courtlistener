@@ -7667,8 +7667,62 @@ class LookupDocketsTest(TestCase):
         )
         self.assertEqual(docket_matched.pk, d_1_2.pk)
 
-        # Two or more Dockets matched.
+        # Partial DN components single docket match.
+        d_1_2_3 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00072",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00072",
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+        )
+        self.assertEqual(docket_matched.pk, d_1_2_3.pk)
+        docket_data = self.docket_data.copy()
+        docket_data["federal_dn_judge_initials_assigned"] = "MA"
+        async_to_sync(update_docket_metadata)(docket_matched, docket_data)
+        docket_matched.save()
+        docket_matched.refresh_from_db()
+        self.assertEqual(
+            docket_matched.federal_dn_judge_initials_assigned, "MA"
+        )
+
+        # Two or more Dockets matched. Partial DN components matched.
         d_2 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00050",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00050",
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="",
+        )
+        self.assertEqual(docket_matched.pk, d_2.pk)
+
+        # Two or more Dockets matched. All DN components matched.
+        d_3 = DocketFactory(
             case_name="Young v. State",
             docket_number="1:03-cr-00076",
             court=self.court_appellate,
@@ -7688,7 +7742,7 @@ class LookupDocketsTest(TestCase):
             federal_dn_judge_initials_assigned="MR",
             federal_dn_judge_initials_referred="DLH",
         )
-        self.assertEqual(docket_matched.pk, d_2.pk)
+        self.assertEqual(docket_matched.pk, d_3.pk)
 
     def test_avoid_lookup_by_docket_number_components(self):
         """If either the docket or the docket_data contains None values for
@@ -7703,7 +7757,7 @@ class LookupDocketsTest(TestCase):
             court=self.court_appellate,
             source=Docket.RECAP,
             pacer_case_id=None,
-            federal_defendant_number=1,
+            federal_defendant_number=None,
             federal_dn_judge_initials_assigned="MR",
             federal_dn_judge_initials_referred="LM",
             federal_dn_case_type="cv",
@@ -7715,7 +7769,7 @@ class LookupDocketsTest(TestCase):
             court=self.court_appellate,
             source=Docket.RECAP,
             pacer_case_id=None,
-            federal_defendant_number=1,
+            federal_defendant_number=None,
             federal_dn_judge_initials_assigned="MR",
             federal_dn_judge_initials_referred="LM",
             federal_dn_case_type="cv",

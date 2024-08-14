@@ -66,12 +66,13 @@ cnt = CaseNameTweaker()
 def confirm_docket_number_core_lookup_match(
     docket: Docket,
     docket_number: str,
-    federal_defendant_number: int | None = None,
+    federal_defendant_number: str | None = None,
     federal_dn_judge_initials_assigned: str | None = None,
     federal_dn_judge_initials_referred: str | None = None,
 ) -> Docket | None:
     """Confirm if the docket_number_core lookup match returns the right docket
-    by confirming the docket_number also matches.
+    by confirming the docket_number and docket_number components also matches
+    if they're available.
 
     :param docket: The docket matched by the lookup
     :param docket_number: The incoming docket_number to lookup.
@@ -88,24 +89,24 @@ def confirm_docket_number_core_lookup_match(
     if existing_docket_number != incoming_docket_number:
         return None
 
-    # If the incoming data contains DN components and the docket also contains DN
-    # components, use them to confirm that the docket matches.
-    dn_fields = [
-        ("federal_defendant_number", federal_defendant_number),
-        (
-            "federal_dn_judge_initials_assigned",
-            federal_dn_judge_initials_assigned,
-        ),
-        (
-            "federal_dn_judge_initials_referred",
-            federal_dn_judge_initials_referred,
-        ),
-    ]
-    if all(
-        value is not None and getattr(docket, field) is not None
-        for field, value in dn_fields
-    ) and any(value != getattr(docket, field) for field, value in dn_fields):
-        return None
+    # If the incoming data contains docket_number components and the docket
+    # also contains DN components, use them to confirm that the docket matches.
+    dn_components = {
+        "federal_defendant_number": federal_defendant_number,
+        "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
+        "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
+    }
+    # Only compare DN component values if both the incoming data and the docket contain
+    # non-None DN component values.
+    for dn_key, dn_value in dn_components.items():
+        incoming_dn_value = dn_value
+        docket_dn_value = getattr(docket, dn_key, None)
+        if (
+            incoming_dn_value
+            and docket_dn_value
+            and incoming_dn_value != docket_dn_value
+        ):
+            return None
     return docket
 
 
@@ -113,7 +114,7 @@ async def find_docket_object(
     court_id: str,
     pacer_case_id: str | None,
     docket_number: str,
-    federal_defendant_number: int | None,
+    federal_defendant_number: str | None,
     federal_dn_judge_initials_assigned: str | None,
     federal_dn_judge_initials_referred: str | None,
     using: str = "default",
@@ -189,21 +190,20 @@ async def find_docket_object(
             if d:
                 break  # Nailed it!
         elif count > 1:
-            if all(
-                [
-                    federal_defendant_number,
-                    federal_dn_judge_initials_assigned,
-                    federal_dn_judge_initials_referred,
-                ]
-            ):
-                dn_lookup = {
-                    "federal_defendant_number": federal_defendant_number,
-                    "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
-                    "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
-                }
-                dn_queryset = ds.filter(**dn_lookup).using(using)
-                count = await dn_queryset.acount()
-
+            # If more than one docket matches, try refining the results using
+            # available docket_number components.
+            dn_components = {
+                "federal_defendant_number": federal_defendant_number,
+                "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
+                "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
+            }
+            dn_lookup = {
+                dn_key: dn_value
+                for dn_key, dn_value in dn_components.items()
+                if dn_value
+            }
+            dn_queryset = ds.filter(**dn_lookup).using(using)
+            count = await dn_queryset.acount()
             if count == 1:
                 d = await dn_queryset.afirst()
             else:
