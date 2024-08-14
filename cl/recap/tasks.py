@@ -2564,9 +2564,9 @@ def process_recap_email(
                 epq.court_id,
                 docket_entry["pacer_case_id"],
                 docket_data["docket_number"],
-                data.get("federal_defendant_number"),
-                data.get("federal_dn_judge_initials_assigned"),
-                data.get("federal_dn_judge_initials_referred"),
+                docket_data.get("federal_defendant_number"),
+                docket_data.get("federal_dn_judge_initials_assigned"),
+                docket_data.get("federal_dn_judge_initials_referred"),
             )
             docket.add_recap_source()
             async_to_sync(update_docket_metadata)(docket, docket_data)
