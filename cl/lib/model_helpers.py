@@ -500,7 +500,7 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
       - Mallory uploads a bad document via the RECAP APIs (these are open APIs).
       - The code here parses that upload in a way to create a redirect on the federalregister.gov
         website.
-      - federalregsiter.gov has an open redirect vulnerability (these are common).
+      - federalregister.gov has an open redirect vulnerability (these are common).
       - The user clicks a link on our site that goes to federalregister.gov, which redirects the
         user to evilsite.com (b/c evilsite.com got through our checks here).
       - The user is tricked on that site into doing something bad.
@@ -533,6 +533,16 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
                 f"{region.zfill(2)}-{case_type}-{number.zfill(6)}"
             )
             return f"https://www.nlrb.gov/case/{formatted_number}"
+
+    # US Tax Court pattern
+    if "Tax" in agency:
+        match = re.match(r"^(?:USTC-)?(\d{1,5})-(\d{2})([A-Z])?$", og_docket_number)
+        if match:
+            number, year, letter_suffix = match.groups()
+            formatted_number = f"{number.zfill(5)}-{year}"
+            if letter_suffix:
+                formatted_number += letter_suffix
+            return f"https://dawson.ustaxcourt.gov/case-detail/{formatted_number}"
 
     """Add other agencies as feasible. Note that the Federal Register link should cover multiple agencies.
     """
