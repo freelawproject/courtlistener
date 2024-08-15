@@ -544,6 +544,12 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
                 formatted_number += letter_suffix
             return f"https://dawson.ustaxcourt.gov/case-detail/{formatted_number}"
 
+    # EPA non-Federal Register pattern
+    if "Environmental Protection" in agency:
+        match = re.match(r"^EPA-(HQ|R\d{2})-[A-Z]{2,5}-\d{4}-\d{4}$", og_docket_number)
+        if match:
+            return f"https://www.regulations.gov/docket/{match}"
+
     """Add other agencies as feasible. Note that the Federal Register link should cover multiple agencies.
     """
     # If no match is found, return empty str
