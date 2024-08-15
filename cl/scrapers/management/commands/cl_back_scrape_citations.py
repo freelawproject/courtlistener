@@ -38,9 +38,13 @@ class Command(cl_back_scrape_opinions.Command):
         court_str = site.court_id.split(".")[-1].split("_")[0]
 
         for case in site:
-            citation = case.get("citation")
-            parallel_citation = case.get("parallel_citation")
+            citation = case.get("citations")
+            parallel_citation = case.get("parallel_citations")
             if not citation and not parallel_citation:
+                logger.debug(
+                    "No citation, skipping row for case %s",
+                    case.get("case_names"),
+                )
                 continue
 
             content = get_binary_content(case["download_urls"], site)
@@ -54,7 +58,9 @@ class Command(cl_back_scrape_opinions.Command):
             except Opinion.DoesNotExist:
                 missing_opinions.append(case)
                 logger.info(
-                    "Opinion with URL '%s' does not exist. Has citation '%s'. Will try to ingest all objects",
+                    "Case '%s', opinion '%s' has no matching hash in the DB. "
+                    "Has a citation '%s'. Will try to ingest all objects",
+                    case["case_names"],
                     case["download_urls"],
                     citation or parallel_citation,
                 )
@@ -80,14 +86,21 @@ class Command(cl_back_scrape_opinions.Command):
         # exists, it will be in the case dictionary, and will be saved in a
         # regular ingestion process
         if missing_opinions:
-            site.cases = missing_opinions
-            super().scrape_court(site, full_crawl=True)
+            # It is easy to ingest a filtered list of cases for OpinionSiteLinear
+            # but not for plain OpinionSite
+            if hasattr(site, "cases"):
+                site.cases = missing_opinions
+                super().scrape_court(site, full_crawl=True)
+            else:
+                logger.info("Run the backscraper to collect missing opinions")
 
     def citation_is_duplicated(
         self, citation_candidate: Citation, cluster: OpinionCluster, cite: str
     ) -> bool:
-        """Checks for exact or reporter duplication of citation in the cluster"""
-        citation_params = citation_candidate.__dict__
+        """Checks for exact or reporter duplication of citation in the cluster
+        Inspired on corpus_importer.utils.add_citations_to_cluster
+        """
+        citation_params = {**citation_candidate.__dict__}
         citation_params.pop("_state", "")
         citation_params.pop("id", "")
 

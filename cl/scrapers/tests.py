@@ -22,6 +22,7 @@ from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
 from cl.scrapers.management.commands import (
+    cl_back_scrape_citations,
     cl_scrape_opinions,
     cl_scrape_oral_arguments,
 )
@@ -29,8 +30,13 @@ from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
 from cl.scrapers.utils import get_binary_content, get_extension
-from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import Court, Docket, Opinion
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactory,
+    OpinionFactory,
+)
+from cl.search.models import Citation, Court, Docket, Opinion
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
@@ -666,3 +672,55 @@ class ScraperContentTypeTest(TestCase):
         with mock.patch.object(self.logger, "error") as error_mock:
             _ = get_binary_content("/dummy/url/", self.site)
             error_mock.assert_not_called()
+
+
+class ScrapeCitationsTestCase(TestCase):
+    """This class only tests the update of existing clusters
+    Since the ingestion of new clusters and their citations call
+    super().scrape_court(), it should be tested in the superclass
+    """
+
+    def setUp(self):
+        keys = [
+            "download_urls",
+            "case_names",
+            "citations",
+            "parallel_citations",
+        ]
+        self.mock_site = mock.MagicMock()
+        self.mock_site.__iter__.return_value = [
+            # update
+            dict(zip(keys, ["", "something", "482 Md. 342", ""])),
+            # exact duplicate
+            dict(zip(keys, ["", "something", "", "482 Md. 342"])),
+            # reporter duplicate
+            dict(zip(keys, ["", "something", "485 Md. 111", ""])),
+            # no citation, ignore
+            dict(zip(keys, ["", "something", "", ""])),
+        ]
+        self.mock_site.court_id = "juriscraper.md"
+        self.hash = "1234" * 10
+        self.hashes = [self.hash, self.hash, self.hash, "111"]
+
+        court = CourtFactory(id="md")
+        docket = DocketFactory(
+            case_name="Attorney Grievance v. Taniform",
+            docket_number="40ag/21",
+            court_id="md",
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+        self.cluster = OpinionClusterFactory(docket=docket)
+        opinion = OpinionFactory(sha1=self.hash, cluster=self.cluster)
+
+    def test_citation_scraper(self):
+        """Test if citation scraper creates a citation or ignores duplicates"""
+        cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
+        with mock.patch(f"{cmd}.sha1", side_effect=self.hashes):
+            with mock.patch(
+                f"{cmd}.get_binary_content", return_value="placeholder"
+            ):
+                cl_back_scrape_citations.Command().scrape_court(self.mock_site)
+
+        citations = Citation.objects.filter(cluster=self.cluster).count()
+        self.assertEqual(citations, 1, "Exactly 1 citation was expected")
