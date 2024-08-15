@@ -1267,7 +1267,7 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
             (
                 "Department of Transportation",
                 "89 Fed. Reg. 34,620",
-                "https://www.federalregister.gov/citation/88-FR-34,620",
+                "https://www.federalregister.gov/citation/89-FR-34,620",
             ),
             ("Federal Communications Commission", "19-CA-289275", ""),
             (
