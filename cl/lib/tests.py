@@ -106,21 +106,11 @@ class TestPacerSessionUtils(TestCase):
         self.test_cookies = RequestsCookieJar()
         self.test_cookies.set("PacerSession", "this-is-a-test")
         r.set(
-            session_key % "test_user_old_format",
-            pickle.dumps(self.test_cookies),
-            ex=60 * 60,
-        )
-        r.set(
             session_key % "test_user_new_format",
             pickle.dumps(
                 SessionData(self.test_cookies, "http://proxy_1:9090")
             ),
             ex=60 * 60,
-        )
-        r.set(
-            session_key % "test_old_format_almost_expired",
-            pickle.dumps(self.test_cookies),
-            ex=60,
         )
         r.set(
             session_key % "test_new_format_almost_expired",
@@ -137,14 +127,6 @@ class TestPacerSessionUtils(TestCase):
             session.proxy_address,
             ["http://proxy_1:9090", "http://proxy_2:9090"],
         )
-
-    def test_use_default_proxy_host_for_old_cookie_format(self):
-        """Can we handle the old cookie format properly?"""
-        session_data = get_or_cache_pacer_cookies(
-            "test_user_old_format", username="test", password="password"
-        )
-        self.assertIsInstance(session_data, SessionData)
-        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
 
     @patch("cl.lib.pacer_session.log_into_pacer")
     def test_compute_new_cookies_with_new_format(self, mock_log_into_pacer):
@@ -176,21 +158,6 @@ class TestPacerSessionUtils(TestCase):
     ):
         """Are we using the dataclass when re-computing session?"""
         mock_log_into_pacer.return_value = SessionData(
-            self.test_cookies, "http://proxy_1:9090"
-        )
-
-        # Attempts to get almost expired cookies with the old format from cache
-        # Expects refresh.
-        session_data = get_or_cache_pacer_cookies(
-            "test_old_format_almost_expired",
-            username="test",
-            password="password",
-        )
-        self.assertEqual(mock_log_into_pacer.call_count, 1)
-        self.assertIsInstance(session_data, SessionData)
-        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
-
-        mock_log_into_pacer.return_value = SessionData(
             self.test_cookies, "http://proxy_2:9090"
         )
 
@@ -202,7 +169,7 @@ class TestPacerSessionUtils(TestCase):
             password="password",
         )
         self.assertIsInstance(session_data, SessionData)
-        self.assertEqual(mock_log_into_pacer.call_count, 2)
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
         self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
 
 
@@ -1288,14 +1255,19 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 "https://www.federalregister.gov/citation/85-FR-12345",
             ),
             (
-                "Bureau of Land Managemnet",
+                "Bureau of Land Management",
                 "88FR20688",
                 "https://www.federalregister.gov/citation/88-FR-20688",
             ),
             (
-                "Bureau of Land Managemnet",
+                "Bureau of Land Management",
                 "88 Fed Reg 34523",
                 "https://www.federalregister.gov/citation/88-FR-34523",
+            ),
+            (
+                "Department of Transportation",
+                "89 Fed. Reg. 34,620",
+                "https://www.federalregister.gov/citation/89-FR-34,620",
             ),
             ("Federal Communications Commission", "19-CA-289275", ""),
             (
