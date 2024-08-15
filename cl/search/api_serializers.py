@@ -577,7 +577,6 @@ class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
             "local_path",
             "sha1",
             "cites",
-            "combined_fields",
         )
 
 
