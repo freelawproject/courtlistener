@@ -536,17 +536,23 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
     # US Tax Court pattern
     if "Tax" in agency:
-        match = re.match(r"^(?:USTC-)?(\d{1,5})-(\d{2})([A-Z])?$", og_docket_number)
+        match = re.match(
+            r"^(?:USTC-)?(\d{1,5})-(\d{2})([A-Z])?$", og_docket_number
+        )
         if match:
             number, year, letter_suffix = match.groups()
             formatted_number = f"{number.zfill(5)}-{year}"
             if letter_suffix:
                 formatted_number += letter_suffix
-            return f"https://dawson.ustaxcourt.gov/case-detail/{formatted_number}"
+            return (
+                f"https://dawson.ustaxcourt.gov/case-detail/{formatted_number}"
+            )
 
     # EPA non-Federal Register pattern
     if "Environmental Protection" in agency:
-        match = re.match(r"^EPA-(HQ|R\d{2})-[A-Z]{2,5}-\d{4}-\d{4}$", og_docket_number)
+        match = re.match(
+            r"^EPA-(HQ|R\d{2})-[A-Z]{2,5}-\d{4}-\d{4}$", og_docket_number
+        )
         if match:
             return f"https://www.regulations.gov/docket/{match}"
 
