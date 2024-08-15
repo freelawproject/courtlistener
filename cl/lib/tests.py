@@ -1255,14 +1255,19 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 "https://www.federalregister.gov/citation/85-FR-12345",
             ),
             (
-                "Bureau of Land Managemnet",
+                "Bureau of Land Management",
                 "88FR20688",
                 "https://www.federalregister.gov/citation/88-FR-20688",
             ),
             (
-                "Bureau of Land Managemnet",
+                "Bureau of Land Management",
                 "88 Fed Reg 34523",
                 "https://www.federalregister.gov/citation/88-FR-34523",
+            ),
+            (
+                "Department of Transportation",
+                "89 Fed. Reg. 34,620",
+                "https://www.federalregister.gov/citation/88-FR-34,620",
             ),
             ("Federal Communications Commission", "19-CA-289275", ""),
             (
