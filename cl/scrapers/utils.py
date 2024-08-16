@@ -162,9 +162,10 @@ def get_binary_content(
     :param download_url: The URL for the item you wish to download.
     :param site: Site object used to download data
 
-    :return: Two values. The first is a msg indicating any errors encountered.
-    If blank, that indicates success. The second value is the response object
-    containing the downloaded file.
+    :return: One of:
+        - None if there was no URL, if the downloaded file was empty or if
+            the content type did not match the expected types
+        - The downloaded and cleaned content
     """
     court_str = site.court_id.split(".")[-1].split("_")[0]
     fingerprint = [f"{court_str}-unexpected-content-type"]

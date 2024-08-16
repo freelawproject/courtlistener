@@ -674,7 +674,7 @@ class ScraperContentTypeTest(TestCase):
             error_mock.assert_not_called()
 
 
-class ScrapeCitationsTestCase(TestCase):
+class ScrapeCitationsTest(TestCase):
     """This class only tests the update of existing clusters
     Since the ingestion of new clusters and their citations call
     super().scrape_court(), it should be tested in the superclass
@@ -716,11 +716,10 @@ class ScrapeCitationsTestCase(TestCase):
     def test_citation_scraper(self):
         """Test if citation scraper creates a citation or ignores duplicates"""
         cmd = "cl.scrapers.management.commands.cl_back_scrape_citations"
-        with mock.patch(f"{cmd}.sha1", side_effect=self.hashes):
-            with mock.patch(
-                f"{cmd}.get_binary_content", return_value="placeholder"
-            ):
-                cl_back_scrape_citations.Command().scrape_court(self.mock_site)
+        with mock.patch(f"{cmd}.sha1", side_effect=self.hashes), mock.patch(
+            f"{cmd}.get_binary_content", return_value="placeholder"
+        ):
+            cl_back_scrape_citations.Command().scrape_court(self.mock_site)
 
         citations = Citation.objects.filter(cluster=self.cluster).count()
         self.assertEqual(citations, 1, "Exactly 1 citation was expected")

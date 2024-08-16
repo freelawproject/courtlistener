@@ -9,6 +9,7 @@ downloaded. If we find an Opinion we don't have in the database,
 we ingest it as in a regular scrape
 """
 
+from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 
 from cl.lib.command_utils import logger
@@ -16,7 +17,7 @@ from cl.lib.crypto import sha1
 from cl.scrapers.management.commands import cl_back_scrape_opinions
 from cl.scrapers.management.commands.cl_scrape_opinions import make_citation
 from cl.scrapers.utils import get_binary_content
-from cl.search.models import Citation, Opinion, OpinionCluster
+from cl.search.models import Citation, Opinion
 
 
 class Command(cl_back_scrape_opinions.Command):
@@ -74,13 +75,20 @@ class Command(cl_back_scrape_opinions.Command):
                 if not citation_candidate:
                     continue
 
-                if self.citation_is_duplicated(
-                    citation_candidate, cluster, cite
-                ):
+                if self.citation_is_duplicated(citation_candidate, cite):
                     continue
 
-                logger.info("Saving citation %s for cluster %s", cite, cluster)
-                citation_candidate.save()
+                try:
+                    citation_candidate.save()
+                    logger.info(
+                        "Saved citation %s for cluster %s", cite, cluster
+                    )
+                except IntegrityError:
+                    logger.warning(
+                        "Error when saving citation %s for cluster %s",
+                        cite,
+                        cluster,
+                    )
 
         # We don't have these opinions. Since we are backscraping, if the citation
         # exists, it will be in the case dictionary, and will be saved in a
@@ -95,32 +103,43 @@ class Command(cl_back_scrape_opinions.Command):
                 logger.info("Run the backscraper to collect missing opinions")
 
     def citation_is_duplicated(
-        self, citation_candidate: Citation, cluster: OpinionCluster, cite: str
+        self, citation_candidate: Citation, cite: str
     ) -> bool:
-        """Checks for exact or reporter duplication of citation in the cluster
-        Inspired on corpus_importer.utils.add_citations_to_cluster
+        """Checks if the citation is duplicated for the cluster
+
+        Following corpus_importer.utils.add_citations_to_cluster we
+        identify 2 types of duplication:
+        - exact: a citation with the same fields already exists for the cluster
+        - duplication in the same reporter: the cluster already has a citation
+            in that reporter
+
+        :param citation_candidate: the citation object
+        :param cite: citation string
+
+        :return: True if citation is duplicated, False if not
         """
         citation_params = {**citation_candidate.__dict__}
         citation_params.pop("_state", "")
         citation_params.pop("id", "")
+        cluster_id = citation_candidate.cluster.id
 
         # Exact duplication
         if Citation.objects.filter(**citation_params).exists():
             logger.info(
                 "Citation '%s' already exists for cluster %s",
                 cite,
-                cluster.id,
+                cluster_id,
             )
             return True
 
         # Duplication in the same reporter
         if Citation.objects.filter(
-            cluster_id=cluster.id, reporter=citation_candidate.reporter
+            cluster_id=cluster_id, reporter=citation_candidate.reporter
         ).exists():
             logger.info(
                 "Another citation in the same reporter '%s' exists for cluster %s",
                 citation_candidate.reporter,
-                cluster.id,
+                cluster_id,
             )
             return True
 
