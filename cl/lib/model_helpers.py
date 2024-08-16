@@ -537,7 +537,7 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
             return f"https://www.nlrb.gov/case/{formatted_number}"
 
     # US Tax Court pattern
-    if "Tax" in agency:
+    if "Tax" or "Internal Revenue" in agency:
         match = re.match(
             r"^(?:USTC-)?(\d{1,5})-(\d{2})([A-Z])?$", og_docket_number
         )
