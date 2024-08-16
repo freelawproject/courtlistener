@@ -1789,6 +1789,64 @@ def merge_unavailable_fields_on_parent_document(
                         result["id"], ""
                     )
 
+        case (
+            SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
+        ) if request_type == "frontend":
+            # Merge initial complaint button to the frontend search results.
+            docket_ids = {doc["docket_id"] for doc in results}
+            # This query retrieves initial complaint documents considering two
+            # possibilities:
+            # 1. For district, bankruptcy, and appellate entries where we don't know
+            #    if the entry contains attachments, it considers:
+            #    document_number=1 and attachment_number=None and document_type=PACER_DOCUMENT
+            #    This represents the main document with document_number 1.
+            # 2. For appellate entries where the attachment page has already been
+            #    merged, it considers:
+            #    document_number=1 and attachment_number=1 and document_type=ATTACHMENT
+            #    This represents document_number 1 that has been converted to an attachment.
+            initial_complaints = (
+                RECAPDocument.objects.filter(
+                    QObject(
+                        QObject(
+                            attachment_number=None,
+                            document_type=RECAPDocument.PACER_DOCUMENT,
+                        )
+                        | QObject(
+                            attachment_number=1,
+                            document_type=RECAPDocument.ATTACHMENT,
+                        )
+                    ),
+                    docket_entry__docket_id__in=docket_ids,
+                    document_number="1",
+                )
+                .select_related("docket_entry")
+                .only(
+                    "document_number",
+                    "attachment_number",
+                    "pacer_doc_id",
+                    "is_available",
+                    "filepath_local",
+                    "docket_entry__docket_id",
+                )
+            )
+            initial_complaints_in_page = {}
+            for initial_complaint in initial_complaints:
+                if initial_complaint.has_valid_pdf:
+                    initial_complaints_in_page[
+                        initial_complaint.docket_entry.docket_id
+                    ] = (initial_complaint.get_absolute_url(), True)
+                else:
+                    initial_complaints_in_page[
+                        initial_complaint.docket_entry.docket_id
+                    ] = (initial_complaint.pacer_url, False)
+
+            for result in results:
+                complaint_url, available = initial_complaints_in_page.get(
+                    result.docket_id, (None, None)
+                )
+                result["initial_complaint_url"] = complaint_url
+                result["available_initial_complaint"] = available
+
         case SEARCH_TYPES.OPINION if request_type == "v4" and not highlight:
             # Retrieves the Opinion plain_text from the DB to fill the snippet
             # when highlighting is disabled. Considering the same prioritization

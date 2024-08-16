@@ -207,6 +207,15 @@
       {% endwith %}
     {% endfor %}
     <div class="col-md-offset-half">
+      {% if result.available_initial_complaint %}
+        <a href="{{ result.initial_complaint_url }}" class="initial-complaint btn-primary btn">
+          Initial Complaint
+        </a>
+      {% elif result.available_initial_complaint == False %}
+        <a href="{{ result.initial_complaint_url }}" rel="nofollow" target="_blank"  class="initial-complaint btn-primary btn">
+          Buy Initial Complaint
+        </a>
+      {% endif %}
       {% if result.child_remaining %}
         <a href="{% url "show_results" %}?type={{ type|urlencode }}&q={% if request.GET.q %}({{ request.GET.q|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}" class="btn-default btn">
           View Additional Results for this Case
