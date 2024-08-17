@@ -1982,12 +1982,14 @@ class OpinionsESSearchTest(
         """Confirm if the query citation alert is shown on the frontend when
         querying a single citation, and it's found into ES."""
 
+        # Cluster with citation and multiple sibling opinions is properly matched.
         with self.captureOnCommitCallbacks(execute=True):
             cluster = OpinionClusterFactory.create(
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 docket=self.docket_1,
                 date_filed=datetime.date(2024, 8, 23),
             )
+            OpinionFactory.create(cluster=cluster, plain_text="")
             OpinionFactory.create(cluster=cluster, plain_text="")
             CitationWithParentsFactory.create(
                 volume=31,
@@ -2009,6 +2011,39 @@ class OpinionsESSearchTest(
         self.assertIn(
             "It looks like you're trying to search for", r.content.decode()
         )
+
+        # Add a new cluster for the same citation. This time, it is not
+        # possible to identify a unique case for the citation.
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster_2 = OpinionClusterFactory.create(
+                case_name="Test case",
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                docket=self.docket_1,
+                date_filed=datetime.date(2024, 8, 23),
+            )
+            OpinionFactory.create(cluster=cluster_2, plain_text="")
+            CitationWithParentsFactory.create(
+                volume=31,
+                reporter="Pa. D. & C.",
+                page="445",
+                type=2,
+                cluster=cluster_2,
+            )
+
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "31 Pa. D. & C. 445",
+            "order_by": "score desc",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertNotIn(
+            "It looks like you're trying to search for", r.content.decode()
+        )
+
+        cluster_2.delete()
         cluster.delete()
 
 
