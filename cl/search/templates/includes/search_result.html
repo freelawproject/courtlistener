@@ -207,12 +207,12 @@
       {% endwith %}
     {% endfor %}
     <div class="col-md-offset-half">
-      {% if result.available_initial_complaint %}
+      {% if result.initial_complaint_url %}
         <a href="{{ result.initial_complaint_url }}" class="initial-complaint btn-primary btn">
           Initial Complaint
         </a>
-      {% elif result.available_initial_complaint == False %}
-        <a href="{{ result.initial_complaint_url }}" rel="nofollow" target="_blank"  class="initial-complaint btn-primary btn">
+      {% elif result.buy_initial_complaint_url %}
+        <a href="{{ result.buy_initial_complaint_url }}" rel="nofollow" target="_blank"  class="initial-complaint btn-primary btn">
           Buy Initial Complaint
         </a>
       {% endif %}

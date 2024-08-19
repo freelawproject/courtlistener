@@ -1819,14 +1819,24 @@ def merge_unavailable_fields_on_parent_document(
                     docket_entry__docket_id__in=docket_ids,
                     document_number="1",
                 )
-                .select_related("docket_entry")
+                .select_related(
+                    "docket_entry",
+                    "docket_entry__docket",
+                    "docket_entry__docket__court",
+                )
                 .only(
+                    "pk",
+                    "document_type",
                     "document_number",
                     "attachment_number",
                     "pacer_doc_id",
                     "is_available",
                     "filepath_local",
                     "docket_entry__docket_id",
+                    "docket_entry__docket__slug",
+                    "docket_entry__docket__pacer_case_id",
+                    "docket_entry__docket__court__jurisdiction",
+                    "docket_entry__docket__court_id",
                 )
             )
             initial_complaints_in_page = {}
@@ -1834,18 +1844,20 @@ def merge_unavailable_fields_on_parent_document(
                 if initial_complaint.has_valid_pdf:
                     initial_complaints_in_page[
                         initial_complaint.docket_entry.docket_id
-                    ] = (initial_complaint.get_absolute_url(), True)
+                    ] = (initial_complaint.get_absolute_url(), None)
                 else:
                     initial_complaints_in_page[
                         initial_complaint.docket_entry.docket_id
-                    ] = (initial_complaint.pacer_url, False)
+                    ] = (None, initial_complaint.pacer_url)
 
             for result in results:
-                complaint_url, available = initial_complaints_in_page.get(
-                    result.docket_id, (None, None)
+                complaint_url, buy_complaint_url = (
+                    initial_complaints_in_page.get(
+                        result.docket_id, (None, None)
+                    )
                 )
                 result["initial_complaint_url"] = complaint_url
-                result["available_initial_complaint"] = available
+                result["buy_initial_complaint_url"] = buy_complaint_url
 
         case SEARCH_TYPES.OPINION if request_type == "v4" and not highlight:
             # Retrieves the Opinion plain_text from the DB to fill the snippet

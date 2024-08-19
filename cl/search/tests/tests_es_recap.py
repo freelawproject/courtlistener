@@ -2297,10 +2297,29 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="234563",
             )
 
-            # Appellate document initial complaint available
+            # Appellate document initial not available and not pacer_doc_id
             de_3 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
-                    court=self.court,
+                    court=self.court_2,
+                    case_name="Appellate Complaint Not Available no pacer_doc_id",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            initial_complaint_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                document_number="1",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+
+            # Appellate document initial complaint available
+            de_4 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
                     case_name="Lorem Appellate vs Complaint Available",
                     docket_number="1:21-bk-1236",
                     source=Docket.RECAP,
@@ -2310,8 +2329,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
-            initial_complaint_3 = RECAPDocumentFactory(
-                docket_entry=de_3,
+            initial_complaint_4 = RECAPDocumentFactory(
+                docket_entry=de_4,
                 document_number="1",
                 attachment_number=1,
                 document_type=RECAPDocument.ATTACHMENT,
@@ -2348,7 +2367,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             cd, 1, "Complaint Not available"
         )
         button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Buy Initial Complaint", button_text)
+        self.assertEqual("Buy Initial Complaint", button_text, msg="Error 1")
         self.assertEqual(initial_complaint_2.pacer_url, button_url)
 
         # Appellate document initial complaint available
@@ -2361,7 +2380,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         button_url, button_text = self._parse_initial_complaint_button(r)
         self.assertEqual("Initial Complaint", button_text)
-        self.assertEqual(initial_complaint_3.get_absolute_url(), button_url)
+        self.assertEqual(initial_complaint_4.get_absolute_url(), button_url)
 
         # No docket entry is available for the initial complaint. No button is shown.
         cd = {
@@ -2375,9 +2394,23 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertIsNone(button_text)
         self.assertIsNone(button_url)
 
+        # Appellate document initial not available and not pacer_doc_id.
+        # No button is shown.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Appellate Complaint Not Available no pacer_doc_id"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Appellate Complaint button no available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertIsNone(button_text)
+        self.assertIsNone(button_url)
+
         de_1.docket.delete()
         de_2.docket.delete()
         de_3.docket.delete()
+        de_4.docket.delete()
         empty_docket.delete()
 
 
