@@ -339,7 +339,7 @@ async def redirect_docket_recap(
     )
 
 
-async def fetch_docket_entries(request, docket, form=None):
+async def fetch_docket_entries(request, docket):
     """ Fetch docket entries asociated to docket
 
     param request: current HttpRequest.
@@ -350,8 +350,21 @@ async def fetch_docket_entries(request, docket, form=None):
     de_list = docket.docket_entries.all().prefetch_related(
       Prefetch("recap_documents", queryset=RECAPDocument.objects.defer("plain_text"))
     )
+    return de_list
+
+
+async def view_docket(
+    request: HttpRequest, pk: int, slug: str
+) -> HttpResponse:
+
+    sort_order_asc = True
+    form = DocketEntryFilterForm(request.GET, request=request)
+    docket, context = await core_docket_data(request, pk)
+    await increment_view_count(docket, request)
+
+    de_list = await fetch_docket_entries(request, docket)
+
     if await sync_to_async(form.is_valid)():
-        if not form:
             cd = form.cleaned_data
 
             if cd.get("entry_gte"):
@@ -366,22 +379,8 @@ async def fetch_docket_entries(request, docket, form=None):
               de_list = de_list.order_by(
                   "-recap_sequence_number", "-entry_number"
               )
-    return de_list
-
-
-async def view_docket(
-    request: HttpRequest, pk: int, slug: str
-) -> HttpResponse:
-
-    sort_order_asc = True
-    form = DocketEntryFilterForm(request.GET, request=request)
-    docket, context = await core_docket_data(request, pk)
-    await increment_view_count(docket, request)
-
-    de_list = await fetch_docket_entries(request, docket, form)
 
     page = request.GET.get("page", 1)
-
 
     @sync_to_async
     def paginate_docket_entries(docket_entries, docket_page):
@@ -616,10 +615,8 @@ async def download_docket_entries_csv(
         logger.debug(f"HERE: {filename}")
         return response
 
-    #FIXME delete form without modifying solution
-    form = DocketEntryFilterForm(request.POST, request=request)
     docket, _ = await core_docket_data(request, docket_id)
-    de_list = await fetch_docket_entries(request, docket, form)
+    de_list = await fetch_docket_entries(request, docket)
     court_id = docket.court_id
     case_name = docket.slug
 
@@ -629,7 +626,6 @@ async def download_docket_entries_csv(
 
     response = await sync_to_async(generate_csv)(de_list, filename)
     return response
-
 
 
 async def view_recap_document(
