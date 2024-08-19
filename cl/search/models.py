@@ -1167,6 +1167,9 @@ class CSVExportMixin:
             row.append(attr)
         return row
 
+    def add_class_name(self, attribute_name):
+        return f"{self.__class__.__name__.lower()}_{attribute_name}"
+
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
 class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
@@ -1291,19 +1294,17 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
         return None
 
     def get_csv_columns(self, get_column_name=False):
-        columns = []
-        if get_column_name:
-            columns.append(self.__class__.__name__.lower() + "_id")
-        else:
-            columns.append("id")
-        columns.extend([
+        columns = [
+            "id",
             "entry_number",
             "date_filed",
             "time_filed",
             "pacer_sequence_number",
             "recap_sequence_number",
             "description"
-        ])
+        ]
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
         return columns
 
     def get_column_fuction(self):
@@ -1797,12 +1798,8 @@ class RECAPDocument(AbstractPacerDocument,
         return normalize_search_dicts(out)
 
     def get_csv_columns(self, get_column_name=False):
-        columns = []
-        if get_column_name:
-            columns.append(self.__class__.__name__.lower() + "_id")
-        else:
-            columns.append("id")
-        columns.extend([
+        columns = [
+            "id",
             "document_type",
             "description",
             "acms_document_guid",
@@ -1819,7 +1816,9 @@ class RECAPDocument(AbstractPacerDocument,
             "filepath_local",
             "filepath_ia",
             "ocr_status"
-        ])
+        ]
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
         return columns
 
     def _get_readable_document_type(self, *args, **kwargs):
