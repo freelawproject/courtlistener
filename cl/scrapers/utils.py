@@ -21,6 +21,11 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.recap.mergers import find_docket_object
+from cl.scrapers.exceptions import (
+    EmptyFileError,
+    NoDownloadUrlError,
+    UnexpectedContentTypeError,
+)
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, Docket, RECAPDocument
 
@@ -155,26 +160,18 @@ def get_extension(content: bytes) -> str:
 def get_binary_content(
     download_url: str,
     site: AbstractSite,
-) -> Optional[bytes | str]:
+) -> bytes | str:
     """Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
     :param site: Site object used to download data
 
-    :return: One of:
-        - None if there was no URL, if the downloaded file was empty or if
-            the content type did not match the expected types
-        - The downloaded and cleaned content
+    :return: The downloaded and cleaned content
+    :raises: NoDownloadUrlError, UnexpectedContentTypeError, EmptyFileError
     """
-    court_str = site.court_id.split(".")[-1].split("_")[0]
-    fingerprint = [f"{court_str}-unexpected-content-type"]
-
     if not download_url:
-        # Occurs when a DeferredList fetcher fails.
-        error = f"NoDownloadUrlError: {download_url}\n{traceback.format_exc()}"
-        logger.error(error, extra={"fingerprint": fingerprint})
-        return
+        raise NoDownloadUrlError(download_url)
 
     # noinspection PyBroadException
     if site.method == "LOCAL":
@@ -207,9 +204,7 @@ def get_binary_content(
 
         # test for empty files (thank you CA1)
         if len(r.content) == 0:
-            error = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
-            logger.error(error, extra={"fingerprint": fingerprint})
-            return
+            raise EmptyFileError(f"EmptyFileError: '{download_url}'")
 
         # test for expected content type (thanks mont for nil)
         if site.expected_content_types:
@@ -224,12 +219,10 @@ def get_binary_content(
             )
 
             if not m:
-                error = (
-                    f"UnexpectedContentTypeError: {download_url}\n"
-                    f'\'"{content_type}" not in {site.expected_content_types}'
-                )
-                logger.error(error, extra={"fingerprint": fingerprint})
-                return
+                court_str = site.court_id.split(".")[-1].split("_")[0]
+                fingerprint = [f"{court_str}-unexpected-content-type"]
+                msg = f"'{download_url}' '{content_type}' not in {site.expected_content_types}"
+                raise UnexpectedContentTypeError(msg, fingerprint=fingerprint)
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)

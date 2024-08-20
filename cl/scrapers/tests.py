@@ -21,6 +21,11 @@ from cl.donate.models import Donation
 from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
+from cl.scrapers.exceptions import (
+    ConsecutiveDuplicatesError,
+    SingleDuplicateError,
+    UnexpectedContentTypeError,
+)
 from cl.scrapers.management.commands import (
     cl_back_scrape_citations,
     cl_scrape_opinions,
@@ -448,26 +453,21 @@ class DupcheckerTest(TestCase):
         site = test_opinion_scraper.Site()
         site.hash = "this is a dummy hash code string"
         for dup_checker in self.dup_checkers:
-            onwards = dup_checker.press_on(
-                Opinion,
-                now(),
-                now() - timedelta(days=1),
-                lookup_value="content",
-                lookup_by="sha1",
-            )
-            if dup_checker.full_crawl:
-                self.assertTrue(
-                    onwards,
-                    "DupChecker says to abort during a full crawl. This should "
-                    "never happen.",
+            try:
+                dup_checker.press_on(
+                    Opinion,
+                    now(),
+                    now() - timedelta(days=1),
+                    lookup_value="content",
+                    lookup_by="sha1",
                 )
-            elif dup_checker.full_crawl is False:
-                count = Opinion.objects.all().count()
-                self.assertTrue(
-                    onwards,
-                    "DupChecker says to abort on dups when the database has %s "
-                    "Documents." % count,
-                )
+            except (SingleDuplicateError, ConsecutiveDuplicatesError):
+                if dup_checker.full_crawl:
+                    failure = "DupChecker says to abort during a full crawl. This should never happen."
+                else:
+                    count = Opinion.objects.all().count()
+                    failure = f"DupChecker says to abort on dups when the database has {count} Documents."
+                self.fail(failure)
 
 
 class DupcheckerWithFixturesTest(TestCase):
@@ -492,77 +492,53 @@ class DupcheckerWithFixturesTest(TestCase):
 
     def test_press_on_with_a_dup_found(self) -> None:
         for dup_checker in self.dup_checkers:
-            onwards = dup_checker.press_on(
-                Opinion,
-                now(),
-                now(),
-                lookup_value=self.content_hash,
-                lookup_by="sha1",
-            )
-            if dup_checker.full_crawl:
-                self.assertFalse(
-                    onwards,
-                    "DupChecker returned True during a full crawl, but there "
-                    "should be duplicates in the database.",
+            try:
+                dup_checker.press_on(
+                    Opinion,
+                    now(),
+                    now(),
+                    lookup_value=self.content_hash,
+                    lookup_by="sha1",
                 )
-                self.assertFalse(
-                    dup_checker.emulate_break,
-                    "DupChecker said to emulate a break during a full crawl. "
-                    "Nothing should stop a full crawl!",
-                )
-
-            elif dup_checker.full_crawl is False:
-                self.assertFalse(
-                    onwards,
-                    "DupChecker returned %s but there should be a duplicate in "
-                    "the database. dup_count is %s, and dup_threshold is %s"
-                    % (
-                        onwards,
-                        dup_checker.dup_count,
-                        dup_checker.dup_threshold,
-                    ),
-                )
-                self.assertTrue(
-                    dup_checker.emulate_break,
-                    "We should have hit a break but didn't.",
-                )
+                if not dup_checker.full_crawl:
+                    self.fail("Did not raise ConsecutiveDuplicatesError.")
+            except ConsecutiveDuplicatesError:
+                if dup_checker.full_crawl:
+                    self.fail(
+                        "DupChecker raised ConsecutiveDuplicatesError breaking"
+                        " the outer loop. Nothing should stop a full crawl!"
+                    )
+            except SingleDuplicateError:
+                # Full crawl or not, a SingleDuplicateError is
+                # expected when a duplicate is found
+                pass
 
     def test_press_on_with_dup_found_and_older_date(self) -> None:
         for dup_checker in self.dup_checkers:
             # Note that the next case occurs prior to the current one
-            onwards = dup_checker.press_on(
-                Opinion,
-                now(),
-                now() - timedelta(days=1),
-                lookup_value=self.content_hash,
-                lookup_by="sha1",
-            )
-            if dup_checker.full_crawl:
-                self.assertFalse(
-                    onwards,
-                    "DupChecker returned True during a full crawl, but there "
-                    "should be duplicates in the database.",
+            try:
+                dup_checker.press_on(
+                    Opinion,
+                    now(),
+                    now() - timedelta(days=1),
+                    lookup_value=self.content_hash,
+                    lookup_by="sha1",
                 )
-                self.assertFalse(
-                    dup_checker.emulate_break,
-                    "DupChecker said to emulate a break during a full crawl. "
-                    "Nothing should stop a full crawl!",
+                self.fail(
+                    "Expected raising SingleDuplicateError, there was a duplicate in the DB"
                 )
-            else:
-                self.assertFalse(
-                    onwards,
-                    "DupChecker returned %s but there should be a duplicate in "
-                    "the database. dup_count is %s, and dup_threshold is %s"
-                    % (
-                        onwards,
-                        dup_checker.dup_count,
-                        dup_checker.dup_threshold,
-                    ),
-                )
-                self.assertTrue(
-                    dup_checker.emulate_break,
-                    "We should have hit a break but didn't.",
-                )
+
+            except SingleDuplicateError:
+                # Full crawl or not, a SingleDuplicateError is
+                # expected when a duplicate is found
+                pass
+            except ConsecutiveDuplicatesError:
+                if dup_checker.full_crawl:
+                    self.fail(
+                        "DupChecker raised ConsecutiveDuplicatesError during a "
+                        "full crawl, breaking the outer loop. Nothing should "
+                        "stop a full crawl!"
+                    )
 
 
 class AudioFileTaskTest(TestCase):
@@ -641,10 +617,11 @@ class ScraperContentTypeTest(TestCase):
         """Test when content type doesn't match scraper expectation."""
         mock_get.return_value = self.mock_response
         self.site.expected_content_types = ["text/html"]
-        with mock.patch.object(self.logger, "error") as error_mock:
-            get_binary_content("/dummy/url/", self.site)
-        self.assertIn(
-            "UnexpectedContentTypeError:", error_mock.call_args_list[0][0][0]
+        self.assertRaises(
+            UnexpectedContentTypeError,
+            get_binary_content,
+            "/dummy/url/",
+            self.site,
         )
 
     @mock.patch("requests.Session.get")

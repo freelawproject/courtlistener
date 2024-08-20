@@ -14,14 +14,22 @@ from django.utils.encoding import force_bytes
 
 from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
+from cl.scrapers.DupChecker import DupChecker
+from cl.scrapers.exceptions import BadContentError
 from cl.scrapers.management.commands import cl_back_scrape_opinions
 from cl.scrapers.management.commands.cl_scrape_opinions import make_citation
 from cl.scrapers.utils import get_binary_content
-from cl.search.models import Citation, Opinion
+from cl.search.models import Citation, Court, Opinion
 
 
 class Command(cl_back_scrape_opinions.Command):
-    def scrape_court(self, site, full_crawl=False, ocr_available=True):
+    def scrape_court(
+        self,
+        site,
+        full_crawl: bool = False,
+        ocr_available: bool = True,
+        backscrape: bool = False,
+    ):
         """
         If the scraped case has citation data
             Check for Opinion existance via content hash
@@ -35,8 +43,9 @@ class Command(cl_back_scrape_opinions.Command):
         :param site: scraper object that has already downloaded
             it's case data
         """
-        missing_opinions = []
         court_str = site.court_id.split(".")[-1].split("_")[0]
+        court = Court.objects.get(id=court_str)
+        dup_checker = DupChecker(court, full_crawl=True)
 
         for case in site:
             citation = case.get("citations")
@@ -48,16 +57,19 @@ class Command(cl_back_scrape_opinions.Command):
                 )
                 continue
 
-            content = get_binary_content(case["download_urls"], site)
-            if not content:
-                # Errors are logged by get_binary_content itself
+            try:
+                content = get_binary_content(case["download_urls"], site)
+            except BadContentError:
                 continue
+
             sha1_hash = sha1(force_bytes(content))
 
             try:
                 cluster = Opinion.objects.get(sha1=sha1_hash).cluster
             except Opinion.DoesNotExist:
-                missing_opinions.append(case)
+                # populate special key to avoid downloading the file again
+                case["content"] = content
+
                 logger.info(
                     "Case '%s', opinion '%s' has no matching hash in the DB. "
                     "Has a citation '%s'. Will try to ingest all objects",
@@ -65,6 +77,8 @@ class Command(cl_back_scrape_opinions.Command):
                     case["download_urls"],
                     citation or parallel_citation,
                 )
+
+                self.ingest_a_case(case, None, True, site, dup_checker, court)
                 continue
 
             for cite in [citation, parallel_citation]:
@@ -89,18 +103,6 @@ class Command(cl_back_scrape_opinions.Command):
                         cite,
                         cluster,
                     )
-
-        # We don't have these opinions. Since we are backscraping, if the citation
-        # exists, it will be in the case dictionary, and will be saved in a
-        # regular ingestion process
-        if missing_opinions:
-            # It is easy to ingest a filtered list of cases for OpinionSiteLinear
-            # but not for plain OpinionSite
-            if hasattr(site, "cases"):
-                site.cases = missing_opinions
-                super().scrape_court(site, full_crawl=True)
-            else:
-                logger.info("Run the backscraper to collect missing opinions")
 
     def citation_is_duplicated(
         self, citation_candidate: Citation, cite: str
