@@ -1804,6 +1804,12 @@ def merge_unavailable_fields_on_parent_document(
             #    merged, it considers:
             #    document_number=1 and attachment_number=1 and document_type=ATTACHMENT
             #    This represents document_number 1 that has been converted to an attachment.
+
+            appellate_court_ids = (
+                Court.federal_courts.appellate_pacer_courts().values_list(
+                    "pk", flat=True
+                )
+            )
             initial_complaints = (
                 RECAPDocument.objects.filter(
                     QObject(
@@ -1814,6 +1820,7 @@ def merge_unavailable_fields_on_parent_document(
                         | QObject(
                             attachment_number=1,
                             document_type=RECAPDocument.ATTACHMENT,
+                            docket_entry__docket__court_id__in=appellate_court_ids,
                         )
                     ),
                     docket_entry__docket_id__in=docket_ids,

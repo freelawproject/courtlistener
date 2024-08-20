@@ -2276,6 +2276,17 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 document_type=RECAPDocument.PACER_DOCUMENT,
                 is_available=True,
                 filepath_local=sample_file,
+                pacer_doc_id="1234567",
+            )
+            # This attachment 1 should be ignored for non-appellate courts
+            RECAPDocumentFactory(
+                docket_entry=de_1,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="1234568",
             )
 
             # District document initial complaint not available
@@ -2293,8 +2304,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             initial_complaint_2 = RECAPDocumentFactory(
                 docket_entry=de_2,
                 document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
                 is_available=False,
                 pacer_doc_id="234563",
+            )
+            # This attachment 1 should be ignored for non-appellate courts
+            RECAPDocumentFactory(
+                docket_entry=de_2,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=False,
+                pacer_doc_id="234564",
             )
 
             # Appellate document initial not available and not pacer_doc_id
@@ -2336,6 +2357,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 document_type=RECAPDocument.ATTACHMENT,
                 is_available=True,
                 filepath_local=sample_file,
+                pacer_doc_id="7654321",
             )
 
             # No DocketEntry for the initial complaint available
