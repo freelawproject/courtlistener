@@ -25,7 +25,7 @@ VALID_COLUMBIA_SOURCES = [
 ]
 
 
-def sort_harvard_opinions(options) -> None:
+def sort_harvard_opinions(options: dict) -> None:
     """Sort harvard opinions
 
     We assume that harvard data is already ordered, we just need to fill
@@ -239,14 +239,15 @@ def update_opinions(
             )
 
 
-def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
+def sort_columbia_opinions(options: dict) -> None:
     """Update opinion ordering for columbia clusters
 
-    :param start_id: skip any id lower than this value
-    :param end_id: skip any id greater than this value
-    :param xml_dir: absolute path to the directory with columbia xml files
+    :param options: dict of arguments passed to the command
     :return: None
     """
+
+    skip_until = options.get("skip_until", None)
+    limit = options.get("limit", None)
 
     # Get all columbia cluster ids with more than one opinion
     clusters = (
@@ -256,11 +257,11 @@ def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
         .values_list("id", flat=True)
     )
 
-    if start_id:
-        clusters = filter(lambda x: x >= start_id, clusters)
+    if skip_until:
+        clusters = clusters.filter(pk__gte=skip_until)
 
-    if end_id:
-        clusters = filter(lambda x: x <= end_id, clusters)
+    if limit:
+        clusters = clusters[:limit]
 
     for cluster_id in clusters:
         logger.info(f"Processing cluster id: {cluster_id}")
@@ -271,13 +272,23 @@ def sort_columbia_opinions(start_id: int, end_id: int, xml_dir: str) -> None:
             )
         except EmptyOpinionException:
             logger.warning(
-                f"At least one of the opinions from cluster id: {cluster_id} is empty."
+                f"At least one of the html_columbia fields in the opinions from "
+                f"cluster id: {cluster_id} is empty"
+            )
+            continue
+
+        if not xml_path:
+            logger.warning(
+                f"Unable to find an xml file assigned to any opinion for cluster id: "
+                f"{cluster_id}"
             )
             continue
 
         extracted_columbia_opinions = None
         if xml_path:
-            fixed_xml_filepath = os.path.join(xml_dir, fix_filepath(xml_path))
+            fixed_xml_filepath = os.path.join(
+                options.get("xml_dir"), fix_filepath(xml_path)
+            )
 
             if not os.path.exists(fixed_xml_filepath):
                 logger.warning(
@@ -389,6 +400,12 @@ class Command(VerboseCommand):
             default=0.2,
             help="How long to wait to update each opinion (in seconds, allows "
             "floating numbers).",
+        )
+        parser.add_argument(
+            "--xml-dir",
+            default="/opt/courtlistener/_columbia",
+            required=False,
+            help="The absolute path to the directory with columbia xml files",
         )
 
     def handle(self, *args, **options):
