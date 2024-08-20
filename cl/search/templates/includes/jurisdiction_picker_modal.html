@@ -48,14 +48,14 @@
                 <ul class="nav nav-tabs" id="court-picker-tabs">
                     {% comment %}
                                        Which Types Get Which Tabs?
-                              ┌──────┬───────┬───────┬───────┬─────────┐
-                              │ App. │ Dist. │ Bank. │ State │ Special │
-                              ├──────┼───────┼───────┼───────┼─────────┤
-                     opinions │   X  │   X   │   X   │   X   │    X    │
-                        recap │   X  │   X   │   X   │       │    X    │
-                    oral args │   X  │       │       │       │         │
-                       people │   X  │   X   │   X   │   X   │    X    │
-                              └──────┴───────┴───────┴───────┴─────────┘
+                              ┌──────┬───────┬───────┬───────┬──────┐
+                              │ App. │ Dist. │ Bank. │ State │ More │
+                              ├──────┼───────┼───────┼───────┼──────┤
+                     opinions │   X  │   X   │   X   │   X   │   X  │
+                        recap │   X  │   X   │   X   │       │   X  │
+                    oral args │   X  │       │       │       │      │
+                       people │   X  │   X   │   X   │   X   │   X  │
+                              └──────┴───────┴───────┴───────┴──────┘
 
                     {% endcomment %}
                     <li class="active">
@@ -89,8 +89,8 @@
                     {% endif %}
                     {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
                         <li>
-                            <a href="#tab-special"
-                               data-toggle="tab">Special</a>
+                            <a href="#tab-more"
+                               data-toggle="tab">More</a>
                         </li>
                     {% endif %}
                 </ul>
@@ -114,9 +114,9 @@
                             {% for group in district_courts %}
                                 <h3 class="bottom inline">
                                     {% if group.grouper %}
-                                        Terminated Courts
+                                        Historical Courts
                                     {% else %}
-                                        Active Courts
+                                        Miscellaneous Courts
                                     {% endif %}
                                 </h3>
                                 <div class="row">
@@ -193,16 +193,16 @@
                     {% endif %}
 
                     {% if v != SEARCH_TYPES.ORAL_ARGUMENT %}
-                        <div class="tab-pane" id="tab-special">
+                        <div class="tab-pane" id="tab-more">
                             {# Regroup into closed/open courts #}
                             {% regroup  courts.special|dictsort:"is_terminated" by is_terminated as special_courts %}
 
                             {% for group in special_courts %}
                                 <h3 class="bottom inline">
                                     {% if group.grouper %}
-                                        Terminated Courts
+                                        Historical Courts
                                     {% else %}
-                                        Active Courts
+                                        Miscellaneous Courts
                                     {% endif %}
                                 </h3>
                                 <div class="row">
