@@ -131,11 +131,13 @@ def es_case_name_query(
 
 
 def es_search_db_for_full_citation(
-    full_citation: FullCaseCitation,
+    full_citation: FullCaseCitation, query_citation: bool = False
 ) -> list[Hit]:
     """For a citation object, try to match it to an item in the database using
     a variety of heuristics.
     :param full_citation: A FullCaseCitation instance.
+    :param query_citation: Whether this is related to es_get_query_citation
+    resolution
     return: A ElasticSearch Result object with the results, or an empty list if
      no hits
     """
@@ -147,12 +149,20 @@ def es_search_db_for_full_citation(
         Q(
             "term", **{"status.raw": "Published"}
         ),  # Non-precedential documents aren't cited
-        Q("match", cluster_child="opinion"),
     ]
+
+    if query_citation:
+        # If this is related to query citation resolution, look for
+        # opinion_cluster to determine if a citation matched a single cluster.
+        filters.append(Q("match", cluster_child="opinion_cluster"))
+    else:
+        filters.append(Q("match", cluster_child="opinion"))
+
     must_not = []
     if full_citation.citing_opinion is not None:
         # Eliminate self-cites.
         must_not.append(Q("match", id=full_citation.citing_opinion.pk))
+
     # Set up filter parameters
     if full_citation.year:
         start_year = end_year = full_citation.year
@@ -204,7 +214,6 @@ def es_search_db_for_full_citation(
                 full_citation.citing_opinion,
             )
             return results
-
     # Give up.
     return []
 
@@ -225,7 +234,9 @@ def es_get_query_citation(cd: CleanData) -> Hit | None:
     matches = None
     if len(citations) == 1:
         # If it's not exactly one match, user doesn't get special help.
-        matches = es_search_db_for_full_citation(citations[0])
+        matches = es_search_db_for_full_citation(
+            citations[0], query_citation=True
+        )
         if len(matches) == 1:
             # If more than one match, don't show the tip
             return matches[0]
