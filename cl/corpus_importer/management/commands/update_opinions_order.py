@@ -287,7 +287,7 @@ def sort_columbia_opinions(options: dict) -> None:
         extracted_columbia_opinions = None
         if xml_path:
             fixed_xml_filepath = os.path.join(
-                options.get("xml_dir"), fix_filepath(xml_path)
+                options.get("xml_dir"), fix_filepath(xml_path)  # type: ignore
             )
 
             if not os.path.exists(fixed_xml_filepath):
