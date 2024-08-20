@@ -7,6 +7,7 @@ from http import HTTPStatus
 from unittest import mock
 from unittest.mock import MagicMock, PropertyMock
 
+import asyncio
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
@@ -38,9 +39,12 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     es_get_citing_clusters_with_cache,
-    make_docket_title,
+    make_docket_title, generate_in_memory_csv,
 )
-from cl.opinion_page.views import get_prev_next_volumes
+from cl.opinion_page.views import (
+    get_prev_next_volumes,
+    fetch_docket_entries
+)
 from cl.people_db.factories import (
     PersonFactory,
     PersonWithChildrenFactory,
@@ -52,6 +56,7 @@ from cl.recap.factories import (
     AppellateAttachmentPageFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    DocketDataFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.search.factories import (
@@ -62,6 +67,8 @@ from cl.search.factories import (
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
+    DocketEntryFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
@@ -1523,3 +1530,102 @@ class TestBlockSearchItemAjax(TestCase):
 
         await self.cluster.arefresh_from_db()
         self.assertTrue(self.cluster.blocked)
+
+
+class DocketEntryFileDownload(TestCase):
+    """Test Docket entries File Download and required functions.
+    """
+
+    def setUp(self):
+        court = CourtFactory(id="ca5", jurisdiction="F")
+        # Main docket to test
+        docket = DocketFactory(
+            court=court,
+            case_name="Foo v. Bar",
+            docket_number="12-40601",
+            pacer_case_id="12345",
+        )
+
+        de1 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506585234,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1,
+            pacer_doc_id="00506585234",
+            document_number="00506585234",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        de1_2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1_2,
+            pacer_doc_id="00506585234",
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        de2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=2,
+            description="Lorem ipsum dolor sit amet",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de2,
+            pacer_doc_id="",
+            document_number="2",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        de3 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506585238,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de3,
+            pacer_doc_id="00506585238",
+            document_number="3",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        # Create extra dcoket and docket entries to make sure it only fetch
+        # required docket_entries
+        docket1 = DocketFactory(
+            court=court,
+            case_name="Test v. Test1",
+            docket_number="12-55667",
+            pacer_case_id="12345",
+        )
+        de4 = DocketEntryFactory(
+            docket=docket1,
+            entry_number=506585567,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de4,
+            pacer_doc_id="00506585567",
+            document_number="005506585567",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        self.mocked_docket = docket
+        self.mocked_extra_docket = docket1
+        self.mocked_docket_entries = [de1, de1_2, de2, de3]
+        self.mocked_extra_docket_entries = [de4]
+
+
+    def test_fetch_docket_entries(
+        self
+    ) -> None:
+        """Verify that fetch entries function returns right docket_entries"""
+        res = asyncio.run(fetch_docket_entries(self.mocked_docket))
+        assert len(res) == len(self.mocked_docket_entries)
+        assert self.mocked_docket_entries[0] in res
+        assert self.mocked_extra_docket_entries[0] not in res
+
+    def test_download_docket_entries_csv(self) -> None:
+        """Verify str with csv data is created. Check column and data entry"""
+        res = generate_in_memory_csv(self.mocked_docket_entries)
+        res_lines = res.split("\r\n")
+        res_line_data = res_lines[1].split(",")
+        assert res[:16] == '"docketentry_id"'
+        assert res_line_data[1] == '"506585234"'

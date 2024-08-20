@@ -76,7 +76,7 @@ from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
     core_docket_data,
     es_get_citing_clusters_with_cache,
-    get_case_title,
+    get_case_title, generate_docket_entries_csv_data,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
@@ -339,7 +339,7 @@ async def redirect_docket_recap(
     )
 
 
-async def fetch_docket_entries(request, docket):
+async def fetch_docket_entries(docket):
     """ Fetch docket entries asociated to docket
 
     param request: current HttpRequest.
@@ -362,7 +362,7 @@ async def view_docket(
     docket, context = await core_docket_data(request, pk)
     await increment_view_count(docket, request)
 
-    de_list = await fetch_docket_entries(request, docket)
+    de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():
             cd = form.cleaned_data
@@ -584,39 +584,9 @@ async def download_docket_entries_csv(
 ) -> HttpResponse:
     """Download csv file containing list of DocketEntry for specific Docket
     """
-    def generate_csv(de_list, filename):
-        # Create file in memory. Should I create it in /tmp?
-        output: StringIO = StringIO()
-        csvwriter = csv.writer(output, quotechar='"',
-                               quoting=csv.QUOTE_ALL)
-        columns = []
-
-
-        columns = de_list[0].get_csv_columns(get_column_name=True)
-        columns += de_list[0].recap_documents.first().get_csv_columns(get_column_name=True)
-        csvwriter.writerow(columns)
-
-        for docket_entry in de_list:
-            row = docket_entry.to_csv_row()
-            for recap_doc in docket_entry.recap_documents.all():
-                row += recap_doc.to_csv_row()
-                csvwriter.writerow(row)
-
-
-        csv_content: str = output.getvalue()
-        output.close()
-
-        response: HttpResponse = HttpResponse(
-            csv_content,
-            content_type='text/csv'
-        )
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        logger = logging.getLogger("cl.opinion_page")
-        logger.debug(f"HERE: {filename}")
-        return response
 
     docket, _ = await core_docket_data(request, docket_id)
-    de_list = await fetch_docket_entries(request, docket)
+    de_list = await fetch_docket_entries(docket)
     court_id = docket.court_id
     case_name = docket.slug
 
@@ -624,7 +594,13 @@ async def download_docket_entries_csv(
     date_str = datetime.datetime.now().strftime("%Y-%m-%d")
     filename = f"{case_name}.{court_id}.{docket_id}_{date_str}.csv"
 
-    response = await sync_to_async(generate_csv)(de_list, filename)
+    #TODO check if for large files we'll cache or send file by email
+    csv_content = await sync_to_async(generate_docket_entries_csv_data)(de_list)
+    response: HttpResponse = HttpResponse(
+        csv_content,
+        content_type='text/csv'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
 
