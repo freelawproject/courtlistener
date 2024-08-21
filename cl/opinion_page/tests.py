@@ -1631,7 +1631,7 @@ class DocketEntryFileDownload(TestCase):
         self.assertIn(self.mocked_docket_entries[0], res)
         self.assertNotIn(self.mocked_extra_docket_entries[0],res)
 
-    def test_download_docket_entries_csv(self) -> None:
+    def test_generate_docket_entries_csv_data(self) -> None:
         """Verify str with csv data is created. Check column and data entry"""
         res = generate_docket_entries_csv_data(self.mocked_docket_entries)
         res_lines = res.split("\r\n")
@@ -1639,7 +1639,8 @@ class DocketEntryFileDownload(TestCase):
         self.assertEqual(res[:16],'"docketentry_id"')
         self.assertEqual(res_line_data[1], '"506585234"')
 
-    def test_download_docket_entries_csv(self) -> None:
+    def test_view_download_docket_entries_csv(self) -> None:
+        """Test download_docket_entries_csv returns csv content"""
         with mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data") as mock_download_function:
             with mock.patch("cl.opinion_page.utils.core_docket_data") as mock_core_docket_data:
                 with mock.patch("cl.opinion_page.utils.user_has_alert") as mock_user_has_alert:
@@ -1658,5 +1659,5 @@ class DocketEntryFileDownload(TestCase):
                         },
                     )
 
-                    response = async_to_sync(download_docket_entries_csv)(self.request, 1)
+                    response = async_to_sync(download_docket_entries_csv)(self.request, self.mocked_docket.id)
                     self.assertEqual(response["Content-Type"], "text/csv")
