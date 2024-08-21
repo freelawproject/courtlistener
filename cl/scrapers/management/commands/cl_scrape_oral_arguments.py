@@ -106,7 +106,7 @@ def make_objects(
 
 
 class Command(cl_scrape_opinions.Command):
-    object_type = "oral arguments"
+    scrape_target_descr = "oral arguments"
 
     def ingest_a_case(
         self,
@@ -132,7 +132,9 @@ class Command(cl_scrape_opinions.Command):
         )
 
         logger.info(
-            "Adding new document found at: %s", item["download_urls"].encode()
+            "Adding new %s found at: %s",
+            self.scrape_target_descr,
+            item["download_urls"].encode(),
         )
         dup_checker.reset()
 

@@ -219,7 +219,7 @@ def save_everything(
 
 class Command(VerboseCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
-    object_type = "opinions"  # for logging purposes
+    scrape_target_descr = "opinions"  # for logging purposes
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
         super().__init__(stdout=None, stderr=None, no_color=False)
@@ -288,7 +288,7 @@ class Command(VerboseCommand):
         if site.cookies:
             logger.info("Using cookies: %s", site.cookies)
 
-        logger.debug("#%s opinions found.", len(site))
+        logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
 
         added = 0
         for i, item in enumerate(site):
@@ -313,7 +313,7 @@ class Command(VerboseCommand):
             site.court_id,
             added,
             len(site),
-            self.object_type,
+            self.scrape_target_descr,
         )
         if not full_crawl:
             # Only update the hash if no errors occurred.

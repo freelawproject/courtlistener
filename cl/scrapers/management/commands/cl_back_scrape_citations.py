@@ -23,6 +23,8 @@ from cl.search.models import Citation, Court, Opinion
 
 
 class Command(cl_back_scrape_opinions.Command):
+    scrape_target_descr = "citations"
+
     def scrape_court(
         self,
         site,
