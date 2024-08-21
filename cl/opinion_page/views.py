@@ -4,7 +4,7 @@ import logging
 from collections import OrderedDict, defaultdict
 from http import HTTPStatus
 from io import StringIO
-from typing import Any, Dict, Union, List
+from typing import Any, Dict, List, Union
 from urllib.parse import urlencode
 
 import eyecite
@@ -76,7 +76,8 @@ from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
     core_docket_data,
     es_get_citing_clusters_with_cache,
-    get_case_title, generate_docket_entries_csv_data,
+    generate_docket_entries_csv_data,
+    get_case_title,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES

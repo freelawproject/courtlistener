@@ -1,6 +1,6 @@
-from typing import Dict, Tuple, Union
-from io import StringIO
 import csv
+from io import StringIO
+from typing import Dict, Tuple, Union
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth.models import AnonymousUser, User

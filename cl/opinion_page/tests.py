@@ -1,20 +1,20 @@
 # mypy: disable-error-code=attr-defined
+import asyncio
 import datetime
 import os
 import shutil
 from datetime import date
 from http import HTTPStatus
 from unittest import mock
-from unittest.mock import MagicMock, PropertyMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
-import asyncio
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import override_settings, RequestFactory
+from django.test import RequestFactory, override_settings
 from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
@@ -39,12 +39,13 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     es_get_citing_clusters_with_cache,
-    make_docket_title,
     generate_docket_entries_csv_data,
+    make_docket_title,
 )
 from cl.opinion_page.views import (
+    download_docket_entries_csv,
+    fetch_docket_entries,
     get_prev_next_volumes,
-    fetch_docket_entries, download_docket_entries_csv
 )
 from cl.people_db.factories import (
     PersonFactory,
@@ -57,18 +58,17 @@ from cl.recap.factories import (
     AppellateAttachmentPageFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
-    DocketDataFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
-    DocketEntryFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
