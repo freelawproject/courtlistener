@@ -1896,7 +1896,7 @@ def merge_unavailable_fields_on_parent_document(
             for result in results:
                 complaint_url, buy_complaint_url, text_button = (
                     initial_complaints_in_page.get(
-                        result.docket_id, (None, None, None)
+                        result.docket_id, (None, None, "")
                     )
                 )
                 result["initial_complaint_url"] = complaint_url
