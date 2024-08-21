@@ -5,7 +5,7 @@ import shutil
 from datetime import date
 from http import HTTPStatus
 from unittest import mock
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, AsyncMock
 
 import asyncio
 from asgiref.sync import async_to_sync, sync_to_async
@@ -14,7 +14,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import override_settings
+from django.test import override_settings, RequestFactory
 from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
@@ -39,11 +39,12 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     es_get_citing_clusters_with_cache,
-    make_docket_title, generate_in_memory_csv,
+    make_docket_title,
+    generate_docket_entries_csv_data,
 )
 from cl.opinion_page.views import (
     get_prev_next_volumes,
-    fetch_docket_entries
+    fetch_docket_entries, download_docket_entries_csv
 )
 from cl.people_db.factories import (
     PersonFactory,
@@ -1589,7 +1590,7 @@ class DocketEntryFileDownload(TestCase):
             document_number="3",
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
-        # Create extra dcoket and docket entries to make sure it only fetch
+        # Create extra docket and docket entries to make sure it only fetch
         # required docket_entries
         docket1 = DocketFactory(
             court=court,
@@ -1612,20 +1613,50 @@ class DocketEntryFileDownload(TestCase):
         self.mocked_docket_entries = [de1, de1_2, de2, de3]
         self.mocked_extra_docket_entries = [de4]
 
+        request_factory = RequestFactory()
+        self.request = request_factory.get("/mock-url/")
+        self.user = UserFactory.create(
+            username="learned",
+            email="learnedhand@scotus.gov",
+        )
+        self.request.auser = AsyncMock(return_value=self.user)
+
 
     def test_fetch_docket_entries(
         self
     ) -> None:
         """Verify that fetch entries function returns right docket_entries"""
         res = asyncio.run(fetch_docket_entries(self.mocked_docket))
-        assert len(res) == len(self.mocked_docket_entries)
-        assert self.mocked_docket_entries[0] in res
-        assert self.mocked_extra_docket_entries[0] not in res
+        self.assertEqual(len(res), len(self.mocked_docket_entries))
+        self.assertIn(self.mocked_docket_entries[0], res)
+        self.assertNotIn(self.mocked_extra_docket_entries[0],res)
 
     def test_download_docket_entries_csv(self) -> None:
         """Verify str with csv data is created. Check column and data entry"""
-        res = generate_in_memory_csv(self.mocked_docket_entries)
+        res = generate_docket_entries_csv_data(self.mocked_docket_entries)
         res_lines = res.split("\r\n")
         res_line_data = res_lines[1].split(",")
-        assert res[:16] == '"docketentry_id"'
-        assert res_line_data[1] == '"506585234"'
+        self.assertEqual(res[:16],'"docketentry_id"')
+        self.assertEqual(res_line_data[1], '"506585234"')
+
+    def test_download_docket_entries_csv(self) -> None:
+        with mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data") as mock_download_function:
+            with mock.patch("cl.opinion_page.utils.core_docket_data") as mock_core_docket_data:
+                with mock.patch("cl.opinion_page.utils.user_has_alert") as mock_user_has_alert:
+                    mock_download_function.return_value = '"col1","col2","col3"\r\n"value1","value2","value3"'
+                    mock_download_function.side_effect = '"col1","col2","col3"\r\n"value1","value2","value3"'
+                    mock_user_has_alert.return_value = False
+                    mock_core_docket_data.return_value = (
+                        self.mocked_docket,
+                        {
+                            "docket": self.mocked_docket,
+                            "title": "title",
+                            "note_form": "note_form",
+                            "has_alert": mock_user_has_alert.return_value,
+                            "timezone": "EST",
+                            "private": True
+                        },
+                    )
+
+                    response = async_to_sync(download_docket_entries_csv)(self.request, 1)
+                    self.assertEqual(response["Content-Type"], "text/csv")
