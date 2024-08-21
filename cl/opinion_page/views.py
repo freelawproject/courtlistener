@@ -341,7 +341,7 @@ async def redirect_docket_recap(
 
 
 async def fetch_docket_entries(docket):
-    """ Fetch docket entries asociated to docket
+    """Fetch docket entries asociated to docket
 
     param request: current HttpRequest.
     param docket: docket.id to get related docket_entries.
@@ -349,7 +349,10 @@ async def fetch_docket_entries(docket):
     returns: DocketEntry list.
     """
     de_list = docket.docket_entries.all().prefetch_related(
-      Prefetch("recap_documents", queryset=RECAPDocument.objects.defer("plain_text"))
+        Prefetch(
+            "recap_documents",
+            queryset=RECAPDocument.objects.defer("plain_text"),
+        )
     )
     return de_list
 
@@ -366,20 +369,20 @@ async def view_docket(
     de_list = await fetch_docket_entries(docket)
 
     if await sync_to_async(form.is_valid)():
-            cd = form.cleaned_data
+        cd = form.cleaned_data
 
-            if cd.get("entry_gte"):
-              de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
-            if cd.get("entry_lte"):
-              de_list = de_list.filter(entry_number__lte=cd["entry_lte"])
-            if cd.get("filed_after"):
-              de_list = de_list.filter(date_filed__gte=cd["filed_after"])
-            if cd.get("filed_before"):
-              de_list = de_list.filter(date_filed__lte=cd["filed_before"])
-            if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
-              de_list = de_list.order_by(
-                  "-recap_sequence_number", "-entry_number"
-              )
+        if cd.get("entry_gte"):
+            de_list = de_list.filter(entry_number__gte=cd["entry_gte"])
+        if cd.get("entry_lte"):
+            de_list = de_list.filter(entry_number__lte=cd["entry_lte"])
+        if cd.get("filed_after"):
+            de_list = de_list.filter(date_filed__gte=cd["filed_after"])
+        if cd.get("filed_before"):
+            de_list = de_list.filter(date_filed__lte=cd["filed_before"])
+        if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
+            de_list = de_list.order_by(
+                "-recap_sequence_number", "-entry_number"
+            )
 
     page = request.GET.get("page", 1)
 
@@ -583,25 +586,22 @@ async def make_thumb_if_needed(
 async def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
-    """Download csv file containing list of DocketEntry for specific Docket
-    """
+    """Download csv file containing list of DocketEntry for specific Docket"""
 
     docket, _ = await core_docket_data(request, docket_id)
     de_list = await fetch_docket_entries(docket)
     court_id = docket.court_id
     case_name = docket.slug
 
-
     date_str = datetime.datetime.now().strftime("%Y-%m-%d")
     filename = f"{case_name}.{court_id}.{docket_id}_{date_str}.csv"
 
-    #TODO check if for large files we'll cache or send file by email
-    csv_content = await sync_to_async(generate_docket_entries_csv_data)(de_list)
-    response: HttpResponse = HttpResponse(
-        csv_content,
-        content_type='text/csv'
+    # TODO check if for large files we'll cache or send file by email
+    csv_content = await sync_to_async(generate_docket_entries_csv_data)(
+        de_list
     )
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
 
 

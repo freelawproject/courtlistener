@@ -1301,7 +1301,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
             "time_filed",
             "pacer_sequence_number",
             "recap_sequence_number",
-            "description"
+            "description",
         ]
         if get_column_name:
             columns = [self.add_class_name(col) for col in columns]
@@ -1313,7 +1313,6 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
 
         returns: dict -- > {attr1: function}"""
         return {}
-
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
@@ -1376,10 +1375,9 @@ class AbstractPacerDocument(models.Model):
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class RECAPDocument(AbstractPacerDocument,
-                    AbstractPDF,
-                    AbstractDateTimeModel,
-                    CSVExportMixin):
+class RECAPDocument(
+    AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel, CSVExportMixin
+):
     """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
@@ -1815,7 +1813,7 @@ class RECAPDocument(AbstractPacerDocument,
             "file_size",
             "filepath_local",
             "filepath_ia",
-            "ocr_status"
+            "ocr_status",
         ]
         if get_column_name:
             columns = [self.add_class_name(col) for col in columns]

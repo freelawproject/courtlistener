@@ -57,8 +57,8 @@ urlpatterns = [
     ),
     path(
         "docket/download/<int:docket_id>/",
-        download_docket_entries_csv, # type: ignore[arg-type]
-        name="view_download_docket"
+        download_docket_entries_csv,  # type: ignore[arg-type]
+        name="view_download_docket",
     ),
     path(
         "recap/gov.uscourts.<str:court>.<str:pacer_case_id>/",
