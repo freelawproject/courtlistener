@@ -285,6 +285,7 @@ class DocketAdmin(CursorPaginatorAdmin):
         "referred_to",
         "originating_court_information",
         "idb_data",
+        "parent_docket",
     )
 
     def save_model(

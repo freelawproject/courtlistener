@@ -164,9 +164,7 @@ def get_or_cache_pacer_cookies(
     ttl_seconds = r.ttl(session_key % user_pk)
     if cookies_data and ttl_seconds >= 300 and not refresh:
         # cookies were found in cache and ttl >= 5 minutes, return them
-        if isinstance(cookies_data, SessionData):
-            return cookies_data
-        return SessionData(cookies_data)
+        return cookies_data
 
     # Unable to find cookies in cache, are about to expire or refresh needed
     # Login and cache new values.

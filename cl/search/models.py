@@ -28,6 +28,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_recap_path,
     make_upload_path,
@@ -326,6 +327,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         blank=True,
         null=True,
     )
+
+    @property
+    def administrative_link(self):
+        return linkify_orig_docket_number(
+            self.docket.appeal_from_str, self.docket_number
+        )
 
     def get_absolute_url(self) -> str:
         return self.docket.get_absolute_url()
@@ -2730,6 +2737,12 @@ class OpinionCluster(AbstractDateTimeModel):
         max_length=1000,
         blank=True,
         db_index=True,
+    )
+    filepath_pdf_harvard = models.FileField(
+        help_text="The case PDF from the Caselaw Access Project for this cluster",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
     )
     arguments = models.TextField(
         help_text="The attorney(s) and legal arguments presented as HTML text. "
