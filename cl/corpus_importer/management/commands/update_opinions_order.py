@@ -6,7 +6,7 @@ from typing import Optional
 
 from bs4 import BeautifulSoup
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Exists, OuterRef
 
 from cl.corpus_importer.import_columbia.columbia_utils import (
     extract_columbia_opinions,
@@ -77,7 +77,9 @@ def sort_harvard_opinions(options: dict) -> None:
                     f"No sub_opinions updated for cluster id: {cluster}"
                 )
                 continue
-            logger.info(msg=f"Opinions reordered for cluster id: {cluster.id}")
+            logger.info(
+                msg=f"Harvard opinions reordered for cluster id: {cluster.id}"
+            )
             # Wait between each processed cluster to avoid issues with elastic
             time.sleep(options["delay"])
 
@@ -233,10 +235,6 @@ def update_opinions(
                 f"cluster id: {cluster_id}"
             )
             transaction.set_rollback(True)
-        else:
-            logger.info(
-                f"The order of opinions was updated, cluster id: {cluster_id}"
-            )
 
 
 def sort_columbia_opinions(options: dict) -> None:
@@ -249,10 +247,24 @@ def sort_columbia_opinions(options: dict) -> None:
     skip_until = options.get("skip_until", None)
     limit = options.get("limit", None)
 
-    # Get all columbia cluster ids with more than one opinion
+    # Get all columbia cluster ids with more than one opinion and where opinions has
+    # a local_path, we require the xml path and file to infer the ordering
     clusters = (
-        OpinionCluster.objects.annotate(opinions_count=Count("sub_opinions"))
-        .filter(opinions_count__gt=1, source__in=VALID_COLUMBIA_SOURCES)
+        OpinionCluster.objects.annotate(
+            opinions_count=Count("sub_opinions"),
+            has_non_empty_file=Exists(
+                Opinion.objects.filter(
+                    cluster=OuterRef("pk"),
+                    local_path__isnull=False,
+                    local_path__gt="",
+                )
+            ),
+        )
+        .filter(
+            opinions_count__gt=1,
+            source__in=VALID_COLUMBIA_SOURCES,
+            has_non_empty_file=True,
+        )
         .order_by("id")
         .values_list("id", flat=True)
     )
@@ -358,6 +370,12 @@ def sort_columbia_opinions(options: dict) -> None:
                     matches,
                 )
 
+                logger.info(
+                    msg=f"Columbia opinions reordered for cluster id: {cluster_id}"
+                )
+                # Wait between each processed cluster to avoid issues with elastic
+                time.sleep(options["delay"])
+
 
 class Command(VerboseCommand):
     help = "Add ordering Key for sub opinions"
@@ -397,7 +415,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--delay",
             type=float,
-            default=0.2,
+            default=0.1,
             help="How long to wait to update each opinion (in seconds, allows "
             "floating numbers).",
         )
