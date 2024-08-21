@@ -9,6 +9,7 @@ from cl.opinion_page.views import (
     court_publish_page,
     docket_authorities,
     docket_idb_data,
+    download_docket_entries_csv,
     redirect_docket_recap,
     redirect_og_lookup,
     view_authorities,
@@ -19,7 +20,7 @@ from cl.opinion_page.views import (
     view_recap_authorities,
     view_recap_document,
     view_summaries,
-    download_docket_entries_csv)
+)
 
 urlpatterns = [
     # Court pages
@@ -56,8 +57,8 @@ urlpatterns = [
     ),
     path(
         "docket/download/<int:docket_id>/",
-        download_docket_entries_csv, # type: ignore[arg-type]
-        name="view_download_docket"
+        download_docket_entries_csv,  # type: ignore[arg-type]
+        name="view_download_docket",
     ),
     path(
         "recap/gov.uscourts.<str:court>.<str:pacer_case_id>/",

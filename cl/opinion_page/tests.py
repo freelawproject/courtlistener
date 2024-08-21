@@ -1,20 +1,20 @@
 # mypy: disable-error-code=attr-defined
+import asyncio
 import datetime
 import os
 import shutil
 from datetime import date
 from http import HTTPStatus
 from unittest import mock
-from unittest.mock import MagicMock, PropertyMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
-import asyncio
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import override_settings, RequestFactory
+from django.test import RequestFactory, override_settings
 from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
@@ -39,12 +39,13 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     es_get_citing_clusters_with_cache,
-    make_docket_title,
     generate_docket_entries_csv_data,
+    make_docket_title,
 )
 from cl.opinion_page.views import (
+    download_docket_entries_csv,
+    fetch_docket_entries,
     get_prev_next_volumes,
-    fetch_docket_entries, download_docket_entries_csv
 )
 from cl.people_db.factories import (
     PersonFactory,
@@ -55,20 +56,20 @@ from cl.people_db.models import Person
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
+    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
-    DocketDataFactory,
 )
 from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
-    DocketEntryFactory,
     RECAPDocumentFactory,
 )
 from cl.search.models import (
@@ -1534,8 +1535,7 @@ class TestBlockSearchItemAjax(TestCase):
 
 
 class DocketEntryFileDownload(TestCase):
-    """Test Docket entries File Download and required functions.
-    """
+    """Test Docket entries File Download and required functions."""
 
     def setUp(self):
         court = CourtFactory(id="ca5", jurisdiction="F")
@@ -1621,31 +1621,38 @@ class DocketEntryFileDownload(TestCase):
         )
         self.request.auser = AsyncMock(return_value=self.user)
 
-
-    def test_fetch_docket_entries(
-        self
-    ) -> None:
+    def test_fetch_docket_entries(self) -> None:
         """Verify that fetch entries function returns right docket_entries"""
         res = asyncio.run(fetch_docket_entries(self.mocked_docket))
         self.assertEqual(len(res), len(self.mocked_docket_entries))
         self.assertIn(self.mocked_docket_entries[0], res)
-        self.assertNotIn(self.mocked_extra_docket_entries[0],res)
+        self.assertNotIn(self.mocked_extra_docket_entries[0], res)
 
     def test_generate_docket_entries_csv_data(self) -> None:
         """Verify str with csv data is created. Check column and data entry"""
         res = generate_docket_entries_csv_data(self.mocked_docket_entries)
         res_lines = res.split("\r\n")
         res_line_data = res_lines[1].split(",")
-        self.assertEqual(res[:16],'"docketentry_id"')
+        self.assertEqual(res[:16], '"docketentry_id"')
         self.assertEqual(res_line_data[1], '"506585234"')
 
     def test_view_download_docket_entries_csv(self) -> None:
         """Test download_docket_entries_csv returns csv content"""
-        with mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data") as mock_download_function:
-            with mock.patch("cl.opinion_page.utils.core_docket_data") as mock_core_docket_data:
-                with mock.patch("cl.opinion_page.utils.user_has_alert") as mock_user_has_alert:
-                    mock_download_function.return_value = '"col1","col2","col3"\r\n"value1","value2","value3"'
-                    mock_download_function.side_effect = '"col1","col2","col3"\r\n"value1","value2","value3"'
+        with mock.patch(
+            "cl.opinion_page.utils.generate_docket_entries_csv_data"
+        ) as mock_download_function:
+            with mock.patch(
+                "cl.opinion_page.utils.core_docket_data"
+            ) as mock_core_docket_data:
+                with mock.patch(
+                    "cl.opinion_page.utils.user_has_alert"
+                ) as mock_user_has_alert:
+                    mock_download_function.return_value = (
+                        '"col1","col2","col3"\r\n"value1","value2","value3"'
+                    )
+                    mock_download_function.side_effect = (
+                        '"col1","col2","col3"\r\n"value1","value2","value3"'
+                    )
                     mock_user_has_alert.return_value = False
                     mock_core_docket_data.return_value = (
                         self.mocked_docket,
@@ -1655,9 +1662,11 @@ class DocketEntryFileDownload(TestCase):
                             "note_form": "note_form",
                             "has_alert": mock_user_has_alert.return_value,
                             "timezone": "EST",
-                            "private": True
+                            "private": True,
                         },
                     )
 
-                    response = async_to_sync(download_docket_entries_csv)(self.request, self.mocked_docket.id)
+                    response = async_to_sync(download_docket_entries_csv)(
+                        self.request, self.mocked_docket.id
+                    )
                     self.assertEqual(response["Content-Type"], "text/csv")
