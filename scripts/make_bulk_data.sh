@@ -337,7 +337,7 @@ echo "Streaming ${lst[0]} to S3"
 psql \
 	--command \
 	  "set statement_timeout to 0;
-	   \COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, QUOTE \"\`\", FORCE_QUOTE *)" \
+	   COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, QUOTE \"\`\", FORCE_QUOTE *)" \
 	--quiet \
 	--host "$DB_HOST" \
 	--username "$DB_USER" \
