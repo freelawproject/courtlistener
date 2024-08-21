@@ -228,6 +228,61 @@
                                     {% endfor %}
                                 </div>
                             {% endfor %}
+                        {% if courts.military %}
+                            <h3 class="bottom inline">
+                                Military Courts
+                            </h3>
+                            <div class="row">
+                                {% for row in courts.military|rows:3 %}
+                                        <div class="col-sm-4">
+                                            {% for court in row %}
+                                                <div class="checkbox">
+                                                    <label for="id_{{ court.pk }}">
+                                                    <input
+                                                            id="id_{{ court.pk }}"
+                                                            name="{{ court.pk }}"
+                                                            {% if court.checked %}checked="checked"{% endif %}
+                                                            type="checkbox"
+                                                            class="external-input court-checkbox">
+                                                        {{ court.short_name }}
+                                                        {% if court.end_date %}
+                                                            <span class="gray">({{ court.end_date.year }})</span>
+                                                        {% endif %}
+                                                    </label>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% if courts.native %}
+                            <h3 class="bottom inline">
+                                Native American Courts
+                            </h3>
+                            <div class="row">
+                                {% for row in courts.native|rows:3 %}
+                                        <div class="col-sm-4">
+                                            {% for court in row %}
+                                                <div class="checkbox">
+                                                    <label for="id_{{ court.pk }}">
+                                                    <input
+                                                            id="id_{{ court.pk }}"
+                                                            name="{{ court.pk }}"
+                                                            {% if court.checked %}checked="checked"{% endif %}
+                                                            type="checkbox"
+                                                            class="external-input court-checkbox">
+                                                        {{ court.short_name }}
+                                                        {% if court.end_date %}
+                                                            <span class="gray">({{ court.end_date.year }})</span>
+                                                        {% endif %}
+                                                    </label>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endfor %}
+                            </div>
+                        {% endif %}
                         </div>
                     {% endif %}
                 </div>
