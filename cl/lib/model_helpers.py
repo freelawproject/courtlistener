@@ -1,7 +1,7 @@
 import contextlib
 import os
 import re
-from typing import List, Optional
+from typing import Callable, Dict, List, Optional
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -555,8 +555,8 @@ class CSVExportMixin:
             "Subclass must implement get_csv_columns method"
         )
 
-    def get_column_function(self) -> List[str]:
-        """Get dict of attrs: fucntion to apply on field value if it needs
+    def get_column_function(self) -> Dict[str, Callable[[str], str]]:
+        """Get dict of attrs: function to apply on field value if it needs
         to be pre-processed before being add to csv
 
         returns: dict -- > {attr1: function}"""
@@ -570,10 +570,11 @@ class CSVExportMixin:
         Return list of modified values for csv row"""
         row = []
         functions = self.get_column_function()
-        for field in self.get_csv_columns(get_column_name=False):
+        columns = self.get_csv_columns(get_column_name=False)
+        for field in columns:
             attr = getattr(self, field)
             if not attr:
-                attr: ""
+                attr = ""
             function = functions.get(field)
             if function:
                 attr = function(field)
