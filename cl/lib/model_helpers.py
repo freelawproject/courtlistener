@@ -544,11 +544,11 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
 class CSVExportMixin:
 
-    def get_csv_columns(self, get_column_name=False) -> List[str]:
+    def get_csv_columns(self, get_column_name: bool=False) -> List[str]:
         """Get list of column names required in a csv file.
-        If get column name is True. It will add class name to id
+        If get column name is True. It will add class name to attribute
 
-        :param: get_column_name: bool. Whether add class name to primary attr name
+        :param: get_column_name: bool. Whether add class name to attr name
 
         :return: list of attrs of class to get into csv file"""
         raise NotImplementedError(
@@ -581,5 +581,5 @@ class CSVExportMixin:
             row.append(attr)
         return row
 
-    def add_class_name(self, attribute_name):
+    def add_class_name(self, attribute_name: str) -> str:
         return f"{self.__class__.__name__.lower()}_{attribute_name}"
