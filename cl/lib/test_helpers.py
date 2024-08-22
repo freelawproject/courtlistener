@@ -1,5 +1,4 @@
 import datetime
-import json
 import unittest
 from functools import wraps
 from typing import Sized, cast
@@ -248,8 +247,7 @@ opinion_document_v4_api_keys = {
 }
 opinion_document_v4_api_keys.update(opinion_document_v3_v4_common_fields)
 
-
-docket_v4_api_keys_base = {
+docket_api_common_keys = {
     "assignedTo": lambda x: (
         x["assignedTo"]
         if x.get("assignedTo")
@@ -264,29 +262,13 @@ docket_v4_api_keys_base = {
         if x["result"].docket_entry.docket.assigned_to
         else None
     ),
-    "attorney": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "attorney"
-        ]
-    ),
-    "attorney_id": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "attorney_id"
-        ]
-    ),
     "caseName": lambda x: (
         x["caseName"]
         if x.get("caseName")
         else x["result"].docket_entry.docket.case_name
     ),
-    "case_name_full": lambda x: x["result"].docket_entry.docket.case_name_full,
     "cause": lambda x: (
         x["cause"] if x.get("cause") else x["result"].docket_entry.docket.cause
-    ),
-    "chapter": lambda x: (
-        x["result"].docket_entry.docket.bankruptcy_information.chapter
-        if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
-        else None
     ),
     "court": lambda x: x["result"].docket_entry.docket.court.full_name,
     "court_citation_string": lambda x: (
@@ -296,17 +278,35 @@ docket_v4_api_keys_base = {
     ),
     "court_id": lambda x: x["result"].docket_entry.docket.court.pk,
     "dateArgued": lambda x: (
-        x["result"].docket_entry.docket.date_argued.isoformat()
+        (
+            x["result"].docket_entry.docket.date_argued.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].docket_entry.docket.date_argued
+            ).isoformat()
+        )
         if x["result"].docket_entry.docket.date_argued
         else None
     ),
     "dateFiled": lambda x: (
-        x["result"].docket_entry.docket.date_filed.isoformat()
+        (
+            x["result"].docket_entry.docket.date_filed.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].docket_entry.docket.date_filed
+            ).isoformat()
+        )
         if x["result"].docket_entry.docket.date_filed
         else None
     ),
     "dateTerminated": lambda x: (
-        x["result"].docket_entry.docket.date_terminated.isoformat()
+        (
+            x["result"].docket_entry.docket.date_terminated.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].docket_entry.docket.date_terminated
+            ).isoformat()
+        )
         if x["result"].docket_entry.docket.date_terminated
         else None
     ),
@@ -315,20 +315,7 @@ docket_v4_api_keys_base = {
         if x.get("docketNumber")
         else x["result"].docket_entry.docket.docket_number
     ),
-    "docket_absolute_url": lambda x: x[
-        "result"
-    ].docket_entry.docket.get_absolute_url(),
     "docket_id": lambda x: x["result"].docket_entry.docket_id,
-    "firm": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "firm"
-        ]
-    ),
-    "firm_id": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "firm_id"
-        ]
-    ),
     "jurisdictionType": lambda x: x[
         "result"
     ].docket_entry.docket.jurisdiction_type,
@@ -336,21 +323,6 @@ docket_v4_api_keys_base = {
         x["juryDemand"]
         if x.get("juryDemand")
         else x["result"].docket_entry.docket.jury_demand
-    ),
-    "pacer_case_id": lambda x: (
-        str(x["result"].docket_entry.docket.pacer_case_id)
-        if x["result"].docket_entry.docket.pacer_case_id
-        else ""
-    ),
-    "party": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "party"
-        ]
-    ),
-    "party_id": lambda x: list(
-        DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
-            "party_id"
-        ]
     ),
     "referredTo": lambda x: (
         x["referredTo"]
@@ -371,22 +343,72 @@ docket_v4_api_keys_base = {
         if x.get("suitNature")
         else x["result"].docket_entry.docket.nature_of_suit
     ),
-    "trustee_str": lambda x: (
-        x["result"].docket_entry.docket.bankruptcy_information.trustee_str
-        if hasattr(x["result"].docket_entry.docket, "bankruptcy_information")
-        else None
-    ),
-    "meta": [],
 }
 
-docket_v4_api_keys = docket_v4_api_keys_base.copy()
-docket_v4_api_keys.update(
+recap_type_v4_api_keys = docket_api_common_keys.copy()
+recap_type_v4_api_keys.update(
     {
+        "attorney": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "attorney"
+            ]
+        ),
+        "attorney_id": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "attorney_id"
+            ]
+        ),
+        "case_name_full": lambda x: x[
+            "result"
+        ].docket_entry.docket.case_name_full,
+        "chapter": lambda x: (
+            x["result"].docket_entry.docket.bankruptcy_information.chapter
+            if hasattr(
+                x["result"].docket_entry.docket, "bankruptcy_information"
+            )
+            else None
+        ),
+        "docket_absolute_url": lambda x: x[
+            "result"
+        ].docket_entry.docket.get_absolute_url(),
+        "firm": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "firm"
+            ]
+        ),
+        "firm_id": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "firm_id"
+            ]
+        ),
+        "pacer_case_id": lambda x: (
+            str(x["result"].docket_entry.docket.pacer_case_id)
+            if x["result"].docket_entry.docket.pacer_case_id
+            else ""
+        ),
+        "party": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "party"
+            ]
+        ),
+        "party_id": lambda x: list(
+            DocketDocument().prepare_parties(x["result"].docket_entry.docket)[
+                "party_id"
+            ]
+        ),
+        "trustee_str": lambda x: (
+            x["result"].docket_entry.docket.bankruptcy_information.trustee_str
+            if hasattr(
+                x["result"].docket_entry.docket, "bankruptcy_information"
+            )
+            else None
+        ),
+        "meta": [],  # type: ignore
         "recap_documents": [],  # type: ignore
     }
 )
 
-recap_document_v4_api_keys = {
+recap_document_common_api_keys = {
     "id": lambda x: x["result"].pk,
     "docket_entry_id": lambda x: x["result"].docket_entry.pk,
     "description": lambda x: (
@@ -396,7 +418,13 @@ recap_document_v4_api_keys = {
     ),
     "entry_number": lambda x: x["result"].docket_entry.entry_number,
     "entry_date_filed": lambda x: (
-        x["result"].docket_entry.date_filed.isoformat()
+        (
+            x["result"].docket_entry.date_filed.isoformat()
+            if x.get("V4")
+            else midnight_pt_test(
+                x["result"].docket_entry.date_filed
+            ).isoformat()
+        )
         if x["result"].docket_entry.date_filed
         else None
     ),
@@ -411,7 +439,6 @@ recap_document_v4_api_keys = {
         if x["result"].document_number
         else None
     ),
-    "pacer_doc_id": lambda x: x["result"].pacer_doc_id or "",
     "snippet": lambda x: (
         x["snippet"] if x.get("snippet") else x["result"].plain_text or ""
     ),
@@ -420,13 +447,20 @@ recap_document_v4_api_keys = {
     "page_count": lambda x: x["result"].page_count or None,
     "filepath_local": lambda x: x["result"].filepath_local.name or None,
     "absolute_url": lambda x: x["result"].get_absolute_url(),
-    "cites": lambda x: list(
-        x["result"]
-        .cited_opinions.all()
-        .values_list("cited_opinion_id", flat=True)
-    ),
-    "meta": [],
 }
+
+recap_document_v4_api_keys = recap_document_common_api_keys.copy()
+recap_document_v4_api_keys.update(
+    {
+        "pacer_doc_id": lambda x: x["result"].pacer_doc_id or "",
+        "cites": lambda x: list(
+            x["result"]
+            .cited_opinions.all()
+            .values_list("cited_opinion_id", flat=True)
+        ),
+        "meta": [],  # type: ignore
+    }
+)
 
 rd_type_v4_api_keys = recap_document_v4_api_keys.copy()
 rd_type_v4_api_keys.update(
@@ -448,6 +482,18 @@ v4_recap_meta_keys = v4_meta_keys.copy()
 v4_recap_meta_keys.update(
     {
         "more_docs": lambda x: False,
+    }
+)
+
+recap_v3_keys = docket_api_common_keys.copy()
+
+recap_v3_keys.update(recap_document_common_api_keys)
+recap_v3_keys.update(
+    {
+        "court_exact": lambda x: x["result"].docket_entry.docket.court.pk,
+        "timestamp": lambda x: timezone.localtime(
+            x["result"].date_created
+        ).isoformat(),
     }
 )
 
@@ -708,7 +754,7 @@ audio_common_fields = {
     "snippet": lambda x: (
         x["snippet"]
         if x.get("snippet")
-        else x["result"].transcript if x["result"].stt_google_response else ""
+        else x["result"].transcript if x["result"].stt_transcript else ""
     ),
 }
 
@@ -746,7 +792,7 @@ class CourtTestCase(SimpleTestCase):
             full_name="First Circuit",
             jurisdiction="F",
             citation_string="1st Cir.",
-            url="http://www.ca1.uscourts.gov/",
+            url="https://www.ca1.uscourts.gov/",
         )
         cls.court_2 = CourtFactory(
             id="test",
@@ -1146,7 +1192,7 @@ class RECAPSearchTestCase(SimpleTestCase):
             ),
             entry_number=1,
             date_filed=datetime.date(2015, 8, 19),
-            description="MOTION for Leave to File Amicus Curiae Lorem",
+            description="MOTION for Leave to File Amicus Curiae Lorem Served",
         )
         cls.firm = AttorneyOrganizationFactory(name="Associates LLP")
         cls.attorney = AttorneyFactory(
@@ -1458,25 +1504,7 @@ class AudioESTestCase(SimpleTestCase):
             court_id=cls.court_1.pk,
             date_argued=datetime.date(2013, 8, 14),
         )
-        cls.transcript_response = {
-            "response": {
-                "results": [
-                    {
-                        "alternatives": [
-                            {
-                                "transcript": "This is the best transcript. Nunc egestas sem sed libero feugiat, at interdum quam viverra. Pellentesque hendrerit ut augue at sagittis. Mauris faucibus fringilla lacus, eget maximus risus. Phasellus id mi at eros fermentum vestibulum nec nec diam. In nec sapien nunc. Ut massa ante, accumsan a erat eget, rhoncus pellentesque felis.",
-                                "confidence": 0.85,
-                            },
-                            {
-                                "transcript": "Another possible transcript.",
-                                "confidence": 0.75,
-                            },
-                        ]
-                    },
-                ]
-            }
-        }
-        cls.json_transcript = json.dumps(cls.transcript_response)
+        cls.transcript = "This is the best transcript. Nunc egestas sem sed libero feugiat, at interdum quam viverra. Pellentesque hendrerit ut augue at sagittis. Mauris faucibus fringilla lacus, eget maximus risus. Phasellus id mi at eros fermentum vestibulum nec nec diam. In nec sapien nunc. Ut massa ante, accumsan a erat eget, rhoncus pellentesque felis."
         cls.filepath_local = SimpleUploadedFile(
             "sec_frank.mp3", b"mp3 binary content", content_type="audio/mpeg"
         )
@@ -1492,7 +1520,7 @@ class AudioESTestCase(SimpleTestCase):
             blocked=False,
             sha1="a49ada009774496ac01fb49818837e2296705c97",
             stt_status=Audio.STT_COMPLETE,
-            stt_google_response=cls.json_transcript,
+            stt_transcript=cls.transcript,
         )
         cls.audio_2 = AudioFactory.create(
             case_name="Jose A. Dominguez v. Loretta E. Lynch",

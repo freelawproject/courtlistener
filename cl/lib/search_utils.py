@@ -23,6 +23,7 @@ from cl.lib.utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
     get_child_court_ids_for_parents,
+    map_to_docket_entry_sorting,
 )
 from cl.search.constants import (
     BOOSTS,
@@ -232,8 +233,8 @@ def merge_form_with_courts(
     }
     bap_bundle = []
     b_bundle = []
-    state_bundle: List = []
-    state_bundles = []
+    states = []
+    territories = []
     for court in courts:
         if court.jurisdiction == Court.FEDERAL_APPELLATE:
             court_tabs["federal"].append(court)
@@ -246,15 +247,9 @@ def merge_form_with_courts(
             else:
                 b_bundle.append(court)
         elif court.jurisdiction in Court.STATE_JURISDICTIONS:
-            # State courts get bundled by supreme courts
-            if court.jurisdiction == Court.STATE_SUPREME:
-                # Whenever we hit a state supreme court, we append the
-                # previous bundle and start a new one.
-                if state_bundle:
-                    state_bundles.append(state_bundle)
-                state_bundle = [court]
-            else:
-                state_bundle.append(court)
+            states.append(court)
+        elif court.jurisdiction in Court.TERRITORY_JURISDICTIONS:
+            territories.append(court)
         elif court.jurisdiction in [
             Court.FEDERAL_SPECIAL,
             Court.COMMITTEE,
@@ -264,18 +259,11 @@ def merge_form_with_courts(
         ]:
             court_tabs["special"].append(court)
 
-    # append the final state bundle after the loop ends. Hack?
-    state_bundles.append(state_bundle)
-
     # Put the bankruptcy bundles in the courts dict
     if bap_bundle:
         court_tabs["bankruptcy_panel"] = [bap_bundle]
     court_tabs["bankruptcy"] = [b_bundle]
-
-    # Divide the state bundles into the correct partitions
-    court_tabs["state"].append(state_bundles[:17])
-    court_tabs["state"].append(state_bundles[17:34])
-    court_tabs["state"].append(state_bundles[34:])
+    court_tabs["state"] = [states, territories]
 
     return court_tabs, court_count_human, court_count
 
@@ -355,7 +343,7 @@ def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
     and 44 F.2d 92. I.e., this ensures that queries don't span citations. This
     works because internally Solr uses proximity to create multiValue fields.
 
-    See: http://stackoverflow.com/a/33858649/64911 and
+    See: https://stackoverflow.com/a/33858649/64911 and
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
@@ -724,16 +712,6 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             main_params["fq"].extend(main_fq)
         else:
             main_params["fq"] = main_fq
-
-
-def map_to_docket_entry_sorting(sort_string: str) -> str:
-    """Convert a RECAP sorting param to a docket entry sorting parameter."""
-    if sort_string == "dateFiled asc":
-        return "entry_date_filed asc"
-    elif sort_string == "dateFiled desc":
-        return "entry_date_filed desc"
-    else:
-        return sort_string
 
 
 def add_grouping(main_params: SearchParam, cd: CleanData, group: bool) -> None:

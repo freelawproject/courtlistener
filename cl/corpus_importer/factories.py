@@ -71,3 +71,14 @@ class FreeOpinionRowDataFactory(factory.DictFactory):
     pacer_case_id = Faker("random_id_string")
     pacer_doc_id = Faker("random_id_string")
     pacer_seq_no = Faker("pyint", min_value=1, max_value=10000)
+
+
+class CaseQueryDataFactory(factory.DictFactory):
+    assigned_to_str = Faker("name_female")
+    case_name = Faker("case_name")
+    case_name_raw = Faker("case_name")
+    court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
+    date_filed = Faker("date_object")
+    date_last_filing = Faker("date_object")
+    date_terminated = Faker("date_object")
+    docket_number = Faker("federal_district_docket_number")

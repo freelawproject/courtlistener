@@ -21,7 +21,7 @@ an algorithm known as a locality-sensitive hashing (LSH) algorithm.
 
 For information about MinHash, here are a couple of good resources:
 https://medium.com/@jonathankoren/near-duplicate-detection-b6694e807f7a
-http://ekzhu.com/datasketch/lsh.html
+https://ekzhu.com/datasketch/lsh.html
 
 A detailed explanation of the implementation and motivation for this algorithm
 can be found in the following issue and pull request:

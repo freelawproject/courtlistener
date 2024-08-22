@@ -1,7 +1,9 @@
+from collections import defaultdict
 from datetime import timedelta
 from http import HTTPStatus
 from unittest.mock import patch
 
+from asgiref.sync import sync_to_async
 from django.core import mail
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
@@ -17,6 +19,7 @@ from cl.donate.models import Donation, NeonMembership, NeonWebhookEvent
 from cl.lib.test_helpers import UserProfileWithParentsFactory
 from cl.tests.cases import TestCase
 from cl.users.models import UserProfile
+from cl.users.utils import create_stub_account
 
 
 class EmailCommandTest(TestCase):
@@ -41,7 +44,9 @@ class EmailCommandTest(TestCase):
 class MembershipWebhookTest(TestCase):
     def setUp(self) -> None:
         self.async_client = AsyncClient()
-        self.user_profile = UserProfileWithParentsFactory()
+        self.user_profile = UserProfileWithParentsFactory(
+            user__email="test_3@email.com"
+        )
         self.user_profile.neon_account_id = "1234"
         self.user_profile.save()
 
@@ -327,3 +332,106 @@ class MembershipWebhookTest(TestCase):
         membership = await query.afirst()
         self.assertEqual(membership.user.email, "test@free.law")
         self.assertEqual(membership.user.profile.neon_account_id, "9524")
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_uses_insensitive_match_for_emails(
+        self, mock_store_webhook, mock_get_account
+    ):
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "9524"
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "9524",
+            "primaryContact": {
+                "email1": "TesT_3@email.com",
+                "firstName": "test",
+                "lastName": "test",
+            },
+        }
+
+        # Assert the existing user's Neon account ID is different than "9524"
+        self.assertNotEqual(self.user_profile.neon_account_id, "9524")
+
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        query = NeonMembership.objects.select_related(
+            "user", "user__profile"
+        ).filter(neon_id="12345")
+        self.assertEqual(await query.acount(), 1)
+
+        # Check the new membership is linked to the expected user
+        membership = await query.afirst()
+        self.assertEqual(membership.user_id, self.user_profile.user_id)
+
+        # Confirm the user's email address remains unchanged
+        self.assertEqual(membership.user.email, "test_3@email.com")
+
+        # Check the neon_account_id was updated properly
+        self.assertEqual(membership.user.profile.neon_account_id, "9524")
+
+    @patch(
+        "cl.lib.neon_utils.NeonClient.get_acount_by_id",
+    )
+    @patch.object(
+        MembershipWebhookViewSet, "_store_webhook_payload", return_value=None
+    )
+    async def test_updates_account_with_recent_login(
+        self, mock_store_webhook, mock_get_account
+    ) -> None:
+        # Create two profile records - one stub, one regular user,
+        _, stub_profile = await sync_to_async(create_stub_account)(
+            {
+                "email": "test_4@email.com",
+                "first_name": "test",
+                "last_name": "test",
+            },
+            defaultdict(lambda: ""),
+        )
+
+        user_profile = await sync_to_async(UserProfileWithParentsFactory)(
+            user__email="test_4@email.com"
+        )
+        user = user_profile.user
+        # Updates last login field for the regular user
+        user.last_login = now()
+        await user.asave()
+
+        # mocks the Neon API response
+        mock_get_account.return_value = {
+            "accountId": "1246",
+            "primaryContact": {
+                "email1": "test_4@email.com",
+                "firstName": "test",
+                "lastName": "test",
+            },
+        }
+
+        self.data["eventTrigger"] = "createMembership"
+        self.data["data"]["membership"]["accountId"] = "1246"
+        r = await self.async_client.post(
+            reverse("membership-webhooks-list", kwargs={"version": "v3"}),
+            data=self.data,
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        # Refresh both profiles to ensure updated data
+        await stub_profile.arefresh_from_db()
+        await user_profile.arefresh_from_db()
+
+        # Verify stub account remains untouched
+        self.assertEqual(stub_profile.neon_account_id, "")
+
+        # Verify regular user account is updated with Neon data
+        self.assertEqual(user_profile.neon_account_id, "1246")

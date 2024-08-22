@@ -8,6 +8,7 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView
@@ -45,7 +46,7 @@ from cl.lib.ratelimiter import (
     ratelimiter_unsafe_2000_per_h,
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
-from cl.lib.url_utils import get_redirect_or_login_url
+from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
@@ -456,7 +457,7 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
 @never_cache
 def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
-    redirect_to = get_redirect_or_login_url(request, "next")
+    redirect_to = get_redirect_or_abort(request, "next")
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
@@ -544,7 +545,7 @@ def register(request: HttpRequest) -> HttpResponse:
 def register_success(request: HttpRequest) -> HttpResponse:
     """Tell the user they have been registered and allow them to continue where
     they left off."""
-    redirect_to = get_redirect_or_login_url(request, "next")
+    redirect_to = get_redirect_or_abort(request, "next")
     email = request.GET.get("email", "")
     default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
     return TemplateResponse(
@@ -828,3 +829,24 @@ class RateLimitedPasswordResetView(PasswordResetView):
     template_name = "register/password_reset_form.html"
     email_template_name = "register/password_reset_email.html"
     form_class = CustomPasswordResetForm
+
+
+class SafeRedirectLoginView(auth_views.LoginView):
+    """
+    Custom LoginView that validates and sanitizes the redirect URL after a
+    successful login.
+
+    This view inherits from Django's built-in LoginView but adds an extra layer
+    of security by ensuring the redirect URL submitted by the login form is safe
+    It prevents potential open redirect vulnerabilities.
+    """
+
+    def get_redirect_url(self):
+        """
+        Return the user-originating redirect URL if it's safe. otherwise falls
+        back to the default.
+
+        This method ensures users cannot be redirected to malicious URLs after
+        logging in, even if they attempt to provide one.
+        """
+        return get_redirect_or_abort(self.request, self.redirect_field_name)

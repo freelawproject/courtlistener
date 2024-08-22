@@ -2,128 +2,118 @@
 {% load static %}
 
 {% block title %}
-  Decisions for {{ form.initial.court }} – CourtListener.com
+	Decisions for {{ form.initial.court }} – CourtListener.com
 {% endblock %}
 {% block og_title %}
-  Decisions for {{ form.initial.court }} – CourtListener.com
+	Decisions for {{ form.initial.court }} – CourtListener.com
 {% endblock %}
 {% block description %}
-  Search and read decisions from the {{ form.initial.court }}
+	Search and read decisions from the {{ form.initial.court }}
 {% endblock %}
 {% block og_description %}
-  Search and read decisions from the {{ form.initial.court }}
+	Search and read decisions from the {{ form.initial.court }}
 {% endblock %}
 
 {% block navbar-o %}active{% endblock %}
 {% block sidebar %}{% endblock %}
 
 {% block head %}
-  {% if DEBUG %}
-    <link rel="stylesheet"
-          href="{% static "css/bootstrap-datepicker3.css" %}"/>
-  {% else %}
-    <link rel="stylesheet"
-          href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
-  {% endif %}
+	{% if DEBUG %}
+		<link rel="stylesheet"
+			  href="{% static "css/bootstrap-datepicker3.css" %}"/>
+	{% else %}
+		<link rel="stylesheet"
+			  href="{% static "css/bootstrap-datepicker3.min.css" %}"/>
+	{% endif %}
 {% endblock %}
 
 {% block footer-scripts %}
-  {% include "includes/date_picker.html" %}
-  <script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
+	{% include "includes/date_picker.html" %}
+	<script src="{% static "js/jquery.bootstrap-growl.js" %}"></script>
 {% endblock %}
 
 {% block content %}
-  <div id="court_publish" class="col-xs-12">
-    <div class="row">
-      <div class="col-xs-1"></div>
-      <div class="col-xs-2">
-        {% if form.initial.court.id == "me" %}
-          <img src="https://seals.free.law/v2/128/me.png" class="img-responsive" height=128 width="128" />
-        {% elif form.initial.court.id == "tennworkcompcl" %}
-          <img src="{% static "img/tn-court.jpg" %}" class="img-responsive" width="359" height="359" >
-        {% elif  form.initial.court.id == "tennworkcompapp" %}
-          <img src="{% static "img/tn-court.jpg" %}" class="img-responsive" width="359" height="359" >
-        {% endif %}
+	<div id="court_publish" class="col-xs-12">
+		<div class="row">
+			<div class="col-xs-1"></div>
+			<div class="col-xs-2">
+                <img src="{{ court_image }}" class="img-responsive"
+					 width="128" height="128">
+			</div>
+			<div class="col-xs-8">
+				<h1>
+					{{ form.initial.court }} Upload Portal
+				</h1>
+				<div class="lead gray">
+					<p>Upload court decisions using the form below.</p>
+				</div>
+			</div>
+			<div class="col-xs-1"></div>
+		</div>
 
-      </div>
-      <div class="col-xs-8">
-        <h1>
-          {{ form.initial.court }} Upload Portal
-        </h1>
-        <div class="lead gray">
-          <p>Upload court decisions using the form below.</p>
-        </div>
-      </div>
-      <div class="col-xs-1"></div>
-    </div>
+		<div class="row">
+			<div class="col-xs-12">
+				{% if form.errors %}
+					{% for field in form %}
+						{% for error in field.errors %}
+							<div class="alert alert-danger">
+								<strong>{{ error|escape }}</strong>
+							</div>
+						{% endfor %}
+					{% endfor %}
+					{% for error in form.non_field_errors %}
+						<div class="alert alert-danger">
+							<strong>{{ error|escape }}</strong>
+						</div>
+					{% endfor %}
+				{% endif %}
+				<hr>
+				<br>
+				<form method="post" action=""
+					  enctype="multipart/form-data"
+					  class="form-horizontal">
+					{% csrf_token %}
+					{% for field in form.hidden_fields %}
+                        {{ field }}
+					{% endfor %}
+					{% for field in form.visible_fields %}
+						{% if "Cite" not in field.label %}
+							<div class="form-group">
+								<label for="{{ field.name }}" class="col-sm-2 control-label">
+									{{ field.label }}{% if field.field.required %}
+										*{% endif %}</label>
+								<div class="col-sm-9">
+									{{ field }}
+                                    {% if field.help_text %}
+                                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                                    {% endif %}
+								</div>
+							</div>
+						{% else %}
+							{% if "Cite Year" in field.label %}
+								<div class="form-group">
+								<label for="{{ field.name }}"
+									   class="col-sm-2 control-label">Neutral
+									Citation</label>
+							{% endif %}
+						<div class="col-sm-3">
+							{{ field }}
+						</div>
+                            {% if "Cite Page" in field.label %}
+                                </div>
+                            {% endif %}
+						{% endif %}
+					{% endfor %}
 
-  <div class="row">
-    <div class="col-xs-12">
-
-      {% if form.errors %}
-        {% for field in form %}
-          {% for error in field.errors %}
-            <div class="alert alert-danger">
-              <strong>{{ error|escape }}</strong>
-            </div>
-          {% endfor %}
-        {% endfor %}
-        {% for error in form.non_field_errors %}
-            <div class="alert alert-danger">
-                <strong>{{ error|escape }}</strong>
-            </div>
-        {% endfor %}
-      {% endif %}
-
-      <hr><br>
-
-      <form method="post" action=""
-              enctype="multipart/form-data"
-              class="form-horizontal">
-        {% csrf_token %}
-
-        {% for field in form.hidden_fields %}
-          {{ field }}
-        {% endfor %}
-
-        {% for field in form.visible_fields %}
-
-          {% if "Cite" not in field.label %}
-
-            <div class="form-group">
-              <label for="{{ field.name }}" class="col-sm-2 control-label">{{ field.label }}</label>
-              <div class="col-sm-9">
-                {{ field }}
-              </div>
-            </div>
-
-          {% else %}
-
-            {% if "Cite Year" in field.label %}
-              <div class="form-group">
-                <label for="{{ field.name }}" class="col-sm-2 control-label">Neutral Citation</label>
-            {% endif %}
-
-              <div class="col-sm-3">
-                {{ field }}
-              </div>
-
-            {% if "Cite Page" in field.label %}
-              </div>
-            {% endif %}
-
-          {% endif %}
-
-        {% endfor %}
-
-        <div class="form-group">
-          <div class="col-sm-offset-2 col-sm-10">
-            <button type="submit" class="btn btn-default">Upload</button>
-          </div>
-        </div>
-      </form>
-
-      </div>
-    </div>
-  </div>
+					<div class="form-group">
+						<div class="col-sm-offset-2 col-sm-10">
+							<button type="submit" class="btn btn-default"><i
+									class="fa fa-upload"></i>&nbsp;Upload
+							</button>
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
 {% endblock %}

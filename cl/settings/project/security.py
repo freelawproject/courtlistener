@@ -13,8 +13,8 @@ ALLOWED_HOSTS: list[str] = env(
     "ALLOWED_HOSTS", default=["www.courtlistener.com"]
 )
 
-EGRESS_PROXY_HOST = env(
-    "EGRESS_PROXY_HOST", default="http://cl-webhook-sentry:9090"
+EGRESS_PROXY_HOSTS: list[str] = env.list(
+    "EGRESS_PROXY_HOSTS", default=["http://cl-webhook-sentry:9090"]
 )
 
 SECURE_HSTS_SECONDS = 63_072_000
@@ -109,6 +109,7 @@ CSP_IMG_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
     "https://portraits.free.law/",
+    "https://seals.free.law/",
     "data:",  # @tailwindcss/forms uses data URIs for images.
 )
 CSP_MEDIA_SRC = (

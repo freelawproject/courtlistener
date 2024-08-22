@@ -172,7 +172,7 @@ emails: Dict[str, EmailType] = {
         "We're always adding features and listening to your requests. "
         "To join the conversation:\n\n"
         " - Sign up for the Free Law Project newsletter: https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9\n"
-        " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject\n"
+        " - Follow Free Law project on BlueSky: https://bsky.app/profile/free.law\n"
         " - Check our blog for the latest news and updates: https://free.law/blog/\n\n"
         "Thanks for using CourtListener and joining our community,\n\n"
         "The Free Law Project Team\n\n"

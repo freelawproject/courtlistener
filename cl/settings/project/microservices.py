@@ -58,6 +58,10 @@ MICROSERVICE_URLS = {
         "url": f"{DOCTOR_HOST}/convert/audio/mp3/",
         "timeout": 60 * 60,
     },
+    "downsize-audio": {
+        "url": f"{DOCTOR_HOST}/convert/audio/ogg/",
+        "timeout": 60 * 60,
+    },
     # Disclosure Microservices
     "disclosure-heartbeat": {
         "url": f"{DISCLOSURE_HOST}",

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load auth %}
 {% load static %}
+{% load waffle_tags %}
 
 {% block title %}
   Decisions for {{ court }} – CourtListener.com
@@ -25,17 +26,23 @@
 {% endblock %}
 
 {% block content %}
-  <div id="court_homepage" class="col-xs-12">
+  <div id="court_homepage" class="col-md-12">
     <div class="row">
-      <div class="col-xs-4">
-        <img src="{% static 'img/' %}{{ pk }}-court.jpg" class="img-responsive" width="460" height="206" >
+      <div class="col-md-1">
       </div>
-      <div class="col-xs-8">
+      <div class="col-md-2">
+        <img src="{{ court_seal }}" class="img-responsive" width="128" height="128">
+      </div>
+      <div class="col-md-8">
         <h1>Decisions of the {{ court }}
         </h1>
-        <div class="lead gray">
-          <p>The Supreme Judicial Court of Maine has partnered with the non-profit organization, Free Law Project, to host its court decisions on CourtListener.com. Free Law Project is proud to support this partnership and makes the decisions available online as they are released by the court.</p>
-        </div>
+        {% if pk == "me" %}
+          <div class="lead gray">
+            <p>The Supreme Judicial Court of Maine has partnered with the non-profit organization, Free Law Project, to host its court decisions on CourtListener.com. Free Law Project is proud to support this partnership and makes the decisions available online as they are released by the court.</p>
+          </div>
+        {% endif %}
+      </div>
+      <div class="col-md-1">
       </div>
     </div>
 
@@ -67,17 +74,22 @@
         </div>
       </form>
     </div>
-    <div class="row v-offset-above-6">
-      <div class="col-xs-8">
+    <div class="row">
+      <div class="col-md-8">
         <h3>Recent Decisions of the&nbsp;{{ court }} <i class="gray fa fa-file-text-o"></i></h3>
         {% if request.user|in_group:"uploaders_{{ pk }}" %}
           <p><a href="{% url "court_publish_page" pk=pk %}"
-                class="btn btn-default">Upload New {{ court }} Decision</a></p>
+              class="btn btn-default"><i class="fa fa-upload"></i>&nbsp;Upload New {{ court }} Decision</a></p>
         {% endif %}
         {% if results.paginator.count > 0 %}
-          {% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
+          {% flag "o-es-active" %}
+            {% include "includes/search_result.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
+          {% else %}
+            {% include "includes/search_result_solr.html" with results=results type_override=SEARCH_TYPES.OPINION simple=True %}
+          {% endflag %}
+
           <p class="left">
-            <a href="/?court_{{ pk }}=on&order_by=dateFiled+desc"
+            <a href="/?court_{{ pk }}=on&order_by=dateFiled+desc&court={{ pk }}"
                class="btn btn-default btn-lg v-offset-above-2"
                rel="nofollow"
             >See More Recent Opinions</a>
@@ -86,7 +98,8 @@
           <p>No cases yet.</p>
         {% endif %}
       </div>
-      <div class="col-xs-4">
+      {% if pk == "me" %}
+        <div class="col-md-4">
         <h3>About the Court</h3>
           <p>The Supreme Judicial Court of Maine is the highest court in the state of Maine. It is made up of a chief justice and six associate justices who are appointed by the governor and confirmed by the Maine Senate. The court has general appellate jurisdiction and is responsible for interpreting the state's laws and constitution. It also has the power to issue advisory opinions on matters of law to the governor and the state's legislature.</p>
         <hr>
@@ -95,7 +108,8 @@
         <p>Citations to the {{ court }} take the form:</p>
         <pre>[YEAR] ME [#]</pre>
         <p>In this cases, the format begins with the year, then an abbreviation for the court (ME), and finishes with a serial number indicating the decision number.</p>
-      </div>
+        </div>
+      {% endif %}
     </div>
   </div>
 

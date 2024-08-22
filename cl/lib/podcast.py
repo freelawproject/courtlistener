@@ -7,8 +7,8 @@ class iTunesPodcastsFeedGenerator(Rss201rev2Feed):
     def rss_attributes(self):
         return {
             "version": self._version,
-            "xmlns:atom": "http://www.w3.org/2005/Atom",
-            "xmlns:itunes": "http://www.itunes.com/dtds/podcast-1.0.dtd",
+            "xmlns:atom": "https://www.w3.org/2005/Atom",
+            "xmlns:itunes": "https://www.itunes.com/dtds/podcast-1.0.dtd",
         }
 
     def add_root_elements(self, handler):

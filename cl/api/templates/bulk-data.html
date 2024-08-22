@@ -136,6 +136,9 @@
         </p>
       </li>
     </ul>
+    <p>We have also partnered with the Library Innovation Lab at Harvard Law Library to create <a href="https://huggingface.co/datasets/harvard-lil/cold-cases">a dataset on Hugging Face</a> with similar data.
+    </p>
+
 
     <h3 id="disclosures">Financial Disclosure Data</h3>
     <p>We have built a database of {{ disclosures|intcomma }} financial disclosure documents containing {{ investments|intcomma }} investments. To learn more about this data, please read the <a href="{% url "financial_disclosures_api_help" %}">REST API documentation</a> or the <a href="{% url "coverage_fds" %}">disclosures coverage page</a>.
@@ -160,6 +163,12 @@
     </p>
 
     <h3 id="old">Release Notes</h3>
+    <p>
+      <strong>2024-08-07</strong>: Added <code>filepath_pdf_harvard</code> field to OpinionCluster data in bulk exports. This field contains the path to the PDF file from the Harvard Caselaw Access Project for the given case.
+    </p>
+	<p>
+      <strong>2024-08-02</strong>: Add new fields to the bulk data files for the Docket object: federal_dn_case_type, federal_dn_office_code, federal_dn_judge_initials_assigned, federal_dn_judge_initials_referred, federal_defendant_number, parent_docket_id.
+    </p>
 	<p>
       <strong>2023-09-26</strong>: Bulk script refactored to make it easier to maintain. Courthouse table added to bulk script. Court appeals_to through table added to bulk script. Bulk script now automatically generates a shell script to load bulk data and stream the script to S3.
     </p>
@@ -172,7 +181,7 @@
     <h3 id="copyright"><span>Copyright</span></h3>
     <p>Our bulk data files are free of known copyright restrictions.<br/>
       <a rel="license"
-         href="http://creativecommons.org/publicdomain/mark/1.0/">
+         href="https://creativecommons.org/publicdomain/mark/1.0/">
         <img src="{% static "png/cc-pd.png" %}"
              alt="Public Domain Mark" height="31"
              width="88"/>

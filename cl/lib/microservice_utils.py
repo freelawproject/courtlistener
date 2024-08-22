@@ -66,12 +66,21 @@ async def microservice(
                 )
             }
         elif type(item) == Audio:
-            files = {
-                "file": (
-                    item.local_path_original_file.name,
-                    item.local_path_original_file.open(mode="rb"),
-                )
-            }
+            match service:
+                case "downsize-audio":
+                    files = {
+                        "file": (
+                            item.local_path_mp3.name,
+                            item.local_path_mp3.open(mode="rb"),
+                        )
+                    }
+                case _:
+                    files = {
+                        "file": (
+                            item.local_path_original_file.name,
+                            item.local_path_original_file.open(mode="rb"),
+                        )
+                    }
     # Sometimes we will want to pass in a filename and the file bytes
     # to avoid writing them to disk. Filename can often be generic
     # and is used to identify the file extension for our microservices

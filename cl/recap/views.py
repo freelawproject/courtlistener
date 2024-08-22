@@ -51,6 +51,14 @@ class PacerProcessingQueueViewSet(LoggingMixin, ModelViewSet):
         "date_created",
         "date_modified",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
     @async_to_sync
     async def perform_create(self, serializer):
@@ -72,6 +80,19 @@ class EmailProcessingQueueViewSet(LoggingMixin, ModelViewSet):
     queryset = EmailProcessingQueue.objects.all().order_by("-id")
     serializer_class = EmailProcessingQueueSerializer
     filterset_class = EmailProcessingQueueFilter
+    ordering_fields = (
+        "id",
+        "date_created",
+        "date_modified",
+    )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
     def get_message_id_from_request_data(self):
         return self.request.data.get("mail", {}).get("message_id")
@@ -101,6 +122,15 @@ class PacerFetchRequestViewSet(LoggingMixin, ModelViewSet):
         "date_modified",
         "date_completed",
     )
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+        "date_completed",
+    ]
 
     def perform_create(self, serializer):
         fq = serializer.save(user=self.request.user)
@@ -115,6 +145,8 @@ class PacerDocIdLookupViewSet(LoggingMixin, ModelViewSet):
             "pk",
             "filepath_local",
             "pacer_doc_id",
+            # Field below is needed for the ACMS attachment page.
+            "acms_document_guid",
             # Fields below needed for absolute_url, if we add that back.
             # 'document_number',
             # 'document_type',
@@ -152,3 +184,12 @@ class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
         "date_modified",
         "date_filed",
     )
+
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]

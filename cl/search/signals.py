@@ -159,7 +159,7 @@ oa_field_mapping = {
                 "judges": ["judge"],
                 "sha1": ["sha1"],
                 "source": ["source"],
-                "stt_google_response": ["prepare"],
+                "stt_transcript": ["prepare"],
                 "docket_id": ["prepare"],
             },
         },
@@ -329,11 +329,11 @@ recap_document_field_mapping = {
         RECAPDocument: {
             "self": {
                 "description": ["short_description"],
-                "document_type": ["document_type"],
+                "document_type": ["document_type", "absolute_url"],
                 "document_number": ["document_number", "absolute_url"],
                 "pacer_doc_id": ["pacer_doc_id"],
                 "plain_text": ["plain_text"],
-                "attachment_number": ["attachment_number"],
+                "attachment_number": ["attachment_number", "absolute_url"],
                 "is_available": ["is_available"],
                 "page_count": ["page_count"],
                 "filepath_local": ["filepath_local"],
@@ -364,6 +364,7 @@ recap_document_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "pacer_case_id": ["pacer_case_id"],
+                "slug": ["absolute_url"],
             }
         },
         Person: {

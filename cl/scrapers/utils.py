@@ -21,6 +21,11 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.recap.mergers import find_docket_object
+from cl.scrapers.exceptions import (
+    EmptyFileError,
+    NoDownloadUrlError,
+    UnexpectedContentTypeError,
+)
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, Docket, RECAPDocument
 
@@ -155,43 +160,43 @@ def get_extension(content: bytes) -> str:
 def get_binary_content(
     download_url: str,
     site: AbstractSite,
-    headers: dict,
-    method: str = "GET",
-) -> Tuple[str, Optional[Response]]:
+) -> bytes | str:
     """Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
     :param site: Site object used to download data
-    :param headers: Headers that might be necessary to download the item.
-    :param method: The HTTP method used to get the item, or "LOCAL" to get an
-    item during testing
-    :return: Two values. The first is a msg indicating any errors encountered.
-    If blank, that indicates success. The second value is the response object
-    containing the downloaded file.
+
+    :return: The downloaded and cleaned content
+    :raises: NoDownloadUrlError, UnexpectedContentTypeError, EmptyFileError
     """
     if not download_url:
-        # Occurs when a DeferredList fetcher fails.
-        msg = f"NoDownloadUrlError: {download_url}\n{traceback.format_exc()}"
-        return msg, None
+        raise NoDownloadUrlError(download_url)
+
     # noinspection PyBroadException
-    if method == "LOCAL":
+    if site.method == "LOCAL":
+        # "LOCAL" is the method when testing
         url = os.path.join(settings.MEDIA_ROOT, download_url)
         mr = MockRequest(url=url)
         r = mr.get()
-        r = follow_redirections(r, requests.Session())
-        r.raise_for_status()
+        s = requests.Session()
     else:
+        # some sites require a custom ssl_context, contained in the Site's
+        # session. However, we can't send a request with both a
+        # custom ssl_context and `verify = False`
+        has_cipher = hasattr(site, "cipher")
+        s = site.request["session"] if has_cipher else requests.session()
+
+        if site.needs_special_headers:
+            headers = site.request["headers"]
+        else:
+            headers = {"User-Agent": "CourtListener"}
+
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
-        s = (
-            site.request["session"]
-            if hasattr(site, "cipher")
-            else requests.session()
-        )
         r = s.get(
             download_url,
-            verify=False,  # WA has a certificate we don't understand
+            verify=has_cipher,  # WA has a certificate we don't understand
             headers=headers,
             cookies=site.cookies,
             timeout=300,
@@ -199,8 +204,7 @@ def get_binary_content(
 
         # test for empty files (thank you CA1)
         if len(r.content) == 0:
-            msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
-            return msg, None
+            raise EmptyFileError(f"EmptyFileError: '{download_url}'")
 
         # test for expected content type (thanks mont for nil)
         if site.expected_content_types:
@@ -213,19 +217,20 @@ def get_binary_content(
                 content_type in mime.lower()
                 for mime in site.expected_content_types
             )
+
             if not m:
-                msg = (
-                    f"UnexpectedContentTypeError: {download_url}\n"
-                    f'\'"{content_type}" not in {site.expected_content_types}'
-                )
-                return msg, None
+                court_str = site.court_id.split(".")[-1].split("_")[0]
+                fingerprint = [f"{court_str}-unexpected-content-type"]
+                msg = f"'{download_url}' '{content_type}' not in {site.expected_content_types}"
+                raise UnexpectedContentTypeError(msg, fingerprint=fingerprint)
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)
         r.raise_for_status()
 
-    # Success!
-    return "", r
+    content = site.cleanup_content(r.content)
+
+    return content
 
 
 def signal_handler(signal, frame):
@@ -290,11 +295,13 @@ def update_or_create_docket(
     court_id: str,
     docket_number: str,
     source: int,
+    overwrite_existing_data: bool,
     blocked: bool = False,
     case_name_full: str = "",
     date_blocked: date | None = None,
     date_argued: date | None = None,
     ia_needs_upload: bool | None = None,
+    appeal_from_str: str = "",
 ) -> Docket:
     """Look for an existing Docket and update it or create a new one if it's
     not found.
@@ -304,11 +311,16 @@ def update_or_create_docket(
     :param court_id: The court id the docket belongs to.
     :param docket_number: The docket number.
     :param source: The docket source.
+    :param overwrite_existing_data: should be True when this function is
+        called from the Harvard importer; the Harvard data is considered
+        more trustable  and should overwrite an existing docket's data
+        Should be False when called from scrapers.
     :param blocked: If the docket should be blocked, default False.
     :param case_name_full: The docket case_name_full.
     :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
+    :param appeal_from_str: Name (not standardized id) of the lower level court.
     :return: The docket.
     """
 
@@ -317,17 +329,39 @@ def update_or_create_docket(
         "case_name_short": case_name_short,
         "case_name_full": case_name_full,
         "blocked": blocked,
+        "ia_needs_upload": ia_needs_upload,
+        "appeal_from_str": appeal_from_str,
         "date_blocked": date_blocked,
         "date_argued": date_argued,
-        "ia_needs_upload": ia_needs_upload,
     }
 
     docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
     if docket.pk:
         # Update the existing docket with the new values
         docket.add_opinions_source(source)
+
         for field, value in docket_fields.items():
-            setattr(docket, field, value)
+            # do not use blanket `if not value:`, since
+            # blocked and ia_needs_upload are booleans and would be skipped
+            if value is None or value == "":
+                continue
+
+            if (
+                not overwrite_existing_data
+                and getattr(docket, field)
+                and getattr(docket, field) != value
+            ):
+                # Prevent overwriting values that already exist, since default values
+                # to this function are empty strings or None
+                logger.error(
+                    "Docket %s already has a %s %s, different than new value %s",
+                    docket.pk,
+                    field,
+                    getattr(docket, field),
+                    value,
+                )
+            else:
+                setattr(docket, field, value)
     else:
         # Create a new docket with docket_fields and additional fields
         docket = Docket(

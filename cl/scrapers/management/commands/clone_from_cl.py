@@ -27,6 +27,10 @@ permissions, for example:
 
 manage.py clone_from_cl --type search.Docket --id 17090923 --add-docket-entries
 
+You can also clone audio files (oral arguments) related to a docket. For example:
+
+manage.py clone_from_cl --type search.Docket --id 66635300 18473600 --add-audio-files
+
 Now you can clone people positions, for example:
 
 manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --clone-person-positions
@@ -47,6 +51,7 @@ import json
 import os
 import pathlib
 import sys
+from datetime import datetime
 
 import requests
 from django.apps import apps
@@ -59,8 +64,9 @@ from django.urls import reverse
 from django.utils.dateparse import parse_date
 from requests import Session
 
+from cl.audio.models import Audio
 from cl.people_db.models import Person
-from cl.search.models import Citation, Court, Opinion, RECAPDocument
+from cl.search.models import Citation, Court, Docket, Opinion, RECAPDocument
 from cl.search.tasks import add_items_to_solr
 
 VALID_TYPES = (
@@ -343,6 +349,7 @@ def clone_docket(
     session: Session,
     docket_ids: list,
     add_docket_entries: bool,
+    add_audio_files: bool,
     person_positions: bool = False,
     add_to_solr: bool = False,
     object_type="search.Docket",
@@ -366,6 +373,12 @@ def clone_docket(
         print(f"Cloning docket id: {docket_id}")
 
         model = apps.get_model(object_type)
+        docket_path = reverse(
+            "docket-detail",
+            kwargs={"version": "v3", "pk": docket_id},
+        )
+        docket_url = f"{domain}{docket_path}"
+        docket_data = None
 
         try:
             docket = model.objects.get(pk=docket_id)
@@ -378,17 +391,19 @@ def clone_docket(
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
 
+            if add_audio_files:
+                docket_data = get_json_data(docket_url, session)
+                clone_audio_files(
+                    session, docket_data.get("audio_files", []), docket
+                )
+
             continue
         except model.DoesNotExist:
             pass
 
         # Create new Docket
-        docket_path = reverse(
-            "docket-detail",
-            kwargs={"version": "v3", "pk": docket_id},
-        )
-        docket_url = f"{domain}{docket_path}"
-        docket_data = get_json_data(docket_url, session)
+        if not docket_data:
+            docket_data = get_json_data(docket_url, session)
 
         # Remove unneeded fields
         for f in [
@@ -396,7 +411,6 @@ def clone_docket(
             "original_court_info",
             "absolute_url",
             "clusters",
-            "audio_files",
             "tags",
             "panel",
             "idb_data",
@@ -441,9 +455,14 @@ def clone_docket(
                 else None
             )
 
+            audio_files = docket_data.pop("audio_files", [])
+
             docket = model.objects.create(**docket_data)
 
             dockets.append(docket)
+
+            if add_audio_files:
+                clone_audio_files(session, audio_files, docket)
 
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
@@ -461,6 +480,66 @@ def clone_docket(
         add_items_to_solr.delay([doc.pk for doc in dockets], "search.Docket")
 
     return dockets
+
+
+def clone_audio_files(
+    session: Session, audio_files: list[str], docket: Docket
+):
+    """Clone audio_audio rows related to the docket
+    Also, clone the actual `local_mp3_path` files to the dev storage.
+    This is useful for testing the audio.transcribe command
+
+    :param session: session with authorization header
+    :param audio_files: api urls for the audio files
+    :param docket: docket object
+    """
+    remove_fields = [
+        "resource_uri",
+        "absolute_url",
+        "panel",
+        "stt_google_response",
+    ]
+
+    for audio_url in audio_files:
+        audio_id = int(get_id_from_url(audio_url))
+        if Audio.objects.filter(id=audio_id).exists():
+            print(f"Audio with id {audio_id} already exists")
+            continue
+
+        audio_json = get_json_data(audio_url, session)
+        for field in remove_fields:
+            audio_json.pop(field, "")
+
+        if not audio_json.get("stt_transcript"):
+            audio_json["stt_transcript"] = ""
+        audio_json["docket"] = docket
+
+        audio = Audio(**audio_json)
+
+        try:
+            if audio_json["local_path_mp3"] is not None:
+                # the file may already be in the dev storage
+                audio.local_path_mp3.size
+        except FileNotFoundError:
+            print("Cloning audio file from prod storage")
+            _, year, month, day, file_name = audio.local_path_mp3.name.split(
+                "/"
+            )
+            file_with_date = datetime(int(year), int(month), int(day))
+            setattr(audio, "file_with_date", file_with_date.date())
+
+            # This step will require AWS keys to be in the environment
+            prod_url = f"https://storage.courtlistener.com/{audio.local_path_mp3.name}"
+            audio_request = requests.get(prod_url)
+            audio_request.raise_for_status()
+            cf = ContentFile(audio_request.content)
+
+            audio.local_path_mp3.save(file_name, cf, save=False)
+
+        with transaction.atomic():
+            # Prevent solr from indexing the file
+            audio.save(index=False)
+            print(f"Cloned audio with id {audio_id}")
 
 
 def clone_docket_entries(
@@ -970,6 +1049,7 @@ class Command(BaseCommand):
         self.ids = []
         self.download_cluster_files = False
         self.add_docket_entries = False
+        self.add_audio_files = False
         self.clone_person_positions = False
         self.add_to_solr = False
 
@@ -1015,6 +1095,14 @@ class Command(BaseCommand):
             help="Use this flag to clone docket entries when cloning "
             "clusters. It requires to have RECAP permissions or it will "
             "raise 403 error.",
+        )
+
+        parser.add_argument(
+            "--add-audio-files",
+            action="store_true",
+            default=False,
+            help="Use this flag to clone docket audio files when cloning "
+            "a docket.",
         )
 
         parser.add_argument(
@@ -1066,6 +1154,7 @@ class Command(BaseCommand):
                     self.s,
                     self.ids,
                     self.add_docket_entries,
+                    options["add_audio_files"],
                     self.clone_person_positions,
                     self.add_to_solr,
                     self.type,

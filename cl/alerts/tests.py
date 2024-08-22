@@ -1,4 +1,3 @@
-import json
 from collections import defaultdict
 from datetime import datetime, timedelta
 from http import HTTPStatus
@@ -1958,21 +1957,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 mock_date, tick=False
             ), self.captureOnCommitCallbacks(execute=True):
                 # When the Audio object is created it should trigger an alert.
-                transcript_response = {
-                    "response": {
-                        "results": [
-                            {
-                                "alternatives": [
-                                    {
-                                        "transcript": "RT Test OA transcript.",
-                                        "confidence": 0.85,
-                                    },
-                                ]
-                            },
-                        ]
-                    }
-                }
-                json_transcript = json.dumps(transcript_response)
+                transcript = "RT Test OA transcript."
                 rt_oral_argument = AudioWithParentsFactory.create(
                     case_name="RT Test OA",
                     docket__court=self.court_1,
@@ -1980,7 +1965,8 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                     docket__docket_number="19-5735",
                     stt_status=Audio.STT_COMPLETE,
                     judges="John Smith",
-                    stt_google_response=json_transcript,
+                    stt_transcript=transcript,
+                    stt_source=Audio.STT_OPENAI_WHISPER,
                 )
 
         # Confirm Alert date_last_hit is updated.
@@ -2090,27 +2076,13 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 mock_date, tick=False
             ), self.captureOnCommitCallbacks(execute=True):
                 # When the Audio object is created it should trigger an alert.
-                transcript_response = {
-                    "response": {
-                        "results": [
-                            {
-                                "alternatives": [
-                                    {
-                                        "transcript": "This a different transcript.",
-                                        "confidence": 0.85,
-                                    },
-                                ]
-                            },
-                        ]
-                    }
-                }
-                json_transcript = json.dumps(transcript_response)
+                transcript = "This a different transcript."
                 rt_oral_argument_2 = AudioWithParentsFactory.create(
                     case_name="No HL OA Alert",
                     docket=self.docket,
                     stt_status=Audio.STT_COMPLETE,
                     judges="George Smith",
-                    stt_google_response=json_transcript,
+                    stt_transcript=transcript,
                 )
 
         self.assertEqual(len(mail.outbox), 3, msg="Wrong number of emails.")

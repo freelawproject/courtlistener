@@ -1,7 +1,6 @@
 import datetime
 import math
 import re
-import unittest
 from http import HTTPStatus
 from unittest import mock
 
@@ -16,20 +15,23 @@ from django.utils.timezone import now
 from elasticsearch_dsl import Q
 from lxml import etree, html
 from rest_framework.serializers import CharField
+from waffle.testutils import override_flag
 
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    compute_lowest_possible_estimate,
     fetch_es_results,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
+    simplify_estimated_count,
 )
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
-    IndexedSolrTestCase,
     RECAPSearchTestCase,
-    docket_v4_api_keys,
     rd_type_v4_api_keys,
     recap_document_v4_api_keys,
+    recap_type_v4_api_keys,
+    recap_v3_keys,
     skip_if_common_tests_skipped,
     v4_meta_keys,
     v4_recap_meta_keys,
@@ -69,7 +71,6 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.tasks import (
-    add_docket_to_solr_by_rds,
     es_save_document,
     index_docket_parties_in_es,
     index_related_cites_fields,
@@ -134,6 +135,29 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "     Got: %s\n\n" % (field_name, expected_count, got),
         )
 
+    def _compare_child_entry_date_filed(
+        self, article, html_content, child_index, expected_date
+    ):
+        """Assert entry date filed in child results."""
+        tree = html.fromstring(html_content)
+        article = tree.xpath("//article")[article]
+        col_md_offset_half_elements = article.xpath(
+            f".//div[@class='bottom']//div[@class='col-md-offset-half']"
+        )
+        col_md_offset_half_elem = col_md_offset_half_elements[child_index]
+        inline_element = col_md_offset_half_elem.xpath(
+            ".//div[contains(@class, 'date-block')]"
+        )[0]
+        date = inline_element.xpath(".//time[@class='meta-data-value']")
+        meta_data_value = date[0].text.strip()
+        self.assertEqual(
+            meta_data_value,
+            expected_date,
+            msg="Did not get the right expected entry date filed \n"
+            "Expected: %s\n"
+            "     Got: %s\n\n" % (expected_date, meta_data_value),
+        )
+
     def _assert_results_header_content(self, html_content, expected_text):
         h2_element = html.fromstring(html_content).xpath(
             '//h2[@id="result-count"]'
@@ -196,6 +220,21 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="Did not get the right number of child documents %s\n"
             "Expected: %s\n"
             "     Got: %s\n\n" % (field_name, expected_count, got),
+        )
+
+    @staticmethod
+    def _parse_initial_complaint_button(response):
+        """Parse the initial complaint button within the HTML response."""
+        tree = html.fromstring(response.content.decode())
+        try:
+            initial_complaint = tree.xpath(
+                "//a[contains(@class, 'initial-complaint')]"
+            )[0]
+        except IndexError:
+            return None, None
+        return (
+            initial_complaint.get("href"),
+            initial_complaint.text_content().strip(),
         )
 
     def test_has_child_text_queries(self) -> None:
@@ -341,9 +380,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # The View Additional Results button is shown.
         self.assertIn("View Additional Results for", r.content.decode())
 
-    def test_match_all_query_and_docket_entries_count(self) -> None:
-        """Confirm a RECAP search with no params return a match all query.
-        The case and docket entries count is available.
+    def test_frontend_docket_and_docket_entries_count(self) -> None:
+        """Assert RECAP search results counts in the fronted. Below and
+        above the estimation threshold.
         """
 
         # Perform a RECAP match all search.
@@ -352,10 +391,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             params, 2, "match all query"
         )
-        # Two cases are returned.
-        self.assertIn("2 Cases", r.content.decode())
-        # 3 Docket entries in count.
-        self.assertIn("3 Docket", r.content.decode())
+        counts_text = self._get_frontend_counts_text(r)
+        # 2 cases and 3 Docket entries in counts are returned
+        self.assertIn("2 Cases and 3 Docket Entries", counts_text)
 
         with self.captureOnCommitCallbacks(execute=True):
             # Confirm an empty docket is shown in a match_all query.
@@ -371,10 +409,24 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             params, 3, "match all query"
         )
-        # 3 cases are returned.
-        self.assertIn("3 Cases", r.content.decode())
-        # 3 Docket entries in count.
-        self.assertIn("3 Docket", r.content.decode())
+        counts_text = self._get_frontend_counts_text(r)
+        # 3 cases and 3 Docket entries in counts are returned
+        self.assertIn("3 Cases and 3 Docket Entries", counts_text)
+
+        # Assert estimated counts above the threshold.
+        with mock.patch(
+            "cl.lib.elasticsearch_utils.simplify_estimated_count",
+            return_value=simplify_estimated_count(
+                compute_lowest_possible_estimate(
+                    settings.ELASTICSEARCH_CARDINALITY_PRECISION
+                )
+            ),
+        ):
+            r = async_to_sync(self.async_client.get)("/", params)
+        counts_text = self._get_frontend_counts_text(r)
+        self.assertIn(
+            "About 1,800 Cases and 1,800 Docket Entries", counts_text
+        )
         with self.captureOnCommitCallbacks(execute=True):
             empty_docket.delete()
 
@@ -1278,7 +1330,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "child filter + text query"
         )
 
-    @override_settings(VIEW_MORE_CHILD_HITS=6)
+    @override_settings(VIEW_MORE_CHILD_HITS=6, RECAP_CHILD_HITS_PER_RESULT=5)
     def test_docket_child_documents(self) -> None:
         """Confirm results contain the right number of child documents"""
         # Get results for a broad filter
@@ -1990,6 +2042,20 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed  desc.",
         )
 
+        # Confirm entry date filed are properly displayed.
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 0, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 1, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            1, r.content.decode(), 0, "July 19th, 2014"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 0, "February 23th, 1732"
+        )
+
         # Order by entry_date_filed asc
         # Ordering by a child field, dockets without entries should come last.
         params = {
@@ -2008,6 +2074,20 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             < r.content.decode().index("12-1236")
             < r.content.decode().index("12-1237"),
             msg="'12-0000' should come BEFORE '12-1235' when order_by entry_date_filed asc.",
+        )
+
+        # Confirm entry date filed are properly displayed.
+        self._compare_child_entry_date_filed(
+            0, r.content.decode(), 0, "February 23th, 1732"
+        )
+        self._compare_child_entry_date_filed(
+            1, r.content.decode(), 0, "July 19th, 2014"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 0, "August 19th, 2015"
+        )
+        self._compare_child_entry_date_filed(
+            2, r.content.decode(), 1, "August 19th, 2015"
         )
 
         # Order by entry_date_filed desc in match all queries.
@@ -2170,11 +2250,391 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("encountered an error", r.content.decode())
 
+    def test_initial_complaint_button(self) -> None:
+        """Confirm the initial complaint button is properly shown on different
+        scenarios"""
+
+        district_court = CourtFactory(id="cand", jurisdiction="FD")
+
+        dockets_to_remove = []
+        # Add dockets with no documents
+        with self.captureOnCommitCallbacks(execute=True):
+
+            # District document initial complaint available
+            de_1 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=district_court,
+                    case_name="Lorem District vs Complaint Available",
+                    docket_number="1:21-bk-1234",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_1.docket)
+            sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
+            initial_complaint_1 = RECAPDocumentFactory(
+                docket_entry=de_1,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="1234567",
+            )
+            # This attachment 1 should be ignored for non-appellate courts
+            RECAPDocumentFactory(
+                docket_entry=de_1,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="1234568",
+            )
+
+            # District document initial complaint not available
+            de_2 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=district_court,
+                    case_name="Lorem District vs Complaint Not Available",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_2.docket)
+            initial_complaint_2 = RECAPDocumentFactory(
+                docket_entry=de_2,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+                pacer_doc_id="234563",
+            )
+            # This attachment 1 should be ignored for non-appellate courts
+            RECAPDocumentFactory(
+                docket_entry=de_2,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=False,
+                pacer_doc_id="234564",
+            )
+
+            # Appellate document initial not available and not pacer_doc_id
+            de_3 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Appellate Complaint Not Available no pacer_doc_id",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_3.docket)
+            initial_complaint_3 = RECAPDocumentFactory(
+                docket_entry=de_3,
+                document_number="1",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+
+            # Appellate document initial complaint available
+            de_4 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Lorem Appellate vs Complaint Available",
+                    docket_number="1:21-bk-1236",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_4.docket)
+            sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
+            initial_complaint_4 = RECAPDocumentFactory(
+                docket_entry=de_4,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="7654321",
+            )
+
+            # Appellate document notice of appeal not available
+            de_5 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Lorem Appellate vs Notice of appeal not Available",
+                    docket_number="1:21-bk-1239",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_5.docket)
+            initial_complaint_5 = RECAPDocumentFactory(
+                docket_entry=de_5,
+                document_number="1",
+                attachment_number=1,
+                document_type=RECAPDocument.ATTACHMENT,
+                is_available=False,
+                pacer_doc_id="765425",
+            )
+
+            # No DocketEntry for the initial complaint available
+            empty_docket = DocketFactory(
+                court=district_court,
+                case_name="Lorem No Initial Complaint Entry",
+                docket_number="1:21-bk-1237",
+                source=Docket.RECAP,
+            )
+            dockets_to_remove.append(empty_docket)
+            # Bankruptcy document initial petition available
+            de_6 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Lorem Bankruptcy vs Petition Available",
+                    docket_number="1:21-bk-1240",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_6.docket)
+            sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
+            initial_complaint_6 = RECAPDocumentFactory(
+                docket_entry=de_6,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=True,
+                filepath_local=sample_file,
+                pacer_doc_id="12345875",
+            )
+
+            # Bankruptcy document initial petition not available
+            de_7 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court,
+                    case_name="Lorem Bankruptcy vs Petition Not Available",
+                    docket_number="1:21-bk-1240",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            dockets_to_remove.append(de_7.docket)
+            initial_complaint_7 = RECAPDocumentFactory(
+                docket_entry=de_7,
+                document_number="1",
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                is_available=False,
+                pacer_doc_id="35345875",
+            )
+
+        # District document initial complaint available
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem District vs Complaint Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertEqual("Initial Complaint", button_text)
+        self.assertEqual(initial_complaint_1.get_absolute_url(), button_url)
+
+        # District document initial complaint not available. Show Buy button.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem District vs Complaint Not Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Not available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertEqual("Buy Initial Complaint", button_text)
+        self.assertEqual(initial_complaint_2.pacer_url, button_url)
+
+        # Appellate notice of appeal available
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem Appellate vs Complaint Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Appellate available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertEqual("Notice of Appeal", button_text)
+        self.assertEqual(initial_complaint_4.get_absolute_url(), button_url)
+
+        # No docket entry is available for the initial complaint. No button is shown.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem No Initial Complaint Entry"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Entry no available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertIsNone(button_text)
+        self.assertIsNone(button_url)
+
+        # Appellate document initial not available and not pacer_doc_id.
+        # No button is shown.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Appellate Complaint Not Available no pacer_doc_id"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Appellate Complaint button no available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertIsNone(button_text)
+        self.assertIsNone(button_url)
+
+        # Appellate notice of appeal not available. Button Buy Notice of appeal
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem Appellate vs Notice of appeal not Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Appellate available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertEqual("Buy Notice of Appeal", button_text)
+        self.assertEqual(initial_complaint_5.pacer_url, button_url)
+
+        "Lorem Bankruptcy vs Petition Available"
+
+        # Bankruptcy document initial petition available
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem Bankruptcy vs Petition Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertEqual("Initial Petition", button_text)
+        self.assertEqual(initial_complaint_6.get_absolute_url(), button_url)
+
+        # Bankruptcy document initial petition not available. Show Buy button.
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": '"Lorem Bankruptcy vs Petition Not Available"',
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Complaint Not available"
+        )
+        button_url, button_text = self._parse_initial_complaint_button(r)
+        self.assertEqual(
+            "Buy Initial Petition", button_text, msg="Failed here..."
+        )
+        self.assertEqual(initial_complaint_7.pacer_url, button_url)
+
+        for docket in dockets_to_remove:
+            docket.delete()
+
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     version_api = "v3"
     skip_common_tests = True
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.judge_api = PersonFactory.create(
+            name_first="George", name_last="Doe", name_suffix="2"
+        )
+        cls.court_api = CourtFactory(
+            id="ca9", jurisdiction="F", citation_string="Appeals. CA9."
+        )
+        cls.de_api = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_api,
+                case_name="America vs API Lorem",
+                case_name_full="America vs API Lorem vs. Bank",
+                date_filed=datetime.date(2016, 4, 16),
+                date_argued=datetime.date(2022, 5, 20),
+                date_reargued=datetime.date(2023, 5, 21),
+                date_terminated=datetime.date(2023, 7, 21),
+                docket_number="1:24-bk-0000",
+                assigned_to=cls.judge_api,
+                referred_to=cls.judge_api,
+                nature_of_suit="569",
+                source=Docket.RECAP,
+                cause="401 Civil",
+                jury_demand="Plaintiff",
+                jurisdiction_type="U.S. Government Defendant",
+            ),
+            entry_number=1,
+            date_filed=datetime.date(2020, 8, 19),
+            description="MOTION for Leave Lorem vs America",
+        )
+        cls.firm_api = AttorneyOrganizationFactory(
+            name="Associates America", lookup_key="firm_api"
+        )
+        cls.attorney_api = AttorneyFactory(
+            name="John Doe",
+            organizations=[cls.firm_api],
+            docket=cls.de_api.docket,
+        )
+        cls.party_type = PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Defendant John Doe",
+                docket=cls.de_api.docket,
+                attorneys=[cls.attorney_api],
+            ),
+            docket=cls.de_api.docket,
+        )
+        cls.rd_api = RECAPDocumentFactory(
+            docket_entry=cls.de_api,
+            description="Order Letter",
+            document_number="2",
+            is_available=False,
+            page_count=100,
+            pacer_doc_id="019036000435",
+            plain_text="This a plain text to be shown in the API",
+        )
+        OpinionsCitedByRECAPDocument.objects.create(
+            citing_document=cls.rd_api,
+            cited_opinion=cls.opinion,
+            depth=1,
+        )
+        BankruptcyInformationFactory(docket=cls.de_api.docket)
+
+        cls.de_empty_fields_api = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court_api,
+                date_reargued=None,
+                source=Docket.RECAP_AND_SCRAPER,
+                pacer_case_id=None,
+                case_name="",
+                case_name_full="",
+            ),
+            description="",
+        )
+        cls.rd_empty_fields_api = RECAPDocumentFactory(
+            docket_entry=cls.de_empty_fields_api,
+            description="empty fields",
+            pacer_doc_id="",
+        )
+        cls.empty_docket_api = DocketFactory(
+            court=cls.court_api,
+            date_argued=None,
+            source=Docket.RECAP_AND_IDB,
+        )
 
     async def _test_api_results_count(
         self, params, expected_count, field_name
@@ -2386,29 +2846,29 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         )
 
 
-class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
+@override_flag("r-es-search-api-active", active=True)
+class RECAPSearchAPIV3Test(
+    RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
+):
     """
     RECAP Search API V3 Tests
     """
 
-    tests_running_over_solr = True
     skip_common_tests = False
 
     @classmethod
     def setUpTestData(cls):
-        super().setUpTestData()
+        cls.mock_date = now().replace(day=15, hour=0)
+        with time_machine.travel(cls.mock_date, tick=False):
+            super().setUpTestData()
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.RECAP,
+                queue="celery",
+                pk_offset=0,
+                testing_mode=True,
+            )
 
-    def setUp(self) -> None:
-        add_docket_to_solr_by_rds(
-            [self.rd.pk, self.rd_att.pk], force_commit=True
-        )
-        add_docket_to_solr_by_rds([self.rd_2.pk], force_commit=True)
-        super().setUp()
-
-    @unittest.skipIf(
-        tests_running_over_solr,
-        "Skip in SOlR due to we stopped indexing parties",
-    )
     async def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
         params = {
@@ -2419,10 +2879,6 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         # API, 2 result expected since RECAPDocuments are not grouped.
         await self._test_api_results_count(params, 2, "party_name")
 
-    @unittest.skipIf(
-        tests_running_over_solr,
-        "Skip in SOlR due to we stopped indexing parties",
-    )
     async def test_atty_name_filter(self) -> None:
         """Confirm atty_name filter works properly"""
         params = {"type": SEARCH_TYPES.RECAP, "atty_name": "Debbie Russell"}
@@ -2430,36 +2886,35 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         # API, 2 result expected since RECAPDocuments are not grouped.
         await self._test_api_results_count(params, 2, "atty_name")
 
-    async def test_docket_child_documents(self) -> None:
+    def test_docket_child_documents(self) -> None:
         """Confirm results contain the right number of child documents"""
         # Get results for a broad filter
-        rd_1 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="2",
-            is_available=True,
-        )
-        rd_2 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="3",
-            is_available=True,
-        )
-        rd_3 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="4",
-            is_available=True,
-        )
-        rd_4 = await sync_to_async(RECAPDocumentFactory)(
-            docket_entry=self.de,
-            document_number="5",
-            is_available=False,
-        )
-        await sync_to_async(add_docket_to_solr_by_rds)(
-            [rd_1.pk, rd_2.pk, rd_3.pk, rd_4.pk], force_commit=True
-        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            rd_1 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="2",
+                is_available=True,
+            )
+            rd_2 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="3",
+                is_available=True,
+            )
+            rd_3 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="4",
+                is_available=True,
+            )
+            rd_4 = RECAPDocumentFactory(
+                docket_entry=self.de,
+                document_number="5",
+                is_available=False,
+            )
 
         params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
         # API
-        await self._test_api_results_count(params, 6, "docket_number")
+        async_to_sync(self._test_api_results_count)(params, 6, "docket_number")
 
         # Constraint filter:
         params = {
@@ -2468,31 +2923,23 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
             "available_only": True,
         }
         # API
-        await self._test_api_results_count(
+        async_to_sync(self._test_api_results_count)(
             params, 4, "docket_number + available_only"
         )
+        rd_1.delete()
+        rd_2.delete()
+        rd_3.delete()
+        rd_4.delete()
 
-    @unittest.skipIf(
-        tests_running_over_solr,
-        "Skip in SOlR due to we stopped indexing parties",
-    )
     async def test_advanced_queries(self) -> None:
         """Confirm advance queries works properly"""
-        # Advanced query string, firm
-        params = {"type": SEARCH_TYPES.RECAP, "q": "firm:(Associates LLP)"}
-
-        # API
-        await self._test_api_results_count(params, 2, "advance firm")
-
         # Advanced query string, firm AND short_description
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": 'firm:(Associates LLP) AND short_description:"Document attachment"',
+            "q": 'short_description:"Document attachment"',
         }
         # API
-        await self._test_api_results_count(
-            params, 1, "advance firm AND short_description"
-        )
+        await self._test_api_results_count(params, 1, "short_description")
 
         # Advanced query string, page_count OR document_type
         params = {
@@ -2526,7 +2973,7 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         """Confirm fields in RECAP Search API results."""
         search_params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": "Discharging Debtor",
+            "q": f"id:{self.rd_api.pk}",
         }
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
@@ -2535,8 +2982,6 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
             "assignedTo",
             "assigned_to_id",
             "attachment_number",
-            "attorney",
-            "attorney_id",
             "caseName",
             "cause",
             "court",
@@ -2548,7 +2993,6 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
             "dateTerminated",
             "description",
             "docketNumber",
-            "docket_absolute_url",
             "docket_entry_id",
             "docket_id",
             "document_number",
@@ -2556,15 +3000,11 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
             "entry_date_filed",
             "entry_number",
             "filepath_local",
-            "firm",
-            "firm_id",
             "id",
             "is_available",
             "jurisdictionType",
             "juryDemand",
             "page_count",
-            "party",
-            "party_id",
             "referredTo",
             "referred_to_id",
             "short_description",
@@ -2572,13 +3012,61 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
             "suitNature",
             "timestamp",
         ]
+        self.assertEqual(len(keys_to_check), len(recap_v3_keys))
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, 40)
-        for key in keys_to_check:
-            self.assertTrue(
-                key in r.data["results"][0],
-                msg=f"Key {key} not found in the result object.",
-            )
+        self.assertEqual(
+            keys_count, len(keys_to_check), msg="Wrong number of keys."
+        )
+        content_to_compare = {"result": self.rd_api}
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            recap_v3_keys,
+            None,
+            None,
+        )
+
+        # Confirm expected values for empty fields.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_empty_fields_api.pk}",
+        }
+        # API
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(recap_v3_keys))
+        content_to_compare = {"result": self.rd_empty_fields_api}
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            recap_v3_keys,
+            None,
+            None,
+        )
+
+    async def test_results_api_highlighted_fields(self) -> None:
+        """Confirm highlighted fields in V3 RECAP Search API results."""
+        # API HL enabled by default.
+        search_params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": f"id:{self.rd_api.pk} plain_text:(shown in the API)",
+        }
+
+        # RECAP Search type HL disabled.
+        r = await self._test_api_results_count(search_params, 1, "API fields")
+        keys_count = len(r.data["results"][0])
+        self.assertEqual(keys_count, len(recap_v3_keys))
+        content_to_compare = {
+            "result": self.rd_api,
+            "snippet": "This a plain text to be <mark>shown in the API</mark>",
+        }
+        await self._test_api_fields_content(
+            r,
+            content_to_compare,
+            recap_v3_keys,
+            None,
+            None,
+        )
 
     async def test_results_ordering(self) -> None:
         """Confirm results ordering works properly"""
@@ -2602,7 +3090,15 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         self.assertTrue(
             r.content.decode().index("1:21-bk-1234")
             < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by desc.",
+            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by score desc.",
+        )
+
+        params["type"] = SEARCH_TYPES.DOCKETS
+        r = await self._test_api_results_count(params, 2, "order")
+        self.assertTrue(
+            r.content.decode().index("1:21-bk-1234")
+            < r.content.decode().index("12-1235"),
+            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by score desc.",
         )
 
         # Order by entry_date_filed desc
@@ -2615,9 +3111,17 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         # API
         r = await self._test_api_results_count(params, 3, "order")
         self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by desc.",
+            r.content.decode().index("1:21-bk-1234")  # 2015, 8, 19
+            < r.content.decode().index("12-1235"),  # 2014, 7, 19
+            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed desc.",
+        )
+
+        params["type"] = SEARCH_TYPES.DOCKETS
+        r = await self._test_api_results_count(params, 2, "order")
+        self.assertTrue(
+            r.content.decode().index("1:21-bk-1234")  # 2015, 8, 19
+            < r.content.decode().index("12-1235"),  # 2014, 7, 19
+            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by entry_date_filed desc.",
         )
 
         # Order by entry_date_filed asc
@@ -2629,16 +3133,23 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         # API
         r = await self._test_api_results_count(params, 3, "order")
         self.assertTrue(
-            r.content.decode().index("12-1235")
-            < r.content.decode().index("1:21-bk-1234"),
-            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by asc.",
+            r.content.decode().index("12-1235")  # 2014, 7, 19
+            < r.content.decode().index("1:21-bk-1234"),  # 2015, 8, 19
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
         )
 
-    @unittest.skipIf(
-        tests_running_over_solr, "Skip in SOlR due to a existing bug."
-    )
+        params["type"] = SEARCH_TYPES.DOCKETS
+        r = await self._test_api_results_count(params, 2, "order")
+        self.assertTrue(
+            r.content.decode().index("12-1235")  # 2014, 7, 19
+            < r.content.decode().index("1:21-bk-1234"),  # 2015, 8, 19
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by entry_date_filed asc.",
+        )
+
     async def test_api_results_date_filed_ordering(self) -> None:
-        """Confirm api results date_filed ordering works properly"""
+        """Confirm api results date_filed ordering works properly.
+        In the RECAP search type, the dateFiled sorting is converted to entry_date_filed
+        """
 
         # Order by dateFiled desc
         params = {
@@ -2649,8 +3160,18 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         # API
         r = await self._test_api_results_count(params, 3, "order")
         self.assertTrue(
-            r.content.decode().index("12-1235")
-            < r.content.decode().index("1:21-bk-1234"),
+            r.content.decode().index("1:21-bk-1234")  # edf: 2015, 8, 19
+            < r.content.decode().index("12-1235"),  # edf: 2014, 7, 19
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by desc.",
+        )
+
+        params["type"] = SEARCH_TYPES.DOCKETS
+        r = await self._test_api_results_count(params, 2, "order")
+        self.assertTrue(
+            r.content.decode().index("12-1235")  # dateFiled:2016, 8, 16
+            < r.content.decode().index(
+                "1:21-bk-1234"
+            ),  # dateFiled:2015, 8, 16
             msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by desc.",
         )
 
@@ -2664,9 +3185,42 @@ class RECAPSearchAPIV3Test(RECAPSearchAPICommonTests, IndexedSolrTestCase):
         # API
         r = await self._test_api_results_count(params, 3, "order")
         self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
+            r.content.decode().index("12-1235")  # edf: 2014, 7, 19
+            < r.content.decode().index("1:21-bk-1234"),  # edf: 2015, 8, 19
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by asc.",
+        )
+
+        params["type"] = SEARCH_TYPES.DOCKETS
+        r = await self._test_api_results_count(params, 2, "order")
+        self.assertTrue(
+            r.content.decode().index("1:21-bk-1234")  # dateFiled:2015, 8, 16
+            < r.content.decode().index("12-1235"),  # dateFiled:2016, 8, 16
             msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by asc.",
+        )
+
+    async def test_api_d_type(self) -> None:
+        """Confirm the DOCKETS search type works properly in the V3 API grouping
+        results by docket_id.
+        """
+
+        # Order by dateFiled desc
+        params = {
+            "type": SEARCH_TYPES.DOCKETS,
+        }
+        total_unique_rds = (
+            await RECAPDocument.objects.all()
+            .order_by("docket_entry__docket__pk")
+            .distinct("docket_entry__docket__pk")
+            .acount()
+        )
+        # API
+        r = await self._test_api_results_count(
+            params, total_unique_rds, "DOCKETS search type"
+        )
+        self.assertEqual(
+            r.data["count"],
+            total_unique_rds,
+            msg="Results count didn't match.",
         )
 
 
@@ -2711,88 +3265,6 @@ class RECAPSearchAPIV4Test(
         cls.mock_date = now().replace(day=15, hour=0)
         with time_machine.travel(cls.mock_date, tick=False):
             super().setUpTestData()
-            cls.judge_api = PersonFactory.create(
-                name_first="George", name_last="Doe", name_suffix="2"
-            )
-            cls.court_api = CourtFactory(
-                id="ca9", jurisdiction="F", citation_string="Appeals. CA9."
-            )
-            cls.de_api = DocketEntryWithParentsFactory(
-                docket=DocketFactory(
-                    court=cls.court_api,
-                    case_name="America vs API Lorem",
-                    case_name_full="America vs API Lorem vs. Bank",
-                    date_filed=datetime.date(2016, 4, 16),
-                    date_argued=datetime.date(2022, 5, 20),
-                    date_reargued=datetime.date(2023, 5, 21),
-                    date_terminated=datetime.date(2023, 7, 21),
-                    docket_number="1:24-bk-0000",
-                    assigned_to=cls.judge_api,
-                    referred_to=cls.judge_api,
-                    nature_of_suit="569",
-                    source=Docket.RECAP,
-                    cause="401 Civil",
-                    jury_demand="Plaintiff",
-                    jurisdiction_type="U.S. Government Defendant",
-                ),
-                entry_number=1,
-                date_filed=datetime.date(2020, 8, 19),
-                description="MOTION for Leave Lorem vs America",
-            )
-            cls.firm_api = AttorneyOrganizationFactory(
-                name="Associates America", lookup_key="firm_api"
-            )
-            cls.attorney_api = AttorneyFactory(
-                name="John Doe",
-                organizations=[cls.firm_api],
-                docket=cls.de_api.docket,
-            )
-            cls.party_type = PartyTypeFactory.create(
-                party=PartyFactory(
-                    name="Defendant John Doe",
-                    docket=cls.de_api.docket,
-                    attorneys=[cls.attorney_api],
-                ),
-                docket=cls.de_api.docket,
-            )
-            cls.rd_api = RECAPDocumentFactory(
-                docket_entry=cls.de_api,
-                description="Order Letter",
-                document_number="2",
-                is_available=False,
-                page_count=100,
-                pacer_doc_id="019036000435",
-                plain_text="This a plain text to be shown in the API",
-            )
-            OpinionsCitedByRECAPDocument.objects.create(
-                citing_document=cls.rd_api,
-                cited_opinion=cls.opinion,
-                depth=1,
-            )
-            BankruptcyInformationFactory(docket=cls.de_api.docket)
-
-            cls.de_empty_fields_api = DocketEntryWithParentsFactory(
-                docket=DocketFactory(
-                    court=cls.court_api,
-                    date_reargued=None,
-                    source=Docket.RECAP_AND_SCRAPER,
-                    pacer_case_id=None,
-                    case_name="",
-                    case_name_full="",
-                ),
-                description="",
-            )
-            cls.rd_empty_fields_api = RECAPDocumentFactory(
-                docket_entry=cls.de_empty_fields_api,
-                description="empty fields",
-                pacer_doc_id="",
-            )
-
-            cls.empty_docket_api = DocketFactory(
-                court=cls.court_api,
-                date_argued=None,
-                source=Docket.RECAP_AND_IDB,
-            )
             call_command(
                 "cl_index_parent_and_child_docs",
                 search_type=SEARCH_TYPES.RECAP,
@@ -2859,14 +3331,14 @@ class RECAPSearchAPIV4Test(
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(docket_v4_api_keys))
+        self.assertEqual(keys_count, len(recap_type_v4_api_keys))
         rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
-        content_to_compare = {"result": self.rd_api}
+        content_to_compare = {"result": self.rd_api, "V4": True}
         await self._test_api_fields_content(
             r,
             content_to_compare,
-            docket_v4_api_keys,
+            recap_type_v4_api_keys,
             recap_document_v4_api_keys,
             v4_recap_meta_keys,
         )
@@ -2883,14 +3355,14 @@ class RECAPSearchAPIV4Test(
         r = await self._test_api_results_count(search_params, 1, "API fields")
 
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(docket_v4_api_keys))
+        self.assertEqual(keys_count, len(recap_type_v4_api_keys))
         rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
-        content_to_compare = {"result": self.rd_empty_fields_api}
+        content_to_compare = {"result": self.rd_empty_fields_api, "V4": True}
         await self._test_api_fields_content(
             r,
             content_to_compare,
-            docket_v4_api_keys,
+            recap_type_v4_api_keys,
             recap_document_v4_api_keys,
             v4_recap_meta_keys,
         )
@@ -2903,7 +3375,7 @@ class RECAPSearchAPIV4Test(
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(docket_v4_api_keys))
+        self.assertEqual(keys_count, len(recap_type_v4_api_keys))
         recap_documents = r.data["results"][0].get("recap_documents")
         self.assertEqual(recap_documents, [])
 
@@ -2924,16 +3396,14 @@ class RECAPSearchAPIV4Test(
         # RECAP Search type HL disabled.
         r = await self._test_api_results_count(search_params, 1, "API fields")
         keys_count = len(r.data["results"][0])
-        self.assertEqual(keys_count, len(docket_v4_api_keys))
+        self.assertEqual(keys_count, len(recap_type_v4_api_keys))
         rd_keys_count = len(r.data["results"][0]["recap_documents"][0])
         self.assertEqual(rd_keys_count, len(recap_document_v4_api_keys))
-        content_to_compare = {
-            "result": self.rd_api,
-        }
+        content_to_compare = {"result": self.rd_api, "V4": True}
         await self._test_api_fields_content(
             r,
             content_to_compare,
-            docket_v4_api_keys,
+            recap_type_v4_api_keys,
             recap_document_v4_api_keys,
             v4_recap_meta_keys,
         )
@@ -2955,6 +3425,7 @@ class RECAPSearchAPIV4Test(
         r = await self._test_api_results_count(search_params, 1, "API fields")
         content_to_compare = {
             "result": self.rd_api,
+            "V4": True,
             "assignedTo": "<mark>George</mark> Doe II",
             "caseName": "<mark>America</mark> <mark>vs</mark> <mark>API</mark> Lorem",
             "cause": "<mark>401</mark> <mark>Civil</mark>",
@@ -2970,7 +3441,7 @@ class RECAPSearchAPIV4Test(
         await self._test_api_fields_content(
             r,
             content_to_compare,
-            docket_v4_api_keys,
+            recap_type_v4_api_keys,
             recap_document_v4_api_keys,
             v4_recap_meta_keys,
         )
@@ -2999,11 +3470,12 @@ class RECAPSearchAPIV4Test(
         content_to_compare = {
             "result": self.rd_2,
             "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, M",
+            "V4": True,
         }
         await self._test_api_fields_content(
             r,
             content_to_compare,
-            docket_v4_api_keys,
+            recap_type_v4_api_keys,
             recap_document_v4_api_keys,
             v4_recap_meta_keys,
         )
@@ -3017,11 +3489,12 @@ class RECAPSearchAPIV4Test(
         content_to_compare = {
             "result": self.rd_2,
             "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas",
+            "V4": True,
         }
         await self._test_api_fields_content(
             r,
             content_to_compare,
-            docket_v4_api_keys,
+            recap_type_v4_api_keys,
             recap_document_v4_api_keys,
             v4_recap_meta_keys,
         )
@@ -3039,6 +3512,7 @@ class RECAPSearchAPIV4Test(
         content_to_compare = {
             "result": self.rd_2,
             "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, M",
+            "V4": True,
         }
         await self._test_api_fields_content(
             r,
@@ -3057,6 +3531,7 @@ class RECAPSearchAPIV4Test(
         content_to_compare = {
             "result": self.rd_2,
             "snippet": "Mauris iaculis, leo sit amet hendrerit vehicula, Maecenas",
+            "V4": True,
         }
         await self._test_api_fields_content(
             r,
@@ -3880,11 +4355,11 @@ class RECAPSearchAPIV4Test(
         r = await self._test_api_results_count(search_params, 1, "API fields")
         keys_count = len(r.data["results"][0])
 
-        d_type_v4_api_keys = docket_v4_api_keys.copy()
+        d_type_v4_api_keys = recap_type_v4_api_keys.copy()
         del d_type_v4_api_keys["recap_documents"]
         self.assertEqual(keys_count, len(d_type_v4_api_keys))
 
-        content_to_compare = {"result": self.rd_api}
+        content_to_compare = {"result": self.rd_api, "V4": True}
         await self._test_api_fields_content(
             r, content_to_compare, d_type_v4_api_keys, None, v4_meta_keys
         )
@@ -3902,7 +4377,7 @@ class RECAPSearchAPIV4Test(
         keys_count = len(r.data["results"][0])
         self.assertEqual(keys_count, len(rd_type_v4_api_keys))
 
-        content_to_compare = {"result": self.rd_api}
+        content_to_compare = {"result": self.rd_api, "V4": True}
         await self._test_api_fields_content(
             r, content_to_compare, rd_type_v4_api_keys, None, v4_meta_keys
         )
@@ -6398,12 +6873,12 @@ class RECAPHistoryTablesIndexingTest(
         rd_2_doc = ESRECAPDocument.get(id=ES_CHILD_ID(self.rd_att.pk).RECAP)
         self.assertEqual(
             rd_1_doc.description,
-            "MOTION for Leave to File Amicus Curiae Lorem",
+            "MOTION for Leave to File Amicus Curiae Lorem Served",
         )
         self.assertEqual(rd_1_doc.entry_number, 1)
         self.assertEqual(
             rd_2_doc.description,
-            "MOTION for Leave to File Amicus Curiae Lorem",
+            "MOTION for Leave to File Amicus Curiae Lorem Served",
         )
         self.assertEqual(rd_2_doc.entry_number, 1)
 

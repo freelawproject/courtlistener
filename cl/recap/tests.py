@@ -16,7 +16,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
@@ -97,6 +97,7 @@ from cl.recap.tasks import (
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
+    process_recap_acms_appellate_attachment,
     process_recap_acms_docket,
     process_recap_appellate_attachment,
     process_recap_appellate_docket,
@@ -124,7 +125,12 @@ from cl.search.models import (
 )
 from cl.tests import fakes
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.tests.utils import AsyncAPIClient, MockACMSDocketReport, MockResponse
+from cl.tests.utils import (
+    AsyncAPIClient,
+    MockACMSAttachmentPage,
+    MockACMSDocketReport,
+    MockResponse,
+)
 from cl.users.factories import (
     UserProfileWithParentsFactory,
     UserWithChildProfileFactory,
@@ -238,6 +244,25 @@ class RecapUploadsTest(TestCase):
         self.data.update(
             {
                 "upload_type": UPLOAD_TYPE.ATTACHMENT_PAGE,
+                "document_number": "",
+            }
+        )
+        r = await self.async_client.post(self.path, self.data)
+        self.assertEqual(r.status_code, HTTPStatus.CREATED)
+
+        j = json.loads(r.content)
+        path = reverse(
+            "processingqueue-detail", kwargs={"version": "v3", "pk": j["id"]}
+        )
+        r = await self.async_client.get(path)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    async def test_uploading_an_acms_attachment_page(self, mock):
+        """Can we upload an ACMS attachment page and have it be saved correctly?"""
+        self.data.update(
+            {
+                "upload_type": UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+                "court": self.court_appellate.id,
                 "document_number": "",
             }
         )
@@ -613,6 +638,7 @@ class RecapUploadsTest(TestCase):
                 "upload_type": UPLOAD_TYPE.ACMS_DOCKET_JSON,
                 "document_number": "",
                 "pacer_case_id": "34cacf7f-52d5-4d1f-b4f0-0542b429f674",
+                "court": self.court_appellate.id,
             }
         )
         del self.data["pacer_doc_id"]
@@ -670,6 +696,69 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(de_2.date_filed, date(2023, 10, 2))
         self.assertEqual(de_2.time_filed, time(11, 20, 0))
 
+    def test_processing_an_acms_attachment_page(self, mock_upload):
+        d = DocketFactory(
+            source=Docket.RECAP,
+            court=self.ca2,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+        )
+        de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="7fae3c58-1ced-ee11-904c-001dd83058b7",
+                    document_number=22,
+                )
+            ],
+        )
+        async_to_sync(add_docket_entries)(d, de_data["docket_entries"])
+
+        pq = ProcessingQueue.objects.create(
+            court=self.ca2,
+            uploader=self.user,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+            upload_type=UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+
+        recap_documents = RECAPDocument.objects.all().order_by("date_created")
+        main_rd = recap_documents[0]
+
+        # After adding 1 docket entry, it should only exist its main RD.
+        self.assertEqual(recap_documents.count(), 1)
+        with mock.patch(
+            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+        ):
+            # Process the acms attachment page containing 3 attachments.
+            async_to_sync(process_recap_acms_appellate_attachment)(pq.pk)
+
+        # After adding attachments, it should only exist 3 RD attachments.
+        self.assertEqual(recap_documents.count(), 3)
+
+        # Confirm that the main RD is transformed into an attachment.
+        main_attachment = RECAPDocument.objects.filter(pk=main_rd.pk)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+
+        # Process the attachment page again, no new attachments should be added
+        pq_1 = ProcessingQueue.objects.create(
+            court=self.ca2,
+            uploader=self.user,
+            pacer_case_id="9f5ae37f-c44e-4194-b075-3f8f028559c4",
+            upload_type=UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        with mock.patch(
+            "cl.recap.tasks.ACMSAttachmentPage", MockACMSAttachmentPage
+        ):
+            # Process the acms attachment page containing 3 attachments.
+            async_to_sync(process_recap_acms_appellate_attachment)(pq_1.pk)
+
+        self.assertEqual(recap_documents.count(), 3)
+        self.assertEqual(
+            main_attachment[0].document_type, RECAPDocument.ATTACHMENT
+        )
+
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
 @mock.patch(
@@ -682,7 +771,6 @@ class RecapUploadsTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
-    side_effect=lambda x: True,
 )
 class RecapDocketFetchApiTest(TestCase):
     """Tests for the RECAP docket Fetch API
@@ -957,10 +1045,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
     "cl.corpus_importer.tasks.FreeOpinionReport",
     new=fakes.FakeFreeOpinionReport,
 )
-@mock.patch(
-    "cl.recap.tasks.get_pacer_cookie_from_cache",
-    return_value={"cookie": "foo"},
-)
+@mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
@@ -1062,7 +1147,6 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
-        return_value={"pacer_cookie": "foo"},
     )
     @mock.patch(
         "cl.corpus_importer.tasks.AttachmentPage",
@@ -1145,6 +1229,9 @@ def mock_bucket_open(message_id, r, read_file=False):
     return recap_mail_example
 
 
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
 class RecapEmailToEmailProcessingQueueTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
 
@@ -1203,10 +1290,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.RecapEmailSESStorage.open",
         side_effect=mock_bucket_open,
     )
-    @mock.patch(
-        "cl.recap.tasks.get_or_cache_pacer_cookies",
-        side_effect=lambda x, y, z: None,
-    )
+    @mock.patch("cl.recap.tasks.get_or_cache_pacer_cookies")
     @mock.patch(
         "cl.recap.tasks.is_docket_entry_sealed",
         return_value=False,
@@ -2472,6 +2556,40 @@ class RecapDocketTaskTest(TestCase):
                 )
         d.delete()
 
+    def test_merge_docket_number_components(
+        self,
+    ) -> None:
+        """Confirm docket_number components are properly merged into the
+        docket instance.
+        """
+
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+        )
+
+        docket_data = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00070-TKW-MAL-1",
+            federal_dn_office_code="3",
+            federal_dn_case_type="cr",
+            federal_dn_judge_initials_assigned="TKW",
+            federal_dn_judge_initials_referred="MAL",
+            federal_defendant_number="1",
+        )
+        async_to_sync(update_docket_metadata)(d, docket_data)
+        d.save()
+        d.refresh_from_db()
+
+        self.assertEqual(d.federal_dn_office_code, "3")
+        self.assertEqual(d.federal_dn_case_type, "cr")
+        self.assertEqual(d.federal_dn_judge_initials_assigned, "TKW")
+        self.assertEqual(d.federal_dn_judge_initials_referred, "MAL")
+        self.assertEqual(d.federal_defendant_number, 1)
+
+        d.delete()
+
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")
 class RecapDocketAttachmentTaskTest(TestCase):
@@ -2857,7 +2975,7 @@ class IdbMergeTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: None,
+    side_effect=lambda x, y, z: (None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -3036,7 +3154,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3111,7 +3229,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3204,7 +3322,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3267,7 +3385,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3358,7 +3476,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
@@ -3405,7 +3523,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3561,7 +3679,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3631,7 +3749,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3725,7 +3843,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3876,7 +3994,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3962,7 +4080,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4119,7 +4237,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -4165,7 +4283,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4220,7 +4338,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4292,7 +4410,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4363,7 +4481,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),
@@ -4534,7 +4652,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -4620,7 +4738,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             None,
             "Document not available from magic link.",
         ),
@@ -4668,7 +4786,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -4986,7 +5104,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -5151,7 +5269,7 @@ class GetAndCopyRecapAttachments(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b"Hello World from magic"),
             "OK",
         ),
@@ -5315,7 +5433,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: "Cookie",
+    side_effect=lambda x, y, z: ("Cookie", settings.EGRESS_PROXY_HOSTS[0]),
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
@@ -5384,7 +5502,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
@@ -5422,7 +5540,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -5469,7 +5587,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -5515,7 +5633,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -5554,7 +5672,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -5604,7 +5722,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             None,
             "Document not available from magic link.",
         ),
@@ -5689,7 +5807,7 @@ class CheckCourtConnectivityTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: None,
+    side_effect=lambda x, y, z: (None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -6000,7 +6118,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_update_webhook_after_http_error(
         self,
@@ -6072,7 +6190,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_update_webhook_after_network_error(
         self,
@@ -6145,7 +6263,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_success_webhook_delivery(
         self,
@@ -6211,7 +6329,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_retry_webhooks_integration(
         self,
@@ -6876,7 +6994,6 @@ class WebhooksRetries(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
-    side_effect=lambda x: True,
 )
 class RecapFetchWebhooksTest(TestCase):
     """Test RECAP Fetch Webhooks"""
@@ -7024,7 +7141,7 @@ class RecapFetchWebhooksTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: (
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -7308,6 +7425,26 @@ class LookupDocketsTest(TestCase):
             d.docket_number_core, self.docket_case_id.docket_number_core
         )
 
+    def test_case_id_and_docket_number_no_match(self):
+        """Confirm if when a lookup by pacer_case_id and docket_number doesn't
+        match a new Docket is created instead.
+        """
+
+        dockets = Docket.objects.all()
+        self.assertEqual(dockets.count(), 4)
+        d = async_to_sync(find_docket_object)(
+            self.court.pk, "12346", self.docket_data["docket_number"]
+        )
+        async_to_sync(update_docket_metadata)(d, self.docket_data)
+        d.save()
+
+        # Docket didn't match. New one created.
+        self.assertEqual(dockets.count(), 5)
+        self.assertNotEqual(d.id, self.docket_case_id.id)
+        self.assertEqual(
+            d.docket_number_core, self.docket_case_id.docket_number_core
+        )
+
     def test_case_id_lookup(self):
         """Confirm if lookup by only pacer_case_id works properly."""
 
@@ -7328,7 +7465,7 @@ class LookupDocketsTest(TestCase):
 
         d = async_to_sync(find_docket_object)(
             self.court.pk,
-            self.docket_core_data["docket_entries"][0]["pacer_case_id"],
+            None,
             self.docket_core_data["docket_number"],
         )
         async_to_sync(update_docket_metadata)(d, self.docket_core_data)
@@ -7345,7 +7482,7 @@ class LookupDocketsTest(TestCase):
 
         d = async_to_sync(find_docket_object)(
             self.court.pk,
-            self.docket_no_core_data["docket_entries"][0]["pacer_case_id"],
+            None,
             self.docket_no_core_data["docket_number"],
         )
         async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
@@ -7426,7 +7563,7 @@ class LookupDocketsTest(TestCase):
         )
         new_d = async_to_sync(find_docket_object)(
             self.court_appellate.pk,
-            docket_data_lower_number["docket_entries"][0]["pacer_case_id"],
+            None,
             docket_data_lower_number["docket_number"],
         )
         async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)

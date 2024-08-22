@@ -28,6 +28,8 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Didn't respone to emails, 2024-08-12
+        "fruitfranky": "10/hour",
         # Email non-functional; making many requests, 2024-04-23
         "NicolasMadan": "10/hour",
         # Didn't respond to emails, 2023-10-02
@@ -98,7 +100,7 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
     ),
     # Assorted & Sundry
-    "DEFAULT_PAGINATION_CLASS": "cl.api.pagination.ShallowOnlyPageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "cl.api.pagination.VersionBasedPagination",
     "PAGE_SIZE": 20,
     "URL_FIELD_NAME": "resource_uri",
     "DEFAULT_METADATA_CLASS": "cl.api.utils.SimpleMetadataWithFilters",

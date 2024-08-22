@@ -67,7 +67,7 @@ def reverse_match(
         query_tokens = case_name.split()[start:]
         query = " ".join(query_tokens)
         # ~ performs a proximity search for the preceding phrase
-        # See: http://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
+        # See: https://wiki.apache.org/solr/SolrRelevancyCookbook#Term_Proximity
         params["q"] = f'"{query}"~{len(query_tokens)}'
         params["caller"] = "reverse_match"
         new_results = conn.query().add_extra(**params).execute()

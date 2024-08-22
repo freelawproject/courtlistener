@@ -25,6 +25,10 @@ class SearchAlertViewSet(LoggingMixin, ModelViewSet):
         "name",
         "rate",
     )
+    # Default cursor ordering key
+    ordering = "-date_created"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = ["date_created"]
 
     def get_queryset(self):
         """
@@ -46,6 +50,10 @@ class DocketAlertViewSet(LoggingMixin, ModelViewSet):
         "date_created",
         "date_modified",
     )
+    # Default cursor ordering key
+    ordering = "-date_created"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = ["date_created"]
 
     def get_queryset(self):
         """

@@ -15,8 +15,8 @@ def retry(
 ) -> Callable:
     """Retry calling the decorated function using an exponential backoff.
 
-    http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
-    original from: http://wiki.python.org/moin/PythonDecoratorLibrary#Retry
+    https://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
+    original from: https://wiki.python.org/moin/PythonDecoratorLibrary#Retry
 
     :param ExceptionToCheck: the exception to check. may be a tuple of
     exceptions to check

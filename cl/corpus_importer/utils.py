@@ -1,4 +1,5 @@
 import itertools
+import random
 import re
 from datetime import date
 from difflib import SequenceMatcher
@@ -7,6 +8,7 @@ from typing import Any, Iterator, Optional, Set
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
 from courts_db import find_court
+from django.conf import settings
 from django.db.models import QuerySet
 from django.db.utils import IntegrityError
 from django.utils.timezone import now
@@ -612,11 +614,14 @@ def merge_overlapping_data(
     return data_to_update
 
 
-def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
+def add_citations_to_cluster(
+    cites: list[str], cluster_id: int, save_again_if_exists: bool = False
+) -> None:
     """Add string citations to OpinionCluster if it has not yet been added
 
     :param cites: citation list
     :param cluster_id: cluster id related to citations
+    :param save_again_if_exists: force save citation if it already exists
     :return: None
     """
     for cite in cites:
@@ -636,29 +641,46 @@ def add_citations_to_cluster(cites: list[str], cluster_id: int) -> None:
             cite_type_str = citation[0].all_editions[0].reporter.cite_type
             reporter_type = map_reporter_db_cite_type(cite_type_str)
 
-        if Citation.objects.filter(
-            cluster_id=cluster_id, reporter=citation[0].corrected_reporter()
-        ).exists():
-            # Avoid adding a citation if we already have a citation from the
-            # citation's reporter
-            continue
-
-        try:
-            o, created = Citation.objects.get_or_create(
-                volume=citation[0].groups["volume"],
-                reporter=citation[0].corrected_reporter(),
-                page=citation[0].groups["page"],
-                type=reporter_type,
+        citation_params = {
+            "volume": citation[0].groups["volume"],
+            "reporter": citation[0].corrected_reporter(),
+            "page": citation[0].groups["page"],
+            "type": reporter_type,
+            "cluster_id": cluster_id,
+        }
+        citation_obj = Citation.objects.filter(**citation_params).first()
+        if citation_obj:
+            if save_again_if_exists:
+                # We already have the citation for the cluster and want to reindex it
+                citation_obj.save()
+                logger.info(
+                    f"Reindexing: {cite} added to cluster id: {cluster_id}"
+                )
+            else:
+                # Ignore and go to the next citation in the list
+                continue
+        else:
+            if Citation.objects.filter(
                 cluster_id=cluster_id,
-            )
-            if created:
+                reporter=citation[0].corrected_reporter(),
+            ).exists():
+                # Avoid adding a citation if we already have a citation from the
+                # citation's reporter.
+                logger.info(
+                    f"Can't add: {cite} to cluster id: {cluster_id}. There is already "
+                    f"a citation from that reporter."
+                )
+                continue
+            try:
+                # We don't have the citation or any citation from the reporter
+                Citation.objects.create(**citation_params)
                 logger.info(
                     f"New citation: {cite} added to cluster id: {cluster_id}"
                 )
-        except IntegrityError:
-            logger.warning(
-                f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
-            )
+            except IntegrityError:
+                logger.warning(
+                    f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
+                )
 
 
 def update_cluster_panel(
@@ -1047,3 +1069,65 @@ def get_court_id(raw_court: str) -> list[str]:
             return found_court
 
     return []
+
+
+def make_iquery_probing_key(court_id: str) -> str:
+    """Small wrapper to centralize iquery probing key semaphore generation.
+    :param court_id: A CL court ID
+    :return: The semaphore iquery probing key
+    """
+    return f"iquery.probing.enqueued:{court_id}"
+
+
+def compute_binary_probe_jitter(testing: bool) -> int:
+    """Compute the jitter for binary probes.
+
+    :param testing: A boolean flag indicating whether the function is being
+    executed in a testing environment. If True, jitter is disabled and returns 0.
+    :return: An integer representing the jitter value for binary probes.
+    """
+
+    # Probe limit e.g: 9 probe iterations -> 256
+    probe_limit = 2 ** (settings.IQUERY_PROBE_ITERATIONS - 1)
+    return random.randint(1, round(probe_limit * 0.05)) if not testing else 0
+
+
+def compute_next_binary_probe(
+    highest_known_pacer_case_id: int, iteration: int, jitter: int
+) -> int:
+    """Compute the next binary probe target for a given PACER case ID.
+
+    This computes the next value of a geometric binary sequence (2 ** (N - 1))
+    where N is the current probe iteration. In non-testing mode a jitter is
+    added to the next value to ensure probing values are not the same from the
+    previous iteration to increase the possibility of getting a hit.
+
+    :param highest_known_pacer_case_id: The final PACER case ID.
+    :param iteration: The current probe iteration number.
+    :param jitter: The jitter value to apply.
+    :return: The updated probe_iteration and the PACER case ID to lookup.
+    """
+
+    pacer_case_id_to_lookup = (
+        highest_known_pacer_case_id + (2 ** (iteration - 1)) + jitter
+    )
+    return pacer_case_id_to_lookup
+
+
+def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
+    """Compute the wait time for the current attempt and the total accumulated
+    seconds from previous attempts.
+
+    :param court_blocked_attempts: The current number of blocked attempts.
+    :return: A tuple containing the wait time for the current attempt and the
+    total accumulated seconds.
+    """
+
+    current_wait_time = int(
+        settings.IQUERY_COURT_BLOCKED_WAIT * 2 ** (court_blocked_attempts - 1)
+    )
+    total_accumulated_time = sum(
+        settings.IQUERY_COURT_BLOCKED_WAIT * 2**i
+        for i in range(court_blocked_attempts)
+    )
+    return current_wait_time, total_accumulated_time

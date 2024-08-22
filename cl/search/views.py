@@ -28,10 +28,12 @@ from waffle.decorators import waffle_flag
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.citations.match_citations_queries import es_get_query_citation
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
     get_facet_dict_for_search_query,
@@ -40,6 +42,7 @@ from cl.lib.elasticsearch_utils import (
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
+    simplify_estimated_count,
 )
 from cl.lib.paginators import ESPaginator
 from cl.lib.redis_utils import get_redis_interface
@@ -406,16 +409,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
             # Load the render_dict with good results that can be shown in the
             # "Latest Cases" section
             if not waffle.flag_is_active(request, "o-es-active"):
-                render_dict.update(
-                    {
-                        "results_o": do_search(
-                            mutable_GET,
-                            rows=5,
-                            override_params={"order_by": "dateFiled desc"},
-                            facet=False,
-                            cache_key="homepage-data-o",
-                        )["results"]
-                    }
+                search = do_search(
+                    mutable_GET,
+                    rows=5,
+                    override_params={"order_by": "dateFiled desc"},
+                    facet=False,
+                    cache_key="homepage-data-o",
                 )
             else:
                 mutable_GET.update(
@@ -424,16 +423,16 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         "type": SEARCH_TYPES.OPINION,
                     }
                 )
-                render_dict.update(
-                    {
-                        "results_o": do_es_search(
-                            mutable_GET,
-                            rows=5,
-                            facet=False,
-                            cache_key="homepage-data-o-es",
-                        )["results"]
-                    }
+                search = do_es_search(
+                    mutable_GET,
+                    rows=5,
+                    facet=False,
+                    cache_key="homepage-data-o-es",
                 )
+
+            render_dict.update(**search)
+            # Rename dictionary key "results" to "results_o" for consistency.
+            render_dict["results_o"] = render_dict.pop("results")
 
             # Get the results from the oral arguments as well
             # Check if waffle flag is active.
@@ -687,7 +686,6 @@ def do_es_search(
     other location.
     """
     paged_results = None
-    # One court?
     courts = Court.objects.filter(in_use=True)
     query_time = total_query_results = 0
     top_hits_limit = 5
@@ -749,7 +747,7 @@ def do_es_search(
                 SEARCH_TYPES.RECAP,
                 SEARCH_TYPES.DOCKETS,
             ]:
-                query_citation = get_query_citation(cd)
+                query_citation = es_get_query_citation(cd)
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
@@ -820,6 +818,11 @@ def do_es_search(
         "cited_cluster": cited_cluster,
         "query_citation": query_citation,
         "facet_fields": facet_fields,
+        "estimated_count_threshold": simplify_estimated_count(
+            compute_lowest_possible_estimate(
+                settings.ELASTICSEARCH_CARDINALITY_PRECISION
+            )
+        ),
     }
 
 

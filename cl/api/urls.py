@@ -1,5 +1,5 @@
 from django.urls import include, path, re_path
-from django.views.generic import RedirectView
+from django.views.generic import RedirectView, TemplateView
 from rest_framework.routers import DefaultRouter
 
 from cl.alerts import api_views as alert_views
@@ -45,21 +45,33 @@ router.register(r"search", search_views.SearchViewSet, basename="search")
 router.register(r"tag", search_views.TagViewSet, basename="tag")
 
 # People & Entities
-router.register(r"people", people_views.PersonViewSet)
+router.register(r"people", people_views.PersonViewSet, basename="person")
 router.register(
     r"disclosure-typeahead",
     people_views.PersonDisclosureViewSet,
     basename="disclosuretypeahead",
 )
-router.register(r"positions", people_views.PositionViewSet)
-router.register(r"retention-events", people_views.RetentionEventViewSet)
-router.register(r"educations", people_views.EducationViewSet)
-router.register(r"schools", people_views.SchoolViewSet)
 router.register(
-    r"political-affiliations", people_views.PoliticalAffiliationViewSet
+    r"positions", people_views.PositionViewSet, basename="position"
 )
-router.register(r"sources", people_views.SourceViewSet)
-router.register(r"aba-ratings", people_views.ABARatingViewSet)
+router.register(
+    r"retention-events",
+    people_views.RetentionEventViewSet,
+    basename="retentionevent",
+)
+router.register(
+    r"educations", people_views.EducationViewSet, basename="education"
+)
+router.register(r"schools", people_views.SchoolViewSet, basename="school")
+router.register(
+    r"political-affiliations",
+    people_views.PoliticalAffiliationViewSet,
+    basename="politicalaffiliation",
+)
+router.register(r"sources", people_views.SourceViewSet, basename="source")
+router.register(
+    r"aba-ratings", people_views.ABARatingViewSet, basename="abarating"
+)
 router.register(r"parties", people_views.PartyViewSet, basename="party")
 router.register(
     r"attorneys", people_views.AttorneyViewSet, basename="attorney"
@@ -158,7 +170,19 @@ API_TITLE = "CourtListener Legal Data API"
 router_v4 = DefaultRouter()
 router_v4.register(r"search", search_views.SearchV4ViewSet, basename="search")
 
+for prefix, viewset, basename in router.registry:
+    # Register all the URLs from the v3 router into the v4 router except for
+    # the "search" route.
+    if basename != "search":
+        router_v4.register(prefix, viewset, basename)
 
+# When we finally need to deprecate V3 of the API, the process to remove it, is:
+# - Remove the re_path(r"^api/rest/(?P<version>[v3]+)/", include(router.urls)) below
+# - The only ViewSet that requires removal is SearchViewSet and its related
+# helper methods should also be removed.
+# - Remove all references to "v3" in the code and tests and simplify them
+# accordingly, as no need to apply conditions based on the V3 API version.
+# - Remove V3 documentation.
 urlpatterns = [
     path(
         "api-auth/",
@@ -180,29 +204,108 @@ urlpatterns = [
         name="citation_lookup_api",
     ),
     path(
+        "help/api/rest/v3/case-law/",
+        TemplateView.as_view(
+            template_name="case-law-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
+        name="case_law_api_help",
+    ),
+    path(
+        "help/api/rest/v3/citations/",
+        TemplateView.as_view(
+            template_name="citation-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
+        name="citation_api_help",
+    ),
+    path(
+        "help/api/rest/v3/pacer/",
+        TemplateView.as_view(
+            template_name="pacer-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
+        name="pacer_api_help",
+    ),
+    path(
+        "help/api/rest/v3/recap/",
+        TemplateView.as_view(
+            template_name="recap-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
+        name="recap_api_help",
+    ),
+    path(
+        "help/api/rest/v3/judges/",
+        TemplateView.as_view(
+            template_name="judge-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
+        name="judge_api_help",
+    ),
+    path(
+        "help/api/rest/v3/oral-arguments/",
+        TemplateView.as_view(
+            template_name="oral-argument-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
+        name="oral_argument_api_help",
+    ),
+    path(
+        "help/api/rest/v3/visualizations/",
+        TemplateView.as_view(
+            template_name="visualizations-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
+        name="visualization_api_help",
+    ),
+    path(
         "help/api/rest/v3/financial-disclosures/",
-        views.financial_disclosures_api_help_help,
+        TemplateView.as_view(
+            template_name="financial-disclosure-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
         name="financial_disclosures_api_help",
     ),
     path(
         "help/api/rest/v3/search/",
-        views.search_api_help,
+        TemplateView.as_view(
+            template_name="search-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
         name="search_api_help",
     ),
     path(
         "help/api/rest/v3/alerts/",
-        views.alert_api_help,
+        TemplateView.as_view(
+            template_name="alert-api-docs-vlatest.html",
+            extra_context={"private": False},
+        ),
         name="alert_api_help",
     ),
     path(
+        "help/api/rest/v3/fields/",
+        TemplateView.as_view(
+            template_name="field-help.html",
+            extra_context={"private": True},
+        ),
+        name="field_api_help",
+    ),
+    path(
         "help/api/rest/changes/",
-        views.rest_change_log,
+        TemplateView.as_view(
+            template_name="rest-change-log.html",
+            extra_context={"private": False},
+        ),
         name="rest_change_log",
     ),
     path("help/api/bulk-data/", views.bulk_data_index, name="bulk_data_index"),
     path(
         "help/api/replication/",
-        views.replication_docs,
+        TemplateView.as_view(
+            template_name="replication.html",
+            extra_context={"private": False},
+        ),
         name="replication_docs",
     ),
     re_path(
@@ -223,7 +326,10 @@ urlpatterns = [
     # Webhooks Documentation
     path(
         "help/api/webhooks/getting-started/",
-        views.webhooks_getting_started,
+        TemplateView.as_view(
+            template_name="webhooks-getting-started.html",
+            extra_context={"private": False},
+        ),
         name="webhooks_getting_started",
     ),
     re_path(

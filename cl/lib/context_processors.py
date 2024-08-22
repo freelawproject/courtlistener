@@ -75,7 +75,7 @@ info_tips = (
     'RECAP was originally created at <a href="https://citp.princeton.edu">The Center for Information Technology Policy at Princeton University</a>.',
     "PACER was created by Congress and makes around $140,000,000/year selling public domain legal documents.",
     "With an estimated 1 billion documents, PACER is the largest paywall in the world.",
-    'The average PACER document is <a href="https://twitter.com/RECAPtheLaw/status/771585725875691520">9.1 pages long</a>. The longest we\'ve seen so far is over 4,000 pages.',
+    'The average PACER document is <a href="https://x.com/RECAPtheLaw/status/771585725875691520">9.1 pages long</a>. The longest we\'ve seen so far is over 4,000 pages.',
     'Downloading everything in PACER <a href="https://free.law/2016/10/10/pacer-costs-a-billion-dollars/">would cost around $1,000,000,000</a>.',
     'We extract text from every PACER document so that it is searchable. <a href="https://free.law/2016/09/26/extracting-text-millions-of-pacer-documents/">This takes months</a>!',
     'CourtListener has <a href="https://free.law/2017/08/15/we-have-all-free-pacer/">every free opinion and order available in PACER</a> and gets the latest ones every night.',

@@ -154,7 +154,7 @@ class BaseSeleniumTest(
         """
         return node.find_element(By.ID, id_)
 
-    # See http://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
+    # See https://www.obeythetestinggoat.com/how-to-get-selenium-to-wait-for-page-load-after-a-click.html
     @contextmanager
     def wait_for_page_load(self, timeout: int = SELENIUM_TIMEOUT):
         old_page = self.browser.find_element(By.TAG_NAME, "html")

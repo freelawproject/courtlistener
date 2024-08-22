@@ -28,6 +28,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_recap_path,
     make_upload_path,
@@ -327,6 +328,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         null=True,
     )
 
+    @property
+    def administrative_link(self):
+        return linkify_orig_docket_number(
+            self.docket.appeal_from_str, self.docket_number
+        )
+
     def get_absolute_url(self) -> str:
         return self.docket.get_absolute_url()
 
@@ -364,6 +371,17 @@ class Docket(AbstractDateTimeModel, DocketSources):
         on_delete=models.RESTRICT,
         blank=True,
         null=True,
+    )
+    parent_docket = models.ForeignKey(
+        "self",
+        help_text="In criminal cases (and some magistrate) PACER creates "
+        "a parent docket and one or more child dockets. Child dockets "
+        "contain docket information for each individual defendant "
+        "while parent dockets are a superset of all docket entries.",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="child_dockets",
     )
     appeal_from_str = models.TextField(
         help_text=(
@@ -544,6 +562,44 @@ class Docket(AbstractDateTimeModel, DocketSources):
         max_length=20,
         blank=True,
         db_index=True,
+    )
+    federal_dn_office_code = models.CharField(
+        help_text="A one digit statistical code (either alphabetic or numeric) "
+        "of the office within the federal district. In this "
+        "example, 2:07-cv-34911-MJL, the 2 preceding "
+        "the : is the office code.",
+        max_length=3,
+        blank=True,
+    )
+    federal_dn_case_type = models.CharField(
+        help_text="Case type, e.g., civil (cv), magistrate (mj), criminal (cr), "
+        "petty offense (po), and miscellaneous (mc). These codes "
+        "can be upper case or lower case, and may vary in number of "
+        "characters.",
+        max_length=6,
+        blank=True,
+    )
+    federal_dn_judge_initials_assigned = models.CharField(
+        help_text="A typically three-letter upper cased abbreviation "
+        "of the judge's initials. In the example 2:07-cv-34911-MJL, "
+        "MJL is the judge's initials. Judge initials change if a "
+        "new judge takes over a case.",
+        max_length=5,
+        blank=True,
+    )
+    federal_dn_judge_initials_referred = models.CharField(
+        help_text="A typically three-letter upper cased abbreviation "
+        "of the judge's initials. In the example 2:07-cv-34911-MJL-GOG, "
+        "GOG is the magistrate judge initials.",
+        max_length=5,
+        blank=True,
+    )
+    federal_defendant_number = models.SmallIntegerField(
+        help_text="A unique number assigned to each defendant in a case, "
+        "typically found in pacer criminal cases as a -1, -2 after "
+        "the judge initials. Example: 1:14-cr-10363-RGS-1.",
+        null=True,
+        blank=True,
     )
     # Nullable for unique constraint requirements.
     pacer_case_id = fields.CharNullField(
@@ -2575,6 +2631,12 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    filepath_pdf_harvard = models.FileField(
+        help_text="The case PDF from the Caselaw Access Project for this cluster",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+    )
     arguments = models.TextField(
         help_text="The attorney(s) and legal arguments presented as HTML text. "
         "This is primarily seen in older opinions and can contain "
@@ -3320,6 +3382,15 @@ class Opinion(AbstractDateTimeModel):
             "sha1",
         ]
     )
+    ordering_key = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cluster_id", "ordering_key"],
+                name="unique_opinion_ordering_key",
+            )
+        ]
 
     @property
     def siblings(self) -> QuerySet:
@@ -3338,6 +3409,10 @@ class Opinion(AbstractDateTimeModel):
     def clean(self) -> None:
         if self.type == "":
             raise ValidationError("'type' is a required field.")
+        if isinstance(self.ordering_key, int) and self.ordering_key < 1:
+            raise ValidationError(
+                {"ordering_key": "Ordering key cannot be zero or negative"}
+            )
 
     def save(
         self,
@@ -3346,6 +3421,7 @@ class Opinion(AbstractDateTimeModel):
         *args: List,
         **kwargs: Dict,
     ) -> None:
+        self.clean()
         super().save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr

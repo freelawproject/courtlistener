@@ -410,7 +410,7 @@ class OAV3SearchAPITests(
                 blocked=False,
                 sha1="a49ada009774496ac01fb49818837e2296705c97",
                 stt_status=Audio.STT_COMPLETE,
-                stt_google_response=self.json_transcript,
+                stt_transcript=self.transcript,
             )
             audio_1.panel.add(self.author)
             audio_1.processing_complete = True
@@ -2358,6 +2358,34 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.delete_documents_from_index(
             AudioPercolator._index._name, created_queries_ids
         )
+
+    def test_frontend_oa_count(self) -> None:
+        """Assert OA search results counts in the fronted. Below and
+        above the estimation threshold.
+        """
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        counts_text = self._get_frontend_counts_text(r)
+        # 2 cases and 3 Docket entries in counts are returned
+        self.assertIn("5 Oral Arguments", counts_text)
+
+        # Assert estimated counts above the threshold.
+        with mock.patch(
+            "cl.lib.elasticsearch_utils.simplify_estimated_count",
+            return_value=1900,
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        counts_text = self._get_frontend_counts_text(r)
+        self.assertIn("About 1,900 Oral Arguments", counts_text)
 
     def test_search_transcript(self) -> None:
         """Test search transcript."""
