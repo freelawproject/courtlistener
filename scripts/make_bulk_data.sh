@@ -84,15 +84,15 @@ fjcintegrateddatabase_csv_filename="fjc-integrated-database-$(date -I).csv"
 
 # search_opinioncluster
 opinioncluster_fields='(
-	       id, date_created, date_modified, judges, date_filed,
-	       date_filed_is_approximate, slug, case_name_short, case_name,
-	       case_name_full, scdb_id, scdb_decision_direction, scdb_votes_majority,
-	       scdb_votes_minority, source, procedural_history, attorneys,
-	       nature_of_suit, posture, syllabus, headnotes, summary, disposition,
-	       history, other_dates, cross_reference, correction, citation_count,
-	       precedential_status, date_blocked, blocked, filepath_json_harvard, docket_id,
-	       arguments, headmatter
-	   )'
+       id, date_created, date_modified, judges, date_filed,
+       date_filed_is_approximate, slug, case_name_short, case_name,
+       case_name_full, scdb_id, scdb_decision_direction, scdb_votes_majority,
+       scdb_votes_minority, source, procedural_history, attorneys,
+       nature_of_suit, posture, syllabus, headnotes, summary, disposition,
+       history, other_dates, cross_reference, correction, citation_count,
+       precedential_status, date_blocked, blocked, filepath_json_harvard,
+	       filepath_pdf_harvard, docket_id, arguments, headmatter
+   )'
 opinioncluster_csv_filename="opinion-clusters-$(date -I).csv"
 
 search_opinion_joined_by_fields='(
@@ -418,7 +418,7 @@ declare -a lst="$group"
 cat >> "$OUT" <<- EOF
 echo "Loading ${lst[2]} to database"
 psql --command \
-"COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, QUOTE \'\`\', HEADER)" \
+"\COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, QUOTE \'\`\', HEADER)" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME"
