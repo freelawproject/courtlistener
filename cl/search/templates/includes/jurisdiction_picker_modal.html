@@ -223,12 +223,12 @@
                                 </div>
                             {% endif %}
 
-                            {% if courts.native %}
+                            {% if courts.tribal %}
                                 <h3 class="bottom inline">
-                                    Native American Courts
+                                    Tribal Courts
                                 </h3>
                                 <div class="row">
-                                    {% for row in courts.native|rows:3 %}
+                                    {% for row in courts.tribal|rows:3 %}
                                             <div class="col-sm-4">
                                                 {% for court in row %}
                                                     <div class="checkbox">

@@ -231,7 +231,7 @@ def merge_form_with_courts(
         "state": [],
         "special": [],
         "military": [],
-        "native": [],
+        "tribal": [],
     }
     bap_bundle = []
     b_bundle = []
@@ -261,7 +261,7 @@ def merge_form_with_courts(
         elif court.jurisdiction in Court.MILITARY_JURISDICTIONS:
             court_tabs["military"].append(court)
         elif court.jurisdiction in Court.TRIBAL_JURISDICTIONS:
-            court_tabs["native"].append(court)
+            court_tabs["tribal"].append(court)
 
     # Put the bankruptcy bundles in the courts dict
     if bap_bundle:
