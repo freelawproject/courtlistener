@@ -21,6 +21,11 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.recap.mergers import find_docket_object
+from cl.scrapers.exceptions import (
+    EmptyFileError,
+    NoDownloadUrlError,
+    UnexpectedContentTypeError,
+)
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, Docket, RECAPDocument
 
@@ -155,30 +160,26 @@ def get_extension(content: bytes) -> str:
 def get_binary_content(
     download_url: str,
     site: AbstractSite,
-    method: str = "GET",
-) -> Tuple[str, Optional[Response]]:
+) -> bytes | str:
     """Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
     :param site: Site object used to download data
-    :param method: The HTTP method used to get the item, or "LOCAL" to get an
-    item during testing
-    :return: Two values. The first is a msg indicating any errors encountered.
-    If blank, that indicates success. The second value is the response object
-    containing the downloaded file.
+
+    :return: The downloaded and cleaned content
+    :raises: NoDownloadUrlError, UnexpectedContentTypeError, EmptyFileError
     """
     if not download_url:
-        # Occurs when a DeferredList fetcher fails.
-        msg = f"NoDownloadUrlError: {download_url}\n{traceback.format_exc()}"
-        return msg, None
+        raise NoDownloadUrlError(download_url)
+
     # noinspection PyBroadException
-    if method == "LOCAL":
+    if site.method == "LOCAL":
+        # "LOCAL" is the method when testing
         url = os.path.join(settings.MEDIA_ROOT, download_url)
         mr = MockRequest(url=url)
         r = mr.get()
-        r = follow_redirections(r, requests.Session())
-        r.raise_for_status()
+        s = requests.Session()
     else:
         # some sites require a custom ssl_context, contained in the Site's
         # session. However, we can't send a request with both a
@@ -203,8 +204,7 @@ def get_binary_content(
 
         # test for empty files (thank you CA1)
         if len(r.content) == 0:
-            msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
-            return msg, None
+            raise EmptyFileError(f"EmptyFileError: '{download_url}'")
 
         # test for expected content type (thanks mont for nil)
         if site.expected_content_types:
@@ -217,19 +217,20 @@ def get_binary_content(
                 content_type in mime.lower()
                 for mime in site.expected_content_types
             )
+
             if not m:
-                msg = (
-                    f"UnexpectedContentTypeError: {download_url}\n"
-                    f'\'"{content_type}" not in {site.expected_content_types}'
-                )
-                return msg, None
+                court_str = site.court_id.split(".")[-1].split("_")[0]
+                fingerprint = [f"{court_str}-unexpected-content-type"]
+                msg = f"'{download_url}' '{content_type}' not in {site.expected_content_types}"
+                raise UnexpectedContentTypeError(msg, fingerprint=fingerprint)
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)
         r.raise_for_status()
 
-    # Success!
-    return "", r
+    content = site.cleanup_content(r.content)
+
+    return content
 
 
 def signal_handler(signal, frame):
