@@ -333,6 +333,26 @@ async def update_docket_metadata(
     d.referred_to_str = docket_data.get("referred_to_str") or d.referred_to_str
     d.blocked, d.date_blocked = await get_blocked_status(d)
 
+    # Update docket_number components:
+    d.federal_dn_office_code = (
+        docket_data.get("federal_dn_office_code") or d.federal_dn_office_code
+    )
+    d.federal_dn_case_type = (
+        docket_data.get("federal_dn_case_type") or d.federal_dn_case_type
+    )
+    d.federal_dn_judge_initials_assigned = (
+        docket_data.get("federal_dn_judge_initials_assigned")
+        or d.federal_dn_judge_initials_assigned
+    )
+    d.federal_dn_judge_initials_referred = (
+        docket_data.get("federal_dn_judge_initials_referred")
+        or d.federal_dn_judge_initials_referred
+    )
+    d.federal_defendant_number = (
+        docket_data.get("federal_defendant_number")
+        or d.federal_defendant_number
+    )
+
     return d
 
 

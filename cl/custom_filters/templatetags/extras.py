@@ -1,5 +1,6 @@
 import random
 import re
+from datetime import date, datetime
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -273,3 +274,14 @@ def group_courts(courts: list[Court], num_columns: int) -> list:
         start = end
 
     return groups
+
+
+@register.filter
+def format_date(date_str: str) -> str:
+    """Formats a date string in the format 'F jS, Y'. Useful for formatting
+    ES child document results where dates are not date objects."""
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        return date_obj.strftime("%B %dth, %Y")
+    except (ValueError, TypeError):
+        return date_str

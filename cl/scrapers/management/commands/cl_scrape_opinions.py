@@ -1,6 +1,7 @@
 import signal
 import sys
 import time
+import traceback
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -22,6 +23,11 @@ from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
+from cl.scrapers.exceptions import (
+    BadContentError,
+    ConsecutiveDuplicatesError,
+    SingleDuplicateError,
+)
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     get_binary_content,
@@ -213,6 +219,7 @@ def save_everything(
 
 class Command(VerboseCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
+    scrape_target_descr = "opinions"  # for logging purposes
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
         super().__init__(stdout=None, stderr=None, no_color=False)
@@ -261,7 +268,13 @@ class Command(VerboseCommand):
             help="Disable duplicate aborting.",
         )
 
-    def scrape_court(self, site, full_crawl=False, ocr_available=True):
+    def scrape_court(
+        self,
+        site,
+        full_crawl: bool = False,
+        ocr_available: bool = True,
+        backscrape: bool = False,
+    ):
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
         court_str = site.court_id.split(".")[-1].split("_")[0]
@@ -273,111 +286,115 @@ class Command(VerboseCommand):
             return
 
         if site.cookies:
-            logger.info(f"Using cookies: {site.cookies}")
-        logger.debug(f"#{len(site)} opinions found.")
+            logger.info("Using cookies: %s", site.cookies)
+
+        logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
+
         added = 0
         for i, item in enumerate(site):
-            # Minn and Mass currently require browser specific user agents
-            if court_str in ["minn", "minnctapp", "mass", "massappct"]:
-                headers = site.headers
-            else:
-                headers = {"User-Agent": "CourtListener"}
-
-            msg, r = get_binary_content(
-                item["download_urls"],
-                site,
-                headers,
-                method=site.method,
-            )
-            if msg:
-                fingerprint = [f"{court_str}-unexpected-content-type"]
-                logger.error(msg, extra={"fingerprint": fingerprint})
-                continue
-
-            content = site.cleanup_content(r.content)
-
-            current_date = item["case_dates"]
             try:
                 next_date = site[i + 1]["case_dates"]
             except IndexError:
                 next_date = None
 
-            # request.content is sometimes a str, sometimes unicode, so
-            # force it all to be bytes, pleasing hashlib.
-            sha1_hash = sha1(force_bytes(content))
-            if (
-                court_str == "nev"
-                and item["precedential_statuses"] == "Unpublished"
-            ) or court_str in ["neb"]:
-                # Nevada's non-precedential cases have different SHA1 sums
-                # every time.
-
-                # Nebraska updates the pdf causing the SHA1 to not match
-                # the opinions in CL causing duplicates. See CL issue #1452
-
-                lookup_params = {
-                    "lookup_value": item["download_urls"],
-                    "lookup_by": "download_url",
-                }
-            else:
-                lookup_params = {
-                    "lookup_value": sha1_hash,
-                    "lookup_by": "sha1",
-                }
-
-            proceed = dup_checker.press_on(
-                Opinion, current_date, next_date, **lookup_params
-            )
-            if dup_checker.emulate_break:
-                logger.debug("Emulate break triggered.")
+            try:
+                self.ingest_a_case(
+                    item, next_date, ocr_available, site, dup_checker, court
+                )
+                added += 1
+            except ConsecutiveDuplicatesError:
                 break
-            if not proceed:
-                logger.debug("Skipping opinion.")
-                continue
-
-            # Not a duplicate, carry on
-            logger.info(
-                f"Adding new document found at: {item['download_urls'].encode()}"
-            )
-            dup_checker.reset()
-
-            child_court = get_child_court(
-                item.get("child_courts", ""), court.id
-            )
-
-            docket, opinion, cluster, citations = make_objects(
-                item, child_court or court, sha1_hash, content
-            )
-
-            save_everything(
-                items={
-                    "docket": docket,
-                    "opinion": opinion,
-                    "cluster": cluster,
-                    "citations": citations,
-                },
-                index=False,
-            )
-            extract_doc_content.delay(
-                opinion.pk,
-                ocr_available=ocr_available,
-                citation_jitter=True,
-                juriscraper_module=site.court_id,
-            )
-
-            logger.info(
-                f"Successfully added opinion {opinion.pk}: "
-                f"{item['case_names'].encode()}"
-            )
-            added += 1
+            except (SingleDuplicateError, BadContentError):
+                pass
 
         # Update the hash if everything finishes properly.
         logger.debug(
-            f"{site.court_id}: Successfully crawled {added}/{len(site)} opinions."
+            "%s: Successfully crawled %s/%s %s.",
+            site.court_id,
+            added,
+            len(site),
+            self.scrape_target_descr,
         )
         if not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
+
+    def ingest_a_case(
+        self,
+        item,
+        next_case_date: date | None,
+        ocr_available: bool,
+        site,
+        dup_checker: DupChecker,
+        court: Court,
+    ):
+        if item.get("content"):
+            content = item.pop("content")
+        else:
+            content = get_binary_content(item["download_urls"], site)
+
+        # request.content is sometimes a str, sometimes unicode, so
+        # force it all to be bytes, pleasing hashlib.
+        sha1_hash = sha1(force_bytes(content))
+
+        if (
+            court.pk == "nev"
+            and item["precedential_statuses"] == "Unpublished"
+        ) or court.pk in ["neb"]:
+            # Nevada's non-precedential cases have different SHA1 sums
+            # every time.
+
+            # Nebraska updates the pdf causing the SHA1 to not match
+            # the opinions in CL causing duplicates. See CL issue #1452
+
+            lookup_params = {
+                "lookup_value": item["download_urls"],
+                "lookup_by": "download_url",
+            }
+        else:
+            lookup_params = {
+                "lookup_value": sha1_hash,
+                "lookup_by": "sha1",
+            }
+
+        # Duplicates will raise errors
+        dup_checker.press_on(
+            Opinion, item["case_dates"], next_case_date, **lookup_params
+        )
+
+        # Not a duplicate, carry on
+        logger.info(
+            "Adding new document found at: %s", item["download_urls"].encode()
+        )
+        dup_checker.reset()
+
+        child_court = get_child_court(item.get("child_courts", ""), court.id)
+
+        docket, opinion, cluster, citations = make_objects(
+            item, child_court or court, sha1_hash, content
+        )
+
+        save_everything(
+            items={
+                "docket": docket,
+                "opinion": opinion,
+                "cluster": cluster,
+                "citations": citations,
+            },
+            index=False,
+        )
+        extract_doc_content.delay(
+            opinion.pk,
+            ocr_available=ocr_available,
+            citation_jitter=True,
+            juriscraper_module=site.court_id,
+        )
+
+        logger.info(
+            "Successfully added opinion %s: %s",
+            opinion.pk,
+            item["case_names"].encode(),
+        )
 
     def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site().parse()
@@ -422,6 +439,7 @@ class Command(VerboseCommand):
                 capture_exception(
                     e, fingerprint=[module_string, "{{ default }}"]
                 )
+                logger.debug(traceback.format_exc())
             last_court_in_list = i == (num_courts - 1)
             daemon_mode = options["daemon"]
             if last_court_in_list:

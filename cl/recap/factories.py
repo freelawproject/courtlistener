@@ -132,3 +132,12 @@ class DocketDataFactory(DictFactory):
     docket_number = Faker("federal_district_docket_number")
     date_filed = Faker("date_object")
     ordered_by = "date_filed"
+    federal_dn_office_code = Faker("pyint", min_value=1, max_value=10)
+    federal_dn_case_type = FuzzyText(length=2, chars=string.ascii_lowercase)
+    federal_dn_judge_initials_assigned = FuzzyText(
+        length=5, chars=string.ascii_lowercase
+    )
+    federal_dn_judge_initials_referred = FuzzyText(
+        length=5, chars=string.ascii_lowercase
+    )
+    federal_defendant_number = Faker("pyint", min_value=1, max_value=999)

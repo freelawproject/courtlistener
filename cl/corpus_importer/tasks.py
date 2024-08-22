@@ -1011,12 +1011,9 @@ def get_pacer_case_id_and_title(
     )
 
     if not session_data and user_pk:
-        cookies_from_cache = get_pacer_cookie_from_cache(user_pk)
-        session_data = (
-            cookies_from_cache
-            if isinstance(cookies_from_cache, SessionData)
-            else SessionData(cookies_from_cache)
-        )
+        session_data = get_pacer_cookie_from_cache(user_pk)
+        if not session_data:
+            raise Exception("Cookies not available in cache")
     else:
         raise Exception(
             "user_pk is unavailable, cookies cannot be retrieved from cache"

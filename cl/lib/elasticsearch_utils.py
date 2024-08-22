@@ -13,9 +13,9 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import caches
 from django.core.paginator import EmptyPage, Page
-from django.db.models import Case
+from django.db.models import Case, CharField
 from django.db.models import Q as QObject
-from django.db.models import QuerySet, TextField, When
+from django.db.models import QuerySet, TextField, Value, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http import HttpRequest
@@ -1789,6 +1789,120 @@ def merge_unavailable_fields_on_parent_document(
                         result["id"], ""
                     )
 
+        case (
+            SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
+        ) if request_type == "frontend":
+            # Merge initial complaint button to the frontend search results.
+            docket_ids = {doc["docket_id"] for doc in results}
+            # This query retrieves initial complaint documents considering two
+            # possibilities:
+            # 1. For district, bankruptcy, and appellate entries where we don't know
+            #    if the entry contains attachments, it considers:
+            #    document_number=1 and attachment_number=None and document_type=PACER_DOCUMENT
+            #    This represents the main document with document_number 1.
+            # 2. For appellate entries where the attachment page has already been
+            #    merged, it considers:
+            #    document_number=1 and attachment_number=1 and document_type=ATTACHMENT
+            #    This represents document_number 1 that has been converted to an attachment.
+
+            appellate_court_ids = (
+                Court.federal_courts.appellate_pacer_courts().values_list(
+                    "pk", flat=True
+                )
+            )
+            bankruptcy_ids = (
+                Court.federal_courts.bankruptcy_pacer_courts().values_list(
+                    "pk", flat=True
+                )
+            )
+            initial_complaints = (
+                RECAPDocument.objects.filter(
+                    QObject(
+                        QObject(
+                            attachment_number=None,
+                            document_type=RECAPDocument.PACER_DOCUMENT,
+                        )
+                        | QObject(
+                            attachment_number=1,
+                            document_type=RECAPDocument.ATTACHMENT,
+                            docket_entry__docket__court_id__in=appellate_court_ids,
+                        )
+                    ),
+                    docket_entry__docket_id__in=docket_ids,
+                    document_number="1",
+                )
+                .select_related(
+                    "docket_entry",
+                    "docket_entry__docket",
+                    "docket_entry__docket__court",
+                )
+                .only(
+                    "pk",
+                    "document_type",
+                    "document_number",
+                    "attachment_number",
+                    "pacer_doc_id",
+                    "is_available",
+                    "filepath_local",
+                    "docket_entry__docket_id",
+                    "docket_entry__docket__slug",
+                    "docket_entry__docket__pacer_case_id",
+                    "docket_entry__docket__court__jurisdiction",
+                    "docket_entry__docket__court_id",
+                )
+                .annotate(
+                    court_type=Case(
+                        When(
+                            docket_entry__docket__court_id__in=appellate_court_ids,
+                            then=Value("appellate"),
+                        ),
+                        When(
+                            docket_entry__docket__court_id__in=bankruptcy_ids,
+                            then=Value("bankruptcy"),
+                        ),
+                        default=Value("district"),
+                        output_field=CharField(),
+                    )
+                )
+            )
+
+            initial_complaints_in_page = {}
+            for initial_complaint in initial_complaints:
+                if initial_complaint.has_valid_pdf:
+                    # Initial complaint/petition/appeal available
+                    text_button = {
+                        "appellate": "Notice of Appeal",
+                        "bankruptcy": "Initial Petition",
+                    }.get(initial_complaint.court_type, "Initial Complaint")
+                    initial_complaints_in_page[
+                        initial_complaint.docket_entry.docket_id
+                    ] = (
+                        initial_complaint.get_absolute_url(),
+                        None,
+                        text_button,
+                    )
+                else:
+                    # Initial complaint/petition/appeal not available. Buy button.
+                    buy_text_button = {
+                        "appellate": "Buy Notice of Appeal",
+                        "bankruptcy": "Buy Initial Petition",
+                    }.get(
+                        initial_complaint.court_type, "Buy Initial Complaint"
+                    )
+                    initial_complaints_in_page[
+                        initial_complaint.docket_entry.docket_id
+                    ] = (None, initial_complaint.pacer_url, buy_text_button)
+
+            for result in results:
+                complaint_url, buy_complaint_url, text_button = (
+                    initial_complaints_in_page.get(
+                        result.docket_id, (None, None, "")
+                    )
+                )
+                result["initial_complaint_url"] = complaint_url
+                result["buy_initial_complaint_url"] = buy_complaint_url
+                result["initial_complaint_text"] = text_button
+
         case SEARCH_TYPES.OPINION if request_type == "v4" and not highlight:
             # Retrieves the Opinion plain_text from the DB to fill the snippet
             # when highlighting is disabled. Considering the same prioritization
@@ -1934,11 +2048,11 @@ def fetch_es_results(
     es_from = (page - 1) * rows_per_page
     error = True
     try:
-        main_query = search_query.extra(from_=es_from, size=rows_per_page)
+        # Set track_total_hits False to avoid retrieving the hit count in the main query.
+        main_query = search_query.extra(
+            from_=es_from, size=rows_per_page, track_total_hits=False
+        )
         main_doc_count_query = clean_count_query(search_query)
-        # Set size to 0 to avoid retrieving documents in the count queries for
-        # better performance. Set track_total_hits to True to consider all the
-        # documents.
 
         search_type = get_params.get("type", SEARCH_TYPES.OPINION)
         parent_unique_field = cardinality_query_unique_ids[search_type]
@@ -1964,12 +2078,12 @@ def fetch_es_results(
         main_response = responses[0]
         main_doc_count_response = responses[1]
         parent_total = simplify_estimated_count(
-            main_doc_count_response.hits.total.value
+            main_doc_count_response.aggregations.unique_documents.value
         )
         if child_total_query:
             child_doc_count_response = responses[2]
             child_total = simplify_estimated_count(
-                child_doc_count_response.hits.total.value
+                child_doc_count_response.aggregations.unique_documents.value
             )
 
         query_time = main_response.took
@@ -2962,7 +3076,7 @@ def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
         field=unique_field,
         precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
     )
-    return count_query.extra(size=0, track_total_hits=True)
+    return count_query.extra(size=0, track_total_hits=False)
 
 
 def do_collapse_count_query(
