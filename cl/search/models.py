@@ -28,6 +28,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
+    CSVExportMixin,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_recap_path,
@@ -1135,49 +1136,6 @@ class DocketPanel(Docket.panel.through):
         proxy = True
 
 
-# @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
-class CSVExportMixin:
-
-    def get_csv_columns(self, get_column_name=False) -> List[str]:
-        """Get list of column names required in a csv file.
-        If get column name is True. It will add class name to id
-
-        :param: get_column_name: bool. Whether add class name to primary attr name
-
-        :return: list of attrs of class to get into csv file"""
-        raise NotImplementedError(
-            "Subclass must implement get_csv_columns method"
-        )
-
-    def get_column_fuction(self) -> List[str]:
-        """Get dict of attrs: fucntion to apply on field value if it needs
-        to be pre-processed before being add to csv
-
-        returns: dict -- > {attr1: function}"""
-        raise NotImplementedError(
-            "Subclass must implement get_column_fuction method"
-        )
-
-    def to_csv_row(self) -> List[str]:
-        """Get fields in model based on attrs column names.
-        Apply function to attr value if required.
-        Return list of modified values for csv row"""
-        row = []
-        functions = self.get_column_fuction()
-        for field in self.get_csv_columns(get_column_name=False):
-            attr = getattr(self, field)
-            if not attr:
-                attr: ""
-            function = functions.get(field)
-            if function:
-                attr = function(field)
-            row.append(attr)
-        return row
-
-    def add_class_name(self, attribute_name):
-        return f"{self.__class__.__name__.lower()}_{attribute_name}"
-
-
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
 class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
@@ -1314,7 +1272,7 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
             columns = [self.add_class_name(col) for col in columns]
         return columns
 
-    def get_column_fuction(self):
+    def get_column_function(self):
         """Get dict of attrs: fucntion to apply on field value if it needs
         to be pre-processed before being add to csv
 
@@ -1832,7 +1790,7 @@ class RECAPDocument(
     def _get_readable_ocr_status(self, *args, **kwargs):
         return self.get_ocr_status_display()
 
-    def get_column_fuction(self):
+    def get_column_function(self):
         """Get dict of attrs: function to apply on field value if it needs
         to be pre-processed before being add to csv
         If not functions returns empty dict

@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import RequestFactory, override_settings
@@ -77,6 +77,7 @@ from cl.search.models import (
     SEARCH_TYPES,
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     RECAPDocument,
@@ -1543,18 +1544,18 @@ class DocketEntryFileDownload(TestCase):
         docket = DocketFactory(
             court=court,
             case_name="Foo v. Bar",
-            docket_number="12-40601",
+            docket_number="12-11111",
             pacer_case_id="12345",
         )
 
         de1 = DocketEntryFactory(
             docket=docket,
-            entry_number=506585234,
+            entry_number=506581111,
         )
         RECAPDocumentFactory(
             docket_entry=de1,
-            pacer_doc_id="00506585234",
-            document_number="00506585234",
+            pacer_doc_id="00506581111",
+            document_number="00506581111",
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
         de1_2 = DocketEntryFactory(
@@ -1563,7 +1564,7 @@ class DocketEntryFileDownload(TestCase):
         )
         RECAPDocumentFactory(
             docket_entry=de1_2,
-            pacer_doc_id="00506585234",
+            pacer_doc_id="00506581111",
             document_number="1",
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
@@ -1582,11 +1583,11 @@ class DocketEntryFileDownload(TestCase):
 
         de3 = DocketEntryFactory(
             docket=docket,
-            entry_number=506585238,
+            entry_number=506582222,
         )
         RECAPDocumentFactory(
             docket_entry=de3,
-            pacer_doc_id="00506585238",
+            pacer_doc_id="00506582222",
             document_number="3",
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
@@ -1595,17 +1596,17 @@ class DocketEntryFileDownload(TestCase):
         docket1 = DocketFactory(
             court=court,
             case_name="Test v. Test1",
-            docket_number="12-55667",
+            docket_number="12-222222",
             pacer_case_id="12345",
         )
         de4 = DocketEntryFactory(
             docket=docket1,
-            entry_number=506585567,
+            entry_number=506582222,
         )
         RECAPDocumentFactory(
             docket_entry=de4,
-            pacer_doc_id="00506585567",
-            document_number="005506585567",
+            pacer_doc_id="00506582222",
+            document_number="005506582222",
             document_type=RECAPDocument.PACER_DOCUMENT,
         )
         self.mocked_docket = docket
@@ -1621,6 +1622,13 @@ class DocketEntryFileDownload(TestCase):
         )
         self.request.auser = AsyncMock(return_value=self.user)
 
+    def tearDown(self):
+        # Clear all test data
+        Docket.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        RECAPDocument.objects.all().delete()
+        User.objects.all().delete()
+
     def test_fetch_docket_entries(self) -> None:
         """Verify that fetch entries function returns right docket_entries"""
         res = asyncio.run(fetch_docket_entries(self.mocked_docket))
@@ -1634,7 +1642,7 @@ class DocketEntryFileDownload(TestCase):
         res_lines = res.split("\r\n")
         res_line_data = res_lines[1].split(",")
         self.assertEqual(res[:16], '"docketentry_id"')
-        self.assertEqual(res_line_data[1], '"506585234"')
+        self.assertEqual(res_line_data[1], '"506581111"')
 
     def test_view_download_docket_entries_csv(self) -> None:
         """Test download_docket_entries_csv returns csv content"""
@@ -1648,9 +1656,6 @@ class DocketEntryFileDownload(TestCase):
                     "cl.opinion_page.utils.user_has_alert"
                 ) as mock_user_has_alert:
                     mock_download_function.return_value = (
-                        '"col1","col2","col3"\r\n"value1","value2","value3"'
-                    )
-                    mock_download_function.side_effect = (
                         '"col1","col2","col3"\r\n"value1","value2","value3"'
                     )
                     mock_user_has_alert.return_value = False

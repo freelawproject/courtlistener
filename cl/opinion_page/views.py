@@ -3,8 +3,7 @@ import datetime
 import logging
 from collections import OrderedDict, defaultdict
 from http import HTTPStatus
-from io import StringIO
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Union
 from urllib.parse import urlencode
 
 import eyecite
@@ -343,9 +342,7 @@ async def redirect_docket_recap(
 async def fetch_docket_entries(docket):
     """Fetch docket entries asociated to docket
 
-    param request: current HttpRequest.
     param docket: docket.id to get related docket_entries.
-
     returns: DocketEntry list.
     """
     de_list = docket.docket_entries.all().prefetch_related(
@@ -594,7 +591,7 @@ async def download_docket_entries_csv(
     case_name = docket.slug
 
     date_str = datetime.datetime.now().strftime("%Y-%m-%d")
-    filename = f"{case_name}.{court_id}.{docket_id}_{date_str}.csv"
+    filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
     csv_content = await sync_to_async(generate_docket_entries_csv_data)(
