@@ -179,7 +179,7 @@
                                 {% for col_bundle in group|group_courts:3 %}
                                     <div class="col-sm-4">
                                     {% for court in col_bundle %}
-                                        {% if court.jurisdiction == 'S' %}
+                                        {% if court.jurisdiction == 'S' or court.jurisdiction == 'TS' %}
                                             {% include "includes/court_checkbox.html" %}
                                         {% else %}
                                             {% include "includes/court_checkbox.html" with indent=True %}
