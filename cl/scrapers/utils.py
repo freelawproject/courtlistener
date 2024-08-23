@@ -335,7 +335,9 @@ def update_or_create_docket(
         "date_argued": date_argued,
     }
 
-    docket = async_to_sync(find_docket_object)(court_id, None, docket_number)
+    docket = async_to_sync(find_docket_object)(
+        court_id, None, docket_number, None, None, None
+    )
     if docket.pk:
         # Update the existing docket with the new values
         docket.add_opinions_source(source)
