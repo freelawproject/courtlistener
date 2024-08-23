@@ -4073,13 +4073,13 @@ files = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.43"
+version = "3.2.44"
 description = "Database of Court Reporters"
 optional = false
 python-versions = "*"
 files = [
-    {file = "reporters_db-3.2.43-py2.py3-none-any.whl", hash = "sha256:30dcc34f8fbdf9ab41cdb15d97c0a0cb948b0deb71f17b5e8074c7fd84c46b2f"},
-    {file = "reporters_db-3.2.43.tar.gz", hash = "sha256:3d10fff5baf4994b879895446e16bbac7b360a4fdc1f5a76377607be8ec105e2"},
+    {file = "reporters_db-3.2.44-py2.py3-none-any.whl", hash = "sha256:598d6f67cbc2ca11d7ec64e99a9e26a62ef3a64e4220a7eec8cbadbcd9e99e09"},
+    {file = "reporters_db-3.2.44.tar.gz", hash = "sha256:612890bb282e5047a31daa32222b26c635c28edf9a8b140f005e6157540f29d1"},
 ]
 
 [package.dependencies]
