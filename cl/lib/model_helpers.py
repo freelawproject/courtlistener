@@ -544,7 +544,7 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
 class CSVExportMixin:
 
-    def get_csv_columns(self, get_column_name: bool=False) -> List[str]:
+    def get_csv_columns(self, get_column_name: bool = False) -> List[str]:
         """Get list of column names required in a csv file.
         If get column name is True. It will add class name to attribute
 
