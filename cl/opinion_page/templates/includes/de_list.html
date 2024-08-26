@@ -4,11 +4,16 @@
 
 <div class="fake-table col-xs-12" id="docket-entry-table">
   <div class="row bold">
-    <div class="col-xs-1 text-center">
+    <div class="col-xs-1 col-sm-1">
       <p class="hidden-xs">Document Number</p>
     </div>
-    <div class="col-xs-3 col-sm-2">Date&nbsp;Filed</div>
-    <div class="col-xs-7 col-sm-6">Description</div>
+    <div class="col-xs-3 col-sm-3">Date&nbsp;Filed</div>
+    <div class="col-xs-7 col-sm-7">Description</div>
+    <div class="col-xs-1 col-sm-1" id="docket-entry-button">
+      <a href="{% url 'view_download_docket' docket.id %}" class="btn btn-primary">
+          <i class="fa fa-download"></i>
+          </a>
+    </div>
   </div>
   {% for de in docket_entries %}
     <div class="row {% cycle "odd" "even" %}"

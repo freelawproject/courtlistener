@@ -745,7 +745,6 @@ div.shown ul {
   padding: 3px 0 5px 0;
 }
 
-
 #summaries ul {
   padding-inline-start: 15px;
   border-bottom: 1pt solid #DDD;
@@ -891,6 +890,38 @@ input.court-checkbox, input.status-checkbox {
 #docket-entry-table .row {
   padding-top: 8px;
   border-bottom: 1px solid #dddddd;
+}
+
+#docket-entry-button {
+  padding-left: 50px;
+  padding-bottom: 15px;
+  margin-left: 0px;
+}
+
+@media (max-width: 1180px) {
+  #docket-entry-button {
+    padding-left: 15px;
+    padding-bottom: 15px;
+    margin-left: 0px;
+  }
+}
+
+@media (max-width: 625px) {
+  #docket-entry-button {
+    padding-left: 10px;
+    padding-bottom: 15px;
+    margin-left: 0px;
+    /*margin-left: -45px;*/
+  }
+}
+
+@media (max-width: 500px) {
+  #docket-entry-button {
+    padding-left: 0px;
+    padding-bottom: 15px;
+    margin-left: 0px;
+    /*margin-left: -45px;*/
+  }
 }
 
 #docket-entry-table .recap-documents.row {
