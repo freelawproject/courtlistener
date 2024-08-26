@@ -893,25 +893,32 @@ input.court-checkbox, input.status-checkbox {
 }
 
 #docket-entry-button {
-  padding-left: 50px;
+  padding-left: 45px;
   padding-bottom: 15px;
   margin-left: 0px;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1200px) {
   #docket-entry-button {
-    padding-left: 15px;
+    padding-left: 90px;
     padding-bottom: 15px;
     margin-left: 0px;
   }
 }
 
-@media (max-width: 625px) {
+@media (max-width: 990px) {
   #docket-entry-button {
-    padding-left: 10px;
+    padding-left: 35px;
     padding-bottom: 15px;
     margin-left: 0px;
-    /*margin-left: -45px;*/
+  }
+}
+
+@media (max-width: 750px) {
+  #docket-entry-button {
+    padding-left: 20px;
+    padding-bottom: 15px;
+    margin-left: 0px;
   }
 }
 

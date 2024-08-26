@@ -7,11 +7,13 @@
     <div class="col-xs-1 col-sm-1">
       <p class="hidden-xs">Document Number</p>
     </div>
-    <div class="col-xs-3 col-sm-3">Date&nbsp;Filed</div>
-    <div class="col-xs-7 col-sm-7">Description</div>
-    <div class="col-xs-1 col-sm-1" id="docket-entry-button">
-      <a href="{% url 'view_download_docket' docket.id %}" class="btn btn-primary">
+    <div class="col-xs-3 col-sm-2">Date&nbsp;Filed</div>
+    <div class="col-xs-6 col-sm-5">Description</div>
+    <div class="col-xs-2 col-sm-3" id="docket-entry-button">
+      <a href="{% url 'view_download_docket' docket.id %}" class="btn btn-default btn-xs">
           <i class="fa fa-download"></i>
+        <!--span class="d-none d-sm-inline">Export CSV</span-->
+        <span class="d-inline d-sm-none">CSV</span>
           </a>
     </div>
   </div>
