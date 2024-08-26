@@ -1790,6 +1790,11 @@ class RECAPDocument(
     def _get_readable_ocr_status(self, *args, **kwargs):
         return self.get_ocr_status_display()
 
+    def _get_full_filepath_local(self, *args, **kwargs):
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
     def get_column_function(self):
         """Get dict of attrs: function to apply on field value if it needs
         to be pre-processed before being add to csv
@@ -1799,6 +1804,7 @@ class RECAPDocument(
         return {
             "document_type": self._get_readable_document_type,
             "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
         }
 
 
