@@ -572,7 +572,12 @@ async def process_recap_docket(pk):
 
     # Merge the contents of the docket into CL.
     d = await find_docket_object(
-        pq.court_id, pq.pacer_case_id, data["docket_number"]
+        pq.court_id,
+        pq.pacer_case_id,
+        data["docket_number"],
+        data.get("federal_defendant_number"),
+        data.get("federal_dn_judge_initials_assigned"),
+        data.get("federal_dn_judge_initials_referred"),
     )
 
     d.add_recap_source()
@@ -749,7 +754,12 @@ async def process_recap_claims_register(pk):
 
     # Merge the contents of the docket into CL.
     d = await find_docket_object(
-        pq.court_id, pq.pacer_case_id, data["docket_number"]
+        pq.court_id,
+        pq.pacer_case_id,
+        data["docket_number"],
+        data.get("federal_defendant_number"),
+        data.get("federal_dn_judge_initials_assigned"),
+        data.get("federal_dn_judge_initials_referred"),
     )
 
     # Merge the contents into CL
@@ -839,7 +849,12 @@ async def process_recap_docket_history_report(pk):
 
     # Merge the contents of the docket into CL.
     d = await find_docket_object(
-        pq.court_id, pq.pacer_case_id, data["docket_number"]
+        pq.court_id,
+        pq.pacer_case_id,
+        data["docket_number"],
+        data.get("federal_defendant_number"),
+        data.get("federal_dn_judge_initials_assigned"),
+        data.get("federal_dn_judge_initials_referred"),
     )
 
     d.add_recap_source()
@@ -943,7 +958,12 @@ async def process_case_query_page(pk):
 
     # Merge the contents of the docket into CL.
     d = await find_docket_object(
-        pq.court_id, pq.pacer_case_id, data["docket_number"]
+        pq.court_id,
+        pq.pacer_case_id,
+        data["docket_number"],
+        data.get("federal_defendant_number"),
+        data.get("federal_dn_judge_initials_assigned"),
+        data.get("federal_dn_judge_initials_referred"),
     )
     current_case_name = d.case_name
     d.add_recap_source()
@@ -1070,7 +1090,12 @@ async def process_recap_appellate_docket(pk):
 
     # Merge the contents of the docket into CL.
     d = await find_docket_object(
-        pq.court_id, pq.pacer_case_id, data["docket_number"]
+        pq.court_id,
+        pq.pacer_case_id,
+        data["docket_number"],
+        data.get("federal_defendant_number"),
+        data.get("federal_dn_judge_initials_assigned"),
+        data.get("federal_dn_judge_initials_referred"),
     )
 
     d.add_recap_source()
@@ -1169,7 +1194,12 @@ async def process_recap_acms_docket(pk):
 
     # Merge the contents of the docket into CL.
     d = await find_docket_object(
-        pq.court_id, pq.pacer_case_id, data["docket_number"]
+        pq.court_id,
+        pq.pacer_case_id,
+        data["docket_number"],
+        data.get("federal_defendant_number"),
+        data.get("federal_dn_judge_initials_assigned"),
+        data.get("federal_dn_judge_initials_referred"),
     )
 
     d.add_recap_source()
@@ -1877,7 +1907,12 @@ def fetch_docket_by_pacer_case_id(session, court_id, pacer_case_id, fq):
         d = Docket.objects.get(pk=fq.docket_id)
     else:
         d = async_to_sync(find_docket_object)(
-            court_id, pacer_case_id, docket_data["docket_number"]
+            court_id,
+            pacer_case_id,
+            docket_data["docket_number"],
+            docket_data.get("federal_defendant_number"),
+            docket_data.get("federal_dn_judge_initials_assigned"),
+            docket_data.get("federal_dn_judge_initials_referred"),
         )
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
         d, pacer_case_id, docket_data, report, appellate=False
@@ -2529,6 +2564,9 @@ def process_recap_email(
                 epq.court_id,
                 docket_entry["pacer_case_id"],
                 docket_data["docket_number"],
+                docket_data.get("federal_defendant_number"),
+                docket_data.get("federal_dn_judge_initials_assigned"),
+                docket_data.get("federal_dn_judge_initials_referred"),
             )
             docket.add_recap_source()
             async_to_sync(update_docket_metadata)(docket, docket_data)
