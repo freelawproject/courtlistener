@@ -240,6 +240,7 @@ def add_new_case(item: dict) -> None:
             ),
             sha1=opinion_info["sha1"],
             local_path=opinion_info["local_path"],
+            ordering_key=opinion_info["order"],
         )
 
         new_opinions.append(opinion)
