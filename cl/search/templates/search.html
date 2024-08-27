@@ -218,6 +218,15 @@
             </div>
         </div>
 
+        {% if search_form.type.value == SEARCH_TYPES.OPINION and missing_citations %}
+          <h2 id="missing-citations" class="alt">
+            Showing results for &mdash; <strong>{{ suggested_query }}</strong> &mdash;
+            without citation{{ missing_citations|pluralize }}
+            {% for citation in missing_citations %} "{{ citation }}"{% if not forloop.last %}, {% endif %}{% endfor %}.
+            It appears we do not have the citation{{ missing_citations|pluralize }} in our system.
+          </h2>
+        {% endif %}
+
         {% if results.paginator.count > 0 %}
             <div class="row">
                 <div class="col-sm-12">

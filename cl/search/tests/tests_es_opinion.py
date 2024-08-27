@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytz
 import time_machine
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
@@ -1276,6 +1276,33 @@ class OpinionsESSearchTest(
         )
         return r
 
+    def _assert_missing_citations_query(
+        self, html_content, suggested_query, missing_citations
+    ):
+        h2_element = html.fromstring(html_content).xpath(
+            '//h2[@id="missing-citations"]'
+        )
+        h2_content = html.tostring(
+            h2_element[0], method="text", encoding="unicode"
+        ).replace("\xa0", " ")
+
+        self.assertIn(
+            suggested_query,
+            h2_content.strip(),
+            msg=f"'{suggested_query}' was not found within the message.",
+        )
+
+        for missing_citation in missing_citations:
+            with self.subTest(
+                missing_citation=missing_citation,
+                msg="Confirm missing_citations",
+            ):
+                self.assertIn(
+                    missing_citation,
+                    h2_content.strip(),
+                    msg=f"'{missing_citation}' was not found within the message.",
+                )
+
     async def test_can_perform_a_regular_text_query(self) -> None:
         # Frontend
         search_params = {"q": "supreme"}
@@ -2044,6 +2071,77 @@ class OpinionsESSearchTest(
         )
 
         cluster_2.delete()
+        cluster.delete()
+
+    def test_drop_missing_citation_from_query(self) -> None:
+        """If a query contains a citation that we don't have,
+        drop the citation(s) from the query, perform the query, and inform the
+        users about this behavior."""
+
+        # Cluster with citation and multiple sibling opinions is properly matched.
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster = OpinionClusterFactory.create(
+                case_name="Voutila v. Lorem",
+                attorneys="James Smith",
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                docket=self.docket_1,
+                date_filed=datetime.date(2024, 8, 23),
+            )
+            CitationWithParentsFactory.create(
+                volume=31,
+                reporter="Pa. D. & C.",
+                page="445",
+                type=2,
+                cluster=cluster,
+            )
+            OpinionFactory.create(cluster=cluster, plain_text="")
+
+        # Test missing citation 32 Pa. D. & C. 446
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Voutila v. Lorem 32 Pa. D. & C. 446 James Smith",
+            "order_by": "score desc",
+        }
+        r = async_to_sync(self._test_article_count)(
+            search_params, 1, "text_query"
+        )
+        self._assert_missing_citations_query(
+            r.content.decode(),
+            "Voutila v. Lorem James Smith",
+            ["32 Pa. D. & C. 446"],
+        )
+
+        # Test two missing citations "32 Pa. D. & C. 446" and "32 Pa. D. & C. 447"
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Voutila v. Lorem 32 Pa. D. & C. 446 James Smith 32 Pa. D. & C. 447",
+            "order_by": "score desc",
+        }
+        r = async_to_sync(self._test_article_count)(
+            search_params, 1, "text_query"
+        )
+        self._assert_missing_citations_query(
+            r.content.decode(),
+            "Voutila v. Lorem James Smith",
+            ["32 Pa. D. & C. 446", "32 Pa. D. & C. 447"],
+        )
+
+        # Test one missing citations "32 Pa. D. & C. 446" and keep an available
+        # one "31 Pa. D. & C. 445"
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Voutila v. Lorem 32 Pa. D. & C. 446 James Smith 31 Pa. D. & C. 445",
+            "order_by": "score desc",
+        }
+        r = async_to_sync(self._test_article_count)(
+            search_params, 1, "text_query"
+        )
+        self._assert_missing_citations_query(
+            r.content.decode(),
+            "Voutila v. Lorem James Smith 31 Pa. D. & C. 445",
+            ["32 Pa. D. & C. 446"],
+        )
+
         cluster.delete()
 
 
