@@ -1,6 +1,4 @@
-import csv
 import datetime
-import logging
 from collections import OrderedDict, defaultdict
 from http import HTTPStatus
 from typing import Any, Dict, Union
@@ -343,7 +341,7 @@ async def fetch_docket_entries(docket):
     """Fetch docket entries asociated to docket
 
     param docket: docket.id to get related docket_entries.
-    returns: DocketEntry list.
+    returns: DocketEntry Queryset.
     """
     de_list = docket.docket_entries.all().prefetch_related(
         Prefetch(
