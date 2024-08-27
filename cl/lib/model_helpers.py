@@ -1,7 +1,7 @@
 import contextlib
 import os
 import re
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Optional
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -566,7 +566,7 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
 
 class CSVExportMixin:
 
-    def get_csv_columns(self, get_column_name: bool = False) -> List[str]:
+    def get_csv_columns(self, get_column_name: bool = False) -> list[str]:
         """Get list of column names required in a csv file.
         If get column name is True. It will add class name to attribute
 
@@ -577,7 +577,7 @@ class CSVExportMixin:
             "Subclass must implement get_csv_columns method"
         )
 
-    def get_column_function(self) -> Dict[str, Callable[[str], str]]:
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
         """Get dict of attrs: function to apply on field value if it needs
         to be pre-processed before being add to csv
 
@@ -586,7 +586,7 @@ class CSVExportMixin:
             "Subclass must implement get_column_fuction method"
         )
 
-    def to_csv_row(self) -> List[str]:
+    def to_csv_row(self) -> list[str]:
         """Get fields in model based on attrs column names.
         Apply function to attr value if required.
         Return list of modified values for csv row"""
