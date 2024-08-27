@@ -1649,9 +1649,11 @@ class DocketEntryFileDownload(TestCase):
     @mock.patch("cl.opinion_page.utils.core_docket_data")
     @mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data")
     def test_view_download_docket_entries_csv(
-        self,mock_download_function,
+        self,
+        mock_download_function,
         mock_core_docket_data,
-        mock_user_has_alert) -> None:
+        mock_user_has_alert,
+    ) -> None:
         """Test download_docket_entries_csv returns csv content"""
 
         mock_download_function.return_value = (
