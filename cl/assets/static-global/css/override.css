@@ -880,11 +880,11 @@ input.court-checkbox, input.status-checkbox {
 
 /* Docket page */
 #id_entry_gte, #id_entry_lte {
-  width: 45px;
+  width: 60px;
 }
 
 #id_filed_after, #id_filed_before {
-  width: 90px;
+  width: 95px;
 }
 
 #docket-entry-table .row {
@@ -892,45 +892,16 @@ input.court-checkbox, input.status-checkbox {
   border-bottom: 1px solid #dddddd;
 }
 
-#docket-entry-button {
-  padding-left: 45px;
-  padding-bottom: 15px;
-  margin-left: 0px;
+.description-header,
+.export-csv {
+  padding: 0px;
 }
 
-@media (max-width: 1200px) {
-  #docket-entry-button {
-    padding-left: 90px;
-    padding-bottom: 15px;
-    margin-left: 0px;
+@media (min-width: 767px) {
+  .export-csv {
+    padding: 5px 10px;
   }
 }
-
-@media (max-width: 990px) {
-  #docket-entry-button {
-    padding-left: 35px;
-    padding-bottom: 15px;
-    margin-left: 0px;
-  }
-}
-
-@media (max-width: 750px) {
-  #docket-entry-button {
-    padding-left: 20px;
-    padding-bottom: 15px;
-    margin-left: 0px;
-  }
-}
-
-@media (max-width: 500px) {
-  #docket-entry-button {
-    padding-left: 0px;
-    padding-bottom: 15px;
-    margin-left: 0px;
-    /*margin-left: -45px;*/
-  }
-}
-
 #docket-entry-table .recap-documents.row {
   padding-top: 0px;
   border-bottom: none;
@@ -1644,8 +1615,8 @@ textarea {
 }
 
 .tight-input input, .tight-input a {
-  padding: 5px 5px !important;
-  margin: 0px 0px !important;
+  padding: 6px 6px;
+  margin: 0px 0px;
 }
 
 @media (max-width: 768px) {
