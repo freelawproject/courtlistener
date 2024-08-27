@@ -56,7 +56,7 @@ urlpatterns = [
         "docket/<int:pk>/<blank-slug:slug>/", view_docket, name="view_docket"  # type: ignore[arg-type]
     ),
     path(
-        "docket/download/<int:docket_id>/",
+        "docket/<int:docket_id>/download/",
         download_docket_entries_csv,  # type: ignore[arg-type]
         name="view_download_docket",
     ),
