@@ -1279,16 +1279,19 @@ class OpinionsESSearchTest(
     def _assert_missing_citations_query(
         self, html_content, suggested_query, missing_citations
     ):
-        h2_element = html.fromstring(html_content).xpath(
-            '//h2[@id="missing-citations"]'
+        """Assert that a message with missing citations is present in search
+        results.
+        """
+        p_element = html.fromstring(html_content).xpath(
+            '//p[@id="missing-citations"]'
         )
-        h2_content = html.tostring(
-            h2_element[0], method="text", encoding="unicode"
+        p_content = html.tostring(
+            p_element[0], method="text", encoding="unicode"
         ).replace("\xa0", " ")
 
         self.assertIn(
             suggested_query,
-            h2_content.strip(),
+            p_content.strip(),
             msg=f"'{suggested_query}' was not found within the message.",
         )
 
@@ -1299,9 +1302,20 @@ class OpinionsESSearchTest(
             ):
                 self.assertIn(
                     missing_citation,
-                    h2_content.strip(),
+                    p_content.strip(),
                     msg=f"'{missing_citation}' was not found within the message.",
                 )
+
+    def _assert_search_box_query(self, html_content, expected_query):
+        """Assert the search box value is correct."""
+        search_box = html.fromstring(html_content).xpath('//input[@id="id_q"]')
+        search_box_value = search_box[0].get("value", "")
+
+        self.assertIn(
+            expected_query,
+            search_box_value.strip(),
+            msg=f"'{expected_query}' was not found within the search box.",
+        )
 
     async def test_can_perform_a_regular_text_query(self) -> None:
         # Frontend
@@ -2110,6 +2124,10 @@ class OpinionsESSearchTest(
             "Voutila v. Lorem James Smith",
             ["32 Pa. D. & C. 446"],
         )
+        self._assert_search_box_query(
+            r.content.decode(),
+            "Voutila v. Lorem 32 Pa. D. & C. 446 James Smith",
+        )
 
         # Test two missing citations "32 Pa. D. & C. 446" and "32 Pa. D. & C. 447"
         search_params = {
@@ -2124,6 +2142,10 @@ class OpinionsESSearchTest(
             r.content.decode(),
             "Voutila v. Lorem James Smith",
             ["32 Pa. D. & C. 446", "32 Pa. D. & C. 447"],
+        )
+        self._assert_search_box_query(
+            r.content.decode(),
+            "Voutila v. Lorem 32 Pa. D. & C. 446 James Smith 32 Pa. D. & C. 447",
         )
 
         # Test one missing citations "32 Pa. D. & C. 446" and keep an available
@@ -2140,6 +2162,10 @@ class OpinionsESSearchTest(
             r.content.decode(),
             "Voutila v. Lorem James Smith 31 Pa. D. & C. 445",
             ["32 Pa. D. & C. 446"],
+        )
+        self._assert_search_box_query(
+            r.content.decode(),
+            "Voutila v. Lorem 32 Pa. D. & C. 446 James Smith 31 Pa. D. & C. 445",
         )
 
         cluster.delete()

@@ -741,7 +741,8 @@ def do_es_search(
             document_type = OpinionClusterDocument
 
     if search_form.is_valid() and document_type:
-        cd = search_form.cleaned_data
+        # Copy cleaned_data to preserve the original data when displaying the form
+        cd = search_form.cleaned_data.copy()
         try:
             # Create necessary filters to execute ES query
             search_query = document_type.search()
