@@ -223,8 +223,8 @@
                 <div class="col-xs-12">
                   <p id="missing-citations"><i class="fa fa-info-circle fa-lg"></i>
                     Showing results for <strong>"{{ suggested_query }}"</strong> without citation{{ missing_citations|pluralize }}
-                    {% for citation in missing_citations %} <strong>"{{ citation }}"</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.</br>
-                    It appears we don't yet have that citation{{ missing_citations|pluralize }}.
+                    {% for citation in missing_citations %} <strong>"{{ citation }}"</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.
+                    It appears we don't yet have {{ missing_citations|pluralize:"that citation,those citations" }}.
                   </p>
                 </div>
             </div>

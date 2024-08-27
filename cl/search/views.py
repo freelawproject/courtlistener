@@ -678,7 +678,7 @@ def remove_missing_citations(
     :param missing_citations: A list of FullCaseCitation objects representing
     the citations that are missing from the query.
     :param cd: A CleanData object containing the query string.
-    :return: A twp tuple containing a list of missing citation strings and the
+    :return: A two-tuple containing a list of missing citation strings and the
     suggested query string with missing citations removed.
     """
     missing_citations_str = [

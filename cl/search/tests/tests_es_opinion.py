@@ -1306,6 +1306,17 @@ class OpinionsESSearchTest(
                     msg=f"'{missing_citation}' was not found within the message.",
                 )
 
+        if len(missing_citations) > 1:
+            self.assertIn(
+                "It appears we don't yet have those citations.",
+                p_content.strip(),
+            )
+        else:
+            self.assertIn(
+                "It appears we don't yet have that citation.",
+                p_content.strip(),
+            )
+
     def _assert_search_box_query(self, html_content, expected_query):
         """Assert the search box value is correct."""
         search_box = html.fromstring(html_content).xpath('//input[@id="id_q"]')
