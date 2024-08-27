@@ -377,6 +377,7 @@ async def view_docket(
         if cd.get("filed_before"):
             de_list = de_list.filter(date_filed__lte=cd["filed_before"])
         if cd.get("order_by") == DocketEntryFilterForm.DESCENDING:
+            sort_order_asc = False
             de_list = de_list.order_by(
                 "-recap_sequence_number", "-entry_number"
             )
