@@ -745,7 +745,6 @@ div.shown ul {
   padding: 3px 0 5px 0;
 }
 
-
 #summaries ul {
   padding-inline-start: 15px;
   border-bottom: 1pt solid #DDD;
@@ -893,6 +892,16 @@ input.court-checkbox, input.status-checkbox {
   border-bottom: 1px solid #dddddd;
 }
 
+.description-header,
+.export-csv {
+  padding: 0px;
+}
+
+@media (min-width: 767px) {
+  .export-csv {
+    padding: 5px 10px;
+  }
+}
 #docket-entry-table .recap-documents.row {
   padding-top: 0px;
   border-bottom: none;
