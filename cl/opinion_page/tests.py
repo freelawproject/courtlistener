@@ -1,5 +1,4 @@
 # mypy: disable-error-code=attr-defined
-import asyncio
 import datetime
 import os
 import shutil
@@ -1629,12 +1628,14 @@ class DocketEntryFileDownload(TestCase):
         RECAPDocument.objects.all().delete()
         User.objects.all().delete()
 
-    def test_fetch_docket_entries(self) -> None:
+    async def test_fetch_docket_entries(self) -> None:
         """Verify that fetch entries function returns right docket_entries"""
-        res = asyncio.run(fetch_docket_entries(self.mocked_docket))
-        self.assertEqual(len(res), len(self.mocked_docket_entries))
-        self.assertIn(self.mocked_docket_entries[0], res)
-        self.assertNotIn(self.mocked_extra_docket_entries[0], res)
+        res = await fetch_docket_entries(self.mocked_docket)
+        self.assertEqual(await res.acount(), len(self.mocked_docket_entries))
+        self.assertTrue(await res.acontains(self.mocked_docket_entries[0]))
+        self.assertFalse(
+            await res.acontains(self.mocked_extra_docket_entries[0])
+        )
 
     def test_generate_docket_entries_csv_data(self) -> None:
         """Verify str with csv data is created. Check column and data entry"""
@@ -1644,34 +1645,31 @@ class DocketEntryFileDownload(TestCase):
         self.assertEqual(res[:16], '"docketentry_id"')
         self.assertEqual(res_line_data[1], '"506581111"')
 
-    def test_view_download_docket_entries_csv(self) -> None:
+    @mock.patch("cl.opinion_page.utils.user_has_alert")
+    @mock.patch("cl.opinion_page.utils.core_docket_data")
+    @mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data")
+    def test_view_download_docket_entries_csv(
+        self,mock_download_function,
+        mock_core_docket_data,
+        mock_user_has_alert) -> None:
         """Test download_docket_entries_csv returns csv content"""
-        with mock.patch(
-            "cl.opinion_page.utils.generate_docket_entries_csv_data"
-        ) as mock_download_function:
-            with mock.patch(
-                "cl.opinion_page.utils.core_docket_data"
-            ) as mock_core_docket_data:
-                with mock.patch(
-                    "cl.opinion_page.utils.user_has_alert"
-                ) as mock_user_has_alert:
-                    mock_download_function.return_value = (
-                        '"col1","col2","col3"\r\n"value1","value2","value3"'
-                    )
-                    mock_user_has_alert.return_value = False
-                    mock_core_docket_data.return_value = (
-                        self.mocked_docket,
-                        {
-                            "docket": self.mocked_docket,
-                            "title": "title",
-                            "note_form": "note_form",
-                            "has_alert": mock_user_has_alert.return_value,
-                            "timezone": "EST",
-                            "private": True,
-                        },
-                    )
 
-                    response = async_to_sync(download_docket_entries_csv)(
-                        self.request, self.mocked_docket.id
-                    )
-                    self.assertEqual(response["Content-Type"], "text/csv")
+        mock_download_function.return_value = (
+            '"col1","col2","col3"\r\n"value1","value2","value3"'
+        )
+        mock_user_has_alert.return_value = False
+        mock_core_docket_data.return_value = (
+            self.mocked_docket,
+            {
+                "docket": self.mocked_docket,
+                "title": "title",
+                "note_form": "note_form",
+                "has_alert": mock_user_has_alert.return_value,
+                "timezone": "EST",
+                "private": True,
+            },
+        )
+        response = async_to_sync(download_docket_entries_csv)(
+            self.request, self.mocked_docket.id
+        )
+        self.assertEqual(response["Content-Type"], "text/csv")
