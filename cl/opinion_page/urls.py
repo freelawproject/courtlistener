@@ -58,7 +58,9 @@ urlpatterns = [
         name="view_download_docket",
     ),
     path(
-        "docket/<int:pk>/<blank-slug:slug>/", view_docket, name="view_docket"
+        "docket/<int:pk>/<blank-slug:slug>/",
+        view_docket,
+        name="view_docket",
         # type: ignore[arg-type]
     ),
     path(
