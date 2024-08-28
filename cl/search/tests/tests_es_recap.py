@@ -2548,7 +2548,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
 
     @mock.patch("cl.search.views.fetch_es_results")
-    @override_settings(RECAP_SEARCH_PAGE_SIZE=2)
+    @override_settings(
+        RECAP_SEARCH_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
+    )
     async def test_micro_cache_for_search_results(self, mock_fetch_es) -> None:
         """Assert micro-cache for search results behaves properly."""
 

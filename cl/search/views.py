@@ -962,7 +962,7 @@ def fetch_and_paginate_results(
     if cache_key is not None:
         # Cache only Page results for displaying insights on the Home Page.
         cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
-    else:
+    elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
         # Cache Page results and counts for all other search requests.
         results_dict = {
             "results": results,
