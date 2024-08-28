@@ -2672,6 +2672,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = await self._test_article_count(params, 0, "filter + text query")
         # fetch_es_results is called this time; the cache is not used.
         self.assertEqual(mock_fetch_es.call_count, 5)
+        cache.clear()
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
