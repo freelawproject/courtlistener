@@ -1,7 +1,7 @@
 import contextlib
 import os
 import re
-from typing import Optional
+from typing import Callable, Optional
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -562,3 +562,46 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
     """
     # If no match is found, return empty str
     return ""
+
+
+class CSVExportMixin:
+
+    def get_csv_columns(self, get_column_name: bool = False) -> list[str]:
+        """Get list of column names required in a csv file.
+        If get column name is True. It will add class name to attribute
+
+        :param: get_column_name: bool. Whether add class name to attr name
+
+        :return: list of attrs of class to get into csv file"""
+        raise NotImplementedError(
+            "Subclass must implement get_csv_columns method"
+        )
+
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
+        """Get dict of attrs: function to apply on field value if it needs
+        to be pre-processed before being add to csv
+
+        returns: dict -- > {attr1: function}"""
+        raise NotImplementedError(
+            "Subclass must implement get_column_fuction method"
+        )
+
+    def to_csv_row(self) -> list[str]:
+        """Get fields in model based on attrs column names.
+        Apply function to attr value if required.
+        Return list of modified values for csv row"""
+        row = []
+        functions = self.get_column_function()
+        columns = self.get_csv_columns(get_column_name=False)
+        for field in columns:
+            attr = getattr(self, field)
+            if not attr:
+                attr = ""
+            function = functions.get(field)
+            if function:
+                attr = function(field)
+            row.append(attr)
+        return row
+
+    def add_class_name(self, attribute_name: str) -> str:
+        return f"{self.__class__.__name__.lower()}_{attribute_name}"
