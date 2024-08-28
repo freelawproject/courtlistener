@@ -897,10 +897,6 @@ input.court-checkbox, input.status-checkbox {
   padding: 0px;
 }
 
-#export-csv-spinner{
-  padding: 7px 0px;
-}
-
 #export-csv-error {
   padding: 5px 0px;
 }
@@ -1702,4 +1698,14 @@ rect.series-segment {
 .htmx-indicator {
   opacity: 0;
   transition: opacity 200ms ease-in;
+}
+
+.htmx-hidden-indicator {
+    display:none;
+}
+.htmx-request .htmx-hidden-indicator {
+    display:inline;
+}
+.htmx-request.htmx-hidden-indicator {
+    display:inline;
 }

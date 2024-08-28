@@ -32,13 +32,9 @@
         </span>
       </div>
     </div>
-    <div class="flex justify-content-end col-xs-7 hidden-xs">
+    <div class="flex justify-content-end col-sm-7 hidden-xs">
       <span id="export-csv-error" class="text-danger hidden">
         <i class="fa fa-info-circle"></i> There was a problem. Try again later.
-      </span>
-      <span id="export-csv-spinner" class="htmx-indicator" >
-        <i class="fa fa-spinner fa-spin hidden-lg"></i>
-        <i class="fa fa-spinner fa-spin fa-lg visible-lg"></i>
       </span>
       &nbsp;
       <a hx-get="{% url 'view_download_docket' docket.id %}"
@@ -48,6 +44,11 @@
           <i class="fa fa-download gray hidden-lg"></i>
           <i class="fa fa-download fa-lg gray visible-lg"></i>&nbsp;
           <span>Export CSV</span>
+          &nbsp;
+          <span id="export-csv-spinner" class="htmx-hidden-indicator" >
+            <i class="fa fa-spinner fa-spin hidden-lg"></i>
+            <i class="fa fa-spinner fa-spin fa-lg visible-lg"></i>
+          </span>
         </div>
       </a>
     </div>
