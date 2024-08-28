@@ -1705,7 +1705,7 @@ class DocketEntryFileDownload(TestCase):
                 "private": True,
             },
         )
-        response = async_to_sync(download_docket_entries_csv)(
+        response = download_docket_entries_csv(
             self.request, self.mocked_docket.id
         )
         self.assertEqual(response["Content-Type"], "text/csv")
