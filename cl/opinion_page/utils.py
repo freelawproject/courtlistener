@@ -154,10 +154,10 @@ def generate_docket_entries_csv_data(docket_entries):
     csvwriter.writerow(columns)
 
     for docket_entry in docket_entries:
-        row = docket_entry.to_csv_row()
         for recap_doc in docket_entry.recap_documents.all():
-            row += recap_doc.to_csv_row()
-            csvwriter.writerow(row)
+            csvwriter.writerow(
+                docket_entry.to_csv_row() + recap_doc.to_csv_row()
+            )
 
     csv_content: str = output.getvalue()
     output.close()

@@ -1,6 +1,7 @@
 # mypy: disable-error-code=attr-defined
 import datetime
 import os
+import re
 import shutil
 from datetime import date
 from http import HTTPStatus
@@ -1588,7 +1589,15 @@ class DocketEntryFileDownload(TestCase):
             docket_entry=de3,
             pacer_doc_id="00506582222",
             document_number="3",
-            document_type=RECAPDocument.PACER_DOCUMENT,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de3,
+            description="Document attachment",
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number="3",
+            attachment_number=2,
         )
         # Create extra docket and docket entries to make sure it only fetch
         # required docket_entries
@@ -1644,6 +1653,31 @@ class DocketEntryFileDownload(TestCase):
         res_line_data = res_lines[1].split(",")
         self.assertEqual(res[:16], '"docketentry_id"')
         self.assertEqual(res_line_data[1], '"506581111"')
+
+        # Checks if the number of values in each CSV row matches the expected
+        # number of columns.
+
+        # Compute the expected number of columns by combining the columns from
+        # the docket entry and recap documents
+        docket_entry = self.mocked_docket_entries[0]
+        de_columns = docket_entry.get_csv_columns(get_column_name=True)
+        rd_columns = docket_entry.recap_documents.first().get_csv_columns(
+            get_column_name=True
+        )
+        column_count = len(de_columns + rd_columns)
+
+        # Iterate over each line in the generated CSV data and count the number
+        # of values.
+        rows = [
+            len(re.findall('"([^"]*)"', line)) == column_count
+            for line in res_lines
+            if line
+        ]
+        # Assert that all rows have the expected number of values.
+        self.assertTrue(
+            all(rows),
+            "One or more rows of the CSV file has more values than expected",
+        )
 
     @mock.patch("cl.opinion_page.utils.user_has_alert")
     @mock.patch("cl.opinion_page.utils.core_docket_data")
