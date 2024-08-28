@@ -328,7 +328,7 @@ def find_just_name(text: str) -> str:
 
     # Next up is full names followed by a comma
     match_titles = re.search(
-        #adding 'r' prefix to address python 3.12 strickness around escape sequences in string literals
+        # adding 'r' prefix to address python 3.12 strickness around escape sequences in string literals
         r"(((Van|VAN|De|DE|Da|DA)\s)?[A-Z][\w\-'']{2,}(\s(IV|I|II|III|V|Jr\.|JR\.|Sr\.|SR\.))?),",
         cleaned_text,
     )
