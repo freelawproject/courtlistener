@@ -73,6 +73,7 @@ from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
     core_docket_data,
     es_get_citing_clusters_with_cache,
+    generate_docket_entries_csv_data,
     get_case_title,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
@@ -336,19 +337,32 @@ async def redirect_docket_recap(
     )
 
 
+async def fetch_docket_entries(docket):
+    """Fetch docket entries asociated to docket
+
+    param docket: docket.id to get related docket_entries.
+    returns: DocketEntry Queryset.
+    """
+    de_list = docket.docket_entries.all().prefetch_related(
+        Prefetch(
+            "recap_documents",
+            queryset=RECAPDocument.objects.defer("plain_text"),
+        )
+    )
+    return de_list
+
+
 async def view_docket(
     request: HttpRequest, pk: int, slug: str
 ) -> HttpResponse:
+
+    sort_order_asc = True
+    form = DocketEntryFilterForm(request.GET, request=request)
     docket, context = await core_docket_data(request, pk)
     await increment_view_count(docket, request)
-    sort_order_asc = True
 
-    page = request.GET.get("page", 1)
-    rd_queryset = RECAPDocument.objects.defer("plain_text")
-    de_list = docket.docket_entries.all().prefetch_related(
-        Prefetch("recap_documents", queryset=rd_queryset)
-    )
-    form = DocketEntryFilterForm(request.GET, request=request)
+    de_list = await fetch_docket_entries(docket)
+
     if await sync_to_async(form.is_valid)():
         cd = form.cleaned_data
 
@@ -365,6 +379,8 @@ async def view_docket(
             de_list = de_list.order_by(
                 "-recap_sequence_number", "-entry_number"
             )
+
+    page = request.GET.get("page", 1)
 
     @sync_to_async
     def paginate_docket_entries(docket_entries, docket_page):
@@ -561,6 +577,28 @@ async def make_thumb_if_needed(
         )
         await rd.arefresh_from_db()
     return rd
+
+
+async def download_docket_entries_csv(
+    request: HttpRequest, docket_id: int
+) -> HttpResponse:
+    """Download csv file containing list of DocketEntry for specific Docket"""
+
+    docket, _ = await core_docket_data(request, docket_id)
+    de_list = await fetch_docket_entries(docket)
+    court_id = docket.court_id
+    case_name = docket.slug
+
+    date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+    filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
+
+    # TODO check if for large files we'll cache or send file by email
+    csv_content = await sync_to_async(generate_docket_entries_csv_data)(
+        de_list
+    )
+    response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
 
 
 async def view_recap_document(
