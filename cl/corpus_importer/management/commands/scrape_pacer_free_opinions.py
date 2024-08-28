@@ -217,11 +217,12 @@ def get_and_save_free_document_reports(
         # point for the sweep
         dates = make_date_range_tuples(date_start, date_end, gap=7)
 
-    for pacer_court_id in pacer_court_ids:
-        court_failed = False
-        if not dates:
+    if not dates:
+        # We are not using a custom date range, it is the daily cron
+        for pacer_court_id in pacer_court_ids:
+            court_failed = False
             # We don't pass the dates in the command, so we generate the range based
-            # on each court
+            # on each court using last day queried until today to build the date range
             date_end = datetime.date.today()
             date_start = get_last_complete_date(pacer_court_id)
             if not date_start:
@@ -232,23 +233,43 @@ def get_and_save_free_document_reports(
                 continue
             dates = make_date_range_tuples(date_start, date_end, gap=7)
 
-        # Iterate through the gap in dates either short or long
+            # Iterate through the gap in dates either short or long
+            for _start, _end in dates:
+                exc = fetch_doc_report(
+                    pacer_court_id, _start, _end  # type: ignore
+                )
+                if exc:
+                    # Something happened with the queried date range, abort process for
+                    # that court
+                    court_failed = True
+                    break
+
+                # Wait 1s between queries to try to avoid a possible throttling/blocking
+                # from the court
+                time.sleep(1)
+
+            if court_failed:
+                continue
+    else:
+        # Custom date range, alternate courts on a weekly basis to generate report
+        # when running sweep based on specified date range
         for _start, _end in dates:
-            exc = fetch_doc_report(
-                pacer_court_id, _start, _end  # type: ignore
-            )
-            if exc:
-                # Something happened with the queried date range, abort process for
-                # that court
-                court_failed = True
-                break
+            court_failed = False
+            for pacer_court_id in pacer_court_ids:
+                exc = fetch_doc_report(
+                    pacer_court_id, _start, _end  # type: ignore
+                )
+                if exc:
+                    # Something happened with the queried date range, abort process for
+                    # that court
+                    court_failed = True
+                    break
+                # Wait 1s between queries to try to avoid a possible throttling/blocking
+                # from the court
+                time.sleep(1)
 
-            # Wait 1s between queries to try to avoid a possible throttling/blocking
-            # from the court
-            time.sleep(1)
-
-        if court_failed:
-            continue
+            if court_failed:
+                continue
 
 
 def get_pdfs(
