@@ -881,8 +881,8 @@ def retrieve_cached_search_results(
     # If no page is present in the parameters, set it to 1 to generate the same
     # hash for page 1, regardless of whether the page parameter is included.
     params.setdefault("page", "1")
-    sorted_params = json.dumps(dict(sorted(params.items())), sort_keys=True)
-    params_hash = sha256(sorted_params.encode("utf-8"))
+    sorted_params = dict(sorted(params.items()))
+    params_hash = sha256(pickle.dumps(sorted_params))
     cached_results = cache.get(params_hash)
     if cached_results:
         return pickle.loads(cached_results), params_hash
