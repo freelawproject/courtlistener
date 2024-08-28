@@ -7,6 +7,7 @@ from unittest import mock
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import AsyncClient, override_settings
@@ -105,6 +106,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         # Index parties in ES.
         index_docket_parties_in_es.delay(cls.de.docket.pk)
+        cache.clear()
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
@@ -2544,6 +2546,122 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         for docket in dockets_to_remove:
             docket.delete()
+
+    @mock.patch("cl.search.views.fetch_es_results")
+    @override_settings(RECAP_SEARCH_PAGE_SIZE=2)
+    async def test_micro_cache_for_search_results(self, mock_fetch_es) -> None:
+        """Assert micro-cache for search results behaves properly."""
+
+        mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
+            *args, **kwargs
+        )
+        # Combine query and filter.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "available_only": True,
+            "q": "Amicus Curiae Lorem",
+        }
+        # First query shouldn't be cached.
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is called one time.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "child filter + text query"
+        )
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        # Repeat the query:
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "child filter + text query"
+        )
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        # Change params order and repeat the query:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Amicus Curiae Lorem",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        # Change query content.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Amicus Curiae",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 2)
+
+        # Confirm searches with no results are also cached.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Index Curiae",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 0, "filter + text query")
+        self.assertIn(
+            "had no results",
+            r.content.decode(),
+        )
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 3)
+
+        # Repeat the query:
+        r = await self._test_article_count(params, 0, "filter + text query")
+        self.assertIn(
+            "had no results",
+            r.content.decode(),
+        )
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 3)
+
+        # Confirm results without page parameter are cached as page 1.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
+        # Same parameters, including page: 1 explicitly.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+            "page": "1",
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
+        # Same parameters page 2.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+            "page": "2",
+        }
+        r = await self._test_article_count(params, 0, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 5)
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):

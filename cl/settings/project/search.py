@@ -61,6 +61,7 @@ RELATED_MLT_MINWL = 3
 RELATED_MLT_MAXWL = 0
 RELATED_FILTER_BY_STATUS = "Precedential"
 QUERY_RESULTS_CACHE = 60 * 60 * 6
+SEARCH_RESULTS_MICRO_CACHE = 60 * 60
 
 #####################
 # Search pagination #
