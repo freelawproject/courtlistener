@@ -2645,6 +2645,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # fetch_es_results is called this time; the cache is not used.
         self.assertEqual(mock_fetch_es.call_count, 4)
 
+        # Confirm results without q parameter are cached as q="".
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
         # Same parameters, including page: 1 explicitly.
         params = {
             "type": SEARCH_TYPES.RECAP,

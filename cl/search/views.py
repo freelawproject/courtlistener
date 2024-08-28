@@ -880,7 +880,9 @@ def retrieve_cached_search_results(
     params = get_params.copy()
     # If no page is present in the parameters, set it to 1 to generate the same
     # hash for page 1, regardless of whether the page parameter is included.
+    # Apply the same to the q parameter when it is not present in params.
     params.setdefault("page", "1")
+    params.setdefault("q", "")
     sorted_params = dict(sorted(params.items()))
     params_hash = sha256(pickle.dumps(sorted_params))
     cached_results = cache.get(params_hash)
