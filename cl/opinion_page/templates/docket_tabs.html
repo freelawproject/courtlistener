@@ -19,6 +19,13 @@
     <script src="{% static "js/jquery.bootstrap-growl.min.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/save-notes.js" %}"></script>
+    {% if DEBUG %}
+      <script src="{% static "js/htmx.js" %}"></script>
+      <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+    {% else %}
+      <script src="{% static "js/htmx.min.js" %}"></script>
+    {% endif %}
+
     {% if request.user.is_authenticated %}
       <script defer type="text/javascript"
               src="{% static "js/toggle_settings.js" %}"></script>
@@ -47,6 +54,7 @@
     <script type="text/javascript"
             src="{% static "js/react/vendor.js" %}"></script>
 
+    <script type="text/javascript" src="{% static "js/export-csv.js" %}"></script>
 {% endblock %}
 
 {% block nav %}

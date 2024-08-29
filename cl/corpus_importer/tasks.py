@@ -1130,7 +1130,7 @@ def do_case_query_by_pacer_case_id(
     async_to_sync(update_docket_metadata)(d, docket_data)
     d.save()
 
-    add_tags_to_objs(tag_names, [d])
+    async_to_sync(add_tags_to_objs)(tag_names, [d])
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(
