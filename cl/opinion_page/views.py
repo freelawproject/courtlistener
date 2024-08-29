@@ -50,6 +50,7 @@ from cl.lib.elasticsearch_utils import get_related_clusters_with_cache_and_es
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.ratelimiter import ratelimiter_all_10_per_h
 from cl.lib.search_utils import (
     get_citing_clusters_with_cache,
     get_related_clusters_with_cache,
@@ -579,13 +580,14 @@ async def make_thumb_if_needed(
     return rd
 
 
-async def download_docket_entries_csv(
+@ratelimiter_all_10_per_h
+def download_docket_entries_csv(
     request: HttpRequest, docket_id: int
 ) -> HttpResponse:
     """Download csv file containing list of DocketEntry for specific Docket"""
 
-    docket, _ = await core_docket_data(request, docket_id)
-    de_list = await fetch_docket_entries(docket)
+    docket, _ = async_to_sync(core_docket_data)(request, docket_id)
+    de_list = async_to_sync(fetch_docket_entries)(docket)
     court_id = docket.court_id
     case_name = docket.slug
 
@@ -593,9 +595,7 @@ async def download_docket_entries_csv(
     filename = f"{case_name}.{court_id}.{docket_id}.{date_str}.csv"
 
     # TODO check if for large files we'll cache or send file by email
-    csv_content = await sync_to_async(generate_docket_entries_csv_data)(
-        de_list
-    )
+    csv_content = generate_docket_entries_csv_data(de_list)
     response: HttpResponse = HttpResponse(csv_content, content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
