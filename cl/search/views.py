@@ -920,10 +920,10 @@ def fetch_and_paginate_results(
     # Check micro-cache for all other search requests.
     results_dict, get_params_hash = retrieve_cached_search_results(get_params)
     if results_dict:
-        # Return results and counts. Set query time to 0ms.
+        # Return results and counts. Set query time to 1ms.
         return (
             results_dict["results"],
-            0,
+            1,
             False,
             results_dict["main_total"],
             results_dict["child_total"],
