@@ -16,6 +16,9 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from requests import RequestException
 from urllib3.exceptions import ReadTimeoutError
 
+from cl.corpus_importer.management.commands.bulk_iquery_project import (
+    CycleChecker,
+)
 from cl.corpus_importer.tasks import (
     delete_pacer_row,
     get_and_process_free_pdf,
@@ -217,12 +220,11 @@ def get_and_save_free_document_reports(
         # point for the sweep
         dates = make_date_range_tuples(date_start, date_end, gap=7)
 
-    if not dates:
-        # We are not using a custom date range, it is the daily cron
-        for pacer_court_id in pacer_court_ids:
-            court_failed = False
+    for pacer_court_id in pacer_court_ids:
+        court_failed = False
+        if not dates:
             # We don't pass the dates in the command, so we generate the range based
-            # on each court using last day queried until today to build the date range
+            # on each court
             date_end = datetime.date.today()
             date_start = get_last_complete_date(pacer_court_id)
             if not date_start:
@@ -233,43 +235,23 @@ def get_and_save_free_document_reports(
                 continue
             dates = make_date_range_tuples(date_start, date_end, gap=7)
 
-            # Iterate through the gap in dates either short or long
-            for _start, _end in dates:
-                exc = fetch_doc_report(
-                    pacer_court_id, _start, _end  # type: ignore
-                )
-                if exc:
-                    # Something happened with the queried date range, abort process for
-                    # that court
-                    court_failed = True
-                    break
-
-                # Wait 1s between queries to try to avoid a possible throttling/blocking
-                # from the court
-                time.sleep(1)
-
-            if court_failed:
-                continue
-    else:
-        # Custom date range, alternate courts on a weekly basis to generate report
-        # when running sweep based on specified date range
+        # Iterate through the gap in dates either short or long
         for _start, _end in dates:
-            court_failed = False
-            for pacer_court_id in pacer_court_ids:
-                exc = fetch_doc_report(
-                    pacer_court_id, _start, _end  # type: ignore
-                )
-                if exc:
-                    # Something happened with the queried date range, abort process for
-                    # that court
-                    court_failed = True
-                    break
-                # Wait 1s between queries to try to avoid a possible throttling/blocking
-                # from the court
-                time.sleep(1)
+            exc = fetch_doc_report(
+                pacer_court_id, _start, _end  # type: ignore
+            )
+            if exc:
+                # Something happened with the queried date range, abort process for
+                # that court
+                court_failed = True
+                break
 
-            if court_failed:
-                continue
+            # Wait 1s between queries to try to avoid a possible throttling/blocking
+            # from the court
+            time.sleep(1)
+
+        if court_failed:
+            continue
 
 
 def get_pdfs(
@@ -278,7 +260,6 @@ def get_pdfs(
     date_end: datetime.date,
     index: bool,
     queue: str,
-    pdf_days_ago: int,
 ) -> None:
     """Get PDFs for the results of the Free Document Report queries.
 
@@ -296,7 +277,6 @@ def get_pdfs(
     courts
     :param index: true if we should index as we process the data or do it later
     :param queue: the queue name
-    :param pdf_days_ago: specify the number of days ago from which to download PDFs
     :return: None
     """
     q = cast(str, queue)
@@ -310,13 +290,6 @@ def get_pdfs(
     if date_start and date_end:
         # Download documents only from the date range passed from the command args (
         # sweep)
-        base_filter &= Q(date_filed__gte=date_start, date_filed__lte=date_end)
-    else:
-        # Download documents only from 'pdf_days_ago' ago
-        date_start = datetime.date.today() - datetime.timedelta(
-            days=pdf_days_ago
-        )
-        date_end = datetime.date.today()
         base_filter &= Q(date_filed__gte=date_start, date_filed__lte=date_end)
 
     # Filter rows based on the base_filter, then annotate each row with a row_number
@@ -344,8 +317,17 @@ def get_pdfs(
     )
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
+    cycle_checker = CycleChecker()
     for row in rows.iterator():
+        # Wait until the queue is short enough
         throttle.maybe_wait()
+
+        if cycle_checker.check_if_cycled(row.court_id):
+            print(
+                f"Court cycle completed. Sleep 1 second before starting the next cycle."
+            )
+            time.sleep(1)
+
         c = chain(
             process_free_opinion_result.si(
                 row.pk,
@@ -499,12 +481,6 @@ class Command(VerboseCommand):
             required=False,
             type=valid_date,
             help="Date when the query should end.",
-        )
-        parser.add_argument(
-            "--pdf-days-ago",
-            type=int,
-            default=10,
-            help="Flag to only download PDFs from X days ago",
         )
 
     def handle(self, *args: List[str], **options: OptionsType) -> None:
