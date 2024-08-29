@@ -816,7 +816,7 @@ async def get_or_make_docket_entry(
 async def add_docket_entries(
     d: Docket,
     docket_entries: list[dict[str, Any]],
-    tags: list[str] | None = None,
+    tags: list[Tag] | None = None,
     do_not_update_existing: bool = False,
 ) -> tuple[
     tuple[list[DocketEntry], list[RECAPDocument]], list[RECAPDocument], bool
@@ -873,7 +873,7 @@ async def add_docket_entries(
         await de.asave()
         if tags:
             for tag in tags:
-                tag.tag_object(de)
+                await sync_to_async(tag.tag_object)(de)
 
         if de_created:
             content_updated = True
@@ -918,7 +918,10 @@ async def add_docket_entries(
                 params["document_type"] = RECAPDocument.ATTACHMENT
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
-            rd = await RECAPDocument.objects.aget(**params)
+            get_params = deepcopy(params)
+            if de_created is False and not appelate_court_id_exists:
+                del get_params["document_type"]
+            rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             try:
@@ -950,9 +953,24 @@ async def add_docket_entries(
             await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
 
         rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
-        rd.description = (
-            docket_entry.get("short_description") or rd.description
-        )
+        description = docket_entry.get("short_description") or rd.description
+        if rd.document_type == RECAPDocument.PACER_DOCUMENT:
+            rd.description = description
+        else:
+            rd_qs = de.recap_documents.filter(
+                document_type=RECAPDocument.PACER_DOCUMENT
+            )
+            if await rd_qs.aexists():
+                rd_pd = await rd_qs.afirst()
+                if rd_pd.attachment_number is not None:
+                    continue
+                if rd_pd.description != description:
+                    rd_pd.description = description
+                    try:
+                        await rd_pd.asave()
+                    except ValidationError:
+                        # Happens from race conditions.
+                        continue
         rd.document_number = docket_entry["document_number"] or ""
         try:
             await rd.asave()
@@ -961,7 +979,7 @@ async def add_docket_entries(
             continue
         if tags:
             for tag in tags:
-                tag.tag_object(rd)
+                await sync_to_async(tag.tag_object)(rd)
 
         attachments = docket_entry.get("attachments")
         if attachments is not None:
@@ -1430,7 +1448,7 @@ def add_claims_to_docket(d, new_claims, tag_names=None):
         )
         db_claim.remarks = new_claim.get("remarks") or db_claim.remarks
         db_claim.save()
-        add_tags_to_objs(tag_names, [db_claim])
+        async_to_sync(add_tags_to_objs)(tag_names, [db_claim])
         for new_history in new_claim["history"]:
             add_claim_history_entry(new_history, db_claim)
 
@@ -1457,7 +1475,7 @@ def get_data_from_appellate_att_report(
     return att_data
 
 
-async def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
+async def add_tags_to_objs(tag_names: List[str], objs: Any) -> list[Tag]:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings
@@ -1469,14 +1487,14 @@ async def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
     if tag_names is None:
         return []
 
-    tags = []
+    tags: list[Tag] = []
     for tag_name in tag_names:
         tag, _ = await Tag.objects.aget_or_create(name=tag_name)
         tags.append(tag)
 
     for tag in tags:
         for obj in objs:
-            tag.tag_object(obj)
+            await sync_to_async(tag.tag_object)(obj)
     return tags
 
 
@@ -1700,8 +1718,6 @@ async def merge_attachment_page_data(
             attachment["attachment_number"],
             # Missing on sealed items.
             attachment.get("pacer_doc_id", False),
-            # Missing on some restricted docs (see Juriscraper)
-            attachment["page_count"] is not None,
             attachment["description"],
         ]
         if not all(sanity_checks):
@@ -1734,17 +1750,49 @@ async def merge_attachment_page_data(
             try:
                 rd = await RECAPDocument.objects.aget(**params)
             except RECAPDocument.DoesNotExist:
-                rd = RECAPDocument(**params)
-                rds_created.append(rd)
+                try:
+                    doc_id_params = deepcopy(params)
+                    del doc_id_params["attachment_number"]
+                    del doc_id_params["document_type"]
+                    doc_id_params["pacer_doc_id"] = attachment["pacer_doc_id"]
+                    rd = await RECAPDocument.objects.aget(**doc_id_params)
+                    if attachment.get("attachment_number") == 0:
+                        try:
+                            old_main_rd = await RECAPDocument.objects.aget(
+                                de=de,
+                                document_type=RECAPDocument.PACER_DOCUMENT,
+                            )
+                            rd.description = old_main_rd.description
+                        except RECAPDocument.DoesNotExist:
+                            rd.description = ""
+                        except RECAPDocument.MultipleObjectsReturned:
+                            rd.description = ""
+                            logger.info(
+                                f"Failed to migrate description for "
+                                f"{attachment["pacer_doc_id"]}, "
+                                f"multiple source documents found."
+                            )
+                        rd.attachment_number = None
+                        rd.document_type = RECAPDocument.PACER_DOCUMENT
+                    else:
+                        rd.attachment_number = attachment["attachment_number"]
+                        rd.document_type = RECAPDocument.ATTACHMENT
+                except RECAPDocument.DoesNotExist:
+                    rd = RECAPDocument(**params)
+                    rds_created.append(rd)
 
         rds_affected.append(rd)
-        for field in ["description", "pacer_doc_id"]:
-            if attachment[field]:
-                setattr(rd, field, attachment[field])
+        if (
+            attachment["description"]
+            and rd.document_type == RECAPDocument.ATTACHMENT
+        ):
+            rd.description = attachment["description"]
+        if attachment["pacer_doc_id"]:
+            rd.pacer_doc_id = attachment["pacer_doc_id"]
 
         # Only set page_count and file_size if they're blank, in case
         # we got the real value by measuring.
-        if rd.page_count is None:
+        if rd.page_count is None and attachment.get("page_count", None):
             rd.page_count = attachment["page_count"]
         # If we have file_size_bytes it should have max precision.
         file_size_bytes = attachment.get("file_size_bytes")
