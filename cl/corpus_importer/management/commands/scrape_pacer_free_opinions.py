@@ -16,9 +16,6 @@ from juriscraper.lib.string_utils import CaseNameTweaker
 from requests import RequestException
 from urllib3.exceptions import ReadTimeoutError
 
-from cl.corpus_importer.management.commands.bulk_iquery_project import (
-    CycleChecker,
-)
 from cl.corpus_importer.tasks import (
     delete_pacer_row,
     get_and_process_free_pdf,
@@ -26,6 +23,7 @@ from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     process_free_opinion_result,
 )
+from cl.corpus_importer.utils import CycleChecker
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
