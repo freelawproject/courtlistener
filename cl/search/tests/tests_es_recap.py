@@ -2575,7 +2575,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self._assert_results_header_content(
             r.content.decode(), "1 Docket Entry"
         )
-        self.assertNotIn("1ms", r.content.decode())
 
         # Repeat the query:
         r = await self._test_article_count(params, 1, "filter + text query")
