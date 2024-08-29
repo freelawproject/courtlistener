@@ -921,6 +921,7 @@ async def add_docket_entries(
             get_params = deepcopy(params)
             if de_created is False and not appelate_court_id_exists:
                 del get_params["document_type"]
+                get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
             rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
@@ -1715,7 +1716,7 @@ async def merge_attachment_page_data(
     main_rd_to_att = False
     for attachment in attachment_dicts:
         sanity_checks = [
-            attachment["attachment_number"],
+            attachment.get("attachment_number") is not None,
             # Missing on sealed items.
             attachment.get("pacer_doc_id", False),
             attachment["description"],
