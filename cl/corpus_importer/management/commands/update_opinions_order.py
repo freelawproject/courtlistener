@@ -168,8 +168,6 @@ def sort_columbia_opinions(options: dict) -> None:
     if limit:
         clusters = clusters[:limit]
 
-    print(clusters)
-
     completed = 0
     logger.info(f"Columbia clusters to process: {clusters.count()}")
     for cluster_id in clusters.iterator():
