@@ -31,7 +31,6 @@ def sort_harvard_opinions(options: dict) -> None:
     # clusters merged with columbia because those may need some extra verification
     harvard_clusters = (
         OpinionCluster.objects.exclude(filepath_json_harvard="")
-        .prefetch_related("sub_opinions")
         .annotate(opinions_count=Count("sub_opinions"))
         .filter(opinions_count__gt=1)
         .exclude(source__contains=SOURCES.COLUMBIA_ARCHIVE)
@@ -46,7 +45,7 @@ def sort_harvard_opinions(options: dict) -> None:
     logger.info(f"Harvard clusters to process: {harvard_clusters.count()}")
 
     completed = 0
-    for cluster in harvard_clusters:
+    for cluster in harvard_clusters.iterator():
         logger.info(f"Processing cluster id: {cluster}")
         opinion_order = 1
         any_update = False
@@ -173,7 +172,7 @@ def sort_columbia_opinions(options: dict) -> None:
 
     completed = 0
     logger.info(f"Columbia clusters to process: {clusters.count()}")
-    for cluster_id in clusters:
+    for cluster_id in clusters.iterator():
         logger.info(f"Starting opinion cluster: {cluster_id}")
         opinions = (
             Opinion.objects.filter(cluster=cluster_id)
