@@ -49,6 +49,9 @@ def sort_harvard_opinions(options: dict) -> None:
     if limit:
         harvard_clusters = harvard_clusters[:limit]
 
+    logger.info(f"Harvard clusters to process: {harvard_clusters.count()}")
+
+    completed = 0
     for cluster in harvard_clusters:
         logger.info(f"Processing cluster id: {cluster}")
         opinion_order = 1
@@ -72,8 +75,11 @@ def sort_harvard_opinions(options: dict) -> None:
             logger.info(
                 msg=f"Harvard opinions reordered for cluster id: {cluster.id}"
             )
+            completed += 1
             # Wait between each processed cluster to avoid issues with elastic
             time.sleep(options["delay"])
+
+    logger.info(f"Processed Harvard clusters: {completed}")
 
 
 def get_xml(filepath: str) -> str:
@@ -163,6 +169,8 @@ def sort_columbia_opinions(options: dict) -> None:
     if skip_until is not None:
         clusters = clusters.filter(id__gt=skip_until)
 
+    completed = 0
+    logger.info(f"Columbia clusters to process: {clusters.count()}")
     for cluster_id in clusters:
         logger.info(f"Starting opinion cluster: {cluster_id}")
         opinions = (
@@ -195,10 +203,14 @@ def sort_columbia_opinions(options: dict) -> None:
             opinion_obj.save()
             order_key += 1
 
+        completed += 1
+
         logger.info(f"Opinion Cluster Saved.")
 
         # Wait between each processed cluster to avoid issues with elastic
         time.sleep(options["delay"])
+
+    logger.info(f"Processed Columbia clusters: {completed}")
 
 
 class Command(VerboseCommand):
