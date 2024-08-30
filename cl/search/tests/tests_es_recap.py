@@ -864,7 +864,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
             docket_2.delete()
 
-    async def test_party_name_filter(self) -> None:
+    def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
 
         params = {
@@ -873,7 +873,29 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
-        await self._test_article_count(params, 1, "party_name")
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+
+        # Confirm parties extracted from case_name are available in filters.
+        with self.captureOnCommitCallbacks(execute=True):
+            d = DocketFactory(
+                court=self.court,
+                pacer_case_id="345784",
+                docket_number="12-cv-03345",
+                case_name="John Smith v. Bank of America",
+                source=Docket.RECAP,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "John Smith",
+        }
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Bank of America",
+        }
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+        d.delete()
 
     def test_party_name_and_children_filter(self) -> None:
         """Confirm dockets with children are shown when using the party filter"""
@@ -4918,7 +4940,9 @@ class RECAPSearchAPIV4Test(
         and empties the list field.
         """
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            d = DocketFactory(court=self.court, source=Docket.RECAP)
+            d = DocketFactory(
+                case_name="Lorem Ipsum", court=self.court, source=Docket.RECAP
+            )
             firm = AttorneyOrganizationFactory(
                 lookup_key="00kingofprussiaroadradnorkesslertopazmeltze87437",
                 name="Law Firm LLP",
@@ -6829,6 +6853,100 @@ class RECAPIndexingTest(
             parties_prepared["firm"],
             {firm.name, firm_2.name, firm_2_1.name, firm_1_2.name},
         )
+
+    def test_index_party_from_case_name_when_parties_are_not_available(
+        self,
+    ) -> None:
+        """Confirm that the party field is populated by splitting the case_name
+        when a valid separator is present.
+        """
+
+        docket_with_parties = DocketFactory(
+            court=self.court,
+            case_name="Lorem v. Dolor",
+            docket_number="1:21-bk-4444",
+            source=Docket.RECAP,
+        )
+        firm = AttorneyOrganizationFactory(
+            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck1536",
+            name="Law Firm LLP",
+        )
+        attorney = AttorneyFactory(
+            name="Emily Green",
+            organizations=[firm],
+            docket=docket_with_parties,
+        )
+        party_type = PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Mary Williams Corp.",
+                docket=docket_with_parties,
+                attorneys=[attorney],
+            ),
+            docket=docket_with_parties,
+        )
+        index_docket_parties_in_es.delay(docket_with_parties.pk)
+        docket_with_no_parties = DocketFactory(
+            court=self.court,
+            case_name="Bank v. Smith",
+            docket_number="1:21-bk-4445",
+            source=Docket.RECAP,
+        )
+
+        docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+
+        # Assert party on initial indexing.
+        self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
+        self.assertEqual(docket_doc_no_parties.party, ["Bank", "Smith"])
+
+        # Modify the docket case_name. Assert that parties are not overwritten
+        # in a docket with normalized parties.
+        docket_with_parties.case_name = "Lorem v. Ipsum"
+        docket_with_parties.save()
+        docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
+        self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
+
+        # Modify the docket case_name. Assert that parties are updated if the
+        # docket does not contain normalized parties.
+        docket_with_no_parties.case_name = "America v. Smith"
+        docket_with_no_parties.save()
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+        self.assertEqual(docket_doc_no_parties.party, ["America", "Smith"])
+
+        # Test that parties are not extracted from the case_name if it does not contain
+        # a valid separator.
+        docket_with_no_parties_no_separator = DocketFactory(
+            court=self.court,
+            case_name="In re: Bank Smith",
+            docket_number="1:21-bk-4446",
+            source=Docket.RECAP,
+        )
+        docket_with_no_parties_no_separator = DocketDocument.get(
+            docket_with_no_parties_no_separator.pk
+        )
+        self.assertEqual(docket_with_no_parties_no_separator.party, [])
+
+        # Confirm that normalized parties can overwrite the case_name parties.
+        attorney_2 = AttorneyFactory(
+            name="John Green",
+            organizations=[firm],
+            docket=docket_with_no_parties,
+        )
+        PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Bank Corp.",
+                docket=docket_with_no_parties,
+                attorneys=[attorney_2],
+            ),
+            docket=docket_with_no_parties,
+        )
+        index_docket_parties_in_es.delay(docket_with_no_parties.pk)
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+        self.assertEqual(docket_doc_no_parties.party, ["Bank Corp."])
+
+        docket_with_parties.delete()
+        docket_doc_no_parties.delete()
+        docket_with_no_parties_no_separator.delete()
 
 
 class RECAPHistoryTablesIndexingTest(

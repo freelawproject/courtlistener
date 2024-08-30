@@ -52,3 +52,24 @@ def normalize_search_dicts(d):
         else:
             new_dict[k] = v
     return new_dict
+
+
+def get_parties_from_case_name(case_name: str) -> list[str]:
+    """Extracts the parties from case_name by splitting on common case_name
+    separators.
+
+    :param case_name: The case_name to be split.
+    :return: A list of parties. If no valid separator is found, returns an
+    empty list.
+    """
+
+    valid_case_name_separators = [
+        " v ",
+        " v. ",
+        " vs. ",
+        " vs ",
+    ]
+    for separator in valid_case_name_separators:
+        if separator in case_name:
+            return case_name.split(separator, 1)
+    return []

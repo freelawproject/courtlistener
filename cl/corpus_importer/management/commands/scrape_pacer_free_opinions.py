@@ -7,7 +7,8 @@ from typing import Callable, Dict, List, Optional, cast
 
 from celery.canvas import chain
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import F, Q, Window
+from django.db.models.functions import RowNumber
 from django.utils.timezone import now
 from juriscraper.lib.date_utils import make_date_range_tuples
 from juriscraper.lib.exceptions import PacerLoginException
@@ -22,6 +23,7 @@ from cl.corpus_importer.tasks import (
     mark_court_done_on_date,
     process_free_opinion_result,
 )
+from cl.corpus_importer.utils import CycleChecker
 from cl.lib.argparse_types import valid_date
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
@@ -280,21 +282,50 @@ def get_pdfs(
     base_filter = Q(error_msg="")
 
     if courts:
+        # Download PDFs only from specified court ids
         base_filter &= Q(court_id__in=courts)
 
     if date_start and date_end:
+        # Download documents only from the date range passed from the command args (
+        # sweep)
         base_filter &= Q(date_filed__gte=date_start, date_filed__lte=date_end)
 
-    rows = PACERFreeDocumentRow.objects.filter(base_filter).only("pk")
+    # Filter rows based on the base_filter, then annotate each row with a row_number
+    # within each partition defined by 'court_id', ordering the rows by 'pk' in
+    # ascending order. Finally, order the results by 'row_number' and 'court_id' to
+    # download one item for each court until it finishes
+    rows = (
+        PACERFreeDocumentRow.objects.filter(base_filter)
+        .annotate(
+            row_number=Window(
+                expression=RowNumber(),
+                partition_by=[F("court_id")],
+                order_by=F("pk").asc(),
+            )
+        )
+        .order_by("row_number", "court_id")
+        .only("pk", "court_id")
+    )
     count = rows.count()
     task_name = "downloading"
     if index:
         task_name += " and indexing"
-    logger.info(f"{task_name} {count} items from PACER.")
+    logger.info(
+        f"{task_name} {count} items from PACER from {date_start} to {date_end}."
+    )
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
+    cycle_checker = CycleChecker()
     for row in rows.iterator():
+        # Wait until the queue is short enough
         throttle.maybe_wait()
+
+        if cycle_checker.check_if_cycled(row.court_id):
+            print(
+                f"Court cycle completed. Sleep 1 second before starting the next cycle."
+            )
+            time.sleep(1)
+
         c = chain(
             process_free_opinion_result.si(
                 row.pk,

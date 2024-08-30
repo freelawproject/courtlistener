@@ -280,7 +280,7 @@ docket_field_mapping = {
     "save": {
         Docket: {
             "self": {
-                "case_name": ["caseName"],
+                "case_name": ["caseName", "party"],
                 "case_name_short": ["caseName"],
                 "case_name_full": ["case_name_full", "caseName"],
                 "docket_number": ["docketNumber"],
