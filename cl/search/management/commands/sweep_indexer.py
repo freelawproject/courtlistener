@@ -27,14 +27,7 @@ from cl.search.tasks import (
 )
 from cl.search.types import ESDocumentClassType
 
-supported_models = [
-    "audio.Audio",
-    "people_db.Person",
-    "search.OpinionCluster",
-    "search.Opinion",
-    "search.Docket",
-    "search.RECAPDocument",
-]
+supported_models = settings.ELASTICSEARCH_SWEEP_INDEXER_MODELS
 r = get_redis_interface("CACHE")
 
 
