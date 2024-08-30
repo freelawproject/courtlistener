@@ -6,6 +6,7 @@ from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
+from cl.favorites.models import Prayer
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
@@ -39,7 +40,6 @@ from cl.search.models import (
     ParentheticalGroup,
     RECAPDocument,
 )
-from cl.favorites.models import Prayer
 
 # This field mapping is used to define which fields should be updated in the
 # Elasticsearch index document when they change in the DB. The outer keys
@@ -570,5 +570,10 @@ def handle_recap_doc_change(
                 args=([instance.pk],)
             )
 
-    if instance.es_rd_field_tracker.has_changed("is_available") and instance.is_available == True:
-        Prayer.objects.filter(recap_document=instance, status=Prayer.WAITING).update(status=Prayer.GRANTED)
+    if (
+        instance.es_rd_field_tracker.has_changed("is_available")
+        and instance.is_available == True
+    ):
+        Prayer.objects.filter(
+            recap_document=instance, status=Prayer.WAITING
+        ).update(status=Prayer.GRANTED)
