@@ -27,7 +27,7 @@ from cl.search.tasks import (
 )
 from cl.search.types import ESDocumentClassType
 
-supported_models = settings.ELASTICSEARCH_SWEEP_INDEXER_MODELS
+supported_models = settings.ELASTICSEARCH_SWEEP_INDEXER_MODELS  # type: ignore
 r = get_redis_interface("CACHE")
 
 
