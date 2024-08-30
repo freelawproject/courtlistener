@@ -76,7 +76,7 @@ def sort_harvard_opinions(options: dict) -> None:
     logger.info(f"Processed Harvard clusters: {completed}")
 
 
-def get_xml(filepath: str) -> str:
+def fetch_cleaned_columbia_text(filepath: str) -> str:
     """Get cleaned columbia content to compare opinions against
 
     :param filepath: the filepath
@@ -97,15 +97,17 @@ def generate_ngrams(words: List[str]) -> List[List[str]]:
     Pass in a list of words in an opinion and divide it up into n-grams based on the
     length of it. For small opinions look for bigrams or single unique words
 
+    Default to a 5 word n-gram unless opinion is very small
+
     :param words: a list of words obtained splitting the opinion
     :return: n-grams
     """
+    width = 5
     if len(words) <= 5:
-        return [[x] for x in words]
-    elif 5 < len(words) < 25:
-        return [words[i : i + 2] for i in range(len(words) - 1)]
-    else:
-        return [words[i : i + 5] for i in range(len(words) - 4)]
+        width = 1
+    elif len(words) < 25:
+        width = 2
+    return [words[i : i + width] for i in range(len(words) - (width - 1))]
 
 
 def match_text(opinions: List[Any], xml_dir: str) -> List[List[Any]]:
@@ -119,16 +121,18 @@ def match_text(opinions: List[Any], xml_dir: str) -> List[List[Any]]:
     :param xml_dir: Path to directory of the xml files
     :return: Ordered opinion list
     """
-    local_path = opinions[0][-1]
+    _, _, _, local_path = opinions[0]
     filepath = local_path.replace("/home/mlissner/columbia/opinions", xml_dir)
 
-    columbia_words = get_xml(filepath=filepath)
+    columbia_words = fetch_cleaned_columbia_text(filepath=filepath)
     matches = []
-
     for opinion in opinions:
+        opinion_id, opinion_type, opinion_html, _ = opinion
+
         # assign back up index to the end of the opinion
         match_index = len(columbia_words)
-        soup = BeautifulSoup(opinion[2], "html.parser")
+
+        soup = BeautifulSoup(opinion_html, "html.parser")
         words = re.findall(r"\b\w+\b", soup.text)
         ngrams_to_check = generate_ngrams(words)
 
@@ -136,10 +140,9 @@ def match_text(opinions: List[Any], xml_dir: str) -> List[List[Any]]:
         for word_group in ngrams_to_check:
             phrase = " ".join(word_group)
             if columbia_words.count(phrase) == 1:
-                # Found a match - break the check
                 match_index = columbia_words.find(phrase)
                 break
-        matches.append([opinion[0], opinion[1], match_index])
+        matches.append([opinion_id, opinion_type, match_index])
     ordered_opinions = sorted(matches, key=lambda x: x[-1])
     return ordered_opinions
 
@@ -162,10 +165,11 @@ def sort_columbia_opinions(options: dict) -> None:
         .values_list("id", flat=True)
     )
     if skip_until is not None:
-        clusters = clusters.filter(id__gt=skip_until)
-
+        clusters = clusters.filter(id__gte=skip_until)
     if limit:
         clusters = clusters[:limit]
+
+    print(clusters)
 
     completed = 0
     logger.info(f"Columbia clusters to process: {clusters.count()}")
@@ -194,16 +198,15 @@ def sort_columbia_opinions(options: dict) -> None:
             logger.info(f"Sorting order by location.")
             ordered_opinions = match_text(opinions, xml_dir)
 
-        order_key = 1
+        ordering_key = 1
         for op in ordered_opinions:
             opinion_obj = Opinion.objects.get(id=op[0])
-            opinion_obj.ordering_key = order_key
+            opinion_obj.ordering_key = ordering_key
             opinion_obj.save()
-            order_key += 1
+            ordering_key += 1
 
         completed += 1
-
-        logger.info(f"Opinion Cluster Saved.")
+        logger.info(f"Opinion Cluster completed.")
 
         # Wait between each processed cluster to avoid issues with redis memory
         time.sleep(options["delay"])
