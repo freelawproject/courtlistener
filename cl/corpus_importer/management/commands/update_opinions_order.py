@@ -10,12 +10,6 @@ from django.db.models import Count
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import SOURCES, Opinion, OpinionCluster
 
-VALID_COLUMBIA_SOURCES = [
-    key
-    for key in dict(SOURCES.NAMES).keys()
-    if SOURCES.COLUMBIA_ARCHIVE in key
-]
-
 
 def sort_harvard_opinions(options: dict) -> None:
     """Sort harvard opinions
@@ -76,7 +70,7 @@ def sort_harvard_opinions(options: dict) -> None:
                 msg=f"Harvard opinions reordered for cluster id: {cluster.id}"
             )
             completed += 1
-            # Wait between each processed cluster to avoid issues with elastic
+            # Wait between each processed cluster to avoid issues with redis memory
             time.sleep(options["delay"])
 
     logger.info(f"Processed Harvard clusters: {completed}")
@@ -100,9 +94,8 @@ def get_xml(filepath: str) -> str:
 def generate_ngrams(words: List[str]) -> List[List[str]]:
     """Generate n-grams based on the length of the word list.
 
-    Pass in a list of words in an opinion and divide it up into n-grams
-    based on the length of it.  for small opinions look for bigrams or
-    single unique words
+    Pass in a list of words in an opinion and divide it up into n-grams based on the
+    length of it. For small opinions look for bigrams or single unique words
 
     :param words: a list of words obtained splitting the opinion
     :return: n-grams
@@ -118,9 +111,9 @@ def generate_ngrams(words: List[str]) -> List[List[str]]:
 def match_text(opinions: List[Any], xml_dir: str) -> List[List[Any]]:
     """Identify a unique set of text in opinions to identify order of opinions
 
-    In a small subset of opinions, duplicate text or bad data fails and assign
-    the end of the index.  These opinions are usually short dissents that we
-    add to be the back of the order.
+    In a small subset of opinions, duplicate text or bad data fails and assign the
+    end of the index. These opinions are usually short dissents that we add to be the
+    back of the order.
 
     :param opinions: Opinions to sort
     :param xml_dir: Path to directory of the xml files
@@ -159,6 +152,8 @@ def sort_columbia_opinions(options: dict) -> None:
     """
     xml_dir = options["xml_dir"]
     skip_until = options.get("skip_until", None)
+    limit = options.get("limit", None)
+
     clusters = (
         OpinionCluster.objects.filter(
             source__contains=SOURCES.COLUMBIA_ARCHIVE
@@ -168,6 +163,9 @@ def sort_columbia_opinions(options: dict) -> None:
     )
     if skip_until is not None:
         clusters = clusters.filter(id__gt=skip_until)
+
+    if limit:
+        clusters = clusters[:limit]
 
     completed = 0
     logger.info(f"Columbia clusters to process: {clusters.count()}")
@@ -180,7 +178,7 @@ def sort_columbia_opinions(options: dict) -> None:
         )
         op_types = [op[1] for op in opinions]
         if len(opinions) < 2:
-            # less than two opinions ... easy peasy
+            # Only one opinion is shown, no need to order
             logger.info(f"Skipping opinion cluster with only one opinion.")
             continue
         elif (
@@ -207,7 +205,7 @@ def sort_columbia_opinions(options: dict) -> None:
 
         logger.info(f"Opinion Cluster Saved.")
 
-        # Wait between each processed cluster to avoid issues with elastic
+        # Wait between each processed cluster to avoid issues with redis memory
         time.sleep(options["delay"])
 
     logger.info(f"Processed Columbia clusters: {completed}")
