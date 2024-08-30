@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Optional
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
@@ -27,7 +28,6 @@ from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 from cl.search.models import RECAPDocument
 
-from typing import Optional
 
 async def get_note(request: HttpRequest) -> HttpResponse:
     audio_pk = request.POST.get("audio_id")
