@@ -1763,7 +1763,7 @@ async def merge_attachment_page_data(
                     if attachment["attachment_number"] == 0:
                         try:
                             old_main_rd = await RECAPDocument.objects.aget(
-                                de=de,
+                                docket_entry=de,
                                 document_type=RECAPDocument.PACER_DOCUMENT,
                             )
                             rd.description = old_main_rd.description
@@ -1786,7 +1786,7 @@ async def merge_attachment_page_data(
                     if attachment["attachment_number"] == 0:
                         try:
                             old_main_rd = await RECAPDocument.objects.aget(
-                                de=de,
+                                docket_entry=de,
                                 document_type=RECAPDocument.PACER_DOCUMENT,
                             )
                             rd.description = old_main_rd.description
