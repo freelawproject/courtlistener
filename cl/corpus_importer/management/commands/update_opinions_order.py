@@ -82,7 +82,7 @@ def get_xml(filepath: str) -> str:
     :param filepath: the filepath
     :return: the opinion text cleaned up
     """
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
 
     columbia_xml = BeautifulSoup(content, "html.parser")
