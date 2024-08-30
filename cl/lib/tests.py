@@ -1269,6 +1269,26 @@ class TestLinkifyOrigDocketNumber(SimpleTestCase):
                 "89 Fed. Reg. 34,620",
                 "https://www.federalregister.gov/citation/89-FR-34,620",
             ),
+            (
+                "Environmental Protection Agency",
+                "EPA-HQ-OW-2020-0005",
+                "https://www.regulations.gov/docket/EPA-HQ-OW-2020-0005",
+            ),
+            (
+                "United States Tax Court",
+                "USTC-2451-13",
+                "https://dawson.ustaxcourt.gov/case-detail/02451-13",
+            ),
+            (
+                "United States Tax Court",
+                "6837-20",
+                "https://dawson.ustaxcourt.gov/case-detail/06837-20",
+            ),
+            (
+                "United States Tax Court",
+                "USTC-5903-19W",
+                "https://dawson.ustaxcourt.gov/case-detail/05903-19W",
+            ),
             ("Federal Communications Commission", "19-CA-289275", ""),
             (
                 "National Labor Relations Board",

@@ -21,6 +21,7 @@ from django.urls import reverse
 from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
 from django_elasticsearch_dsl.search import Search
+from eyecite.models import FullCaseCitation
 from requests import RequestException, Session
 from scorched.exc import SolrError
 from waffle.decorators import waffle_flag
@@ -57,6 +58,7 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     regroup_snippets,
 )
+from cl.lib.types import CleanData
 from cl.lib.utils import (
     sanitize_unbalanced_parenthesis,
     sanitize_unbalanced_quotes,
@@ -667,6 +669,30 @@ def es_search(request: HttpRequest) -> HttpResponse:
     return render(request, template, render_dict)
 
 
+def remove_missing_citations(
+    missing_citations: list[FullCaseCitation], cd: CleanData
+) -> tuple[list[str], str]:
+    """Removes missing citations from the query and returns the missing
+    citations as strings and the modified query.
+
+    :param missing_citations: A list of FullCaseCitation objects representing
+    the citations that are missing from the query.
+    :param cd: A CleanData object containing the query string.
+    :return: A two-tuple containing a list of missing citation strings and the
+    suggested query string with missing citations removed.
+    """
+    missing_citations_str = [
+        citation.corrected_citation() for citation in missing_citations
+    ]
+    query_string = cd["q"]
+    for citation in missing_citations_str:
+        query_string = query_string.replace(citation, "")
+    suggested_query = (
+        " ".join(query_string.split()) if missing_citations_str else ""
+    )
+    return missing_citations_str, suggested_query
+
+
 def do_es_search(
     get_params: QueryDict,
     rows: int = settings.SEARCH_PAGE_SIZE,
@@ -697,6 +723,7 @@ def do_es_search(
     cited_cluster = None
     query_citation = None
     facet_fields = []
+    missing_citations_str = []
 
     search_form = SearchForm(get_params, is_es_form=True, courts=courts)
     match get_params.get("type", SEARCH_TYPES.OPINION):
@@ -714,10 +741,25 @@ def do_es_search(
             document_type = OpinionClusterDocument
 
     if search_form.is_valid() and document_type:
-        cd = search_form.cleaned_data
+        # Copy cleaned_data to preserve the original data when displaying the form
+        cd = search_form.cleaned_data.copy()
         try:
             # Create necessary filters to execute ES query
             search_query = document_type.search()
+
+            if cd["type"] in [
+                SEARCH_TYPES.OPINION,
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+            ]:
+                query_citation, missing_citations = es_get_query_citation(cd)
+                if cd["type"] in [
+                    SEARCH_TYPES.OPINION,
+                ]:
+                    missing_citations_str, suggested_query = (
+                        remove_missing_citations(missing_citations, cd)
+                    )
+                    cd["q"] = suggested_query if suggested_query else cd["q"]
             (
                 s,
                 child_docs_count_query,
@@ -741,13 +783,6 @@ def do_es_search(
                 search_data=cd,
                 search_results=paged_results,
             )
-
-            if cd["type"] in [
-                SEARCH_TYPES.OPINION,
-                SEARCH_TYPES.RECAP,
-                SEARCH_TYPES.DOCKETS,
-            ]:
-                query_citation = es_get_query_citation(cd)
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
@@ -823,6 +858,7 @@ def do_es_search(
                 settings.ELASTICSEARCH_CARDINALITY_PRECISION
             )
         ),
+        "missing_citations": missing_citations_str,
     }
 
 
