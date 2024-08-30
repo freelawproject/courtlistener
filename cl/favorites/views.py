@@ -16,10 +16,16 @@ from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
-from cl.favorites.models import DocketTag, Note, UserTag
+from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
-
+from cl.search.models import RECAPDocument
+from datetime import timedelta
+from django.conf import settings
+from django.utils import timezone
+from django.db.models import Count, Avg, ExpressionWrapper, F, FloatField
+from django.utils import timezone
+from django.db.models.functions import Now, Sqrt
 
 async def get_note(request: HttpRequest) -> HttpResponse:
     audio_pk = request.POST.get("audio_id")
@@ -177,3 +183,44 @@ async def view_tags(request, username):
             "private": False,
         },
     )
+
+def prayer_eligible(user: User) -> bool:
+
+    ALLOWED_PRAYER_COUNT = getattr(settings, 'ALLOWED_PRAYER_COUNT', 5)
+
+    now = timezone.now()
+    last_24_hours = now - timedelta(hours=24)
+
+    # Count the number of prayers made by this user in the last 24 hours
+    prayer_count = Prayer.objects.filter(user=user, date_created__gte=last_24_hours).count()
+
+    if prayer_count < ALLOWED_PRAYER_COUNT:
+        return True
+    return False
+
+def new_prayer(user: User, recap_document: RECAPDocument) -> Optional[Prayer]:
+      
+    if prayer_eligible(User) and not(RECAPDocument.is_available):
+        new_prayer = Prayer.objects.create(
+            user=user,
+            recap_document=recap_document,
+            status=Prayer.WAITING
+        )
+        return new_prayer
+
+    return None
+
+def get_top_prayers() -> list[RECAPDocument]:
+    # Calculate the age of each prayer
+    prayer_age = ExpressionWrapper(Now() - F('prayers__date_created'), output_field=FloatField())
+
+    # Annotate each RECAPDocument with the number of prayers and the average prayer age
+    documents = RECAPDocument.objects.annotate(
+        prayer_count=Count('prayers'),
+        avg_prayer_age=Avg(prayer_age)
+    ).annotate(
+        # Calculate the geometric mean (sqrt(prayer_count * avg_prayer_age))
+        geometric_mean=Sqrt(F('prayer_count') * F('avg_prayer_age'))
+    ).order_by('-geometric_mean')[:50]
+
+    return list(documents)
