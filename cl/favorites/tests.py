@@ -8,7 +8,7 @@ from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
 from cl.favorites.factories import NoteFactory
-from cl.favorites.models import DocketTag, Note, UserTag
+from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
