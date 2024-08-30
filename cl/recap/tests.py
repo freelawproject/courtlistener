@@ -2669,10 +2669,12 @@ class RecapDocketAttachmentTaskTest(TestCase):
                         AppellateAttachmentFactory(
                             attachment_number=0,
                             pacer_doc_id="1234566",
+                            description="Complaint",
                         ),
                         AppellateAttachmentFactory(
                             attachment_number=1,
                             pacer_doc_id="1234567",
+                            description="Attachment 1",
                         ),
                     ],
                 ),
@@ -2689,12 +2691,15 @@ class RecapDocketAttachmentTaskTest(TestCase):
             msg="PACER_DOCUMENT type didn't match.",
         )
         self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
         self.assertEqual(
             attachment_1.document_type,
             RECAPDocument.ATTACHMENT,
             msg="ATTACHMENT type didn't match.",
         )
         self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
 
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -2744,10 +2749,12 @@ class RecapDocketAttachmentTaskTest(TestCase):
                         AppellateAttachmentFactory(
                             attachment_number=0,
                             pacer_doc_id="1234566",
+                            description="Complaint",
                         ),
                         AppellateAttachmentFactory(
                             attachment_number=1,
                             pacer_doc_id="1234567",
+                            description="Attachment 1",
                         ),
                     ],
                 ),
@@ -2766,6 +2773,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
             msg="PACER_DOCUMENT type didn't match.",
         )
         self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
 
         # pacer_doc_id 1234567 should now be an attachment.
         attachment_1 = RECAPDocument.objects.get(pacer_doc_id="1234567")
@@ -2775,6 +2783,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
             msg="ATTACHMENT type didn't match.",
         )
         self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
 
 
 class ClaimsRegistryTaskTest(TestCase):
