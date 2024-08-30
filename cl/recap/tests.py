@@ -2665,11 +2665,12 @@ class RecapDocketAttachmentTaskTest(TestCase):
                 DocketEntryWithAttachmentsDataFactory(
                     document_number=1,
                     pacer_doc_id="1234567",
+                    short_description="Complaint",
                     attachments=[
                         AppellateAttachmentFactory(
                             attachment_number=0,
                             pacer_doc_id="1234566",
-                            description="Complaint",
+                            description="Main Document",
                         ),
                         AppellateAttachmentFactory(
                             attachment_number=1,
@@ -2745,11 +2746,12 @@ class RecapDocketAttachmentTaskTest(TestCase):
                 DocketEntryWithAttachmentsDataFactory(
                     document_number=1,
                     pacer_doc_id="1234567",
+                    short_description="Complaint",
                     attachments=[
                         AppellateAttachmentFactory(
                             attachment_number=0,
                             pacer_doc_id="1234566",
-                            description="Complaint",
+                            description="Main Document",
                         ),
                         AppellateAttachmentFactory(
                             attachment_number=1,
