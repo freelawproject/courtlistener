@@ -1,7 +1,7 @@
 import contextlib
 import os
 import re
-from typing import Optional
+from typing import Callable, Optional
 
 from django.core.exceptions import ValidationError
 from django.utils.text import get_valid_filename, slugify
@@ -502,7 +502,7 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
       - Mallory uploads a bad document via the RECAP APIs (these are open APIs).
       - The code here parses that upload in a way to create a redirect on the federalregister.gov
         website.
-      - federalregsiter.gov has an open redirect vulnerability (these are common).
+      - federalregister.gov has an open redirect vulnerability (these are common).
       - The user clicks a link on our site that goes to federalregister.gov, which redirects the
         user to evilsite.com (b/c evilsite.com got through our checks here).
       - The user is tricked on that site into doing something bad.
@@ -536,7 +536,72 @@ def linkify_orig_docket_number(agency: str, og_docket_number: str) -> str:
             )
             return f"https://www.nlrb.gov/case/{formatted_number}"
 
+    # US Tax Court pattern
+    if any(x in agency for x in ("Tax", "Internal Revenue")):
+        match = re.match(
+            r"^(?:USTC-)?(\d{1,5})-(\d{2})([A-Z])?$", og_docket_number
+        )
+        if match:
+            number, year, letter_suffix = match.groups()
+            formatted_number = f"{number.zfill(5)}-{year}"
+            if letter_suffix:
+                formatted_number += letter_suffix
+            return (
+                f"https://dawson.ustaxcourt.gov/case-detail/{formatted_number}"
+            )
+
+    # EPA non-Federal Register pattern
+    if "Environmental Protection" in agency:
+        match = re.match(
+            r"^EPA-(HQ|R\d{2})-[A-Z]{2,5}-\d{4}-\d{4}$", og_docket_number
+        )
+        if match:
+            return f"https://www.regulations.gov/docket/{match.group(0)}"
+
     """Add other agencies as feasible. Note that the Federal Register link should cover multiple agencies.
     """
     # If no match is found, return empty str
     return ""
+
+
+class CSVExportMixin:
+
+    def get_csv_columns(self, get_column_name: bool = False) -> list[str]:
+        """Get list of column names required in a csv file.
+        If get column name is True. It will add class name to attribute
+
+        :param: get_column_name: bool. Whether add class name to attr name
+
+        :return: list of attrs of class to get into csv file"""
+        raise NotImplementedError(
+            "Subclass must implement get_csv_columns method"
+        )
+
+    def get_column_function(self) -> dict[str, Callable[[str], str]]:
+        """Get dict of attrs: function to apply on field value if it needs
+        to be pre-processed before being add to csv
+
+        returns: dict -- > {attr1: function}"""
+        raise NotImplementedError(
+            "Subclass must implement get_column_fuction method"
+        )
+
+    def to_csv_row(self) -> list[str]:
+        """Get fields in model based on attrs column names.
+        Apply function to attr value if required.
+        Return list of modified values for csv row"""
+        row = []
+        functions = self.get_column_function()
+        columns = self.get_csv_columns(get_column_name=False)
+        for field in columns:
+            attr = getattr(self, field)
+            if not attr:
+                attr = ""
+            function = functions.get(field)
+            if function:
+                attr = function(field)
+            row.append(attr)
+        return row
+
+    def add_class_name(self, attribute_name: str) -> str:
+        return f"{self.__class__.__name__.lower()}_{attribute_name}"
