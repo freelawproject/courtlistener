@@ -189,7 +189,7 @@ async def view_tags(request, username):
 
 def prayer_eligible(user: User) -> bool:
 
-    ALLOWED_PRAYER_COUNT = getattr(settings, "ALLOWED_PRAYER_COUNT", 5)
+    allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
 
     now = timezone.now()
     last_24_hours = now - timedelta(hours=24)
@@ -199,7 +199,7 @@ def prayer_eligible(user: User) -> bool:
         user=user, date_created__gte=last_24_hours
     ).count()
 
-    if prayer_count < ALLOWED_PRAYER_COUNT:
+    if prayer_count < allowed_prayer_count:
         return True
     return False
 
