@@ -921,6 +921,7 @@ async def add_docket_entries(
             get_params = deepcopy(params)
             if de_created is False and not appelate_court_id_exists:
                 del get_params["document_type"]
+                get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
             rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
@@ -1715,7 +1716,7 @@ async def merge_attachment_page_data(
     main_rd_to_att = False
     for attachment in attachment_dicts:
         sanity_checks = [
-            attachment["attachment_number"],
+            attachment.get("attachment_number") is not None,
             # Missing on sealed items.
             attachment.get("pacer_doc_id", False),
             attachment["description"],
@@ -1742,9 +1743,12 @@ async def merge_attachment_page_data(
             params = {
                 "docket_entry": de,
                 "document_number": document_number,
-                "attachment_number": attachment["attachment_number"],
-                "document_type": RECAPDocument.ATTACHMENT,
             }
+            if attachment["attachment_number"] == 0:
+                params["document_type"] = RECAPDocument.PACER_DOCUMENT
+            else:
+                params["attachment_number"] = attachment["attachment_number"]
+                params["document_type"] = RECAPDocument.ATTACHMENT
             if "acms_document_guid" in attachment:
                 params["acms_document_guid"] = attachment["acms_document_guid"]
             try:
@@ -1752,14 +1756,14 @@ async def merge_attachment_page_data(
             except RECAPDocument.DoesNotExist:
                 try:
                     doc_id_params = deepcopy(params)
-                    del doc_id_params["attachment_number"]
+                    doc_id_params.pop("attachment_number", None)
                     del doc_id_params["document_type"]
                     doc_id_params["pacer_doc_id"] = attachment["pacer_doc_id"]
                     rd = await RECAPDocument.objects.aget(**doc_id_params)
-                    if attachment.get("attachment_number") == 0:
+                    if attachment["attachment_number"] == 0:
                         try:
                             old_main_rd = await RECAPDocument.objects.aget(
-                                de=de,
+                                docket_entry=de,
                                 document_type=RECAPDocument.PACER_DOCUMENT,
                             )
                             rd.description = old_main_rd.description
@@ -1779,6 +1783,22 @@ async def merge_attachment_page_data(
                         rd.document_type = RECAPDocument.ATTACHMENT
                 except RECAPDocument.DoesNotExist:
                     rd = RECAPDocument(**params)
+                    if attachment["attachment_number"] == 0:
+                        try:
+                            old_main_rd = await RECAPDocument.objects.aget(
+                                docket_entry=de,
+                                document_type=RECAPDocument.PACER_DOCUMENT,
+                            )
+                            rd.description = old_main_rd.description
+                        except RECAPDocument.DoesNotExist:
+                            rd.description = ""
+                        except RECAPDocument.MultipleObjectsReturned:
+                            rd.description = ""
+                            logger.info(
+                                f"Failed to migrate description for "
+                                f"{attachment["pacer_doc_id"]}, "
+                                f"multiple source documents found."
+                            )
                     rds_created.append(rd)
 
         rds_affected.append(rd)
