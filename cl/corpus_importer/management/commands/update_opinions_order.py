@@ -32,9 +32,10 @@ def sort_harvard_opinions(options: dict) -> None:
     harvard_clusters = (
         OpinionCluster.objects.exclude(filepath_json_harvard="")
         .annotate(opinions_count=Count("sub_opinions"))
-        .filter(opinions_count__gt=1)
+        .filter(opinions_count__gt=1, source__contains=SOURCES.HARVARD_CASELAW)
         .exclude(source__contains=SOURCES.COLUMBIA_ARCHIVE)
         .order_by("id")
+        .values_list("id", flat=True)
     )
     if skip_until:
         harvard_clusters = harvard_clusters.filter(pk__gte=skip_until)
@@ -45,13 +46,16 @@ def sort_harvard_opinions(options: dict) -> None:
     logger.info(f"Harvard clusters to process: {harvard_clusters.count()}")
 
     completed = 0
-    for cluster in harvard_clusters.iterator():
-        logger.info(f"Processing cluster id: {cluster}")
+    for cluster_id in harvard_clusters:
+        logger.info(f"Processing cluster id: {cluster_id}")
         opinion_order = 1
         any_update = False
         with transaction.atomic():
+            opinions = Opinion.objects.filter(cluster_id=cluster_id).order_by(
+                "id"
+            )
             # We need to make sure they are ordered by id
-            for cluster_op in cluster.sub_opinions.all().order_by("id"):
+            for cluster_op in opinions:
                 if cluster_op.type == Opinion.COMBINED:
                     continue
                 cluster_op.ordering_key = opinion_order
@@ -62,11 +66,11 @@ def sort_harvard_opinions(options: dict) -> None:
                 # We want to know if you found anything unexpected, like for example
                 # only having combined opinions
                 logger.info(
-                    f"No sub_opinions updated for cluster id: {cluster}"
+                    f"No sub_opinions updated for cluster id: {cluster_id}"
                 )
                 continue
             logger.info(
-                msg=f"Harvard opinions reordered for cluster id: {cluster.id}"
+                msg=f"Harvard opinions reordered for cluster id: {cluster_id}"
             )
             completed += 1
             # Wait between each processed cluster to avoid issues with redis memory
@@ -170,7 +174,7 @@ def sort_columbia_opinions(options: dict) -> None:
 
     completed = 0
     logger.info(f"Columbia clusters to process: {clusters.count()}")
-    for cluster_id in clusters.iterator():
+    for cluster_id in clusters:
         logger.info(f"Starting opinion cluster: {cluster_id}")
         opinions = (
             Opinion.objects.filter(cluster=cluster_id)
