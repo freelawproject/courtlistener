@@ -728,7 +728,7 @@ def build_es_plain_filters(cd: CleanData) -> List:
         )
         # Build caseName terms filter
         queries_list.extend(
-            build_text_filter("caseName", cd.get("case_name", ""))
+            build_text_filter("caseName.exact", cd.get("case_name", ""))
         )
         # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
@@ -2207,7 +2207,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_term_query(
                     "docketNumber",
                     cd.get("docket_number", ""),
@@ -2246,7 +2246,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_daterange_query(
                     "dateFiled",
                     cd.get("filed_before", ""),
