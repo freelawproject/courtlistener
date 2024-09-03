@@ -216,6 +216,7 @@ def add_fields_boosting(
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
+        SEARCH_TYPES.OPINION,
     ]:
         qf = BOOSTS["es"][cd["type"]].copy()
 
@@ -241,7 +242,7 @@ def add_fields_boosting(
         matter_of_query = query.lower().startswith("matter of ")
         ex_parte_query = query.lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({"caseName": 50})
+            qf.update({"caseName.exact": 50})
 
     if fields:
         qf = {key: value for key, value in qf.items() if key in fields}
@@ -1148,7 +1149,7 @@ def build_es_base_query(
                         "description",
                         # Docket Fields
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1159,7 +1160,7 @@ def build_es_base_query(
                     cd,
                     [
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1185,7 +1186,7 @@ def build_es_base_query(
                     [
                         "type",
                         "text",
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 ),
@@ -1196,7 +1197,7 @@ def build_es_base_query(
                 add_fields_boosting(
                     cd,
                     [
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 )

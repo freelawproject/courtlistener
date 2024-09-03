@@ -1204,7 +1204,7 @@ class OpinionsESSearchTest(
             full_name="court of the Medical Worries",
         )
         OpinionClusterFactoryWithChildrenAndParents(
-            case_name="Strickland v. Washington.",
+            case_name="Strickland v. Washington. Howell",
             case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
                 court=court,
@@ -1230,7 +1230,7 @@ class OpinionsESSearchTest(
             scdb_votes_majority=6,
         )
         OpinionClusterFactoryWithChildrenAndParents(
-            case_name="Strickland v. Lorem.",
+            case_name="Strickland v. Lorem. Howells",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(
@@ -2180,6 +2180,51 @@ class OpinionsESSearchTest(
         )
 
         cluster.delete()
+
+    async def test_uses_exact_version_for_case_name_field(self) -> None:
+        """Confirm that stemming is disabled on the case_name
+        filter and text query.
+        """
+
+        # case_name filter: Howell
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "case_name": "Howell",
+        }
+        r = await self._test_article_count(
+            search_params, 1, "case_name exact filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howells
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "case_name": "Howells",
+        }
+        r = await self._test_article_count(
+            search_params, 1, "case_name exact filter"
+        )
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Howell",
+        }
+        r = await self._test_article_count(
+            search_params, 1, "case_name exact query"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # text query: Howells
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Howells",
+        }
+        r = await self._test_article_count(
+            search_params, 1, "case_name exact query"
+        )
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
 
 
 class RelatedSearchTest(

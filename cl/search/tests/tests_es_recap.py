@@ -2698,9 +2698,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(mock_fetch_es.call_count, 5)
         cache.clear()
 
-    def test_disable_stemming_on_case_name_filter(self) -> None:
-        """Confirm that stemming is disabled on the case_name filter and that
-        this change doesn't affect text queries matching case_name.
+    def test_uses_exact_version_for_case_name_field(self) -> None:
+        """Confirm that stemming and synonyms are disabled on the case_name
+        filter and text query.
         """
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -2731,7 +2731,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             de_2 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court_2,
-                    case_name="Howells v. Google",
+                    case_name="Howells v. Indiana",
                     docket_number="1:21-bk-1235",
                     source=Docket.RECAP,
                 ),
@@ -2773,29 +2773,30 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
         self.assertIn("<mark>Howells</mark>", r.content.decode())
 
-        # text query: Howell (stemming is not disabled)
+        # text query: Howell
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": "Howell",
         }
-        r = async_to_sync(self._test_article_count)(cd, 2, "text query")
+        r = async_to_sync(self._test_article_count)(cd, 1, "text query")
         self.assertIn("<mark>Howell</mark>", r.content.decode())
 
-        # text query: Howells (stemming is not disabled)
+        # text query: Howells
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": "Howells",
         }
-        r = async_to_sync(self._test_article_count)(cd, 2, "Disable stemming")
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
         self.assertIn("<mark>Howells</mark>", r.content.decode())
 
-        # text query: Howell ind (stemming is not disabled but synonyms support)
+        # text query: Howell ind (stemming and synonyms disabled)
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": "Howell ind",
         }
-        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
-        self.assertIn("<mark>Indiana</mark>", r.content.decode())
+        r = async_to_sync(self._test_article_count)(
+            cd, 0, "Disable stemming and synonyms"
+        )
 
         de.docket.delete()
         de_2.docket.delete()
