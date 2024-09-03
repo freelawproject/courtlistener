@@ -2189,7 +2189,7 @@ class OpinionsESSearchTest(
         # case_name filter: Howell
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "case_name": "Howell",
+            "case_name": "Lorem Howell",
             "stat_Errata": "on",
             "stat_Published": "on",
         }
@@ -2201,7 +2201,7 @@ class OpinionsESSearchTest(
         # case_name filter: Howells
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "case_name": "Howells",
+            "case_name": "Lorem Howells",
             "stat_Errata": "on",
             "stat_Published": "on",
         }
@@ -2213,26 +2213,26 @@ class OpinionsESSearchTest(
         # text query: Howell
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "q": "Howell",
+            "q": "Lorem Howell",
             "stat_Errata": "on",
             "stat_Published": "on",
         }
         r = await self._test_article_count(
             search_params, 1, "case_name exact query"
         )
-        self.assertIn("<mark>Howell</mark>", r.content.decode())
+        self.assertIn("<mark>Lorem Howell</mark>", r.content.decode())
 
         # text query: Howells
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "q": "Howells",
+            "q": "Lorem Howells",
             "stat_Errata": "on",
             "stat_Published": "on",
         }
         r = await self._test_article_count(
             search_params, 1, "case_name exact query"
         )
-        self.assertIn("<mark>Howells</mark>", r.content.decode())
+        self.assertIn("<mark>Lorem Howells</mark>", r.content.decode())
 
 
 class RelatedSearchTest(
@@ -2364,7 +2364,7 @@ class RelatedSearchTest(
             ),
             (
                 f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
-                "case name cluster 3 Howell",
+                "case name cluster 3 Lorem Howell",
             ),
         ]
 
