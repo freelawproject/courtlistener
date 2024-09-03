@@ -1204,7 +1204,7 @@ class OpinionsESSearchTest(
             full_name="court of the Medical Worries",
         )
         OpinionClusterFactoryWithChildrenAndParents(
-            case_name="Strickland v. Washington. Howell",
+            case_name="Strickland v. Washington.",
             case_name_full="Strickland v. Washington.",
             docket=DocketFactory(
                 court=court,
@@ -1230,7 +1230,7 @@ class OpinionsESSearchTest(
             scdb_votes_majority=6,
         )
         OpinionClusterFactoryWithChildrenAndParents(
-            case_name="Strickland v. Lorem. Howells",
+            case_name="Strickland v. Lorem.",
             case_name_full="Strickland v. Lorem.",
             date_filed=datetime.date(2020, 8, 15),
             docket=DocketFactory(
@@ -2190,6 +2190,8 @@ class OpinionsESSearchTest(
         search_params = {
             "type": SEARCH_TYPES.OPINION,
             "case_name": "Howell",
+            "stat_Errata": "on",
+            "stat_Published": "on",
         }
         r = await self._test_article_count(
             search_params, 1, "case_name exact filter"
@@ -2200,6 +2202,8 @@ class OpinionsESSearchTest(
         search_params = {
             "type": SEARCH_TYPES.OPINION,
             "case_name": "Howells",
+            "stat_Errata": "on",
+            "stat_Published": "on",
         }
         r = await self._test_article_count(
             search_params, 1, "case_name exact filter"
@@ -2210,6 +2214,8 @@ class OpinionsESSearchTest(
         search_params = {
             "type": SEARCH_TYPES.OPINION,
             "q": "Howell",
+            "stat_Errata": "on",
+            "stat_Published": "on",
         }
         r = await self._test_article_count(
             search_params, 1, "case_name exact query"
@@ -2220,6 +2226,8 @@ class OpinionsESSearchTest(
         search_params = {
             "type": SEARCH_TYPES.OPINION,
             "q": "Howells",
+            "stat_Errata": "on",
+            "stat_Published": "on",
         }
         r = await self._test_article_count(
             search_params, 1, "case_name exact query"
@@ -2356,7 +2364,7 @@ class RelatedSearchTest(
             ),
             (
                 f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
-                "case name cluster 3",
+                "case name cluster 3 Howell",
             ),
         ]
 
