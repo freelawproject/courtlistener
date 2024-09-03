@@ -57,6 +57,9 @@ def sort_harvard_opinions(options: dict) -> None:
             # We need to make sure they are ordered by id
             for cluster_op in opinions:
                 if cluster_op.type == Opinion.COMBINED:
+                    logger.info(
+                        f"Ignoring combined opinion in cluster id: {cluster_id}"
+                    )
                     continue
                 cluster_op.ordering_key = opinion_order
                 cluster_op.save()
