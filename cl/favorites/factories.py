@@ -2,9 +2,11 @@ from factory import Faker, SubFactory
 from factory.django import DjangoModelFactory
 
 from cl.favorites.models import Note, Prayer, UserTag
-from cl.search.factories import OpinionClusterWithParentsFactory
+from cl.search.factories import (
+    OpinionClusterWithParentsFactory,
+    RECAPDocumentFactory,
+)
 from cl.users.factories import UserWithChildProfileFactory
-from cl.search.factories import RECAPDocumentFactory
 
 
 class NoteFactory(DjangoModelFactory):
@@ -20,6 +22,7 @@ class NoteFactory(DjangoModelFactory):
 class UserTagFactory(DjangoModelFactory):
     class Meta:
         model = UserTag
+
 
 class PrayerFactory(DjangoModelFactory):
     class Meta:
