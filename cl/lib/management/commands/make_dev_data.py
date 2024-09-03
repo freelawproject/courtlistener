@@ -17,8 +17,10 @@ from cl.search.factories import (
     OpinionClusterWithParentsFactory,
     OpinionWithParentsFactory,
     ParentheticalWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.users.factories import UserFactory
+from cl.favorites.factories import PrayerFactory
 
 FACTORIES = {
     # Search app
@@ -31,6 +33,8 @@ FACTORIES = {
     106: FjcIntegratedDatabaseFactory,
     107: DocketEntryForDocketFactory,
     108: DocketEntryReuseParentsFactory,
+    109: RECAPDocumentFactory,
+    110: PrayerFactory,
     # People DB app
     200: PersonFactory,
     201: PersonWithChildrenFactory,
