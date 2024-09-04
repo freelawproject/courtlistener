@@ -171,7 +171,7 @@ def build_daterange_query(
 
 def build_more_like_this_query(related_id: list[str]):
     document_list = [{"_id": f"o_{id}"} for id in related_id]
-    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS
+    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
     more_like_this_fields.extend(
         [
             "type",

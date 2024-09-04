@@ -1263,8 +1263,6 @@ class OpinionsESSearchTest(
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
-
-        print("Debug HTML:", r.content.decode())
         tree = html.fromstring(r.content.decode())
         got = len(tree.xpath("//article"))
         self.assertEqual(
