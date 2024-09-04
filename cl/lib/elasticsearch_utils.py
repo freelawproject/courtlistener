@@ -171,7 +171,7 @@ def build_daterange_query(
 
 def build_more_like_this_query(related_id: list[str]):
     document_list = [{"_id": f"o_{id}"} for id in related_id]
-    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS
+    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
     more_like_this_fields.extend(
         [
             "type",
@@ -216,6 +216,7 @@ def add_fields_boosting(
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
+        SEARCH_TYPES.OPINION,
     ]:
         qf = BOOSTS["es"][cd["type"]].copy()
 
@@ -241,7 +242,7 @@ def add_fields_boosting(
         matter_of_query = query.lower().startswith("matter of ")
         ex_parte_query = query.lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({"caseName": 50})
+            qf.update({"caseName.exact": 50})
 
     if fields:
         qf = {key: value for key, value in qf.items() if key in fields}
@@ -728,7 +729,7 @@ def build_es_plain_filters(cd: CleanData) -> List:
         )
         # Build caseName terms filter
         queries_list.extend(
-            build_text_filter("caseName", cd.get("case_name", ""))
+            build_text_filter("caseName.exact", cd.get("case_name", ""))
         )
         # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
@@ -1148,7 +1149,7 @@ def build_es_base_query(
                         "description",
                         # Docket Fields
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1159,7 +1160,7 @@ def build_es_base_query(
                     cd,
                     [
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1185,7 +1186,7 @@ def build_es_base_query(
                     [
                         "type",
                         "text",
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 ),
@@ -1196,7 +1197,7 @@ def build_es_base_query(
                 add_fields_boosting(
                     cd,
                     [
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 )
@@ -2207,7 +2208,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_term_query(
                     "docketNumber",
                     cd.get("docket_number", ""),
@@ -2246,7 +2247,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_daterange_query(
                     "dateFiled",
                     cd.get("filed_before", ""),
