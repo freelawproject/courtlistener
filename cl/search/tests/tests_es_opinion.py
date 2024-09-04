@@ -2181,19 +2181,31 @@ class OpinionsESSearchTest(
 
         cluster.delete()
 
-    async def test_uses_exact_version_for_case_name_field(self) -> None:
+    def test_uses_exact_version_for_case_name_field(self) -> None:
         """Confirm that stemming is disabled on the case_name
         filter and text query.
         """
 
+        with self.captureOnCommitCallbacks(execute=True):
+            cluster_1 = OpinionClusterFactory.create(
+                case_name="Maecenas Howell",
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                docket=self.docket_1,
+            )
+            OpinionFactory.create(cluster=cluster_1, plain_text="")
+            cluster_2 = OpinionClusterFactory.create(
+                case_name="Maecenas Howells",
+                precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+                docket=self.docket_1,
+            )
+            OpinionFactory.create(cluster=cluster_2, plain_text="")
+
         # case_name filter: Howell
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "case_name": "Lorem Howell",
-            "stat_Errata": "on",
-            "stat_Published": "on",
+            "case_name": "Maecenas Howell",
         }
-        r = await self._test_article_count(
+        r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
         self.assertIn("<mark>Howell</mark>", r.content.decode())
@@ -2201,11 +2213,9 @@ class OpinionsESSearchTest(
         # case_name filter: Howells
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "case_name": "Lorem Howells",
-            "stat_Errata": "on",
-            "stat_Published": "on",
+            "case_name": "Maecenas Howells",
         }
-        r = await self._test_article_count(
+        r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
         self.assertIn("<mark>Howells</mark>", r.content.decode())
@@ -2213,26 +2223,25 @@ class OpinionsESSearchTest(
         # text query: Howell
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "q": "Lorem Howell",
-            "stat_Errata": "on",
-            "stat_Published": "on",
+            "q": "Maecenas Howell",
         }
-        r = await self._test_article_count(
+        r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact query"
         )
-        self.assertIn("<mark>Lorem Howell</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas Howell</mark>", r.content.decode())
 
         # text query: Howells
         search_params = {
             "type": SEARCH_TYPES.OPINION,
-            "q": "Lorem Howells",
-            "stat_Errata": "on",
-            "stat_Published": "on",
+            "q": "Maecenas Howells",
         }
-        r = await self._test_article_count(
+        r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact query"
         )
-        self.assertIn("<mark>Lorem Howells</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas Howells</mark>", r.content.decode())
+
+        cluster_1.delete()
+        cluster_2.delete()
 
 
 class RelatedSearchTest(
@@ -2364,7 +2373,7 @@ class RelatedSearchTest(
             ),
             (
                 f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
-                "case name cluster 3 Lorem Howell",
+                "case name cluster 3",
             ),
         ]
 

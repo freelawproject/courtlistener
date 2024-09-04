@@ -2189,7 +2189,6 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Freedom of", r.content.decode())
         self.assertIn("<mark>Inform</mark>", r.content.decode())
-        print(" r.content.decode()", r.content.decode())
         self.assertEqual(r.content.decode().count("<mark>Inform</mark>"), 2)
         self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 1)
 
