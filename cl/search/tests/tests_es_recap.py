@@ -2703,6 +2703,109 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(mock_fetch_es.call_count, 5)
         cache.clear()
 
+    def test_uses_exact_version_for_case_name_field(self) -> None:
+        """Confirm that stemming and synonyms are disabled on the case_name
+        filter and text query.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Howell v. Indiana",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            RECAPDocumentFactory(
+                docket_entry=de,
+                document_number="1",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+            RECAPDocumentFactory(
+                docket_entry=de,
+                document_number="2",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+
+            de_2 = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Howells v. Indiana",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+
+        # case_name filter: Howell
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self._count_child_documents(
+            0, r.content.decode(), 2, "case_name filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howell + document_number 1
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howell",
+            "document_number": 1,
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Disable stemming case_name + child filter."
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 1, "case_name + child filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howells
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howells",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "text query")
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # text query: Howells
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howells",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell ind (stemming and synonyms disabled)
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howell ind",
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 0, "Disable stemming and synonyms"
+        )
+
+        de.docket.delete()
+        de_2.docket.delete()
+
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
