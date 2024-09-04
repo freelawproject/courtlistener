@@ -871,9 +871,9 @@ def retrieve_cached_search_results(
     Retrieve cached search results based on the GET parameters.
 
     :param get_params: The GET parameters provided by the user.
-    :return: A two-tuple containing either the cached search results and a hash
-    of the get parameters, or None and the query parameters hash if no cached
-    results were found.
+    :return: A two-tuple containing either the cached search results and the
+    cache key based ona prefix and the get parameters, or None and the cache key
+    if no cached results were found.
     """
 
     params = get_params.copy()
@@ -883,11 +883,13 @@ def retrieve_cached_search_results(
     params.setdefault("page", "1")
     params.setdefault("q", "")
     sorted_params = dict(sorted(params.items()))
+    key_prefix = "search_results_cache:"
     params_hash = sha256(pickle.dumps(sorted_params))
-    cached_results = cache.get(params_hash)
+    cache_key = f"{key_prefix}{params_hash}"
+    cached_results = cache.get(cache_key)
     if cached_results:
-        return pickle.loads(cached_results), params_hash
-    return None, params_hash
+        return pickle.loads(cached_results), cache_key
+    return None, cache_key
 
 
 def fetch_and_paginate_results(
@@ -918,7 +920,7 @@ def fetch_and_paginate_results(
             return results, 0, False, None, None
 
     # Check micro-cache for all other search requests.
-    results_dict, get_params_hash = retrieve_cached_search_results(get_params)
+    results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
     if results_dict:
         # Return results and counts. Set query time to 1ms.
         return (
@@ -972,7 +974,7 @@ def fetch_and_paginate_results(
         }
         serialized_data = pickle.dumps(results_dict)
         cache.set(
-            get_params_hash,
+            micro_cache_key,
             serialized_data,
             settings.SEARCH_RESULTS_MICRO_CACHE,
         )
