@@ -2713,6 +2713,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket=DocketFactory(
                     court=self.court_2,
                     case_name="Howell v. Indiana",
+                    case_name_short="Dolor",
+                    case_name_full="Ipsum Dolor",
                     docket_number="1:21-bk-1235",
                     source=Docket.RECAP,
                 ),
@@ -2732,17 +2734,13 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=False,
                 pacer_doc_id=None,
             )
-
-            de_2 = DocketEntryWithParentsFactory(
-                docket=DocketFactory(
-                    court=self.court_2,
-                    case_name="Howells v. Indiana",
-                    docket_number="1:21-bk-1235",
-                    source=Docket.RECAP,
-                ),
-                entry_number=1,
-                date_filed=datetime.date(2015, 8, 19),
-                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            docket_2 = DocketFactory(
+                court=self.court_2,
+                case_name="Howells v. Indiana",
+                case_name_short="Dolor",
+                case_name_full="Lorem Ipsum",
+                docket_number="1:21-bk-1235",
+                source=Docket.RECAP,
             )
 
         # case_name filter: Howell
@@ -2804,7 +2802,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
         de.docket.delete()
-        de_2.docket.delete()
+        docket_2.delete()
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
