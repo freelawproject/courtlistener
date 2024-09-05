@@ -141,3 +141,11 @@ class DocketDataFactory(DictFactory):
         length=5, chars=string.ascii_lowercase
     )
     federal_defendant_number = Faker("pyint", min_value=1, max_value=999)
+
+
+class DocketEntryWithAttachmentsDataFactory(MinuteDocketEntryDataFactory):
+    attachments = List([SubFactory(AppellateAttachmentPageFactory)])
+
+
+class DocketDataWithAttachmentsFactory(DocketDataFactory):
+    docket_entries = List([SubFactory(DocketEntryWithAttachmentsDataFactory)])

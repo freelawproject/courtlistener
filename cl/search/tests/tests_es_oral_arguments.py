@@ -2189,7 +2189,7 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         self.assertEqual(actual, expected)
         self.assertIn("Freedom of", r.content.decode())
         self.assertIn("<mark>Inform</mark>", r.content.decode())
-        self.assertEqual(r.content.decode().count("<mark>Inform</mark>"), 1)
+        self.assertEqual(r.content.decode().count("<mark>Inform</mark>"), 2)
         self.assertEqual(r.content.decode().count("<mark>Deposit</mark>"), 1)
 
     def test_exact_and_synonyms_query(self) -> None:
@@ -2406,6 +2406,59 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             "<mark>This is the best transcript</mark>", r.content.decode()
         )
 
+    def test_uses_exact_version_for_case_name_field(self) -> None:
+        """Confirm that stemming is disabled on the case_name
+        filter and text query.
+        """
+
+        # case_name filter: Howell
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "case_name": "Howell",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(self.get_article_count(r), 1)
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howells
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "case_name": "Howells",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(self.get_article_count(r), 1)
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Howell",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(self.get_article_count(r), 1)
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # text query: Howells
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Howells",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(self.get_article_count(r), 1)
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
 
 class OralArgumentIndexingTest(
     CountESTasksTestCase, ESIndexTestCase, TransactionTestCase
@@ -2449,7 +2502,7 @@ class OralArgumentIndexingTest(
         )
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            "q": "Lorem Ipsum Dolor vs. United States",
+            "q": "Lorem Ipsum Dolor vs. USA",
             "order_by": "score desc",
         }
         search_query = AudioDocument.search()
