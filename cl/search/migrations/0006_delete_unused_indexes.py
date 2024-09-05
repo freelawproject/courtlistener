@@ -145,8 +145,10 @@ class Migration(migrations.Migration):
                 null=True,
             ),
         ),
-        migrations.AlterIndexTogether(
+        migrations.AlterModelOptions(
             name="docket",
-            index_together=set(),
+            options={
+                'indexes': [],
+            },
         ),
     ]

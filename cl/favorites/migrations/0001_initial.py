@@ -40,7 +40,9 @@ class Migration(migrations.Migration):
             ],
             options={
                 'unique_together': {('user', 'name')},
-                'index_together': {('user', 'name')},
+                'indexes': [
+                    models.Index(fields=['user', 'name'], name='favorites_usertag_user_name_idx'),
+                ],
             },
         ),
         migrations.AddField(
@@ -58,7 +60,11 @@ class Migration(migrations.Migration):
                 ('user', models.ForeignKey(help_text='The user that made the prayer', on_delete=django.db.models.deletion.CASCADE, related_name='prayers', to=settings.AUTH_USER_MODEL)),
             ],
             options={
-                'index_together': {('recap_document', 'user'), ('recap_document', 'status'), ('date_created', 'user', 'status')},
+                'indexes': [
+                    models.Index(fields=['recap_document', 'user'], name='favorites_prayer_recap_document_user_idx'),
+                    models.Index(fields=['recap_document', 'status'], name='favorites_prayer_recap_document_status_idx'),
+                    models.Index(fields=['date_created', 'user', 'status'], name='favorites_prayer_date_created_user_status_idx'),
+                ],
             },
         ),
         migrations.CreateModel(

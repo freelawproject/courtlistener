@@ -41,7 +41,9 @@ class Migration(migrations.Migration):
                 ('status_str', models.TextField(blank=True, help_text='The status of the case')),
             ],
             options={
-                'index_together': {('docket_number', 'district', 'division_code')},
+                'indexes': [
+                    models.Index(fields=['docket_number', 'district', 'division_code'], name='lasc_docket_docket_number_district_division_code_idx'),
+                ],
             },
         ),
         migrations.CreateModel(
