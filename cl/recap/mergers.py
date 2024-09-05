@@ -1677,12 +1677,54 @@ async def merge_attachment_page_data(
             # with the wrong case. We must punt.
             raise exc
     except RECAPDocument.DoesNotExist as exc:
+        found_main_rd = False
+        if not is_acms_attachment:
+            for attachment in attachment_dicts:
+                if attachment.get("pacer_doc_id", False):
+                    params["pacer_doc_id"] = attachment["pacer_doc_id"]
+                try:
+                    main_rd = await RECAPDocument.objects.select_related(
+                        "docket_entry", "docket_entry__docket"
+                    ).aget(**params)
+                    found_main_rd = True
+                    break
+                except RECAPDocument.MultipleObjectsReturned as exc:
+                    if pacer_case_id:
+                        duplicate_rd_queryset = RECAPDocument.objects.filter(
+                            **params
+                        )
+                        rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+                            is_available=True
+                        ).exclude(filepath_local="")
+                        if await rd_with_pdf_queryset.aexists():
+                            keep_rd = await rd_with_pdf_queryset.alatest(
+                                "date_created"
+                            )
+                        else:
+                            keep_rd = await duplicate_rd_queryset.alatest(
+                                "date_created"
+                            )
+                        await duplicate_rd_queryset.exclude(
+                            pk=keep_rd.pk
+                        ).adelete()
+                        main_rd = await RECAPDocument.objects.select_related(
+                            "docket_entry", "docket_entry__docket"
+                        ).aget(**params)
+                        found_main_rd = True
+                        break
+                    else:
+                        # Unclear how to proceed and we don't want to associate
+                        # this data with the wrong case. We must punt.
+                        raise exc
+                except RECAPDocument.DoesNotExist:
+                    continue
         # Can't find the docket to associate with the attachment metadata
         # It may be possible to go look for orphaned documents at this stage
         # and to then add them here, as we do when adding dockets. This need is
         # particularly acute for those that get free look emails and then go to
         # the attachment page.
-        raise exc
+        if not found_main_rd:
+            raise exc
 
     # We got the right item. Update/create all the attachments for
     # the docket entry.
