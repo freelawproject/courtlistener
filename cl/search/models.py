@@ -1488,11 +1488,11 @@ class RECAPDocument(
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
             if self.pacer_doc_id.count("-") > 1:
-                # It seems like loading the ACMS Download Page using links is not
-                # possible. we've implemented a modal window that explains this
-                # issue and guides users towards using the button to access the
-                # docket report.
-                return self.docket_entry.docket.pacer_docket_url
+                return (
+                    f"https://{court_id}-showdoc.azurewebsites.us/docs/"
+                    f"{self.docket_entry.docket.pacer_case_id}/"
+                    f"{self.pacer_doc_id}"
+                )
             elif court.jurisdiction == Court.FEDERAL_APPELLATE:
                 template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
