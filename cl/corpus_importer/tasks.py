@@ -1118,14 +1118,19 @@ def do_case_query_by_pacer_case_id(
     # Merge the contents into CL.
     if d is None:
         d = async_to_sync(find_docket_object)(
-            court_id, pacer_case_id, docket_data["docket_number"]
+            court_id,
+            pacer_case_id,
+            docket_data["docket_number"],
+            docket_data.get("federal_defendant_number"),
+            docket_data.get("federal_dn_judge_initials_assigned"),
+            docket_data.get("federal_dn_judge_initials_referred"),
         )
 
     d.add_recap_source()
     async_to_sync(update_docket_metadata)(d, docket_data)
     d.save()
 
-    add_tags_to_objs(tag_names, [d])
+    async_to_sync(add_tags_to_objs)(tag_names, [d])
 
     # Add the HTML to the docket in case we need it someday.
     pacer_file = PacerHtmlFiles(
@@ -1271,6 +1276,9 @@ def make_docket_by_iquery_base(
         court_id,
         str(pacer_case_id),
         report_data["docket_number"],
+        report_data.get("federal_defendant_number"),
+        report_data.get("federal_dn_judge_initials_assigned"),
+        report_data.get("federal_dn_judge_initials_referred"),
         using=using,
     )
 
@@ -1650,7 +1658,12 @@ def get_docket_by_pacer_case_id(
 
     if d is None:
         d = async_to_sync(find_docket_object)(
-            court_id, pacer_case_id, docket_data["docket_number"]
+            court_id,
+            pacer_case_id,
+            docket_data["docket_number"],
+            docket_data.get("federal_defendant_number"),
+            docket_data.get("federal_dn_judge_initials_assigned"),
+            docket_data.get("federal_dn_judge_initials_referred"),
         )
 
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(
@@ -1731,7 +1744,12 @@ def get_appellate_docket_by_docket_number(
 
     if d is None:
         d = async_to_sync(find_docket_object)(
-            court_id, docket_number, docket_number
+            court_id,
+            docket_number,
+            docket_number,
+            docket_data.get("federal_defendant_number"),
+            docket_data.get("federal_dn_judge_initials_assigned"),
+            docket_data.get("federal_dn_judge_initials_referred"),
         )
 
     rds_created, content_updated = merge_pacer_docket_into_cl_docket(

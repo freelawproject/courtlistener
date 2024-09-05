@@ -7,6 +7,7 @@ from unittest import mock
 import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.test import AsyncClient, override_settings
@@ -862,7 +863,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
             docket_2.delete()
 
-    async def test_party_name_filter(self) -> None:
+    def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
 
         params = {
@@ -871,7 +872,29 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
 
         # Frontend, 1 result expected since RECAPDocuments are grouped by case
-        await self._test_article_count(params, 1, "party_name")
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+
+        # Confirm parties extracted from case_name are available in filters.
+        with self.captureOnCommitCallbacks(execute=True):
+            d = DocketFactory(
+                court=self.court,
+                pacer_case_id="345784",
+                docket_number="12-cv-03345",
+                case_name="John Smith v. Bank of America",
+                source=Docket.RECAP,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "John Smith",
+        }
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "party_name": "Bank of America",
+        }
+        async_to_sync(self._test_article_count)(params, 1, "party_name")
+        d.delete()
 
     def test_party_name_and_children_filter(self) -> None:
         """Confirm dockets with children are shown when using the party filter"""
@@ -2544,6 +2567,242 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         for docket in dockets_to_remove:
             docket.delete()
+
+    @mock.patch("cl.search.views.fetch_es_results")
+    @override_settings(
+        RECAP_SEARCH_PAGE_SIZE=2, ELASTICSEARCH_MICRO_CACHE_ENABLED=True
+    )
+    async def test_micro_cache_for_search_results(self, mock_fetch_es) -> None:
+        """Assert micro-cache for search results behaves properly."""
+
+        # Clean search_results_cache before starting the test.
+        r = get_redis_interface("CACHE")
+        keys = r.keys("search_results_cache")
+        if keys:
+            r.delete(*keys)
+
+        mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
+            *args, **kwargs
+        )
+        # Combine query and filter.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "available_only": True,
+            "q": "Amicus Curiae Lorem",
+        }
+        # First query shouldn't be cached.
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is called one time.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "child filter + text query"
+        )
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        # Repeat the query:
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        # Count child documents under docket.
+        self._count_child_documents(
+            0, r.content.decode(), 1, "child filter + text query"
+        )
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+        # 1ms query time when using the micro-cache.
+        self.assertIn("1ms", r.content.decode())
+
+        # Change params order and repeat the query:
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Amicus Curiae Lorem",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 1)
+        self._assert_results_header_content(r.content.decode(), "1 Case")
+        self._assert_results_header_content(
+            r.content.decode(), "1 Docket Entry"
+        )
+
+        # Change query content.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Amicus Curiae",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 1, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 2)
+
+        # Confirm searches with no results are also cached.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Index Curiae",
+            "available_only": True,
+        }
+        r = await self._test_article_count(params, 0, "filter + text query")
+        self.assertIn(
+            "had no results",
+            r.content.decode(),
+        )
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 3)
+
+        # Repeat the query:
+        r = await self._test_article_count(params, 0, "filter + text query")
+        self.assertIn(
+            "had no results",
+            r.content.decode(),
+        )
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 3)
+
+        # Confirm results without page parameter are cached as page 1.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
+        # Confirm results without q parameter are cached as q="".
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
+        # Same parameters, including page: 1 explicitly.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+            "page": "1",
+        }
+        r = await self._test_article_count(params, 2, "filter + text query")
+        # fetch_es_results is not called again; results are retrieved from the cache.
+        self.assertEqual(mock_fetch_es.call_count, 4)
+
+        # Same parameters page 2.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "",
+            "page": "2",
+        }
+        r = await self._test_article_count(params, 0, "filter + text query")
+        # fetch_es_results is called this time; the cache is not used.
+        self.assertEqual(mock_fetch_es.call_count, 5)
+        cache.clear()
+
+    def test_uses_exact_version_for_case_name_field(self) -> None:
+        """Confirm that stemming and synonyms are disabled on the case_name
+        filter and text query.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Howell v. Indiana",
+                    case_name_short="Dolor",
+                    case_name_full="Ipsum Dolor",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            RECAPDocumentFactory(
+                docket_entry=de,
+                document_number="1",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+            RECAPDocumentFactory(
+                docket_entry=de,
+                document_number="2",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+            docket_2 = DocketFactory(
+                court=self.court_2,
+                case_name="Howells v. Indiana",
+                case_name_short="Dolor",
+                case_name_full="Lorem Ipsum",
+                docket_number="1:21-bk-1235",
+                source=Docket.RECAP,
+            )
+
+        # case_name filter: Howell
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self._count_child_documents(
+            0, r.content.decode(), 2, "case_name filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howell + document_number 1
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howell",
+            "document_number": 1,
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Disable stemming case_name + child filter."
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 1, "case_name + child filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howells
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howells",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "text query")
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # text query: Howells
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howells",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell ind (stemming and synonyms disabled)
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howell ind",
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 0, "Disable stemming and synonyms"
+        )
+
+        de.docket.delete()
+        docket_2.delete()
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
@@ -4787,7 +5046,9 @@ class RECAPSearchAPIV4Test(
         and empties the list field.
         """
         with self.captureOnCommitCallbacks(execute=True) as callbacks:
-            d = DocketFactory(court=self.court, source=Docket.RECAP)
+            d = DocketFactory(
+                case_name="Lorem Ipsum", court=self.court, source=Docket.RECAP
+            )
             firm = AttorneyOrganizationFactory(
                 lookup_key="00kingofprussiaroadradnorkesslertopazmeltze87437",
                 name="Law Firm LLP",
@@ -6698,6 +6959,100 @@ class RECAPIndexingTest(
             parties_prepared["firm"],
             {firm.name, firm_2.name, firm_2_1.name, firm_1_2.name},
         )
+
+    def test_index_party_from_case_name_when_parties_are_not_available(
+        self,
+    ) -> None:
+        """Confirm that the party field is populated by splitting the case_name
+        when a valid separator is present.
+        """
+
+        docket_with_parties = DocketFactory(
+            court=self.court,
+            case_name="Lorem v. Dolor",
+            docket_number="1:21-bk-4444",
+            source=Docket.RECAP,
+        )
+        firm = AttorneyOrganizationFactory(
+            lookup_key="280kingofprussiaroadradnorkesslertopazmeltzercheck1536",
+            name="Law Firm LLP",
+        )
+        attorney = AttorneyFactory(
+            name="Emily Green",
+            organizations=[firm],
+            docket=docket_with_parties,
+        )
+        party_type = PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Mary Williams Corp.",
+                docket=docket_with_parties,
+                attorneys=[attorney],
+            ),
+            docket=docket_with_parties,
+        )
+        index_docket_parties_in_es.delay(docket_with_parties.pk)
+        docket_with_no_parties = DocketFactory(
+            court=self.court,
+            case_name="Bank v. Smith",
+            docket_number="1:21-bk-4445",
+            source=Docket.RECAP,
+        )
+
+        docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+
+        # Assert party on initial indexing.
+        self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
+        self.assertEqual(docket_doc_no_parties.party, ["Bank", "Smith"])
+
+        # Modify the docket case_name. Assert that parties are not overwritten
+        # in a docket with normalized parties.
+        docket_with_parties.case_name = "Lorem v. Ipsum"
+        docket_with_parties.save()
+        docket_doc_parties = DocketDocument.get(docket_with_parties.pk)
+        self.assertEqual(docket_doc_parties.party, ["Mary Williams Corp."])
+
+        # Modify the docket case_name. Assert that parties are updated if the
+        # docket does not contain normalized parties.
+        docket_with_no_parties.case_name = "America v. Smith"
+        docket_with_no_parties.save()
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+        self.assertEqual(docket_doc_no_parties.party, ["America", "Smith"])
+
+        # Test that parties are not extracted from the case_name if it does not contain
+        # a valid separator.
+        docket_with_no_parties_no_separator = DocketFactory(
+            court=self.court,
+            case_name="In re: Bank Smith",
+            docket_number="1:21-bk-4446",
+            source=Docket.RECAP,
+        )
+        docket_with_no_parties_no_separator = DocketDocument.get(
+            docket_with_no_parties_no_separator.pk
+        )
+        self.assertEqual(docket_with_no_parties_no_separator.party, [])
+
+        # Confirm that normalized parties can overwrite the case_name parties.
+        attorney_2 = AttorneyFactory(
+            name="John Green",
+            organizations=[firm],
+            docket=docket_with_no_parties,
+        )
+        PartyTypeFactory.create(
+            party=PartyFactory(
+                name="Bank Corp.",
+                docket=docket_with_no_parties,
+                attorneys=[attorney_2],
+            ),
+            docket=docket_with_no_parties,
+        )
+        index_docket_parties_in_es.delay(docket_with_no_parties.pk)
+        docket_doc_no_parties = DocketDocument.get(docket_with_no_parties.pk)
+        self.assertEqual(docket_doc_no_parties.party, ["Bank Corp."])
+
+        docket_with_parties.delete()
+        docket_doc_no_parties.delete()
+        docket_with_no_parties_no_separator.delete()
 
 
 class RECAPHistoryTablesIndexingTest(

@@ -248,6 +248,22 @@ ELASTICSEARCH_SWEEP_INDEXER_CHUNK_SIZE = env(
 ELASTICSEARCH_SWEEP_INDEXER_HEADS_RATE = env(
     "ELASTICSEARCH_SWEEP_INDEXER_HEADS_RATE", default=60
 )
+ELASTICSEARCH_SWEEP_INDEXER_MODELS = env(
+    "ELASTICSEARCH_SWEEP_INDEXER_MODELS",
+    default=[
+        "audio.Audio",
+        "people_db.Person",
+        "search.OpinionCluster",
+        "search.Opinion",
+        "search.Docket",
+        "search.RECAPDocument",
+    ],
+)
+
 
 ELASTICSEARCH_MAX_RESULT_COUNT = 10_000
 ELASTICSEARCH_CARDINALITY_PRECISION = 2000
+
+ELASTICSEARCH_MICRO_CACHE_ENABLED = env(
+    "ELASTICSEARCH_MICRO_CACHE_ENABLED", default=False
+)

@@ -1,6 +1,7 @@
 import itertools
 import random
 import re
+from collections import defaultdict
 from datetime import date
 from difflib import SequenceMatcher
 from typing import Any, Iterator, Optional, Set
@@ -1115,3 +1116,54 @@ def compute_blocked_court_wait(court_blocked_attempts: int) -> tuple[int, int]:
         for i in range(court_blocked_attempts)
     )
     return current_wait_time, total_accumulated_time
+
+
+class CycleChecker:
+    """Keep track of a cycling list to determine each time it starts over.
+
+    We plan to iterate over dockets that are ordered by a cycling court ID, so
+    imagine if we had two courts, ca1 and ca2, we'd have rows like:
+
+        docket: 1, court: ca1
+        docket: 14, court: ca2
+        docket: 15, court: ca1
+        docket: xx, court: ca2
+
+    In other words, they'd just go back and forth. In reality, we have about
+    200 courts, but the idea is the same. This code lets us detect each time
+    the cycle has started over, even if courts stop being part of the cycle,
+    as will happen towards the end of the queryset.. For example, maybe ca1
+    finishes, and now we just have:
+
+        docket: x, court: ca2
+        docket: y, court: ca2
+        docket: z, court: ca2
+
+    That's considered cycling each time we get to a new row.
+
+    The way to use this is to just create an instance and then send it a
+    cycling list of court_id's.
+
+    Other fun requirements this hits:
+     - No need to know the length of the cycle
+     - No need to externally track the iteration count
+    """
+
+    def __init__(self) -> None:
+        self.court_counts: defaultdict = defaultdict(int)
+        self.current_iteration: int = 1
+
+    def check_if_cycled(self, court_id: str) -> bool:
+        """Check if the cycle repeated
+
+        :param court_id: The ID of the court
+        :return True if the cycle started over, else False
+        """
+        self.court_counts[court_id] += 1
+        if self.court_counts[court_id] == self.current_iteration:
+            return False
+        else:
+            # Finished cycle and court has been seen more times than the
+            # iteration count. Bump the iteration count and return True.
+            self.current_iteration += 1
+            return True

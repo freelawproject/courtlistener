@@ -66,18 +66,47 @@ cnt = CaseNameTweaker()
 def confirm_docket_number_core_lookup_match(
     docket: Docket,
     docket_number: str,
+    federal_defendant_number: str | None = None,
+    federal_dn_judge_initials_assigned: str | None = None,
+    federal_dn_judge_initials_referred: str | None = None,
 ) -> Docket | None:
     """Confirm if the docket_number_core lookup match returns the right docket
-    by confirming the docket_number also matches.
+    by confirming the docket_number and docket_number components also matches
+    if they're available.
 
     :param docket: The docket matched by the lookup
     :param docket_number: The incoming docket_number to lookup.
+    :param federal_defendant_number: The federal defendant number to validate
+    the match.
+    :param federal_dn_judge_initials_assigned: The judge's initials assigned to
+    validate the match.
+    :param federal_dn_judge_initials_referred: The judge's initials referred to
+    validate the match.
     :return: The docket object if both dockets matched or otherwise None.
     """
     existing_docket_number = clean_docket_number(docket.docket_number)
     incoming_docket_number = clean_docket_number(docket_number)
     if existing_docket_number != incoming_docket_number:
         return None
+
+    # If the incoming data contains docket_number components and the docket
+    # also contains DN components, use them to confirm that the docket matches.
+    dn_components = {
+        "federal_defendant_number": federal_defendant_number,
+        "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
+        "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
+    }
+    # Only compare DN component values if both the incoming data and the docket contain
+    # non-None DN component values.
+    for dn_key, dn_value in dn_components.items():
+        incoming_dn_value = dn_value
+        docket_dn_value = getattr(docket, dn_key, None)
+        if (
+            incoming_dn_value
+            and docket_dn_value
+            and incoming_dn_value != docket_dn_value
+        ):
+            return None
     return docket
 
 
@@ -85,6 +114,9 @@ async def find_docket_object(
     court_id: str,
     pacer_case_id: str | None,
     docket_number: str,
+    federal_defendant_number: str | None,
+    federal_dn_judge_initials_assigned: str | None,
+    federal_dn_judge_initials_referred: str | None,
     using: str = "default",
 ) -> Docket:
     """Attempt to find the docket based on the parsed docket data. If cannot be
@@ -93,6 +125,12 @@ async def find_docket_object(
     :param court_id: The CourtListener court_id to lookup
     :param pacer_case_id: The PACER case ID for the docket
     :param docket_number: The docket number to lookup.
+    :param federal_defendant_number: The federal defendant number to validate
+    the match.
+    :param federal_dn_judge_initials_assigned: The judge's initials assigned to
+    validate the match.
+    :param federal_dn_judge_initials_referred: The judge's initials referred to
+    validate the match.
     :param using: The database to use for the lookup queries.
     :return The docket found or created.
     """
@@ -142,16 +180,41 @@ async def find_docket_object(
             if kwargs.get("pacer_case_id") is None and kwargs.get(
                 "docket_number_core"
             ):
-                d = confirm_docket_number_core_lookup_match(d, docket_number)
+                d = confirm_docket_number_core_lookup_match(
+                    d,
+                    docket_number,
+                    federal_defendant_number,
+                    federal_dn_judge_initials_assigned,
+                    federal_dn_judge_initials_referred,
+                )
             if d:
                 break  # Nailed it!
         elif count > 1:
-            # Choose the oldest one and live with it.
-            d = await ds.aearliest("date_created")
-            if kwargs.get("pacer_case_id") is None and kwargs.get(
-                "docket_number_core"
-            ):
-                d = confirm_docket_number_core_lookup_match(d, docket_number)
+            # If more than one docket matches, try refining the results using
+            # available docket_number components.
+            dn_components = {
+                "federal_defendant_number": federal_defendant_number,
+                "federal_dn_judge_initials_assigned": federal_dn_judge_initials_assigned,
+                "federal_dn_judge_initials_referred": federal_dn_judge_initials_referred,
+            }
+            dn_lookup = {
+                dn_key: dn_value
+                for dn_key, dn_value in dn_components.items()
+                if dn_value
+            }
+            dn_queryset = ds.filter(**dn_lookup).using(using)
+            count = await dn_queryset.acount()
+            if count == 1:
+                d = await dn_queryset.afirst()
+            else:
+                # Choose the oldest one and live with it.
+                d = await ds.aearliest("date_created")
+                if kwargs.get("pacer_case_id") is None and kwargs.get(
+                    "docket_number_core"
+                ):
+                    d = confirm_docket_number_core_lookup_match(
+                        d, docket_number
+                    )
             if d:
                 break
     if d is None:
@@ -753,7 +816,7 @@ async def get_or_make_docket_entry(
 async def add_docket_entries(
     d: Docket,
     docket_entries: list[dict[str, Any]],
-    tags: list[str] | None = None,
+    tags: list[Tag] | None = None,
     do_not_update_existing: bool = False,
 ) -> tuple[
     tuple[list[DocketEntry], list[RECAPDocument]], list[RECAPDocument], bool
@@ -810,7 +873,7 @@ async def add_docket_entries(
         await de.asave()
         if tags:
             for tag in tags:
-                tag.tag_object(de)
+                await sync_to_async(tag.tag_object)(de)
 
         if de_created:
             content_updated = True
@@ -855,7 +918,11 @@ async def add_docket_entries(
                 params["document_type"] = RECAPDocument.ATTACHMENT
                 params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
         try:
-            rd = await RECAPDocument.objects.aget(**params)
+            get_params = deepcopy(params)
+            if de_created is False and not appelate_court_id_exists:
+                del get_params["document_type"]
+                get_params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
+            rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
             try:
@@ -887,9 +954,24 @@ async def add_docket_entries(
             await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
 
         rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
-        rd.description = (
-            docket_entry.get("short_description") or rd.description
-        )
+        description = docket_entry.get("short_description")
+        if rd.document_type == RECAPDocument.PACER_DOCUMENT and description:
+            rd.description = description
+        elif description:
+            rd_qs = de.recap_documents.filter(
+                document_type=RECAPDocument.PACER_DOCUMENT
+            )
+            if await rd_qs.aexists():
+                rd_pd = await rd_qs.afirst()
+                if rd_pd.attachment_number is not None:
+                    continue
+                if rd_pd.description != description:
+                    rd_pd.description = description
+                    try:
+                        await rd_pd.asave()
+                    except ValidationError:
+                        # Happens from race conditions.
+                        continue
         rd.document_number = docket_entry["document_number"] or ""
         try:
             await rd.asave()
@@ -898,7 +980,7 @@ async def add_docket_entries(
             continue
         if tags:
             for tag in tags:
-                tag.tag_object(rd)
+                await sync_to_async(tag.tag_object)(rd)
 
         attachments = docket_entry.get("attachments")
         if attachments is not None:
@@ -1367,7 +1449,7 @@ def add_claims_to_docket(d, new_claims, tag_names=None):
         )
         db_claim.remarks = new_claim.get("remarks") or db_claim.remarks
         db_claim.save()
-        add_tags_to_objs(tag_names, [db_claim])
+        async_to_sync(add_tags_to_objs)(tag_names, [db_claim])
         for new_history in new_claim["history"]:
             add_claim_history_entry(new_history, db_claim)
 
@@ -1394,7 +1476,7 @@ def get_data_from_appellate_att_report(
     return att_data
 
 
-async def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
+async def add_tags_to_objs(tag_names: List[str], objs: Any) -> list[Tag]:
     """Add tags by name to objects
 
     :param tag_names: A list of tag name strings
@@ -1406,14 +1488,14 @@ async def add_tags_to_objs(tag_names: List[str], objs: Any) -> QuerySet:
     if tag_names is None:
         return []
 
-    tags = []
+    tags: list[Tag] = []
     for tag_name in tag_names:
         tag, _ = await Tag.objects.aget_or_create(name=tag_name)
         tags.append(tag)
 
     for tag in tags:
         for obj in objs:
-            tag.tag_object(obj)
+            await sync_to_async(tag.tag_object)(obj)
     return tags
 
 
@@ -1634,11 +1716,9 @@ async def merge_attachment_page_data(
     main_rd_to_att = False
     for attachment in attachment_dicts:
         sanity_checks = [
-            attachment["attachment_number"],
+            attachment.get("attachment_number") is not None,
             # Missing on sealed items.
             attachment.get("pacer_doc_id", False),
-            # Missing on some restricted docs (see Juriscraper)
-            attachment["page_count"] is not None,
             attachment["description"],
         ]
         if not all(sanity_checks):
@@ -1663,25 +1743,76 @@ async def merge_attachment_page_data(
             params = {
                 "docket_entry": de,
                 "document_number": document_number,
-                "attachment_number": attachment["attachment_number"],
-                "document_type": RECAPDocument.ATTACHMENT,
             }
+            if attachment["attachment_number"] == 0:
+                params["document_type"] = RECAPDocument.PACER_DOCUMENT
+            else:
+                params["attachment_number"] = attachment["attachment_number"]
+                params["document_type"] = RECAPDocument.ATTACHMENT
             if "acms_document_guid" in attachment:
                 params["acms_document_guid"] = attachment["acms_document_guid"]
             try:
                 rd = await RECAPDocument.objects.aget(**params)
             except RECAPDocument.DoesNotExist:
-                rd = RECAPDocument(**params)
-                rds_created.append(rd)
+                try:
+                    doc_id_params = deepcopy(params)
+                    doc_id_params.pop("attachment_number", None)
+                    del doc_id_params["document_type"]
+                    doc_id_params["pacer_doc_id"] = attachment["pacer_doc_id"]
+                    rd = await RECAPDocument.objects.aget(**doc_id_params)
+                    if attachment["attachment_number"] == 0:
+                        try:
+                            old_main_rd = await RECAPDocument.objects.aget(
+                                docket_entry=de,
+                                document_type=RECAPDocument.PACER_DOCUMENT,
+                            )
+                            rd.description = old_main_rd.description
+                        except RECAPDocument.DoesNotExist:
+                            rd.description = ""
+                        except RECAPDocument.MultipleObjectsReturned:
+                            rd.description = ""
+                            logger.info(
+                                f"Failed to migrate description for "
+                                f"{attachment["pacer_doc_id"]}, "
+                                f"multiple source documents found."
+                            )
+                        rd.attachment_number = None
+                        rd.document_type = RECAPDocument.PACER_DOCUMENT
+                    else:
+                        rd.attachment_number = attachment["attachment_number"]
+                        rd.document_type = RECAPDocument.ATTACHMENT
+                except RECAPDocument.DoesNotExist:
+                    rd = RECAPDocument(**params)
+                    if attachment["attachment_number"] == 0:
+                        try:
+                            old_main_rd = await RECAPDocument.objects.aget(
+                                docket_entry=de,
+                                document_type=RECAPDocument.PACER_DOCUMENT,
+                            )
+                            rd.description = old_main_rd.description
+                        except RECAPDocument.DoesNotExist:
+                            rd.description = ""
+                        except RECAPDocument.MultipleObjectsReturned:
+                            rd.description = ""
+                            logger.info(
+                                f"Failed to migrate description for "
+                                f"{attachment["pacer_doc_id"]}, "
+                                f"multiple source documents found."
+                            )
+                    rds_created.append(rd)
 
         rds_affected.append(rd)
-        for field in ["description", "pacer_doc_id"]:
-            if attachment[field]:
-                setattr(rd, field, attachment[field])
+        if (
+            attachment["description"]
+            and rd.document_type == RECAPDocument.ATTACHMENT
+        ):
+            rd.description = attachment["description"]
+        if attachment["pacer_doc_id"]:
+            rd.pacer_doc_id = attachment["pacer_doc_id"]
 
         # Only set page_count and file_size if they're blank, in case
         # we got the real value by measuring.
-        if rd.page_count is None:
+        if rd.page_count is None and attachment.get("page_count", None):
             rd.page_count = attachment["page_count"]
         # If we have file_size_bytes it should have max precision.
         file_size_bytes = attachment.get("file_size_bytes")
@@ -1824,6 +1955,9 @@ def process_case_query_report(
         court_id,
         str(pacer_case_id),
         report_data["docket_number"],
+        report_data.get("federal_defendant_number"),
+        report_data.get("federal_dn_judge_initials_assigned"),
+        report_data.get("federal_dn_judge_initials_referred"),
         using="default",
     )
     d.pacer_case_id = pacer_case_id

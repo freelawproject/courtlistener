@@ -28,6 +28,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
+    CSVExportMixin,
     linkify_orig_docket_number,
     make_docket_number_core,
     make_recap_path,
@@ -1136,7 +1137,7 @@ class DocketPanel(Docket.panel.through):
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class DocketEntry(AbstractDateTimeModel):
+class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
         Docket,
         help_text=(
@@ -1257,6 +1258,27 @@ class DocketEntry(AbstractDateTimeModel):
             )
         return None
 
+    def get_csv_columns(self, get_column_name=False):
+        columns = [
+            "id",
+            "entry_number",
+            "date_filed",
+            "time_filed",
+            "pacer_sequence_number",
+            "recap_sequence_number",
+            "description",
+        ]
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
+        return columns
+
+    def get_column_function(self):
+        """Get dict of attrs: fucntion to apply on field value if it needs
+        to be pre-processed before being add to csv
+
+        returns: dict -- > {attr1: function}"""
+        return {}
+
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
 class DocketEntryTags(DocketEntry.tags.through):
@@ -1318,7 +1340,9 @@ class AbstractPacerDocument(models.Model):
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
+class RECAPDocument(
+    AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel, CSVExportMixin
+):
     """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
@@ -1735,6 +1759,53 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         out["text"] = text_template.render({"item": self}).translate(null_map)
 
         return normalize_search_dicts(out)
+
+    def get_csv_columns(self, get_column_name=False):
+        columns = [
+            "id",
+            "document_type",
+            "description",
+            "acms_document_guid",
+            "date_upload",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "is_free_on_pacer",
+            "is_available",
+            "is_sealed",
+            "sha1",
+            "page_count",
+            "file_size",
+            "filepath_local",
+            "filepath_ia",
+            "ocr_status",
+        ]
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
+        return columns
+
+    def _get_readable_document_type(self, *args, **kwargs):
+        return self.get_document_type_display()
+
+    def _get_readable_ocr_status(self, *args, **kwargs):
+        return self.get_ocr_status_display()
+
+    def _get_full_filepath_local(self, *args, **kwargs):
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    def get_column_function(self):
+        """Get dict of attrs: function to apply on field value if it needs
+        to be pre-processed before being add to csv
+        If not functions returns empty dict
+
+        returns: dict -- > {attr1: function}"""
+        return {
+            "document_type": self._get_readable_document_type,
+            "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
+        }
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)

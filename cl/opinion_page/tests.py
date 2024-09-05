@@ -1,19 +1,20 @@
 # mypy: disable-error-code=attr-defined
 import datetime
 import os
+import re
 import shutil
 from datetime import date
 from http import HTTPStatus
 from unittest import mock
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
@@ -38,9 +39,14 @@ from cl.opinion_page.forms import (
 )
 from cl.opinion_page.utils import (
     es_get_citing_clusters_with_cache,
+    generate_docket_entries_csv_data,
     make_docket_title,
 )
-from cl.opinion_page.views import get_prev_next_volumes
+from cl.opinion_page.views import (
+    download_docket_entries_csv,
+    fetch_docket_entries,
+    get_prev_next_volumes,
+)
 from cl.people_db.factories import (
     PersonFactory,
     PersonWithChildrenFactory,
@@ -50,6 +56,7 @@ from cl.people_db.models import Person
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
+    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
 )
@@ -57,17 +64,20 @@ from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     RECAPDocument,
@@ -1523,3 +1533,179 @@ class TestBlockSearchItemAjax(TestCase):
 
         await self.cluster.arefresh_from_db()
         self.assertTrue(self.cluster.blocked)
+
+
+class DocketEntryFileDownload(TestCase):
+    """Test Docket entries File Download and required functions."""
+
+    def setUp(self):
+        court = CourtFactory(id="ca5", jurisdiction="F")
+        # Main docket to test
+        docket = DocketFactory(
+            court=court,
+            case_name="Foo v. Bar",
+            docket_number="12-11111",
+            pacer_case_id="12345",
+        )
+
+        de1 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506581111,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1,
+            pacer_doc_id="00506581111",
+            document_number="00506581111",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        de1_2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1_2,
+            pacer_doc_id="00506581111",
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        de2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=2,
+            description="Lorem ipsum dolor sit amet",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de2,
+            pacer_doc_id="",
+            document_number="2",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        de3 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506582222,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de3,
+            pacer_doc_id="00506582222",
+            document_number="3",
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de3,
+            description="Document attachment",
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number="3",
+            attachment_number=2,
+        )
+        # Create extra docket and docket entries to make sure it only fetch
+        # required docket_entries
+        docket1 = DocketFactory(
+            court=court,
+            case_name="Test v. Test1",
+            docket_number="12-222222",
+            pacer_case_id="12345",
+        )
+        de4 = DocketEntryFactory(
+            docket=docket1,
+            entry_number=506582222,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de4,
+            pacer_doc_id="00506582222",
+            document_number="005506582222",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        self.mocked_docket = docket
+        self.mocked_extra_docket = docket1
+        self.mocked_docket_entries = [de1, de1_2, de2, de3]
+        self.mocked_extra_docket_entries = [de4]
+
+        request_factory = RequestFactory()
+        self.request = request_factory.get("/mock-url/")
+        self.user = UserFactory.create(
+            username="learned",
+            email="learnedhand@scotus.gov",
+        )
+        self.request.auser = AsyncMock(return_value=self.user)
+
+    def tearDown(self):
+        # Clear all test data
+        Docket.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        RECAPDocument.objects.all().delete()
+        User.objects.all().delete()
+
+    async def test_fetch_docket_entries(self) -> None:
+        """Verify that fetch entries function returns right docket_entries"""
+        res = await fetch_docket_entries(self.mocked_docket)
+        self.assertEqual(await res.acount(), len(self.mocked_docket_entries))
+        self.assertTrue(await res.acontains(self.mocked_docket_entries[0]))
+        self.assertFalse(
+            await res.acontains(self.mocked_extra_docket_entries[0])
+        )
+
+    def test_generate_docket_entries_csv_data(self) -> None:
+        """Verify str with csv data is created. Check column and data entry"""
+        res = generate_docket_entries_csv_data(self.mocked_docket_entries)
+        res_lines = res.split("\r\n")
+        res_line_data = res_lines[1].split(",")
+        self.assertEqual(res[:16], '"docketentry_id"')
+        self.assertEqual(res_line_data[1], '"506581111"')
+
+        # Checks if the number of values in each CSV row matches the expected
+        # number of columns.
+
+        # Compute the expected number of columns by combining the columns from
+        # the docket entry and recap documents
+        docket_entry = self.mocked_docket_entries[0]
+        de_columns = docket_entry.get_csv_columns(get_column_name=True)
+        rd_columns = docket_entry.recap_documents.first().get_csv_columns(
+            get_column_name=True
+        )
+        column_count = len(de_columns + rd_columns)
+
+        # Iterate over each line in the generated CSV data and count the number
+        # of values.
+        rows = [
+            len(re.findall('"([^"]*)"', line)) == column_count
+            for line in res_lines
+            if line
+        ]
+        # Assert that all rows have the expected number of values.
+        self.assertTrue(
+            all(rows),
+            "One or more rows of the CSV file has more values than expected",
+        )
+
+    @mock.patch("cl.opinion_page.utils.user_has_alert")
+    @mock.patch("cl.opinion_page.utils.core_docket_data")
+    @mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data")
+    def test_view_download_docket_entries_csv(
+        self,
+        mock_download_function,
+        mock_core_docket_data,
+        mock_user_has_alert,
+    ) -> None:
+        """Test download_docket_entries_csv returns csv content"""
+
+        mock_download_function.return_value = (
+            '"col1","col2","col3"\r\n"value1","value2","value3"'
+        )
+        mock_user_has_alert.return_value = False
+        mock_core_docket_data.return_value = (
+            self.mocked_docket,
+            {
+                "docket": self.mocked_docket,
+                "title": "title",
+                "note_form": "note_form",
+                "has_alert": mock_user_has_alert.return_value,
+                "timezone": "EST",
+                "private": True,
+            },
+        )
+        response = download_docket_entries_csv(
+            self.request, self.mocked_docket.id
+        )
+        self.assertEqual(response["Content-Type"], "text/csv")

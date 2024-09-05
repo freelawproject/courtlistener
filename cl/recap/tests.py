@@ -56,8 +56,10 @@ from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
     DocketDataFactory,
+    DocketDataWithAttachmentsFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    DocketEntryWithAttachmentsDataFactory,
     FjcIntegratedDatabaseFactory,
     MinuteDocketEntryDataFactory,
     PacerFetchQueueFactory,
@@ -2031,7 +2033,12 @@ class RecapMinuteEntriesTest(TestCase):
         rss_feed._parse_text(text)
         docket = rss_feed.data[0]
         d = async_to_sync(find_docket_object)(
-            court_id, docket["pacer_case_id"], docket["docket_number"]
+            court_id,
+            docket["pacer_case_id"],
+            docket["docket_number"],
+            docket["federal_defendant_number"],
+            docket["federal_dn_judge_initials_assigned"],
+            docket["federal_dn_judge_initials_referred"],
         )
         async_to_sync(update_docket_metadata)(d, docket)
         d.save()
@@ -2192,6 +2199,45 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(docket.docket_entries.count(), 1)
         self.assertEqual(docket.assigned_to_str, "John Marshall")
         self.assertEqual(docket.referred_to_str, "Sophia Clinton")
+
+    def test_avoid_deleting_short_description(self) -> None:
+        """Test that merging identical docket entries without a
+        short_description does not delete or overwrite the existing short_description
+        """
+        court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
+        rss_feed = PacerRssFeed(court_ca10.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            text = f.read().decode()
+        rss_feed._parse_text(text)
+        docket = rss_feed.data[0]
+        d = async_to_sync(find_docket_object)(
+            court_ca10.pk,
+            docket["pacer_case_id"],
+            docket["docket_number"],
+            docket["federal_defendant_number"],
+            docket["federal_dn_judge_initials_assigned"],
+            docket["federal_dn_judge_initials_referred"],
+        )
+        async_to_sync(update_docket_metadata)(d, docket)
+        d.save()
+        async_to_sync(add_docket_entries)(d, docket["docket_entries"])
+        rd = RECAPDocument.objects.all().first()
+        self.assertEqual(rd.description, "Case termination for COA")
+
+        # Merge the identical entry without a short_description.
+        # It should not be removed.
+        docket_entries = [
+            MinuteDocketEntryDataFactory(
+                description="Lorem ipsum",
+                short_description=None,
+                pacer_doc_id="010010808570",
+                document_number="010010808570",
+            ),
+        ]
+        async_to_sync(add_docket_entries)(d, docket_entries)
+        rd = RECAPDocument.objects.all().first()
+        self.assertEqual(d.docket_entries.count(), 1)
+        self.assertEqual(rd.description, "Case termination for COA")
 
 
 class DescriptionCleanupTest(SimpleTestCase):
@@ -2595,7 +2641,7 @@ class RecapDocketTaskTest(TestCase):
 class RecapDocketAttachmentTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        CourtFactory(id="cand", jurisdiction="FD")
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -2634,6 +2680,151 @@ class RecapDocketAttachmentTaskTest(TestCase):
         )
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_main_document_doesnt_match_attachment_zero_on_creation(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that attachment 0 is properly set as the Main document if
+        the docket entry's pacer_doc_id does not match the Main document's
+        pacer_doc_id on creation.
+        """
+        docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            pacer_case_id="238743",
+        )
+        docket_data = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="1234567",
+                    short_description="Complaint",
+                    attachments=[
+                        AppellateAttachmentFactory(
+                            attachment_number=0,
+                            pacer_doc_id="1234566",
+                            description="Main Document",
+                        ),
+                        AppellateAttachmentFactory(
+                            attachment_number=1,
+                            pacer_doc_id="1234567",
+                            description="Attachment 1",
+                        ),
+                    ],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data["docket_entries"]
+        )
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234566")
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_main_document_doesnt_match_attachment_zero_existing(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that attachment 0 is properly set as the Main document if
+        the docket entry's pacer_doc_id does not match the Main document's
+        pacer_doc_id on an existing document.
+        """
+        docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            pacer_case_id="238743",
+        )
+        docket_data_no_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1, pacer_doc_id="1234567", attachments=[]
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data_no_att["docket_entries"]
+        )
+
+        # When attachment data is unknown, the main PACER_DOCUMENT should be
+        # set to pacer_doc_id 1234567.
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+
+        docket_data_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="1234567",
+                    short_description="Complaint",
+                    attachments=[
+                        AppellateAttachmentFactory(
+                            attachment_number=0,
+                            pacer_doc_id="1234566",
+                            description="Main Document",
+                        ),
+                        AppellateAttachmentFactory(
+                            attachment_number=1,
+                            pacer_doc_id="1234567",
+                            description="Attachment 1",
+                        ),
+                    ],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data_att["docket_entries"]
+        )
+
+        # After merging attachments, the main PACER_DOCUMENT should now be set
+        # to attachment 0 with pacer_doc_id 1234566.
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234566")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        # pacer_doc_id 1234567 should now be an attachment.
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
 
 
 class ClaimsRegistryTaskTest(TestCase):
@@ -7414,7 +7605,12 @@ class LookupDocketsTest(TestCase):
         """
 
         d = async_to_sync(find_docket_object)(
-            self.court.pk, "12345", self.docket_data["docket_number"]
+            self.court.pk,
+            "12345",
+            self.docket_data["docket_number"],
+            None,
+            "",
+            "",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
@@ -7433,7 +7629,12 @@ class LookupDocketsTest(TestCase):
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 4)
         d = async_to_sync(find_docket_object)(
-            self.court.pk, "12346", self.docket_data["docket_number"]
+            self.court.pk,
+            "12346",
+            self.docket_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
@@ -7449,7 +7650,12 @@ class LookupDocketsTest(TestCase):
         """Confirm if lookup by only pacer_case_id works properly."""
 
         d = async_to_sync(find_docket_object)(
-            self.court.pk, "54321", self.docket_data["docket_number"]
+            self.court.pk,
+            "54321",
+            self.docket_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
@@ -7467,6 +7673,9 @@ class LookupDocketsTest(TestCase):
             self.court.pk,
             None,
             self.docket_core_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_core_data)
         d.save()
@@ -7484,6 +7693,9 @@ class LookupDocketsTest(TestCase):
             self.court.pk,
             None,
             self.docket_no_core_data["docket_number"],
+            None,
+            "",
+            "",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
         d.save()
@@ -7503,6 +7715,9 @@ class LookupDocketsTest(TestCase):
             self.court.pk,
             self.docket_data["docket_entries"][0]["pacer_case_id"],
             self.docket_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
 
         async_to_sync(update_docket_metadata)(d, self.docket_data)
@@ -7531,6 +7746,9 @@ class LookupDocketsTest(TestCase):
             self.court.pk,
             self.docket_data["docket_entries"][0]["pacer_case_id"],
             self.docket_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
 
         async_to_sync(update_docket_metadata)(d, self.docket_data)
@@ -7565,11 +7783,226 @@ class LookupDocketsTest(TestCase):
             self.court_appellate.pk,
             None,
             docket_data_lower_number["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
         async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)
         new_d.save()
         # The existing docket is matched instead of creating a new one.
         self.assertEqual(new_d.pk, d.pk)
+
+    def test_lookup_by_docket_number_components(self):
+        """Can we match a docket using the components of the docket number?
+        If two or more dockets are found without a matching pacer_case_id, and
+        they are matched by docket_number or docket_number_core, use the
+        components of the docket number as a last resort to find the correct
+        match. If a single docket is matched, and it contains DN components use
+        them to confirm the docket matched is the right one.
+        """
+
+        # Single docket doesn't match.
+        d_1 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00076",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+            federal_dn_case_type="cv",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00076",
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="ML",
+            federal_dn_judge_initials_referred="DHL",
+        )
+        self.assertNotEqual(docket_matched.pk, d_1.pk)
+
+        # Single docket match.
+        d_1_2 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00073",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00073",
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+        )
+        self.assertEqual(docket_matched.pk, d_1_2.pk)
+
+        # Partial DN components single docket match.
+        d_1_2_3 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00072",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00072",
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+        )
+        self.assertEqual(docket_matched.pk, d_1_2_3.pk)
+        docket_data = self.docket_data.copy()
+        docket_data["federal_dn_judge_initials_assigned"] = "MA"
+        async_to_sync(update_docket_metadata)(docket_matched, docket_data)
+        docket_matched.save()
+        docket_matched.refresh_from_db()
+        self.assertEqual(
+            docket_matched.federal_dn_judge_initials_assigned, "MA"
+        )
+
+        # Two or more Dockets matched. Partial DN components matched.
+        d_2 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00050",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00050",
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="",
+        )
+        self.assertEqual(docket_matched.pk, d_2.pk)
+
+        # Two or more Dockets matched. All DN components matched.
+        d_3 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00076",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=1,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="DLH",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00076",
+            federal_defendant_number=1,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="DLH",
+        )
+        self.assertEqual(docket_matched.pk, d_3.pk)
+
+    def test_avoid_lookup_by_docket_number_components(self):
+        """If either the docket or the docket_data contains None values for
+        DN components. Avoid using them to match the docket.
+        """
+
+        # Dockets in DB contains docket_number components but the incoming data
+        # doesn't.
+        oldest_d = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00075",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="LM",
+            federal_dn_case_type="cv",
+            federal_dn_office_code="1",
+        )
+        DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00075",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="LM",
+            federal_dn_case_type="cv",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00075",
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="",
+            federal_dn_judge_initials_referred="",
+        )
+        # DN components are not used to match the docket. The oldest one is
+        # selected instead.
+        self.assertEqual(docket_matched.pk, oldest_d.pk)
+
+        # Dockets in DB lacks of docket_number components.
+        oldest_d_1 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00076",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="",
+            federal_dn_office_code="",
+        )
+        DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00076",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="",
+            federal_dn_office_code="",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00076",
+            federal_defendant_number=1,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="DLH",
+        )
+        # DN components are not used to match the docket. The oldest one is
+        # selected instead.
+        self.assertEqual(docket_matched.pk, oldest_d_1.pk)
 
 
 class CleanUpDuplicateAppellateEntries(TestCase):
