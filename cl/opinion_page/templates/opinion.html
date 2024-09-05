@@ -15,7 +15,7 @@
 {% block navbar-o %}active{% endblock %}
 
 {% block head %}
-    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster|best_case_name|truncatewords:10}}" href="/feed/search/?q=cites:({{ cluster.sub_opinions.all|OR_join }})">
+    <link rel="alternate" type="application/rss+xml" title="Atom feed for cases citing {{cluster|best_case_name|truncatewords:10}}" href="/feed/search/?q=cites:({{ opinions|OR_join }})">
 {% endblock %}
 
 {% block footer-scripts %}
@@ -48,7 +48,7 @@
                            class="btn btn-primary btn-xs">Cluster</a>
                     {% endif %}
                     {% if perms.search.change_opinion %}
-                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                        {% for sub_opinion in opinions %}
                             <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
                                class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion</a>
                         {% endfor %}
@@ -111,7 +111,7 @@
         <div id="cited-by" class="sidebar-section">
           <h3>
             <span>Cited By ({{ citing_cluster_count|intcomma }}) <a
-              href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+              href="/feed/search/?type=o&q=cites%3A({{ opinions|OR_join }})"
               rel="nofollow">
                 <i class="gray fa fa-rss"
                    title="Subscribe to a feed of citations to this case."></i>
@@ -128,7 +128,7 @@
               {% endfor %}
             </ul>
             <p>
-              <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+              <a href="/?q=cites%3A({{ opinions|OR_join }})"
                  rel="nofollow"
                  class="btn btn-default"
               >View Citing Opinions</a>
@@ -137,7 +137,7 @@
             <p>This case has not yet been cited in our system.</p>
           {% endif %}
           <div class="btn-group">
-            <a href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+            <a href="/?show_alert_modal=yes&q=cites%3A({{ opinions|OR_join }})"
                rel="nofollow"
                class="btn btn-primary"
             ><i class="fa fa-bell-o"></i> Get Citation Alerts</a>
@@ -221,7 +221,7 @@
 
 {% block content %}
     <article class="col-sm-9">
-        {% with opinion_count=cluster.sub_opinions.all.count %}
+        {% with opinion_count=opinions.count %}
             <h2 class="inline">{{ caption|safe|v_wrapper }}</h2>
             {% include "includes/notes_modal.html" %}
 
@@ -308,7 +308,7 @@
                 </p>
             {% endif %}
             {% if opinion_count == 1 %}
-                {% with opinion=cluster.sub_opinions.all.0 %}
+                {% with opinion=opinions.0 %}
                 {% if opinion.author %}
                     <p class="bottom">
                         <span class="meta-data-header">Author:</span>
@@ -350,7 +350,7 @@
                         Download Original <span class="caret"></span>
                     </button>
                     <ul class="dropdown-menu">
-                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                        {% for sub_opinion in opinions %}
                             {% if sub_opinion.local_path %}
                                 <li>
                                     <a href="{{ sub_opinion.local_path.url }}"
@@ -361,7 +361,7 @@
                                 </li>
                             {% endif %}
                         {% endfor %}
-                        {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                        {% for sub_opinion in opinions %}
                             {% if sub_opinion.download_url %}
                                 {% if forloop.counter == 1 %}
                                     <li role="separator" class="divider"></li>
@@ -399,7 +399,7 @@
             {# Only display tabs and make panels if more than one sub-opinion. #}
             {% if opinion_count > 1 %}
                 <ul class="nav nav-tabs v-offset-below-1" role="tablist">
-                    {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                    {% for sub_opinion in opinions %}
                         <li role="presentation" {% if forloop.first %}class="active"{% endif %}>
                             <a href="#{{ sub_opinion.type }}{{ forloop.counter }}"
                                aria-controls="{{ sub_opinion.type }}{{ forloop.counter }}"
@@ -411,7 +411,7 @@
             {% endif %}
 
             <div class="tab-content">
-                {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                {% for sub_opinion in opinions %}
                     <div {% if opinion_count > 1 %}
                             role="tabpanel"
                             class="tab-pane {% if forloop.first %}active{% endif %}"

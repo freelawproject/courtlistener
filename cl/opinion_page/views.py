@@ -83,10 +83,12 @@ from cl.recap.models import FjcIntegratedDatabase
 from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     SEARCH_TYPES,
+    SOURCES,
     Citation,
     Court,
     Docket,
     DocketEntry,
+    Opinion,
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
@@ -872,6 +874,23 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     )
     await authorities_context.post_init()
 
+    opinions = cluster.sub_opinions.all()
+
+    # Verify if the cluster has any of the two possible sources with multiple opinions
+    if (
+        SOURCES.HARVARD_CASELAW in cluster.source
+        or SOURCES.COLUMBIA_ARCHIVE in cluster.source
+    ):
+        opinions_count = await opinions.acount()
+        if opinions_count > 1:
+            # We have more than one opinion, exclude combined opinions
+            opinions = opinions.exclude(type=Opinion.COMBINED).order_by(
+                "ordering_key"
+            )
+    else:
+        # Default order for non-Harvard or Columbia opinions
+        opinions = opinions.order_by("type")
+
     return TemplateResponse(
         request,
         "opinion.html",
@@ -879,6 +898,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             "title": title,
             "caption": await cluster.acaption(),
             "cluster": cluster,
+            "opinions": opinions,
             "has_downloads": has_downloads,
             "note_form": note_form,
             "get_string": get_string,
