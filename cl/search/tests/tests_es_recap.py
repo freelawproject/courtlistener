@@ -2473,7 +2473,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             cd, 1, "Complaint available"
         )
         button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Initial Complaint", button_text)
+        self.assertEqual("Initial Document", button_text)
         self.assertEqual(initial_complaint_1.get_absolute_url(), button_url)
 
         # District document initial complaint not available. Show Buy button.
@@ -2485,7 +2485,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             cd, 1, "Complaint Not available"
         )
         button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Buy Initial Complaint", button_text)
+        self.assertEqual("Buy Initial Document", button_text)
         self.assertEqual(initial_complaint_2.pacer_url, button_url)
 
         # Appellate notice of appeal available
@@ -2497,7 +2497,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             cd, 1, "Complaint Appellate available"
         )
         button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Notice of Appeal", button_text)
+        self.assertEqual("Initial Document", button_text)
         self.assertEqual(initial_complaint_4.get_absolute_url(), button_url)
 
         # No docket entry is available for the initial complaint. No button is shown.
@@ -2534,7 +2534,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             cd, 1, "Complaint Appellate available"
         )
         button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Buy Notice of Appeal", button_text)
+        self.assertEqual("Buy Initial Document", button_text)
         self.assertEqual(initial_complaint_5.pacer_url, button_url)
 
         "Lorem Bankruptcy vs Petition Available"
@@ -2548,7 +2548,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             cd, 1, "Complaint available"
         )
         button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Initial Petition", button_text)
+        self.assertEqual("Initial Document", button_text)
         self.assertEqual(initial_complaint_6.get_absolute_url(), button_url)
 
         # Bankruptcy document initial petition not available. Show Buy button.
@@ -2561,7 +2561,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         button_url, button_text = self._parse_initial_complaint_button(r)
         self.assertEqual(
-            "Buy Initial Petition", button_text, msg="Failed here..."
+            "Buy Initial Document",
+            button_text,
         )
         self.assertEqual(initial_complaint_7.pacer_url, button_url)
 

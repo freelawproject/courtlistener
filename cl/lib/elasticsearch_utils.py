@@ -1811,12 +1811,7 @@ def merge_unavailable_fields_on_parent_document(
                     "pk", flat=True
                 )
             )
-            bankruptcy_ids = (
-                Court.federal_courts.bankruptcy_pacer_courts().values_list(
-                    "pk", flat=True
-                )
-            )
-            initial_complaints = (
+            initial_documents = (
                 RECAPDocument.objects.filter(
                     QObject(
                         QObject(
@@ -1851,52 +1846,30 @@ def merge_unavailable_fields_on_parent_document(
                     "docket_entry__docket__court__jurisdiction",
                     "docket_entry__docket__court_id",
                 )
-                .annotate(
-                    court_type=Case(
-                        When(
-                            docket_entry__docket__court_id__in=appellate_court_ids,
-                            then=Value("appellate"),
-                        ),
-                        When(
-                            docket_entry__docket__court_id__in=bankruptcy_ids,
-                            then=Value("bankruptcy"),
-                        ),
-                        default=Value("district"),
-                        output_field=CharField(),
-                    )
-                )
             )
 
-            initial_complaints_in_page = {}
-            for initial_complaint in initial_complaints:
-                if initial_complaint.has_valid_pdf:
+            initial_documents_in_page = {}
+            for initial_document in initial_documents:
+                if initial_document.has_valid_pdf:
                     # Initial complaint/petition/appeal available
-                    text_button = {
-                        "appellate": "Notice of Appeal",
-                        "bankruptcy": "Initial Petition",
-                    }.get(initial_complaint.court_type, "Initial Complaint")
-                    initial_complaints_in_page[
-                        initial_complaint.docket_entry.docket_id
+                    text_button = "Initial Document"
+                    initial_documents_in_page[
+                        initial_document.docket_entry.docket_id
                     ] = (
-                        initial_complaint.get_absolute_url(),
+                        initial_document.get_absolute_url(),
                         None,
                         text_button,
                     )
                 else:
                     # Initial complaint/petition/appeal not available. Buy button.
-                    buy_text_button = {
-                        "appellate": "Buy Notice of Appeal",
-                        "bankruptcy": "Buy Initial Petition",
-                    }.get(
-                        initial_complaint.court_type, "Buy Initial Complaint"
-                    )
-                    initial_complaints_in_page[
-                        initial_complaint.docket_entry.docket_id
-                    ] = (None, initial_complaint.pacer_url, buy_text_button)
+                    buy_text_button = "Buy Initial Document"
+                    initial_documents_in_page[
+                        initial_document.docket_entry.docket_id
+                    ] = (None, initial_document.pacer_url, buy_text_button)
 
             for result in results:
                 complaint_url, buy_complaint_url, text_button = (
-                    initial_complaints_in_page.get(
+                    initial_documents_in_page.get(
                         result.docket_id, (None, None, "")
                     )
                 )
