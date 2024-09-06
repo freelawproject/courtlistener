@@ -2913,6 +2913,107 @@ class RecapDocketAttachmentTaskTest(TestCase):
         self.assertEqual(attachment_1.attachment_number, 1)
         self.assertEqual(attachment_1.description, "Attachment 1")
 
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_handle_old_main_rds_with_att_number(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that we can fix old main RDs that were merged with an
+        attachment number, and when the main RD's pacer_doc_id mismatches the
+        pacer_doc_id from the entry.
+        """
+
+        # Reproduce initial scenario described in:
+        # https://github.com/freelawproject/courtlistener/issues/4416#issue-2505976445
+        de = DocketEntryFactory(
+            docket=DocketFactory(
+                source=Docket.RECAP,
+                court=self.court,
+                pacer_case_id="238743",
+            ),
+            entry_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de,
+            pacer_doc_id="12606201629",
+            document_number="1",
+            attachment_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            description="Complaint",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de,
+            pacer_doc_id="12606200429",
+            document_number="1",
+            attachment_number=None,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            description="Attachment 1",
+        )
+
+        # Merge attachment data and confirm the existing RDs get fixed.
+        docket_data_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="12606201629",
+                    short_description="Complaint",
+                    attachments=[
+                        AppellateAttachmentFactory(
+                            attachment_number=1,
+                            pacer_doc_id="12606200429",
+                            description="Attachment 1",
+                        ),
+                        AppellateAttachmentFactory(
+                            attachment_number=1,
+                            pacer_doc_id="12606200430",
+                            description="Attachment 2",
+                        ),
+                    ],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            de.docket, docket_data_att["docket_entries"]
+        )
+
+        # After merging the attachments, there should be 3 RDs in the entry.
+        rds = RECAPDocument.objects.all()
+        self.assertEqual(rds.count(), 3)
+
+        # Main rd should be the one with pacer_doc_id: 12606201629
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        # pacer_doc_id 12606200429 should now be attachment 1.
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="1234566")
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
+
+        # pacer_doc_id 12606200430 should now be attachment 2.
+        attachment_2 = RECAPDocument.objects.get(pacer_doc_id="1234568")
+        self.assertEqual(
+            attachment_2.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 2)
+        self.assertEqual(attachment_1.description, "Attachment 2")
+
 
 class ClaimsRegistryTaskTest(TestCase):
     """Can we handle claims registry uploads?"""
