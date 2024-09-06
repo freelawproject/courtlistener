@@ -1821,6 +1821,16 @@ async def merge_attachment_page_data(
                 params["acms_document_guid"] = attachment["acms_document_guid"]
             try:
                 rd = await RECAPDocument.objects.aget(**params)
+            except RECAPDocument.MultipleObjectsReturned:
+                doc_id_params = deepcopy(params)
+                doc_id_params["pacer_doc_id"] = attachment["pacer_doc_id"]
+                rd = await RECAPDocument.objects.aget(**doc_id_params)
+                if attachment["attachment_number"] == 0:
+                    rd.attachment_number = None
+                    rd.document_type = RECAPDocument.PACER_DOCUMENT
+                else:
+                    rd.attachment_number = attachment["attachment_number"]
+                    rd.document_type = RECAPDocument.ATTACHMENT
             except RECAPDocument.DoesNotExist:
                 try:
                     doc_id_params = deepcopy(params)
