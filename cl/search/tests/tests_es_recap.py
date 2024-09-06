@@ -224,18 +224,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
     @staticmethod
-    def _parse_initial_complaint_button(response):
-        """Parse the initial complaint button within the HTML response."""
+    def _parse_initial_document_button(response):
+        """Parse the initial document button within the HTML response."""
         tree = html.fromstring(response.content.decode())
         try:
-            initial_complaint = tree.xpath(
-                "//a[contains(@class, 'initial-complaint')]"
+            initial_document = tree.xpath(
+                "//a[contains(@class, 'initial-document')]"
             )[0]
         except IndexError:
             return None, None
         return (
-            initial_complaint.get("href"),
-            initial_complaint.text_content().strip(),
+            initial_document.get("href"),
+            initial_document.text_content().strip(),
         )
 
     def test_has_child_text_queries(self) -> None:
@@ -2273,8 +2273,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("encountered an error", r.content.decode())
 
-    def test_initial_complaint_button(self) -> None:
-        """Confirm the initial complaint button is properly shown on different
+    def test_initial_document_button(self) -> None:
+        """Confirm the initial document button is properly shown on different
         scenarios"""
 
         district_court = CourtFactory(id="cand", jurisdiction="FD")
@@ -2283,7 +2283,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
 
-            # District document initial complaint available
+            # District document initial document available
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=district_court,
@@ -2297,7 +2297,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             dockets_to_remove.append(de_1.docket)
             sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
-            initial_complaint_1 = RECAPDocumentFactory(
+            initial_document_1 = RECAPDocumentFactory(
                 docket_entry=de_1,
                 document_number="1",
                 document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2316,7 +2316,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="1234568",
             )
 
-            # District document initial complaint not available
+            # District document initial document not available
             de_2 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=district_court,
@@ -2329,7 +2329,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_2.docket)
-            initial_complaint_2 = RECAPDocumentFactory(
+            initial_document_2 = RECAPDocumentFactory(
                 docket_entry=de_2,
                 document_number="1",
                 document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2359,14 +2359,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_3.docket)
-            initial_complaint_3 = RECAPDocumentFactory(
+            initial_document_3 = RECAPDocumentFactory(
                 docket_entry=de_3,
                 document_number="1",
                 is_available=False,
                 pacer_doc_id=None,
             )
 
-            # Appellate document initial complaint available
+            # Appellate document initial document available
             de_4 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court_2,
@@ -2380,7 +2380,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             dockets_to_remove.append(de_4.docket)
             sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
-            initial_complaint_4 = RECAPDocumentFactory(
+            initial_document_4 = RECAPDocumentFactory(
                 docket_entry=de_4,
                 document_number="1",
                 attachment_number=1,
@@ -2403,7 +2403,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_5.docket)
-            initial_complaint_5 = RECAPDocumentFactory(
+            initial_document_5 = RECAPDocumentFactory(
                 docket_entry=de_5,
                 document_number="1",
                 attachment_number=1,
@@ -2412,7 +2412,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="765425",
             )
 
-            # No DocketEntry for the initial complaint available
+            # No DocketEntry for the initial document available
             empty_docket = DocketFactory(
                 court=district_court,
                 case_name="Lorem No Initial Complaint Entry",
@@ -2420,7 +2420,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 source=Docket.RECAP,
             )
             dockets_to_remove.append(empty_docket)
-            # Bankruptcy document initial petition available
+            # Bankruptcy document initial document available
             de_6 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2434,7 +2434,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             dockets_to_remove.append(de_6.docket)
             sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
-            initial_complaint_6 = RECAPDocumentFactory(
+            initial_document_6 = RECAPDocumentFactory(
                 docket_entry=de_6,
                 document_number="1",
                 document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2443,7 +2443,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="12345875",
             )
 
-            # Bankruptcy document initial petition not available
+            # Bankruptcy document initial document not available
             de_7 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2456,7 +2456,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_7.docket)
-            initial_complaint_7 = RECAPDocumentFactory(
+            initial_document_7 = RECAPDocumentFactory(
                 docket_entry=de_7,
                 document_number="1",
                 document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2464,19 +2464,19 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="35345875",
             )
 
-        # District document initial complaint available
+        # District document initial document available
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"Lorem District vs Complaint Available"',
         }
         r = async_to_sync(self._test_article_count)(
-            cd, 1, "Complaint available"
+            cd, 1, "Document available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertEqual("Initial Document", button_text)
-        self.assertEqual(initial_complaint_1.get_absolute_url(), button_url)
+        self.assertEqual(initial_document_1.get_absolute_url(), button_url)
 
-        # District document initial complaint not available. Show Buy button.
+        # District document initial document not available. Show Buy button.
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"Lorem District vs Complaint Not Available"',
@@ -2484,9 +2484,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Not available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertEqual("Buy Initial Document", button_text)
-        self.assertEqual(initial_complaint_2.pacer_url, button_url)
+        self.assertEqual(initial_document_2.pacer_url, button_url)
 
         # Appellate notice of appeal available
         cd = {
@@ -2496,11 +2496,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Appellate available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertEqual("Initial Document", button_text)
-        self.assertEqual(initial_complaint_4.get_absolute_url(), button_url)
+        self.assertEqual(initial_document_4.get_absolute_url(), button_url)
 
-        # No docket entry is available for the initial complaint. No button is shown.
+        # No docket entry is available for the initial document. No button is shown.
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"Lorem No Initial Complaint Entry"',
@@ -2508,7 +2508,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Entry no available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertIsNone(button_text)
         self.assertIsNone(button_url)
 
@@ -2521,7 +2521,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Appellate Complaint button no available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertIsNone(button_text)
         self.assertIsNone(button_url)
 
@@ -2533,9 +2533,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Appellate available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertEqual("Buy Initial Document", button_text)
-        self.assertEqual(initial_complaint_5.pacer_url, button_url)
+        self.assertEqual(initial_document_5.pacer_url, button_url)
 
         "Lorem Bankruptcy vs Petition Available"
 
@@ -2547,9 +2547,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertEqual("Initial Document", button_text)
-        self.assertEqual(initial_complaint_6.get_absolute_url(), button_url)
+        self.assertEqual(initial_document_6.get_absolute_url(), button_url)
 
         # Bankruptcy document initial petition not available. Show Buy button.
         cd = {
@@ -2559,12 +2559,12 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Not available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertEqual(
             "Buy Initial Document",
             button_text,
         )
-        self.assertEqual(initial_complaint_7.pacer_url, button_url)
+        self.assertEqual(initial_document_7.pacer_url, button_url)
 
         for docket in dockets_to_remove:
             docket.delete()
