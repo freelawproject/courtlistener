@@ -2968,7 +2968,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
                             description="Attachment 1",
                         ),
                         AppellateAttachmentFactory(
-                            attachment_number=1,
+                            attachment_number=2,
                             pacer_doc_id="12606200430",
                             description="Attachment 2",
                         ),
