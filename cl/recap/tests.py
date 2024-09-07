@@ -2664,9 +2664,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
-        RECAPDocument.objects.filter(
-            document_type=RECAPDocument.ATTACHMENT,
-        ).delete()
+        RECAPDocument.objects.all().delete()
 
     def test_attachments_get_created(self, mock):
         """Do attachments get created if we have a RECAPDocument to match
@@ -2850,6 +2848,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
                 DocketEntryWithAttachmentsDataFactory(
                     document_number=1,
                     pacer_doc_id="12606200429",
+                    short_description="Complaint",
                     attachments=[],
                 ),
             ],
@@ -2902,6 +2901,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
             msg="PACER_DOCUMENT type didn't match.",
         )
         self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
 
         # Confirm attachment 1 is the one with pacer_doc_id:12606200429
         attachment_1 = RECAPDocument.objects.get(pacer_doc_id="12606200429")
