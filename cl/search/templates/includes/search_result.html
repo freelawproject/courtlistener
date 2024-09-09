@@ -8,7 +8,7 @@
   {% with doc0=result.doclist.docs.0 type=search_form.type.value %}
   <h3 class="bottom serif">
     {% if type == SEARCH_TYPES.PEOPLE or type_override == SEARCH_TYPES.PEOPLE %}
-      <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
+      <a href="{{ result.absolute_url }}{% querystring %}"
          class="visitable">
       {{ result.name|render_string_or_list|safe }}
       {% if result.court %}
@@ -24,7 +24,7 @@
       </a>
 
     {% elif type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
-      <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
+      <a href="{{ result.absolute_url }}{% querystring %}"
          class="visitable">
       {{ result.caseName|render_string_or_list|safe }}
       {% url "court_homepage" pk="me" as maine_url %}
@@ -34,7 +34,7 @@
       </a>
 
     {% elif type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT %}
-      <a href="{% url 'view_audio_file' result.id result.docket_slug %}?{{ request.META.QUERY_STRING }}"
+      <a href="{% url 'view_audio_file' result.id result.docket_slug %}{% querystring %}"
          class="visitable">
       {{ result.caseName|render_string_or_list|safe  }}
       ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|render_string_or_list|safe|nbsp }}&nbsp;{% endif %}{{ result.dateArgued|date:"Y" }})
@@ -217,7 +217,7 @@
         </a>
       {% endif %}
       {% if result.child_remaining %}
-        <a href="{% url "show_results" %}?type={{ type|urlencode }}&q={% if request.GET.q %}({{ request.GET.q|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}" class="btn-default btn">
+        <a href="{% url 'show_results' %}{% querystring type=type q=request.GET.q|build_docket_id_q_param:result.docket_id %}" class="btn-default btn">
           View Additional Results for this Case
         </a>
       {% elif result.child_remaining_query_id %}
