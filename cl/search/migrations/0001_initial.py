@@ -421,7 +421,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='recapdocument',
-            index=models.Index(fields=['document_type', 'document_number', 'attachment_number'], name='search_recapdocument_document_type_document_num_attachment_num_idx'),
+            index=models.Index(fields=['document_type', 'document_number', 'attachment_number'], name='search_reca_documen_cc5acd_idx'),
         ),
         migrations.AlterUniqueTogether(
             name='opinionscited',
@@ -429,7 +429,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='docketentry',
-            index=models.Index(fields=['recap_sequence_number', 'entry_number'], name='search_docketentry_recap_seq_num_entry_num_idx')
+            index=models.Index(fields=['recap_sequence_number', 'entry_number'], name='search_dock_recap_s_306ab9_idx')
         ),
         migrations.AddIndex(
             model_name='docket',
@@ -439,21 +439,17 @@ class Migration(migrations.Migration):
             name='docket',
             unique_together={('docket_number', 'pacer_case_id', 'court')},
         ),
-        migrations.AddIndex(
-            model_name='docket',
-            index=models.Index(fields=['ia_upload_failure_count', 'ia_needs_upload', 'ia_date_first_change'], name='search_docket_ia_upload_failure_count_ia_needs_upload_ia_date_first_change_idx'),
-        ),
         migrations.AlterUniqueTogether(
             name='citation',
             unique_together={('cluster', 'volume', 'reporter', 'page')},
         ),
         migrations.AddIndex(
             model_name='citation',
-            index=models.Index(fields=['volume', 'reporter', 'page'], name='search_citation_volume_reporter_page_idx')
+            index=models.Index(fields=['volume', 'reporter', 'page'], name='search_cita_volume_92c344_idx')
         ),
         migrations.AddIndex(
             model_name='citation',
-            index=models.Index(fields=['volume', 'reporter'], name='search_citation_volume_reporter_idx')
+            index=models.Index(fields=['volume', 'reporter'], name='search_cita_volume_464334_idx')
         ),
 
     ]

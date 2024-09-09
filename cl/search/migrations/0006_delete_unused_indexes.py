@@ -144,11 +144,5 @@ class Migration(migrations.Migration):
                 help_text="The moment when this item first changed and was marked as needing an upload. Used for determining when to upload an item.",
                 null=True,
             ),
-        ),
-        migrations.AlterModelOptions(
-            name="docket",
-            options={
-                'indexes': [],
-            },
-        ),
+        )
     ]

@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'indexes': [
-                    models.Index(fields=['docket_number', 'district', 'division_code'], name='lasc_docket_docket_number_district_division_code_idx'),
+                    models.Index(fields=['docket_number', 'district', 'division_code'], name='lasc_docket_docket__4b4f04_idx'),
                 ],
             },
         ),

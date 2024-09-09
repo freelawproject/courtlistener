@@ -94,6 +94,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='fjcintegrateddatabase',
-            index=models.Index(fields=['district', 'docket_number'], name='recap_fjc_district_docket_number_idx'),
+            index=models.Index(fields=['district', 'docket_number'], name='recap_fjcin_distric_731c7b_idx'),
         ),
     ]
