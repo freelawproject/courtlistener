@@ -297,8 +297,6 @@ def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
     :return:The query string with the docket_id included.
     """
 
-    parts = []
     if request_q:
-        parts.append(f"({request_q})")
-    parts.append(f"docket_id:{docket_id}")
-    return mark_safe(" AND ".join(parts))
+        return f"({request_q}) AND docket_id:{docket_id}"
+    return f"docket_id:{docket_id}"

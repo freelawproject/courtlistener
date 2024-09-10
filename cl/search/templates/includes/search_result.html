@@ -217,7 +217,7 @@
         </a>
       {% endif %}
       {% if result.child_remaining %}
-        <a href="{% url 'show_results' %}{% querystring type=type q=request.GET.q|build_docket_id_q_param:result.docket_id %}" class="btn-default btn">
+        <a href="{% url 'show_results' %}{% querystring type=type q=request.GET.q|build_docket_id_q_param:result.docket_id %}" class="btn-default btn view-additional-results">
           View Additional Results for this Case
         </a>
       {% elif result.child_remaining_query_id %}
