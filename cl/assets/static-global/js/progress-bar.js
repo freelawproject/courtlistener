@@ -7,7 +7,8 @@ function updateProgressBar() {
     oldValue = parseFloat(progressElement.dataset.value);
   }
   let newValue = oldValue + Math.random() / 10;
-  progressElement.style.width = `${10 + newValue * 85}%`;
+  if (newValue >= 1) newValue = 1;
+  progressElement.style.width = `${10 + newValue * 75}%`;
   progressElement.dataset.value = newValue;
 }
 
