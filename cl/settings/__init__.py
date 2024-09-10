@@ -19,3 +19,4 @@ from .third_party.redis import *
 from .third_party.rest_framework import *
 from .third_party.sentry import *
 from .third_party.waffle import *
+from .third_party.r2 import *
