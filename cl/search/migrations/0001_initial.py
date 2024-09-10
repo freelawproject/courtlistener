@@ -421,7 +421,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='recapdocument',
-            index=models.Index(fields=['document_type', 'document_number', 'attachment_number'], name='search_reca_documen_cc5acd_idx'),
+            index=models.Index(fields=['document_type', 'document_number', 'attachment_number'], name='search_recapdocument_document_type_303cccac79571217_idx'),
         ),
         migrations.AlterUniqueTogether(
             name='opinionscited',
@@ -429,7 +429,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='docketentry',
-            index=models.Index(fields=['recap_sequence_number', 'entry_number'], name='search_dock_recap_s_306ab9_idx')
+            index=models.Index(fields=['recap_sequence_number', 'entry_number'], name='search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx')
         ),
         migrations.AddIndex(
             model_name='docket',
@@ -445,11 +445,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='citation',
-            index=models.Index(fields=['volume', 'reporter', 'page'], name='search_cita_volume_92c344_idx')
+            index=models.Index(fields=['volume', 'reporter', 'page'], name='search_citation_volume_ae340b5b02e8912_idx')
         ),
         migrations.AddIndex(
             model_name='citation',
-            index=models.Index(fields=['volume', 'reporter'], name='search_cita_volume_464334_idx')
+            index=models.Index(fields=['volume', 'reporter'], name='search_citation_volume_251bc1d270a8abee_idx')
         ),
 
     ]

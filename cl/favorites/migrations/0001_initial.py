@@ -41,7 +41,7 @@ class Migration(migrations.Migration):
             options={
                 'unique_together': {('user', 'name')},
                 'indexes': [
-                    models.Index(fields=['user', 'name'], name='favorites_u_user_id_f6c9a6_idx'),
+                    models.Index(fields=['user', 'name'], name='favorites_usertag_user_id_name_54aef6fe_idx'),
                 ],
             },
         ),
@@ -61,9 +61,9 @@ class Migration(migrations.Migration):
             ],
             options={
                 'indexes': [
-                    models.Index(fields=['recap_document', 'user'], name='favorites_p_recap_d_7c046c_idx'),
-                    models.Index(fields=['recap_document', 'status'], name='favorites_p_recap_d_00e8c5_idx'),
-                    models.Index(fields=['date_created', 'user', 'status'], name='favorites_p_date_cr_8bf054_idx'),
+                    models.Index(fields=['recap_document', 'user'], name='favorites_prayer_recap_document_id_user_id_c5d30108_idx'),
+                    models.Index(fields=['recap_document', 'status'], name='favorites_prayer_recap_document_id_status_82e2dbbb_idx'),
+                    models.Index(fields=['date_created', 'user', 'status'], name='favorites_prayer_date_created_user_id_status_880d7280_idx'),
                 ],
             },
         ),
