@@ -28,8 +28,8 @@ DATABASES = {
             # "require" or above.
             "sslmode": env("DB_SSL_MODE", default="require"),
             "pool": {
-                "min_size": env("DB_POOL_MIN_SIZE", default=2),
-                "max_size": env("DB_POOL_MAX_SIZE", default=4),
+                "min_size": env("DB_POOL_MIN_SIZE", default=1),
+                "max_size": env("DB_POOL_MAX_SIZE", default=20),
                 "timeout": env("DB_POOL_TIMEOUT", default=30),
             },
         },
@@ -47,8 +47,8 @@ if env("DB_REPLICA_HOST", default=""):
         "OPTIONS": {
             "sslmode": env("DB_REPLICA_SSL_MODE", default="prefer"),
             "pool": {
-                "min_size": env("DB_REPLICA_POOL_MIN_SIZE", default=2),
-                "max_size": env("DB_REPLICA_POOL_MAX_SIZE", default=4),
+                "min_size": env("DB_REPLICA_POOL_MIN_SIZE", default=1),
+                "max_size": env("DB_REPLICA_POOL_MAX_SIZE", default=20),
                 "timeout": env("DB_REPLICA_POOL_TIMEOUT", default=30),
             },
         },
