@@ -104,6 +104,7 @@ $(document).ready(function () {
         .appendTo('#search-form');
     });
     installProgressBar();
+    disableAllSubmitButtons();
     document.location = '/?' + $('#search-form').serialize();
   }
 

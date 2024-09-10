@@ -21,6 +21,15 @@ function installProgressBar() {
   trickleInterval = window.setInterval(updateProgressBar, 300);
 }
 
+function disableAllSubmitButtons() {
+  // Get all submit buttons on the page
+  const submitButtons = document.querySelectorAll('input[type="submit"],button[type="submit"]');
+  // Disable each element
+  submitButtons.forEach((button) => {
+    button.disabled = true;
+  });
+}
+
 document.onvisibilitychange = () => {
   if (document.visibilityState !== 'hidden') return;
 
