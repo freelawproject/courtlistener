@@ -103,6 +103,7 @@ $(document).ready(function () {
         .val(el.val())
         .appendTo('#search-form');
     });
+    installProgressBar();
     document.location = '/?' + $('#search-form').serialize();
   }
 
