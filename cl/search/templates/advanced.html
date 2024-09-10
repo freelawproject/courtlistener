@@ -37,6 +37,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
+  <script src="{% static "js/progress-bar.js" %}"></script>
   {% include "includes/date_picker.html" %}
   <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     $(document).ready(function () {
