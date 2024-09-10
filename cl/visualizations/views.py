@@ -195,7 +195,7 @@ async def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
 async def delete_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
         v = await SCOTUSMap.objects.aget(
-            pk=request.POST.get("pk"), user=request.user
+            pk=request.POST.get("pk"), user=await request.auser()
         )
         v.deleted = True
         await v.asave()
@@ -211,7 +211,7 @@ async def delete_visualization(request: HttpRequest) -> HttpResponse:
 async def restore_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
         v = await SCOTUSMap.objects.aget(
-            pk=request.POST.get("pk"), user=request.user
+            pk=request.POST.get("pk"), user=await request.auser()
         )
         v.deleted = False
         v.date_deleted = None
@@ -228,7 +228,7 @@ async def restore_visualization(request: HttpRequest) -> HttpResponse:
 async def share_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
         v = await SCOTUSMap.objects.aget(
-            pk=request.POST.get("pk"), user=request.user
+            pk=request.POST.get("pk"), user=await request.auser()
         )
         v.published = True
         await v.asave()
@@ -244,7 +244,7 @@ async def share_visualization(request: HttpRequest) -> HttpResponse:
 async def privatize_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
         v = await SCOTUSMap.objects.aget(
-            pk=request.POST.get("pk"), user=request.user
+            pk=request.POST.get("pk"), user=await request.auser()
         )
         v.published = False
         await v.asave()

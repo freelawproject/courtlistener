@@ -2333,11 +2333,10 @@ class RelatedSearchTest(
 
         recommendations_expected = [
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
                 "Howard v. Honda",
             )
         ]
-
         # Test if related opinion exist in expected order
         self.assertEqual(
             recommendations_expected,
@@ -2370,11 +2369,11 @@ class RelatedSearchTest(
 
         recommendations_expected = [
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/",
                 "case name cluster 3",
             ),
         ]
