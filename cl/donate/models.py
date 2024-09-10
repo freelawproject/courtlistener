@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 
 class PAYMENT_TYPES:
@@ -46,7 +45,12 @@ class PROVIDERS:
     )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+)
 class Donation(AbstractDateTimeModel):
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
@@ -127,7 +131,12 @@ class Donation(AbstractDateTimeModel):
         ordering = ["-date_created"]
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+)
 class MonthlyDonation(AbstractDateTimeModel):
     """The metadata needed to associate a monthly donation with a user."""
 
@@ -198,7 +207,12 @@ class NeonWebhookEvent(AbstractDateTimeModel):
     )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+)
 class NeonMembership(AbstractDateTimeModel):
     BASIC = 1
     LEGACY = 2

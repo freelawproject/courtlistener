@@ -43,7 +43,7 @@ django-filter = "^23.5"
 django-localflavor = "^4.0"
 django-markdown-deux = "^1.0.6"
 django-mathfilters = "*"
-django-pghistory = "^2.9.0"
+django-pghistory = "^3.4.0"
 django-ratelimit = "^4.1.0"
 django-storages = "^1.14.2"
 djangorestframework = {git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2"}

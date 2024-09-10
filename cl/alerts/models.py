@@ -8,11 +8,15 @@ from django.http import QueryDict
 from django.utils.crypto import get_random_string
 
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import SEARCH_TYPES, Docket
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+)
 class Alert(AbstractDateTimeModel):
     REAL_TIME = "rt"
     DAILY = "dly"
@@ -81,7 +85,12 @@ class DocketAlertManager(models.Manager):
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+)
 class DocketAlert(AbstractDateTimeModel):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1

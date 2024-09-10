@@ -5,11 +5,15 @@ from django.db import models
 
 from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+)
 class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -70,7 +74,12 @@ class Note(models.Model):
         )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+)
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
@@ -87,7 +96,13 @@ class DocketTag(models.Model):
         unique_together = (("docket", "tag"),)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), exclude=["view_count"])
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+    exclude=["view_count"],
+)
 class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
 
@@ -130,7 +145,12 @@ class UserTag(AbstractDateTimeModel):
         indexes = [models.Index(fields=["user", "name"])]
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+)
 class Prayer(models.Model):
     WAITING = 1
     GRANTED = 2
