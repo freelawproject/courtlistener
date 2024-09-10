@@ -470,75 +470,94 @@ class DupcheckerTest(TestCase):
                 self.fail(failure)
 
 
-class DupcheckerWithFixturesTest(TestCase):
-    fixtures = [
-        "test_court.json",
-        "judge_judy.json",
-        "test_objects_search.json",
-    ]
-
+class DupcheckerPressOnTest(TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.court = Court.objects.get(pk="test")
 
-        # Set the dup_threshold to zero for these tests
-        self.dup_checkers = [
-            DupChecker(self.court, full_crawl=True, dup_threshold=0),
-            DupChecker(self.court, full_crawl=False, dup_threshold=0),
-        ]
+        self.dc_full_crawl = DupChecker(self.court, True, 2)
+        self.dc_not_full_crawl = DupChecker(self.court, False, 2)
+        self.dup_checkers = [self.dc_full_crawl, self.dc_not_full_crawl]
+        self.dup_hash = "1" * 40
+        self.press_on_args = [Opinion, now(), now(), self.dup_hash]
 
-        # Set up the hash value using one in the fixture.
-        self.content_hash = "asdfasdfasdfasdfasdfasddf"
+        docket = DocketFactory()
+        cluster = OpinionClusterFactory(docket=docket)
+        opinion = OpinionFactory(sha1=self.dup_hash, cluster=cluster)
+
+    def test_press_on_no_dup(self) -> None:
+        """Does the DupChecker raises no error when seeing a new hash?"""
+        self.dc_full_crawl.press_on(*self.press_on_args[:-1], "not a dup")
+        self.dc_not_full_crawl.press_on(*self.press_on_args[:-1], "not a dup")
 
     def test_press_on_with_a_dup_found(self) -> None:
-        for dup_checker in self.dup_checkers:
-            try:
-                dup_checker.press_on(
-                    Opinion,
-                    now(),
-                    now(),
-                    lookup_value=self.content_hash,
-                    lookup_by="sha1",
-                )
-                if not dup_checker.full_crawl:
-                    self.fail("Did not raise ConsecutiveDuplicatesError.")
-            except ConsecutiveDuplicatesError:
-                if dup_checker.full_crawl:
-                    self.fail(
-                        "DupChecker raised ConsecutiveDuplicatesError breaking"
-                        " the outer loop. Nothing should stop a full crawl!"
-                    )
-            except SingleDuplicateError:
-                # Full crawl or not, a SingleDuplicateError is
-                # expected when a duplicate is found
-                pass
+        """Do we raise the appropiate exceptions when a dup is found?"""
+        # First duplicate
+        try:
+            self.dc_full_crawl.press_on(*self.press_on_args)
+            self.fail("Should raise SingleDuplicateError")
+        except ConsecutiveDuplicatesError:
+            self.fail("Full crawl raised a loop breaking exception")
+        except SingleDuplicateError:
+            pass  # we expect this to happen
+
+        # Second duplicate, dup threshold = 2
+        try:
+            self.dc_full_crawl.press_on(*self.press_on_args)
+            self.fail("Should raise SingleDuplicateError")
+        except ConsecutiveDuplicatesError:
+            self.fail("Full crawl raised a loop breaking exception")
+        except SingleDuplicateError:
+            pass
+
+        # First duplicate
+        try:
+            self.dc_not_full_crawl.press_on(*self.press_on_args)
+            self.fail("Should raise SingleDuplicateError")
+        except SingleDuplicateError:
+            pass
+        except ConsecutiveDuplicatesError:
+            self.fail(
+                "Dup threshold is 1, should not raise ConsecutiveDuplicatesError"
+            )
+
+        # Second duplicate, dup threshold = 2
+        try:
+            self.dc_not_full_crawl.press_on(*self.press_on_args)
+            self.fail("Should raise ConsecutiveDuplicatesError")
+        except SingleDuplicateError:
+            self.fail("Should raise ConsecutiveDuplicatesError")
+        except ConsecutiveDuplicatesError:
+            pass  # expected behavior
 
     def test_press_on_with_dup_found_and_older_date(self) -> None:
-        for dup_checker in self.dup_checkers:
-            # Note that the next case occurs prior to the current one
-            try:
-                dup_checker.press_on(
-                    Opinion,
-                    now(),
-                    now() - timedelta(days=1),
-                    lookup_value=self.content_hash,
-                    lookup_by="sha1",
-                )
-                self.fail(
-                    "Expected raising SingleDuplicateError, there was a duplicate in the DB"
-                )
+        """Do we raise the appropiate exception when a duplicate is found
+        and we account for case dates?
+        """
+        self.dc_not_full_crawl.reset()
+        self.dc_full_crawl.reset()
 
-            except SingleDuplicateError:
-                # Full crawl or not, a SingleDuplicateError is
-                # expected when a duplicate is found
-                pass
-            except ConsecutiveDuplicatesError:
-                if dup_checker.full_crawl:
-                    self.fail(
-                        "DupChecker raised ConsecutiveDuplicatesError during a "
-                        "full crawl, breaking the outer loop. Nothing should "
-                        "stop a full crawl!"
-                    )
+        # duplicated case occurs prior to the current one
+        args = [*self.press_on_args]
+        args[2] = now() - timedelta(days=1)
+
+        try:
+            self.dc_full_crawl.press_on(*args)
+            self.fail("Expected SingleDuplicateError")
+        except SingleDuplicateError:
+            pass
+        except ConsecutiveDuplicatesError:
+            self.fail(
+                "This a full crawl, ConsecutiveDuplicatesError should not be raised"
+            )
+
+        try:
+            self.dc_not_full_crawl.press_on(*args)
+            self.fail("Expected loop breaking ConsecutiveDuplicatesError")
+        except SingleDuplicateError:
+            self.fail("Expected loop breaking ConsecutiveDuplicatesError")
+        except ConsecutiveDuplicatesError:
+            pass
 
 
 class AudioFileTaskTest(TestCase):

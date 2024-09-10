@@ -56,8 +56,10 @@ from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
     DocketDataFactory,
+    DocketDataWithAttachmentsFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    DocketEntryWithAttachmentsDataFactory,
     FjcIntegratedDatabaseFactory,
     MinuteDocketEntryDataFactory,
     PacerFetchQueueFactory,
@@ -79,6 +81,7 @@ from cl.recap.mergers import (
     add_parties_and_attorneys,
     find_docket_object,
     get_order_of_docket,
+    merge_attachment_page_data,
     normalize_long_description,
     update_case_names,
     update_docket_metadata,
@@ -2198,6 +2201,45 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(docket.assigned_to_str, "John Marshall")
         self.assertEqual(docket.referred_to_str, "Sophia Clinton")
 
+    def test_avoid_deleting_short_description(self) -> None:
+        """Test that merging identical docket entries without a
+        short_description does not delete or overwrite the existing short_description
+        """
+        court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
+        rss_feed = PacerRssFeed(court_ca10.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            text = f.read().decode()
+        rss_feed._parse_text(text)
+        docket = rss_feed.data[0]
+        d = async_to_sync(find_docket_object)(
+            court_ca10.pk,
+            docket["pacer_case_id"],
+            docket["docket_number"],
+            docket["federal_defendant_number"],
+            docket["federal_dn_judge_initials_assigned"],
+            docket["federal_dn_judge_initials_referred"],
+        )
+        async_to_sync(update_docket_metadata)(d, docket)
+        d.save()
+        async_to_sync(add_docket_entries)(d, docket["docket_entries"])
+        rd = RECAPDocument.objects.all().first()
+        self.assertEqual(rd.description, "Case termination for COA")
+
+        # Merge the identical entry without a short_description.
+        # It should not be removed.
+        docket_entries = [
+            MinuteDocketEntryDataFactory(
+                description="Lorem ipsum",
+                short_description=None,
+                pacer_doc_id="010010808570",
+                document_number="010010808570",
+            ),
+        ]
+        async_to_sync(add_docket_entries)(d, docket_entries)
+        rd = RECAPDocument.objects.all().first()
+        self.assertEqual(d.docket_entries.count(), 1)
+        self.assertEqual(rd.description, "Case termination for COA")
+
 
 class DescriptionCleanupTest(SimpleTestCase):
     def test_cleanup(self) -> None:
@@ -2600,7 +2642,7 @@ class RecapDocketTaskTest(TestCase):
 class RecapDocketAttachmentTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        CourtFactory(id="cand", jurisdiction="FD")
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -2622,9 +2664,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
-        RECAPDocument.objects.filter(
-            document_type=RECAPDocument.ATTACHMENT,
-        ).delete()
+        RECAPDocument.objects.all().delete()
 
     def test_attachments_get_created(self, mock):
         """Do attachments get created if we have a RECAPDocument to match
@@ -2639,6 +2679,239 @@ class RecapDocketAttachmentTaskTest(TestCase):
         )
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_main_document_doesnt_match_attachment_zero_on_creation(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that attachment 0 is properly set as the Main document if
+        the docket entry's pacer_doc_id does not match the Main document's
+        pacer_doc_id on creation.
+        """
+        docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            pacer_case_id="238743",
+        )
+        docket_data = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="1234567",
+                    short_description="Complaint",
+                    attachments=[
+                        AppellateAttachmentFactory(
+                            attachment_number=0,
+                            pacer_doc_id="1234566",
+                            description="Main Document",
+                        ),
+                        AppellateAttachmentFactory(
+                            attachment_number=1,
+                            pacer_doc_id="1234567",
+                            description="Attachment 1",
+                        ),
+                    ],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data["docket_entries"]
+        )
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234566")
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_main_document_doesnt_match_attachment_zero_existing(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that attachment 0 is properly set as the Main document if
+        the docket entry's pacer_doc_id does not match the Main document's
+        pacer_doc_id on an existing document.
+        """
+        docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            pacer_case_id="238743",
+        )
+        docket_data_no_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1, pacer_doc_id="1234567", attachments=[]
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data_no_att["docket_entries"]
+        )
+
+        # When attachment data is unknown, the main PACER_DOCUMENT should be
+        # set to pacer_doc_id 1234567.
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+
+        docket_data_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="1234567",
+                    short_description="Complaint",
+                    attachments=[
+                        AppellateAttachmentFactory(
+                            attachment_number=0,
+                            pacer_doc_id="1234566",
+                            description="Main Document",
+                        ),
+                        AppellateAttachmentFactory(
+                            attachment_number=1,
+                            pacer_doc_id="1234567",
+                            description="Attachment 1",
+                        ),
+                    ],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data_att["docket_entries"]
+        )
+
+        # After merging attachments, the main PACER_DOCUMENT should now be set
+        # to attachment 0 with pacer_doc_id 1234566.
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234566")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        # pacer_doc_id 1234567 should now be an attachment.
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_main_rd_lookup_fallback_for_attachment_merging(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that attachment data can be properly merged when the current
+        main_rd pacer_doc_id mismatches the main document's pacer_doc_id from
+        the attachment page.
+        """
+        docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            pacer_case_id="238743",
+        )
+        docket_data_no_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="12606200429",
+                    short_description="Complaint",
+                    attachments=[],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data_no_att["docket_entries"]
+        )
+
+        # When attachment data is unknown, the main PACER_DOCUMENT is the one
+        # with pacer_doc_id: 12606200429
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="12606200429")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+
+        # Merge attachment data where the main_document pacer_doc_id has a
+        # different pacer_doc_id: 12606201629
+        attachments_data = AppellateAttachmentPageFactory(
+            document_number=1,
+            pacer_doc_id="12606201629",
+            attachments=[
+                AppellateAttachmentFactory(
+                    attachment_number=1,
+                    pacer_doc_id="12606200429",
+                    description="Attachment 1",
+                ),
+            ],
+        )
+        async_to_sync(merge_attachment_page_data)(
+            docket.court,
+            docket.pacer_case_id,
+            attachments_data["pacer_doc_id"],
+            None,
+            "",
+            attachments_data["attachments"],
+        )
+
+        # Now we should have 2 RDs in the entry: the main document + 1 attachment
+        de_rds = RECAPDocument.objects.all()
+        self.assertEqual(de_rds.count(), 2)
+
+        # Confirm main_rd is now the one with pacer_doc_id:12606201629
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="12606201629")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        # Confirm attachment 1 is the one with pacer_doc_id:12606200429
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="12606200429")
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
 
 
 class ClaimsRegistryTaskTest(TestCase):

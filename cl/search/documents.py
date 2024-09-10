@@ -13,7 +13,7 @@ from cl.custom_filters.templatetags.text_filters import (
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
-from cl.lib.search_index_utils import null_map
+from cl.lib.search_index_utils import get_parties_from_case_name, null_map
 from cl.lib.utils import deepgetattr
 from cl.people_db.models import (
     Attorney,
@@ -1230,6 +1230,14 @@ class DocketDocument(DocketBaseDocument):
         for pk, name in party_values.iterator():
             out["party_id"].add(pk)
             out["party"].add(name)
+
+        if not out["party"]:
+            # Get party from docket case_name if no normalized parties are
+            # available.
+            party_from_case_name = get_parties_from_case_name(
+                instance.case_name
+            )
+            out["party"] = party_from_case_name if party_from_case_name else []
 
         # Extract only required attorney values.
         atty_values = (

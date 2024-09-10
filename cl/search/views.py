@@ -1,4 +1,5 @@
 import logging
+import pickle
 import traceback
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
@@ -32,6 +33,7 @@ from cl.audio.models import Audio
 from cl.citations.match_citations_queries import es_get_query_citation
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.crypto import sha256
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
     compute_lowest_possible_estimate,
@@ -862,6 +864,34 @@ def do_es_search(
     }
 
 
+def retrieve_cached_search_results(
+    get_params: QueryDict,
+) -> tuple[dict[str, Page | int] | None, str]:
+    """
+    Retrieve cached search results based on the GET parameters.
+
+    :param get_params: The GET parameters provided by the user.
+    :return: A two-tuple containing either the cached search results and the
+    cache key based ona prefix and the get parameters, or None and the cache key
+    if no cached results were found.
+    """
+
+    params = get_params.copy()
+    # If no page is present in the parameters, set it to 1 to generate the same
+    # hash for page 1, regardless of whether the page parameter is included.
+    # Apply the same to the q parameter when it is not present in params.
+    params.setdefault("page", "1")
+    params.setdefault("q", "")
+    sorted_params = dict(sorted(params.items()))
+    key_prefix = "search_results_cache:"
+    params_hash = sha256(pickle.dumps(sorted_params))
+    cache_key = f"{key_prefix}{params_hash}"
+    cached_results = cache.get(cache_key)
+    if cached_results:
+        return pickle.loads(cached_results), cache_key
+    return None, cache_key
+
+
 def fetch_and_paginate_results(
     get_params: QueryDict,
     search_query: Search,
@@ -884,9 +914,22 @@ def fetch_and_paginate_results(
 
     # Run the query and set up pagination
     if cache_key is not None:
+        # Check cache for displaying insights on the Home Page.
         results = cache.get(cache_key)
         if results is not None:
             return results, 0, False, None, None
+
+    # Check micro-cache for all other search requests.
+    results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
+    if results_dict:
+        # Return results and counts. Set query time to 1ms.
+        return (
+            results_dict["results"],
+            1,
+            False,
+            results_dict["main_total"],
+            results_dict["child_total"],
+        )
 
     try:
         page = int(get_params.get("page", 1))
@@ -920,5 +963,20 @@ def fetch_and_paginate_results(
     merge_unavailable_fields_on_parent_document(results, search_type)
 
     if cache_key is not None:
+        # Cache only Page results for displaying insights on the Home Page.
         cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
+    elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
+        # Cache Page results and counts for all other search requests.
+        results_dict = {
+            "results": results,
+            "main_total": main_total,
+            "child_total": child_total,
+        }
+        serialized_data = pickle.dumps(results_dict)
+        cache.set(
+            micro_cache_key,
+            serialized_data,
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+
     return results, query_time, error, main_total, child_total

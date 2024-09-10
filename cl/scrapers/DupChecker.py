@@ -135,19 +135,20 @@ class DupChecker(dict):
         else:
             already_scraped_next_date = True
 
+        # When in a full crawl, we do not raise a loop breaking
+        # `ConsecutiveDuplicatesError`
         if not self.full_crawl:
             if already_scraped_next_date:
                 if self.court.pk == "mich":
                     # Michigan sometimes has multiple occurrences of the
                     # same case with different dates on a page.
                     raise SingleDuplicateError(logger=logger)
-                else:
-                    message = "Next case occurs prior to when we found a duplicate. Court is up to date."
-                    raise ConsecutiveDuplicatesError(message, logger=logger)
+
+                message = "Next case occurs prior to when we found a duplicate. Court is up to date."
+                raise ConsecutiveDuplicatesError(message, logger=logger)
             elif self.dup_count >= self.dup_threshold:
                 message = f"Found {self.dup_count} duplicates in a row. Court is up to date."
                 raise ConsecutiveDuplicatesError(message, logger=logger)
-        else:
-            # This is a full crawl. Do not raise a loop breaking `ConsecutiveDuplicatesError`,
-            # but say that we shouldn't press on, since the item already exists.
-            raise SingleDuplicateError(logger=logger)
+
+        # Full crawl or not, this is a duplicate and we shouldn't store it
+        raise SingleDuplicateError(logger=logger)

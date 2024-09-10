@@ -8,25 +8,47 @@
       <p class="hidden-xs">Document Number</p>
     </div>
     <div class="col-xs-3 col-sm-2">Date&nbsp;Filed</div>
-    <div class="col-xs-8 col-sm-6">
-      <div class="col-xs-9 description-header">
+    <div class="col-xs-8 col-sm-2">
+      <div class="col-xs-3 description-header">
         Description
       </div>
-      <div class="col-xs-3">
-        <a href="{% url 'view_download_docket' docket.id %}" class="btn export-csv visible-xs">
+      <div class="col-xs-6 description-header flex justify-content-end">
+        <span id="mobile-export-csv-error" class="hidden visible-xs text-danger">
+          <i class="fa fa-info-circle"></i>&nbspTry again later.
+        </span>
+      </div>
+      <div class="col-xs-3 flex">
+        <a hx-get="{% url 'view_download_docket' docket.id %}"
+          hx-swap="none" hx-indicator="#mobile-spinner"
+          hx-trigger="click" class="btn export-csv visible-xs">
           <div class="flex align-items-center">
             <i class="fa fa-download gray"></i>&nbsp;
             <span>CSV</span>
           </div>
         </a>
+        &nbsp;
+        <span>
+          <i id="mobile-spinner" class="htmx-indicator fa fa-spinner fa-spin fa-lg"></i>
+        </span>
       </div>
     </div>
-    <div class="flex justify-content-end col-xs-3">
-      <a href="{% url 'view_download_docket' docket.id %}" class="btn btn-default hidden-xs export-csv">
+    <div class="flex justify-content-end col-sm-7 hidden-xs">
+      <span id="export-csv-error" class="text-danger hidden">
+        <i class="fa fa-info-circle"></i> There was a problem. Try again later.
+      </span>
+      &nbsp;
+      <a hx-get="{% url 'view_download_docket' docket.id %}"
+        hx-swap="none" hx-indicator="#export-csv-spinner" hx-trigger="click"
+        class="btn btn-default hidden-xs export-csv">
         <div class="flex align-items-center">
           <i class="fa fa-download gray hidden-lg"></i>
           <i class="fa fa-download fa-lg gray visible-lg"></i>&nbsp;
           <span>Export CSV</span>
+          &nbsp;
+          <span id="export-csv-spinner" class="htmx-hidden-indicator" >
+            <i class="fa fa-spinner fa-spin hidden-lg"></i>
+            <i class="fa fa-spinner fa-spin fa-lg visible-lg"></i>
+          </span>
         </div>
       </a>
     </div>
@@ -121,25 +143,16 @@
                           <li role="separator" class="divider"></li>
                           <li>
                               <a href="{{ rd.pacer_url }}"
-                                {% if '-' in rd.pacer_doc_id %}
-                                  class="open_buy_acms_modal"
-                                  data-toggle="modal"
-                                  data-target="#modal-buy-acms"
-                                {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                                   class="open_buy_pacer_modal"
                                   data-toggle="modal"
                                   data-target="#modal-buy-pacer"
                                 {% endif %}
                                 target="_blank"
                                 rel="nofollow">
-                                  {% if '-' in rd.pacer_doc_id %}
-                                    Direct Link Unavailable
-                                  {% else %}
-                                    {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
-                                  {% endif %}
+                                  {% if rd.is_free_on_pacer %}From PACER{% else %}Buy on PACER{% endif %} {% if rd.page_count %}(${{ rd|price }}){% endif %}
                               </a>
                           </li>
-                        </li>
                         {% endif %}
                     </ul>
                   {% else %}
@@ -149,23 +162,14 @@
                     {% else %}
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
-                          {% if '-' in rd.pacer_doc_id %}
-                            class="disabled open_buy_acms_modal cursor btn btn-default btn-xs"
-                            data-toggle="modal" data-target="#modal-buy-acms"
-                            style="pointer-events: all;"
-                          {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                             class="open_buy_pacer_modal btn btn-default btn-xs"
                             data-toggle="modal" data-target="#modal-buy-pacer"
                           {% else%}
                             class="btn btn-default btn-xs"
                           {% endif %}
                             target="_blank"
-                            rel="nofollow">
-                            {% if '-' in rd.pacer_doc_id %}
-                              Direct Link Unavailable
-                            {% else %}
-                              Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
-                            {% endif %}
+                            rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
                       {% endif %}
                     {% endif %}
@@ -189,12 +193,7 @@
                     {% else %}
                       {% if rd.pacer_url %}
                         <a href="{{ rd.pacer_url }}"
-                          {% if '-' in rd.pacer_doc_id %}
-                            data-toggle="modal"
-                            data-target="#modal-buy-acms"
-                            class="disabled open_buy_acms_modal cursor btn btn-default btn-xs"
-                            style="pointer-events: all;"
-                          {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                             data-toggle="modal"
                             data-target="#modal-buy-pacer"
                             class="open_buy_pacer_modal btn btn-default btn-xs"
@@ -203,7 +202,7 @@
                           {% endif %}
                           target="_blank"
                           rel="nofollow"
-                          title="{% if '-' in rd.pacer_doc_id %}Direct Link Unavailable{% else%}Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}{% endif %}"><i class="fa fa-download"></i>
+                          title="Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}"><i class="fa fa-download"></i>
                         </a>
                       {% endif %}
                     {% endif %}
