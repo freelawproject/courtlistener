@@ -109,6 +109,12 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "posture",
     "syllabus",
 ]
+SEARCH_MLT_OPINION_QUERY_FIELDS = [
+    "procedural_history",
+    "posture",
+    "syllabus",
+    "text",
+]
 
 # ES fields that are used for highlighting
 SEARCH_HL_TAG = "mark"

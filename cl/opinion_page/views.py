@@ -46,7 +46,6 @@ from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
-from cl.lib.elasticsearch_utils import get_related_clusters_with_cache_and_es
 from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -73,14 +72,13 @@ from cl.opinion_page.forms import (
 from cl.opinion_page.types import AuthoritiesContext
 from cl.opinion_page.utils import (
     core_docket_data,
-    es_get_citing_clusters_with_cache,
+    es_get_citing_and_related_clusters_with_cache,
     generate_docket_entries_csv_data,
     get_case_title,
 )
 from cl.people_db.models import AttorneyOrganization, CriminalCount, Role
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.models import FjcIntegratedDatabase
-from cl.search.documents import OpinionClusterDocument
 from cl.search.models import (
     SEARCH_TYPES,
     Citation,
@@ -822,18 +820,16 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         request, "o-es-active"
     )
     if es_flag_for_o:
-        search = OpinionClusterDocument.search()
         (
             related_clusters,
             sub_opinion_ids,
             related_search_params,
-        ) = await get_related_clusters_with_cache_and_es(
-            search, cluster, request
-        )
-        (
             citing_clusters,
             citing_cluster_count,
-        ) = await es_get_citing_clusters_with_cache(cluster)
+        ) = await es_get_citing_and_related_clusters_with_cache(
+            cluster, request
+        )
+
     else:
         (
             related_clusters,

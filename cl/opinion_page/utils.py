@@ -1,24 +1,38 @@
 import csv
+import logging
+import traceback
 from io import StringIO
 from typing import Dict, Tuple, Union
 
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.cache import caches
 from django.core.exceptions import ObjectDoesNotExist
 from django.http import HttpRequest
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
-from elasticsearch_dsl import Q
+from django_elasticsearch_dsl.search import Search
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
+from elasticsearch_dsl import MultiSearch, Q
 
 from cl.alerts.models import DocketAlert
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
-from cl.lib.elasticsearch_utils import do_count_query
+from cl.lib.bot_detector import is_bot
+from cl.lib.elasticsearch_utils import build_es_main_query
 from cl.lib.string_utils import trunc
+from cl.lib.types import CleanData
 from cl.recap.constants import COURT_TIMEZONES
 from cl.search.documents import OpinionClusterDocument
-from cl.search.models import Docket, OpinionCluster
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SEARCH_TYPES,
+    Docket,
+    OpinionCluster,
+)
+
+logger = logging.getLogger(__name__)
 
 
 async def get_case_title(cluster: OpinionCluster) -> str:
@@ -88,53 +102,6 @@ async def user_has_alert(
     return has_alert
 
 
-async def es_get_citing_clusters_with_cache(
-    cluster: OpinionCluster,
-) -> tuple[list[OpinionClusterDocument], int | None]:
-    """Use Elasticsearch to get clusters citing the one we're looking at
-
-    :param cluster: The cluster we're targeting
-    :type cluster: OpinionCluster
-    :return: A tuple of the list of ES results and the number of results
-    """
-    cache_key = f"citing-es:{cluster.pk}"
-    cache = caches["db_cache"]
-    cached_results = await cache.aget(cache_key)
-    if cached_results is not None:
-        return cached_results
-
-    # No cached results. Get the citing results from Elasticsearch
-    sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
-    ids_str = [str(pk) async for pk in sub_opinion_pks]
-    cites_query = Q(
-        "bool",
-        filter=[
-            Q("match", cluster_child="opinion"),
-            Q("terms", **{"cites": ids_str}),
-        ],
-    )
-    cluster_document = OpinionClusterDocument.search()
-    cluster_cites_query = cluster_document.query(cites_query)
-    search_query = (
-        cluster_cites_query.sort({"citeCount": {"order": "desc"}})
-        .source(includes=["absolute_url", "caseName", "dateFiled"])
-        .extra(size=5)
-    )
-    results = await sync_to_async(search_query.execute)()
-    citing_cluster_count = await sync_to_async(do_count_query)(
-        cluster_cites_query
-    )
-    citing_clusters = list(results)
-    a_week = 60 * 60 * 24 * 7
-
-    if citing_cluster_count is not None:
-        # Cache only if the citing_cluster_count query was successful.
-        await cache.aset(
-            cache_key, (citing_clusters, citing_cluster_count), a_week
-        )
-    return citing_clusters, citing_cluster_count
-
-
 def generate_docket_entries_csv_data(docket_entries):
     """Get str representing in memory file from docket_entries.
 
@@ -162,3 +129,176 @@ def generate_docket_entries_csv_data(docket_entries):
     csv_content: str = output.getvalue()
     output.close()
     return csv_content
+
+
+async def build_cites_clusters_query(
+    cluster_search: Search, sub_opinion_pks: list[str]
+) -> Search:
+    """Build the ES cites clusters query to find clusters citing specific
+    sub-opinions.
+
+    :param cluster_search: The Elasticsearch DSL Search object
+    :param sub_opinion_pks: A list of ids of sub-opinions to search for in
+    the 'cites' field.
+    :return: The ES DSL Search object representing the query to find clusters
+    citing the specified sub-opinions.
+    """
+    cites_query = Q(
+        "bool",
+        filter=[
+            Q("match", cluster_child="opinion"),
+            Q("terms", **{"cites": sub_opinion_pks}),
+        ],
+    )
+    cluster_cites_query = cluster_search.query(cites_query)
+    search_query = (
+        cluster_cites_query.sort({"citeCount": {"order": "desc"}})
+        .source(includes=["absolute_url", "caseName", "dateFiled"])
+        .extra(size=5)
+    )
+    return search_query
+
+
+async def build_related_clusters_query(
+    cluster_search: Search,
+    sub_opinion_pks: list[str],
+    search_params: dict[str, str],
+) -> Search:
+    """Build the ES related clusters query based on sub-opinion IDs.
+
+    :param cluster_search: The Elasticsearch DSL Search object
+    :param sub_opinion_pks: A list of IDs representing sub-opinions to be queried.
+    :param search_params: A dict of parameters used to form the query.
+    :return: The ES DSL Search object representing the query to find the
+    related clusters.
+    """
+
+    sub_opinion_queries = ",".join(str(pk) for pk in sub_opinion_pks)
+    search_params["q"] = f"related:{sub_opinion_queries}"
+    search_params["type"] = SEARCH_TYPES.OPINION
+    search_query, _, _ = await sync_to_async(build_es_main_query)(
+        cluster_search, search_params
+    )
+    return search_query
+
+
+async def es_get_citing_and_related_clusters_with_cache(
+    cluster: OpinionCluster,
+    request: HttpRequest,
+) -> tuple[
+    list[OpinionClusterDocument],
+    list[int],
+    dict[str, str],
+    list[OpinionClusterDocument],
+    int | None,
+]:
+    """Use Elasticsearch to get clusters citing and related clusters to the
+    one we're looking at.
+
+    :param cluster: The cluster we're targeting
+    :param request: The HttpRequest object.
+    :return: A tuple of related_clusters, sub_opinion_pks, the url_search_params,
+    citing_clusters and citing_cluster_count.
+    """
+
+    cache = caches["db_cache"]
+    cache_citing_key = f"citing-es:{cluster.pk}"
+    mlt_cache_key = f"mlt-cluster-es:{cluster.pk}"
+
+    # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
+    # attributes (since they're indexed in ES) instead of the NAMES values.
+    search_params: CleanData = {}
+    url_search_params = {
+        f"stat_{v[0]}": "on" for v in PRECEDENTIAL_STATUS.NAMES
+    }
+    sub_opinion_pks = [
+        str(pk)
+        async for pk in cluster.sub_opinions.values_list("pk", flat=True)
+    ]
+
+    if settings.RELATED_FILTER_BY_STATUS:
+        # Filter results by status (e.g., Precedential)
+        # Update URL parameters accordingly
+        search_params[
+            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}"
+        ] = True
+        url_search_params = {
+            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
+        }
+
+    if is_bot(request) or not sub_opinion_pks:
+        return [], [], url_search_params, [], None
+
+    cached_citing_results = await cache.aget(cache_citing_key)
+    cached_related_clusters = (
+        await cache.aget(mlt_cache_key) if settings.RELATED_USE_CACHE else None
+    )
+
+    # Prepare cited and related cluster queries if not cached results.
+    cluster_search = OpinionClusterDocument.search()
+    cited_search_query = (
+        None
+        if cached_citing_results
+        else await build_cites_clusters_query(cluster_search, sub_opinion_pks)
+    )
+    related_search_query = (
+        None
+        if cached_related_clusters
+        else await build_related_clusters_query(
+            cluster_search, sub_opinion_pks, search_params
+        )
+    )
+
+    if related_search_query:
+        related_search_query = related_search_query.extra(
+            size=settings.RELATED_COUNT, track_total_hits=False
+        )
+    try:
+        # Execute the MultiSearch request as needed based on available
+        # cached results
+        multi_search = MultiSearch()
+        if related_search_query:
+            multi_search = multi_search.add(related_search_query)
+        if cited_search_query:
+            multi_search = multi_search.add(cited_search_query)
+        multi_search.params(
+            timeout=f"{settings.ELASTICSEARCH_FAST_QUERIES_TIMEOUT}s"
+        )
+
+        responses = multi_search.execute() if multi_search._searches else []
+        related_clusters = (
+            list(responses[0])
+            if related_search_query
+            else cached_related_clusters or []
+        )
+        citing_clusters, citing_cluster_count = (
+            (list(responses[1]), responses[1].hits.total.value)
+            if cited_search_query
+            else cached_citing_results or ([], None)
+        )
+    except (TransportError, ConnectionError, RequestError, ApiError) as e:
+        logger.warning("Error getting cited and related clusters: %s", e)
+        if settings.DEBUG is True:
+            traceback.print_exc()
+
+        return [], [], url_search_params, [], None
+
+    if cited_search_query:
+        await cache.aset(
+            cache_citing_key,
+            (citing_clusters, citing_cluster_count),
+            settings.RELATED_CACHE_TIMEOUT,
+        )
+    if related_search_query:
+        await cache.aset(
+            mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
+        )
+
+    sub_opinion_ids = list(map(int, sub_opinion_pks))
+    return (
+        related_clusters,
+        sub_opinion_ids,
+        url_search_params,
+        citing_clusters,
+        citing_cluster_count,
+    )
