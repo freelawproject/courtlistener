@@ -60,6 +60,7 @@ class Command(CommandUtils, BaseCommand):
         self.print_statistics()
 
     def setup_s3_client(self, mock_client=None):
+        # Set up S3 client for accessing CAP data in R2. Ensure env has appropriate values set
         if mock_client:
             self.s3_client = mock_client
         else:
@@ -140,6 +141,7 @@ class Command(CommandUtils, BaseCommand):
             )
 
     def fetch_volumes_for_reporter(self, reporter_slug):
+        # Fetch volume directories for a given reporter from R2
         try:
             response = self.s3_client.list_objects_v2(
                 Bucket=self.bucket_name,
@@ -199,6 +201,7 @@ class Command(CommandUtils, BaseCommand):
         return None
 
     def fetch_cases_metadata(self, reporter_slug, volume):
+        # Fetch CasesMetadata.json for a specific reporter and volume from R2
         key = f"{reporter_slug}/{volume}/CasesMetadata.json"
         try:
             response = self.s3_client.get_object(
@@ -212,6 +215,7 @@ class Command(CommandUtils, BaseCommand):
             return []
 
     def fetch_reporters_metadata(self):
+        # Fetch ReportersMetadata.json from R2
         try:
             response = self.s3_client.get_object(
                 Bucket=self.bucket_name, Key="ReportersMetadata.json"
@@ -222,6 +226,7 @@ class Command(CommandUtils, BaseCommand):
             return []
 
     def is_valid_case_metadata(self, case_meta):
+        # Check if case metadata contains all required fields
         required_fields = [
             "id",
             "name_abbreviation",
