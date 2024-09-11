@@ -381,14 +381,6 @@
     <p>A few things to consider that may increase your performance:</p>
     <ol>
       <li>
-        <p>When doing deep crawls of the data, going to very high page numbers will incur increasingly bad performance. This is common in databases because to go to a high page number means sorting the entire data set, then counting to the correct location. Page 50 isn't a big deal. Page 2,000 starts getting slower.
-        </p>
-        <p>The fix to this solution is often to work with "slices" of the data. Instead of paginating across the whole result set, use a date field or another range-type field to only paginate over a smaller set of the data. For example, you could slice a large result set by the month of the date filing field to prevent deep pagination.
-        </p>
-        <p>Be careful to slice using a field with a normal distribution. Do not use one like <code>date_created</code>, which could have extreme spikes of activity.
-        </p>
-      </li>
-      <li>
         <p>Avoid doing queries like <code>court__id=xyz</code> when you can instead do <code>court=xyz</code>. Doing queries with the extra <code>__id</code> introduces a join that can be expensive.</p>
       </li>
       <li>
