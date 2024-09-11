@@ -50,6 +50,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
+  <script src="{% static "js/progress-bar.js" %}"></script>
   {% include "includes/date_picker.html" %}
   {% if alert_form.errors or request.GET.show_alert_modal %}
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">

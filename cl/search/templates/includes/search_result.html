@@ -207,13 +207,13 @@
       {% endwith %}
     {% endfor %}
     <div class="col-md-offset-half">
-      {% if result.initial_complaint_url %}
-        <a href="{{ result.initial_complaint_url }}" class="initial-complaint btn-primary btn">
-          {{ result.initial_complaint_text }}
+      {% if result.initial_document_url %}
+        <a href="{{ result.initial_document_url }}" class="initial-document btn-primary btn">
+          {{ result.initial_document_text }}
         </a>
-      {% elif result.buy_initial_complaint_url %}
-        <a href="{{ result.buy_initial_complaint_url }}" rel="nofollow" target="_blank"  class="initial-complaint btn-primary btn">
-          {{ result.initial_complaint_text }}
+      {% elif result.buy_initial_document_url %}
+        <a href="{{ result.buy_initial_document_url }}" rel="nofollow" target="_blank"  class="initial-document btn-primary btn">
+          {{ result.initial_document_text }}
         </a>
       {% endif %}
       {% if result.child_remaining %}

@@ -2189,12 +2189,14 @@ class OpinionsESSearchTest(
         with self.captureOnCommitCallbacks(execute=True):
             cluster_1 = OpinionClusterFactory.create(
                 case_name="Maecenas Howell",
+                case_name_full="Ipsum Dolor",
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 docket=self.docket_1,
             )
             OpinionFactory.create(cluster=cluster_1, plain_text="")
             cluster_2 = OpinionClusterFactory.create(
                 case_name="Maecenas Howells",
+                case_name_full="Ipsum Dolor",
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 docket=self.docket_1,
             )
