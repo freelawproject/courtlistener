@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load extras %}
+{% load text_filters %}
+{% load static %}
+
+<table>
+    <thead>
+        <tr>
+            <th>User Preference</th>
+            <th>Prayer Title</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for prayer in top_prayers %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ prayer.title }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="2">No document requests open. Consider making one!</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

@@ -5,6 +5,7 @@ from cl.favorites.views import (
     save_or_update_note,
     view_tag,
     view_tags,
+    open_prayers,
 )
 
 urlpatterns = [
@@ -22,4 +23,5 @@ urlpatterns = [
         name="view_tag",
     ),
     path("tags/<str:username>/", view_tags, name="tag_list"),
+    path("recap_requests/", open_prayers, name="recap_requests"),
 ]
