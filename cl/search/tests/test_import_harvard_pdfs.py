@@ -30,6 +30,12 @@ class TestImportHarvardPDFs(TransactionTestCase):
 
     def setUp(self):
         super().setUp()
+        from django.conf import settings
+
+        settings.R2_ENDPOINT_URL = "http://test-endpoint"
+        settings.R2_ACCESS_KEY_ID = "test-access-key"
+        settings.R2_SECRET_ACCESS_KEY = "test-secret-key"
+        settings.R2_BUCKET_NAME = "test-bucket"
         self.court = Court.objects.get(pk="scotus")
 
         # Create test dockets and clusters
