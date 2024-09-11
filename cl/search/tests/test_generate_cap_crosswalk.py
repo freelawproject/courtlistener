@@ -1,56 +1,97 @@
 import json
-import boto3
-from django.core.management.base import BaseCommand
-from django.conf import settings
-from cl.search.models import OpinionCluster
-from tqdm import tqdm
+from unittest.mock import patch, MagicMock
+from django.test import override_settings
+from django.core.management import call_command
+from cl.tests.cases import SimpleTestCase
+from io import StringIO
+import os
 
 
-class Command(BaseCommand):
-    help = "Generate crosswalk between CAP and CL IDs"
+@override_settings(
+    R2_ENDPOINT_URL="http://test-endpoint",
+    R2_ACCESS_KEY_ID="test-access-key",
+    R2_SECRET_ACCESS_KEY="test-secret-key",
+    R2_BUCKET_NAME="test-bucket",
+)
+class TestGenerateCapCrosswalk(SimpleTestCase):
+    @patch(
+        "cl.search.management.commands.generate_cap_crosswalk.Command.fetch_reporters_metadata"
+    )
+    @patch(
+        "cl.search.management.commands.generate_cap_crosswalk.Command.fetch_volumes_for_reporter"
+    )
+    @patch(
+        "cl.search.management.commands.generate_cap_crosswalk.Command.fetch_cases_metadata"
+    )
+    @patch(
+        "cl.search.management.commands.generate_cap_crosswalk.Command.find_matching_case"
+    )
+    def test_generate_cap_crosswalk_creates_file(
+        self,
+        mock_find_matching_case,
+        mock_fetch_cases_metadata,
+        mock_fetch_volumes,
+        mock_fetch_reporters,
+    ):
+        # Mock fetch_reporters_metadata
+        mock_fetch_reporters.return_value = [
+            {"slug": "U.S.", "short_name": "U.S."}
+        ]
 
-    def handle(self, *args, **options):
-        s3 = boto3.client(
-            "s3",
-            endpoint_url=settings.R2_ENDPOINT_URL,
-            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+        # Mock fetch_volumes_for_reporter
+        mock_fetch_volumes.return_value = ["1"]
+
+        # Mock fetch_cases_metadata
+        mock_fetch_cases_metadata.return_value = [
+            {
+                "id": 1,
+                "name_abbreviation": "Test Case",
+                "decision_date": "2023-01-01",
+                "citations": [{"cite": "1 U.S. 1"}],
+                "file_name": "test_case",
+            }
+        ]
+
+        # Mock find_matching_case
+        mock_opinion_cluster = MagicMock()
+        mock_opinion_cluster.id = 100
+        mock_find_matching_case.return_value = mock_opinion_cluster
+
+        # Call the command
+        call_command("generate_cap_crosswalk")
+
+        # Check if crosswalk file was created
+        expected_file_path = (
+            "/opt/courtlistener/cl/search/crosswalks/U_S_.json"
+        )
+        self.assertTrue(
+            os.path.exists(expected_file_path),
+            f"Crosswalk file not found at {expected_file_path}",
         )
 
-        crosswalk = []
-        paginator = s3.get_paginator("list_objects_v2")
-        for page in paginator.paginate(
-            Bucket=settings.R2_BUCKET_NAME, Prefix="a2d"
-        ):
-            for obj in page.get("Contents", []):
-                if obj["Key"].endswith(".json"):
-                    response = s3.get_object(
-                        Bucket=settings.R2_BUCKET_NAME, Key=obj["Key"]
-                    )
-                    cap_data = json.loads(
-                        response["Body"].read().decode("utf-8")
-                    )
-
-                    # Match logic here (simplified for example)
-                    cl_cluster = OpinionCluster.objects.filter(
-                        case_name__icontains=cap_data["name"],
-                        date_filed=cap_data["decision_date"],
-                    ).first()
-
-                    if cl_cluster:
-                        crosswalk.append(
-                            {
-                                "cap_id": cap_data["id"],
-                                "cl_id": cl_cluster.id,
-                                "cap_path": obj["Key"],
-                            }
-                        )
-
-        with open("cap_cl_crosswalk.json", "w") as f:
-            json.dump(crosswalk, f)
-
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"Generated crosswalk with {len(crosswalk)} entries"
+        # Check the content of the file
+        with open(expected_file_path, "r") as f:
+            crosswalk_data = json.load(f)
+            self.assertEqual(len(crosswalk_data), 1)
+            self.assertEqual(crosswalk_data[0]["cap_id"], 1)
+            self.assertEqual(crosswalk_data[0]["cl_id"], 100)
+            self.assertEqual(
+                crosswalk_data[0]["cap_path"], "/U.S./1/cases/test_case.json"
             )
-        )
+
+        # Clean up the created file
+        os.remove(expected_file_path)
+
+        # Verify that our mocked methods were called
+        mock_fetch_reporters.assert_called_once()
+        mock_fetch_volumes.assert_called_once_with("U.S.")
+        mock_fetch_cases_metadata.assert_called_once_with("U.S.", "1")
+        mock_find_matching_case.assert_called_once()
+
+
+if __name__ == "__main__":
+    import unittest
+
+    unittest.main()
+
+    unittest.main()

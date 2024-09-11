@@ -25,7 +25,10 @@ class HarvardPDFStorage(S3Boto3Storage):
 
 
 class Command(BaseCommand):
-    help = "Import PDFs from Harvard Case Law Access Project and update CourtListener models"
+    help = """
+    Import PDFs from Harvard Case Law Access Project and update CourtListener models.
+    Crosswalk files should be generated from the `generate_cap_crosswalks` management command before running.
+    """
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -34,9 +37,9 @@ class Command(BaseCommand):
             help="Specific reporter to process (e.g., 'A.2d')",
         )
         parser.add_argument(
-            "--resume-from",
-            type=str,
-            help="Resume processing from this CAP ID",
+            "--resume",
+            action="store_true",
+            help="Resume processing from the last completed reporter",
         )
         parser.add_argument(
             "--dry-run",
@@ -54,7 +57,7 @@ class Command(BaseCommand):
 
         self.dry_run = options["dry_run"]
         self.setup_s3_clients()
-        self.process_crosswalks(options["reporter"], options["resume_from"])
+        self.process_crosswalks(options["reporter"], options["resume"])
 
     def setup_s3_clients(self):
         # Initialize S3 client for accessing Harvard CAP R2
@@ -66,48 +69,72 @@ class Command(BaseCommand):
         )
         self.cap_bucket_name = settings.R2_BUCKET_NAME
 
-    def process_crosswalks(self, specific_reporter, resume_from):
-        # Process crosswalk files for mapping between CAP and CL IDs
+    def process_crosswalks(self, specific_reporter, resume):
         crosswalk_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "crosswalks",
         )
-        for filename in os.listdir(crosswalk_dir):
+        last_reporter_file = "last_completed_reporter.txt"
+
+        # Load the last completed reporter if resuming
+        if resume:
+            try:
+                with open(last_reporter_file, "r") as f:
+                    last_completed_reporter = f.read().strip()
+                resume = True
+            except FileNotFoundError:
+                logger.warning(
+                    "No last completed reporter file found. Starting from the beginning."
+                )
+                last_completed_reporter = None
+                resume = False
+        else:
+            last_completed_reporter = None
+
+        for filename in sorted(os.listdir(crosswalk_dir)):
             if filename.endswith(".json"):
                 reporter = filename.replace("_", ".").rstrip(".json")
+
+                # Skip reporters until we reach the resume point
+                if resume and last_completed_reporter:
+                    if reporter <= last_completed_reporter:
+                        logger.info(
+                            f"Skipping already processed reporter: {reporter}"
+                        )
+                        continue
+
                 if specific_reporter and reporter != specific_reporter:
                     continue
+
+                logger.info(f"Starting to process reporter: {reporter}")
                 self.process_crosswalk_file(
-                    os.path.join(crosswalk_dir, filename), resume_from
+                    os.path.join(crosswalk_dir, filename)
                 )
 
-    def process_crosswalk_file(self, crosswalk_file, resume_from):
+                # Log the completed reporter
+                logger.info(f"Completed processing reporter: {reporter}")
+                with open(last_reporter_file, "w") as f:
+                    f.write(reporter)
+
+    def process_crosswalk_file(self, crosswalk_file):
         logger.info(f"Processing crosswalk file: {crosswalk_file}")
         with open(crosswalk_file, "r") as f:
             crosswalk_data = json.load(f)
 
-        # Find the index to resume from resuming a run
-        resume_index = 0
-        if resume_from:
-            resume_index = next(
-                (
-                    i
-                    for i, entry in enumerate(crosswalk_data)
-                    if entry["cap_id"] == int(resume_from)
-                ),
-                0,
-            )
-
-        for entry in tqdm(
-            crosswalk_data[resume_index:], desc="Processing entries"
-        ):
-            reporter_slug, volume_folder, case_name = self.parse_cap_path(
-                entry["cap_path"]
-            )
-            entry["reporter_slug"] = reporter_slug
-            entry["volume_folder"] = volume_folder
-            entry["case_name"] = case_name
-            self.process_entry(entry)
+        for entry in tqdm(crosswalk_data, desc="Processing entries"):
+            try:
+                reporter_slug, volume_folder, case_name = self.parse_cap_path(
+                    entry["cap_path"]
+                )
+                entry["reporter_slug"] = reporter_slug
+                entry["volume_folder"] = volume_folder
+                entry["case_name"] = case_name
+                self.process_entry(entry)
+            except Exception as e:
+                logger.error(
+                    f"Error processing CAP ID {entry['cap_id']}: {str(e)}"
+                )
+                # You might want to add more error handling here
 
     def parse_cap_path(self, cap_path):
         # Extract data from CAP path
