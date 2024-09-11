@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField
-from django.db.models.functions import Now, Sqrt
+from django.db.models.functions import Cast, Extract, Now, Sqrt
 from django.http import (
     Http404,
     HttpRequest,
@@ -218,31 +218,39 @@ def new_prayer(user: User, recap_document: RECAPDocument) -> Optional[Prayer]:
 def get_top_prayers() -> list[RECAPDocument]:
     # Calculate the age of each prayer
     prayer_age = ExpressionWrapper(
-        Now() - F("prayers__date_created"), output_field=FloatField()
+        Extract(Now() - F("prayers__date_created"), 'epoch'),
+        output_field=FloatField()
     )
 
     # Annotate each RECAPDocument with the number of prayers and the average prayer age
     documents = (
         RECAPDocument.objects.annotate(
-            prayer_count=Count("prayers"), avg_prayer_age=Avg(prayer_age)
+            prayer_count=Count("prayers"),
+            avg_prayer_age=Avg(prayer_age)
         )
         .annotate(
-            # Calculate the geometric mean (sqrt(prayer_count * avg_prayer_age))
-            geometric_mean=Sqrt(F("prayer_count") * F("avg_prayer_age"))
+            # Calculate the geometric mean with explicit type casting
+            geometric_mean=Sqrt(
+                Cast(F("prayer_count") * Cast(F("avg_prayer_age"), FloatField()), FloatField())
+            )
         )
         .order_by("-geometric_mean")[:50]
     )
 
     return list(documents)
 
+async def get_top_prayers_async():
+    return await sync_to_async(get_top_prayers)()
+
 async def open_prayers(request):
     """Show the user top open prayer requests.
     """
-    top_prayers = get_top_prayers()
+    top_prayers = await get_top_prayers_async()
     return TemplateResponse(
         request,
         "recap_requests.html",
         {
             "top_prayers": top_prayers,
+            "private": False,
         },
     )
