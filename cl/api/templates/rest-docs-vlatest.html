@@ -263,7 +263,7 @@
     <pre class="pre-scrollable">curl -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "court-list" version="v4" %}" | jq '.filters'</pre>
-    <p>Again, one of the fitlers is the ID field, but it only allows exact values on this API:</p>
+    <p>Again, one of the filters is the ID field, but it only allows exact values on this API:</p>
     <pre>
 "id": {
     "type": "CharFilter",
