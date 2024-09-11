@@ -41,12 +41,7 @@ class BarMembership(models.Model):
         ordering = ["barMembership"]
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class UserProfile(models.Model):
     user = models.OneToOneField(
         User,
@@ -529,12 +524,7 @@ class UserProxy(User):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class GroupProxy(Group):
     """A proxy model class to track auth group model"""
 
@@ -542,12 +532,7 @@ class GroupProxy(Group):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class PermissionProxy(Permission):
     """A proxy model class to track auth permission model"""
 

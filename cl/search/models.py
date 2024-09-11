@@ -232,12 +232,7 @@ class SOURCES:
     )
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
 
@@ -1150,12 +1145,7 @@ class DocketPanel(Docket.panel.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
         Docket,
@@ -1360,12 +1350,7 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class RECAPDocument(
     AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel, CSVExportMixin
 ):
@@ -1844,12 +1829,7 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
         Docket,
@@ -1898,12 +1878,7 @@ class BankruptcyInformation(AbstractDateTimeModel):
         return f"Bankruptcy Info for docket {self.docket_id}"
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -2028,12 +2003,7 @@ class ClaimTags(Claim.tags.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
@@ -2155,12 +2125,7 @@ class FederalCourtsQuerySet(models.QuerySet):
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
@@ -2404,12 +2369,7 @@ class CourtAppealsTo(Court.appeals_to.through):
         proxy = True
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Courthouse(models.Model):
     """A class to represent the physical location of a court."""
 
@@ -2512,12 +2472,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         return clone
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
 
@@ -3225,12 +3180,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Citation(models.Model):
     """A simple class to hold citations."""
 
@@ -3351,12 +3301,7 @@ def sort_cites(c):
         return 8
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -3859,12 +3804,7 @@ class ParentheticalGroup(models.Model):
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",

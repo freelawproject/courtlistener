@@ -21,12 +21,7 @@ from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Audio(AbstractDateTimeModel):
     """A class representing oral arguments and their associated metadata"""
 

@@ -8,12 +8,7 @@ from cl.lib.models import AbstractDateTimeModel
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -74,12 +69,7 @@ class Note(models.Model):
         )
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
@@ -145,12 +135,7 @@ class UserTag(AbstractDateTimeModel):
         indexes = [models.Index(fields=["user", "name"])]
 
 
-@pghistory.track(
-    pghistory.UpdateEvent(
-        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
-    ),
-    pghistory.DeleteEvent(),
-)
+@pghistory.track()
 class Prayer(models.Model):
     WAITING = 1
     GRANTED = 2
