@@ -360,7 +360,10 @@
     <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/wimglenn/djangorestframework-queryfields/issues/8" target="_blank">there is an open issue tracking this</a>.
     </p>
 
-
+    <h3 id="pagination">Cursor-based Pagination</h3> <! -- I'm not sure what the "id" should be. -->
+    <p>Search API crawls are no longer limited to 100 pages. Deep pagination of search results is now possible. Users cannot directly jump to a specific page. Look at and follow the <code>next</code> and <code>previous</code> parameters provided in each response. Navigation of the API is exclusively through those keys in each API response.
+    </p>
+    
     <h3 id="rates">Rate Limits</h3>
     <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation.
     </p>
