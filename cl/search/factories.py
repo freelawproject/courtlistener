@@ -209,21 +209,22 @@ class OpinionClusterWithParentsFactory(
     pass
 
 
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
-
-    description = Faker("text", max_nb_chars=750)
-    document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
-    # is_available = Faker("boolean", chance_of_getting_true=40)
-
-
 class DocketEntryFactory(DjangoModelFactory):
     class Meta:
         model = DocketEntry
 
     description = Faker("text", max_nb_chars=750)
+
+
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    docket_entry = SubFactory(DocketEntryFactory)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
+    is_available = Faker("boolean", chance_of_getting_true=40)
 
 
 class DocketReuseParentMixin(DjangoModelFactory):
