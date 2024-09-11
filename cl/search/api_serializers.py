@@ -432,6 +432,7 @@ class V3OpinionESResultSerializer(DocumentSerializer):
             "procedural_history",
             "panel_names",
             "sha1",
+            "combined_fields",
         )
 
 
@@ -606,6 +607,7 @@ class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
             "cluster_child",
             "date_created",
             "timestamp",
+            "combined_fields",
         )
 
 
