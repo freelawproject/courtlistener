@@ -1,10 +1,12 @@
 import json
-from unittest.mock import patch, MagicMock
-from django.test import override_settings
-from django.core.management import call_command
-from cl.tests.cases import SimpleTestCase
-from io import StringIO
 import os
+from io import StringIO
+from unittest.mock import MagicMock, patch
+
+from django.core.management import call_command
+from django.test import override_settings
+
+from cl.tests.cases import SimpleTestCase
 
 
 @override_settings(

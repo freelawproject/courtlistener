@@ -1,12 +1,16 @@
 import json
-import tempfile
 import os
-from unittest.mock import patch, MagicMock, mock_open as mock_open_function
-from django.test import override_settings
-from django.core.management import call_command
+import tempfile
+from unittest.mock import MagicMock
+from unittest.mock import mock_open as mock_open_function
+from unittest.mock import patch
+
 from django.core.files.base import ContentFile
-from cl.search.models import OpinionCluster, Court, Docket
+from django.core.management import call_command
+from django.test import override_settings
+
 from cl.search.management.commands.import_harvard_pdfs import Command
+from cl.search.models import Court, Docket, OpinionCluster
 from cl.tests.cases import TransactionTestCase
 
 

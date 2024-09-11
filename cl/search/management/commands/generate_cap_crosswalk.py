@@ -1,14 +1,16 @@
 import json
-import boto3
-from django.db.models import Q
-from django.core.management.base import BaseCommand
-from cl.search.models import OpinionCluster, Court, Citation
-from cl.lib.command_utils import CommandUtils
-from tqdm import tqdm
-from django.conf import settings
 import logging
-from datetime import datetime, timedelta
 import os
+from datetime import datetime, timedelta
+
+import boto3
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from django.db.models import Q
+from tqdm import tqdm
+
+from cl.lib.command_utils import CommandUtils
+from cl.search.models import Citation, Court, OpinionCluster
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +271,8 @@ class Command(CommandUtils, BaseCommand):
 
 
 if __name__ == "__main__":
-    from django.core.management import execute_from_command_line
     import sys
+
+    from django.core.management import execute_from_command_line
 
     execute_from_command_line(sys.argv)

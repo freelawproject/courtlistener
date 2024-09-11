@@ -1,17 +1,19 @@
-import os
 import json
+import logging
+import os
+import tempfile
+
 import boto3
-from django.core.management.base import BaseCommand
+from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from cl.search.models import OpinionCluster
-from cl.lib.storage import IncrementingAWSMediaStorage
-from tqdm import tqdm
-import logging
-import tempfile
+from django.core.management.base import BaseCommand
 from storages.backends.s3boto3 import S3Boto3Storage
-from botocore.exceptions import BotoCoreError, ClientError
+from tqdm import tqdm
+
+from cl.lib.storage import IncrementingAWSMediaStorage
+from cl.search.models import OpinionCluster
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +212,8 @@ class Command(BaseCommand):
 
 
 if __name__ == "__main__":
-    from django.core.management import execute_from_command_line
     import sys
+
+    from django.core.management import execute_from_command_line
 
     execute_from_command_line(sys.argv)
