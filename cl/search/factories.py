@@ -214,6 +214,7 @@ class DocketEntryFactory(DjangoModelFactory):
         model = DocketEntry
 
     description = Faker("text", max_nb_chars=750)
+    docket = SubFactory("cl.search.factories.DocketFactory")
 
 
 class RECAPDocumentFactory(DjangoModelFactory):
