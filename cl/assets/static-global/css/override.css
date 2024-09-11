@@ -1709,3 +1709,17 @@ rect.series-segment {
 .htmx-request.htmx-hidden-indicator {
     display:inline;
 }
+
+.turbo-progress-bar {
+  position: fixed;
+  display: block;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: #B53C2C;
+  z-index: 2147483647;
+  transition:
+    width 300ms ease-out,
+    opacity 150ms 150ms ease-in;
+  transform: translate3d(0, 0, 0);
+}

@@ -80,7 +80,7 @@
   }
 }</pre>
   <p>To understand <code>RelatedFilters</code>, see our <a href="{% url "rest_docs" version="v3" %}">filtering documentation</a>.</p>
-  <p>These filters allow you to filter to the opinions that an opinion cites (it's "Authorities") or the opinions that cite it.
+  <p>These filters allow you to filter to the opinions that an opinion cites (its "Authorities" or backward citations) or the later opinions that cite it (forward citations).
   </p>
   <p>For example, opinion <code>2812209</code> is the decision in <em>Obergefell v. Hodges</em>. To see what it cites:</p>
   <pre class="pre-scrollable tall">curl -v \

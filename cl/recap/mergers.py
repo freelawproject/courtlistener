@@ -954,10 +954,10 @@ async def add_docket_entries(
             await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
 
         rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
-        description = docket_entry.get("short_description") or rd.description
-        if rd.document_type == RECAPDocument.PACER_DOCUMENT:
+        description = docket_entry.get("short_description")
+        if rd.document_type == RECAPDocument.PACER_DOCUMENT and description:
             rd.description = description
-        else:
+        elif description:
             rd_qs = de.recap_documents.filter(
                 document_type=RECAPDocument.PACER_DOCUMENT
             )
@@ -1630,6 +1630,9 @@ async def merge_attachment_page_data(
     and the DocketEntry object associated with the RECAPDocuments
     :raises: RECAPDocument.MultipleObjectsReturned, RECAPDocument.DoesNotExist
     """
+    # Create/update the attachment items.
+    rds_created = []
+    rds_affected = []
     params = {
         "pacer_doc_id": pacer_doc_id,
         "docket_entry__docket__court": court,
@@ -1677,12 +1680,80 @@ async def merge_attachment_page_data(
             # with the wrong case. We must punt.
             raise exc
     except RECAPDocument.DoesNotExist as exc:
+        found_main_rd = False
+        migrated_description = ""
+        if not is_acms_attachment:
+            for attachment in attachment_dicts:
+                if attachment.get("pacer_doc_id", False):
+                    params["pacer_doc_id"] = attachment["pacer_doc_id"]
+                try:
+                    main_rd = await RECAPDocument.objects.select_related(
+                        "docket_entry", "docket_entry__docket"
+                    ).aget(**params)
+                    if attachment.get("attachment_number", 0) != 0:
+                        main_rd.attachment_number = attachment[
+                            "attachment_number"
+                        ]
+                        main_rd.document_type = RECAPDocument.ATTACHMENT
+                        migrated_description = main_rd.description
+                        await main_rd.asave()
+                    found_main_rd = True
+                    break
+                except RECAPDocument.MultipleObjectsReturned as exc:
+                    if pacer_case_id:
+                        duplicate_rd_queryset = RECAPDocument.objects.filter(
+                            **params
+                        )
+                        rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+                            is_available=True
+                        ).exclude(filepath_local="")
+                        if await rd_with_pdf_queryset.aexists():
+                            keep_rd = await rd_with_pdf_queryset.alatest(
+                                "date_created"
+                            )
+                        else:
+                            keep_rd = await duplicate_rd_queryset.alatest(
+                                "date_created"
+                            )
+                        await duplicate_rd_queryset.exclude(
+                            pk=keep_rd.pk
+                        ).adelete()
+                        main_rd = await RECAPDocument.objects.select_related(
+                            "docket_entry", "docket_entry__docket"
+                        ).aget(**params)
+                        if attachment.get("attachment_number", 0) != 0:
+                            main_rd.attachment_number = attachment[
+                                "attachment_number"
+                            ]
+                            main_rd.document_type = RECAPDocument.ATTACHMENT
+                            migrated_description = main_rd.description
+                            await main_rd.asave()
+                        found_main_rd = True
+                        break
+                    else:
+                        # Unclear how to proceed and we don't want to associate
+                        # this data with the wrong case. We must punt.
+                        raise exc
+                except RECAPDocument.DoesNotExist:
+                    continue
         # Can't find the docket to associate with the attachment metadata
         # It may be possible to go look for orphaned documents at this stage
         # and to then add them here, as we do when adding dockets. This need is
         # particularly acute for those that get free look emails and then go to
         # the attachment page.
-        raise exc
+        if not found_main_rd:
+            raise exc
+        else:
+            rd = RECAPDocument(
+                docket_entry=main_rd.docket_entry,
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                document_number=main_rd.document_number,
+                description=migrated_description,
+                pacer_doc_id=pacer_doc_id,
+            )
+            rds_created.append(rd)
+            rds_affected.append(rd)
+            await rd.asave()
 
     # We got the right item. Update/create all the attachments for
     # the docket entry.
@@ -1706,9 +1777,6 @@ async def merge_attachment_page_data(
             ContentFile(text.encode()),
         )
 
-    # Create/update the attachment items.
-    rds_created = []
-    rds_affected = []
     appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
     court_is_appellate = await appellate_court_ids.filter(
         pk=court.pk
@@ -1763,7 +1831,7 @@ async def merge_attachment_page_data(
                     if attachment["attachment_number"] == 0:
                         try:
                             old_main_rd = await RECAPDocument.objects.aget(
-                                de=de,
+                                docket_entry=de,
                                 document_type=RECAPDocument.PACER_DOCUMENT,
                             )
                             rd.description = old_main_rd.description
@@ -1786,7 +1854,7 @@ async def merge_attachment_page_data(
                     if attachment["attachment_number"] == 0:
                         try:
                             old_main_rd = await RECAPDocument.objects.aget(
-                                de=de,
+                                docket_entry=de,
                                 document_type=RECAPDocument.PACER_DOCUMENT,
                             )
                             rd.description = old_main_rd.description

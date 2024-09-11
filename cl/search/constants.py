@@ -102,7 +102,6 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "citation",
     "judge",
     "caseNameFull",
-    "caseName",
     "status",
     "suitNature",
     "attorney",
@@ -226,12 +225,19 @@ recap_boosts_qf = {
 }
 recap_boosts_es = {
     # Docket fields
-    "caseName": 4.0,
+    "caseName.exact": 4.0,
     "docketNumber": 3.0,
     # RECAPDocument fields:
     "description": 2.0,
 }
 recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
+opinion_boosts_es = {
+    "text": 1.0,
+    "type": 1.0,
+    # Cluster fields
+    "caseName.exact": 4.0,
+    "docketNumber": 2.0,
+}
 BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
@@ -246,7 +252,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
             "text": 1.0,
-            "caseName": 4.0,
+            "caseName.exact": 4.0,
             "docketNumber": 2.0,
         },
         SEARCH_TYPES.PEOPLE: {
@@ -264,6 +270,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         SEARCH_TYPES.RECAP: recap_boosts_es,
         SEARCH_TYPES.DOCKETS: recap_boosts_es,
         SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_es,
+        SEARCH_TYPES.OPINION: opinion_boosts_es,
     },
     # Phrase-based boosts.
     "pf": {
