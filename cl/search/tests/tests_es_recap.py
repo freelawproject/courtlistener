@@ -106,7 +106,6 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
         # Index parties in ES.
         index_docket_parties_in_es.delay(cls.de.docket.pk)
-        cache.clear()
 
     async def _test_article_count(self, params, expected_count, field_name):
         r = await self.async_client.get("/", params)
@@ -225,18 +224,18 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         )
 
     @staticmethod
-    def _parse_initial_complaint_button(response):
-        """Parse the initial complaint button within the HTML response."""
+    def _parse_initial_document_button(response):
+        """Parse the initial document button within the HTML response."""
         tree = html.fromstring(response.content.decode())
         try:
-            initial_complaint = tree.xpath(
-                "//a[contains(@class, 'initial-complaint')]"
+            initial_document = tree.xpath(
+                "//a[contains(@class, 'initial-document')]"
             )[0]
         except IndexError:
             return None, None
         return (
-            initial_complaint.get("href"),
-            initial_complaint.text_content().strip(),
+            initial_document.get("href"),
+            initial_document.text_content().strip(),
         )
 
     def test_has_child_text_queries(self) -> None:
@@ -2274,8 +2273,8 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("encountered an error", r.content.decode())
 
-    def test_initial_complaint_button(self) -> None:
-        """Confirm the initial complaint button is properly shown on different
+    def test_initial_document_button(self) -> None:
+        """Confirm the initial document button is properly shown on different
         scenarios"""
 
         district_court = CourtFactory(id="cand", jurisdiction="FD")
@@ -2284,7 +2283,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # Add dockets with no documents
         with self.captureOnCommitCallbacks(execute=True):
 
-            # District document initial complaint available
+            # District document initial document available
             de_1 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=district_court,
@@ -2298,7 +2297,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             dockets_to_remove.append(de_1.docket)
             sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
-            initial_complaint_1 = RECAPDocumentFactory(
+            initial_document_1 = RECAPDocumentFactory(
                 docket_entry=de_1,
                 document_number="1",
                 document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2317,7 +2316,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="1234568",
             )
 
-            # District document initial complaint not available
+            # District document initial document not available
             de_2 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=district_court,
@@ -2330,7 +2329,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_2.docket)
-            initial_complaint_2 = RECAPDocumentFactory(
+            initial_document_2 = RECAPDocumentFactory(
                 docket_entry=de_2,
                 document_number="1",
                 document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2360,14 +2359,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_3.docket)
-            initial_complaint_3 = RECAPDocumentFactory(
+            initial_document_3 = RECAPDocumentFactory(
                 docket_entry=de_3,
                 document_number="1",
                 is_available=False,
                 pacer_doc_id=None,
             )
 
-            # Appellate document initial complaint available
+            # Appellate document initial document available
             de_4 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court_2,
@@ -2381,7 +2380,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             dockets_to_remove.append(de_4.docket)
             sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
-            initial_complaint_4 = RECAPDocumentFactory(
+            initial_document_4 = RECAPDocumentFactory(
                 docket_entry=de_4,
                 document_number="1",
                 attachment_number=1,
@@ -2404,7 +2403,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_5.docket)
-            initial_complaint_5 = RECAPDocumentFactory(
+            initial_document_5 = RECAPDocumentFactory(
                 docket_entry=de_5,
                 document_number="1",
                 attachment_number=1,
@@ -2413,7 +2412,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="765425",
             )
 
-            # No DocketEntry for the initial complaint available
+            # No DocketEntry for the initial document available
             empty_docket = DocketFactory(
                 court=district_court,
                 case_name="Lorem No Initial Complaint Entry",
@@ -2421,7 +2420,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 source=Docket.RECAP,
             )
             dockets_to_remove.append(empty_docket)
-            # Bankruptcy document initial petition available
+            # Bankruptcy document initial document available
             de_6 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2435,7 +2434,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             )
             dockets_to_remove.append(de_6.docket)
             sample_file = SimpleUploadedFile("recap_filename.pdf", b"file")
-            initial_complaint_6 = RECAPDocumentFactory(
+            initial_document_6 = RECAPDocumentFactory(
                 docket_entry=de_6,
                 document_number="1",
                 document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2444,7 +2443,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="12345875",
             )
 
-            # Bankruptcy document initial petition not available
+            # Bankruptcy document initial document not available
             de_7 = DocketEntryWithParentsFactory(
                 docket=DocketFactory(
                     court=self.court,
@@ -2457,7 +2456,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             dockets_to_remove.append(de_7.docket)
-            initial_complaint_7 = RECAPDocumentFactory(
+            initial_document_7 = RECAPDocumentFactory(
                 docket_entry=de_7,
                 document_number="1",
                 document_type=RECAPDocument.PACER_DOCUMENT,
@@ -2465,19 +2464,19 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 pacer_doc_id="35345875",
             )
 
-        # District document initial complaint available
+        # District document initial document available
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"Lorem District vs Complaint Available"',
         }
         r = async_to_sync(self._test_article_count)(
-            cd, 1, "Complaint available"
+            cd, 1, "Document available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Initial Complaint", button_text)
-        self.assertEqual(initial_complaint_1.get_absolute_url(), button_url)
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Initial Document", button_text)
+        self.assertEqual(initial_document_1.get_absolute_url(), button_url)
 
-        # District document initial complaint not available. Show Buy button.
+        # District document initial document not available. Show Buy button.
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"Lorem District vs Complaint Not Available"',
@@ -2485,9 +2484,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Not available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Buy Initial Complaint", button_text)
-        self.assertEqual(initial_complaint_2.pacer_url, button_url)
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Buy Initial Document", button_text)
+        self.assertEqual(initial_document_2.pacer_url, button_url)
 
         # Appellate notice of appeal available
         cd = {
@@ -2497,11 +2496,11 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Appellate available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Notice of Appeal", button_text)
-        self.assertEqual(initial_complaint_4.get_absolute_url(), button_url)
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Initial Document", button_text)
+        self.assertEqual(initial_document_4.get_absolute_url(), button_url)
 
-        # No docket entry is available for the initial complaint. No button is shown.
+        # No docket entry is available for the initial document. No button is shown.
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"Lorem No Initial Complaint Entry"',
@@ -2509,7 +2508,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Entry no available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertIsNone(button_text)
         self.assertIsNone(button_url)
 
@@ -2522,7 +2521,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Appellate Complaint button no available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertIsNone(button_text)
         self.assertIsNone(button_url)
 
@@ -2534,9 +2533,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Appellate available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Buy Notice of Appeal", button_text)
-        self.assertEqual(initial_complaint_5.pacer_url, button_url)
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Buy Initial Document", button_text)
+        self.assertEqual(initial_document_5.pacer_url, button_url)
 
         "Lorem Bankruptcy vs Petition Available"
 
@@ -2548,9 +2547,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
-        self.assertEqual("Initial Petition", button_text)
-        self.assertEqual(initial_complaint_6.get_absolute_url(), button_url)
+        button_url, button_text = self._parse_initial_document_button(r)
+        self.assertEqual("Initial Document", button_text)
+        self.assertEqual(initial_document_6.get_absolute_url(), button_url)
 
         # Bankruptcy document initial petition not available. Show Buy button.
         cd = {
@@ -2560,11 +2559,12 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(
             cd, 1, "Complaint Not available"
         )
-        button_url, button_text = self._parse_initial_complaint_button(r)
+        button_url, button_text = self._parse_initial_document_button(r)
         self.assertEqual(
-            "Buy Initial Petition", button_text, msg="Failed here..."
+            "Buy Initial Document",
+            button_text,
         )
-        self.assertEqual(initial_complaint_7.pacer_url, button_url)
+        self.assertEqual(initial_document_7.pacer_url, button_url)
 
         for docket in dockets_to_remove:
             docket.delete()
@@ -2575,6 +2575,12 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
     )
     async def test_micro_cache_for_search_results(self, mock_fetch_es) -> None:
         """Assert micro-cache for search results behaves properly."""
+
+        # Clean search_results_cache before starting the test.
+        r = get_redis_interface("CACHE")
+        keys = r.keys("search_results_cache")
+        if keys:
+            r.delete(*keys)
 
         mock_fetch_es.side_effect = lambda *args, **kwargs: fetch_es_results(
             *args, **kwargs
@@ -2697,6 +2703,107 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         # fetch_es_results is called this time; the cache is not used.
         self.assertEqual(mock_fetch_es.call_count, 5)
         cache.clear()
+
+    def test_uses_exact_version_for_case_name_field(self) -> None:
+        """Confirm that stemming and synonyms are disabled on the case_name
+        filter and text query.
+        """
+
+        with self.captureOnCommitCallbacks(execute=True):
+            de = DocketEntryWithParentsFactory(
+                docket=DocketFactory(
+                    court=self.court_2,
+                    case_name="Howell v. Indiana",
+                    case_name_short="Dolor",
+                    case_name_full="Ipsum Dolor",
+                    docket_number="1:21-bk-1235",
+                    source=Docket.RECAP,
+                ),
+                entry_number=1,
+                date_filed=datetime.date(2015, 8, 19),
+                description="MOTION for Leave to File Amicus Curiae Lorem Served",
+            )
+            RECAPDocumentFactory(
+                docket_entry=de,
+                document_number="1",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+            RECAPDocumentFactory(
+                docket_entry=de,
+                document_number="2",
+                is_available=False,
+                pacer_doc_id=None,
+            )
+            docket_2 = DocketFactory(
+                court=self.court_2,
+                case_name="Howells v. Indiana",
+                case_name_short="Dolor",
+                case_name_full="Lorem Ipsum",
+                docket_number="1:21-bk-1235",
+                source=Docket.RECAP,
+            )
+
+        # case_name filter: Howell
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self._count_child_documents(
+            0, r.content.decode(), 2, "case_name filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howell + document_number 1
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howell",
+            "document_number": 1,
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 1, "Disable stemming case_name + child filter."
+        )
+        self._count_child_documents(
+            0, r.content.decode(), 1, "case_name + child filter"
+        )
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # case_name filter: Howells
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Howells",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "text query")
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+
+        # text query: Howells
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howells",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # text query: Howell ind (stemming and synonyms disabled)
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "Howell ind",
+        }
+        r = async_to_sync(self._test_article_count)(
+            cd, 0, "Disable stemming and synonyms"
+        )
+
+        de.docket.delete()
+        docket_2.delete()
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):

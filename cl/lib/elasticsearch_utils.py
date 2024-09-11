@@ -171,7 +171,7 @@ def build_daterange_query(
 
 def build_more_like_this_query(related_id: list[str]):
     document_list = [{"_id": f"o_{id}"} for id in related_id]
-    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS
+    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
     more_like_this_fields.extend(
         [
             "type",
@@ -216,6 +216,7 @@ def add_fields_boosting(
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
+        SEARCH_TYPES.OPINION,
     ]:
         qf = BOOSTS["es"][cd["type"]].copy()
 
@@ -241,7 +242,7 @@ def add_fields_boosting(
         matter_of_query = query.lower().startswith("matter of ")
         ex_parte_query = query.lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({"caseName": 50})
+            qf.update({"caseName.exact": 50})
 
     if fields:
         qf = {key: value for key, value in qf.items() if key in fields}
@@ -728,7 +729,7 @@ def build_es_plain_filters(cd: CleanData) -> List:
         )
         # Build caseName terms filter
         queries_list.extend(
-            build_text_filter("caseName", cd.get("case_name", ""))
+            build_text_filter("caseName.exact", cd.get("case_name", ""))
         )
         # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
@@ -1148,7 +1149,7 @@ def build_es_base_query(
                         "description",
                         # Docket Fields
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1159,7 +1160,7 @@ def build_es_base_query(
                     cd,
                     [
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1185,7 +1186,7 @@ def build_es_base_query(
                     [
                         "type",
                         "text",
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 ),
@@ -1196,7 +1197,7 @@ def build_es_base_query(
                 add_fields_boosting(
                     cd,
                     [
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 )
@@ -1792,9 +1793,9 @@ def merge_unavailable_fields_on_parent_document(
         case (
             SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
         ) if request_type == "frontend":
-            # Merge initial complaint button to the frontend search results.
+            # Merge initial document button to the frontend search results.
             docket_ids = {doc["docket_id"] for doc in results}
-            # This query retrieves initial complaint documents considering two
+            # This query retrieves initial documents considering two
             # possibilities:
             # 1. For district, bankruptcy, and appellate entries where we don't know
             #    if the entry contains attachments, it considers:
@@ -1810,12 +1811,7 @@ def merge_unavailable_fields_on_parent_document(
                     "pk", flat=True
                 )
             )
-            bankruptcy_ids = (
-                Court.federal_courts.bankruptcy_pacer_courts().values_list(
-                    "pk", flat=True
-                )
-            )
-            initial_complaints = (
+            initial_documents = (
                 RECAPDocument.objects.filter(
                     QObject(
                         QObject(
@@ -1850,58 +1846,38 @@ def merge_unavailable_fields_on_parent_document(
                     "docket_entry__docket__court__jurisdiction",
                     "docket_entry__docket__court_id",
                 )
-                .annotate(
-                    court_type=Case(
-                        When(
-                            docket_entry__docket__court_id__in=appellate_court_ids,
-                            then=Value("appellate"),
-                        ),
-                        When(
-                            docket_entry__docket__court_id__in=bankruptcy_ids,
-                            then=Value("bankruptcy"),
-                        ),
-                        default=Value("district"),
-                        output_field=CharField(),
-                    )
-                )
             )
 
-            initial_complaints_in_page = {}
-            for initial_complaint in initial_complaints:
-                if initial_complaint.has_valid_pdf:
-                    # Initial complaint/petition/appeal available
-                    text_button = {
-                        "appellate": "Notice of Appeal",
-                        "bankruptcy": "Initial Petition",
-                    }.get(initial_complaint.court_type, "Initial Complaint")
-                    initial_complaints_in_page[
-                        initial_complaint.docket_entry.docket_id
+            initial_documents_in_page = {}
+            for initial_document in initial_documents:
+                if initial_document.has_valid_pdf:
+                    # Initial Document available
+                    initial_documents_in_page[
+                        initial_document.docket_entry.docket_id
                     ] = (
-                        initial_complaint.get_absolute_url(),
+                        initial_document.get_absolute_url(),
                         None,
-                        text_button,
+                        "Initial Document",
                     )
                 else:
-                    # Initial complaint/petition/appeal not available. Buy button.
-                    buy_text_button = {
-                        "appellate": "Buy Notice of Appeal",
-                        "bankruptcy": "Buy Initial Petition",
-                    }.get(
-                        initial_complaint.court_type, "Buy Initial Complaint"
+                    # Initial Document not available. Buy button.
+                    initial_documents_in_page[
+                        initial_document.docket_entry.docket_id
+                    ] = (
+                        None,
+                        initial_document.pacer_url,
+                        "Buy Initial Document",
                     )
-                    initial_complaints_in_page[
-                        initial_complaint.docket_entry.docket_id
-                    ] = (None, initial_complaint.pacer_url, buy_text_button)
 
             for result in results:
-                complaint_url, buy_complaint_url, text_button = (
-                    initial_complaints_in_page.get(
+                document_url, buy_document_url, text_button = (
+                    initial_documents_in_page.get(
                         result.docket_id, (None, None, "")
                     )
                 )
-                result["initial_complaint_url"] = complaint_url
-                result["buy_initial_complaint_url"] = buy_complaint_url
-                result["initial_complaint_text"] = text_button
+                result["initial_document_url"] = document_url
+                result["buy_initial_document_url"] = buy_document_url
+                result["initial_document_text"] = text_button
 
         case SEARCH_TYPES.OPINION if request_type == "v4" and not highlight:
             # Retrieves the Opinion plain_text from the DB to fill the snippet
@@ -2207,7 +2183,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_term_query(
                     "docketNumber",
                     cd.get("docket_number", ""),
@@ -2246,7 +2222,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_daterange_query(
                     "dateFiled",
                     cd.get("filed_before", ""),

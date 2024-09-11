@@ -103,6 +103,8 @@ $(document).ready(function () {
         .val(el.val())
         .appendTo('#search-form');
     });
+    installProgressBar();
+    disableAllSubmitButtons();
     document.location = '/?' + $('#search-form').serialize();
   }
 
