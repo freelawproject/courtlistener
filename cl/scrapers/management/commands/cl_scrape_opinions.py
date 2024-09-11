@@ -113,7 +113,7 @@ def make_objects(
     docket = update_or_create_docket(
         item["case_names"],
         case_name_short,
-        court.pk,
+        court,
         item.get("docket_numbers", ""),
         item.get("source") or Docket.SCRAPER,
         from_harvard=False,

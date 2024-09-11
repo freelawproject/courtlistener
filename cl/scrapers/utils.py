@@ -9,7 +9,7 @@ import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
@@ -20,7 +20,7 @@ from cl.corpus_importer.utils import winnow_case_name
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
-from cl.recap.mergers import find_docket_object, make_docket_number_core
+from cl.recap.mergers import find_docket_object
 from cl.scrapers.exceptions import (
     EmptyFileError,
     NoDownloadUrlError,
@@ -289,7 +289,9 @@ def extract_recap_documents(
             sys.stdout.flush()
 
 
-def get_existing_docket(court_id: str, docket_number: str) -> Docket | None:
+def get_existing_docket(
+    court_id: str, docket_number: str, appeal_from_str: str = ""
+) -> Docket | None:
     """Look for an existing docket for a given court_id and docket number
 
     recap.mergers.find_docket_object prioritizes lookups by docket_number_core
@@ -307,40 +309,63 @@ def get_existing_docket(court_id: str, docket_number: str) -> Docket | None:
 
     :param court_id: the court id
     :param docket_number: the docket number
+    :param appeal_from_str: useful for disambiguating `ohioctapp` dockets,
+        this is the "lower_courts" returned juriscraper field
 
     :return: Docket if find a match, None if we don't
     """
-    lookups = [
-        {"court_id": court_id, "docket_number": docket_number},
-    ]
 
-    docket_number_core = make_docket_number_core(docket_number)
-    if docket_number_core:
-        lookups.append(
-            {
-                "court_id": court_id,
-                "pacer_case_id": None,
-                "docket_number_core": docket_number_core,
-            }
+    # delete semicolons only for the lookup, for back compatibility
+    # with juriscraper string formatting
+    # https://github.com/freelawproject/juriscraper/pull/1166
+    lookup = Q(court_id=court_id) & (
+        Q(docket_number=docket_number.replace(";", ""))
+        | Q(docket_number=docket_number)
+    )
+
+    # Special case where docket numbers are the same and repeated
+    # across districts, but can be disambiguated using the lower court
+    if court_id == "ohioctapp" and appeal_from_str:
+        lookup = lookup & Q(appeal_from_str=appeal_from_str)
+
+    queryset = Docket.objects.filter(lookup)
+    count = queryset.count()
+    if count == 1:
+        return queryset[0]
+    if count > 1:
+        logger.error(
+            "%s: more than 1 docket match for docket number '%s'",
+            court_id,
+            docket_number,
         )
+        return queryset[0]
 
-    for lookup in lookups:
-        queryset = Docket.objects.filter(**lookup)
-        count = queryset.count()
-        if count == 1:
-            return queryset[0]
-        if count > 1:
-            logger.error(
-                "%s: more than 1 docket match for docket number '%s'",
-                court_id,
-                docket_number,
-            )
+
+def case_names_are_too_different(
+    first: str, second: str, threshold: float = 0.5
+) -> bool:
+    """Compares 2 case names' words as a similitude measure
+    Useful to raise a warning when updating a docket and names are found
+    to be too different
+
+    :param first: first case name
+    :param second: second case name
+    :param threshold: minimum percentage of words in common
+
+    :return: True if case names are too different according to the threshold;
+        False if names are similar
+    """
+    new_parts = winnow_case_name(first.lower())
+    old_parts = winnow_case_name(second.lower())
+    # or 1 to prevent 0 lenght minimum
+    denominator = min(len(old_parts), len(new_parts)) or 1
+    return len(new_parts.intersection(old_parts)) / denominator < threshold
 
 
 def update_or_create_docket(
     case_name: str,
     case_name_short: str,
-    court_id: str,
+    court: Court,
     docket_number: str,
     source: int,
     from_harvard: bool,
@@ -356,7 +381,7 @@ def update_or_create_docket(
 
     :param case_name: The docket case_name.
     :param case_name_short: The docket case_name_short
-    :param court_id: The court id the docket belongs to.
+    :param court: The court objects the docket belongs to
     :param docket_number: The docket number.
     :param source: The docket source.
     :param from_harvard: True when this function is called from the
@@ -371,7 +396,6 @@ def update_or_create_docket(
     :param appeal_from_str: Name (not standardized id) of the lower level court.
     :return: The docket.
     """
-
     docket_fields = {
         "case_name": case_name,
         "case_name_short": case_name_short,
@@ -382,12 +406,16 @@ def update_or_create_docket(
         "date_blocked": date_blocked,
         "date_argued": date_argued,
     }
-    if from_harvard:
+
+    court_id = court.pk
+    uses_docket_number_core = court.jurisdiction in Court.FEDERAL_JURISDICTIONS
+
+    if from_harvard or uses_docket_number_core:
         docket = async_to_sync(find_docket_object)(
             court_id, None, docket_number, None, None, None
         )
     else:
-        docket = get_existing_docket(court_id, docket_number)
+        docket = get_existing_docket(court_id, docket_number, appeal_from_str)
 
     if not docket or not docket.pk:
         return Docket(
@@ -414,10 +442,7 @@ def update_or_create_docket(
         ):
             # Safeguard to catch possible docket mismatches, check that they
             # have at least 50% of words in common
-            new_parts = winnow_case_name(value)
-            old_parts = winnow_case_name(docket.case_name)
-            denominator = min(len(old_parts), len(new_parts)) + 1
-            if len(new_parts.intersection(old_parts)) / denominator < 0.5:
+            if case_names_are_too_different(value, docket.case_name, 0.5):
                 logger.error(
                     "New case_name '%s' looks too different from old '%s'. Court %s. Docket %s",
                     value,
