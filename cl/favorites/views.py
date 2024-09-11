@@ -235,9 +235,9 @@ def get_top_prayers() -> list[RECAPDocument]:
 
     return list(documents)
 
+
 async def open_prayers(request):
-    """Show the user top open prayer requests.
-    """
+    """Show the user top open prayer requests."""
     top_prayers = get_top_prayers()
     return TemplateResponse(
         request,
