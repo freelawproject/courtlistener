@@ -2,10 +2,10 @@ from django.urls import path
 
 from cl.favorites.views import (
     delete_note,
+    open_prayers,
     save_or_update_note,
     view_tag,
     view_tags,
-    open_prayers,
 )
 
 urlpatterns = [

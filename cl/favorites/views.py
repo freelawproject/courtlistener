@@ -243,8 +243,7 @@ async def get_top_prayers_async():
     return await sync_to_async(get_top_prayers)()
 
 async def open_prayers(request):
-    """Show the user top open prayer requests.
-    """
+    """Show the user top open prayer requests."""
     top_prayers = await get_top_prayers_async()
     return TemplateResponse(
         request,
