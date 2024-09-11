@@ -218,20 +218,23 @@ def new_prayer(user: User, recap_document: RECAPDocument) -> Optional[Prayer]:
 def get_top_prayers() -> list[RECAPDocument]:
     # Calculate the age of each prayer
     prayer_age = ExpressionWrapper(
-        Extract(Now() - F("prayers__date_created"), 'epoch'),
-        output_field=FloatField()
+        Extract(Now() - F("prayers__date_created"), "epoch"),
+        output_field=FloatField(),
     )
 
     # Annotate each RECAPDocument with the number of prayers and the average prayer age
     documents = (
         RECAPDocument.objects.annotate(
-            prayer_count=Count("prayers"),
-            avg_prayer_age=Avg(prayer_age)
+            prayer_count=Count("prayers"), avg_prayer_age=Avg(prayer_age)
         )
         .annotate(
             # Calculate the geometric mean with explicit type casting
             geometric_mean=Sqrt(
-                Cast(F("prayer_count") * Cast(F("avg_prayer_age"), FloatField()), FloatField())
+                Cast(
+                    F("prayer_count")
+                    * Cast(F("avg_prayer_age"), FloatField()),
+                    FloatField(),
+                )
             )
         )
         .order_by("-geometric_mean")[:50]
@@ -239,8 +242,10 @@ def get_top_prayers() -> list[RECAPDocument]:
 
     return list(documents)
 
+
 async def get_top_prayers_async():
     return await sync_to_async(get_top_prayers)()
+
 
 async def open_prayers(request):
     """Show the user top open prayer requests."""
