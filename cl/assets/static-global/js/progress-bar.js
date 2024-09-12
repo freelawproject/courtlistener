@@ -30,19 +30,3 @@ function disableAllSubmitButtons() {
     button.disabled = true;
   });
 }
-
-document.onvisibilitychange = () => {
-  if (document.visibilityState !== 'hidden') return;
-
-  let progressElement = document.getElementById('progress-bar');
-  if (progressElement == null) return;
-
-  window.clearInterval(trickleInterval);
-  progressElement.style.width = '100%';
-  progressElement.style.opacity = 0;
-
-  setTimeout(() => {
-    let progressElement = document.getElementById('progress-bar');
-    progressElement.remove();
-  }, 450);
-};
