@@ -291,19 +291,20 @@ async def es_get_citing_and_related_clusters_with_cache(
             timeout=f"{settings.ELASTICSEARCH_FAST_QUERIES_TIMEOUT}s"
         )
         responses = multi_search.execute() if multi_search._searches else []
-        related_clusters = (
+        related_clusters: list[OpinionClusterDocument] = (
             list(responses[related_index])
             if related_index is not None
             else cached_related_clusters or []
         )
-        citing_clusters, citing_cluster_count = (
-            (
-                list(responses[citing_index]),
-                responses[citing_index].hits.total.value,
-            )
+        citing_clusters: list[OpinionClusterDocument] = (
+            list(responses[citing_index])
             if citing_index is not None
-            else (cached_citing_results, cached_citing_cluster_count)
-            or ([], 0)
+            else cached_citing_results or []
+        )
+        citing_cluster_count: int = (
+            responses[citing_index].hits.total.value
+            if citing_index is not None
+            else cached_citing_cluster_count or 0
         )
         timeout_related = False if related_clusters else timeout_related
         timeout_cited = False if citing_clusters else timeout_cited
