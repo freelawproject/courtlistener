@@ -9,6 +9,7 @@ from dataclasses import fields
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.paginator import Page
 from django.db.models import Case
@@ -76,7 +77,13 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court, Opinion, RECAPDocument
+from cl.search.models import (
+    SEARCH_TYPES,
+    Court,
+    Opinion,
+    OpinionCluster,
+    RECAPDocument,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,17 +165,33 @@ def build_daterange_query(
     return []
 
 
-def build_more_like_this_query(related_id: list[str]):
-    document_list = [{"_id": f"o_{id}"} for id in related_id]
-    more_like_this_fields = SEARCH_MLT_OPINION_QUERY_FIELDS.copy()
+async def build_more_like_this_query(related_ids: list[str]) -> Query:
+    """Build an ES "more like this" query based on related Opinion IDs.
 
-    return Q(
+    :param related_ids: A list of related Opinion IDs to build the query on.
+    :return: An ES query object with "more like this" query and
+    exclusions for specific opinion clusters.
+    """
+
+    document_list = [{"_id": f"o_{id}"} for id in related_ids]
+    more_like_this_fields = SEARCH_MLT_OPINION_QUERY_FIELDS.copy()
+    mlt_query = Q(
         "more_like_this",
         fields=more_like_this_fields,
         like=document_list,
         min_term_freq=1,
         max_query_terms=12,
     )
+    # Exclude opinion clusters to which the related IDs to query belong.
+    cluster_ids_to_exclude = (
+        OpinionCluster.objects.filter(sub_opinions__pk__in=related_ids)
+        .distinct("pk")
+        .values_list("pk", flat=True)
+    )
+    cluster_ids_list = [pk async for pk in cluster_ids_to_exclude.aiterator()]
+    exclude_cluster_ids = [Q("terms", cluster_id=cluster_ids_list)]
+    bool_query = Q("bool", must=[mlt_query], must_not=exclude_cluster_ids)
+    return bool_query
 
 
 def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
@@ -1159,7 +1182,9 @@ def build_es_base_query(
             mlt_query = None
             if related_match:
                 cluster_pks = related_match.group("pks").split(",")
-                mlt_query = build_more_like_this_query(cluster_pks)
+                mlt_query = async_to_sync(build_more_like_this_query)(
+                    cluster_pks
+                )
                 main_query, join_query = build_full_join_es_queries(
                     cd,
                     {"opinion": []},
@@ -1433,6 +1458,12 @@ def add_es_highlighting(
     :param highlighting: Whether highlighting should be enabled in docs.
     :return: The modified Elasticsearch search query object with highlights set
     """
+
+    # Avoid highlighting for the related cluster query.
+    related_match = RELATED_PATTERN.search(cd.get("q", ""))
+    if related_match:
+        return search_query
+
     highlighting_fields = {}
     highlighting_keyword_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
@@ -2027,8 +2058,6 @@ def fetch_es_results(
         main_doc_count_query = build_cardinality_count(
             main_doc_count_query, parent_unique_field
         )
-
-        print("MAin query :", main_doc_count_query.to_dict())
         if child_docs_count_query:
             child_unique_field = cardinality_query_unique_ids[
                 SEARCH_TYPES.RECAP_DOCUMENT
@@ -2036,7 +2065,6 @@ def fetch_es_results(
             child_total_query = build_cardinality_count(
                 child_docs_count_query, child_unique_field
             )
-            print("child_total_query", child_total_query.to_dict())
 
         # Execute the ES main query + count queries in a single request.
         multi_search = MultiSearch()

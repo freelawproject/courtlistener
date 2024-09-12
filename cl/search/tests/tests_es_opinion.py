@@ -2249,6 +2249,54 @@ class OpinionsESSearchTest(
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+        cls.cluster_4 = OpinionClusterFactory.create(
+            case_name_full="Reference to Voutila v. Bonvini",
+            case_name_short="Case name in short for Voutila v. Bonvini",
+            syllabus="some rando syllabus",
+            date_filed=datetime.date(2015, 12, 20),
+            procedural_history="some rando history",
+            source="C",
+            judges="",
+            case_name="Voutila v. Bonvini",
+            attorneys="a bunch of crooks!",
+            slug="case-name-cluster",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            citation_count=1,
+            posture="",
+            scdb_id="",
+            nature_of_suit="",
+            docket=cls.docket_1,
+        )
+        cls.opinion_7 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=None,
+            plain_text="my plain text secret word for queries",
+            cluster=cls.cluster_4,
+            local_path="txt/2015/12/28/opinion_text.txt",
+            per_curiam=False,
+            type="020lead",
+        )
+        cls.opinion_8 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=None,
+            plain_text="my plain text secret word for queries",
+            cluster=cls.cluster_4,
+            local_path="txt/2015/12/28/opinion_text.txt",
+            per_curiam=False,
+            type="010combined",
+        )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
     def setUp(self) -> None:
         # Do this in two steps to avoid triggering profile creation signal
         admin = UserProfileWithParentsFactory.create(
@@ -2260,13 +2308,6 @@ class RelatedSearchTest(
         admin.user.save()
 
         super().setUp()
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.OPINION,
-            queue="celery",
-            pk_offset=0,
-            testing_mode=True,
-        )
 
     def get_article_count(self, r):
         """Get the article count in a query response"""
@@ -2275,14 +2316,16 @@ class RelatedSearchTest(
     def test_more_like_this_opinion(self) -> None:
         """Does the MoreLikeThis query return the correct number and order of
         articles."""
-        seed_pk = self.opinion_1.pk  # Paul Debbas v. Franklin
-        expected_article_count = 3
+
+        seed_1_pk = self.opinion_1.pk  # Paul Debbas v. Franklin
+        seed_2_pk = self.opinion_7.pk  # "Voutila v. Bonvini"
+        expected_article_count = 2
         expected_first_pk = self.opinion_cluster_2.pk  # Howard v. Honda
         expected_second_pk = self.opinion_cluster_3.pk  # case name cluster 3
 
         params = {
             "type": "o",
-            "q": "related:%i" % seed_pk,
+            "q": f"related:{seed_1_pk},{seed_2_pk}",
         }
 
         # enable all status filters (otherwise results do not match detail page)
@@ -2292,7 +2335,6 @@ class RelatedSearchTest(
 
         r = self.client.get(reverse("show_results"), params)
         self.assertEqual(r.status_code, HTTPStatus.OK)
-
         self.assertEqual(expected_article_count, self.get_article_count(r))
         self.assertTrue(
             r.content.decode().index("/opinion/%i/" % expected_first_pk)
@@ -2306,9 +2348,12 @@ class RelatedSearchTest(
         h2_content = html.tostring(
             h2_element[0], method="text", encoding="unicode"
         )
+        # Confirm that we can display more than one "related to" cluster.
         self.assertIn("related to", h2_content)
         self.assertIn("Debbas", h2_content)
         self.assertIn("Franklin", h2_content)
+        self.assertIn("Voutila", h2_content)
+        self.assertIn("Bonvini", h2_content)
 
     async def test_more_like_this_opinion_detail_detail(self) -> None:
         """MoreLikeThis query on opinion detail page with status filter"""
@@ -2330,14 +2375,20 @@ class RelatedSearchTest(
             (a.get("href"), a.text_content().strip())
             for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
         ]
-
         recommendations_expected = [
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
             (
                 f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
                 "Howard v. Honda",
-            )
+            ),
+            (
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/?",
+                "Voutila v. Bonvini",
+            ),
         ]
-
         # Test if related opinion exist in expected order
         self.assertEqual(
             recommendations_expected,
@@ -2374,6 +2425,10 @@ class RelatedSearchTest(
                 "Howard v. Honda",
             ),
             (
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/?",
+                "Voutila v. Bonvini",
+            ),
+            (
                 f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
                 "case name cluster 3",
             ),
@@ -2385,7 +2440,51 @@ class RelatedSearchTest(
             recomendations_actual,
             msg="Unexpected opinion recommendations.",
         )
+        await sync_to_async(self.async_client.logout)()
 
+    async def test_more_like_this_opinion_detail_multiple_sub_opinions(
+        self,
+    ) -> None:
+        """MoreLikeThis query on opinion detail page on a cluster with multiple
+        sub_opinions."""
+        seed_pk = self.cluster_4.pk  # Voutila v. Bonvini
+
+        # Login as staff user (related items are by default disabled for guests)
+        self.assertTrue(
+            await sync_to_async(self.async_client.login)(
+                username="admin", password="password"
+            )
+        )
+
+        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        self.assertEqual(r.status_code, 200)
+
+        tree = html.fromstring(r.content.decode())
+
+        recomendations_actual = [
+            (a.get("href"), a.text_content().strip())
+            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        ]
+        recommendations_expected = [
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                "case name cluster 3",
+            ),
+        ]
+        # Test if related opinion exist in expected order
+        self.assertEqual(
+            recommendations_expected,
+            recomendations_actual,
+            msg="Unexpected opinion recommendations.",
+        )
         await sync_to_async(self.async_client.logout)()
 
 

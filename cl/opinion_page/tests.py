@@ -196,7 +196,7 @@ class OpinionPageLoadTest(
         """
 
         request = AsyncRequestFactory().get("/")
-        _, _, _, clusters, count = (
+        _, _, _, clusters, count, _ = (
             await es_get_citing_and_related_clusters_with_cache(
                 self.o_cluster_3, request
             )

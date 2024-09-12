@@ -819,6 +819,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "o-es-active"
     )
+    queries_timeout = False
     if es_flag_for_o:
         (
             related_clusters,
@@ -826,6 +827,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             related_search_params,
             citing_clusters,
             citing_cluster_count,
+            queries_timeout,
         ) = await es_get_citing_and_related_clusters_with_cache(
             cluster, request
         )
@@ -893,6 +895,7 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
             ],
             "related_search_params": f"&{urlencode(related_search_params)}",
             "sponsored": sponsored,
+            "queries_timeout": queries_timeout,
         },
     )
 
