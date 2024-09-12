@@ -39,6 +39,12 @@
     <td id="date_last_filing-{{ note_form.instance.id }}" data-text="{{  note_form.instance.docket_id.date_last_filing|date:"Ymd" }}">
       {{ note_form.instance.docket_id.date_last_filing|date:"M j, Y"|default:"(none)"|nbsp }}
     </td>
+    <td id="docket-number-{{ note_form.instance.id }}">
+      {{ note_form.instance.docket_id.docket_number }}
+    </td>
+    <td id="court-{{ note_form.instance.id }}">
+      {{ note_form.instance.docket_id.court.short_name }}
+    </td>
   {% endif %}
   <td id="notes-{{ note_form.instance.id }}">
     {{ note_form.instance.notes|default:"(none)" }}
