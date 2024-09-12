@@ -31,6 +31,7 @@ DATABASES = {
                 "min_size": env("DB_POOL_MIN_SIZE", default=1),
                 "max_size": env("DB_POOL_MAX_SIZE", default=20),
                 "timeout": env("DB_POOL_TIMEOUT", default=30),
+                "max_idle": env("DB_POOL_MAX_IDLE", default=600),
             },
         },
     },
@@ -50,6 +51,7 @@ if env("DB_REPLICA_HOST", default=""):
                 "min_size": env("DB_REPLICA_POOL_MIN_SIZE", default=1),
                 "max_size": env("DB_REPLICA_POOL_MAX_SIZE", default=20),
                 "timeout": env("DB_REPLICA_POOL_TIMEOUT", default=30),
+                "max_idle": env("DB_REPLICA_POOL_MAX_IDLE", default=600),
             },
         },
     }
