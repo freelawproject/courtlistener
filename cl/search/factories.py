@@ -225,7 +225,7 @@ class RECAPDocumentFactory(DjangoModelFactory):
     docket_entry = SubFactory(DocketEntryFactory)
     document_type = RECAPDocument.PACER_DOCUMENT
     pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
-    is_available = Faker("boolean", chance_of_getting_true=40)
+    # is_available = Faker("boolean", chance_of_getting_true=40)
 
 
 class DocketReuseParentMixin(DjangoModelFactory):
