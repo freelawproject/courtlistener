@@ -498,10 +498,10 @@ def add_new_case(
         docket = update_or_create_docket(
             case_name,
             case_name_short,
-            court_id,
+            Court.objects.get(id=court_id),
             docket_string,
             Docket.HARVARD,
-            overwrite_existing_data=True,
+            from_harvard=True,
             case_name_full=case_name_full,
             ia_needs_upload=False,
         )
