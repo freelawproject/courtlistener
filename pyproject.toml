@@ -105,7 +105,7 @@ dateparser = "1.2.0"
 types-dateparser = "^1.1.4.20240106"
 uvicorn = {extras = ["standard"], version = "^0.27.1"}
 daphne = "^4.1.0"
-httpx = {extras = ["http2"], version = "^0.26.0"}
+httpx = {extras = ["http2"], version = "^0.27.2"}
 django-model-utils = "^4.5.1"
 django-permissions-policy = "^4.19.0"
 tiktoken = "^0.6.0"
