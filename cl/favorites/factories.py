@@ -30,5 +30,5 @@ class PrayerFactory(DjangoModelFactory):
 
     date_created = Faker("date_time_this_year")
     user = SubFactory(UserWithChildProfileFactory)
-    recap_document = SubFactory(RECAPDocumentFactory)
+    recap_document = SubFactory(RECAPDocumentFactory(is_available=False))
     status = Faker("random_element", elements=[Prayer.WAITING, Prayer.GRANTED])
