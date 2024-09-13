@@ -570,10 +570,10 @@ def handle_recap_doc_change(
                 args=([instance.pk],)
             )
 
-    # if (
-    #     instance.es_rd_field_tracker.has_changed("is_available")
-    #     and instance.is_available == True
-    # ):
-    #     Prayer.objects.filter(
-    #         recap_document=instance, status=Prayer.WAITING
-    #     ).update(status=Prayer.GRANTED)
+    if (
+        instance.es_rd_field_tracker.has_changed("is_available")
+        and instance.is_available == True
+    ):
+        Prayer.objects.filter(
+            recap_document=instance, status=Prayer.WAITING
+        ).update(status=Prayer.GRANTED)
