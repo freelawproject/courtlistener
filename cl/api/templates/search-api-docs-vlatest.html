@@ -152,6 +152,10 @@
     </tr>
     <tr>
       <td><code>r</code></td>
+      <td>List of Federal cases (dockets) with up to three nested documents. If there are more than three matching documents, the <code>more_docs</code> field for the docket result will be </code>true</code>.</td>
+    </tr>
+    <tr>
+      <td><code>rd</code></td>
       <td>Federal filing documents from PACER</td>
     </tr>
     <tr>
@@ -177,6 +181,8 @@
 
   <h3 id="ordering">Ordering Results</h3>
   <p>Each search <code>type</code> can be sorted by certain fields. These are available on the front end in the ordering drop down, which sets the <code>order_by</code> parameter.
+  </p>
+  <p>If your sorting field has null values, those results will be sorted at the end of the query, regardless of whether you sort in ascending or descending order. For example if you sort by a date that is null for an opinion, that opinion will go at the end of the result set.
   </p>
 
 
@@ -225,7 +231,19 @@
       </p>
       <p>This field only responds to arguments provided to the <code>q</code> parameter.  If the <code>q</code> parameter is not used, the <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
       </p>
+      <p>This field only displays Opinion text content.
+      </p>
     </li>
+    <li>
+      <p>To enhance performance, results are not highlighted by default. To enable highlighting, include <code>highlight=on</code> in your request.
+      </p>
+      <p>When highlighting is disabled, the first 500 characters of snippet fields are returned for fields <code>o</code>, <code>r</code>, and <code>rd</code>. 
+      </p>
+    </li>
+     <li>
+      <p><code>type=d</code> and <code>type=r</code> use cardinality aggregation to compute the result count, which has an error of ±6% if results are over 2000.
+      </p>
+     </li>
   </ol>
 
 
