@@ -34,7 +34,13 @@ from cl.scrapers.management.commands import (
 from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
 from cl.scrapers.test_assets import test_opinion_scraper, test_oral_arg_scraper
-from cl.scrapers.utils import get_binary_content, get_extension
+from cl.scrapers.utils import (
+    case_names_are_too_different,
+    get_binary_content,
+    get_existing_docket,
+    get_extension,
+    update_or_create_docket,
+)
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
@@ -719,3 +725,145 @@ class ScrapeCitationsTest(TestCase):
 
         citations = Citation.objects.filter(cluster=self.cluster).count()
         self.assertEqual(citations, 1, "Exactly 1 citation was expected")
+
+
+class ScraperDocketMatchingTest(TestCase):
+    """Docket matching behaves differently depending on court jurisdiction
+    - Federal courts use `docket_number_core`
+    - State courts do not
+    - There are also special cases such as ohioctapp
+
+    Also, test if we can detect when a docket match has a
+    case_name to different than the incoming case_name
+    """
+
+    def setUp(self):
+        self.ariz = CourtFactory(id="ariz")
+        DocketFactory(
+            docket_number="1 CA-CR 23-0297",
+            court=self.ariz,
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+        # To test query for multi docket dockets without
+        # a semicolon
+        DocketFactory(
+            docket_number="23-1374 23-1880",
+            court=self.ariz,
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+
+        # Need to disambiguate using `appeal_from_str`
+        self.ohioctapp = CourtFactory(id="ohioctapp")
+        self.ohioctapp_dn = "22CA15"
+        DocketFactory(
+            docket_number=self.ohioctapp_dn,
+            appeal_from_str="Pickaway County",
+            case_name="Dietrich v. Dietrich",
+            court=self.ohioctapp,
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+        DocketFactory(
+            docket_number=self.ohioctapp_dn,
+            appeal_from_str="Athens County",
+            case_name="State v. Myers",
+            court=self.ohioctapp,
+            source=Docket.SCRAPER,
+            pacer_case_id=None,
+        )
+
+        self.ca2 = CourtFactory(id="ca2", jurisdiction=Court.FEDERAL_APPELLATE)
+        self.ca2_docket = DocketFactory(
+            court=self.ca2,
+            docket_number="10-1039-pr",
+            case_name="Garbutt v. Conway",
+            docket_number_core="10001039",
+        )
+
+    def test_get_existing_docket(self):
+        """Can we get an existing docket if it exists,
+        or None if it doesn't?
+
+        Can we handle special cases like ohioctapp and
+        multi-docket docket numbers without semicolons?
+        """
+        # Return Docket
+        docket = get_existing_docket(self.ariz.id, "1 CA-CR 23-0297")
+        self.assertEqual(docket.docket_number, "1 CA-CR 23-0297")
+
+        docket = get_existing_docket(
+            self.ohioctapp.id, self.ohioctapp_dn, "Athens County"
+        )
+        self.assertEqual(
+            docket.appeal_from_str,
+            "Athens County",
+            "Incorrect docket match for ohioctapp",
+        )
+
+        # Test for OR query with or without semicolons
+        docket = get_existing_docket(self.ariz.id, "23-1374; 23-1880")
+        self.assertEqual(
+            get_existing_docket(self.ariz.id, "23-1374 23-1880").id,
+            docket.id,
+            "should match the same docket",
+        )
+
+        # Return None
+        docket = get_existing_docket(self.ariz.id, "1 CA-CV 23-0297-FC")
+        self.assertIsNone(docket, "Expected None")
+
+        docket = get_existing_docket(
+            self.ohioctapp.id, self.ohioctapp_dn, "Gallia County"
+        )
+        self.assertIsNone(docket, "Expected None, ohioctapp special case")
+
+    def test_different_case_names_detection(self):
+        """Can we detect case names that are too different?"""
+        similar_names = [
+            ("Miller v. Doe", "Miller v. Nelson"),
+            (
+                "IN RE: KIRKLAND LAKE GOLD LTD. SECURITIES LITIGATION",
+                "In Re: Kirkland Lake Gold",
+            ),
+            # Docket 14734478
+            (
+                "State ex rel. AWMS Water Solutions, L.L.C. v. Zehringer",
+                "State ex rel. AWMS Water Solutions, L.L.C. v. Mertz",
+            ),
+            # Docket 61614696
+            (
+                "Fortis Advisors LLC v. Johnson & Johnson, Ethicon, Inc., Alex Gorsky, Ashley McEvoy, Peter Shen and Susan Morano",
+                "Fortis Advisors LLC v. Johnson & Johnson",
+            ),
+        ]
+        different_names = [
+            # Docket 68390253, ohioctapp error
+            ("M.A.N.S.O. Holding, L.L.C. v. Marquette", "State v. Sweeney"),
+            # Docket 68295573, az error
+            ("Van Camp v. Van Camp", "State v. Snyder"),
+        ]
+        for first, second in similar_names:
+            self.assertFalse(
+                case_names_are_too_different(first, second),
+                "Case names should not be marked as too different",
+            )
+
+        for first, second in different_names:
+            self.assertTrue(
+                case_names_are_too_different(first, second),
+                "Case names should be marked as too different",
+            )
+
+    def test_federal_jurisdictions(self):
+        """These courts should follow the flow that uses
+        cl.recap.mergers.find_docket_object and relies on
+        Docket.docket_number_core
+        """
+        docket = update_or_create_docket(
+            "Garbutt v Conway", "", self.ca2, "10-1039", Docket.SCRAPER, False
+        )
+        self.assertEqual(
+            docket, self.ca2_docket, "Should match using docket number core"
+        )

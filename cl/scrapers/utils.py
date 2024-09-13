@@ -1,6 +1,5 @@
 import os
 import sys
-import traceback
 from datetime import date
 from typing import Optional, Tuple
 from urllib.parse import urljoin
@@ -10,13 +9,14 @@ import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 from requests import Response, Session
 
+from cl.corpus_importer.utils import winnow_case_name
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
@@ -289,13 +289,86 @@ def extract_recap_documents(
             sys.stdout.flush()
 
 
+def get_existing_docket(
+    court_id: str, docket_number: str, appeal_from_str: str = ""
+) -> Docket | None:
+    """Look for an existing docket for a given court_id and docket number
+
+    recap.mergers.find_docket_object prioritizes lookups by docket_number_core
+    which is designed for federal / PACER sources. This function is rough
+    equivalent with lookup priorities inverted, intended to be used with
+    scraped sources
+
+    Even when make_docket_number_core returns an empty string for most state
+    courts that we scrape, it causes mismatches in courts like `az`, where
+    2 different dockets like '1 CA-CR 23-0297' and '1 CA-CV 23-0297-FC'
+    have the same core number
+
+    Examples of  docket numbers do not map to a docket_number_core
+    (fldistctapp '5D2023-0888'), (ohioctapp, '22CA15')
+
+    :param court_id: the court id
+    :param docket_number: the docket number
+    :param appeal_from_str: useful for disambiguating `ohioctapp` dockets,
+        this is the "lower_courts" returned juriscraper field
+
+    :return: Docket if find a match, None if we don't
+    """
+
+    # delete semicolons only for the lookup, for back compatibility
+    # with juriscraper string formatting
+    # https://github.com/freelawproject/juriscraper/pull/1166
+    lookup = Q(court_id=court_id) & (
+        Q(docket_number=docket_number.replace(";", ""))
+        | Q(docket_number=docket_number)
+    )
+
+    # Special case where docket numbers are the same and repeated
+    # across districts, but can be disambiguated using the lower court
+    if court_id == "ohioctapp" and appeal_from_str:
+        lookup = lookup & Q(appeal_from_str=appeal_from_str)
+
+    queryset = Docket.objects.filter(lookup)
+    count = queryset.count()
+    if count == 1:
+        return queryset[0]
+    if count > 1:
+        logger.error(
+            "%s: more than 1 docket match for docket number '%s'",
+            court_id,
+            docket_number,
+        )
+        return queryset[0]
+
+
+def case_names_are_too_different(
+    first: str, second: str, threshold: float = 0.5
+) -> bool:
+    """Compares 2 case names' words as a similitude measure
+    Useful to raise a warning when updating a docket and names are found
+    to be too different
+
+    :param first: first case name
+    :param second: second case name
+    :param threshold: minimum percentage of words in common
+
+    :return: True if case names are too different according to the threshold;
+        False if names are similar
+    """
+    new_parts = winnow_case_name(first.lower())
+    old_parts = winnow_case_name(second.lower())
+    # or 1 to prevent 0 lenght minimum
+    denominator = min(len(old_parts), len(new_parts)) or 1
+    return len(new_parts.intersection(old_parts)) / denominator < threshold
+
+
 def update_or_create_docket(
     case_name: str,
     case_name_short: str,
-    court_id: str,
+    court: Court,
     docket_number: str,
     source: int,
-    overwrite_existing_data: bool,
+    from_harvard: bool,
     blocked: bool = False,
     case_name_full: str = "",
     date_blocked: date | None = None,
@@ -308,11 +381,11 @@ def update_or_create_docket(
 
     :param case_name: The docket case_name.
     :param case_name_short: The docket case_name_short
-    :param court_id: The court id the docket belongs to.
+    :param court: The court objects the docket belongs to
     :param docket_number: The docket number.
     :param source: The docket source.
-    :param overwrite_existing_data: should be True when this function is
-        called from the Harvard importer; the Harvard data is considered
+    :param from_harvard: True when this function is called from the
+        Harvard importer; the Harvard data is considered
         more trustable  and should overwrite an existing docket's data
         Should be False when called from scrapers.
     :param blocked: If the docket should be blocked, default False.
@@ -323,7 +396,6 @@ def update_or_create_docket(
     :param appeal_from_str: Name (not standardized id) of the lower level court.
     :return: The docket.
     """
-
     docket_fields = {
         "case_name": case_name,
         "case_name_short": case_name_short,
@@ -335,42 +407,59 @@ def update_or_create_docket(
         "date_argued": date_argued,
     }
 
-    docket = async_to_sync(find_docket_object)(
-        court_id, None, docket_number, None, None, None
-    )
-    if docket.pk:
-        # Update the existing docket with the new values
-        docket.add_opinions_source(source)
+    court_id = court.pk
+    uses_docket_number_core = court.jurisdiction in Court.FEDERAL_JURISDICTIONS
 
-        for field, value in docket_fields.items():
-            # do not use blanket `if not value:`, since
-            # blocked and ia_needs_upload are booleans and would be skipped
-            if value is None or value == "":
-                continue
-
-            if (
-                not overwrite_existing_data
-                and getattr(docket, field)
-                and getattr(docket, field) != value
-            ):
-                # Prevent overwriting values that already exist, since default values
-                # to this function are empty strings or None
-                logger.error(
-                    "Docket %s already has a %s %s, different than new value %s",
-                    docket.pk,
-                    field,
-                    getattr(docket, field),
-                    value,
-                )
-            else:
-                setattr(docket, field, value)
+    if from_harvard or uses_docket_number_core:
+        docket = async_to_sync(find_docket_object)(
+            court_id, None, docket_number, None, None, None
+        )
     else:
-        # Create a new docket with docket_fields and additional fields
-        docket = Docket(
+        docket = get_existing_docket(court_id, docket_number, appeal_from_str)
+
+    if not docket or not docket.pk:
+        return Docket(
             **docket_fields,
             source=source,
             docket_number=docket_number,
             court_id=court_id,
         )
+
+    # Update the existing docket with the new values
+    docket.add_opinions_source(source)
+
+    for field, value in docket_fields.items():
+        # do not use blanket `if not value:`, since
+        # blocked and ia_needs_upload are booleans and would be skipped
+        if value is None or value == "":
+            continue
+
+        if (
+            not from_harvard
+            and field == "case_name"
+            and getattr(docket, field)
+            and getattr(docket, field) != value
+        ):
+            # Safeguard to catch possible docket mismatches, check that they
+            # have at least 50% of words in common
+            if case_names_are_too_different(value, docket.case_name, 0.5):
+                logger.error(
+                    "New case_name '%s' looks too different from old '%s'. Court %s. Docket %s",
+                    value,
+                    docket.case_name,
+                    court_id,
+                    docket.pk,
+                )
+                continue
+
+            # Most times, we find updated values for case_name that may
+            # be a longer form than what we currently have, which we can
+            # take advantage of to populate case_name_full
+            if not getattr(docket, "case_name_full") and len(value) > len(
+                getattr(docket, field)
+            ):
+                setattr(docket, "case_name_full", value)
+        else:
+            setattr(docket, field, value)
 
     return docket
