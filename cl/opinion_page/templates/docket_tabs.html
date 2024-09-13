@@ -46,7 +46,6 @@
             src="{% static "js/buy_pacer_modal.js" %}"></script>
 
     {% include "includes/buy_pacer_modal.html" %}
-    {% include "includes/buy_acms_modal.html" %}
     {% include "includes/date_picker.html" %}
 
     <script type="text/javascript"
@@ -446,7 +445,7 @@
       <ul>
         {% for af in docket.audio_files.all %}
           <li>
-            <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+            <a href="{{ af.get_absolute_url }}{% querystring %}">
                 {{ af|best_case_name|safe|v_wrapper }}
             </a>
             {% if perms.audio.change_audio %}

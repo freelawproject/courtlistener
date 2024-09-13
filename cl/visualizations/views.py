@@ -98,9 +98,7 @@ async def view_visualization(
     return await render_visualization_page(request, pk, embed=False)
 
 
-@sync_to_async
 @login_required
-@async_to_sync
 @never_cache
 async def new_visualization(request: HttpRequest) -> HttpResponse:
     demo_viz = (
@@ -163,9 +161,7 @@ async def new_visualization(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "new_visualization.html", context)
 
 
-@sync_to_async
 @login_required
-@async_to_sync
 async def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
     # This could apparently also be done with formsets? But they seem awful.
     viz = await aget_object_or_404(SCOTUSMap, pk=pk, user=request.user)
@@ -195,13 +191,11 @@ async def edit_visualization(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @ensure_csrf_cookie
-@sync_to_async
 @login_required
-@async_to_sync
 async def delete_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
         v = await SCOTUSMap.objects.aget(
-            pk=request.POST.get("pk"), user=request.user
+            pk=request.POST.get("pk"), user=await request.auser()
         )
         v.deleted = True
         await v.asave()
@@ -213,13 +207,11 @@ async def delete_visualization(request: HttpRequest) -> HttpResponse:
 
 
 @ensure_csrf_cookie
-@sync_to_async
 @login_required
-@async_to_sync
 async def restore_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
         v = await SCOTUSMap.objects.aget(
-            pk=request.POST.get("pk"), user=request.user
+            pk=request.POST.get("pk"), user=await request.auser()
         )
         v.deleted = False
         v.date_deleted = None
@@ -232,13 +224,11 @@ async def restore_visualization(request: HttpRequest) -> HttpResponse:
 
 
 @ensure_csrf_cookie
-@sync_to_async
 @login_required
-@async_to_sync
 async def share_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
         v = await SCOTUSMap.objects.aget(
-            pk=request.POST.get("pk"), user=request.user
+            pk=request.POST.get("pk"), user=await request.auser()
         )
         v.published = True
         await v.asave()
@@ -250,13 +240,11 @@ async def share_visualization(request: HttpRequest) -> HttpResponse:
 
 
 @ensure_csrf_cookie
-@sync_to_async
 @login_required
-@async_to_sync
 async def privatize_visualization(request: HttpRequest) -> HttpResponse:
     if is_ajax(request):
         v = await SCOTUSMap.objects.aget(
-            pk=request.POST.get("pk"), user=request.user
+            pk=request.POST.get("pk"), user=await request.auser()
         )
         v.published = False
         await v.asave()

@@ -1237,7 +1237,10 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
                 name="entry_number_idx",
                 condition=Q(entry_number=1),
             ),
-            models.Index(fields=["recap_sequence_number", "entry_number"]),
+            models.Index(
+                fields=["recap_sequence_number", "entry_number"],
+                name="search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx",
+            ),
         ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1412,7 +1415,8 @@ class RECAPDocument(
                     "document_type",
                     "document_number",
                     "attachment_number",
-                ]
+                ],
+                name="search_recapdocument_document_type_303cccac79571217_idx",
             ),
             models.Index(
                 fields=["filepath_local"],
@@ -1488,11 +1492,11 @@ class RECAPDocument(
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
             if self.pacer_doc_id.count("-") > 1:
-                # It seems like loading the ACMS Download Page using links is not
-                # possible. we've implemented a modal window that explains this
-                # issue and guides users towards using the button to access the
-                # docket report.
-                return self.docket_entry.docket.pacer_docket_url
+                return (
+                    f"https://{court_id}-showdoc.azurewebsites.us/docs/"
+                    f"{self.docket_entry.docket.pacer_case_id}/"
+                    f"{self.pacer_doc_id}"
+                )
             elif court.jurisdiction == Court.FEDERAL_APPELLATE:
                 template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
@@ -3229,9 +3233,15 @@ class Citation(models.Model):
     class Meta:
         indexes = [
             # To look up individual citations
-            models.Index(fields=["volume", "reporter", "page"]),
+            models.Index(
+                fields=["volume", "reporter", "page"],
+                name="search_citation_volume_ae340b5b02e8912_idx",
+            ),
             # To generate reporter volume lists
-            models.Index(fields=["volume", "reporter"]),
+            models.Index(
+                fields=["volume", "reporter"],
+                name="search_citation_volume_251bc1d270a8abee_idx",
+            ),
         ]
         unique_together = (("cluster", "volume", "reporter", "page"),)
 

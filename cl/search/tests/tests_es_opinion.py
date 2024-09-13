@@ -2189,12 +2189,14 @@ class OpinionsESSearchTest(
         with self.captureOnCommitCallbacks(execute=True):
             cluster_1 = OpinionClusterFactory.create(
                 case_name="Maecenas Howell",
+                case_name_full="Ipsum Dolor",
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 docket=self.docket_1,
             )
             OpinionFactory.create(cluster=cluster_1, plain_text="")
             cluster_2 = OpinionClusterFactory.create(
                 case_name="Maecenas Howells",
+                case_name_full="Ipsum Dolor",
                 precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
                 docket=self.docket_1,
             )
@@ -2331,11 +2333,10 @@ class RelatedSearchTest(
 
         recommendations_expected = [
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
                 "Howard v. Honda",
             )
         ]
-
         # Test if related opinion exist in expected order
         self.assertEqual(
             recommendations_expected,
@@ -2368,11 +2369,11 @@ class RelatedSearchTest(
 
         recommendations_expected = [
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/",
                 "case name cluster 3",
             ),
         ]

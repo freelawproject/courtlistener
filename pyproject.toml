@@ -34,7 +34,7 @@ celery = "^5.3.6"
 certifi = "^2024.7.4"
 courts-db = "*"
 disposable-email-domains = "*"
-Django = "^5.0.8"
+Django = "^5.1.1"
 django-cache-memoize = "==0.*"
 django-cors-headers = "^4.4.0"
 django-csp = "^3.8"
@@ -106,7 +106,6 @@ dateparser = "1.2.0"
 types-dateparser = "^1.1.4.20240106"
 uvicorn = {extras = ["standard"], version = "^0.27.1"}
 daphne = "^4.1.0"
-psycopg = {extras = ["binary"], version = "^3.1.17"}
 httpx = {extras = ["http2"], version = "^0.26.0"}
 django-model-utils = "^4.5.1"
 django-permissions-policy = "^4.19.0"
@@ -116,6 +115,7 @@ openai = "^1.31.1"
 seal-rookery = "^2.2.3"
 types-pytz = "^2024.1.0.20240417"
 juriscraper = "^2.6.20"
+psycopg = {version = "3.1.17", extras = ["binary", "pool"]}
 
 
 [tool.poetry.group.dev.dependencies]

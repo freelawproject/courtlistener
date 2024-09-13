@@ -25,20 +25,15 @@
         </li>
         <li role="separator" class="divider"></li>
       {% endif %}
-      {% if rd.pacer_url or '-' in rd.pacer_doc_id%}
+      {% if rd.pacer_url %}
         <li>
             <a href="{{ rd.pacer_url }}"
-              {% if '-' in rd.pacer_doc_id %}
-                data-toggle="modal" data-target="#modal-buy-acms"
-                class="open_buy_acms_modal"
-              {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+              {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                 data-toggle="modal" data-target="#modal-buy-pacer"
                 class="open_buy_pacer_modal"
               {% endif %}
               target="_blank"
-              rel="nofollow">
-              {% if '-' in rd.pacer_doc_id %}Direct Link Unavailable{% else %}Buy on PACER{% endif %}
-            </a>
+              rel="nofollow">Buy on PACER</a>
         </li>
       {% endif %}
     </ul>
@@ -47,13 +42,9 @@
     {% if rd.is_sealed %}
       <span class="btn btn-primary disabled">This Item is Sealed</span>
     {% else %}
-      {% if rd.pacer_url or '-' in rd.pacer_doc_id%}
+      {% if rd.pacer_url %}
         <a href="{{ rd.pacer_url }}"
-          {% if '-' in rd.pacer_doc_id %}
-            data-toggle="modal" data-target="#modal-buy-acms"
-            class="disabled open_buy_acms_modal cursor btn btn-primary"
-            style="pointer-events: all;"
-          {% elif not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+          {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
             data-toggle="modal" data-target="#modal-buy-pacer"
             class="open_buy_pacer_modal btn btn-primary"
           {% else %}
@@ -61,9 +52,7 @@
           {% endif %}
           target="_blank"
           rel="nofollow">
-          <i class="fa fa-external-link"></i>
-          {% if '-' in rd.pacer_doc_id %}Direct Link Unavailable{% else %}Buy on PACER{% endif %}
-        </a>
+          <i class="fa fa-external-link"></i>Buy on PACER</a>
       {% endif %}
     {% endif %}
   {% endif %}
