@@ -189,8 +189,7 @@
   "{% get_full_host %}{% url "party-list" version=version %}?docket=123"</pre>
   <p>It returns something like:</p>
   <pre class="pre-scrollable tall">{
-① "count": 35,
-  "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&page=2",
+① "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&page=2",
   "previous": null,
   "results": [
     {
@@ -267,7 +266,6 @@
   "{% get_full_host %}{% url "attorney-list" version=version %}?docket=4214664"</pre>
   <p>Returns:</p>
   <pre class="pre-scrollable tall">{
-    "count": 108,
     "next": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/?docket=4214664&page=2",
     "previous": null,
     "results": [
@@ -333,7 +331,6 @@
   </pre>
   <p>This will return one entry for each document found, up to a maximum of 300 items:</p>
   <pre class="pre-scrollable tall">{
-  "count": 2,
   "next": null,
   "previous": null,
   "results": [
