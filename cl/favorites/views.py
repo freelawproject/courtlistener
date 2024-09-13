@@ -62,9 +62,7 @@ async def get_note(request: HttpRequest) -> HttpResponse:
     return note
 
 
-@sync_to_async
 @login_required
-@async_to_sync
 async def save_or_update_note(request: HttpRequest) -> HttpResponse:
     """Uses ajax to save or update a note.
 
@@ -100,9 +98,7 @@ async def save_or_update_note(request: HttpRequest) -> HttpResponse:
         )
 
 
-@sync_to_async
 @login_required
-@async_to_sync
 async def delete_note(request: HttpRequest) -> HttpResponse:
     """Delete a user's note
 

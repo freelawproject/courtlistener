@@ -57,22 +57,22 @@ class Migration(migrations.Migration):
         ),
         migrations.RenameIndex(
             model_name="citation",
-            new_name="search_cita_volume_464334_idx",
+            new_name="search_citation_volume_251bc1d270a8abee_idx",
             old_fields=("volume", "reporter"),
         ),
         migrations.RenameIndex(
             model_name="citation",
-            new_name="search_cita_volume_92c344_idx",
+            new_name="search_citation_volume_ae340b5b02e8912_idx",
             old_fields=("volume", "reporter", "page"),
         ),
         migrations.RenameIndex(
             model_name="docketentry",
-            new_name="search_dock_recap_s_306ab9_idx",
+            new_name="search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx",
             old_fields=("recap_sequence_number", "entry_number"),
         ),
         migrations.RenameIndex(
             model_name="recapdocument",
-            new_name="search_reca_documen_cc5acd_idx",
+            new_name="search_recapdocument_document_type_303cccac79571217_idx",
             old_fields=(
                 "document_type",
                 "document_number",

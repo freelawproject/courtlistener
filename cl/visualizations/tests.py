@@ -295,7 +295,8 @@ class TestVizAjaxCrud(TestCase):
             data = {}
         post = self.factory.post(url, data=data)
         if username:
-            post.user = await User.objects.aget(username=username)
+            user = await User.objects.aget(username=username)
+            post.auser = sync_to_async(lambda: user)
         post.META["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest"
         return post
 
