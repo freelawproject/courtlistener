@@ -29,7 +29,6 @@ cl-manage = "manage:main"
 ada-url = "^1.15.0"
 argparse = "*"
 beautifulsoup4 = "==4.12.*"
-boto3 = "^1.35.11"
 celery = "^5.3.6"
 certifi = "^2024.7.4"
 courts-db = "*"
@@ -116,6 +115,7 @@ seal-rookery = "^2.2.3"
 types-pytz = "^2024.1.0.20240417"
 juriscraper = "^2.6.20"
 psycopg = {version = "3.1.17", extras = ["binary", "pool"]}
+boto3 = "^1.35.19"
 
 
 [tool.poetry.group.dev.dependencies]
