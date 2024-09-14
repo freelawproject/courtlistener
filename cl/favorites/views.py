@@ -251,6 +251,6 @@ async def open_prayers(request):
         "recap_requests.html",
         {
             "top_prayers": top_prayers,
-            "private": False,
+            "private": True, # temporary to prevent Google indexing
         },
     )
