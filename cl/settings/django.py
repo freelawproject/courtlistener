@@ -20,6 +20,7 @@ DATABASES = {
         "NAME": env("DB_NAME", default="courtlistener"),
         "USER": env("DB_USER", default="postgres"),
         "PASSWORD": env("DB_PASSWORD", default="postgres"),
+        "CONN_MAX_AGE": env("DB_CONN_MAX_AGE", default=0),
         "HOST": env("DB_HOST", default="cl-postgres"),
         "OPTIONS": {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
@@ -43,6 +44,7 @@ if env("DB_REPLICA_HOST", default=""):
         "PASSWORD": env("DB_REPLICA_PASSWORD", default="postgres"),
         "HOST": env("DB_REPLICA_HOST", default=""),
         "PORT": "",
+        "CONN_MAX_AGE": env("DB_REPLICA_CONN_MAX_AGE", default=0),
         "OPTIONS": {
             "sslmode": env("DB_REPLICA_SSL_MODE", default="prefer"),
             "pool": {
