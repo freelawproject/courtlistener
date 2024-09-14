@@ -27,11 +27,6 @@ DATABASES = {
             # "prefer" is fine in dev, but poor in prod, where it should be
             # "require" or above.
             "sslmode": env("DB_SSL_MODE", default="require"),
-            "pool": {
-                "min_size": env("DB_POOL_MIN_SIZE", default=1),
-                "max_size": env("DB_POOL_MIN_SIZE", default=20),
-                "timeout": env("DB_POOL_TIMEOUT", default=30),
-            },
         },
     },
 }
@@ -46,11 +41,6 @@ if env("DB_REPLICA_HOST", default=""):
         "CONN_MAX_AGE": env("DB_REPLICA_CONN_MAX_AGE", default=0),
         "OPTIONS": {
             "sslmode": env("DB_REPLICA_SSL_MODE", default="prefer"),
-            "pool": {
-                "min_size": env("DB_REPLICA_POOL_MIN_SIZE", default=1),
-                "max_size": env("DB_REPLICA_POOL_MIN_SIZE", default=20),
-                "timeout": env("DB_REPLICA_POOL_TIMEOUT", default=30),
-            },
         },
     }
 
