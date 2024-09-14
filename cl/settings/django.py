@@ -20,18 +20,13 @@ DATABASES = {
         "NAME": env("DB_NAME", default="courtlistener"),
         "USER": env("DB_USER", default="postgres"),
         "PASSWORD": env("DB_PASSWORD", default="postgres"),
+        "CONN_MAX_AGE": env("DB_CONN_MAX_AGE", default=0),
         "HOST": env("DB_HOST", default="cl-postgres"),
         "OPTIONS": {
             # See: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION
             # "prefer" is fine in dev, but poor in prod, where it should be
             # "require" or above.
             "sslmode": env("DB_SSL_MODE", default="require"),
-            "pool": {
-                "min_size": env("DB_POOL_MIN_SIZE", default=1),
-                "max_size": env("DB_POOL_MAX_SIZE", default=20),
-                "timeout": env("DB_POOL_TIMEOUT", default=30),
-                "max_idle": env("DB_POOL_MAX_IDLE", default=600),
-            },
         },
     },
 }
@@ -43,14 +38,9 @@ if env("DB_REPLICA_HOST", default=""):
         "PASSWORD": env("DB_REPLICA_PASSWORD", default="postgres"),
         "HOST": env("DB_REPLICA_HOST", default=""),
         "PORT": "",
+        "CONN_MAX_AGE": env("DB_REPLICA_CONN_MAX_AGE", default=0),
         "OPTIONS": {
             "sslmode": env("DB_REPLICA_SSL_MODE", default="prefer"),
-            "pool": {
-                "min_size": env("DB_REPLICA_POOL_MIN_SIZE", default=1),
-                "max_size": env("DB_REPLICA_POOL_MAX_SIZE", default=20),
-                "timeout": env("DB_REPLICA_POOL_TIMEOUT", default=30),
-                "max_idle": env("DB_REPLICA_POOL_MAX_IDLE", default=600),
-            },
         },
     }
 
