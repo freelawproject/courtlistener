@@ -47,7 +47,6 @@ django-ratelimit = "^4.1.0"
 django-storages = "^1.14.2"
 djangorestframework = {git = "https://github.com/encode/django-rest-framework.git", rev = "cc3c89a11c7ee9cf7cfd732e0a329c318ace71b2"}
 djangorestframework-xml = "^2.0.0"
-drf-dynamic-fields = "*"
 feedparser = "^6.0.10"
 httplib2 = "^0.22.0"
 igraph = "^0.11.3"
@@ -116,6 +115,7 @@ types-pytz = "^2024.1.0.20240417"
 juriscraper = "^2.6.20"
 psycopg = {version = "3.1.17", extras = ["binary", "pool"]}
 boto3 = "^1.35.19"
+drf-dynamic-fields = "^0.4.0"
 
 
 [tool.poetry.group.dev.dependencies]
