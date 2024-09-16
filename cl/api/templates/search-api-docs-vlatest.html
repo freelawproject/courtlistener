@@ -63,68 +63,69 @@
   '{% get_full_host %}{% url "search-list" version=version %}?q=foo'</pre>
   <p>That returns:</p>
   <pre class="pre-scrollable tall">{
-  "count": 2369,
-  "next": "https://www.courtlistener.com/api/rest/{{ version }}/search/?page=2&q=foo",
-  "previous": null,
-  "results": [
-    {
-      "absolute_url": "/opinion/106359/fong-foo-v-united-states/",
-      "attorney": "Arthur Richenthal argued the causes for petitioners and filed briefs for petitioner in No. 65. David E. Feller filed briefs for petitioners in No. 64., Solicitor General Cox argued the causes for the United States. With him on the briefs were Assistant Attorney General Miller, Stephen J. Poliak, Beatrice Rosenberg, Philip R. Monahan and J. F. Bishop.",
-      "author_id": null,
-      "caseName": "Fong Foo v. United States",
-      "caseNameShort": "Fong Foo",
-      "citation": [
-        "7 L. Ed. 2d 629",
-        "82 S. Ct. 671",
-        "369 U.S. 141",
-        "1962 U.S. LEXIS 1600"
-      ],
-      "citeCount": 357,
-      "cites": [
-        94515,
-        98794,
-        100989,
-        101974,
-        106273,
-        253004
-      ],
-      "cluster_id": 106359,
-      "court": "Supreme Court of the United States",
-      "court_citation_string": "SCOTUS",
-      "court_exact": "scotus",
-      "court_id": "scotus",
-      "dateArgued": null,
-      "dateFiled": "1962-03-19T00:00:00-08:00",
-      "dateReargued": null,
-      "dateReargumentDenied": null,
-      "docketNumber": "64",
-      "docket_id": 1153854,
-      "download_url": null,
-      "id": 106359,
-      "joined_by_ids": null,
-      "judge": "Harlan, Clark, Whittaker",
-      "lexisCite": "1962 U.S. LEXIS 1600",
-      "local_path": null,
-      "neutralCite": null,
-      "non_participating_judge_ids": null,
-      "pagerank": null,
-      "panel_ids": null,
-      "per_curiam": null,
-      "scdb_id": "1961-048",
-      "sibling_ids": [
-        106359,
-        9422362,
-        9422363,
-        9422364
-      ],
-      "snippet": "\n\n\n    \n369 U.S. 141 (1962)\nFONG <mark>FOO</mark> ET AL.\nv.\nUNITED STATES.\nNo. 64.\nSupreme Court of United States.&hellip;Court of the United States\nscotus\nSCOTUS\n\n\n\n    FONG <mark>FOO</mark> Et Al. v. UNITED STATES\n\n\nHarlan, Clark, Whittaker",
-      "source": "LRU",
-      "status": "Precedential",
-      "status_exact": "Precedential",
-      "suitNature": "",
-      "timestamp": "2024-03-01T14:12:07.892000-08:00",
-      "type": "010combined"
-    },
+  "count": 2343,
+    "next": "https://www.courtlistener.com/api/rest/v4/search/?cursor=cz0yMzUuODcxMjUmcz04MDUzNTUzJnQ9byZkPTIwMjQtMDktMTY%3D&q=foo",
+    "previous": null,
+    "results": [
+        {
+            "absolute_url": "/opinion/6613686/foo-v-foo/",
+            "attorney": "",
+            "caseName": "Foo v. Foo",
+            "caseNameFull": "Foo v. Foo",
+            "citation": [
+                "101 Haw. 235",
+                "65 P.3d 182"
+            ],
+            "citeCount": 0,
+            "cluster_id": 6613686,
+            "court": "Hawaii Intermediate Court of Appeals",
+            "court_citation_string": "Haw. App.",
+            "court_id": "hawapp",
+            "dateArgued": null,
+            "dateFiled": "2003-01-10",
+            "dateReargued": null,
+            "dateReargumentDenied": null,
+            "docketNumber": "24158",
+            "docket_id": 63544014,
+            "judge": "",
+            "lexisCite": "",
+            "meta": {
+                "timestamp": "2024-06-22T10:26:35.320787Z",
+                "date_created": "2022-06-26T23:24:18.926040Z"
+            },
+            "neutralCite": "",
+            "non_participating_judge_ids": [],
+            "opinions": [
+                {
+                    "author_id": null,
+                    "cites": [],
+                    "download_url": null,
+                    "id": 6489975,
+                    "joined_by_ids": [],
+                    "local_path": null,
+                    "meta": {
+                        "timestamp": "2024-06-24T21:14:41.408206Z",
+                        "date_created": "2022-06-26T23:24:18.931912Z"
+                    },
+                    "per_curiam": false,
+                    "sha1": "",
+                    "snippet": "\nAffirmed in part, reversed in part, vacated and remanded\n",
+                    "type": "lead-opinion"
+                }
+            ],
+            "panel_ids": [],
+            "panel_names": [],
+            "posture": "",
+            "procedural_history": "",
+            "scdb_id": "",
+            "sibling_ids": [
+                6489975
+            ],
+            "source": "U",
+            "status": "Published",
+            "suitNature": "",
+            "syllabus": ""
+        },
     ...</pre>
   <p>That's the simple version. Read on to learn the rest.</p>
 
