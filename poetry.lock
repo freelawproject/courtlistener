@@ -1184,25 +1184,24 @@ files = [
 
 [[package]]
 name = "django-ses"
-version = "3.5.2"
+version = "4.1.1"
 description = "A Django email backend for Amazon's Simple Email Service (SES)"
 optional = false
-python-versions = ">=3.8,<4.0"
+python-versions = "<4.0,>=3.8"
 files = [
-    {file = "django_ses-3.5.2-py3-none-any.whl", hash = "sha256:90c68cc6ca3467893faa8499981c81ba8ff2bd3f3acb08c06423a4142d6a0fc6"},
-    {file = "django_ses-3.5.2.tar.gz", hash = "sha256:b6d94689bc15de02a11e84f05a5bf4a7895688e570c6f07c21698094debc6ced"},
+    {file = "django_ses-4.1.1-py3-none-any.whl", hash = "sha256:83bb09d2b149dbc1a67a89f66a6681a99e32b8253f47ff4b7fae241d05344cc8"},
+    {file = "django_ses-4.1.1.tar.gz", hash = "sha256:28f9931df1251660eaf976b7413a42e7b0d25a18043316b96c721d8add7bf7b8"},
 ]
 
 [package.dependencies]
 boto3 = ">=1.0.0"
 cryptography = {version = ">=36.0.2", optional = true, markers = "extra == \"bounce\" or extra == \"events\""}
-django = ">=2.2"
-pytz = ">=2016.10"
-requests = {version = ">=2.27.1", optional = true, markers = "extra == \"bounce\" or extra == \"events\""}
+django = ">=3.2"
+requests = {version = ">=2.32.1", optional = true, markers = "extra == \"bounce\" or extra == \"events\""}
 
 [package.extras]
-bounce = ["cryptography (>=36.0.2)", "requests (>=2.27.1)"]
-events = ["cryptography (>=36.0.2)", "requests (>=2.27.1)"]
+bounce = ["cryptography (>=36.0.2)", "requests (>=2.32.1)"]
+events = ["cryptography (>=36.0.2)", "requests (>=2.32.1)"]
 
 [[package]]
 name = "django-storages"
@@ -5455,4 +5454,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "83789940303ae06b3417fd981df3a1a16d3071fe69d5f378d705dfef25f992eb"
+content-hash = "3323ebee63fda656fb26f18e6dc398649cf7466455eef08281155c8c28ee777f"
