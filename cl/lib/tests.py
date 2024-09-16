@@ -1,19 +1,22 @@
 import datetime
+import pickle
 from typing import Tuple, TypedDict, cast
+from unittest.mock import patch
 
-from django.contrib.auth.hashers import make_password
+from asgiref.sync import async_to_sync
+from django.conf import settings
 from django.core.files.base import ContentFile
-from django.db.models import F
 from django.test import override_settings
-from django.urls import reverse
-from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
+from requests.cookies import RequestsCookieJar
 
 from cl.lib.date_time import midnight_pt
+from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
     is_docket_number,
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_upload_path,
 )
@@ -24,10 +27,28 @@ from cl.lib.pacer import (
     normalize_attorney_role,
     normalize_us_state,
 )
+from cl.lib.pacer_session import (
+    ProxyPacerSession,
+    SessionData,
+    get_or_cache_pacer_cookies,
+    session_key,
+)
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
+from cl.lib.redis_utils import (
+    acquire_redis_lock,
+    get_redis_interface,
+    release_redis_lock,
+)
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
+from cl.lib.utils import (
+    check_for_proximity_tokens,
+    check_unbalanced_parenthesis,
+    check_unbalanced_quotes,
+    sanitize_unbalanced_parenthesis,
+    sanitize_unbalanced_quotes,
+)
 from cl.people_db.models import Role
 from cl.recap.models import UPLOAD_TYPE, PacerHtmlFiles
 from cl.search.factories import (
@@ -37,7 +58,6 @@ from cl.search.factories import (
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserProfileWithParentsFactory
 
 
 class TestPacerUtils(TestCase):
@@ -47,12 +67,14 @@ class TestPacerUtils(TestCase):
         """Do we properly set small bankruptcy dockets to private?"""
         d = Docket()
         d.court = Court.objects.get(pk="akb")
-        blocked, date_blocked = get_blocked_status(d)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(d)
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets with few entries should be blocked.",
         )
-        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(
+            d, count_override=501
+        )
         self.assertFalse(
             blocked,
             msg="Bankruptcy dockets with many entries "
@@ -60,12 +82,95 @@ class TestPacerUtils(TestCase):
         )
         # This should stay blocked even though it's a big bankruptcy docket.
         d.blocked = True
-        blocked, date_blocked = get_blocked_status(d, count_override=501)
+        blocked, date_blocked = async_to_sync(get_blocked_status)(
+            d, count_override=501
+        )
         self.assertTrue(
             blocked,
             msg="Bankruptcy dockets that start blocked "
             "should stay blocked.",
         )
+
+
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
+class TestPacerSessionUtils(TestCase):
+
+    def setUp(self) -> None:
+        r = get_redis_interface("CACHE", decode_responses=False)
+        # Clear cached session keys to prevent data inconsistencies.
+        key = r.keys(session_key % "test_user_new_cookie")
+        if key:
+            r.delete(*key)
+        self.test_cookies = RequestsCookieJar()
+        self.test_cookies.set("PacerSession", "this-is-a-test")
+        r.set(
+            session_key % "test_user_new_format",
+            pickle.dumps(
+                SessionData(self.test_cookies, "http://proxy_1:9090")
+            ),
+            ex=60 * 60,
+        )
+        r.set(
+            session_key % "test_new_format_almost_expired",
+            pickle.dumps(
+                SessionData(self.test_cookies, "http://proxy_1:9090")
+            ),
+            ex=60,
+        )
+
+    def test_pick_random_proxy_when_list_is_available(self):
+        """Does ProxyPacerSession choose a random proxy from the available list?"""
+        session = ProxyPacerSession(username="test", password="password")
+        self.assertIn(
+            session.proxy_address,
+            ["http://proxy_1:9090", "http://proxy_2:9090"],
+        )
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_compute_new_cookies_with_new_format(self, mock_log_into_pacer):
+        """Are we using the dataclass for new cookies?"""
+        mock_log_into_pacer.return_value = SessionData(
+            self.test_cookies,
+            "http://proxy_1:9090",
+        )
+        session_data = get_or_cache_pacer_cookies(
+            "test_user_new_cookie", username="test", password="password"
+        )
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_parse_cookie_proxy_pair_properly(self, mock_log_into_pacer):
+        """Can we parse the dataclass from cache properly?"""
+        session_data = get_or_cache_pacer_cookies(
+            "test_user_new_format", username="test", password="password"
+        )
+        self.assertEqual(mock_log_into_pacer.call_count, 0)
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_compute_cookies_for_almost_expired_data(
+        self, mock_log_into_pacer
+    ):
+        """Are we using the dataclass when re-computing session?"""
+        mock_log_into_pacer.return_value = SessionData(
+            self.test_cookies, "http://proxy_2:9090"
+        )
+
+        # Attempts to get almost expired cookies with the new format from cache
+        # Expects refresh.
+        session_data = get_or_cache_pacer_cookies(
+            "test_new_format_almost_expired",
+            username="test",
+            password="password",
+        )
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
+        self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
 
 
 class TestStringUtils(SimpleTestCase):
@@ -353,45 +458,6 @@ class TestMimeLookup(SimpleTestCase):
         }
         for test_path in tests.keys():
             self.assertEqual(tests.get(test_path), lookup_mime_type(test_path))
-
-
-@override_settings(MAINTENANCE_MODE_ENABLED=True)
-class TestMaintenanceMiddleware(TestCase):
-    """Test the maintenance middleware"""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        # Do this in two steps to avoid triggering profile creation signal
-        admin = UserProfileWithParentsFactory.create(
-            user__username="admin",
-            user__password=make_password("password"),
-        )
-        admin.user.is_superuser = True
-        admin.user.is_staff = True
-        admin.user.save()
-
-    def test_middleware_works_when_enabled(self) -> None:
-        """Does the middleware block users when enabled?"""
-        r = self.client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_503_SERVICE_UNAVAILABLE,
-            "Did not get correct status code. Got: %s instead of %s"
-            % (r.status_code, HTTP_503_SERVICE_UNAVAILABLE),
-        )
-
-    def test_staff_can_get_through(self) -> None:
-        """Can staff get through when the middleware is enabled?"""
-        self.assertTrue(
-            self.client.login(username="admin", password="password")
-        )
-        r = self.client.get(reverse("show_results"))
-        self.assertEqual(
-            r.status_code,
-            HTTP_200_OK,
-            "Staff did not get through, but should have. Staff got status "
-            "code of: %s instead of %s" % (r.status_code, HTTP_200_OK),
-        )
 
 
 class TestPACERPartyParsing(SimpleTestCase):
@@ -957,3 +1023,290 @@ class TestDateTimeHelpers(SimpleTestCase):
         pdt_date_time = midnight_pt(pdt_date)
         pdt_utc_offset_hours = pdt_date_time.utcoffset().total_seconds() / 3600  # type: ignore
         self.assertEqual(pdt_utc_offset_hours, -7.0)
+
+
+class TestElasticsearchUtils(SimpleTestCase):
+    def test_can_add_conjunction(self) -> None:
+        tests = [
+            {"input": "a", "output": "a"},
+            {"input": "a b", "output": "a AND b"},
+            {"input": "a b (c d)", "output": "a AND b AND (c d)"},
+            {
+                "input": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+                "output": "caseName:Loretta AND docketNumber:(ASBCA No. 59126)",
+            },
+            {
+                "input": "a b (c d) [a b]",
+                "output": "a AND b AND (c d) AND [a b]",
+            },
+            {
+                "input": 'a b (c d) [a b] "a c"',
+                "output": 'a AND b AND (c d) AND [a b] AND "a c"',
+            },
+            {
+                "input": "a b (c d) [a b] NOT word1",
+                "output": "a AND b AND (c d) AND [a b] AND NOT word1",
+            },
+            {
+                "input": 'a b NOT word1 (c d) [a b] NOT (word1 word2) "a z" NOT [word3 word4]',
+                "output": 'a AND b AND NOT word1 AND (c d) AND [a b] AND NOT (word1 word2) AND "a z" AND NOT [word3 word4]',
+            },
+            {
+                "input": 'a b NOT a (c d) [a b] NOT (a w) "a z" word1 AND word2',
+                "output": 'a AND b AND NOT a AND (c d) AND [a b] AND NOT (a w) AND "a z" AND word1 AND word2',
+            },
+            {
+                "input": 'a b NOT a (c d) [a b] AND (a w) "a z" word1 OR word2',
+                "output": 'a AND b AND NOT a AND (c d) AND [a b] AND (a w) AND "a z" AND word1 OR word2',
+            },
+            {
+                "input": "(A AND B) (a bc (a b)) and word1",
+                "output": "(A AND B) AND (a bc (a b)) and word1",
+            },
+            {
+                "input": 'field:"a w c" (a bc (a b) and w) and docket:"word1 word3"',
+                "output": 'field:"a w c" AND (a bc (a b) and w) and docket:"word1 word3"',
+            },
+        ]
+
+        for test in tests:
+            ouput_str = append_query_conjunctions(test["input"])
+            self.assertEqual(ouput_str, test["output"])
+
+    def test_check_and_sanitize_queries_bad_syntax(self) -> None:
+        """Tests for methods that check and sanitize queries with a bad search
+        syntax.
+        """
+
+        # Check for bad proximity tokens.
+        tests = [
+            {
+                "input_str": "This is a range /p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range /s query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range/s query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a range/p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is a /s range /p query",
+                "output": True,
+            },
+            {
+                "input_str": "This is not a range query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity /short query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity /parent query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity long/short query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity long/parent query",
+                "output": False,
+            },
+        ]
+        for test in tests:
+            output = check_for_proximity_tokens(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
+
+        # Check for Unbalanced parentheses.
+        tests = [
+            {
+                "input_str": "This is (unbalanced",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": "This is unbalanced)",
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": "This is (unbalanced)(",
+                "output": True,
+                "sanitized": "This is (unbalanced)",
+            },
+            {
+                "input_str": "This (is (unbalanced)(",
+                "output": True,
+                "sanitized": "This (is unbalanced)",
+            },
+            {
+                "input_str": "This (is (unbalanced)()",
+                "output": True,
+                "sanitized": "This (is (unbalanced))",
+            },
+            {
+                "input_str": "(This) (is (balanced))",
+                "output": False,
+                "sanitized": "(This) (is (balanced))",
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_parenthesis(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])
+
+        # Check for Unbalanced quotes.
+        tests = [
+            {
+                "input_str": 'This is "unbalanced',
+                "output": True,
+                "sanitized": "This is unbalanced",
+            },
+            {
+                "input_str": 'This is "unbalanced""',
+                "output": True,
+                "sanitized": 'This is "unbalanced"',
+            },
+            {
+                "input_str": 'This "is" unbalanced"',
+                "output": True,
+                "sanitized": 'This "is" unbalanced',
+            },
+            {
+                "input_str": 'This "is" unbalanced"""',
+                "output": True,
+                "sanitized": 'This "is" unbalanced""',
+            },
+            {
+                "input_str": '"This is" "balanced"',
+                "output": False,
+                "sanitized": '"This is" "balanced"',
+            },
+        ]
+        for test in tests:
+            output = check_unbalanced_quotes(test["input_str"])  # type: ignore
+            self.assertEqual(output, test["output"])
+
+        for test in tests:
+            output = sanitize_unbalanced_quotes(
+                test["input_str"]  # type: ignore
+            )
+            self.assertEqual(output, test["sanitized"])
+
+
+class TestRedisUtils(SimpleTestCase):
+    """Test Redis utils functions."""
+
+    def test_redis_lock(self) -> None:
+        """Test acquiring and releasing a Redis lock."""
+
+        lock_key = "test_lock"
+        r = get_redis_interface("CACHE")
+        identifier = acquire_redis_lock(r, lock_key, 2000)
+        self.assertTrue(identifier)
+
+        result = release_redis_lock(r, lock_key, identifier)
+        self.assertEqual(result, 1)
+
+
+class TestLinkifyOrigDocketNumber(SimpleTestCase):
+    def test_linkify_orig_docket_number(self):
+        test_pairs = [
+            (
+                "National Labor Relations Board",
+                "19-CA-289275",
+                "https://www.nlrb.gov/case/19-CA-289275",
+            ),
+            (
+                "National Labor Relations Board",
+                "NLRB-09CA110508",
+                "https://www.nlrb.gov/case/09-CA-110508",
+            ),
+            (
+                "EPA",
+                "85 FR 20688",
+                "https://www.federalregister.gov/citation/85-FR-20688",
+            ),
+            (
+                "Other Agency",
+                "85 Fed. Reg. 12345",
+                "https://www.federalregister.gov/citation/85-FR-12345",
+            ),
+            (
+                "National Labor Relations Board",
+                "85 Fed. Reg. 12345",
+                "https://www.federalregister.gov/citation/85-FR-12345",
+            ),
+            (
+                "Bureau of Land Management",
+                "88FR20688",
+                "https://www.federalregister.gov/citation/88-FR-20688",
+            ),
+            (
+                "Bureau of Land Management",
+                "88 Fed Reg 34523",
+                "https://www.federalregister.gov/citation/88-FR-34523",
+            ),
+            (
+                "Department of Transportation",
+                "89 Fed. Reg. 34,620",
+                "https://www.federalregister.gov/citation/89-FR-34,620",
+            ),
+            (
+                "Environmental Protection Agency",
+                "EPA-HQ-OW-2020-0005",
+                "https://www.regulations.gov/docket/EPA-HQ-OW-2020-0005",
+            ),
+            (
+                "United States Tax Court",
+                "USTC-2451-13",
+                "https://dawson.ustaxcourt.gov/case-detail/02451-13",
+            ),
+            (
+                "United States Tax Court",
+                "6837-20",
+                "https://dawson.ustaxcourt.gov/case-detail/06837-20",
+            ),
+            (
+                "United States Tax Court",
+                "USTC-5903-19W",
+                "https://dawson.ustaxcourt.gov/case-detail/05903-19W",
+            ),
+            ("Federal Communications Commission", "19-CA-289275", ""),
+            (
+                "National Labor Relations Board",
+                "This is not an NLRB case",
+                "",
+            ),
+            ("Other Agency", "This is not a Federal Register citation", ""),
+        ]
+
+        for i, (agency, docket_number, expected_output) in enumerate(
+            test_pairs
+        ):
+            with self.subTest(
+                f"Testing description text cleaning for {agency, docket_number}...",
+                i=i,
+            ):
+                self.assertEqual(
+                    linkify_orig_docket_number(agency, docket_number),
+                    expected_output,
+                    f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}",
+                )

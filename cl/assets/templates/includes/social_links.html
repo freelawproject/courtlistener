@@ -7,14 +7,14 @@
            title="Email this Link to a Friend or Colleague">
             <i class="fa fa-envelope-o fa-lg gray"></i>
         </a>&nbsp;
-        <a href="http://www.facebook.com/share.php?u={% get_full_host %}{{ request.path }}&t={{ title }} at CourtListener.com"
+        <a href="https://www.facebook.com/share.php?u={% get_full_host %}{{ request.path }}&t={{ title }} at CourtListener.com"
            target="_blank"
            title="Share on Facebook">
             <i class="fa fa-facebook-square fa-lg gray"></i>
         </a>&nbsp;
-        <a href="http://twitter.com/home?status={% get_full_host %}{{ request.path }}"
+        <a href="https://x.com/home?status={% get_full_host %}{{ request.path }}"
            target="_blank"
-           title="Share on Twitter">
+           title="Share on X">
             <i class="fa fa-twitter-square fa-lg gray"></i>
         </a>&nbsp;
 
@@ -22,9 +22,8 @@
             <input type="text"
                    readonly="readonly"
                    id="copy-input"
-                   class="form-control input-sm form-inline"
-                   value="{% get_full_host %}{{ request.path }}"
-                   onclick="this.select()"/>
+                   class="form-control input-sm form-inline click-select"
+                   value="{% get_full_host %}{{ request.path }}"/>
         </div>
     </div>
 </div>

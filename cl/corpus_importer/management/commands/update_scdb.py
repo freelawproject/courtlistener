@@ -16,6 +16,7 @@ Once located, we update items:
  - votes_majority & votes_minority
  - decision_direction
 """
+
 import csv
 import string
 from datetime import datetime
@@ -24,10 +25,13 @@ from django.core.management import CommandError
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import gen_diff_ratio
 from cl.search.models import Citation, OpinionCluster
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
@@ -64,7 +68,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.debug = options["debug"]
         self.file = options["file"]
         self.skip_human_review = options["skip_human_review"]
@@ -168,6 +172,7 @@ class Command(VerboseCommand):
                 citation_obj = get_citations(
                     scdb_info[scdb_field],
                     remove_ambiguous=False,
+                    tokenizer=HYPERSCAN_TOKENIZER,
                 )[0]
             except IndexError:
                 logger.warning(
@@ -280,9 +285,9 @@ class Command(VerboseCommand):
                 c for c in cluster.case_name if c not in exclude
             )
             case_name_words = case_name.lower().split()
-            cluster_words = set(
-                [word for word in case_name_words if word not in bad_words]
-            )
+            cluster_words = {
+                word for word in case_name_words if word not in bad_words
+            }
             if scdb_words.issuperset(cluster_words):
                 good_cluster_ids.append(cluster.pk)
 

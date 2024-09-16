@@ -4,11 +4,11 @@
 
 {% block title %}REST API, v2 &ndash; CourtListener.com{% endblock %}
 {% block description %}
-    The first REST API for federal and state opinions and still the best.
+    The first REST API for federal and state case law and still the best.
     Provided by Free Law Project, a 501(c)(3) non-profit.
 {% endblock %}
 {% block og_description %}
-    The first REST API for federal and state opinions and still the best.
+    The first REST API for federal and state case law and still the best.
     Provided by Free Law Project, a 501(c)(3) non-profit.
 {% endblock %}
 
@@ -31,7 +31,7 @@
 
         <h3>General Notes</h3>
         <p>For developers that wish to have a more granular API for our data, we provide a RESTful API
-            based on the <a href="http://django-tastypie.readthedocs.org/en/latest/">tastypie toolkit</a>.
+            based on the <a href="https://django-tastypie.readthedocs.org/en/latest/">tastypie toolkit</a>.
         </p>
         <p>This API currently has nine endpoints that can be consumed via GET requests:</p>
         <ol>
@@ -60,7 +60,7 @@
         <img src="{% static "png/schema-design.png" %}" height="276" width="470" class="img-responsive">
 
         <p class="alt">(A more detailed version of this diagram <a
-                href="http://lists.freelawproject.org/pipermail/dev/2014-September/000084.html">was
+                href="https://lists.freelawproject.org/pipermail/dev/2014-September/000084.html">was
             posted to our developer mailing list</a>.)
         </p>
 
@@ -93,7 +93,7 @@
         <h4>Authentication</h4>
         <p>
             With the exception of the coverage endpoint, all of the endpoints use either
-            <a href="http://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a> or
+            <a href="https://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a> or
             Django Session Authentication. To use the API, you must therefore either be logged into the CourtListener
             website (Session Authentication) or you must use your CourtListener credentials to set up HTTP Basic
             Authentication. Both of these authentication mechanisms protect your credentials on the wire via HTTPS.
@@ -252,9 +252,9 @@
 
         <h4>Date Formats</h4>
         <p>
-            As <a href="http://xkcd.com/1179/">required by influential comic
+            As <a href="https://xkcd.com/1179/">required by influential comic
             strips</a>, all date formats are set to <a
-                href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601
+                href="https://en.wikipedia.org/wiki/ISO_8601">ISO-8601
             format</a>.
         </p>
 
@@ -340,7 +340,7 @@
                 source</a>. If it lacks functionality that you desire or if you find
             <a href="https://github.com/freelawproject/courtlistener/tree/main/alert/assets/templates/api">these
             notes</a> lacking, pull requests providing improvements are very welcome. Just get in touch in
-            <a href="http://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a> to discuss
+            <a href="https://lists.freelawproject.org/cgi-bin/mailman/listinfo/dev">our developer forum</a> to discuss
             your ideas or, if it's a quick thing, just go ahead and send us a pull request.
         </p>
 
@@ -443,7 +443,7 @@
             This endpoint is integrated into the <code>document</code> endpoint and is also available individually.
             This endpoint provides each of the many citations that an opinion can have. Since opinions are often included
             in several written reporters, there are fields in this model for numerous
-            <a href="http://legalresearchprinciples.pbworks.com/w/page/16129937/Parallel%20Citations">parallel
+            <a href="https://legalresearchprinciples.pbworks.com/w/page/16129937/Parallel%20Citations">parallel
             citations</a>. After several years reorganizing our schema, we currently categorize citations into the
             following types:
         </p>
@@ -630,7 +630,7 @@
         <p>
             Unlike the other endpoints in this API, the coverage endpoint is
             not based on the <a
-                href="http://django-tastypie.readthedocs.org/en/latest/">tastypie
+                href="https://django-tastypie.readthedocs.org/en/latest/">tastypie
             API framework</a>. As a result it is much simpler, only providing
             data in a very specific manner, serialized as JSON. In the future
             we expect to expand this API to provide faceting along additional
@@ -695,9 +695,6 @@
                 If you are interested, we have a variety of <a href="https://free.law/press-assets/">"Powered
                 By" logos</a> available for your website or application. We appreciate a reference, but it's not required.
             </p>
-            <a href="https://free.law/press-assets/">
-                <img src="{% static "png/logo-long-w350.png" %}" width="350" height="81">
-            </a>
         </div>
 
         <div class="sidebar-section">
@@ -727,14 +724,12 @@
             </p>
         </div>
 
-        {% include "includes/deprecated_sidebar_section.html" %}
-
         <div class="sidebar-section">
             <h3 id="copyright"><span>Copyright</span></h3>
             <p>
                 Our data is free of known copyright restrictions.<br />
-                <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
-                    <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
+                <a rel="license" href="https://creativecommons.org/publicdomain/mark/1.0/">
+                    <img src="{% static "png/cc-pd.png" %}" alt="Public Domain Mark" height="31" width="88"/>
                 </a>
             </p>
         </div>

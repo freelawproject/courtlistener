@@ -3,12 +3,15 @@ import random
 import traceback
 from typing import List, Optional, Tuple, Union
 
+import httpx
 import requests
+from asgiref.sync import async_to_sync
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from httpx import Response
 from juriscraper.lib.exceptions import PacerLoginException
-from juriscraper.pacer import CaseQuery, PacerSession
+from juriscraper.pacer import CaseQuery
 from redis import ConnectionError as RedisConnectionError
 
 from cl.audio.models import Audio
@@ -21,7 +24,7 @@ from cl.lib.celery_utils import throttle_task
 from cl.lib.juriscraper_utils import get_scraper_object_by_name
 from cl.lib.microservice_utils import microservice
 from cl.lib.pacer import map_cl_to_pacer_id
-from cl.lib.pacer_session import get_or_cache_pacer_cookies
+from cl.lib.pacer_session import ProxyPacerSession, get_or_cache_pacer_cookies
 from cl.lib.privacy_tools import anonymize, set_blocked_status
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
@@ -34,7 +37,9 @@ logger = logging.getLogger(__name__)
 ExtractProcessResult = Tuple[str, Optional[str]]
 
 
-def update_document_from_text(opinion: Opinion) -> None:
+def update_document_from_text(
+    opinion: Opinion, juriscraper_module: str = ""
+) -> None:
     """Extract additional metadata from document text
 
     We use this code with BIA decisions. Previously Tax.
@@ -48,13 +53,15 @@ def update_document_from_text(opinion: Opinion) -> None:
     the calling function.
 
     :param opinion: Opinion object
+    :param juriscraper_module: full module to get Site object
     :return: None
     """
     court = opinion.cluster.docket.court.pk
-    site = get_scraper_object_by_name(court)
+    site = get_scraper_object_by_name(court, juriscraper_module)
     if site is None:
         return
-    metadata_dict = site.extract_from_text(opinion.plain_text)
+
+    metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
         ModelClass = apps.get_model(f"search.{model_name}")
         if model_name == "Docket":
@@ -64,6 +71,8 @@ def update_document_from_text(opinion: Opinion) -> None:
         elif model_name == "Citation":
             data["cluster_id"] = opinion.cluster_id
             ModelClass.objects.get_or_create(**data)
+        elif model_name == "Opinion":
+            opinion.__dict__.update(data)
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
@@ -79,6 +88,7 @@ def update_document_from_text(opinion: Opinion) -> None:
 def extract_doc_content(
     self,
     pk: int,
+    juriscraper_module: str = "",
     ocr_available: bool = False,
     citation_jitter: bool = False,
 ) -> None:
@@ -112,6 +122,7 @@ def extract_doc_content(
 
     :param self: The Celery task
     :param pk: The opinion primary key to work on
+    :param juriscraper_module: the full module string to re-import a Site object
     :param ocr_available: Whether the PDF converting function should use OCR
     :param citation_jitter: Whether to apply jitter before running the citation
     parsing code. This can be useful do spread these tasks out when doing a
@@ -121,13 +132,21 @@ def extract_doc_content(
     opinion = Opinion.objects.get(pk=pk)
 
     # Try to extract opinion content without using OCR.
-    response = microservice(
+    response = async_to_sync(microservice)(
         service="document-extract",
         item=opinion,
     )
-    if not response.ok:
-        logging.warning(
-            f"Error from document-extract microservice: {response.status_code}"
+    if not response.is_success:
+        logger.error(
+            f"Error from document-extract microservice: {response.status_code}",
+            extra=dict(
+                opinion_id=opinion.id,
+                url=opinion.download_url,
+                local_path=opinion.local_path.name,
+                fingerprint=[
+                    f"{opinion.cluster.docket.court_id}-document-extract-failure"
+                ],
+            ),
         )
         return
 
@@ -140,12 +159,12 @@ def extract_doc_content(
         and needs_ocr(content)
         and ".pdf" in str(opinion.local_path)
     ):
-        response = microservice(
+        response = async_to_sync(microservice)(
             service="document-extract-ocr",
             item=opinion,
             params={"ocr_available": ocr_available},
         )
-        if response.ok:
+        if response.is_success:
             content = response.json()["content"]
             extracted_by_ocr = True
 
@@ -161,7 +180,7 @@ def extract_doc_content(
     ), f"content must be of type str, not {type(content)}"
 
     set_blocked_status(opinion, content, extension)
-    update_document_from_text(opinion)
+    update_document_from_text(opinion, juriscraper_module)
 
     if data["err"]:
         logger.error(
@@ -183,9 +202,10 @@ def extract_doc_content(
             # according to schedule
             opinion.save(index=True)
     except Exception:
-        print(
-            "****Error saving text to the db for: %s****\n%s"
-            % (opinion, traceback.format_exc())
+        logger.error(
+            "****Error saving text to the db for: %s****\n%s",
+            opinion,
+            traceback.format_exc(),
         )
         return
 
@@ -197,7 +217,11 @@ def extract_doc_content(
 
 @app.task(
     bind=True,
-    autoretry_for=(requests.ConnectionError, requests.ReadTimeout),
+    autoretry_for=(
+        httpx.ConnectError,
+        httpx.ConnectTimeout,
+        httpx.ReadTimeout,
+    ),
     max_retries=3,
     retry_backoff=10,
 )
@@ -232,10 +256,12 @@ def extract_recap_pdf(
     :return: A list of processed RECAPDocument
     """
 
-    return extract_recap_pdf_base(pks, ocr_available, check_if_needed)
+    return async_to_sync(extract_recap_pdf_base)(
+        pks, ocr_available, check_if_needed
+    )
 
 
-def extract_recap_pdf_base(
+async def extract_recap_pdf_base(
     pks: Union[int, List[int]],
     ocr_available: bool = True,
     check_if_needed: bool = True,
@@ -253,32 +279,32 @@ def extract_recap_pdf_base(
     if not is_iter(pks):
         pks = [pks]
 
-    processed = []
+    processed: List[int] = []
     for pk in pks:
-        rd = RECAPDocument.objects.get(pk=pk)
+        rd = await RECAPDocument.objects.aget(pk=pk)
         if check_if_needed and not rd.needs_extraction:
             # Early abort if the item doesn't need extraction and the user
             # hasn't disabled early abortion.
             processed.append(pk)
             continue
 
-        response = microservice(
+        response = await microservice(
             service="document-extract",
             item=rd,
         )
-        if not response.ok:
+        if not response.is_success:
             continue
 
         content = response.json()["content"]
         extracted_by_ocr = response.json()["extracted_by_ocr"]
         ocr_needed = needs_ocr(content)
         if ocr_available and ocr_needed:
-            response = microservice(
+            response = await microservice(
                 service="document-extract-ocr",
                 item=rd,
                 params={"ocr_available": ocr_available},
             )
-            if response.ok:
+            if response.is_success:
                 content = response.json()["content"]
                 extracted_by_ocr = True
 
@@ -296,7 +322,11 @@ def extract_recap_pdf_base(
 
         rd.plain_text, _ = anonymize(content)
         # Do not do indexing here. Creates race condition in celery.
-        rd.save(index=False, do_extraction=False)
+        await rd.asave(
+            index=False,
+            do_extraction=False,
+            update_fields=["ocr_status", "plain_text"],
+        )
         processed.append(pk)
 
     return processed
@@ -337,7 +367,7 @@ def process_audio_file(self, pk) -> None:
         "case_name_short": audio_obj.case_name_short,
         "download_url": audio_obj.download_url,
     }
-    audio_response = microservice(
+    audio_response: Response = async_to_sync(microservice)(
         service="convert-audio",
         item=audio_obj,
         params=audio_data,
@@ -348,14 +378,20 @@ def process_audio_file(self, pk) -> None:
     audio_obj.file_with_date = audio_obj.docket.date_argued
     audio_obj.local_path_mp3.save(file_name, cf, save=False)
     audio_obj.duration = float(
-        microservice(
+        async_to_sync(microservice)(
             service="audio-duration",
             file=audio_response.content,
             file_type="mp3",
         ).text
     )
     audio_obj.processing_complete = True
-    audio_obj.save()
+    audio_obj.save(
+        update_fields=[
+            "duration",
+            "local_path_mp3",
+            "processing_complete",
+        ]
+    )
 
 
 @app.task(
@@ -374,15 +410,16 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     :param court_id: The court of the docket. Needed for throttling by court.
     :return: None
     """
-    cookies = get_or_cache_pacer_cookies(
+    session_data = get_or_cache_pacer_cookies(
         "pacer_scraper",
         settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
     )
-    s = PacerSession(
-        cookies=cookies,
+    s = ProxyPacerSession(
+        cookies=session_data.cookies,
         username=settings.PACER_USERNAME,
         password=settings.PACER_PASSWORD,
+        proxy=session_data.proxy_address,
     )
     d = Docket.objects.get(pk=d_pk, court_id=court_id)
     report = CaseQuery(map_cl_to_pacer_id(d.court_id), s)
@@ -402,6 +439,7 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
     save_iquery_to_docket(
         self,
         report.data,
+        report.response.text,
         d,
         tag_names=None,
         add_to_solr=True,

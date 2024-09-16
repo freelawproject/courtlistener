@@ -1,7 +1,8 @@
+from http import HTTPStatus
+
 import requests
 from django.conf import settings
 from django.utils.timezone import now
-from rest_framework.status import HTTP_200_OK
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.decorators import retry
@@ -10,7 +11,7 @@ from cl.search.models import Court
 
 
 @retry(requests.RequestException, tries=2, backoff=1)
-def check_and_log_url(session, url, timeout=10):
+def check_and_log_url(session: requests.Session, url: str, timeout: int = 10):
     """Check if a URL is accessible by sending it a GET request
 
     :param session: A requests.Session object
@@ -40,7 +41,7 @@ def check_if_global_outage(session, url, timeout=5):
         # from the proxy, not from here.
         timeout=timeout + 1,
     )
-    if response.status_code != HTTP_200_OK:
+    if response.status_code != HTTPStatus.OK:
         # Something went wrong with our request
         print(response.json())
         raise requests.RequestException("Didn't use proxy API correctly.")
@@ -48,14 +49,14 @@ def check_if_global_outage(session, url, timeout=5):
     return response
 
 
-def make_simple_url(court):
+def make_simple_url(court) -> str:
     if court.pk == "cavc":
         return "https://efiling.uscourts.cavc.gov/"
     else:
         return f"https://ecf.{map_cl_to_pacer_id(court.pk)}.uscourts.gov/"
 
 
-def down_for_only_me(session, url):
+def down_for_only_me(session: requests.Session, url: str) -> bool:
     """Check if a URL is down just our server, or globally
 
     :return: True if the url is only down for me, or False if entirely up or
@@ -113,6 +114,6 @@ class Command(VerboseCommand):
     )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         courts = Court.federal_courts.all_pacer_courts()
         iterate_and_log_courts(courts)

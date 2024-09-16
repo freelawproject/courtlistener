@@ -5,9 +5,10 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.template import loader
 from django.utils.timezone import now
-from juriscraper.pacer import CaseQueryAdvancedBankruptcy, PacerSession
+from juriscraper.pacer import CaseQueryAdvancedBankruptcy
 
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.pacer_session import ProxyPacerSession
 
 
 def send_emails(report, recipients):
@@ -39,12 +40,12 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         recipients = options["recipients"].split(",")
         print(f"Recipients list is: {recipients}")
 
-        s = PacerSession(
+        s = ProxyPacerSession(
             username=settings.PACER_USERNAME, password=settings.PACER_PASSWORD
         )
         s.login()

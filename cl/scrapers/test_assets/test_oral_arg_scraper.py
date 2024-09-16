@@ -8,7 +8,7 @@ from juriscraper.OralArgumentSite import OralArgumentSite
 
 class Site(OralArgumentSite):
     def __init__(self):
-        super(Site, self).__init__()
+        super().__init__()
         self.court_id = self.__module__
         self.url = join(
             settings.INSTALL_ROOT,
@@ -16,7 +16,7 @@ class Site(OralArgumentSite):
         )
         self.method = "LOCAL"
 
-    def _get_download_urls(self):
+    def _get_download_urls(self) -> list[str]:
         path = "//url/text()"
         return [
             os.path.join(settings.MEDIA_ROOT, "test", "audio", url)

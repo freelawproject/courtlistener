@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}Legal Search API – CourtListener.com{% endblock %}
+{% block og_title %}Legal Search API – CourtListener.com{% endblock %}
+
+{% block description %}Use this API to search case law, federal filings and cases, judges, and oral argument audio files.{% endblock %}
+{% block og_description %}Use this API to search case law, federal filings and cases, judges, and oral argument audio files.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#usage">Basic Usage</a></li>
+      <li><a href="#understanding">Understanding</a></li>
+      <ul>
+        <li><a href="#type">Result Types</a></li>
+        <li><a href="#ordering">Ordering</a></li>
+        <li><a href="#filtering">Filtering</a></li>
+        <li><a href="#fields">Fields</a></li>
+        <li><a href="#notes">Special Notes</a></li>
+      </ul>
+      <li><a href="#monitoring">Monitoring a Query</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">Legal Search&nbsp;API</h1>
+  <h2><code>{% url "search-list" version="v3" %}</code></h2>
+  <p class="lead v-offset-above-3">Use this API to search case law, PACER data, judges, and oral argument audio recordings.</p>
+  <p>To get the most out of this API, see our <a href="{% url "coverage" %}">coverage</a> and <a href="{% url "advanced_search" %}">advanced operators</a> documentation.
+  </p>
+
+  <h2 id="usage">Basic Usage</h2>
+  <p>This API uses the same GET parameters as the front end of the website. To use this API, place a search query on the front end of the website. That will give you a URL like:
+  </p>
+  <pre class="pre-scrollable">{% get_full_host %}/q=foo</pre>
+  <p>To make this into an API request, copy the GET parameters from this URL to the API endpoint, creating a request like:
+  </p>
+  <pre class="pre-scrollable">curl -X GET \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  '{% get_full_host %}{% url "search-list" version="v3" %}?q=foo'</pre>
+  <p>That returns:</p>
+  <pre class="pre-scrollable tall">{
+  "count": 2369,
+  "next": "https://www.courtlistener.com/api/rest/v3/search/?page=2&q=foo",
+  "previous": null,
+  "results": [
+    {
+      "absolute_url": "/opinion/106359/fong-foo-v-united-states/",
+      "attorney": "Arthur Richenthal argued the causes for petitioners and filed briefs for petitioner in No. 65. David E. Feller filed briefs for petitioners in No. 64., Solicitor General Cox argued the causes for the United States. With him on the briefs were Assistant Attorney General Miller, Stephen J. Poliak, Beatrice Rosenberg, Philip R. Monahan and J. F. Bishop.",
+      "author_id": null,
+      "caseName": "Fong Foo v. United States",
+      "caseNameShort": "Fong Foo",
+      "citation": [
+        "7 L. Ed. 2d 629",
+        "82 S. Ct. 671",
+        "369 U.S. 141",
+        "1962 U.S. LEXIS 1600"
+      ],
+      "citeCount": 357,
+      "cites": [
+        94515,
+        98794,
+        100989,
+        101974,
+        106273,
+        253004
+      ],
+      "cluster_id": 106359,
+      "court": "Supreme Court of the United States",
+      "court_citation_string": "SCOTUS",
+      "court_exact": "scotus",
+      "court_id": "scotus",
+      "dateArgued": null,
+      "dateFiled": "1962-03-19T00:00:00-08:00",
+      "dateReargued": null,
+      "dateReargumentDenied": null,
+      "docketNumber": "64",
+      "docket_id": 1153854,
+      "download_url": null,
+      "id": 106359,
+      "joined_by_ids": null,
+      "judge": "Harlan, Clark, Whittaker",
+      "lexisCite": "1962 U.S. LEXIS 1600",
+      "local_path": null,
+      "neutralCite": null,
+      "non_participating_judge_ids": null,
+      "pagerank": null,
+      "panel_ids": null,
+      "per_curiam": null,
+      "scdb_id": "1961-048",
+      "sibling_ids": [
+        106359,
+        9422362,
+        9422363,
+        9422364
+      ],
+      "snippet": "\n\n\n    \n369 U.S. 141 (1962)\nFONG <mark>FOO</mark> ET AL.\nv.\nUNITED STATES.\nNo. 64.\nSupreme Court of United States.&hellip;Court of the United States\nscotus\nSCOTUS\n\n\n\n    FONG <mark>FOO</mark> Et Al. v. UNITED STATES\n\n\nHarlan, Clark, Whittaker",
+      "source": "LRU",
+      "status": "Precedential",
+      "status_exact": "Precedential",
+      "suitNature": "",
+      "timestamp": "2024-03-01T14:12:07.892000-08:00",
+      "type": "010combined"
+    },
+    ...</pre>
+  <p>That's the simple version. Read on to learn the rest.</p>
+
+
+  <h2 id="understanding">Understanding the API</h2>
+  <p>Unlike most APIs on CourtListener, this API is powered by our search engine, not our database.
+  </p>
+  <p>This means that it does not use the same approach to ordering, filtering, or field definitions as our other APIs, and sending an HTTP <code>OPTIONS</code> request won't be useful.
+  </p>
+
+  <h3 id="type">Setting the Result <code>type</code></h3>
+  <p>The most important parameter in this API is <code>type</code>. This parameter sets the type of object you are querying:
+  </p>
+  <table class="table">
+    <thead>
+    <tr>
+      <th>Type</th>
+      <th>Definition</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td><code>o</code></td>
+      <td>Case law opinions</td>
+    </tr>
+    <tr>
+      <td><code>r</code></td>
+      <td>Federal filing documents from PACER</td>
+    </tr>
+    <tr>
+      <td><code>d</code></td>
+      <td>Federal cases (dockets) from PACER</td>
+    </tr>
+    <tr>
+      <td><code>p</code></td>
+      <td>Judges</td>
+    </tr>
+    <tr>
+      <td><code>oa</code></td>
+      <td>Oral argument audio files</td>
+    </tr>
+    </tbody>
+  </table>
+  <p>For example, this query searches case law:</p>
+  <pre class="pre-scrollable">{% get_full_host %}/q=foo&type=o</pre>
+  <p>And this query searches federal filings in the PACER system:</p>
+  <pre class="pre-scrollable">{% get_full_host %}/q=foo&type=r</pre>
+  <p>If the <code>type</code> parameter is not provided, the default is to search case law.</p>
+
+
+  <h3 id="ordering">Ordering Results</h3>
+  <p>Each search <code>type</code> can be sorted by certain fields. These are available on the front end in the ordering drop down, which sets the <code>order_by</code> parameter.
+  </p>
+
+
+  <h3 id="filtering">Filtering Results</h3>
+  <p>Results can be filtered with the input boxes provided on the front end or by <a href="{% url "advanced_search" %}">advanced query operators</a> provided to the <code>q</code> parameter.
+  </p>
+  <p>The best way to refine your query is to do so on the front end, and then copy the GET parameters to the API.
+  </p>
+
+
+  <h3 id="fields">Fields</h3>
+  <p>Unlike most of the fields on CourtListener, many fields on this API are provided in camelCase instead of snake_case. This is to make it easier for users to place queries like:
+  </p>
+  <pre class="pre-scrollable">caseName:foo</pre>
+  <p>Instead of:</p>
+  <pre class="pre-scrollable">case_name:foo</pre>
+  <p>All available fields are listed on the <a href="{% url "advanced_search" %}">advanced operators help page</a>.
+  </p>
+  <p>To understand the meaning of a field, find the object in our regular APIs that it corresponds to, and send an HTTP <code>OPTIONS</code> request to the API.
+  </p>
+  <p>For example, the <code>docketNumber</code> field in the search engine corresponds to the <code>docket_number</code> field in the <code>docket</code> API, so an HTTP <code>OPTIONS</code> request to that API returns its definition:
+  </p>
+  <pre class="pre-scrollable">curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v3" %}" \
+  | jq '.actions.POST.docket_number</pre>
+  <p>After filtering through <a href="https://github.com/jqlang/jq"><code>jq</code></a>, that returns:</p>
+  <pre class="pre-scrollable">{
+  "type": "string",
+  "required": false,
+  "read_only": false,
+  "label": "Docket number",
+  "help_text": "The docket numbers of a case, can be consolidated and quite long. In some instances they are too long to be indexed by postgres and we store the full docket in the correction field on the Opinion Cluster."
+}</pre>
+
+
+  <h3 id="notes">Special Notes</h3>
+  <p>A few fields deserve special consideration:</p>
+  <ol>
+    <li>
+      <p>As in the front end, when the <code>type</code> is set to return case law, only published results are returned by default. To include unpublished and other statuses, you need to explicitly request them.
+      </p>
+    </li>
+    <li>
+      <p>The <code>snippet</code> field contains the same values as are found on the front end. This uses the HTML5 <code>&lt;mark&gt;</code> element to identify up to five matches in a document.
+      </p>
+      <p>This field only responds to arguments provided to the <code>q</code> parameter.  If the <code>q</code> parameter is not used, the <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
+      </p>
+    </li>
+  </ol>
+
+
+  <h2 id="monitoring">Monitoring a Query for New&nbsp;Results</h2>
+  <p>To monitor queries for new results, use the <a href="{% url "search_api_help" %}">Alert API</a>, which will send emails or webhook events when there are new results.
+  </p>
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

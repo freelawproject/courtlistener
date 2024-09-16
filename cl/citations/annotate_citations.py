@@ -1,32 +1,35 @@
+import html
 from typing import Dict, List
 
 from eyecite import annotate_citations, clean_text
 
 from cl.citations.match_citations import NO_MATCH_RESOURCE
-from cl.lib.types import MatchedResourceType, SupportedCitationType
-from cl.search.models import Opinion
+from cl.citations.types import MatchedResourceType, SupportedCitationType
+from cl.search.models import Opinion, RECAPDocument
 
 
-def get_and_clean_opinion_text(opinion: Opinion) -> None:
+def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
     """Memoize useful versions of an opinion's text as additional properties
     on the Opinion object. This should be done before performing citation
     extraction and annotation on an opinion.
 
-    :param opinion: The Opinion whose text should be parsed
+    :param document: The Opinion or RECAPDocument whose text should be parsed
     """
     for attr in ["html_anon_2020", "html_columbia", "html_lawbox", "html"]:
-        text = getattr(opinion, attr)
+        text = getattr(document, attr, None)
         if text:
-            opinion.source_text = text
-            opinion.cleaned_text = clean_text(text, ["html", "all_whitespace"])
-            opinion.source_is_html = True
+            document.source_text = text
+            document.cleaned_text = clean_text(
+                text, ["html", "all_whitespace"]
+            )
+            document.source_is_html = True
             break
     else:
         # Didn't hit the break; use plain text
-        text = getattr(opinion, "plain_text")
-        opinion.source_text = text
-        opinion.cleaned_text = clean_text(text, ["all_whitespace"])
-        opinion.source_is_html = False
+        text = getattr(document, "plain_text")
+        document.source_text = text
+        document.cleaned_text = clean_text(text, ["all_whitespace"])
+        document.source_is_html = False
 
 
 def generate_annotations(
@@ -36,7 +39,7 @@ def generate_annotations(
 ) -> List[List]:
     """Generate the string annotations to insert into the opinion text
 
-    :param citations: A list of citations in the opinion
+    :param citation_resolutions: A map of lists of citations in the opinion
     :return The new HTML containing citations
     """
     annotations: List[List] = []
@@ -66,7 +69,7 @@ def create_cited_html(
     the citations into links to the correct citations.
 
     :param opinion: The opinion to enhance
-    :param citations: A list of citations in the opinion
+    :param citation_resolutions: A map of lists of citations in the opinion
     :return The new HTML containing citations
     """
     if opinion.source_is_html:  # If opinion was originally HTML...
@@ -76,16 +79,15 @@ def create_cited_html(
             source_text=opinion.source_text,
             unbalanced_tags="skip",  # Don't risk overwriting existing tags
         )
-    else:  # Else, make sure to wrap the new text in <pre> HTML tags...
+    else:  # Else, present `source_text` wrapped in <pre> HTML tags...
         new_html = annotate_citations(
             plain_text=opinion.cleaned_text,
             annotations=[
                 [a[0], f"</pre>{a[1]}", f'{a[2]}<pre class="inline">']
                 for a in generate_annotations(citation_resolutions)
             ],
-            source_text=opinion.source_text,
+            source_text=f'<pre class="inline">{html.escape(opinion.source_text)}</pre>',
         )
-        new_html = f'<pre class="inline">{new_html}</pre>'
 
     # Return the newly-annotated text
     return new_html

@@ -103,7 +103,7 @@ class TestNaturalDuration(SimpleTestCase):
             )
 
 
-class DummyObject(object):
+class DummyObject:
     pass
 
 

@@ -4,7 +4,6 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.bulk_utils import (
     get_petitions,
@@ -17,6 +16,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import DocketEntry, RECAPDocument
 from cl.search.tasks import add_items_to_solr, add_or_update_recap_docket
@@ -35,7 +35,7 @@ def get_dockets(options):
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = PacerSession(
+    pacer_session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     pacer_session.login()
@@ -46,13 +46,16 @@ def get_dockets(options):
             break
 
         if i % 1000 == 0:
-            pacer_session = PacerSession(
+            pacer_session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
+        session_data = SessionData(
+            pacer_session.cookies, pacer_session.proxy_address
+        )
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
@@ -60,13 +63,13 @@ def get_dockets(options):
                     row["docket"], row["office"]
                 ),
                 court_id="ilnb",
-                cookies=pacer_session.cookies,
+                session_data=session_data,
                 office_number=row["office"],
                 docket_number_letters="bk",
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id="ilnb",
-                cookies=pacer_session.cookies,
+                cookies_data=session_data,
                 tag_names=[TAG],
                 **{
                     "show_parties_and_counsel": True,
@@ -89,7 +92,7 @@ def get_final_docs(options):
     )
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = PacerSession(
+    pacer_session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     pacer_session.login()
@@ -100,7 +103,7 @@ def get_final_docs(options):
         if i >= options["limit"] > 0:
             break
         if i % 1000 == 0:
-            pacer_session = PacerSession(
+            pacer_session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
@@ -118,7 +121,11 @@ def get_final_docs(options):
             throttle.maybe_wait()
             chain(
                 get_pacer_doc_by_rd.s(
-                    rd_pk, pacer_session.cookies, tag=TAG_FINALS
+                    rd_pk,
+                    SessionData(
+                        pacer_session.cookies, pacer_session.proxy_address
+                    ),
+                    tag=TAG_FINALS,
                 ).set(queue=q),
                 extract_recap_pdf.si(rd_pk).set(queue=q),
                 add_items_to_solr.si([rd_pk], "search.RECAPDocument").set(
@@ -164,7 +171,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         if options["task"] == "all_dockets":
             get_dockets(options)

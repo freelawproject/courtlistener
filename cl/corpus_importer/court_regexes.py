@@ -1,9 +1,4 @@
-import os
-import pickle
 import re
-from math import ceil
-
-from django.conf import settings
 
 conn_counties = ")|(".join(
     [
@@ -415,7 +410,7 @@ state_pairs = (
 
     (re.compile(r'Supreme Court of California', re.I), 'cal'),
     (re.compile(r'California Court of Appeals', re.I), 'calctapp'),
-        (re.compile(r'Court of Appeal of the State of California',re.I), 'calctapp'),
+        (re.compile(r'Court of Appeal of the State of California', re.I), 'calctapp'),
         (re.compile(r'Court of Appeals? of California', re.I), 'calctapp'),
     (re.compile(r'Appellate Division, Superior Court', re.I), 'calappdeptsuperct'),
         (re.compile(r'Appellate Division of the Superior Court of the State of California', re.I), 'calappdeptsuperct'),
@@ -435,8 +430,8 @@ state_pairs = (
         (re.compile(r'Connecticut Superior Court', re.I), 'connsuperct'),
         (re.compile(r'Review Division Of The Superior Court', re.I), 'connsuperct'),
         # Merged with Superior Court on July 1, 1978
-        (re.compile(r'Court of Common Pleas,? +((%s))' % conn_counties, re.I), 'connsuperct'),
-        (re.compile(r'Superior Court,? +((%s))' % conn_counties, re.I), 'connsuperct'),
+        (re.compile(fr'Court of Common Pleas,? +(({conn_counties}))', re.I), 'connsuperct'),
+        (re.compile(fr'Superior Court,? +(({conn_counties}))', re.I), 'connsuperct'),
 
     (re.compile(r'Supreme Court of (the State of )?Delaware', re.I), 'del'),
         (re.compile(r'Delaware Supreme Court', re.I), 'del'),
@@ -575,7 +570,7 @@ state_pairs = (
         (re.compile(r'New York Court of Appeals', re.I), 'ny'),
     (re.compile(r'Appellate Division of the Supreme Court of (the State of )?New York', re.I), 'nyappdiv'),
         (re.compile(r'New York Supreme Court, Appellate Term', re.I), 'nyappdiv'),
-    (re.compile(r'Supreme Court.*((%s))' % ny_counties, re.I), 'nyappdiv'),
+    (re.compile(fr'Supreme Court.*(({ny_counties}))', re.I), 'nyappdiv'),
     (re.compile(r'Supreme Court of the State of New York', re.I), 'nysupct'),
     (re.compile(r'Family Court.*New York', re.I), 'nyfamct'),
     (re.compile(r'Surrogate\'s Court', re.I), 'nysurct'),
@@ -701,14 +696,14 @@ international_pairs = (
 
 
 def match_court_string(
-    court_str,
-    federal_appeals=False,
-    federal_district=False,
-    bankruptcy=False,
-    state=False,
-    state_ag=False,
-    international=False,
-):
+    court_str: str,
+    federal_appeals: bool = False,
+    federal_district: bool = False,
+    bankruptcy: bool = False,
+    state: bool = False,
+    state_ag: bool = False,
+    international: bool = False,
+) -> str | None:
     """Look up a court string and return a CourtListener ID.
 
     Note you cannot use bankruptcy and federal_district together due to

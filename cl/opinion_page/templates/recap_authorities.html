@@ -1,0 +1,19 @@
+{% extends "recap_document.html" %}
+{% load humanize %}
+
+{% block nav-pdf %}{% endblock %}
+{% block content-pdf %}{% endblock %}
+{% block nav-authorities %}active{% endblock %}
+
+{% block tab-content %}
+  <div role="tabpanel" class="tab-pane active" id="text">
+    <div id="authorities">
+      {% with authorities_count=rd.authority_count %}
+        <h3>This document cites {{ authorities_count|intcomma }} opinion{{ authorities_count|pluralize }}</h3>
+      {% endwith %}
+      <hr>
+      {# Westlaw's metadata organization: Checkbox, Treatment, Name + citation + summary, Date, Type, Depth #}
+      {% include 'includes/authorities_list.html' with authorities=authorities %}
+    </div>
+  </div>
+{% endblock %}

@@ -7,7 +7,7 @@ from juriscraper.OpinionSite import OpinionSite
 
 class Site(OpinionSite):
     def __init__(self):
-        super(Site, self).__init__()
+        super().__init__()
         self.court_id = self.__module__
         self.url = join(
             settings.INSTALL_ROOT,
@@ -23,7 +23,7 @@ class Site(OpinionSite):
         path = "//name/text()"
         return list(self.html.xpath(path))
 
-    def _get_case_dates(self):
+    def _get_case_dates(self) -> list[datetime]:
         path = "//date/text()"
         return [
             datetime.strptime(date_string, "%Y/%m/%d")

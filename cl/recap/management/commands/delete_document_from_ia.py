@@ -18,7 +18,7 @@ def delete_from_ia(url: str) -> Response:
     # and the path
     path = parse.urlparse(url).path
     bucket_path = path.split("/", 2)[2]
-    storage_domain = "http://s3.us.archive.org"
+    storage_domain = "https://s3.us.archive.org"
     return requests.delete(
         f"{storage_domain}/{bucket_path}",
         headers={
@@ -44,7 +44,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         r = delete_from_ia(options["ia_download_url"])
         if r.ok:
             print("Item deleted successfully")

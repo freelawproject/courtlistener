@@ -1,4 +1,4 @@
-{# Audio file #}
+{# Person #}
 {{ item.name_full }}
 {% for alias in item.aliases.all %}
     {{ alias.name_full }}

@@ -1,0 +1,223 @@
+{% load extras %}
+{% load waffle_tags %}
+<ul class="nav nav-tabs" role="tablist">
+  <li role="presentation" class="active"><a href="#list-fields-opinions" aria-controls="list-fields-opinions" role="tab" data-toggle="tab">Opinions</a></li>
+  <li role="presentation"><a href="#list-fields-parentheticals" aria-controls="list-fields-parentheticals" role="tab" data-toggle="tab">Parentheticals</a></li>
+  <li role="presentation"><a href="#list-fields-recap_archive" aria-controls="list-fields-recap" role="tab" data-toggle="tab">RECAP</a></li>
+  <li role="presentation"><a href="#list-fields-oral_arguments" aria-controls="list-fields-oral-arguments" role="tab" data-toggle="tab">Oral Arguments</a></li>
+  <li role="presentation"><a href="#list-fields-judges" aria-controls="list-fields-judges" role="tab" data-toggle="tab">Judges</a></li>
+</ul>
+
+<div class="tab-content">
+  {% for type in types %}
+    <div role="tabpanel" class="tab-pane {% if type == "opinions" %} active{% endif %}" id="list-fields-{{ type }}">
+      <div class="table-responsive">
+        <table class="table table-striped table-condensed">
+          <thead>
+              <tr>
+                  <th>Field</th>
+                  <th>Description</th>
+              </tr>
+          </thead>
+          <tbody>
+              {% for item in data %}
+                  <tr>
+                  {% if item|get:type %}
+                    {% flag "o-es-active" %}
+                      <td><code>{{ item.field }}</code></td>
+                      <td>{{ item.description|safe }}</td>
+                    {% else %}
+                      {% if item.field == "status" %}
+                        <td><code>status_exact</code></td>
+                        <td>The precedential status of a case. Valid entries for this field are <code>"Precedential"</code>, <code>"Non-Precedential"</code>, <code>"Errata"</code>, <code>"Separate Opinion"</code>, <code>"In-chambers"</code>, <code>"Relating-to orders"</code>, <code>"Unknown Status"</code>.</td>
+                      {% elif item.field == "type" %}
+                        <td><code>type</code></td>
+                        <td>The Opinion type. Valid entries for this field are <code>010combined</code>, <code>015unamimous</code>, <code>020lead</code>, <code>025plurality</code>, <code>030concurrence</code>, <code>035concurrenceinpart</code>, <code>040dissent</code>, <code>050addendum</code>, <code>060remittitur</code>, <code>070rehearing</code>, <code>080onthemerits</code>, <code>090onmotiontostrike</code>.</td>
+                      {% elif item.field == "panel_names" %}
+                      {% elif item.field == "procedural_history" %}
+                      {% elif item.field == "posture" %}
+                      {% elif item.field == "syllabus" %}
+                      {% elif item.field == "source" %}
+                      {% else %}
+                        <td><code>{{ item.field }}</code></td>
+                        <td>{{ item.description|safe }}</td>
+                      {% endif %}
+                    {% endflag %}
+                  {% endif %}
+                  </tr>
+              {% endfor %}
+          </tbody>
+        </table>
+        {% if type == "recap_archive" %}
+          <p>
+            <sup>*</sup> <code>party</code> and <code>attorney</code> values are associated with dockets, not filings. Therefore, avoid combining non-docket fields with <code>party</code> and <code>attorney</code> in the main query box, as such combinations won't yield any results. For example, a query like:
+          </p>
+          <ul>
+            <li><code>party:(Party Name) AND attorney:(Attorney) AND description:(some description)</code></li>
+          </ul>
+          <p>Will not return any results. To achieve the desired results, utilize filters available in the sidebar:</p>
+          <ul>
+            <li><code>Document Description: "some description"</code></li>
+            <li><code>Party Name: "The party name"</code></li>
+            <li><code>Attorney  Name: "The attorney name"</code></li>
+          </ul>
+          <p>This approach will retrieve filings that match the specified document description in dockets with the specified parties and attorneys.</p>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+  <div role="tabpanel" class="tab-pane" id="list-fields-judges">
+    <div class="table-responsive">
+      <table class="table table-striped table-condensed">
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>id</code></td>
+            <td>The ID of the judge in the CourtListener system.</td>
+          </tr>
+          <tr>
+            <td><code>fjc_id</code></td>
+            <td>The ID of a judge in the Federal Judicial Center's database
+                of judges.
+            </td>
+          </tr>
+          <tr>
+            <td><code>name</code></td>
+            <td>A judge's full name.</td>
+          </tr>
+          <tr>
+            <td><code>races</code></td>
+            <td>The races that are known for a judge.</td>
+          </tr>
+          <tr>
+            <td><code>gender</code></td>
+            <td>The gender that a judge is known to identify with, for now only Female, Male, or Other.</td>
+          </tr>
+          <tr>
+            <td><code>religion</code></td>
+            <td>A judge's religion, if known.</td>
+          </tr>
+          <tr>
+            <td><code>dod</code> and <code>dob</code></td>
+            <td>The date of death and date of birth for a judge.</td>
+          </tr>
+          <tr>
+            <td><code>dob_city</code>, <code>dob_state</code>, and <code>dob_state_id</code>
+            </td>
+            <td>The birth city, state, and state abbreviation for a judge.</td>
+          </tr>
+          <tr>
+            <td><code>court</code></td>
+            <td>The courts where a judge has held positions.</td>
+          </tr>
+          <tr>
+            <td><code>position_type</code></td>
+            <td>The titles that a judge has held, such as "Special Chariman",
+                "Chief Judge", "Acting Judge", etc.
+            </td>
+          </tr>
+          <tr>
+            <td><code>appointer</code>, <code>supervisor</code>, <code>predecessor</code>
+            </td>
+            <td>The full name of the appointer, supervisor, and predecessor of a
+                judge while in a position.
+            </td>
+          </tr>
+          <tr>
+            <td><code>date_nominated</code></td>
+            <td>The date a judge was nominated to a position.</td>
+          </tr>
+          <tr>
+            <td><code>date_elected</code></td>
+            <td>If an elected judge, this is the date the judge was elected to
+                their position.
+            </td>
+          </tr>
+          <tr>
+            <td><code>date_recess_appointment</code></td>
+            <td>If a judge was appointed while congress was in recess, this is
+                the date of that appointment.
+            </td>
+          </tr>
+          <tr>
+            <td><code>date_referred_to_judicial_committee</code></td>
+            <td>The date that a federal judge nomination was referred to the
+                judicial committee.
+            </td>
+          </tr>
+          <tr>
+            <td><code>date_judicial_committee_action</code></td>
+            <td>The date that the judicial committee took action on a judicial
+                nomination.
+            </td>
+          </tr>
+          <tr>
+            <td><code>date_hearing</code></td>
+            <td>The date of a judicial hearing for a federal judge.</td>
+          </tr>
+          <tr>
+            <td><code>date_confirmation</code></td>
+            <td>The date a federal judge is confirmed by the Senate.</td>
+          </tr>
+          <tr>
+            <td><code>date_start</code></td>
+            <td>The date that a judge starts a position.</td>
+          </tr>
+          <tr>
+            <td><code>date_retirement</code></td>
+            <td>The date a judge retires from a position.</td>
+          </tr>
+          <tr>
+            <td><code>date_termination</code></td>
+            <td>The date a judge ends active duty in a position. The compliment
+                to <code>date_start</code></td>
+          </tr>
+          <tr>
+            <td><code>termination_reason</code></td>
+            <td>The reason a judge was terminated from a position.</td>
+          </tr>
+          <tr>
+            <td><code>judicial_committee_action</code></td>
+            <td>The action taken by the Judicial Committee in response to a
+                nomination. Possible values: "Not Reported", "Reported with
+                Recommendation", "Reported without Recommendation",
+                "Recommendation Postponed", or "Recommended Unfavorably".
+            </td>
+          </tr>
+          <tr>
+            <td><code>nomination_process</code></td>
+            <td>The process by which a person was nominated into this a
+                position. Possible values: "U.S. Senate", "State Senate",
+                "Primary Election", or "Merit Commission".
+            </td>
+          </tr>
+          <tr>
+            <td><code>selection_method</code></td>
+            <td>How the judge was selected for a position. Possible values:
+                "Partisan Election", "Non-Partisan Election", "Appointment
+                (President)", "Appointment (Governor)", or "Appointment
+                (Legislature)".
+            </td>
+          </tr>
+          <tr>
+            <td><code>school</code></td>
+            <td>The name of the school attended by a judge.</td>
+          </tr>
+          <tr>
+            <td><code>political_affiliation</code></td>
+            <td>The political affiliation of a juge.</td>
+          </tr>
+          <tr>
+            <td><code>aba_rating</code></td>
+            <td>The American Bar Association rating of a judge.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

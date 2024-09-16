@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load partition_util %}
+
+
+{% block title %}Oral Argument Archive Coverage — CourtListener.com{% endblock %}
+{% block og_title %}Oral Argument Archive Coverage — CourtListener.com{% endblock %}
+{% block description %}CourtListener has the biggest collection of oral argument recordings on the Internet. Learn more about what we have in this vast collection.{% endblock %}
+{% block og_description %}CourtListener has the biggest collection of oral argument recordings on the Internet. Learn more about what we have in this vast collection.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "coverage" %}">Back to Coverage Overview</a>
+  </h4>
+</div>
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "coverage" %}">Back to Coverage Home</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#courts">Included Courts</a></li>
+    </ul>
+  </div>
+</div>
+
+<div class="col-xs-12 col-md-8 col-lg-6" role="main">
+  <h1 id="overview">Data Coverage — What Oral Argument Recordings Does CourtListener Have?</h1>
+  <p class="lead">Our <a href="{% url "advanced_oa" %}">database of oral argument recordings</a> is the largest on the Internet.
+  </p>
+
+  <p>Each hour, we gather audio files from the Supreme Court and the Federal Circuit Courts listed below. For many of these courts, we also gathered everything they had available on their website so that we would have as complete a collection as possible. We are seeking partnerships with courts to host their older content from their archives.
+  </p>
+  <p>As we gather audio files from court websites, we convert them into enhanced audio files, which we make available in our <a href="{% url "advanced_oa" %}">search engine</a>, <a href="{% url "alert_help" %}">alerts</a>, <a href="{% url "api_index" %}">APIs</a>, and <a href="{% url "podcasts" %}">podcasts</a>.
+  <p id="courts">These circuit courts are currently supported:</p>
+  <div class="row">
+    {% for row in courts_with_oral_argument_scrapers|rows:2 %}
+      <div class="col-sm-6">
+        <ul class="{% if not forloop.last %}bottom{% endif %}">
+          {% for court in row %}
+            <li>
+              <a href="/?q=&court_{{ court.pk }}=on&order_by=dateArgued+desc&type=oa"
+                 rel="nofollow"
+              >{{ court }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+  </div>
+  <p>This list continues to grow as we receive <a href="https://donate.free.law/forms/supportflp">financial support</a>, code contributions, and <a href="{% url "contact" %}">requests</a> for additional jurisdictions. As with everything we do, your support helps make this project possible.
+  </p>
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}

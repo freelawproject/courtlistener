@@ -8,6 +8,7 @@ from typing import Mapping, Optional, TypedDict
 
 import requests
 import usaddress
+from asgiref.sync import async_to_sync
 from dateutil import parser
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -22,11 +23,12 @@ from juriscraper.pacer import (
 )
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import AttorneyOrganization, Role
 from cl.people_db.types import RoleType
 from cl.recap.models import UPLOAD_TYPE
 from cl.search.models import Court, Docket
+from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +89,7 @@ def lookup_and_save(new, debug=False):
             def is_different(x):
                 return x.pacer_case_id and x.pacer_case_id != new.pacer_case_id
 
-            if all([is_different(d) for d in ds]):
+            if all(is_different(d) for d in ds):
                 # All the dockets found match on docket number, but have
                 # different pacer_case_ids. This means that the docket has
                 # multiple pacer_case_ids in PACER, and we should mirror that
@@ -100,12 +102,12 @@ def lookup_and_save(new, debug=False):
                 d = ds[0]
 
     # Add RECAP as a source if it's not already.
-    if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-        d.source = Docket.RECAP_AND_SCRAPER
-    elif d.source == Docket.COLUMBIA:
-        d.source = Docket.COLUMBIA_AND_RECAP
-    elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
+    d.add_recap_source()
+
+    if d.nature_of_suit and hasattr(new, "nature_of_suit"):
+        # Avoid updating the nature_of_suit if the docket already has a
+        # nature_of_suit set, since this value doesn't change. See issue #3878.
+        delattr(new, "nature_of_suit")
 
     for attr, v in new.__dict__.items():
         setattr(d, attr, v)
@@ -113,13 +115,12 @@ def lookup_and_save(new, debug=False):
     if not debug:
         d.save()
         logger.info(
-            "Saved as Docket %s: https://www.courtlistener.com%s"
-            % (d.pk, d.get_absolute_url())
+            f"Saved as Docket {d.pk}: https://www.courtlistener.com{d.get_absolute_url()}"
         )
     return d
 
 
-def get_first_missing_de_date(d):
+def get_first_missing_de_date(d: Docket):
     """When buying dockets use this function to figure out which docket entries
     we already have, starting at the first item. Since PACER only allows you to
     do a range of docket entries, this allows us to figure out a later starting
@@ -161,7 +162,9 @@ def get_first_missing_de_date(d):
     return date(1960, 1, 1)
 
 
-def get_blocked_status(docket: Docket, count_override: int | None = None):
+async def get_blocked_status(
+    docket: Docket, count_override: int | None = None
+):
     """Set the blocked status for the Docket.
 
     Dockets are public (blocked is False) when:
@@ -192,14 +195,14 @@ def get_blocked_status(docket: Docket, count_override: int | None = None):
     if count_override is not None:
         count = count_override
     elif docket.pk:
-        count = docket.docket_entries.all().count()
+        count = await docket.docket_entries.all().acount()
     else:
         count = 0
     small_case = count <= bankruptcy_privacy_threshold
-    bankruptcy_court = (
-        docket.court.jurisdiction in Court.BANKRUPTCY_JURISDICTIONS
-    )
-    if all([small_case, bankruptcy_court]):
+    bankruptcy_court = await Court.objects.filter(
+        pk=docket.court_id, jurisdiction__in=Court.BANKRUPTCY_JURISDICTIONS
+    ).aexists()
+    if small_case and bankruptcy_court:
         return True, date.today()
     return False, None
 
@@ -260,20 +263,23 @@ def process_docket_data(
         add_bankruptcy_data_to_docket(d, data)
         add_claims_to_docket(d, data["claims"])
     else:
-        update_docket_metadata(d, data)
-        d, og_info = update_docket_appellate_metadata(d, data)
+        async_to_sync(update_docket_metadata)(d, data)
+        d, og_info = async_to_sync(update_docket_appellate_metadata)(d, data)
         if og_info is not None:
             og_info.save()
             d.originating_court_information = og_info
         d.save()
         if data.get("docket_entries"):
-            add_docket_entries(d, data["docket_entries"])
+            async_to_sync(add_docket_entries)(d, data["docket_entries"])
     if report_type in (
         UPLOAD_TYPE.DOCKET,
         UPLOAD_TYPE.APPELLATE_DOCKET,
         UPLOAD_TYPE.IA_XML_FILE,
     ):
         add_parties_and_attorneys(d, data["parties"])
+        if data["parties"]:
+            # Index or re-index parties only if the docket has parties.
+            index_docket_parties_in_es.delay(d.pk)
     return d.pk
 
 
@@ -365,7 +371,7 @@ def make_address_lookup_key(address_info):
     }
     for k, v in sorted_info.items():
         for bad, good in fixes.items():
-            v = re.sub(r"\b%s\b" % bad, good, v, flags=re.IGNORECASE)
+            v = re.sub(rf"\b{bad}\b", good, v, flags=re.IGNORECASE)
         sorted_info[k] = v
     key = "".join(sorted_info.values())
     return re.sub(r"[^a-z0-9]", "", key.lower())
@@ -390,7 +396,7 @@ def normalize_address_info(address_info):
             continue
 
         for bad, good in fixes.items():
-            a = re.sub(r"\b%s\b" % bad, good, a, flags=re.IGNORECASE)
+            a = re.sub(rf"\b{bad}\b", good, a, flags=re.IGNORECASE)
 
         address_info[address_part] = a
 
@@ -557,7 +563,7 @@ def check_pacer_court_connectivity(court_id: str) -> ConnectionType:
         status_code = r.status_code
         r.raise_for_status()
         connection_ok = True
-    except requests.exceptions.RequestException as e:
+    except requests.exceptions.RequestException:
         connection_ok = False
 
     blocked_dict: ConnectionType = {
@@ -577,7 +583,7 @@ def get_or_cache_pacer_court_status(court_id: str, server_ip: str) -> bool:
     """
 
     court_status_key = f"status:pacer:court.{court_id}:ip.{server_ip}"
-    r = make_redis_interface("CACHE", decode_responses=False)
+    r = get_redis_interface("CACHE", decode_responses=False)
     pickle_status = r.get(court_status_key)
     if pickle_status:
         court_status = pickle.loads(pickle_status)
@@ -612,7 +618,7 @@ def log_pacer_court_connection(
     :param server_ip: The server IP address.
     :return: None
     """
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
     d = connection_info["date_time"].date().isoformat()
     t = connection_info["date_time"].time().isoformat()
