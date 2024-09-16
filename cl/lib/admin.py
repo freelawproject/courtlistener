@@ -3,7 +3,7 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 from cl.lib.models import Note
 
 
-class AdminTweaksMixin(object):
+class AdminTweaksMixin:
     class Media:
         css = {
             "all": ("css/admin.css",),

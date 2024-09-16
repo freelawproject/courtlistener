@@ -8,7 +8,7 @@ from django.db.models import F
 from django.utils.timezone import now
 
 from cl.lib.db_tools import fetchall_as_dict
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Stat
 
 MILESTONES = OrderedDict(
@@ -25,7 +25,7 @@ MILESTONES = OrderedDict(
 )
 
 MILESTONES_FLAT = sorted(
-    [item for sublist in MILESTONES.values() for item in sublist]
+    item for sublist in MILESTONES.values() for item in sublist
 )
 
 
@@ -47,7 +47,7 @@ def get_milestone_range(start, end):
     return out
 
 
-def tally_stat(name, inc=1, date_logged=None):
+async def tally_stat(name, inc=1, date_logged=None):
     """Tally an event's occurrence to the database.
 
     Will assume the following overridable values:
@@ -56,7 +56,7 @@ def tally_stat(name, inc=1, date_logged=None):
     """
     if date_logged is None:
         date_logged = now()
-    stat, created = Stat.objects.get_or_create(
+    stat, created = await Stat.objects.aget_or_create(
         name=name, date_logged=date_logged, defaults={"count": inc}
     )
     if created:
@@ -64,14 +64,14 @@ def tally_stat(name, inc=1, date_logged=None):
     else:
         count_cache = stat.count
         stat.count = F("count") + inc
-        stat.save()
+        await stat.asave()
         # stat doesn't have the new value when it's updated with a F object, so
         # we fake the return value instead of looking it up again for the user.
         return count_cache + inc
 
 
 def check_redis() -> bool:
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     try:
         r.ping()
     except (redis.exceptions.ConnectionError, ConnectionRefusedError):

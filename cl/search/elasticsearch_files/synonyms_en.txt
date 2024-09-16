@@ -1,0 +1,827 @@
+ann => ann,annotated,annual
+app => app,appellate,appendix,appendicies
+comm => comm,committee,communications
+comp => comp,compensation,compilation,compiled
+dec => dec,decision,december
+def => def,defense,defender
+del => del,delaware,delegate
+elec => elec,electrical,electricity,electronic
+eng => eng,english,england
+est => est,estonia,estate,estimate
+fin => fin,finland,finance,financial
+hosp => hosp,hospital,hospitality
+hous => hous,housing,houston
+lab => lab,labor,laboritory
+mag => mag,magazine,magistrate
+mar => mar,maritime,march
+med => med,medical,mediator
+merch => merch,merchant,merchandise
+pers => pers,person,personnel
+phil => phil,philippines,philosophical
+pol => pol,poland,political
+prac => prac,practical,practice,practitioner
+prob => prob,probate,problem
+proc => proc,proceedings,procedure
+prod => prod,production,product
+pub => pub,publication,public,publishing
+ref => ref,referee,reference,refining
+reg => reg,registrar,regular
+rep => rep,representative,reporter,report
+res => res,research,reserve,resolution
+sec => sec,section,securities
+sen => sen,senator,senegal
+st => st,state,street
+tel => tel,telephone,telegraph
+tr => tr,trustee,trust
+
+// "trans" is used much more to mean transgender than the other words, and we've
+// gotten a complaint from a user about this synonym. Removing it, but adding a
+// synonym between trans and transgender instead (below).
+// trans => translation,translator,transgender
+
+// Units
+GB,gib,gigabyte,gigabytes
+MB,mib,megabyte,megabytes
+
+// Numbers
+1st,first
+2nd,second
+3rd,third
+4th,fourth
+5th,fifth
+6th,sixth
+7th,seventh
+8th,eighth
+9th,ninth
+10th,tenth
+11th,eleventh
+12th,twelfth
+13th,thirteenth
+14th,fourteenth
+15th,fifteenth
+16th,sixteenth
+17th,seventeenth
+18th,eighteenth
+19th,nineteenth
+20th,twentieth
+
+1,one
+2,two
+3,three
+4,four
+5,five
+6,six
+7,seven
+8,eight
+9,nine
+10,ten
+11,eleven
+12,twelve
+13,thirteen
+14,fourteen
+15,fifteen
+16,sixteen
+17,seventeen
+18,eighteen
+19,nineteen
+20,twenty
+
+// Abbreviations, Countries, Legal Terms.
+abr,abridge
+acad,academy
+acct,accountant
+admin,administrative,administration
+advert,advertising,adver
+advoc,advocate
+aff,affairs
+afg,afghanistan
+afr,africa,african
+agric,agriculture
+ala,alabama
+alb,albania
+alg,algeria
+alt,alternative
+amend,amendment
+anc,ancestry
+angl,angola
+annot,annotation
+anon,anonymous
+apr,april
+arb,arbitrator,arbitration
+arg,argentina
+ariz,arizona
+ark,arkansas
+arm,armenia
+assemb,assembly,assemblyman,assemblywoman,assemblymember
+assoc,associate
+atl,atlantic
+aug,august
+austl,australia
+auth,authority
+auto,automobile,automotive
+ave,avenue
+azer,azerbaijan
+bah,bahamas
+bahr,bahrain
+balt,baltimore
+bangl,bangladesh
+bankr,bankruptcy
+barb,barbados
+behav,behavioral,behavior
+belr,belarus
+belg,belgium
+berm,bermuda
+bibliog,bibliography
+bd,board
+bol,bolivia
+bk,book
+bos,boston
+braz,brazil
+brit,british
+bhd,brotherhood
+bros,brothers
+bldg,building
+bulg,bulgaria
+bus,business
+cal,california
+cas,casualty
+cath,catholic
+ctr,center,centre
+ch,chapter
+chem,chemical
+chi,chicago
+chron,chronicle
+cir,circuit
+civ,civil
+cl,clause
+coll,college
+colom,colombia
+colo,colorado
+col,column
+cmt,comment,commentary
+com,commerce
+cmty,community
+co,company
+comput,computer
+con,concurrent
+condo,condominium
+conf,conference
+congress,cong,congressional
+conn,connecticut
+consol,consolidated
+const,constitution,constitutional
+constr,construction
+contemp,contemporary
+// This synonym means that whenever you search for 'contract' you get results
+// for "continued". Removing this.
+// cont,contract
+conv,conveyancer
+coop,cooperative
+corp,corporate
+corr,correction
+cosm,cosmetic
+couns,counselor
+cty,county,cnty
+ct,court
+cts,courts
+crim,criminal
+croat,croatia
+dall,dallas
+deb,debate
+delinq,delinquency
+der,derecho
+det,detention
+dev,development
+dipl,diplomacy
+dir,director
+disc,discount
+disp,dispute
+distrib,distributor
+dist,district
+div,division
+djib,djibouti
+dr,doctor
+doc,document
+drft,draft
+economical,econ,economic,economy
+educ,education
+emp,employee
+ent,entertainment,entm
+equip,equipment
+eri,eritrea
+eth,ethiopia
+eur,europe,european
+ex,example
+exch,exchange
+exec,executive
+expl,exploration
+exp,exporter
+fac,faculty
+fam,family
+feb,february
+fed,federal
+fid,fidelity
+fig,figure1
+fla,florida
+fol,folio
+fr,france
+gam,gambia
+gen,general
+ga,georgia,geor
+ger,germany
+gib,gibraltar
+glob,global
+gren,grenada
+grp,group
+guad,guadeloupe
+guar,guaranty
+guat,guatemala
+haw,hawaii
+hisp,hispanic
+hist,history
+hond,honduras
+hon,honorable
+hum,human
+hung,hungary
+hypo,hypothetical
+ill,illinois
+illus,illustration
+immigr,immigration
+imp,importer
+inc,incorporated
+indem,indemnity
+indep,independent,independence
+ind,indiana
+indon,indonesia
+indus,industrial
+ineq,inequality
+info,information
+inj,injury
+inst,institute,institution
+ins,insurance
+intell,intellectual
+interdisc,interdisciplinary
+int,interest
+intro,introduction
+inv,investment,investor
+irs,internal revenue service
+isr,israel
+jan,january
+jj,judge
+jud,judicial
+jurid,juridical
+juris,jurisprudence
+juv,juvenile
+kan,kansas
+kaz,kazakhstan
+ky,kentucky
+kos,kosovo
+kyrg,kyrgyzstan
+lat,latvia
+leb,lebanon
+legis,legislation,legislative
+liab,liability
+liber,liberia
+libr,library
+liech,liechtenstein
+ltd,limited
+lith,lithuania
+litig,litigation
+loc,local
+la,louisiana
+lux,luxembourg
+madag,madagascar
+maint,maintenance
+malay,malaysia
+mgmt,management
+mfr,manufacturer
+mfg,manufacturing
+ms,manuscript
+mkt,market
+mktg,marketing
+md,maryland
+matrim,matrimonial
+mech,mechanic
+metro,metropolitan
+mex,mexico
+mich,michigan
+micr,micronesia
+mil,military
+mimeo,mimeograph
+min,mineral
+minn,minnesota
+misc,miscellaneous
+mo,missouri
+mod,modern
+mong,mongolia
+mont,montana
+mortg,mortgage
+mozam,mozambique
+mun,municipal
+mut,mutual
+myan,myanmar
+namib,namibia
+nat,natural
+neb,nebraska
+negl,negligence
+negot,negotiation
+neth,netherlands
+nev,nevada
+newsl,newsletter
+nicar,nicaragua
+ne,northeast,northeastern
+nw,northwestern,northwest
+nov,november
+oct,october
+offprt,offprint
+okla,oklahoma
+op,opinion
+ord,order
+or,oregon
+org,organization
+pac,pacific
+pak,pakistan
+¶,paragraph,¶¶
+para,paraguay
+par,parish
+pt,part
+pa,pennsylvania
+persp,perpsective
+pers,personal
+pharm,pharmaceuticals
+phila,philadelphia
+phx,phoenix
+pol,political,politics
+pmbl,preamble
+pres,preserve
+princ,principle
+prtg,printing
+priv,private
+prof,profession
+prop,property
+prot,protection
+psychol,psychological
+ry,railway
+rec,record
+reg,regulation,regulatory
+rehab,rehabilitation
+rel,relations
+repl,replacement
+reprt,reprint
+reprod,reproduction
+resol,resolution
+res,resource
+resp,responsibility
+ret,retirement
+revista,rev,revised,revision
+rts,rights
+rd,road
+rom,romania
+russ,russia
+sav,savings
+sched,schedule
+sch,school
+sci,science
+scot,scotland,scottish
+§,section,§§,sec
+sept,september
+serb,serbia
+serv,service
+sess,session
+sey,seychelles
+slovk,slovakia
+slovn,slovenia
+sociological,soc,social
+solic,solicitor
+sol,solution
+som,somalia
+se,southeast,southeastern
+sw,southwest,southwestern
+spec,special
+stat,statistics
+stud,studies
+subcomm,subcommittee
+subdiv,subdivision
+subsec,subsection
+supp,supplement
+sur,surety
+surin,suriname
+surv,survey
+swaz,swaziland
+swed,sweden
+switz,switzerland
+symp,symposium
+sys,system
+tbl,table4
+taj,tajikistan
+tanz,tanzania
+tchr,teacher
+tech,technique,technology
+telecomm,telecommunication
+television,televisions,tv,tvs
+temp,temporary
+tenn,tennessee
+tex,texas
+thai,thailand
+tit,title
+twp,township
+trans,transgender
+transcon,transcontinental
+transp,transportation
+trib,tribune
+tunis,tunisia
+turk,turkey
+turkm,turkmenistan
+tpk,turnpike
+ukr,ukraine
+unabr,unabridged
+unif,uniform
+univ,university
+us,usa, united states
+urb,urban
+uru,uruguay
+util,utility
+uzb,uzbekistan
+venez,venezuela
+vs,v
+vt,vermont
+viet,vietnam
+vill,village
+va,virginia
+vol,volume
+wk,week
+wkly,weekly
+wis,wisconsin
+wyo,wyoming
+zam,zambia
+zim,zimbabwe
+
+# Court abbreviations
+mdal,almd
+ndal,alnd
+sdal,alsd
+edar,ared
+wdar,arwd
+cdca,cacd
+edca,caed
+ndca,cand
+sdca,casd
+mdfl,flmd
+ndfl,flnd
+sdfl,flsd
+mdga,gamd
+ndga,gand
+sdga,gasd
+cdil,ilcd
+ndil,ilnd
+sdil,ilsd
+ndin,innd
+sdin,insd
+ndia,iand
+sdia,iasd
+edky,kyed
+wdky,kywd
+edla,laed
+mdla,lamd
+wdla,lawd
+edmi,mied
+wdmi,miwd
+ndms,msnd
+sdms,mssd
+edmo,moed
+wdmo,mowd
+edny,nyed
+ndny,nynd
+sdny,nysd
+wdny,nywd
+ednc,nced
+mdnc,ncmd
+wdnc,ncwd
+ndoh,ohnd
+sdoh,ohsd
+edok,oked
+ndok,oknd
+wdok,okwd
+edpa,paed
+mdpa,pamd
+wdpa,pawd
+edtn,tned
+mdtn,tnmd
+wdtn,tnwd
+edtx,txed
+ndtx,txnd
+sdtx,txsd
+wdtx,txwd
+edva,vaed
+wdva,vawd
+edwa,waed
+wdwa,wawd
+ndwv,wvnd
+sdwv,wvsd
+edwi,wied
+wdwi,wiwd
+
+# Top abbreviations in legal documents since 1975
+american bar association, aba
+american broadcasting company, abc
+armed career criminal act, acca
+arkansas crime information center, acic
+americans with disabilities act, ada
+age discrimination in employment act, adea
+attention deficit hyperactivity disorder, adhd
+antiterrorism and effective death penalty act, aedpa
+aid to families with dependent children, afdc
+air force office of special investigations, afosi
+american institute of architects, aia
+acquired immune deficiency syndrome, aids
+administrative law court, alc
+administrative law judge, alj
+american national standards institute, ansi
+agency of original jurisdiction, aoj
+administrative procedure act, administrative procedures act, apa
+albuquerque police department, apd
+armed services board of contract appeals, asbca
+alcohol tobacco and firearms, atf
+all terrain vehicle, atv
+assistant united states attorney, ausa
+blood alcohol concentration, bac
+bankruptcy appellate panel, bap
+bureau of criminal apprehension, bca
+bureau of criminal identification, bci
+board of immigration appeal, bureau of indian affairs, bia
+bureau of land management, blm
+bureau of prisons, bop
+benefits review board, brb
+child advocacy center, children advocacy center, cac
+coronavirus aid relief and economic security, cares
+collective bargaining agreement, cba
+continuing criminal enterprise, cce
+california department of corrections and rehabilitation, cdcr
+controlled dangerous substance, cds
+chief executive officer, code enforcement officer, ceo
+california environmental quality act, ceqa
+commercial general liability, cgl
+california highway patrol, chp
+criminal investigation division, cid
+court improvement program, cip
+certificate of appealability, coa
+consolidated omnibus budget reconciliation act, cobra
+consumer protection act, cpa
+chicago police department, cpd
+child protective services, children protective services, cps
+california rehabilitation center, crc
+controlled substances act, csa
+child sexual abuse accommodation syndrome, csaas
+child support recovery act, civil service reform act, civil service retirement act, csra
+connecticut unfair trade practices act, cutpa
+clean water act, cwa
+children and youth services, cys
+department of children and families, dcf
+department of children and family services, division of child and family services, dcfs
+department of child services, dcs
+drug enforcement administration, dea
+department of environmental conservation, dec
+department of environmental protection, dep
+department of environmental quality, deq
+department of environmental resources, der
+department of family and children services, dfacs
+division of family services, dfs
+division of housing and community renewal, dhcr
+department of health and human services, dhhs
+department of human resources, dhr
+department of homeland security, department of human services, dhs
+disability insurance benefits, dib
+department of juvenile justice, djj
+department of local government finance, dlgf
+department of motor vehicles, dmv
+deoxyribonucleic acid, dna
+department of natural resources, dnr
+department of correction, doc
+department of correctional services, docs
+department of defense, dod
+department of education, doe
+department of health, doh
+department of labor, dol
+department of revenue, dor
+department of transportation and development, dotd
+department of public safety, dps
+department of public welfare, dpw
+development review board, drb
+department of social and health services, dshs
+department of social services, dss
+deceptive trade practices act, deceptive trade practices consumer protection act, dtpa
+driving under the influence, dui
+domestic violence restraining order, dvro
+driving while intoxicated, dwi
+division of youth and family services, dyfs
+equal access to justice act, eaja
+equal employment opportunity commission, eeoc
+environmental impact statement, eis
+emergency medical services, ems
+environmental protection agency, epa
+employee retirement income security act, erisa
+federal arbitration act, federal aviation administration, faa
+first amended complaint, fac
+federal bureau of investigation, fbi
+false claims act, federal communications act, fca
+federal communications commission, fcc
+fair credit reporting act, fcra
+food and drug administration, fda
+fair debt collection practices act, fdcpa
+federal deposit insurance corporation, fdic
+federal energy administration, fea
+federal election campaign act, feca
+fair employment and housing act, feha
+federal employers liability act, fela
+federal emergency management agency, fema
+federal energy regulatory commission, ferc
+fair housing act, fha
+federal insurance contribution act, fica
+financial industry regulatory authority, finra
+fair labor standards act, flsa
+family and medical leave act, fmla
+freedom of information act, foia
+federal rules of civil procedure, frcp
+fair sentencing act, fsa
+foreign sovereign immunities act, fsia
+federal savings and loan insurance corporation, fslic
+federal trade commission, ftc
+federal tort claims act, ftca
+guardian ad litem, gal
+georgia bureau of investigation, gbi
+government employees insurance company, geico
+global positioning system, gps
+general services administration, gsa
+horizontal gaze nystagmus, hgn
+health and human services, hhs
+health insurance portability and accountability act, hipaa
+human immunodeficiency virus, hiv
+health maintenance organization, hmo
+housing preservation and development, hpd
+hawaii revised statutes, hrs
+harmonized tariff schedule of the united states, htsus
+housing and urban development, hud
+interstate agreement on detainers, iad
+initial appeal file, iaf
+interstate commerce commission, icc
+immigration and customs enforcement, ice
+intensive care unit, icu
+indian child welfare act, icwa
+illinois department of corrections, idoc
+individualized education plan, iep
+in forma pauperis, ifp
+independent medical examination, ime
+immigration and nationality act, insurance company of north america, ina
+immigration and naturalization service, ins
+illinois pattern jury instruction, ipi
+individual retirement account, ira
+internal revenue service, irs
+international trade administration, ita
+intrauterine device, iud
+judge of compensation claims, jcc
+kentucky bar association, kba
+kansas offender registration act, kansas open records act, kora
+kentucky revised statutes, krs
+kansas sentencing guidelines act, ksga
+longshore and harbor workers compensation act, lhwca
+louisiana insurance guaranty association, liga
+life insurance company of north america, lina
+limited liability company, llc
+labor management relations act, lmra
+massachusetts bay transportation authority, mbta
+metropolitan correctional center, mcc
+mississippi department of corrections, mdoc
+mortgage electronic registration systems, mers
+memorandum of understanding, mou
+municipalities planning code, mpc
+metropolitan police department, mpd
+magnetic resonance imaging, mri
+marital settlement agreement, msa
+merit systems protection board, mspb
+mississippi tort claims act, mtca
+mandatory victims restitution act, mvra
+national association of securities dealers, nasd
+national crime information center, ncic
+national environmental policy act, nepa
+no early release act, nera
+national highway traffic safety administration, nhtsa
+national labor relations act, nlra
+national labor relations board, nlrb
+notice of appeal, noa
+notice of disagreement, nod
+new york city police department, new york police department, nypd
+office of administrative hearings, oah
+oklahoma bar association, oba
+ohio bureau of employment services, obes
+office of consumer advocate, oca
+office of disciplinary counsel, odc
+ohio department of transportation, odot
+ohio department of rehabilitation and correction, odrc
+office of lawyer regulation, olr
+open meetings act, oma
+office of mental health, omh
+omaha police department, opd
+office of personnel management, opm
+occupational safety and health act, occupational safety and health administration, osha
+office of workers compensation, owc
+office of workers compensation programs, owcp
+operating while intoxicated, owi
+public access to court electronic records, pacer
+post conviction relief, pcr
+post conviction relief act, pcra
+public employee relations act, pera
+public employment relations commission, perc
+public employees retirement system, pers
+pennsylvania human relations act, phra
+personal injury protection, pip
+prison litigation reform act, plra
+public records act, pra
+personal restraint petition, prp
+public service commission, psc
+presentence investigation, psi
+presentence report, psr
+political subdivisions tort claims act, pstca
+permanent total disability, ptd
+patent and trademark office, pto
+post traumatic stress disorder, posttraumatic stress disorder, ptsd
+public utilities commission, puc
+planned unit development, pud
+public utility regulatory act, pura
+qualified domestic relations order, qdro
+rules of the united states court of federal claims, rcfc
+request for proposal, rfp
+religious freedom restoration act, rfra
+rules governing disciplinary proceedings, rgdp
+racketeer influenced and corrupt organization act, rico
+revised judicature act, rja
+railway labor act, rla
+rules on lawyers professional responsibility, rlpr
+resolution trust corporation, rtc
+second amended complaint, sac
+small business administration, sba
+securities and exchange commission, sec
+southeastern pennsylvania transportation authority, septa
+staff judge advocate, sja
+supreme judicial court, sjc
+securities litigation uniform standards act, slusa
+seattle municipal code, smc
+special processing unit, spu
+sentence reform act, sra
+social and rehabilitation services, srs
+social security act, social security administration, ssa
+supplemental security income, ssi
+sport utility vehicle, suv
+sexually violent predator, svp
+tennessee bureau of investigation, tbi
+trial court opinion, tco
+telephone consumer protection act, tcpa
+texas department of criminal justice, tdcj
+truth in lending act, tila
+temporary restraining order, tro
+texas tort claims act, ttca
+temporary total disability, ttd
+texas youth commission, tyc
+uniform administrative procedure act, uapa
+uniform commercial code, ucc
+uniform child custody jurisdiction act, uccja
+uniform code of military justice, ucmj
+underinsured motorist, uim
+united parcel service, ups
+uniform reciprocal enforcement of support act, uresa
+united services automobile association, usaa
+united states citizenship and immigration services, uscis
+united states department of agriculture, usda
+united states postal service, usps
+united states trustee, ust
+veterans employment opportunities act, veoa
+vehicle identification number, vin
+violation of probation, vop
+verbatim report of proceedings, vrp
+victim and witness protection act, vwpa
+workers compensation appeal board, wcab
+workers compensation judge, wcj
+women in crisis, wic
+zoning board of adjustment, zba
+zoning hearing board, zhb
+comprehensive environmental response compensation and liability act, cercla
+illegal immigration reform and immigrant responsibility act, iirira
+financial institutions reform, recovery and enforcement act, firrea
+bankruptcy abuse prevention and consumer protection act of 2005, bapcpa
+uniform child custody jurisdiction and enforcement act, uccjea
+religious land use and institutionalized persons act, rluipa
+uniformed services employment and reemployment rights act, userra
+federal employee group life insurance act, feglia
+new york city employees retirement system, nycers
+uniform division of income for tax purposes act, uditpa
+california jury instruction criminal, caljic
+florida deceptive and unfair trade practices act, fdutpa
+alaska national interest lands conservation act, anilca
+
+# Corporate synonyms from #923
+corp,corporation
+
+
+# Special ones for fun
+free law project, flp
+court listener, cl
+courthouse ethics and transparency act, ceta

@@ -3,7 +3,7 @@
 {% block title %} Confirm your Docket Alert {% if target_state == docket_alert.SUBSCRIPTION %} subscription {% else %} unsubscription {% endif %} – CourtListener.com{% endblock %}
 
 {% block footer-scripts %}
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     function onSubmit(token) {
       document.getElementById('confirmation').submit();
     }

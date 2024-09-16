@@ -4,6 +4,8 @@
     {{ item.html_columbia|striptags|html_decode }}
 {% elif item.html_lawbox %}
     {{ item.html_lawbox|striptags|html_decode }}
+{% elif item.xml_harvard %}
+    {{ item.xml_harvard|striptags|html_decode }}
 {% elif item.html %}
     {{ item.html|striptags|html_decode }}
 {% else %}

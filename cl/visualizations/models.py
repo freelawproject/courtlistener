@@ -89,7 +89,7 @@ class SCOTUSMap(AbstractDateTimeModel):
     __original_deleted = None
 
     def __init__(self, *args, **kwargs):
-        super(SCOTUSMap, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.__original_deleted = self.deleted
 
     @property
@@ -109,7 +109,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         """Return good referers"""
         return self.referers.filter(display=True).order_by("date_created")
 
-    def build_nx_digraph(
+    async def build_nx_digraph(
         self,
         parent_authority,
         visited_nodes,
@@ -201,7 +201,8 @@ class SCOTUSMap(AbstractDateTimeModel):
         if not any(blocking_conditions):
             visited_nodes[parent_authority.pk] = {"hops_taken": hops_taken}
             hops_taken += 1
-            for child_authority in parent_authority.authorities.filter(
+            authorities = await parent_authority.aauthorities()
+            async for child_authority in authorities.filter(
                 docket__court="scotus",
                 date_filed__gte=self.cluster_start.date_filed,
             ).order_by("date_filed"):
@@ -234,7 +235,7 @@ class SCOTUSMap(AbstractDateTimeModel):
                         if is_shorter:
                             # New route to a node that's shorter than the old
                             # route. Thus, we must re-recurse its children.
-                            sub_graph = self.build_nx_digraph(
+                            sub_graph = await self.build_nx_digraph(
                                 parent_authority=child_authority,
                                 visited_nodes=visited_nodes,
                                 good_nodes=good_nodes,
@@ -244,7 +245,7 @@ class SCOTUSMap(AbstractDateTimeModel):
                             )
                 else:
                     # No easy shortcuts. Recurse.
-                    sub_graph = self.build_nx_digraph(
+                    sub_graph = await self.build_nx_digraph(
                         parent_authority=child_authority,
                         visited_nodes=visited_nodes,
                         good_nodes=good_nodes,
@@ -268,12 +269,12 @@ class SCOTUSMap(AbstractDateTimeModel):
 
         return g
 
-    def add_clusters(self, g):
+    async def add_clusters(self, g):
         """Add clusters to the model using an existing nx graph."""
-        self.clusters.add(*g.nodes())
-        self.save()
+        await self.clusters.aadd(*g.nodes())
+        await self.asave()
 
-    def to_json(self, g):
+    async def to_json(self, g):
         """Make a JSON representation of a NetworkX graph of the data."""
         j = {
             "meta": {
@@ -284,7 +285,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         }
 
         opinion_clusters = []
-        for cluster in self.clusters.all():
+        async for cluster in self.clusters.all():
             opinions_cited = {}
             for node in g.neighbors(cluster.pk):
                 opinions_cited[node] = {"opacitiy": 1}
@@ -364,9 +365,7 @@ class SCOTUSMap(AbstractDateTimeModel):
         if update_fields is not None:
             changeable_fields = {"title", "date_published", "date_created"}
             update_fields = changeable_fields.union(update_fields)
-        super(SCOTUSMap, self).save(
-            update_fields=update_fields, *args, **kwargs
-        )
+        super().save(update_fields=update_fields, *args, **kwargs)
         self.__original_deleted = self.deleted
 
 

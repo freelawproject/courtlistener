@@ -13,7 +13,7 @@ class Command(VerboseCommand):
     help = "Send an email to the admins with any events from the past day."
 
     def handle(self, *args, **options) -> None:
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         today = now()
         yesterday = today - timedelta(days=1)
         events = Event.objects.filter(date_created__gte=yesterday)

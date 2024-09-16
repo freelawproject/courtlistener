@@ -16,7 +16,7 @@ s3_warning_note = (
 )
 
 
-class THUMBNAIL_STATUSES(object):
+class THUMBNAIL_STATUSES:
     NEEDED = 0
     COMPLETE = 1
     FAILED = 2
@@ -75,7 +75,7 @@ class AbstractPDF(models.Model):
         null=True,
     )
     filepath_local = models.FileField(
-        help_text=f"The path is AWS S3 where the file is saved. "
+        help_text="The path is AWS S3 where the file is saved. "
         f"{s3_warning_note}",
         upload_to=make_pdf_path,
         storage=IncrementingAWSMediaStorage(),

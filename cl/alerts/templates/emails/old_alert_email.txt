@@ -42,8 +42,12 @@ This message brought to you by the 501(c)(3) non-profit Free Law Project
 
  - Blog: https://free.law/
 
- - Twitter: http://twitter.com/freelawproject/
+ - BlueSky: https://bsky.app/profile/free.law
 
- - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=disable-email
+ - X: https://x.com/freelawproject/
+
+ - Donate: https://donate.free.law/forms/supportflp
+
+ - Become a Member: https://donate.free.law/forms/membership
 
 Please donate to support our work.

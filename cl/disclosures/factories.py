@@ -2,7 +2,16 @@ from factory import Faker
 from factory.django import DjangoModelFactory
 from factory.fuzzy import FuzzyInteger
 
-from cl.disclosures.models import FinancialDisclosure, Investment, Position
+from cl.disclosures.models import (
+    Debt,
+    FinancialDisclosure,
+    Gift,
+    Investment,
+    NonInvestmentIncome,
+    Position,
+    Reimbursement,
+    SpouseIncome,
+)
 
 
 class InvestmentFactory(DjangoModelFactory):
@@ -11,6 +20,37 @@ class InvestmentFactory(DjangoModelFactory):
 
     page_number = FuzzyInteger(50)
     description = Faker("sentence")
+
+
+class GiftFactory(DjangoModelFactory):
+    class Meta:
+        model = Gift
+
+    description = Faker("sentence")
+    source = Faker("sentence")
+
+
+class ReimbursementFactory(DjangoModelFactory):
+    class Meta:
+        model = Reimbursement
+
+    location = Faker("city")
+    purpose = Faker("sentence")
+
+
+class DebtFactory(DjangoModelFactory):
+    class Meta:
+        model = Debt
+
+
+class NonInvestmentIncomeFactory(DjangoModelFactory):
+    class Meta:
+        model = NonInvestmentIncome
+
+
+class SpousalIncomeFactory(DjangoModelFactory):
+    class Meta:
+        model = SpouseIncome
 
 
 class FinancialDisclosurePositionFactory(DjangoModelFactory):

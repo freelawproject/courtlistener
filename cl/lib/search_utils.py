@@ -3,23 +3,32 @@ from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.core.cache import cache, caches
+from django.core.cache import caches
+from django.core.paginator import Page
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from eyecite.tokenizers import HyperscanTokenizer
 from requests import Session
 from scorched.response import SolrResponse
 
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
 from cl.lib.bot_detector import is_bot
-from cl.lib.model_helpers import clean_docket_number, is_docket_number
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
+from cl.lib.utils import (
+    cleanup_main_query,
+    get_array_of_selected_fields,
+    get_child_court_ids_for_parents,
+    map_to_docket_entry_sorting,
+)
 from cl.search.constants import (
+    BOOSTS,
+    SEARCH_ORAL_ARGUMENT_HL_FIELDS,
     SOLR_OPINION_HL_FIELDS,
-    SOLR_ORAL_ARGUMENT_HL_FIELDS,
     SOLR_PEOPLE_HL_FIELDS,
     SOLR_RECAP_HL_FIELDS,
 )
@@ -32,50 +41,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 
-recap_boosts_qf = {
-    "text": 1.0,
-    "caseName": 4.0,
-    "docketNumber": 3.0,
-    "description": 2.0,
-}
-recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
-BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
-    "qf": {
-        SEARCH_TYPES.OPINION: {
-            "text": 1.0,
-            "caseName": 4.0,
-            "docketNumber": 2.0,
-        },
-        SEARCH_TYPES.RECAP: recap_boosts_qf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_qf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {
-            "text": 1.0,
-            "caseName": 4.0,
-            "docketNumber": 2.0,
-        },
-        SEARCH_TYPES.PEOPLE: {
-            "text": 1,
-            # Was previously 4, but that had bad results for the name "William"
-            # due to Williams and Mary College.
-            "name": 8,
-            # Suppress these fields b/c a match on them returns the wrong
-            # person.
-            "appointer": 0.3,
-            "supervisor": 0.3,
-            "predecessor": 0.3,
-        },
-    },
-    # Phrase-based boosts.
-    "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3.0, "caseName": 3.0},
-        SEARCH_TYPES.RECAP: recap_boosts_pf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_pf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3.0},
-        SEARCH_TYPES.PEOPLE: {
-            # None here. Phrases don't make much sense for people.
-        },
-    },
-}
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def get_solr_interface(
@@ -134,7 +100,7 @@ def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
     """
     if not cd.get("q"):
         return None
-    citations = get_citations(cd["q"])
+    citations = get_citations(cd["q"], tokenizer=HYPERSCAN_TOKENIZER)
 
     citations = [c for c in citations if isinstance(c, FullCaseCitation)]
 
@@ -231,6 +197,7 @@ def merge_form_with_courts(
     requires manual adjustment here.
     """
     # Are any of the checkboxes checked?
+
     checked_statuses = [
         field.value()
         for field in search_form
@@ -263,11 +230,13 @@ def merge_form_with_courts(
         "district": [],
         "state": [],
         "special": [],
+        "military": [],
+        "tribal": [],
     }
     bap_bundle = []
     b_bundle = []
-    state_bundle: List = []
-    state_bundles = []
+    states = []
+    territories = []
     for court in courts:
         if court.jurisdiction == Court.FEDERAL_APPELLATE:
             court_tabs["federal"].append(court)
@@ -280,34 +249,25 @@ def merge_form_with_courts(
             else:
                 b_bundle.append(court)
         elif court.jurisdiction in Court.STATE_JURISDICTIONS:
-            # State courts get bundled by supreme courts
-            if court.jurisdiction == Court.STATE_SUPREME:
-                # Whenever we hit a state supreme court, we append the
-                # previous bundle and start a new one.
-                if state_bundle:
-                    state_bundles.append(state_bundle)
-                state_bundle = [court]
-            else:
-                state_bundle.append(court)
+            states.append(court)
+        elif court.jurisdiction in Court.TERRITORY_JURISDICTIONS:
+            territories.append(court)
         elif court.jurisdiction in [
             Court.FEDERAL_SPECIAL,
             Court.COMMITTEE,
             Court.INTERNATIONAL,
         ]:
             court_tabs["special"].append(court)
-
-    # append the final state bundle after the loop ends. Hack?
-    state_bundles.append(state_bundle)
+        elif court.jurisdiction in Court.MILITARY_JURISDICTIONS:
+            court_tabs["military"].append(court)
+        elif court.jurisdiction in Court.TRIBAL_JURISDICTIONS:
+            court_tabs["tribal"].append(court)
 
     # Put the bankruptcy bundles in the courts dict
     if bap_bundle:
         court_tabs["bankruptcy_panel"] = [bap_bundle]
     court_tabs["bankruptcy"] = [b_bundle]
-
-    # Divide the state bundles into the correct partitions
-    court_tabs["state"].append(state_bundles[:17])
-    court_tabs["state"].append(state_bundles[17:34])
-    court_tabs["state"].append(state_bundles[34:])
+    court_tabs["state"] = [states, territories]
 
     return court_tabs, court_count_human, court_count
 
@@ -387,7 +347,7 @@ def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
     and 44 F.2d 92. I.e., this ensures that queries don't span citations. This
     works because internally Solr uses proximity to create multiValue fields.
 
-    See: http://stackoverflow.com/a/33858649/64911 and
+    See: https://stackoverflow.com/a/33858649/64911 and
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
@@ -433,17 +393,14 @@ def make_cite_count_query(cd: CleanData) -> str:
 
 
 def get_selected_field_string(cd: CleanData, prefix: str) -> str:
-    """Pulls the selected checkboxes out of the form data, and puts it into
-    Solr strings. Uses a prefix to know which items to pull out of the cleaned
-    data. Check forms.py to see how the prefixes are set up.
+    """Pulls the selected checkboxes using the get_array_of_selected_fields
+    method, and puts it into Solr strings.
 
     Final strings are of the form "A" OR "B" OR "C", with quotes in case there
     are spaces in the values.
     """
     selected_fields = [
-        f"\"{k.replace(prefix, '')}\""
-        for k, v in cd.items()
-        if (k.startswith(prefix) and v is True)
+        f'"{field}"' for field in get_array_of_selected_fields(cd, prefix)
     ]
     if len(selected_fields) == cd[f"_{prefix}count"]:
         # All the boxes are checked. No need for filtering.
@@ -599,7 +556,7 @@ def add_highlighting(
             "dateArgued",
             "duration",
         ]
-        hlfl = SOLR_ORAL_ARGUMENT_HL_FIELDS
+        hlfl = SEARCH_ORAL_ARGUMENT_HL_FIELDS
     elif cd["type"] == SEARCH_TYPES.PEOPLE:
         fl = [
             "id",
@@ -743,12 +700,14 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
         selected_stats_string = get_selected_field_string(cd, "stat_")
         if len(selected_stats_string) > 0:
             main_fq.append(
-                "{!tag=dt}status_exact:(%s)" % selected_stats_string
+                f"{{!tag=dt}}status_exact:({selected_stats_string})"
             )
 
     selected_courts_string = get_selected_field_string(cd, "court_")
     if len(selected_courts_string) > 0:
-        main_fq.append(f"court_exact:({selected_courts_string})")
+        main_fq.append(
+            f"court_exact:({get_child_court_ids_for_parents(selected_courts_string)})"
+        )
 
     # If a param has been added to the fq variables, then we add them to the
     # main_params var. Otherwise, we don't, as doing so throws an error.
@@ -757,16 +716,6 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             main_params["fq"].extend(main_fq)
         else:
             main_params["fq"] = main_fq
-
-
-def map_to_docket_entry_sorting(sort_string: str) -> str:
-    """Convert a RECAP sorting param to a docket entry sorting parameter."""
-    if sort_string == "dateFiled asc":
-        return "entry_date_filed asc"
-    elif sort_string == "dateFiled desc":
-        return "entry_date_filed desc"
-    else:
-        return sort_string
 
 
 def add_grouping(main_params: SearchParam, cd: CleanData, group: bool) -> None:
@@ -847,65 +796,8 @@ def print_params(params: SearchParam) -> None:
     if settings.DEBUG:
         print(
             "Params sent to search are:\n%s"
-            % " &\n".join(["  %s = %s" % (k, v) for k, v in params.items()])
+            % " &\n".join(f"  {k} = {v}" for k, v in params.items())
         )
-        # print results_si.execute()
-
-
-def cleanup_main_query(query_string: str) -> str:
-    """Enhance the query string with some simple fixes
-
-     - Make any numerical queries into phrases (except dates)
-     - Add hyphens to district docket numbers that lack them
-     - Ignore tokens inside phrases
-     - Handle query punctuation correctly by mostly ignoring it
-
-    :param query_string: The query string from the form
-    :return The enhanced query string
-    """
-    inside_a_phrase = False
-    cleaned_items = []
-    for item in re.split(r'([^a-zA-Z0-9_\-~":]+)', query_string):
-        if not item:
-            continue
-
-        if item.startswith('"') or item.endswith('"'):
-            # Start or end of a phrase; flip whether we're inside a phrase
-            inside_a_phrase = not inside_a_phrase
-            cleaned_items.append(item)
-            continue
-
-        if inside_a_phrase:
-            # Don't do anything if we're already in a phrase query
-            cleaned_items.append(item)
-            continue
-
-        not_numeric = not item[0].isdigit()
-        is_date_str = re.match(
-            "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", item
-        )
-        if any([not_numeric, is_date_str]):
-            cleaned_items.append(item)
-            continue
-
-        m = re.match(r"(\d{2})(cv|cr|mj|po)(\d{1,5})", item)
-        if m:
-            # It's a docket number missing hyphens, e.g. 19cv38374
-            item = "-".join(m.groups())
-
-        # Some sort of number, probably a docket number or other type of number
-        # Wrap in quotes to do a phrase search
-        if is_docket_number(item) and "docketNumber:" not in query_string:
-            # Confirm is a docket number and clean it. So docket_numbers with
-            # suffixes can be searched: 1:21-bk-1234-ABC -> 1:21-bk-1234,
-            item = clean_docket_number(item)
-            # Adds a proximity query of ~1 to match
-            # numbers like 1:21-cv-1234 -> 21-1234
-            cleaned_items.append(f'docketNumber:"{item}"~1')
-        else:
-            cleaned_items.append(f'"{item}"')
-
-    return "".join(cleaned_items)
 
 
 def build_main_query(
@@ -1045,40 +937,46 @@ def build_court_count_query(group: bool = False) -> SearchParam:
     return params
 
 
-def add_depth_counts(
-    search_data: Dict[str, Any],
-    search_results: SolrResponse,
-) -> Optional[OpinionCluster]:
+async def add_depth_counts(
+    search_data: dict[str, Any],
+    search_results: Page,
+) -> OpinionCluster | None:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
-    calculate and append the citation depth information between each Solr
+    calculate and append the citation depth information between each Solr/ES
     result and the cited OpinionCluster. We only do this for *single* "cites"
     terms to avoid the complexity of trying to render multiple depth
     relationships for all the possible result-citation combinations.
 
     :param search_data: The cleaned search form data
-    :param search_results: Solr results from paginate_cached_solr_results()
+    :param search_results: The paginated Solr/ES results
     :return The OpinionCluster if the lookup was successful
     """
+
     cites_query_matches = re.findall(r"cites:\((\d+)\)", search_data["q"])
-    if len(cites_query_matches) == 1:
+    if (
+        len(cites_query_matches) == 1
+        and search_data["type"] == SEARCH_TYPES.OPINION
+    ):
         try:
-            cited_cluster = OpinionCluster.objects.get(
+            cited_cluster = await OpinionCluster.objects.aget(
                 sub_opinions__pk=cites_query_matches[0]
             )
         except OpinionCluster.DoesNotExist:
             return None
         else:
             for result in search_results.object_list:
-                result["citation_depth"] = get_citation_depth_between_clusters(
-                    citing_cluster_pk=result["cluster_id"],
-                    cited_cluster_pk=cited_cluster.pk,
+                result["citation_depth"] = (
+                    await get_citation_depth_between_clusters(
+                        citing_cluster_pk=result["cluster_id"],
+                        cited_cluster_pk=cited_cluster.pk,
+                    )
                 )
             return cited_cluster
     else:
         return None
 
 
-def get_citing_clusters_with_cache(
+async def get_citing_clusters_with_cache(
     cluster: OpinionCluster,
 ) -> Tuple[list, int]:
     """Use Solr to get clusters citing the one we're looking at
@@ -1089,13 +987,13 @@ def get_citing_clusters_with_cache(
     """
     cache_key = f"citing:{cluster.pk}"
     cache = caches["db_cache"]
-    cached_results = cache.get(cache_key)
+    cached_results = await cache.aget(cache_key)
     if cached_results is not None:
         return cached_results
 
     # Cache miss. Get the citing results from Solr
     sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
-    ids_str = " OR ".join([str(pk) for pk in sub_opinion_pks])
+    ids_str = " OR ".join([str(pk) async for pk in sub_opinion_pks])
     q = {
         "q": f"cites:({ids_str})",
         "rows": 5,
@@ -1110,12 +1008,14 @@ def get_citing_clusters_with_cache(
     citing_clusters = list(results)
     citing_cluster_count = results.result.numFound
     a_week = 60 * 60 * 24 * 7
-    cache.set(cache_key, (citing_clusters, citing_cluster_count), a_week)
+    await cache.aset(
+        cache_key, (citing_clusters, citing_cluster_count), a_week
+    )
 
     return citing_clusters, citing_cluster_count
 
 
-def get_related_clusters_with_cache(
+async def get_related_clusters_with_cache(
     cluster: OpinionCluster,
     request: HttpRequest,
 ) -> Tuple[List[OpinionCluster], List[int], Dict[str, str]]:
@@ -1134,25 +1034,30 @@ def get_related_clusters_with_cache(
     # Opinions that belong to the targeted cluster
     sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
 
-    if is_bot(request) or not sub_opinion_ids:
+    if is_bot(request) or not await sub_opinion_ids.aexists():
         # If it is a bot or lacks sub-opinion IDs, return empty results
         return [], [], url_search_params
 
     si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
 
     # Use cache if enabled
+    cache = caches["db_cache"]
     mlt_cache_key = f"mlt-cluster:{cluster.pk}"
     related_clusters = (
-        caches["db_cache"].get(mlt_cache_key)
-        if settings.RELATED_USE_CACHE
-        else None
+        await cache.aget(mlt_cache_key) if settings.RELATED_USE_CACHE else None
     )
+
+    if settings.RELATED_FILTER_BY_STATUS:
+        # Update URL parameters accordingly
+        url_search_params = {f"stat_{settings.RELATED_FILTER_BY_STATUS}": "on"}
 
     if related_clusters is None:
         # Cache is empty
 
         # Turn list of opinion IDs into list of Q objects
-        sub_opinion_queries = [si.Q(id=sub_id) for sub_id in sub_opinion_ids]
+        sub_opinion_queries = [
+            si.Q(id=sub_id) async for sub_id in sub_opinion_ids
+        ]
 
         # Take one Q object from the list
         sub_opinion_query = sub_opinion_queries.pop()
@@ -1185,11 +1090,6 @@ def get_related_clusters_with_cache(
                 status_exact=settings.RELATED_FILTER_BY_STATUS
             )
 
-            # Update URL parameters accordingly
-            url_search_params = {
-                f"stat_{settings.RELATED_FILTER_BY_STATUS}": "on"
-            }
-
         mlt_res = mlt_query.execute()
 
         if hasattr(mlt_res, "more_like_this"):
@@ -1219,7 +1119,7 @@ def get_related_clusters_with_cache(
             # No MLT results are available (this should not happen)
             related_clusters = []
 
-        cache.set(
+        await cache.aset(
             mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
         )
     si.conn.http_connection.close()
@@ -1283,7 +1183,7 @@ def get_mlt_query(
     return si.mlt_query(hl_fields).add_extra(**q)
 
 
-def clean_up_recap_document_file(item: RECAPDocument) -> None:
+async def clean_up_recap_document_file(item: RECAPDocument) -> None:
     """Clean up the RecapDocument file-related fields after detecting the file
     doesn't exist in the storage.
 
@@ -1292,10 +1192,10 @@ def clean_up_recap_document_file(item: RECAPDocument) -> None:
     """
 
     if type(item) == RECAPDocument:
-        item.filepath_local.delete()
+        await sync_to_async(item.filepath_local.delete)()
         item.sha1 = ""
         item.date_upload = None
         item.file_size = None
         item.page_count = None
         item.is_available = False
-        item.save()
+        await item.asave()

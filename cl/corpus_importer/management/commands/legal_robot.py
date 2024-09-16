@@ -2,12 +2,12 @@ import os
 
 from celery.canvas import chain
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 from requests import Session
 
 from cl.corpus_importer.tasks import add_tags, get_pacer_doc_by_rd
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.scrapers.tasks import extract_recap_pdf
@@ -29,7 +29,9 @@ def get_documents(options):
     q = options["queue"]
 
     throttle = CeleryThrottle(queue_name=q)
-    session = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    session = ProxyPacerSession(
+        username=PACER_USERNAME, password=PACER_PASSWORD
+    )
     session.login()
 
     page_size = 20000
@@ -77,9 +79,11 @@ def get_documents(options):
             continue
 
         chain(
-            get_pacer_doc_by_rd.s(rd.pk, session.cookies, tag=TAG).set(
-                queue=q
-            ),
+            get_pacer_doc_by_rd.s(
+                rd.pk,
+                SessionData(session.cookies, session.proxy_address),
+                tag=TAG,
+            ).set(queue=q),
             extract_recap_pdf.si(rd.pk).set(queue=q),
             add_items_to_solr.si([rd.pk], "search.RECAPDocument").set(queue=q),
         ).apply_async()
@@ -110,6 +114,6 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         logger.info(f"Using PACER username: {PACER_USERNAME}")
         get_documents(options)

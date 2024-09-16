@@ -14,7 +14,7 @@
     <script defer type="text/javascript"
             src="{% static "js/toggle_settings.js" %}"></script>
   {% endif %}
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{ request.csp_nonce }}">
     // Set this variable for the docket alerts script to find
     var userAlertAcount = {{ user.docket_alerts.subscriptions.count|default:"0" }};
   </script>

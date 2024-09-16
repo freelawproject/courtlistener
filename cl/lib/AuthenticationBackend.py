@@ -15,7 +15,7 @@ class ConfirmedEmailAuthenticationForm(AuthenticationForm):
     """
 
     def __init__(self, *args, **kwargs) -> None:
-        super(ConfirmedEmailAuthenticationForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def confirm_login_allowed(self, user: AbstractBaseUser) -> None:
         """Make sure the user is active and has a confirmed email address

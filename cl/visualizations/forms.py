@@ -7,7 +7,7 @@ class VizForm(forms.ModelForm):
     """NB: The VizEditForm subclasses this!"""
 
     def __init__(self, *args, **kwargs):
-        super(VizForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.fields["title"].required = False
 
     class Meta:

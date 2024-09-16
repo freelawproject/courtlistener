@@ -7,7 +7,7 @@
   <script defer type="application/javascript"
           src="{% static "js/bootstrap-datepicker.min.js" %}"></script>
 {% endif %}
-<script type="text/javascript">
+<script type="text/javascript" nonce="{{ request.csp_nonce }}">
   $(document).ready(function () {
     $('.datepicker').datepicker({
       autoclose: true,

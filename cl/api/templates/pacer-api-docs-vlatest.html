@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% load extras %}
+
+{% block title %}PACER Data APIs – CourtListener.com{% endblock %}
+{% block og_title %}PACER Data APIs – CourtListener.com{% endblock %}
+
+{% block description %}Use these APIs to query parties, dockets, and filings in the RECAP Archive of PACER data. This is sourced from federal district, appellate, and bankruptcy courts.{% endblock %}
+{% block og_description %}Use these APIs to query parties, dockets, and filings in the RECAP Archive of PACER data. This is sourced from federal district, appellate, and bankruptcy courts.{% endblock %}
+
+{% block sidebar %}{% endblock %}
+{% block navbar-r %}active{% endblock %}
+
+{% block footer-scripts %}
+  {% include "includes/anchors.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-xs-12 hidden-md hidden-lg">
+  <h4 class="v-offset-below-2">
+    <i class="fa fa-arrow-circle-o-left gray"></i>
+    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+  </h4>
+</div>
+
+
+<div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+  <div id="toc">
+    <h4 class="v-offset-below-3">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    </h4>
+    <h3>Table of Contents</h3>
+    <ul>
+      <li><a href="#about">Overview</a></li>
+      <li><a href="#apis">The APIs</a></li>
+      <ul>
+        <li><a href="#docket-endpoint">Dockets</a></li>
+        <li><a href="#court-endpoint">Courts</a></li>
+        <li><a href="#docket-entry-endpoint">Docket Entries</a></li>
+        <li><a href="#recap-document-endpoint">Documents</a></li>
+        <li><a href="#party-endpoint">Parties</a></li>
+        <li><a href="#attorney-endpoint">Attorneys</a></li>
+        <li><a href="#og-court-info-endpoint">Originating Court Info</a></li>
+        <li><a href="#idb-data-endpoint">Integrated Database</a></li>
+      </ul>
+      <li><a href="#recap-query">Fast Document Lookup</a></li>
+    </ul>
+  </div>
+</div>
+
+
+<div class="col-xs-12 col-md-8 col-lg-6">
+  <h1 id="about">PACER Data&nbsp;APIs</h1>
+  <p class="lead">Use these APIs to access almost half a billion items we have in our collection of PACER data.
+  </p>
+  <p>To learn more about what's in the collection and how we gather PACER data each day, see <a href="{% url "coverage_recap" %}">our coverage page on the topic</a>.
+  </p>
+  <p>This data is organized into a number of objects. An overview of these objects is described in this section, and greater detail is provided for each, below.
+  </p>
+  <p>In any legal proceeding, there are roughly three things: Documents, people, and organizations. Documents are grouped together into docket entries, which are grouped together into dockets. People and organizations are examples of parties. Parties have attorneys who act on their behalf in particular ways, which we call the attorney's role in the case.
+  </p>
+  <p>Each of these relationships is interlinked and has metadata that describes it. Use these APIs to explore this data.
+  </p>
+
+  <h2 id="apis">Dockets, Courts, Docket Entries, and&nbsp;Documents</h2>
+  <p>A docket is a list of docket entries and some metadata. Each docket entry is a collection of documents that is uploaded to the court by a party or their attorney at a given time.
+  </p>
+  <p>The endpoints described in this section explain these objects and how they can be accessed in our system.
+  </p>
+
+
+  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version="v3" %}</code></small></h3>
+  {% include "includes/docket-endpoint.html" %}
+  <p>Ideally, docket entries, parties, and attorneys would be nested within the docket object you request, but this is not possible because some dockets have a vast number of these objects. Listing so many values in a single response from the server is impractical. To access docket entries, parties, or attorneys for a specific docket, use the docket entry, party, or attorney endpoints and filter by docket ID.
+  </p>
+  <p>The court fields are references to our Court API, described below.</p>
+
+
+  <h3 id="court-endpoint">Courts <small> — <code>{% url "court-list" version="v3" %}</code></small></h3>
+  {% include "includes/court-endpoint.html" %}
+
+
+  <h3 id="docket-entry-endpoint">Docket Entries <small> — <code>{% url "docketentry-list" version="v3" %}</code></small></h3>
+  <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain one or more nested documents. This follows the design on PACER, in which a single row on a docket represents a document with its associated attachments.
+  </p>
+  <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
+  </p>
+  <p>To filter to the docket entries for a particular docket use the <code>docket</code>filter:
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docketentry-list" version="v3" %}?docket=4214664"</pre>
+  <p>Such a request will return up to 20 docket entries per page. Each docket entry returned can contain a number of nested documents in the <code>recap_document</code> key, including their full extracted text (see details in the next section below). As a result, this response can be quite large.
+  </p>
+  <p>A few field-level notes:</p>
+  <table class="table">
+    <thead>
+    <tr>
+      <th>Field</th>
+      <th>Notes</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td><code>entry_number</code></td>
+      <td>
+        <p>In district courts, this field is usually a number between zero and the low thousands (depending on the length of the case).
+        </p>
+        <p>Some appellate courts do not provide this number, in which case we use the internal PACER document ID to populate this field.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td><code>description</code></td>
+      <td>This field contains the description of the docket entry, if we have it. A second, shorter description is also available on the document itself.</td>
+    </tr>
+    <tr>
+      <td><code>recap_documents</code></td>
+      <td>This field contains all the documents associated with the docket entry. In general, this is only one or two items, but it can be more in complex litigation. See below for details.
+      </td>
+    </tr>
+    <tr>
+      <td><code>recap_sequence_number</code><br><code>pacer_sequence_number</code></td>
+      <td>Use the RECAP sequence number to sort dockets in your system. It is based on the PACER sequence number when we have it, plus some heuristics to order content as accurately as possible. In rare cases, docket entry numbers are not sequential, and these fields are preferred.
+      </td>
+    </tr>
+    </tbody>
+  </table>
+  {% if not perms.search.has_recap_api_access %}
+    <p>This endpoint is only available to select users. Please <a href="{% url "contact" %}">get in touch</a> to access this API.
+    </p>
+  {% endif %}
+
+  <h3 id="recap-document-endpoint">Documents <small> — <code>{% url "recapdocument-list" version="v3" %}</code></small></h3>
+  <p>Each docket entry contains several documents, which we call <code>RECAP Document</code> objects.
+  </p>
+  <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
+  </p>
+  <p>A few field-level notes:</p>
+  <table class="table">
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>plain_text</code></td>
+      <td>
+        <p>This field contains the extracted text of the document.
+        </p>
+        <p>We use <a href="https://free.law/projects/doctor">Doctor</a> to complete this task. If needed, Doctor uses an optimized version of Tesseract to complete OCR.
+        </p>
+        <p>To see whether OCR was used, check the <code>ocr_status</code> field.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td><code>filepath_local</code></td>
+      <td>
+        <p>This field contains the path to the binary file if we have it (<code>is_available=True</code>). To use this field, see the <a href="{% url "field_api_help" %}#downloads">help article on this topic</a>.
+        </p>
+        <p>The name of this field dates back to when all our files were locally stored on a single server.
+        </p>
+      </td>
+    </tr>
+  </tbody>
+  </table>
+  {% if not perms.search.has_recap_api_access %}
+    <p>This endpoint is only available to select users. Please <a href="{% url "contact" %}">get in touch</a> to access this API.
+    </p>
+  {% endif %}
+
+
+
+  <h2 id="party-endpoint">Parties <small> — <code>{% url "party-list" version="v3" %}</code></small></h2>
+  <p>The <code>Party</code> endpoint provides details about parties that have been involved in federal cases in PACER, and contains nested attorney information.
+  </p>
+  <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP <code>OPTIONS</code> request.
+  </p>
+  <p>This API can be filtered by docket ID to show all the parties for a particular case.
+  </p>
+  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> Filters apply to this endpoint, not the data nested within it. Therefore, each party returned by this API will list all the attorneys that have represented them in any case, even if the parties themselves are filtered to a particular case.
+  </p>
+  <p>For example, this query returns the parties for docket number <code>123</code>:</p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "party-list" version="v3" %}?docket=123"</pre>
+  <p>It returns something like:</p>
+  <pre class="pre-scrollable tall">{
+① "count": 35,
+  "next": "https://www.courtlistener.com/api/rest/v3/parties/?docket=123&page=2",
+  "previous": null,
+  "results": [
+    {
+      "resource_uri": "https://www.courtlistener.com/api/rest/v3/parties/42/",
+      "id": 42,
+②    "attorneys": [
+        {
+          "attorney": "https://www.courtlistener.com/api/rest/v3/attorneys/1/",
+          "attorney_id": 1,
+          "date_action": null,
+          "docket": "https://www.courtlistener.com/api/rest/v3/dockets/123/",
+          "docket_id": 123,
+          "role": 10
+        },
+        {
+          "attorney": "https://www.courtlistener.com/api/rest/v3/attorneys/2/",
+          "attorney_id": 2,
+          "date_action": null,
+          "docket": "https://www.courtlistener.com/api/rest/v3/dockets/456/",
+          "docket_id": 456,
+          "role": 2
+        }
+      ],
+③    "party_types": [
+        {
+          "docket": "https://www.courtlistener.com/api/rest/v3/dockets/123/",
+          "docket_id": 123,
+          "name": "Plaintiff",
+          "date_terminated": null,
+          "extra_info": "",
+④         "highest_offense_level_opening": "",
+          "highest_offense_level_terminated": "",
+          "criminal_counts": [],
+          "criminal_complaints": []
+        }
+      ],
+      "date_created": "2024-04-24T13:33:39.096780-07:00",
+      "date_modified": "2024-04-24T13:33:39.096790-07:00",
+      "name": "Samuel Jackson",
+      "extra_info": ""
+    },
+    ...</pre>
+  <p>Note that:</p>
+  <ol>
+    <li>
+      <p>There are 35 parties in this case. (Only the first is shown in this example.)</p>
+    </li>
+    <li>
+      <p>The first party (ID 42) has had two attorneys. The first attorney (ID 1) represented them with role 10 in case 123 (the one we filtered to). The second attorney (ID 2) represented party 42 with role 2 in case 456.
+      </p>
+    </li>
+    <li>
+      <p>The <code>party_types</code> field indicates the role the party has in the case (defendant, plaintiff, trustee, etc).
+      </p>
+    </li>
+    <li>
+      <p>In criminal cases, the <code>party_type</code> field may also include the highest offenses, criminal counts, and criminal complaints against the defendant.
+      </p>
+    </li>
+  </ol>
+  {% if not perms.people_db.has_recap_api_access %}
+    <p>These endpoints are only available to select users. Please <a href="{% url "contact" %}">get in touch</a> to access these endpoints.
+    </p>
+  {% endif %}
+
+
+  <h2 id="attorney-endpoint">Attorneys <small> — <code>{% url "attorney-list" version="v3" %}</code></small></h2>
+  <p>Use this API to look up an attorney in our system.</p>
+  <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP OPTIONS request.</p>
+  <p>Like docket entries and parties, attorneys can be filtered to a particular docket. For example:
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "attorney-list" version="v3" %}?docket=4214664"</pre>
+  <p>Returns:</p>
+  <pre class="pre-scrollable tall">{
+    "count": 108,
+    "next": "https://www.courtlistener.com/api/rest/v3/attorneys/?docket=4214664&page=2",
+    "previous": null,
+    "results": [
+        {
+            "resource_uri": "https://www.courtlistener.com/api/rest/v3/attorneys/9247906/",
+            "id": 9247906,
+            "parties_represented": [
+                {
+                    "role": 10,
+                    "docket": "https://www.courtlistener.com/api/rest/v3/dockets/4214664/",
+                    "party": "https://www.courtlistener.com/api/rest/v3/parties/13730908/",
+                    "date_action": null
+                }
+            ],
+            "date_created": "2024-04-24T13:33:39.109264-07:00",
+            "date_modified": "2024-05-07T21:32:12.465340-07:00",
+            "name": "ERIC ALAN ISAACSON",
+            "contact_raw": "6580 Avenida Mirola\nLa Jolla, CA 92037\n(858) 263-9581\nPRO SE\n",
+            "phone": "(858) 263-9581",
+            "fax": "",
+            "email": ""
+        },
+  ...</pre>
+  <p>Similar to the party API above, when you filter attorneys to a particular docket, the nested <code>parties_represented</code> field is not filtered and can show other parties the attorney represented in other dockets.
+  </p>
+  {% if not perms.people_db.has_recap_api_access %}
+    <p>These endpoints are only available to select users. Please <a href="{% url "contact" %}">get in touch</a> to access these endpoints.
+    </p>
+  {% endif %}
+
+
+  <h2 id="og-court-info-endpoint">Originating Court <small> — <code><nobr>{% url 'originatingcourtinformation-list' version="v3" %}</nobr></code></small></h2>
+  <p><code>Originating Court Information</code> represents the information gathered at an appellate court about a case when it was in a lower court or administrative body.
+  </p>
+  <p>The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.
+  </p>
+  <p>Cross-walking from the upper court docket to the lower is possible using the the <code>docket_number</code> and <code>appeal_from</code> fields.
+  </p>
+
+
+  <h2 id="idb-data-endpoint">Integrated Database <small> — <code><nobr>{% url 'fjcintegrateddatabase-list' version='v3' %}</nobr></code></small></h2>
+  <p><code>FJC Integrated Database</code> objects represent the information available in the <a href="https://www.fjc.gov/research/idb">Federal Judicial Center's Integrated Database</a>, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:
+  </p>
+  <ul>
+    <li><a href="https://www.fjc.gov/research/idb">The FJC IDB Homepage</a></li>
+    <li><a href="https://free.law/idb-facts/">Our datasheet on the IDB</a></li>
+    <li>The various codebooks for <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Civil%20Codebook%201988%20Forward_0.pdf">civil</a>, <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Criminal%20Code%20Book%201996%20Forward.pdf">criminal</a>, <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Appeals%20Codebook%202008%20Forward.pdf">appellate</a>, and <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Bankruptcy%20Codebook%202008%20Forward%20(Rev%20January%202018).pdf">bankruptcy</a> datasets.</li>
+  </ul>
+  <p>As always, you can find our interpretations of these fields by performing an <code>OPTIONS</code> request on this endpoint.
+  </p>
+  <p><strong>Note:</strong> Pending further support, this endpoint should be considered <em>experimental</em> quality. It is not guaranteed to have all of the available data sets, may not have the latest quarterly data, and indeed may have bugs. If you encounter any bugs, please let us know. If you would like better guarantees about the quality of this endpoint, we are enthusiastic about finding partners to better support it.
+  </p>
+
+
+  <h2 id="recap-query">Fast Document Lookup <small> — <code>{% url "fast-recapdocument-list" version="v3" %}</code></small></h2>
+  <p>This API is used to check if documents with known IDs are available in our system.
+  </p>
+  <p>To use it, provide a court ID and a comma-separated list of <code>pacer_doc_id</code>'s:
+  </p>
+  <pre class="pre-scrollable">curl \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  '{% get_full_host %}{% url "fast-recapdocument-list" version="v3" %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
+  </pre>
+  <p>This will return one entry for each document found, up to a maximum of 300 items:</p>
+  <pre class="pre-scrollable tall">{
+  "count": 2,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "pacer_doc_id": "04505578717",
+      "filepath_local": "recap/gov.uscourts.dcd.178502/gov.uscourts.dcd.178502.2.0_54.pdf",
+      "id": 2974081
+    },
+    {
+      "pacer_doc_id": "04505578698",
+      "filepath_local": "recap/gov.uscourts.dcd.178502/gov.uscourts.dcd.178502.1.0_48.pdf",
+      "id": 2974077
+    }
+  ]
+}</pre>
+  {% include "includes/court-id-mappings.html" %}
+
+  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Careful:</strong> When placing queries, the fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero, and you will need to do so in your queries.
+  </p>
+  <p>To query whether a case is in our system, use the <code>Docket</code> endpoint described above.
+  </p>
+  {% if not perms.search.has_recap_api_access %}
+    <p>This endpoint is only available to select users. Please <a href="{% url "contact" %}">get in touch</a> to access this API.
+    </p>
+  {% endif %}
+
+
+
+  {% include "includes/donate_footer_plea.html" %}
+</div>
+{% endblock %}

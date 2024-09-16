@@ -4,8 +4,8 @@ import uuid
 from typing import Dict, Optional
 
 from django.conf import settings
-from django.core.files.storage import FileSystemStorage, Storage
-from storages.backends.s3boto3 import S3Boto3Storage, S3ManifestStaticStorage
+from django.core.files.storage import Storage
+from storages.backends.s3 import S3ManifestStaticStorage, S3Storage
 
 
 def clobbering_get_name(
@@ -54,7 +54,7 @@ def get_name_by_incrementing(
     return name
 
 
-class AWSMediaStorage(S3Boto3Storage):
+class AWSMediaStorage(S3Storage):
     """Implements AWS file system storage with a few overrides"""
 
     location = ""
@@ -92,11 +92,11 @@ class SubDirectoryS3ManifestStaticStorage(S3ManifestStaticStorage):
     manifest_strict = False
 
 
-class RecapEmailSESStorage(S3Boto3Storage):
+class RecapEmailSESStorage(S3Storage):
     bucket_name = "recap.email"
 
 
-class S3PrivateUUIDStorage(S3Boto3Storage):
+class S3PrivateUUIDStorage(S3Storage):
     """Implements a UUID file system storage.
 
     Useful when you don't care what the name of the file is, but you want it to
@@ -105,7 +105,7 @@ class S3PrivateUUIDStorage(S3Boto3Storage):
     """
 
     default_acl = "private"
-    bucket_name = "com-courtlistener-private-storage"
+    bucket_name = settings.AWS_PRIVATE_STORAGE_BUCKET_NAME
     file_overwrite = True
 
     def get_available_name(

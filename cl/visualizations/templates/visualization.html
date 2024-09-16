@@ -23,7 +23,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
-    <script type="text/javascript">
+    <script type="text/javascript" nonce="{{ request.csp_nonce }}">
         {# Gets the most recent version, by default ordering #}
         var opinions = {{ viz.json|safe }},
             embedUrl = '{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}';
@@ -288,9 +288,9 @@
                                 <h3><span>Embed</span></h3>
                                 <div class="form-group">
                                     <input type="text"
+                                           readonly="readonly"
                                            value="&lt;iframe height=&quot;540&quot; width=&quot;560&quot; src=&quot;{% get_full_host %}{% url "view_embedded_visualization" viz.pk %}&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;"
-                                           onclick="this.select()"
-                                           class="form-control"
+                                           class="form-control input-sm form-inline click-select"
                                            id="embed-input">
                                 </div>
                             </div>
@@ -298,7 +298,7 @@
                         <div class="row">
                             <div class="sidebar-section col-xs-12">
                                 <h3><span>Collaboration</span></h3>
-                                <a href="http://law.ubalt.edu/faculty/scotus-mapping/index.cfm" target="_blank">
+                                <a href="https://law.ubalt.edu/faculty/scotus-mapping/index.cfm" target="_blank">
                                     <img src="{% static "png/ubalt-logo.png" %}"
                                          class="img-responsive"
                                          height="98" width="292">

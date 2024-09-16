@@ -41,9 +41,11 @@ def transform_employ(string):
     string_list = re.split("<BR>|;|<br>", string)
     #  Separate dates from the rest.
     employ_list = [
-        [a]
-        if a is None or a.startswith("Nominated")
-        else re.split(r"\,+\s+(?=\d)+|\,+\s+(?=\-)", a, 1)
+        (
+            [a]
+            if a is None or a.startswith("Nominated")
+            else re.split(r"\,+\s+(?=\d)+|\,+\s+(?=\-)", a, 1)
+        )
         for a in string_list
     ]
 
@@ -138,14 +140,18 @@ def transform_bankruptcy(string):
     string_list = str(string)
     string_list = re.split("<BR>|;|<br>", string_list)
     bankruptcy_list = [
-        None
-        if a is None
-        else re.split(r"\,+\s+(?=\d)+", a, 1)
-        if not any(month in a for month in month_list)
-        else re.split(
-            r",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
-            a,
-            1,
+        (
+            None
+            if a is None
+            else (
+                re.split(r"\,+\s+(?=\d)+", a, 1)
+                if not any(month in a for month in month_list)
+                else re.split(
+                    r",+\s+(?=June|March|January|February|April|May|July|August|September|October|November|December|Fall|Spring)+",
+                    a,
+                    1,
+                )
+            )
         )
         for a in string_list
     ]

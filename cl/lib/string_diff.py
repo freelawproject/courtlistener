@@ -13,7 +13,7 @@ def remove_words(phrase):
         + r"|others|against|ex|parte|complainants?|original|claimants?|devisee"
         + r"|executrix|executor"
     )
-    stop_words_reg = re.compile(r"^(%s)$" % stop_words, re.IGNORECASE)
+    stop_words_reg = re.compile(rf"^({stop_words})$", re.IGNORECASE)
 
     # strips punctuation
     exclude = set(string.punctuation)
