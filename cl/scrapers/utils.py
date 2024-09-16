@@ -314,6 +314,9 @@ def get_existing_docket(
 
     :return: Docket if find a match, None if we don't
     """
+    # Avoid lookups by blank docket number
+    if not docket_number.strip():
+        return
 
     # delete semicolons only for the lookup, for back compatibility
     # with juriscraper string formatting
