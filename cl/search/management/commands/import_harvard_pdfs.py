@@ -65,11 +65,11 @@ class Command(BaseCommand):
         # Initialize S3 client for accessing Harvard CAP R2
         self.cap_client = boto3.client(
             "s3",
-            endpoint_url=settings.R2_ENDPOINT_URL,
-            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+            endpoint_url=settings.CAP_R2_ENDPOINT_URL,
+            aws_access_key_id=settings.CAP_R2_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.CAP_R2_SECRET_ACCESS_KEY,
         )
-        self.cap_bucket_name = settings.R2_BUCKET_NAME
+        self.cap_bucket_name = settings.CAP_R2_BUCKET_NAME
 
     def process_crosswalks(self, specific_reporter, resume):
         crosswalk_dir = os.path.join(
@@ -134,9 +134,8 @@ class Command(BaseCommand):
                 self.process_entry(entry)
             except Exception as e:
                 logger.error(
-                    f"Error processing CAP ID {entry['cap_id']}: {str(e)}"
+                    f"Error processing CAP ID {entry['cap_case_id']}: {str(e)}"
                 )
-                # You might want to add more error handling here
 
     def parse_cap_path(self, cap_path):
         # Extract data from CAP path
@@ -147,18 +146,20 @@ class Command(BaseCommand):
         return reporter_slug, volume_folder, case_name
 
     def process_entry(self, entry):
-        cap_id = entry["cap_id"]
-        cl_id = entry["cl_id"]
+        cap_case_id = entry["cap_case_id"]
+        cl_cluster_id = entry["cl_cluster_id"]
         reporter_slug = entry["reporter_slug"]
         volume_folder = entry["volume_folder"]
         case_name = entry["case_name"]
 
-        logger.debug(f"Processing entry: CAP ID {cap_id}, CL ID {cl_id}")
+        logger.debug(
+            f"Processing entry: CAP ID {cap_case_id}, CL ID {cl_cluster_id}"
+        )
 
         try:
-            cluster = OpinionCluster.objects.get(id=cl_id)
+            cluster = OpinionCluster.objects.get(id=cl_cluster_id)
         except OpinionCluster.DoesNotExist:
-            logger.warning(f"OpinionCluster with id {cl_id} not found")
+            logger.warning(f"OpinionCluster with id {cl_cluster_id} not found")
             return
 
         pdf_path = f"{reporter_slug}/{volume_folder}/case-pdfs/{case_name}.pdf"
@@ -166,7 +167,7 @@ class Command(BaseCommand):
         if pdf_content and not self.dry_run:
             self.store_pdf_in_cl(cluster, pdf_content)
         elif not pdf_content:
-            logger.warning(f"Failed to fetch PDF for cluster {cl_id}")
+            logger.warning(f"Failed to fetch PDF for cluster {cl_cluster_id}")
 
     def fetch_pdf_from_cap(self, pdf_path):
         logger.debug(f"Fetching PDF from CAP: {pdf_path}")

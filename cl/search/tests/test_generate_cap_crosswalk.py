@@ -10,10 +10,10 @@ from cl.tests.cases import SimpleTestCase
 
 
 @override_settings(
-    R2_ENDPOINT_URL="http://test-endpoint",
-    R2_ACCESS_KEY_ID="test-access-key",
-    R2_SECRET_ACCESS_KEY="test-secret-key",
-    R2_BUCKET_NAME="test-bucket",
+    CAP_R2_ENDPOINT_URL="http://test-endpoint",
+    CAP_R2_ACCESS_KEY_ID="test-access-key",
+    CAP_R2_SECRET_ACCESS_KEY="test-secret-key",
+    CAP_R2_BUCKET_NAME="test-bucket",
 )
 class TestGenerateCapCrosswalk(SimpleTestCase):
     @patch(
@@ -75,8 +75,8 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
         with open(expected_file_path, "r") as f:
             crosswalk_data = json.load(f)
             self.assertEqual(len(crosswalk_data), 1)
-            self.assertEqual(crosswalk_data[0]["cap_id"], 1)
-            self.assertEqual(crosswalk_data[0]["cl_id"], 100)
+            self.assertEqual(crosswalk_data[0]["cap_case_id"], 1)
+            self.assertEqual(crosswalk_data[0]["cl_cluster_id"], 100)
             self.assertEqual(
                 crosswalk_data[0]["cap_path"], "/U.S./1/cases/test_case.json"
             )
@@ -93,7 +93,5 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
 
 if __name__ == "__main__":
     import unittest
-
-    unittest.main()
 
     unittest.main()

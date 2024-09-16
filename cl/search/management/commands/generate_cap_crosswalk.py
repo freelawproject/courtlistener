@@ -14,6 +14,11 @@ from cl.search.models import Citation, Court, OpinionCluster
 
 logger = logging.getLogger(__name__)
 
+# Note: To run this command, you need to set up the following environment variables:
+# CAP_R2_ENDPOINT_URL, CAP_R2_ACCESS_KEY_ID, CAP_R2_SECRET_ACCESS_KEY, and CAP_R2_BUCKET_NAME
+# These values must be obtained from the Harvard CAP DevOps team.
+# Ensure these are properly configured in your environment before executing this command.
+
 
 class Command(CommandUtils, BaseCommand):
     help = "Generate a comprehensive crosswalk between CAP and CourtListener cases using only CasesMetadata.json"
@@ -68,11 +73,11 @@ class Command(CommandUtils, BaseCommand):
         else:
             self.s3_client = boto3.client(
                 "s3",
-                endpoint_url=settings.R2_ENDPOINT_URL,
-                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+                endpoint_url=settings.CAP_R2_ENDPOINT_URL,
+                aws_access_key_id=settings.CAP_R2_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.CAP_R2_SECRET_ACCESS_KEY,
             )
-        self.bucket_name = settings.R2_BUCKET_NAME
+        self.bucket_name = settings.CAP_R2_BUCKET_NAME
 
     def generate_complete_crosswalk(self):
         reporters = self.fetch_reporters_metadata()
@@ -118,8 +123,8 @@ class Command(CommandUtils, BaseCommand):
                         self.total_matches_found += 1
                         crosswalk.append(
                             {
-                                "cap_id": case_meta["id"],
-                                "cl_id": cl_case.id,
+                                "cap_case_id": case_meta["id"],
+                                "cl_cluster_id": cl_case.id,
                                 "cap_path": f"/{reporter['slug']}/{volume}/cases/{case_meta['file_name']}.json",
                             }
                         )

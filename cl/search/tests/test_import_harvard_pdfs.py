@@ -15,10 +15,10 @@ from cl.tests.cases import TransactionTestCase
 
 
 @override_settings(
-    R2_ENDPOINT_URL="http://test-endpoint",
-    R2_ACCESS_KEY_ID="test-access-key",
-    R2_SECRET_ACCESS_KEY="test-secret-key",
-    R2_BUCKET_NAME="test-bucket",
+    CAP_R2_ENDPOINT_URL="http://test-endpoint",
+    CAP_R2_ACCESS_KEY_ID="test-access-key",
+    CAP_R2_SECRET_ACCESS_KEY="test-secret-key",
+    CAP_R2_BUCKET_NAME="test-bucket",
     AWS_STORAGE_BUCKET_NAME="test-cl-bucket",
     AWS_S3_CUSTOM_DOMAIN="test-cl-domain",
     AWS_DEFAULT_ACL="public-read",
@@ -32,10 +32,10 @@ class TestImportHarvardPDFs(TransactionTestCase):
         super().setUp()
         from django.conf import settings
 
-        settings.R2_ENDPOINT_URL = "http://test-endpoint"
-        settings.R2_ACCESS_KEY_ID = "test-access-key"
-        settings.R2_SECRET_ACCESS_KEY = "test-secret-key"
-        settings.R2_BUCKET_NAME = "test-bucket"
+        settings.CAP_R2_ENDPOINT_URL = "http://test-endpoint"
+        settings.CAP_R2_ACCESS_KEY_ID = "test-access-key"
+        settings.CAP_R2_SECRET_ACCESS_KEY = "test-secret-key"
+        settings.CAP_R2_BUCKET_NAME = "test-bucket"
         self.court = Court.objects.get(pk="scotus")
 
         # Create test dockets and clusters
@@ -59,13 +59,13 @@ class TestImportHarvardPDFs(TransactionTestCase):
         # Mock crosswalk data
         self.crosswalk_data = [
             {
-                "cap_id": 8118004,
-                "cl_id": self.clusters[0].id,
+                "cap_case_id": 8118004,
+                "cl_cluster_id": self.clusters[0].id,
                 "cap_path": "/a2d/100/cases/0036-01.json",
             },
             {
-                "cap_id": 8118121,
-                "cl_id": self.clusters[1].id,
+                "cap_case_id": 8118121,
+                "cl_cluster_id": self.clusters[1].id,
                 "cap_path": "/a2d/100/cases/0040-01.json",
             },
         ]
