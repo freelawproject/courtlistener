@@ -1,13 +1,13 @@
 import logging
 import time
 from functools import wraps
-from typing import Callable, Type
+from typing import Callable, Tuple, Type, Union
 
 logger = logging.getLogger(__name__)
 
 
 def retry(
-    ExceptionToCheck: Type[Exception],
+    ExceptionToCheck: Union[Type[Exception], Tuple[Type[Exception], ...]],
     tries: int = 4,
     delay: float = 3,
     backoff: float = 2,
@@ -15,8 +15,8 @@ def retry(
 ) -> Callable:
     """Retry calling the decorated function using an exponential backoff.
 
-    http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
-    original from: http://wiki.python.org/moin/PythonDecoratorLibrary#Retry
+    https://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
+    original from: https://wiki.python.org/moin/PythonDecoratorLibrary#Retry
 
     :param ExceptionToCheck: the exception to check. may be a tuple of
     exceptions to check

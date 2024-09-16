@@ -11,7 +11,7 @@
 <body>
   {% with cluster=o.cluster %}
     <div class="titles">
-      <h1>{{ cluster.caption|safe }}</h1>
+      <h1>{{ caption|safe }}</h1>
       <h2>{{ cluster.docket.court }}</h2>
       <h3><a href="https://www.courtlistener.com{{ o.get_absolute_url }}">https://www.courtlistener.com{{ o.get_absolute_url }}</a></h3>
     </div>

@@ -238,7 +238,10 @@ class Docket(AbstractDateTimeModel):
 
     class Meta:
         indexes = [
-            models.Index(fields=["docket_number", "district", "division_code"])
+            models.Index(
+                fields=["docket_number", "district", "division_code"],
+                name="lasc_docket_docket_number_district_division_code_07584433_idx",
+            )
         ]
 
     @property
@@ -551,7 +554,6 @@ class CrossReference(AbstractDateTimeModel):
 
 
 class Party(AbstractDateTimeModel):
-
     """
     # "EntityNumber": "3",
     # "PartyFlag": "L",
@@ -622,18 +624,17 @@ class TIME_CHOICES:
 
 class PastProceedingManager(models.Manager):
     def get_queryset(self):
-        super_qs = super(PastProceedingManager, self).get_queryset()
+        super_qs = super().get_queryset()
         return super_qs.filter(past_or_future=TIME_CHOICES.PAST)
 
 
 class FutureProceedingManager(models.Manager):
     def get_queryset(self):
-        super_qs = super(FutureProceedingManager, self).get_queryset()
+        super_qs = super().get_queryset()
         return super_qs.filter(past_or_future=TIME_CHOICES.FUTURE)
 
 
 class Proceeding(AbstractDateTimeModel):
-
     """
     "ProceedingDateString": "08/24/2018",
     "CourtAlt": "",

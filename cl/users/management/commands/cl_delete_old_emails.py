@@ -38,7 +38,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.options = options
         emails = delete_old_emails(options["older_than_days"])
         print(f"Emails deleted: {emails}")

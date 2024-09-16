@@ -1,4 +1,6 @@
 import random
+import re
+from datetime import date, datetime
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -7,8 +9,9 @@ from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
+from elasticsearch_dsl import AttrDict, AttrList
 
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import Court, Docket, DocketEntry
 
 register = template.Library()
 
@@ -125,6 +128,16 @@ def random_int(a: int, b: int) -> int:
     return random.randint(a, b)
 
 
+@register.filter
+def get_attrdict(mapping, key):
+    """Emulates the dictionary get for AttrDict objects. Useful when keys
+    have spaces or other punctuation."""
+    try:
+        return mapping[key]
+    except KeyError:
+        return ""
+
+
 # sourced from: https://stackoverflow.com/questions/2272370/sortable-table-columns-in-django
 @register.simple_tag
 def url_replace(request, value):
@@ -183,3 +196,107 @@ def citation(obj) -> SafeString:
     if ecf:
         result = f"{result} ECF No. {ecf}"
     return result
+
+
+@register.simple_tag
+def contains_highlights(content: str) -> bool:
+    """Check if a given string contains the mark tag used in highlights.
+
+    :param content: The input string to check.
+    :return: True if the mark highlight tag is found, otherwise False.
+    """
+    pattern = r"<mark>.*?</mark>"
+    matches = re.findall(pattern, content)
+    return bool(matches)
+
+
+@register.filter
+def render_string_or_list(value: any) -> any:
+    """Filter to render list of strings separated by commas or the original
+    value.
+
+    :param value: The value to be rendered.
+    :return: The original value or comma-separated values.
+    """
+    if isinstance(value, (list, AttrList)):
+        return ", ".join(str(item) for item in value)
+    return value
+
+
+@register.filter
+def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
+    """Returns the highlighted version of the field is present, otherwise,
+    falls back to the original field value.
+
+    :param result: The search result object.
+    :param field: The name of the field for which to retrieve the highlighted
+    version.
+    :return: The highlighted field value if available, otherwise, the original
+    field value.
+    """
+
+    hl_value = None
+    original_value = getattr(result, field, "")
+    if isinstance(result, AttrDict) and hasattr(result.meta, "highlight"):
+        hl_value = getattr(result.meta.highlight, field, None)
+    elif isinstance(result, dict):
+        hl_value = result.get("meta", {}).get("highlight", {}).get(field)
+        original_value = result.get(field, "")
+
+    return render_string_or_list(hl_value) if hl_value else original_value
+
+
+@register.filter
+def group_courts(courts: list[Court], num_columns: int) -> list:
+    """Divide courts in equal groupings while keeping related courts together
+
+    :param courts: Courts to group.
+    :param num_columns: Number of groups wanted
+    :return: The courts grouped together
+    """
+
+    column_len = len(courts) // num_columns
+    remainder = len(courts) % num_columns
+
+    groups = []
+    start = 0
+    for index in range(num_columns):
+        # Calculate the end index for this chunk
+        end = start + column_len + (1 if index < remainder else 0)
+
+        # Find the next COLR as a starting point (Court of last resort)
+        COLRs = [Court.TERRITORY_SUPREME, Court.STATE_SUPREME]
+        while end < len(courts) and courts[end].jurisdiction not in COLRs:
+            end += 1
+
+        # Create the column and add it to result
+        groups.append(courts[start:end])
+        start = end
+
+    return groups
+
+
+@register.filter
+def format_date(date_str: str) -> str:
+    """Formats a date string in the format 'F jS, Y'. Useful for formatting
+    ES child document results where dates are not date objects."""
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        return date_obj.strftime("%B %dth, %Y")
+    except (ValueError, TypeError):
+        return date_str
+
+
+@register.filter
+def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
+    """Build a query string that includes the docket ID and any existing query
+    parameters.
+
+    :param request_q: The current query string, if present.
+    :param docket_id: The docket_id to append to the query string.
+    :return:The query string with the docket_id included.
+    """
+
+    if request_q:
+        return f"({request_q}) AND docket_id:{docket_id}"
+    return f"docket_id:{docket_id}"

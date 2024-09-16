@@ -1,4 +1,3 @@
-from django.contrib.auth.models import User
 from juriscraper.lib.exceptions import PacerLoginException
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -72,6 +71,7 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         if attrs["upload_type"] in [
             UPLOAD_TYPE.DOCKET,
             UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.ACMS_DOCKET_JSON,
             UPLOAD_TYPE.CLAIMS_REGISTER,
         ]:
             # Dockets shouldn't have these fields completed.
@@ -94,13 +94,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
             UPLOAD_TYPE.CASE_QUERY_PAGE,
             UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE,
         ]:
-            # These are district court dockets. Is the court valid?
-            district_court_ids = (
-                Court.federal_courts.district_pacer_courts().values_list(
-                    "pk", flat=True
-                )
+            # These are district or bankruptcy court dockets. Is the court valid?
+            court_ids = Court.federal_courts.district_or_bankruptcy_pacer_courts().values_list(
+                "pk", flat=True
             )
-            if attrs["court"].pk not in district_court_ids:
+            if attrs["court"].pk not in court_ids:
                 raise ValidationError(
                     "%s is not a district or bankruptcy court ID. Did you "
                     "mean to use the upload_type for appellate dockets?"
@@ -109,12 +107,12 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
 
         if attrs["upload_type"] == UPLOAD_TYPE.CLAIMS_REGISTER:
             # Only allowed on bankruptcy courts
-            district_court_ids = (
+            bankruptcy_court_ids = (
                 Court.federal_courts.bankruptcy_pacer_courts().values_list(
                     "pk", flat=True
                 )
             )
-            if attrs["court"].pk not in district_court_ids:
+            if attrs["court"].pk not in bankruptcy_court_ids:
                 raise ValidationError(
                     "%s is not a bankruptcy court ID. Only bankruptcy cases "
                     "should have claims registry pages." % attrs["court"]
@@ -123,6 +121,8 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
         if attrs["upload_type"] in [
             UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE,
             UPLOAD_TYPE.APPELLATE_DOCKET,
+            UPLOAD_TYPE.ACMS_ATTACHMENT_PAGE,
+            UPLOAD_TYPE.ACMS_DOCKET_JSON,
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE,
             UPLOAD_TYPE.APPELLATE_CASE_QUERY_RESULT_PAGE,
         ]:
@@ -161,9 +161,11 @@ class ProcessingQueueSerializer(serializers.ModelSerializer):
                     "uploads."
                 )
 
-            if "-" in attrs.get("pacer_case_id"):
+            dashes = attrs.get("pacer_case_id").count("-")
+            if dashes == 1:
                 raise ValidationError(
-                    "PACER case ID can not contains dashes -"
+                    "PACER case ID can not contain a single (-); "
+                    "that looks like a docket number."
                 )
 
         return attrs
@@ -272,13 +274,27 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         # Is it a good court value?
-        district_court_ids = (
-            Court.federal_courts.district_pacer_courts().values_list(
-                "pk", flat=True
-            )
+        valid_court_ids = Court.federal_courts.district_or_bankruptcy_pacer_courts().values_list(
+            "pk", flat=True
         )
-        if attrs.get("court") and attrs["court"].pk not in district_court_ids:
-            raise ValidationError(f"Invalid court id: {attrs['court'].pk}")
+
+        if (
+            attrs.get("court")
+            or attrs.get("docket")
+            or attrs.get("recap_document")
+        ):
+            # this check ensures the docket is not an appellate record.
+            if attrs.get("recap_document"):
+                rd = attrs["recap_document"]
+                court_id = rd.docket_entry.docket.court_id
+            else:
+                court_id = (
+                    attrs["court"].pk
+                    if attrs.get("court")
+                    else attrs["docket"].court_id
+                )
+            if court_id not in valid_court_ids:
+                raise ValidationError(f"Invalid court id: {court_id}")
 
         # Docket validations
         if attrs.get("pacer_case_id") and not attrs.get("court"):
@@ -288,8 +304,13 @@ class PacerFetchQueueSerializer(serializers.ModelSerializer):
                 "without 'court' parameter."
             )
 
-        if attrs.get("pacer_case_id") and "-" in attrs.get("pacer_case_id"):
-            raise ValidationError("PACER case ID can not contains dashes -")
+        if attrs.get("pacer_case_id"):
+            dashes = attrs.get("pacer_case_id").count("-")
+            if dashes == 1:
+                raise ValidationError(
+                    "PACER case ID can not contain a single (-); "
+                    "that looks like a docket number."
+                )
 
         if attrs.get("docket_number") and not attrs.get("court"):
             # If a docket_number is included, is a court also?
@@ -348,6 +369,7 @@ class PacerDocIdLookUpSerializer(serializers.HyperlinkedModelSerializer):
         fields = (
             "pacer_doc_id",
             "filepath_local",
+            "acms_document_guid",
             "id",
         )
 

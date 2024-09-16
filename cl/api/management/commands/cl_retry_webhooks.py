@@ -8,7 +8,7 @@ from django.utils.timezone import now
 from cl.api.models import WEBHOOK_EVENT_STATUS, Webhook, WebhookEvent
 from cl.api.webhooks import send_webhook_event
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.users.tasks import send_webhook_still_disabled_email
 
 DAYS_TO_DELETE = 90
@@ -97,7 +97,7 @@ def check_if_executed_today() -> bool:
     :return: True if the task has already been executed today, otherwise False
     """
     daemon_key = "daemon:webhooks:executed"
-    r = make_redis_interface("CACHE", decode_responses=False)
+    r = get_redis_interface("CACHE", decode_responses=False)
     exists_daemon_key = r.get(daemon_key)
     if exists_daemon_key:
         return True
@@ -134,7 +134,7 @@ class Command(VerboseCommand):
     DELAY_BETWEEN_ITERATIONS = 1 * 60  # One minute
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
 
         # Execute it continuously with a delay of one minute between iterations
         while True:

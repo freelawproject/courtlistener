@@ -9,7 +9,7 @@ class Command(VerboseCommand):
     help = "Upgrade JSON data from old format to new."
 
     def __init__(self, *args, **kwargs):
-        super(Command, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.options = None
         self.json_objects = None
         self.num_objects = None
@@ -23,7 +23,7 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         self.options = options
         self.json_objects = JSONVersion.objects.all()
         self.num_objects = self.json_objects.count()

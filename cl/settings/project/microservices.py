@@ -20,6 +20,10 @@ MICROSERVICE_URLS = {
         "url": f"{DOCTOR_HOST}/extract/doc/text/",
         "timeout": 60 * 90,
     },
+    "recap-extract": {
+        "url": f"{DOCTOR_HOST}/extract/recap/text/",
+        "timeout": 60 * 90,
+    },
     # Utils Endpoints
     "page-count": {
         "url": f"{DOCTOR_HOST}/utils/page-count/pdf/",
@@ -52,6 +56,10 @@ MICROSERVICE_URLS = {
     },
     "convert-audio": {
         "url": f"{DOCTOR_HOST}/convert/audio/mp3/",
+        "timeout": 60 * 60,
+    },
+    "downsize-audio": {
+        "url": f"{DOCTOR_HOST}/convert/audio/ogg/",
         "timeout": 60 * 60,
     },
     # Disclosure Microservices

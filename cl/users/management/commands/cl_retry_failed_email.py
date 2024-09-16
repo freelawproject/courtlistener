@@ -85,7 +85,7 @@ class Command(VerboseCommand):
     help = "Check email recipients' deliverability and send failed emails."
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         sys.stdout.write("Sending failed email...")
         email_sent = handle_failing_emails()
         sys.stdout.write(f"{email_sent} emails sent.")

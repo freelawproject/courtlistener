@@ -1,31 +1,94 @@
 import os
 import sys
-import traceback
 from datetime import date
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
+import httpx
 import requests
+from asgiref.sync import async_to_sync
+from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
+from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
 from requests import Response, Session
-from requests.cookies import RequestsCookieJar
 
+from cl.corpus_importer.utils import winnow_case_name
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.recap.mergers import find_docket_object
+from cl.scrapers.exceptions import (
+    EmptyFileError,
+    NoDownloadUrlError,
+    UnexpectedContentTypeError,
+)
 from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Docket, RECAPDocument
+from cl.search.models import Court, Docket, RECAPDocument
+
+
+def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
+    """Get Court object from "child_courts" scraped string
+
+    Ensure that the Court object found has the same parent court id has the
+    Court object got from the scraper
+
+    :param item: scraped court's name
+    :param court_id: court id got from the Site scraper object
+
+    :return: Court object for the child_court string if it exists and is valid
+    """
+    if not child_court_name:
+        return None
+
+    parent_court = find_court_by_id(court_id)[0]
+
+    child_court_ids = find_court_ids_by_name(
+        child_court_name,
+        bankruptcy=parent_court["type"] == "bankruptcy",
+        location=parent_court["location"],
+        allow_partial_matches=False,
+    )
+
+    if not child_court_ids:
+        logger.error(
+            "Could not get child court id from name '%s'",
+            child_court_name,
+            extra={"fingerprint": [f"{court_id}-no-child-in-reportersdb"]},
+        )
+        return None
+
+    if not (child_courts := Court.objects.filter(pk=child_court_ids[0])):
+        logger.error(
+            "Court object does not exist for '%s'",
+            child_court_ids[0],
+            extra={"fingerprint": [f"{court_id}-no-child-in-db"]},
+        )
+        return None
+
+    child_court = child_courts[0]
+    parent_id = child_court.parent_court.id if child_court.parent_court else ""
+    if parent_id != court_id:
+        logger.error(
+            "Child court found from name '%s' with id '%s' has parent court id different from expected. Expected: '%s' Found: '%s'",
+            child_court_name,
+            child_court_ids[0],
+            court_id,
+            parent_id,
+            extra={"fingerprint": [f"{court_id}-child-found-no-parent-match"]},
+        )
+        return None
+
+    return child_court
 
 
 @retry(
     (
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.TimeoutException,
     ),
     tries=3,
     delay=5,
@@ -38,7 +101,7 @@ def test_for_meta_redirections(r: Response) -> Tuple[bool, Optional[str]]:
     :param r: A response object
     :return:  A boolean and value
     """
-    extension = microservice(
+    extension = async_to_sync(microservice)(
         service="buffer-extension",
         file=r.content,
         params={"mime": True},
@@ -78,8 +141,8 @@ def follow_redirections(r: Response, s: Session) -> Response:
 
 @retry(
     (
-        requests.ConnectionError,
-        requests.ReadTimeout,
+        httpx.NetworkError,
+        httpx.TimeoutException,
     ),
     tries=3,
     delay=5,
@@ -88,7 +151,7 @@ def follow_redirections(r: Response, s: Session) -> Response:
 )
 def get_extension(content: bytes) -> str:
     """A handful of workarounds for getting extensions we can trust."""
-    return microservice(
+    return async_to_sync(microservice)(
         service="buffer-extension",
         file=content,
     ).text
@@ -96,56 +159,78 @@ def get_extension(content: bytes) -> str:
 
 def get_binary_content(
     download_url: str,
-    cookies: RequestsCookieJar,
-    method: str = "GET",
-) -> Tuple[str, Optional[Response]]:
+    site: AbstractSite,
+) -> bytes | str:
     """Downloads the file, covering a few special cases such as invalid SSL
     certificates and empty file errors.
 
     :param download_url: The URL for the item you wish to download.
-    :param cookies: Cookies that might be necessary to download the item.
-    :param method: The HTTP method used to get the item, or "LOCAL" to get an
-    item during testing
-    :return: Two values. The first is a msg indicating any errors encountered.
-    If blank, that indicates success. The second value is the response object
-    containing the downloaded file.
+    :param site: Site object used to download data
+
+    :return: The downloaded and cleaned content
+    :raises: NoDownloadUrlError, UnexpectedContentTypeError, EmptyFileError
     """
     if not download_url:
-        # Occurs when a DeferredList fetcher fails.
-        msg = f"NoDownloadUrlError: {download_url}\n{traceback.format_exc()}"
-        return msg, None
+        raise NoDownloadUrlError(download_url)
+
     # noinspection PyBroadException
-    if method == "LOCAL":
+    if site.method == "LOCAL":
+        # "LOCAL" is the method when testing
         url = os.path.join(settings.MEDIA_ROOT, download_url)
         mr = MockRequest(url=url)
         r = mr.get()
-        r = follow_redirections(r, requests.Session())
-        r.raise_for_status()
+        s = requests.Session()
     else:
+        # some sites require a custom ssl_context, contained in the Site's
+        # session. However, we can't send a request with both a
+        # custom ssl_context and `verify = False`
+        has_cipher = hasattr(site, "cipher")
+        s = site.request["session"] if has_cipher else requests.session()
+
+        if site.needs_special_headers:
+            headers = site.request["headers"]
+        else:
+            headers = {"User-Agent": "CourtListener"}
+
         # Note that we do a GET even if site.method is POST. This is
         # deliberate.
-        s = requests.session()
-        headers = {"User-Agent": "CourtListener"}
-
         r = s.get(
             download_url,
-            verify=False,  # WA has a certificate we don't understand
+            verify=has_cipher,  # WA has a certificate we don't understand
             headers=headers,
-            cookies=cookies,
+            cookies=site.cookies,
             timeout=300,
         )
 
         # test for empty files (thank you CA1)
         if len(r.content) == 0:
-            msg = f"EmptyFileError: {download_url}\n{traceback.format_exc()}"
-            return msg, None
+            raise EmptyFileError(f"EmptyFileError: '{download_url}'")
+
+        # test for expected content type (thanks mont for nil)
+        if site.expected_content_types:
+            # Clean up content types like "application/pdf;charset=utf-8"
+            # and 'application/octet-stream; charset=UTF-8'
+            content_type = (
+                r.headers.get("Content-Type").lower().split(";")[0].strip()
+            )
+            m = any(
+                content_type in mime.lower()
+                for mime in site.expected_content_types
+            )
+
+            if not m:
+                court_str = site.court_id.split(".")[-1].split("_")[0]
+                fingerprint = [f"{court_str}-unexpected-content-type"]
+                msg = f"'{download_url}' '{content_type}' not in {site.expected_content_types}"
+                raise UnexpectedContentTypeError(msg, fingerprint=fingerprint)
 
         # test for and follow meta redirects
         r = follow_redirections(r, s)
         r.raise_for_status()
 
-    # Success!
-    return "", r
+    content = site.cleanup_content(r.content)
+
+    return content
 
 
 def signal_handler(signal, frame):
@@ -204,54 +289,177 @@ def extract_recap_documents(
             sys.stdout.flush()
 
 
+def get_existing_docket(
+    court_id: str, docket_number: str, appeal_from_str: str = ""
+) -> Docket | None:
+    """Look for an existing docket for a given court_id and docket number
+
+    recap.mergers.find_docket_object prioritizes lookups by docket_number_core
+    which is designed for federal / PACER sources. This function is rough
+    equivalent with lookup priorities inverted, intended to be used with
+    scraped sources
+
+    Even when make_docket_number_core returns an empty string for most state
+    courts that we scrape, it causes mismatches in courts like `az`, where
+    2 different dockets like '1 CA-CR 23-0297' and '1 CA-CV 23-0297-FC'
+    have the same core number
+
+    Examples of  docket numbers do not map to a docket_number_core
+    (fldistctapp '5D2023-0888'), (ohioctapp, '22CA15')
+
+    :param court_id: the court id
+    :param docket_number: the docket number
+    :param appeal_from_str: useful for disambiguating `ohioctapp` dockets,
+        this is the "lower_courts" returned juriscraper field
+
+    :return: Docket if find a match, None if we don't
+    """
+
+    # delete semicolons only for the lookup, for back compatibility
+    # with juriscraper string formatting
+    # https://github.com/freelawproject/juriscraper/pull/1166
+    lookup = Q(court_id=court_id) & (
+        Q(docket_number=docket_number.replace(";", ""))
+        | Q(docket_number=docket_number)
+    )
+
+    # Special case where docket numbers are the same and repeated
+    # across districts, but can be disambiguated using the lower court
+    if court_id == "ohioctapp" and appeal_from_str:
+        lookup = lookup & Q(appeal_from_str=appeal_from_str)
+
+    queryset = Docket.objects.filter(lookup)
+    count = queryset.count()
+    if count == 1:
+        return queryset[0]
+    if count > 1:
+        logger.error(
+            "%s: more than 1 docket match for docket number '%s'",
+            court_id,
+            docket_number,
+        )
+        return queryset[0]
+
+
+def case_names_are_too_different(
+    first: str, second: str, threshold: float = 0.5
+) -> bool:
+    """Compares 2 case names' words as a similitude measure
+    Useful to raise a warning when updating a docket and names are found
+    to be too different
+
+    :param first: first case name
+    :param second: second case name
+    :param threshold: minimum percentage of words in common
+
+    :return: True if case names are too different according to the threshold;
+        False if names are similar
+    """
+    new_parts = winnow_case_name(first.lower())
+    old_parts = winnow_case_name(second.lower())
+    # or 1 to prevent 0 lenght minimum
+    denominator = min(len(old_parts), len(new_parts)) or 1
+    return len(new_parts.intersection(old_parts)) / denominator < threshold
+
+
 def update_or_create_docket(
     case_name: str,
     case_name_short: str,
-    court_id: str,
+    court: Court,
     docket_number: str,
     source: int,
+    from_harvard: bool,
     blocked: bool = False,
     case_name_full: str = "",
     date_blocked: date | None = None,
     date_argued: date | None = None,
     ia_needs_upload: bool | None = None,
+    appeal_from_str: str = "",
 ) -> Docket:
     """Look for an existing Docket and update it or create a new one if it's
     not found.
 
     :param case_name: The docket case_name.
     :param case_name_short: The docket case_name_short
-    :param court_id: The court id the docket belongs to.
+    :param court: The court objects the docket belongs to
     :param docket_number: The docket number.
     :param source: The docket source.
+    :param from_harvard: True when this function is called from the
+        Harvard importer; the Harvard data is considered
+        more trustable  and should overwrite an existing docket's data
+        Should be False when called from scrapers.
     :param blocked: If the docket should be blocked, default False.
     :param case_name_full: The docket case_name_full.
     :param date_blocked: The docket date_blocked if it's blocked.
     :param date_argued: The docket date_argued if it's an oral argument.
     :param ia_needs_upload: If the docket needs upload to IA, default None.
-    :return: The docket docket.
+    :param appeal_from_str: Name (not standardized id) of the lower level court.
+    :return: The docket.
     """
-    docket = find_docket_object(court_id, None, docket_number)
-    if docket.pk:
-        docket.case_name = case_name
-        docket.case_name_short = case_name_short
-        docket.case_name_full = case_name_full
-        docket.source = source
-        docket.blocked = blocked
-        docket.date_blocked = date_blocked
-        docket.date_argued = date_argued
-        docket.ia_needs_upload = ia_needs_upload
+    docket_fields = {
+        "case_name": case_name,
+        "case_name_short": case_name_short,
+        "case_name_full": case_name_full,
+        "blocked": blocked,
+        "ia_needs_upload": ia_needs_upload,
+        "appeal_from_str": appeal_from_str,
+        "date_blocked": date_blocked,
+        "date_argued": date_argued,
+    }
+
+    court_id = court.pk
+    uses_docket_number_core = court.jurisdiction in Court.FEDERAL_JURISDICTIONS
+
+    if from_harvard or uses_docket_number_core:
+        docket = async_to_sync(find_docket_object)(
+            court_id, None, docket_number, None, None, None
+        )
     else:
-        docket = Docket(
-            case_name=case_name,
-            case_name_short=case_name_short,
-            case_name_full=case_name_full,
+        docket = get_existing_docket(court_id, docket_number, appeal_from_str)
+
+    if not docket or not docket.pk:
+        return Docket(
+            **docket_fields,
+            source=source,
             docket_number=docket_number,
             court_id=court_id,
-            source=source,
-            blocked=blocked,
-            date_blocked=date_blocked,
-            date_argued=date_argued,
-            ia_needs_upload=ia_needs_upload,
         )
+
+    # Update the existing docket with the new values
+    docket.add_opinions_source(source)
+
+    for field, value in docket_fields.items():
+        # do not use blanket `if not value:`, since
+        # blocked and ia_needs_upload are booleans and would be skipped
+        if value is None or value == "":
+            continue
+
+        if (
+            not from_harvard
+            and field == "case_name"
+            and getattr(docket, field)
+            and getattr(docket, field) != value
+        ):
+            # Safeguard to catch possible docket mismatches, check that they
+            # have at least 50% of words in common
+            if case_names_are_too_different(value, docket.case_name, 0.5):
+                logger.error(
+                    "New case_name '%s' looks too different from old '%s'. Court %s. Docket %s",
+                    value,
+                    docket.case_name,
+                    court_id,
+                    docket.pk,
+                )
+                continue
+
+            # Most times, we find updated values for case_name that may
+            # be a longer form than what we currently have, which we can
+            # take advantage of to populate case_name_full
+            if not getattr(docket, "case_name_full") and len(value) > len(
+                getattr(docket, field)
+            ):
+                setattr(docket, "case_name_full", value)
+        else:
+            setattr(docket, field, value)
+
     return docket

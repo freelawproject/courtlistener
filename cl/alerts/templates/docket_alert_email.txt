@@ -20,14 +20,6 @@ CourtListener Docket Alert
 View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc{% if docket.pacer_url %}
 Buy Docket on PACER: {{ docket.pacer_url }}{% endif %}
 
-{% if notes or tags %}
-Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
-
-Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
-{% else %}
-Use notes and tags to organize and share the cases you follow. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}
-{% endif %}
-
 {% for de in new_des %}{% for rd in de.recap_documents.all %}Document Number: {{ de.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
 Date Filed: {% if de.datetime_filed %}{{ de.datetime_filed|timezone:timezone|date:"M j, Y" }}{% else %}{{ de.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
 {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ de.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}{% if rd.document_number %}{% if rd.filepath_local %}
@@ -37,6 +29,14 @@ Download PDF from RECAP with PACER fallback: https://www.courtlistener.com{{ rd.
 
 {% endfor %}{% endfor %}
 
+{% if notes or tags %}
+Your Note: {% if notes %}{{ notes }}{% else %} You have not added notes to this case. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
+
+Your Tags: {% if tags %}{% for tag in tags %}{{ tag.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %} No tags yet. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}{% endif %}
+{% else %}
+Use notes and tags to organize and share the cases you follow. Learn More: https://www.courtlistener.com{% url 'tag_notes_help' %}
+{% endif %}
+
 {% if not first_email or first_email and auto_subscribe %}
 This alert was sent because you subscribed to this docket with your account on CourtListener.com.
 To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'toggle_docket_alert_confirmation' 'unsubscribe' docket_alert_secret_key %}
@@ -45,7 +45,9 @@ To disable this alert unsubscribe here: https://www.courtlistener.com{% url 'tog
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
 
  - Blog: https://free.law
- - Twitter: http://twitter.com/freelawproject
- - Donate: https://www.courtlistener.com{% url "donate" %}?referrer=pt-email
+ - BlueSky: https://bsky.app/profile/free.law
+ - X: https://x.com/freelawproject
+ - Donate: https://donate.free.law/forms/supportflp
+ - Become a Member: https://donate.free.law/forms/membership
 
 Please donate to support our work.

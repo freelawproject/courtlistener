@@ -7,7 +7,6 @@ import re
 from typing import TypedDict, cast
 
 from django.conf import settings
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.bulk_utils import make_bankr_docket_number
 from cl.corpus_importer.tasks import (
@@ -17,6 +16,7 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.lib.redis_utils import create_redis_semaphore
 
 CLIENT_PACER_USERNAME = os.environ.get("CLIENT_PACER_USERNAME", "")
@@ -70,7 +70,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
         else:
             raise ValueError(f"Bad file name {file}")
 
-    session = PacerSession(
+    session = ProxyPacerSession(
         username=CLIENT_PACER_USERNAME, password=CLIENT_PACER_PASSWORD
     )
     session.login()
@@ -139,7 +139,7 @@ def query_and_save_creditors_data(options: OptionsType) -> None:
                 )
                 throttle.maybe_wait()
                 query_and_save_list_of_creditors.si(
-                    session.cookies,
+                    SessionData(session.cookies, session.proxy_address),
                     court_id,
                     d_number_file_name,
                     docket_number,
@@ -195,5 +195,5 @@ class Command(VerboseCommand):
         )
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         query_and_save_creditors_data(options)

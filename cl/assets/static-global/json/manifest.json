@@ -1,0 +1,6 @@
+{
+  "icons": [
+    { "src": "https://storage.courtlistener.com/static/png/icon-192.ddda77cc85be.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "https://storage.courtlistener.com/static/png/icon-512.20038da696c0.png", "type": "image/png", "sizes": "512x512" }
+  ]
+}

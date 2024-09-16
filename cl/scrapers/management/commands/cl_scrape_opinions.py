@@ -1,14 +1,17 @@
 import signal
 import sys
 import time
+import traceback
 from datetime import date
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from asgiref.sync import async_to_sync
 from django.core.files.base import ContentFile
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils.encoding import force_bytes
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.importer import build_module_list
 from juriscraper.lib.string_utils import CaseNameTweaker
 from sentry_sdk import capture_exception
@@ -20,10 +23,15 @@ from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
 from cl.scrapers.DupChecker import DupChecker
-from cl.scrapers.models import ErrorLog
+from cl.scrapers.exceptions import (
+    BadContentError,
+    ConsecutiveDuplicatesError,
+    SingleDuplicateError,
+)
 from cl.scrapers.tasks import extract_doc_content
 from cl.scrapers.utils import (
     get_binary_content,
+    get_child_court,
     get_extension,
     signal_handler,
     update_or_create_docket,
@@ -38,21 +46,27 @@ from cl.search.models import (
     OpinionCluster,
 )
 
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
 # for use in catching the SIGINT (Ctrl+4)
 die_now = False
 cnt = CaseNameTweaker()
 
 
 def make_citation(
-    cite_str: str,
-    cluster: OpinionCluster,
+    cite_str: str, cluster: OpinionCluster, court_id: str
 ) -> Optional[Citation]:
     """Create and return a citation object for the input values."""
-    citation_objs = get_citations(cite_str)
+    citation_objs = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
     if not citation_objs:
         logger.error(
-            f"Could not parse citation",
-            extra=dict(cite=cite_str, cluster=cluster),
+            "Could not parse citation from court '%s'",
+            court_id,
+            extra=dict(
+                cite=cite_str,
+                cluster=cluster,
+                fingerprint=[f"{court_id}-no-citation-found"],
+            ),
         )
         return None
     # Convert the found cite type to a valid cite type for our DB.
@@ -75,6 +89,15 @@ def make_objects(
 ) -> Tuple[Docket, Opinion, OpinionCluster, List[Citation]]:
     """Takes the meta data from the scraper and associates it with objects.
 
+    The keys returned by juriscraper scrapers are defined by `self._all_attrs`
+    on OpinionSite and OralArgumentSite, where the legacy convention is to use
+    plural names.
+
+    However, this function is also used by importers and user pages, that
+    may not respect this convention, thus the duplication of singular and
+    plural names, like in
+    `item.get("disposition") or item.get("dispositions", "")`
+
     Returns the created objects.
     """
     blocked = item["blocked_statuses"]
@@ -90,29 +113,42 @@ def make_objects(
     docket = update_or_create_docket(
         item["case_names"],
         case_name_short,
-        court.pk,
+        court,
         item.get("docket_numbers", ""),
         item.get("source") or Docket.SCRAPER,
+        from_harvard=False,
         blocked=blocked,
         date_blocked=date_blocked,
+        appeal_from_str=item.get("lower_courts", ""),
     )
 
+    # Note that if opinion.author_str has no value, and cluster.judges find
+    # a single judge, opinion.author will be populated with that Person object
+    # Check `save_everything`
+
+    # For a discussion on syllabus vs summary, check
+    # https://github.com/freelawproject/juriscraper/issues/66
     cluster = OpinionCluster(
-        judges=item.get("judges", ""),
         date_filed=item["case_dates"],
         date_filed_is_approximate=item["date_filed_is_approximate"],
         case_name=item["case_names"],
         case_name_short=case_name_short,
         source=item.get("cluster_source") or SOURCES.COURT_WEBSITE,
         precedential_status=item["precedential_statuses"],
-        nature_of_suit=item.get("nature_of_suit", ""),
         blocked=blocked,
         date_blocked=date_blocked,
+        judges=item.get("judges", ""),
+        nature_of_suit=item.get("nature_of_suit", ""),
+        disposition=item.get("disposition") or item.get("dispositions", ""),
+        other_dates=item.get("other_dates", ""),
+        summary=item.get("summary", ""),
         syllabus=item.get("summaries", ""),
     )
 
     cites = [item.get(key, "") for key in ["citations", "parallel_citations"]]
-    citations = [make_citation(cite, cluster) for cite in cites if cite]
+    citations = [
+        make_citation(cite, cluster, court.id) for cite in cites if cite
+    ]
     # Remove citations that did not parse correctly.
     citations = [cite for cite in citations if cite]
 
@@ -121,9 +157,12 @@ def make_objects(
         url = ""
 
     opinion = Opinion(
-        type=Opinion.COMBINED,
+        type=item.get("types", Opinion.COMBINED),
         sha1=sha1_hash,
         download_url=url,
+        joined_by_str=item.get("joined_by", ""),
+        per_curiam=item.get("per_curiam", False),
+        author_str=item.get("author_str") or item.get("authors", ""),
     )
 
     cf = ContentFile(content)
@@ -152,14 +191,21 @@ def save_everything(
         citation.cluster_id = cluster.pk
         citation.save()
 
+    if opinion.author_str:
+        candidate = async_to_sync(lookup_judges_by_messy_str)(
+            opinion.author_str, docket.court.pk, cluster.date_filed
+        )
+        if len(candidate) == 1:
+            opinion.author = candidate[0]
+
     if cluster.judges:
-        candidate_judges = lookup_judges_by_messy_str(
+        candidate_judges = async_to_sync(lookup_judges_by_messy_str)(
             cluster.judges, docket.court.pk, cluster.date_filed
         )
-        if len(candidate_judges) == 1:
-            opinion.author = candidate_judges[0]
 
-        if len(candidate_judges) > 1:
+        if len(candidate_judges) == 1 and not opinion.author_str:
+            opinion.author = candidate_judges[0]
+        elif len(candidate_judges) > 1:
             for candidate in candidate_judges:
                 cluster.panel.add(candidate)
 
@@ -173,9 +219,10 @@ def save_everything(
 
 class Command(VerboseCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
+    scrape_target_descr = "opinions"  # for logging purposes
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
-        super(Command, self).__init__(stdout=None, stderr=None, no_color=False)
+        super().__init__(stdout=None, stderr=None, no_color=False)
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -221,7 +268,13 @@ class Command(VerboseCommand):
             help="Disable duplicate aborting.",
         )
 
-    def scrape_court(self, site, full_crawl=False, ocr_available=True):
+    def scrape_court(
+        self,
+        site,
+        full_crawl: bool = False,
+        ocr_available: bool = True,
+        backscrape: bool = False,
+    ):
         # Get the court object early for logging
         # opinions.united_states.federal.ca9_u --> ca9
         court_str = site.court_id.split(".")[-1].split("_")[0]
@@ -229,108 +282,126 @@ class Command(VerboseCommand):
 
         dup_checker = DupChecker(court, full_crawl=full_crawl)
         if dup_checker.abort_by_url_hash(site.url, site.hash):
-            logger.debug(f"Aborting by url hash.")
+            logger.debug("Aborting by url hash.")
             return
 
         if site.cookies:
-            logger.info(f"Using cookies: {site.cookies}")
-        logger.debug(f"#{len(site)} opinions found.")
+            logger.info("Using cookies: %s", site.cookies)
+
+        logger.debug("#%s %s found.", len(site), self.scrape_target_descr)
+
         added = 0
         for i, item in enumerate(site):
-            msg, r = get_binary_content(
-                item["download_urls"],
-                site.cookies,
-                method=site.method,
-            )
-            if msg:
-                logger.warning(msg)
-                ErrorLog(log_level="WARNING", court=court, message=msg).save()
-                continue
-
-            content = site.cleanup_content(r.content)
-
-            current_date = item["case_dates"]
             try:
                 next_date = site[i + 1]["case_dates"]
             except IndexError:
                 next_date = None
 
-            # request.content is sometimes a str, sometimes unicode, so
-            # force it all to be bytes, pleasing hashlib.
-            sha1_hash = sha1(force_bytes(content))
-            if (
-                court_str == "nev"
-                and item["precedential_statuses"] == "Unpublished"
-            ) or court_str in ["neb"]:
-                # Nevada's non-precedential cases have different SHA1 sums
-                # every time.
-
-                # Nebraska updates the pdf causing the SHA1 to not match
-                # the opinions in CL causing duplicates. See CL issue #1452
-
-                lookup_params = {
-                    "lookup_value": item["download_urls"],
-                    "lookup_by": "download_url",
-                }
-            else:
-                lookup_params = {
-                    "lookup_value": sha1_hash,
-                    "lookup_by": "sha1",
-                }
-
-            proceed = dup_checker.press_on(
-                Opinion, current_date, next_date, **lookup_params
-            )
-            if dup_checker.emulate_break:
-                logger.debug("Emulate break triggered.")
+            try:
+                self.ingest_a_case(
+                    item, next_date, ocr_available, site, dup_checker, court
+                )
+                added += 1
+            except ConsecutiveDuplicatesError:
                 break
-            if not proceed:
-                logger.debug("Skipping opinion.")
-                continue
-
-            # Not a duplicate, carry on
-            logger.info(
-                f"Adding new document found at: {item['download_urls'].encode()}"
-            )
-            dup_checker.reset()
-
-            docket, opinion, cluster, citations = make_objects(
-                item, court, sha1_hash, content
-            )
-
-            save_everything(
-                items={
-                    "docket": docket,
-                    "opinion": opinion,
-                    "cluster": cluster,
-                    "citations": citations,
-                },
-                index=False,
-            )
-            extract_doc_content.delay(
-                opinion.pk, ocr_available=ocr_available, citation_jitter=True
-            )
-
-            logger.info(
-                f"Successfully added opinion {opinion.pk}: "
-                f"{item['case_names'].encode()}"
-            )
-            added += 1
+            except (SingleDuplicateError, BadContentError):
+                pass
 
         # Update the hash if everything finishes properly.
         logger.debug(
-            f"{site.court_id}: Successfully crawled {added}/{len(site)} opinions."
+            "%s: Successfully crawled %s/%s %s.",
+            site.court_id,
+            added,
+            len(site),
+            self.scrape_target_descr,
         )
         if not full_crawl:
             # Only update the hash if no errors occurred.
             dup_checker.update_site_hash(site.hash)
 
-    def parse_and_scrape_site(self, mod, full_crawl):
+    def ingest_a_case(
+        self,
+        item,
+        next_case_date: date | None,
+        ocr_available: bool,
+        site,
+        dup_checker: DupChecker,
+        court: Court,
+    ):
+        if item.get("content"):
+            content = item.pop("content")
+        else:
+            content = get_binary_content(item["download_urls"], site)
+
+        # request.content is sometimes a str, sometimes unicode, so
+        # force it all to be bytes, pleasing hashlib.
+        sha1_hash = sha1(force_bytes(content))
+
+        if (
+            court.pk == "nev"
+            and item["precedential_statuses"] == "Unpublished"
+        ) or court.pk in ["neb"]:
+            # Nevada's non-precedential cases have different SHA1 sums
+            # every time.
+
+            # Nebraska updates the pdf causing the SHA1 to not match
+            # the opinions in CL causing duplicates. See CL issue #1452
+
+            lookup_params = {
+                "lookup_value": item["download_urls"],
+                "lookup_by": "download_url",
+            }
+        else:
+            lookup_params = {
+                "lookup_value": sha1_hash,
+                "lookup_by": "sha1",
+            }
+
+        # Duplicates will raise errors
+        dup_checker.press_on(
+            Opinion, item["case_dates"], next_case_date, **lookup_params
+        )
+
+        # Not a duplicate, carry on
+        logger.info(
+            "Adding new document found at: %s", item["download_urls"].encode()
+        )
+        dup_checker.reset()
+
+        child_court = get_child_court(item.get("child_courts", ""), court.id)
+
+        docket, opinion, cluster, citations = make_objects(
+            item, child_court or court, sha1_hash, content
+        )
+
+        save_everything(
+            items={
+                "docket": docket,
+                "opinion": opinion,
+                "cluster": cluster,
+                "citations": citations,
+            },
+            index=False,
+        )
+        extract_doc_content.delay(
+            opinion.pk,
+            ocr_available=ocr_available,
+            citation_jitter=True,
+            juriscraper_module=site.court_id,
+        )
+
+        logger.info(
+            "Successfully added opinion %s: %s",
+            opinion.pk,
+            item["case_names"].encode(),
+        )
+
+    def parse_and_scrape_site(self, mod, options: dict):
         site = mod.Site().parse()
-        self.scrape_court(site, full_crawl)
+        self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
-        super(Command, self).handle(*args, **options)
+        super().handle(*args, **options)
         global die_now
 
         # this line is used for handling SIGTERM (CTRL+4), so things can die
@@ -356,10 +427,19 @@ class Command(VerboseCommand):
             mod = __import__(
                 f"{package}.{module}", globals(), locals(), [module]
             )
+            module_string = mod.Site().court_id
+            court_id = module_string.split(".")[-1].split("_")[0]
+            if not Court.objects.get(id=court_id).has_opinion_scraper:
+                logger.info(f"{court_id} is currently disabled.")
+                i += 1
+                continue
             try:
-                self.parse_and_scrape_site(mod, options["full_crawl"])
+                self.parse_and_scrape_site(mod, options)
             except Exception as e:
-                capture_exception(e)
+                capture_exception(
+                    e, fingerprint=[module_string, "{{ default }}"]
+                )
+                logger.debug(traceback.format_exc())
             last_court_in_list = i == (num_courts - 1)
             daemon_mode = options["daemon"]
             if last_court_in_list:

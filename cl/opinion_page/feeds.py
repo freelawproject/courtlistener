@@ -8,7 +8,7 @@ from django.utils.feedgenerator import Atom1Feed
 from django.utils.safestring import SafeText, mark_safe
 
 from cl.lib.date_time import midnight_pt
-from cl.opinion_page.views import make_docket_title
+from cl.opinion_page.utils import make_docket_title
 from cl.search.models import Docket, DocketEntry, RECAPDocument
 
 

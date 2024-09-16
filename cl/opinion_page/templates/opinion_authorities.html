@@ -18,7 +18,7 @@
         <div class="sidebar-section">
             <h4 class="bottom">
                 <i class="fa fa-arrow-circle-o-left gray"></i>
-                <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+                <a href="{{ cluster.get_absolute_url }}{% querystring %}"
                    {% if cluster.blocked %}rel="nofollow"{% endif %}>Back to Opinion</a>
             </h4>
         </div>
@@ -28,9 +28,9 @@
 {% block content %}
     <div class="col-sm-9">
         <h2>
-          <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+          <a href="{{ cluster.get_absolute_url }}{% querystring %}"
              class="black-link no-underline"
-             {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ cluster.caption|safe|v_wrapper }}</a>
+             {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ caption|safe|v_wrapper }}</a>
         </h2>
 
         <div id="authorities">
@@ -41,7 +41,7 @@
                 {% for authority in authorities_with_data %}
                     <li>
                         {{ authority.citation_depth }} reference{{ authority.citation_depth|pluralize }} to
-                        <a href="{{ authority.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+                        <a href="{{ authority.get_absolute_url }}{% querystring %}"
                            {% if authority.blocked %}rel="nofollow"{% endif %}>
                             {{ authority.caption|safe|v_wrapper }}
                         </a>
@@ -50,7 +50,7 @@
                         <span class="bullet-tail">{{ authority.date_filed }}</span>
                         {% if authority.citation_count > 1 %}
                             Also cited by <a href="/?q=cites%3A({{ authority.sub_opinions.all|OR_join }})"
-                                             rel="nofollow">{{ authority.citation_count|add:"-1" }} other opinion{{ authority.citation_count|add:"-1"|pluralize }}</a>
+                                             rel="nofollow">{{ authority.citation_count|add:"-1" }} opinion{{ authority.citation_count|add:"-1"|pluralize }}</a>
                         {% else %}
                             Cited by 0 other opinions
                         {% endif %}

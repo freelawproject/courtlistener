@@ -48,11 +48,7 @@ def convert_columbia_html(text):
             fnum = re.search(r"[\*\d]+", ref).group()
         except:
             fnum = re.search(r"\[fn(.+)\]", ref).group(1)
-        rep = r'<sup id="fn%s"><a href="#ref-fn%s">%s</a></sup>' % (
-            fnum,
-            fnum,
-            fnum,
-        )
+        rep = rf'<sup id="fn{fnum}"><a href="#ref-fn{fnum}">{fnum}</a></sup>'
         text = text.replace(ref, rep)
 
     # Make nice paragraphs. This replaces double newlines with paragraphs, then

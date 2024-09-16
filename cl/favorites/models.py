@@ -127,7 +127,12 @@ class UserTag(AbstractDateTimeModel):
 
     class Meta:
         unique_together = (("user", "name"),)
-        indexes = [models.Index(fields=["user", "name"])]
+        indexes = [
+            models.Index(
+                fields=["user", "name"],
+                name="favorites_usertag_user_id_name_54aef6fe_idx",
+            )
+        ]
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
@@ -167,11 +172,20 @@ class Prayer(models.Model):
             # prayers do we have for this document?
             # When loading the prayer leader board, we'll ask: Which documents
             # have the most outstanding prayers?
-            models.Index(fields=["recap_document", "status"]),
+            models.Index(
+                fields=["recap_document", "status"],
+                name="favorites_prayer_recap_document_id_status_82e2dbbb_idx",
+            ),
             # When loading docket pages, we'll ask (hundreds of times): Did
             # user ABC pray for document XYZ?
-            models.Index(fields=["recap_document", "user"]),
+            models.Index(
+                fields=["recap_document", "user"],
+                name="favorites_prayer_recap_document_id_user_id_c5d30108_idx",
+            ),
             # When a user votes, we'll ask: How many outstanding prayers did
             # user ABC make today?
-            models.Index(fields=["date_created", "user", "status"]),
+            models.Index(
+                fields=["date_created", "user", "status"],
+                name="favorites_prayer_date_created_user_id_status_880d7280_idx",
+            ),
         ]

@@ -2,9 +2,9 @@
 {% load static %}
 {% load extras %}
 
-{% block title %}REST API, v3.14 &ndash; CourtListener.com{% endblock %}
-{% block description %}REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
-{% block og_description %}REST API for federal and state opinions, PACER data, the searchable RECAP Archive, and oral argument recordings. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
+{% block title %}REST API, v3.15 &ndash; CourtListener.com{% endblock %}
+{% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
+{% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
 {% block sidebar %}{% endblock %}
 
@@ -13,51 +13,62 @@
 {% endblock %}
 
 {% block content %}
-  <div class="col-sm-7">
-    <h1 id="about">REST API &ndash; v3.14</h1>
-    <h2 id="api-overview">Getting Started &amp; Overview</h2>
 
-    <p>For developers that wish to have a granular API for our data, we provide a RESTful API based on the <a href="http://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>.
+  <div class="col-xs-12 hidden-md hidden-lg">
+    <h4 class="v-offset-below-2">
+      <i class="fa fa-arrow-circle-o-left gray"></i>
+      <a href="{% url "help_home" %}">Back to Help</a>
+    </h4>
+  </div>
+
+  <div id="toc-container" class="hidden-xs hidden-sm col-md-3">
+    {% include "includes/toc_sidebar.html" %}
+  </div>
+  <div class="col-xs-12 col-md-8 col-lg-6">
+    <h1 id="about">REST API &ndash; v3.15</h1>
+
+    <p class="lead">APIs for developers and researchers that need granular legal data.
     </p>
-    <p>This API provides responses in JSON, XML, or HTML, with JSON as the default. If you visit the API using your browser you'll receive nicely formatted HTML making your work as a developer as simple as possible. Hit this button, and you'll open a new tab listing all of the endpoints this API supports:
+    <p>After more than a decade of development, these APIs are powerful. Our <a href="{% url "case_law_api_help" %}">case law API</a> was the first. Our <a href="{% url "pacer_api_help" %}">PACER</a> and <a href="{% url "oral_argument_api_help" %}">oral argument</a> APIs are the biggest. Our <a href="{% url "webhooks_getting_started" %}">webhooks</a> push data to you. Our <a href="{% url "citation_lookup_api" %}">citation lookup tool</a> can fight hallucinations in AI tools.
+    </p>
+    <p>Let's get started. To see and browse all the API URLs, click the button below:
     </p>
     <p><a href="{% url "api-root" version="v3" %}"
           target="_blank"
-          class="btn btn-lg btn-primary">Show Endpoints</a>
+          class="btn btn-lg btn-primary">Show the APIs</a>
     </p>
-    <p>We could have also pulled up that same information using curl, using a command like:</p>
-
+    <p>We could have also pulled up that same information using curl, with a command like:</p>
     <pre class="scrollable">curl "{% get_full_host %}{% url "api-root" version="v3" %}"</pre>
-
-    <p>Note that when you press the button in your browser, you got an HTML result, but when you run <code>curl</code> you got a JSON object. This is deliberate and is <a href="#formats">discussed in more depth below</a>.
+    <p>Note that when you press the button in your browser, you get an HTML result, but when you run <code>curl</code> you get a JSON object. This is <a href="#formats">discussed in more depth below</a>.
     </p>
-
-    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Watch out!</strong> Something else that's curious just happened. You didn't authenticate to the API. This is deliberate to encourage experimentation, but the biggest gotcha people run into is that they forget to enable authentication before deploying their code. Don't let this be you! Remember to add <a href="#authentication">authentication</a>.
+    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up!</strong> Something else that's curious just happened. You didn't authenticate to the API. To encourage experimentation, many of our APIs are open by default. The biggest gotcha people have is that they forget to enable authentication before deploying their code. Don't make this mistake! Remember to add <a href="#authentication">authentication</a>.
     </p>
-    <p>The endpoints listed in this response can be used in combination to make sophisticated queries against our database or our search engine. To learn more about an endpoint, you can send an <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/OPTIONS">OPTIONS</a> request to it, like so:
+    <p>The APIs listed in this response can be used to make queries against our database or search engine.
     </p>
-
+    <p>To learn more about an API, you can send an <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/OPTIONS">HTTP OPTIONS</a> request to it, like so:
+    </p>
     <pre class="scrollable">curl -X OPTIONS "{% get_full_host %}{% url "api-root" version="v3" %}"</pre>
-
-    <p>An <code>OPTIONS</code> request is typically the best way to understand the API, however as of v3.1 we also offer an experimental <a href="{% url "swagger_schema" %}">swagger/OpenAPI interface</a>. These endpoints can be used with <a href="http://www.django-rest-framework.org/topics/api-clients/">a variety of bindings</a> to incorporate the API into your code.
+    <p>An <code>OPTIONS</code> request is one of the best ways to understand the API.
     </p>
 
 
-    <h2>Support</h2>
-    <p>Questions about the APIs can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our Github Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>. In general, we prefer that questions be posted publicly in the forum so they can be searched by others in the future. If you are a private organization posting to that forum, we will work with you to avoid sharing details about your organization.
+    <h2 id="support">Support</h2>
+    <p>Questions about the APIs can be sent <a href="https://github.com/freelawproject/courtlistener/discussions" target="_blank">to our GitHub Discussions forum</a> or via our <a href="{% url "contact" %}">contact form</a>.
+    </p>
+    <p>We prefer that questions be posted in the forum so they can help others. If you are a private organization posting to that forum, we will avoid sharing details about your organization.
     </p>
     <p>
       <a href="https://github.com/freelawproject/courtlistener/discussions"
           target="_blank"
-          class="btn btn-default">Ask in Github Discussions</a>
+          class="btn btn-default">Ask in GitHub Discussions</a>
       <a href="{% url "contact" %}"
          target="_blank"
          class="btn btn-default">Send us a Private Message</a>
     </p>
 
 
-    <h2>Data Modeling</h2>
-    <p>The two images below show how these endpoints work together. The first image shows the models we use for people and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a
+    <h2 id="data-modeling">Data Models</h2>
+    <p>The two images below show how the APIs work together. The first image shows the models we use for people, and the second shows the models we use for documents and metadata about them. You can see that these models currently link together on the Docket, Person, and Court tables. (<a
       href="{% static "png/complete-model-v3.13.png" %}"
       target="_blank">Here's a version of this diagram that shows everything all at once</a>.)
     </p>
@@ -82,970 +93,19 @@
       </a>
     </p>
 
-    <p>In general the basic ideas are:</p>
-    <ul>
-      <li><code>Dockets</code> are the top-level objects and they contain <code>Opinion Clusters</code>, <code>Audio</code> files, and <code>Docket Entries</code>. <code>Dockets</code> are the highest level object in the API, serving to group other objects together.
-      </li>
-      <li><code>Opinion Clusters</code> are collections of <code>Opinion</code> objects. <code>Opinions</code> can be Dissents, Concurrences or other types of opinion, and so this is how they are grouped together for a specific case. If we don't know if an <code>Opinion</code> is a Dissent, Concurrence or something else, we just call it a Combined Opinion. You can see all the different types of Opinions by sending an <code>OPTIONS</code> request to the <code>Opinion</code> endpoint.
-      </li>
-      <li><code>Docket Entries</code> are the individual rows of data on a PACER docket. In PACER some rows on the docket refer to several files, and so <code>Docket Entries</code> contain <code>RECAP Document</code> objects to represent those sub-resources. Thus, the big picture is, <code>Dockets</code> contain <code>Docket Entries</code>. <code>Docket Entires</code> contain <code>RECAP Documents</code>.
-      </li>
-      <li>As a general rule, metadata lives at the highest level where it makes sense. For example, it's possible to put docket numbers in the <code>Opinion Cluster</code> objects, but it makes more sense at a higher level&mdash;at the <code>Docket</code> level. A sometimes-confusing counter example are case names, which have metadata at the <code>Docket</code> level <em>and</em> at the <code>Opinion Cluster</code> level. This is because case names can change at different times, and because a single <code>Docket</code> could have multiple <code>Opinion Clusters</code>, each with a different case name. <a href="#case-names">See more information about case names.</a>
-      </li>
-      <li>Each <code>Docket</code> is associated with a single jurisdiction. Generally, this is the court where the dispute was litigated. If the case moves between jurisdictions, each jurisdiction has its own <code>Docket</code>.
-      </li>
-      <li>As of version three of this API, <code>Opinions</code> objects cite each other, allowing a dissent to cite a concurrence or any other combination of <code>Opinion</code> types.
-      </li>
-      <li><code>Judges</code> have <code>Careers</code>, <code>Titles</code>, <code>Positions</code>, and a number of other fields as described in the image above.
-      </li>
-    </ul>
 
-
-
-    <h2 id="overview">Overview of Endpoints</h2>
-    <p>This section explains general principles of the API and rules that apply to all of our RESTful endpoints. In general, these principals are driven by the features supported by the <a href="http://www.django-rest-framework.org/" target="_blank"> Django REST Framework</a>. For more information about many of these sections, we encourage you to check out the documentation there.
+    <h2 id="overview">API Overview</h2>
+    <p>This section explains the general principles of the API. These principals are driven by the features supported by the <a href="https://www.django-rest-framework.org/" target="_blank">Django REST Framework</a>. To go deep on any of these sections, we encourage you to check out the documentation there.
     </p>
 
 
     <h3 id="permissions">Permissions</h3>
-    <p>Endpoints relating to PACER data are currently only available to select users. If you wish to have access to these endpoints, <a href="{% url "contact" %}">please get in touch</a>.
+    <p>Some of our APIs are only available to select users. If you need greater access to these APIs, <a href="{% url "contact" %}">please get in touch</a>.
     </p>
     <p>All other endpoints are available according to the <a href="#limitations-throttles">throttling</a> and <a href="#authentication">authentication</a> limitations listed below.
     </p>
 
 
-    <h3 id="authentication">Authentication</h3>
-    <p>Authentication is necessary so we can monitor usage of the system and so we can assist with any errors that may occur. Per our <a href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.
-    </p>
-    <p>There are currently three types of authentication available on the API:
-    </p>
-    <ol>
-      <li>
-        <a href="http://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
-      </li>
-      <li>
-        <a href="https://docs.djangoproject.com/en/dev/topics/auth/" target="_blank"> Django Session Authentication</a> (using cookies)
-      </li>
-      <li>
-        <a href="http://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">Django REST Framework Token Authentication</a>
-      </li>
-    </ol>
-    <p>One form of authentication that is currently not supported is <a href="http://tools.ietf.org/html/rfc6749">OAuth2</a>. If this is a valuable form of authentication for your service, please get in touch using <a href="{% url "contact" %}">our contact form</a>, or chime in to <a href="https://github.com/freelawproject/courtlistener/issues/371">the issue where we're tracking this feature</a>. If there is enough demand, or if somebody steps forward to develop this feature, it will be added.
-    </p>
-    <p>All communication with the CourtListener servers is over HTTPS, and so the choice of which form of authentication to use is generally a question of what's most convenient for the context of your work. Our recommendations are:
-    </p>
-    <ul>
-      <li>Use Basic Authentication for testing.</li>
-      <li>Use Django Session Authentication if you already have a user's cookie or are developing a system where you can ask the user to log into CourtListener.
-      </li>
-      <li>Use Token Authentication for all normal programmatic API access.
-      </li>
-    </ul>
-    <p>Until now, in this documentation we've used the API without authenticating at all. We made this possible for tutorials like this, but there are very strict throttles for users that are not authenticated. It is not recommended to use the APIs without authenticating. (<a href="#limitations-throttles">See more about Throttles</a>.)
-    </p>
-
-
-    <h4 id="basic-auth">HTTP Basic Authentication</h4>
-    <p>To do HTTP Basic Authentication using curl, you might do something like this:
-    </p>
-    <pre class="scrollable">curl --user "harvey:your-password" "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}"</pre>
-    <p>You can also do it in your browser with a url like:</p>
-    <pre class="scrollable">{% get_full_host username='harvey' password='your-password' %}{% url "opinioncluster-list" version="v3" %}</pre>
-    <p>But if you're using your browser, <a href="{% url 'sign-in' %}">you might as well just log in</a>.
-    </p>
-
-
-    <h4 id="session-auth">Django Session Authentication</h4>
-    <p>To use Django Session Authentication, simply <a href="{% url 'sign-in' %}">log into Courtlistener</a>.</p>
-
-
-    <h4 id="token-auth">Token Authentication</h4>
-    <p>To use your token, use the <code>Authorization</code> HTTP Header. The key should be prefixed by the string literal <code>Token</code>, with whitespace separating the two strings. For example:
-    </p>
-    <pre class="scrollable">Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</pre>
-    <p>Using curl, this looks like:</p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}" --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
-    <p>Note that quotes are used to enclose the whitespace in the header.</p>
-    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Careful!</strong> The most common mistake we see is forgetting the word "Token" in the token authentication header value. Remember that the header name is <code>Authorization</code> and the value is <code>Token&nbsp;{% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</code></p>
-    {% if user.is_authenticated %}
-      <p>Your permanent token for use with this API is being used in the examples above, is at the top of this page, and is:</p>
-      <pre class="scrollable">{{ user.auth_token }}</pre>
-      <p>Do not share this value publicly via code check ins, emails, etc. Treat this value as you would a password. Do not email it to us.
-      </p>
-    {% else %}
-      <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in to see your permanent token in these examples and at the top of this page.</a>
-      </p>
-    {% endif %}
-
-
-    <h3 id="formats">Serialization Formats</h3>
-    <p>Requests may be serialized as HTML, JSON, or XML, with JSON as the default if no format is specified. The format you wish to receive may be requested via the HTTP <code>Accept</code> header.
-    </p>
-    <p>The following media types and parameters can be used:
-    </p>
-    <ul>
-      <li><strong>HTML</strong>: The media type for HTML is <code>text/html</code>.</li>
-      <li><strong>JSON</strong>: The media type for JSON is <code>application/json</code>. Providing the <code>indent</code> media type parameter allows clients to set the indenting for the response, for example: <code>Accept: application/json; indent=2</code>.
-      </li>
-      <li><strong>XML</strong>: The media type for XML is <code>application/xml</code>.</li>
-    </ul>
-    <p>JSONP, a clever browser hack, is no longer provided due to the wide support of <a href="http://www.w3.org/TR/cors/">CORS</a>. YAML is no longer supported due to the ubiquitous availability of JSON parsers.
-    </p>
-    <p>Note that by default, browsers send an <code>Accept</code> header similar to:
-    </p>
-    <pre class="scrollable">text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</pre>
-    <p>This states that <code>text/html</code> is the preferred serialization format, and the API respects that, returning HTML when requested by a browser and returning JSON when no <code>Accept</code> header is provided (such as when using cURL).
-    </p>
-    <p>If you wish to set the <code>Accept</code> header using cURL, you can do so using the <code>--header</code> flag:
-    </p>
-    <pre class="scrollable">curl --header "Accept: application/xml" "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}"</pre>
-    <p>All data is serialized using the utf-8 charset.</p>
-
-
-    <h3 id="parsing">Parsing Uploaded Content</h3>
-    <p>If you are a user that has write access to these APIs (most users do not), you will need to use the <code>Content-Type</code> HTTP header to explicitly set the format of the content you are uploading. The header can be set to any of the values that are available for serialization or to <code>application/x-www-form-urlencoded</code> or <code>multipart/form-data</code>, if you are sending form data.
-    </p>
-
-
-    <h3 id="filtering">Filtering</h3>
-    <p>Each endpoint can be filtered in a variety of ways using a technique similar to <a href="https://docs.djangoproject.com/en/dev/ref/models/querysets/#field-lookups">Django's field lookups</a> (see exceptions in <a href="#fn1" id="fn-ref-1">footnote 1</a>). The best way to see how an endpoint can be filtered is by doing an <code>OPTIONS</code> request on the endpoint, and inspecting the <code>filters</code> key in the response.
-    </p>
-    <p>In the <code>filters</code> key, you'll find a dictionary listing all of the fields that can be used for filtering along with their their types, lookup fields, and any values (aka choices) that can be used for specific lookups. For example, every <code>Opinion Cluster</code> has a field called <code>lexis_cite</code> that can be used for lookups. An <code>OPTIONS</code> request describes it like so:
-    </p>
-
-    <pre>
-"lexis_cite": {
-    "type": "CharFilter",
-    "lookup_types": [
-        "exact"
-    ]
-}</pre>
-    <p>This means that it is a <code>CharFilter</code>, and that it can only be filtered for exact matches.
-    </p>
-    <p>Here's a more complicated example:</p>
-    <pre>
-"scdb_votes_majority": {
-    "type": "NumberFilter",
-    "lookup_types": [
-        "exact",
-        "gte",
-        "gt",
-        "lte",
-        "lt",
-        "range"
-    ]
-}</pre>
-    <p>This field, <code>scdb_votes_majority</code>, is a <code>NumberFilter</code> which allows you to filter by exact matches, numbers that are greater than (<code>gt</code>), greater than or equal (<code>gte</code>), less than (<code>lt</code>), less than or equal (<code>lte</code>), or within a range.
-    <p>
-    <p>These field lookups can be used by appending them to a field with a double underscore as a separator. For example, this would return all clusters with a <code>scdb_votes_majority</code> value greater than 2:
-    </p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}?scdb_votes_majority__gt=2"</pre>
-    <p>These filters can be combined using multiple <code>GET</code> parameters.</p>
-    <p>There are a few special types of filters. The first are <code>RelatedFilters</code>, which allow you to use any of the filters from one object on a different, related object. For example, when you are using the <code>Docket</code> endpoint, you'll see that it has a filter described as:
-    </p>
-    <pre>
-"court": {
-    "type": "RelatedFilter",
-    "lookup_types": "See available filters for 'Courts'"
-}</pre>
-    <p>This means that you can use any of the <code>Court</code> filters while filtering <code>Dockets</code>. For example, the <code>Court</code> endpoint advertises this filter:
-    </p>
-    <pre>
-"id": {
-    "type": "CharFilter",
-    "lookup_types": [
-        "exact"
-    ]
-}
-</pre>
-    <p>Thus, you can lookup dockets from a specific jurisdiction using:</p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "docket-list" version="v3" %}?court__id=scotus"</pre>
-    <p>This opens up many possibilities. For example, another filter on the <code>Court</code> endpoint is for <code>jurisdictions</code>:
-    </p>
-    <pre>
-"jurisdiction": {
-    "type": "MultipleChoiceFilter",
-    "lookup_types": [
-        "exact"
-    ],
-    "choices": [
-        {
-            "display_name": "Federal Appellate",
-            "value": "F"
-        },
-        {
-            "display_name": "Federal District",
-            "value": "FD"
-        },
-        ...more choices here...
-    ]
-}
-</pre>
-    <p>This is a <code>MultipleChoiceFilter</code>, which means you can select multiple values. In the <code>choices</code> key (truncated above), it lists values that you can filter on.
-    </p>
-    <p>Thus, if you want to filter for <code>Dockets</code> that occur in Federal Appellate (<code>F</code>) or Federal District (<code>FD</code>) courts, you can do:
-    </p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "docket-list" version="v3" %}?court__jurisdiction=F&court__jurisdiction=FD"</pre>
-    <p>Naturally, related filter queries and lookup types can be combined to arrive at queries like:
-    </p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "docket-list" version="v3" %}?court__date_modified__gt=2013-01-01T00:00:00Z"</pre>
-    <p>Which would return all dockets that occurred in a court that was modified in our system after January 01, 2013. Note that date-times are described in the <code>OPTIONS</code> response as <code>IsoDateTimeFilters</code>, and that dates are simply <code>DateFilters</code>. The former need dates as above, with the complete date and time provided as described by <a href="http://en.wikipedia.org/wiki/ISO_8601" target="_blank">ISO-8601</a>. The latter only need the date to be provided.
-    </p>
-    <p><code>RelatedFilters</code> can span many objects and can also be reversed. For example, if you want to get all of the Supreme Court <code>Opinion</code> objects, you will need to do that with a query such as:
-    </p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v3" %}?cluster__docket__court__id=scotus"</pre>
-    <p>This uses the <code>Opinion</code> endpoint to get <code>Opinions</code> that are part of <code>Opinion Clusters</code> that are on <code>Dockets</code> in the <code>Court</code> with the ID of <code>scotus</code>. This follows the principle stated above that metadata lives at the highest level possible &mdash; it makes more sense for court data to be on the docket, not the cluster or the opinion itself.
-    </p>
-
-    <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Dockets</code> from non-Federal Appellate jurisdictions:
-    </p>
-    <pre class=pre-scrollable>curl "{% get_full_host %}{% url "docket-list" version="v3" %}?court__jurisdiction!=F"</pre>
-    <p>You can see more examples of almost any type of filter in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/api/tests.py" target="_blank">our automated tests</a>.
-    </p>
-
-
-
-    <h3 id="ordering">Ordering</h3>
-    <p>To see which fields can be used for ordering, look at the <code>ordering</code> key in an <code>OPTIONS</code> request (see exceptions in <a href="#fn1" id="fn-ref-2">footnote 1</a>). For example, the <code>Position</code> endpoint contains this:
-    </p>
-    <pre class="pre-scrollable">
-"ordering": [
-    "id",
-    "date_created",
-    "date_modified",
-    "date_nominated",
-    "date_elected",
-    "date_recess_appointment",
-    "date_referred_to_judicial_committee",
-    "date_judicial_committee_action",
-    "date_hearing",
-    "date_confirmation",
-    "date_start",
-    "date_retirement",
-    "date_termination"
-]</pre>
-    <p>Thus, you can order using any of these fields in conjunction with the <code>order_by</code> parameter.</p>
-    <p>Descending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Positions</code> ordered by the most recently modified, then by the most recently elected:
-    </p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected"</pre>
-    <p>Ordering by fields with duplicate values is non-deterministic. If you wish to order by such a field, you should also provide a tie-breaker in order to consistently order results. For example, ordering by <code>date_filed</code> will not return consistent ordering for items that have the same date, but this can be fixed by ordering by <code>date_filed,id</code>. In that case, if two items have the same <code>date_filed</code> value, the tie will be broken by the <code>id</code> field.
-    </p>
-
-    <h3 id="field-selection">Field Selection</h3>
-    <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields you wish to receive.
-    </p>
-    <p>For example, if you wish to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
-    </p>
-    <pre class="scrollable">curl "{% get_full_host %}{% url "person-list" version="v3" %}?fields=educations,date_modified"</pre>
-    <p>You can also exclude fields using <code>fields!=educations,date_modified</code>.
-    </p>
-    <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/wimglenn/djangorestframework-queryfields/issues/8" target="_blank">there is an open issue tracking this</a>.
-    </p>
-
-
-
-    <h3 id="limitations-throttles">Limitations &amp; Throttles</h3>
-    <p>At present, this API is throttled to 5,000 queries per hour. Anonymous users (those that are not logged in), are allowed 100 queries per day for testing purposes.
-    </p>
-    <p>These numbers are counted by using the <code>X-Forwarded-For</code> and <code>Remote-Addr</code> HTTP headers, which can create problems for users that are behind a gateway that uses <a href="http://en.wikipedia.org/wiki/Network_address_translation">Network Address Translation (NAT)</a>. For more information about how this works, <a href="http://www.django-rest-framework.org/api-guide/throttling/#how-clients-are-identified">read the documentation on the Django REST Framework website</a>, but in general, the simplest solution is usually to log in. Note that using the browsable HTML API counts towards these thresholds since it's technically just another mediatype of the API.
-    </p>
-    <p>If you find that you are hitting a throttle while using token authentication, check if it is resolved by browsing the API while logged into your browser. If so, this indicates that the token authentication in your code is not working properly and you are being throttled as an anonymous user. You can also see your recent API requests by looking in your <a href="{% url "view_api" %}#usage">profile</a>, but remember that will show stats for the browsable API as well.
-    </p>
-    <p>If after checking the above you need your rate limit increased, <a href="{% url "contact" %}">please get in touch</a> so we can discuss your use case.
-    </p>
-
-
-    <h3 id="performance-tips">Performance Tips</h3>
-    <p>A few things to consider that may increase your performance:</p>
-    <ol>
-      <li>
-        <p>When doing deep crawls of the data, going to very high page numbers will incur increasingly bad performance. This is common in databases because to go to a high page number means sorting the entire data set, then counting to the correct location. Page 50 isn't a big deal. Page 2,000 starts getting slower.
-        </p>
-        <p>The fix to this solution is often to work with "slices" of the data. Instead of paginating across the whole result set, use a date field or another range-type field to only paginate over a smaller set of the data. For example, you could slice a large result set by the month of the date filing field to prevent deep pagination.
-        </p>
-        <p>Be careful to slice using a field with a normal distribution. Do not use one like <code>date_created</code>, which could have extreme spikes of activity.
-        </p>
-      </li>
-      <li>
-        <p>Avoid doing queries like <code>court__id=xyz</code> when you can instead do <code>court=xyz</code>. Doing queries with the extra <code>__id</code> introduces a join that can be very expensive.</p>
-      </li>
-      <li>
-        <p>In general less data is easier and faster to get than more. Could you use a field to filter your result set down to something smaller?
-        </p>
-      </li>
-      <li>
-        <p>When using the <code>search</code> endpoint, smaller result sets are faster. It isn't always possible to tweak your query to return fewer results, but sometimes it is possible to do a more precise query first, thus making a more broad query unnecessary. For example, a search for an individual in their expected jurisdiction will be faster than doing it in the entire corpus, and may be worthwhile even if it fails and requires the second, broader query some percentage of the time. This will benefit from profiling in your use case and application.
-        </p>
-      </li>
-    </ol>
-
-    <h3 id="downloading-files">Downloading Files</h3>
-    <p>API responses will give you the URL path to a resource such a PDF or MP3, but not the domain. To download a resource, create a full URL by concatenating the path from the API response with either <code>https://www.courtlistener.com/</code> or <code>https://storage.courtlistener.com/</code>. Historically, we kept these resources on our own servers, and they were accessible at the <code>www</code> subdomain.
-    </p>
-    <p>Recently, we transitioned our content to AWS S3, which serves them from the <code>storage</code> subdomain. Prefer using the <code>storage</code> subdomain if you find that the <code>www</code> subdomain is redirecting you. If you are being redirected, that indicates that you are using a URL that is deprecated and that is being maintained <a href="https://www.w3.org/Provider/Style/URI">for backwards compatibility</a>.
-    </p>
-
-    <h3 id="field-details">Field Details</h3>
-    <h4 id="date-formats">Date Formats</h4>
-    <p>As <a href="http://xkcd.com/1179/">required by an influential comic strip</a>, all date formats are set to <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 format</a>.
-    </p>
-
-
-    <h4 id="case-names">Case Names</h4>
-    <p>Unfortunately, case Names are a complicated topic, and there are a few common misconceptions about them:
-    </p>
-    <ol>
-      <li><strong>Case names are not unique.</strong> There's nothing stopping a court from using <em>Johnson v. State</em> every time a person named Johnson sues the State. Indeed, this is common.
-      </li>
-      <li><strong>Case names are not stable.</strong> Many cases begin their lives by suing the governor or the Attorney General. But these people change as a result of elections or appointments and so the names of these cases must change too.
-      </li>
-      <li><strong>Case names don't always contain v.</strong> Instead, many cases start with <em>In Re</em> or other abbreviations.
-      </li>
-    </ol>
-    <p>We've done our best to normalize case names wherever we can, following Blue Book conventions. Some things we regularly do include:
-    </p>
-    <ol>
-      <li>We normalize all the different ways people write "United States" (U.S.A., United States of America, U.S., etc.) All of these variations simply become "United States", as the Blue Book requires.
-      </li>
-      <li>We remove some abbreviations, like <em>Et al</em>.</li>
-      <li>We replace any instance of vs. with v.</li>
-      <li>We do our best to make the case names Title Case rather than UPPERCASE, as many courts insist on publishing them.</li>
-    </ol>
-    <p>The result of all this work is that we have pretty good case names.</p>
-    <p>In the API, you'll see case names in a variety of places due to the fact that they can change over time. For example, there are <code>case_name</code> fields on the <code>Docket</code> object and also on the <code>Opinion Cluster</code> objects. In almost all instances, these values are the same but some cases have different values for the <code>Docket</code> than for an <code>Opinion Cluster</code>, so we keep this data in duplicate.
-    </p>
-    <p>Case names can also vary considerably in length, and we've identified three different types of case names:
-    </p>
-    <ol>
-      <li><code>case_name</code>: This is a typical case name that can be used in almost all references. An example might be <em>Roe v. Wade</em>.
-      </li>
-      <li><code>case_name_short</code>: This is a shortened one or two word case name that can be used in legal writing after the standard case name has been provided by the author. An example of this might be simply <em>Roe</em> used, "As was stated in <em>Roe</em>&hellip;"
-      </li>
-      <li><code>case_name_full</code>: This is the full list of plaintiffs and defendants in a case, sometimes going on for hundreds of words, and often including titles or other information. For example: <em>Roe Et Al v. Wade, District Attorney of Dallas County</em>.
-      </li>
-    </ol>
-    <p>All cases have at least one of these values, many have two values and some have all three. A <code>case_name_short</code> was generated algorithmically for every case possible, but about 40% of cases were too complicated for our program to process and so they were left blank. Human editors have ensured that every Supreme Court case from 1945 to present has a <code>case_name_short</code> value.
-    </p>
-    <p><code>case_name</code> is available for the majority of cases, except those that were imported from Resource.org, which only provided <code>case_name_full</code> values. When that happened, there was no way for us to condense a <code>case_name_full</code>, so until a human editor is available to review them, they will lack this value. All cases have either a <code>case_name</code> or a <code>case_name_full</code> value.
-    </p>
-    <p>Our general-purpose advice is to use a <code>case_name</code> if it is available and to fall back on the <code>case_name_full</code> if it is not. If you are interested in sponsoring trained humans to improve this data, please <a href="{% url "contact" %}">get in touch</a>.
-    </p>
-
-
-    <h4 id="absolute-url">The <code>absolute_url</code> Field</h4>
-    <p>The <code>absolute_url</code> field shows the URL where a resource can be seen live on the site. It is absolute in the sense that it should never change and will always be backwards compatible if changes are ever needed.
-    </p>
-    <p>In some cases you might start with a URL from CourtListener, and you might want to look up the item in the API. Generally, CourtListener URLs are designed to contain an ID that can be used in the API to look it up, following a pattern like:
-    </p>
-    <pre class="scrollable">/$document-type/$numeric-id/$name-of-the-case/</pre>
-    <p>There are three sections:</p>
-    <ol>
-      <li>
-        <strong>$document-type</strong>: This is the type of document that has been returned, for example, "opinion" indicates that you have gotten an opinion as your result.
-      </li>
-      <li>
-        <strong>$numeric-id</strong>: This is a numeric representation of the ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not guaranteed to be purely sequential&mdash;IDs will be missing.
-      </li>
-      <li>
-        <strong>$name-of-the-case</strong>: This is the "<a href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and generally mirrors its case name. This value can change if we clean up a case name, but provided it is not omitted completely, this part of the URL can be any value without ever affecting the page that is loaded. Put another way, we load pages based on the <code>$numeric-id</code> and <code>$document-type</code>, not by the name of the case.
-      </li>
-    </ol>
-
-
-
-    <h3 id="upgrades">Upgrades and Fixes</h3>
-    <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are encouraged. Just get in touch via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
-    </p>
-    <p>Getting this kind support is one of the most rewarding things possible for an organization like ours and is a major goal of <a href="https://free.law">Free Law Project</a>. Many of the features you use on CourtListener were built this way. We're building something together.
-    </p>
-    <p>(Upgrades requiring downtime are scheduled according to our maintenance schedule as described in the sidebar below.)</p>
-
-
-    <h2 id="endpoints">Endpoints</h2>
-    <p>
-      <a href="{% url "api-root" version="v3" %}"
-        target="_blank"
-        class="btn btn-lg btn-primary">Show All Endpoints</a>
-      <a href="{% url "swagger_schema" %}"
-         target="_blank"
-         class="btn btn-lg btn-primary">Show Swagger Schema</a>
-    </p>
-    <h3 id="docket-endpoint">{% url "docket-list" version="v3" %}</h3>
-    <p><code>Docket</code> objects link <code>Opinion Cluster</code>, <code>Audio</code>, and <code>Docket Entry</code> objects together, following the conventional definition of a docket. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
-    </p>
-    <p>Docket Entry, Party, and Attorney objects are <em>not</em> listed on docket instances due to performance reasons. Some dockets have tens of thousands of docket entries and hundreds of parties. Listing all of these values in a single JSON or XML object is impractical. To get the docket entries, parties, or attorneys for a specific docket, you can use the docket entry, party, or attorney endpoints and filter by docket ID. This will present the results in a more practical paginated format.
-    </p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "docketentry-list" version="v3" %}?docket__id=XXX"</pre>
-
-
-    <h3 id="og-court-info-endpoint">{% url 'originatingcourtinformation-list' version="v3" %}</h3>
-    <p><code>Originating Court Information</code> represents the information gathered at an appellate court about the case when it was in a lower court or administrative body. The information in this table is joined via a one-to-one relationship to the <code>Docket</code> object. Generally, this table is only completed for appellate cases that we acquire from PACER.
-    </p>
-    <p>Some systems may normalize this data by linking the lower and upper courts on the database level rather than storing this information in a separate table, but CourtListener does not. Because we get information about the lower court case from the appellate court website, we prefer to keep it separate. This keeps the information acquired from each court compartmentalized so that when we get data from one case, it does not affect the data in the other.
-    </p>
-    <p>Cross-walking from the upper court docket to the lower is still possible using the the <code>docket_number</code> and <code>appeal_from</code> fields.
-    </p>
-
-
-    <h3 id="idb-data-endpoint">{% url 'fjcintegrateddatabase-list' version='v3' %}</h3>
-    <p><code>FJC Integrated Database</code> objects represent the information available in the Federal Judicial Center's Integrated Database, a regularly updated source of metadata about federal court cases. You can learn more about the IDB from the following sources:
-    </p>
-    <ul>
-      <li><a href="https://www.fjc.gov/research/idb">The FJC IDB Homepage</a></li>
-      <li><a href="https://free.law/idb-facts/">Our datasheet on the IDB</a></li>
-      <li>The various codebooks for <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Civil%20Codebook%201988%20Forward_0.pdf">civil</a>, <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Criminal%20Code%20Book%201996%20Forward.pdf">criminal</a>, <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Appeals%20Codebook%202008%20Forward.pdf">appellate</a>, and <a href="https://www.fjc.gov/sites/default/files/idb/codebooks/Bankruptcy%20Codebook%202008%20Forward%20(Rev%20January%202018).pdf">bankruptcy</a> datasets.</li>
-    </ul>
-    <p>As always, you can find our interpretations of these fields by performing an <code>OPTIONS</code> request on this endpoint.
-    </p>
-    <p>Pending further support, this endpoint should be considered <em>experimental</em> quality. It is not guaranteed to have all of the available data sets, may not have the latest quarterly data, and indeed may have bugs. If you encounter any bugs, please let us know. If you would like better guarantees about the quality of this endpoint, we are enthusiastic about finding partners to better support it.
-    </p>
-
-
-    <h3 id="docket-entry-endpoint">{% url "docketentry-list" version="v3" %} <span class="alt">&amp;</span> {% url "recapdocument-list" version="v3" %}</h3>
-    <p><code>Docket Entry</code> objects represent the rows on a PACER docket, and contain nested <code>RECAP Document</code> objects. This follows the design on PACER, in which a single row on a docket may represent a document and several additional attachments.
-    </p>
-    <p>One comment about the <code>entry_number</code> field. In district courts, this number is consistently provided by the court, and is usually a number between zero and the low thousands (depending on the length of the case). In appellate court, this number is not provided by some courts, and so we use the internal PACER document ID to populate this field. We <a href="https://law.builders/@flp/109554336659947687">are advocating</a> for courts to always use docket entry numbers.
-    </p>
-    <p>The field, filtering, and ordering parameters for <code>Docket Entry</code> and <code>RECAP Document</code> objects can be found via an <code>OPTIONS</code> request.
-    </p>
-    {% if not perms.search.has_recap_api_access %}
-      <p>These endpoints are only available to select users. Please <a href="{% url "contact" %}">get in touch</a> to access these endpoints.
-      </p>
-    {% endif %}
-
-
-    <h3 id="party-and-attorney-endpoints">{% url "party-list" version="v3" %} <span class="alt">&amp;</span> {% url "attorney-list" version="v3" %}</h3>
-    <p>The <code>Party</code> and <code>Attorney</code> endpoints provide details about parties and attorneys that have been involved in federal cases in PACER. Each endpoint can be filtered by docket ID as described above, and lists the relationship of parties to attorneys according to the <code>role</code> field.
-    </p>
-    <p>As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an OPTIONS request.
-    </p>
-    {% if not perms.people_db.has_recap_api_access %}
-      <p>These endpoints are only available to select users. Please <a href="{% url "contact" %}">get in touch</a> to access these endpoints.
-      </p>
-    {% endif %}
-
-
-    <h3 id="cluster-endpoint">{% url "opinioncluster-list" version="v3" %}</h3>
-    <p>This is a major endpoint serving up the millions of <code>Opinion Clusters</code> that are available on CourtListener. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
-    </p>
-    <p>Follows are a few notes on the fields that are available:</p>
-    <ul>
-      <li>There are presently two fields, <code>judges</code> and <code>panel</code> that contain similar information. The <code>judges</code> field is simply a string field containing the names of judges that heard a case. The <code>panel</code> field is a foreign key to the <code>Judges</code> endpoint, providing more detail about a specific judge or judges. These two fields exist because we have not historically had access to good judicial data, forcing us to simply save the name of the judge as a string.
-      </li>
-      <li>
-        <p>There are numerous citation fields such as <code>federal_cite_one</code>, <code>neutral_cite</code>, <code>state_cite_two</code>, etc. As of API version 3.6, these are all deprecated fields, replaced by the <code>citation</code> field, which lists the same information, but in a more normalized format. These fields will stop getting new values on February 1, 2019, and be removed from the API on May 1, 2019. Both the old and the new approach aim to hold all of the possible <a href="http://legalresearchprinciples.pbworks.com/w/page/16129937/Parallel%20Citations">parallel citations</a> that an <code>Opinion Cluster</code> may have. To see the types of citation we recognize, do an <code>OPTIONS</code> request on this endpoint.
-        </p>
-
-        <p class="v-offset-above-1">Some opinions have multiple citations of a given type. In our old schema, we supported this by having several fields of that type. For example, <code>federal_cite_one</code>, <code>federal_cite_two</code>, and <code>federal_cite_three</code>, which together can hold three parallel federal citations for a single opinion. Our new system handles this much more intuitively.
-        </p>
-        <p>Finally, you can learn more about citation types in our <a href="https://github.com/freelawproject/reporters-db" target="_blank">Reporter Database</a> project.
-        </p>
-      </li>
-      <li>The <code>source</code> field is a very important one, as it designates where the content of the <code>Opinion Cluster</code> came from. This is vitally important when you are looking at the sub_opinions of the <code>Opinion Cluster</code> (the dissents, concurrences, etc.) because the <code>source</code> field indicates whether we will have the plain text or HTML of the item.
-      </li>
-    </ul>
-
-
-    <h3 id="opinion-endpoint">{% url "opinion-list" version="v3" %}</h3>
-    <p>The <code>Opinion</code> endpoint contains specific information about Opinions. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
-    </p>
-    <p>Follows are a few notes on the fields that are available:</p>
-    <ul>
-      <li>The <code>type</code> field indicates whether the item is a concurrence, lead opinion, dissent, etc. The values provided for this field are proceeded by numbers so that if they are sorted alphabetically, they will also be sorted from highest priority to lowest.
-      </li>
-      <li>The <code>sha1</code> field provides a unique cryptographic hash of every item in our collection.
-      </li>
-      <li>Some of the <code>plain_text</code>, <code>html</code>, <code>html_lawbox</code>, <code>html_columbia</code> and <code>html_with_citations</code> fields will be populated depending on the <code>Opinion Cluster's</code> <code>source</code> field:
-        <ul>
-          <li><code>plain_text</code> will be populated if we got the opinion from a court's website as a PDF or Microsoft Word document.
-          </li>
-          <li><code>html</code> will be populated if we got the opinion from a court's website as a Word Perfect or HTML document, or if we got the opinion from Resource.org, which provides HTML documents.
-          </li>
-          <li><code>html_lawbox</code> will be populated if we got the content from the Lawbox donation.
-          </li>
-          <li><code>html_columbia</code> will be populated if we got the content from the Columbia collaboration.
-          </li>
-          <li><code>html_anon_2020</code> will be populated if we got the content from our anonymous source in 2020.</li>
-          <li><code>html_with_citations</code> is a special field that is populated by parsing one of the above fields for citations, generating an HTML file with linkified citations. All items should eventually have this field (though processing can take some time). In general, this is the field that is used to generate pages on CourtListener.
-          </li>
-        </ul>
-      </li>
-    </ul>
-
-
-
-    <h3 id="audio-endpoint">{% url "audio-list" version="v3" %}</h3>
-    <p>The <code>audio</code> endpoint is modeled after the <code>Opinion Cluster</code> endpoint and has very similar behavior, except instead of serving collections of opinions, it currently serves oral arguments and may later serve other similar audio files. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
-    </p>
-
-
-    <h3 id='cites-endpoint'>{% url "opinionscited-list" version="v3" %}</h3>
-    <p>This endpoint provides an interface into the citation graph that CourtListener provides between <code>Opinions</code>. Using the filters listed in response to an <code>OPTIONS</code> request, you can see the <code>Opinions</code> that an <code>Opinion</code> cites (it's "Authorities") or you can see the <code>Opinions</code> that cite an <code>Opinion</code>.
-    </p>
-    <p>These can be thought of as compliments, though the results can be dramatically different. For example, a very important <code>Opinion</code>, <em><a href="{% url "view_case" "111170" "strickland-v-washington" %}">Strickland v. Washington</a></em>, has been cited thousands of times by subsequent cases, but a quick look in the database reveals that no <code>Opinion</code> has more than about 500 authorities (things it cites to), and most have about 60.
-    </p>
-    <p>The citation graph is also provided as <a href="{% url "bulk_data_index" %}#citation-data">a single CSV file</a> listing every citation between <code>Opinions</code>. Please don't attempt to crawl this endpoint &mdash; It has more than 10 million records.
-    </p>
-
-
-    <h3 id="jurisdiction-endpoint">{% url "court-list" version="v3" %}</h3>
-    <p>This endpoint provides basic information about the <strong>{{ court_count }}</strong> jurisdictions in the American court system that we support. As with all other endpoints, you can look up the field descriptions, filtering options, ordering options, and rendering options by making an <code>OPTIONS</code> request.
-    </p>
-    <p>Please cache the results of this endpoint to your system. It does not change often.</p>
-
-
-
-    <h3 id="search-endpoint">{% url "search-list" version="v3" %}</h3>
-    <p>This endpoint allows you to query our search engine in a similar manner to our front end. Because this endpoint does not use the Django models directly, this endpoint is quite different than any other. Unlike other endpoints, it does not support <code>OPTIONS</code> requests and thus is not self-documenting, however this endpoint is easy to use because GET parameters from the front end can simply be copy-pasted onto this endpoint. For example, this URL on the front end:
-    </p>
-    <pre class="pre-scrollable">{% get_full_host %}{% url "show_results" %}?q=foo</pre>
-    <p>Becomes this, on the API:</p>
-    <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo</pre>
-
-    <p>Several Additional differences should also be noted:</p>
-    <ul>
-      <li>
-        <p><strong>Ordering</strong>: Instead of using a minus sign to flip ordering, it uses <code>asc</code> and <code>desc</code>.
-        </p>
-        <p>In addition, results may be sorted randomly by using <code>random_{your-seed} desc/asc</code> as your sort parameter. Substitute any value for <code>{your seed}</code> to get results that are consistent across pagination. For example:
-        </p>
-        <pre class="pre-scrollable">{% get_full_host %}{% url "search-list" version="v3" %}?q=foo&order_by=random_123+desc</pre>
-        <p>This way of sorting the results also works on the front end, but does not show up via the dropdowns.
-        </p>
-      </li>
-      <li>
-        <p><strong>Filtering</strong>: Instead of using the Django lookup fields, it uses Solr syntax. To filter on this endpoint, we recommend identifying an effective query on the front end that generates the results you want and then using that query (and variations thereof) to query the API. On the backend, very similar code serves both the API and the front end.
-        </p>
-        <p><code>GET</code> parameters from the front end can be copy-pasted to the API endpoint.
-        </p>
-      </li>
-      <li>
-        <p><strong>Fields</strong>: The fields on this endpoint often differ slightly from those in the other endpoints. Both their names and their values may be different. For example, instead of having a field called <code>nature_of_suit</code>, this endpoint has a field called <code>suitNature</code>. Instead of having a number of citation fields (<code>federal_cite_one</code>, <code>state_cite_two</code>, etc.), this endpoint just has all the citations in a single field called <code>citations</code>, which provides the same values as a list.
-        </p>
-        <p>These changes are all necessary to make this endpoint a powerful and user friendly search engine. For example, users can query natures of suit using a query like <code>suitNature:foo</code> instead of having to write underscores. Users can search all citations at once, not having to think about whether it's a federal citation or a state one or something else.
-        </p>
-        <p>You can see the field definitions on the <a href="{% url "advanced_search" %}#fielded-queries-fieldname-term">Advanced Search Help Page</a>.
-        </p>
-      </li>
-      <li>This endpoint can return different kinds of objects, depending on the <code>type</code> parameter. Currently supported parameters are:
-        <ul>
-          <li><code>o</code> &mdash; Opinions</li>
-          <li><code>r</code> &mdash; Document-oriented results from the RECAP Archive</li>
-          <li><code>d</code> &mdash; Docket-oriented results from the RECAP Archive</li>
-          <li><code>p</code> &mdash; Judges</li>
-          <li><code>oa</code> &mdash; Oral Arguments</li>
-        </ul>
-      </li>
-      <li>As in the front end, when the <code>type</code> is set to return opinions, only precedential results are returned by default. To get other precedential statuses, you need to explicitly request them.
-      </li>
-      <li>The <code>r</code> <code>type</code> returns a flat list of document results from the RECAP Archive, unlike as is done in the front end, where the results are nested. This is to simplify the backend and to aid in performance of API requests. The <code>d</code> <code>type</code> returns a flat list of docket results from the RECAP Archive.
-      </li>
-    </ul>
-    <p>Some fields warrant more details:
-    </p>
-    <ul>
-      <li><strong><code>snippet</code></strong>: This field contains the same values as are found on the front end, utilizing the HTML5 <code>&lt;mark&gt;</code> element to identify up to five matches in a document. If you wish to use the snippet but do not want highlighting, simply use CSS to give the <code>mark</code> element no styling, like a <code>span</code> element. This field only responds to arguments provided to the <code>q</code> parameter. If that parameter is not used, the <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
-      </li>
-      <li><strong><code>stat_*</code></strong>: For this Boolean field, we provide opinionated default values. Because most searchers are not interested in non-precedential (unpublished) results, we leave them out by default. If you wish to receive these items, you must explicitly ask for them as you do on the front end.
-      </li>
-    </ul>
-
-    <h3 id="judge-endpoint">Judge Endpoints</h3>
-    <p>We are pleased to share the world's first REST API of federal and state judges. This database is very detailed, containing nearly 100 fields. As with the other endpoints, the best way to find field-level descriptions is by sending an <code>OPTIONS</code> request to an endpoint. If you don't have a clear understanding of a field after sending an options request and reading this documentation, please <a href="{% url "contact" %}">contact us</a> so we may help.
-    </p>
-    <h4 id="judge-endpoint-notes">Endpoint-Level Notes</h4>
-    <p>The judicial REST API contains the following endpoints:</p>
-    <ul>
-      {% include "includes/judge-endpoints.html" %}
-      <li>
-        <p><strong>Sources</strong> &mdash; <code>{% url "source-list" version="v3" %}</code></p>
-        <p>These are objects explaining the source of a piece of data. For example, it may provide a link or a text explanation of where something is from.
-        </p>
-      </li>
-      <li>
-        <p><strong>ABA Ratings</strong> &mdash; <code>{% url "abarating-list" version="v3" %}</code></p>
-        <p>These are the American Bar Association ratings that are given to many judges, particularly those that are nominated to federal positions.
-        </p>
-      </li>
-    </ul>
-    <h4 id="judge-field-notes">Field-Level Notes</h4>
-    <ul>
-      <li>There are a number of date "granularity" fields. These are used to indicate how granular a date is known to be. For example, for many people we know the year they died but not the month or day. For these people, the <code>date_dod</code> field might be <code>2010-01-01</code>, and the <code>date_granularity_dod</code> field would be set to <code>%Y</code>, using <a href="https://secure.php.net/manual/en/function.strftime.php">strftime formatting</a> to indicate the granularity. If a date field has a granularity field, both fields will either be completed or null.
-      </li>
-      <li>There are a number of validation rules that can be useful for understanding this data. For example, one rule mandates that every position be affiliated with a school, a court, or an organization. These rules are written in Python and can be found by looking in the <code>clean_fields</code> method of the <code>Model</code> classes
-          <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/people_db/models.py">found here.</a>.
-      </li>
-    </ul>
-
-
-    <h3 id="financialdisclosure-endpoint">Financial Disclosure Endpoints</h3>
-    <p>This endpoint provides an API for financial disclosures of current and former federal judges beginning in 1987. You can learn more about which disclosures are included and the limitations of this data source on our <a href="{% url "coverage_fds" %}">coverage page for financial disclosures</a>.
-    </p>
-    <h4 id="financialdisclosure-background">Background on the Information</h4>
-    <p>Judicial officers and certain judicial employees in the United States are required to file financial disclosure reports by <a href="https://www.law.cornell.edu/uscode/text/5a/compiledact-95-521/title-I">Title I of the Ethics in Government Act of 1978</a>. The Act requires that designated federal officials disclose publicly their personal financial interests, to ensure confidence in the integrity of the federal government by demonstrating that they are able to carry out their duties without compromising the public trust.
-    </p>
-    <p>The Act enumerates the types of information required and prescribes the general format and procedures for the reports. Our APIs mirror the Act's language, with APIs corresponding to each required disclosure type:</p>
-    <ul>
-      <li>
-        <p><strong>Financial Disclosures</strong> &mdash; <code>{% url "financialdisclosure-list" version="v3" %}</code></p>
-        <p>This endpoint contains information about the main document itself and is the link between the other financial disclosure endpoints and the judges themselves.
-        </p>
-      </li>
-      <li>
-        <p><strong>Positions</strong> &mdash; <code>{% url "disclosureposition-list" version="v3" %}</code></p>
-        <p>This endpoint lists the positions held as an officer, director, trustee, general partner, proprietor, representative, executor, employee, or consultant of any corporation, company, firm, partnership, trust, or other business enterprise, any nonprofit organization, any labor organization, or any educational or other institution other than the United States.
-        </p>
-      </li>
-      <li>
-        <p><strong>Agreements</strong> &mdash; <code>{% url "agreement-list" version="v3" %}</code></p>
-        <p>Agreement or arrangement of the filer in existence at any time during the reporting period.</p>
-      </li>
-      <li>
-        <p><strong>Non-Investment income</strong> &mdash; <code>{% url "noninvestmentincome-list" version="v3" %}</code></p>
-        <p> Source, type, and the actual amount or value of earned or other non-investment income aggregating $200 or more from any one source that is received.</p>
-      </li>
-      <li>
-        <p><strong>Non-Investment income (Spouse)</strong> &mdash; <code>{% url "spouseincome-list" version="v3" %}</code></p>
-        <p>The source and type earned of non-investment income from the spouse of the filer of the financial disclosure.</p>
-      </li>
-      <li>
-        <p><strong>Reimbursements</strong> &mdash; <code>{% url "reimbursement-list" version="v3" %}</code></p>
-        <p>The identity of the source and a brief description (including travel locations, dates, and nature of expenses provided) of any travel-related reimbursements aggregating more than $415 in value that are received by the filer from one source during the reporting period.</p>
-      </li>
-      <li>
-        <p><strong>Gifts</strong> &mdash; <code>{% url "gift-list" version="v3" %}</code></p>
-        <p>The source, a brief description, and the value of all gifts aggregating more than $415 in value that are received by the filer during the reporting period from any one source.</p>
-      </li>
-      <li>
-        <p><strong>Debts</strong> &mdash; <code>{% url "debt-list" version="v3" %}</code></p>
-        <p>All liabilities specified by that section that are owed during the period beginning on January 1 of the preceding calendar year and ending fewer than 31 days before the date on which the report is filed.</p>
-      </li>
-      <li>
-        <p><strong>Investments</strong> &mdash; <code>{% url "investment-list" version="v3" %}</code></p>
-        <p>The source and type of investment income, including dividends, rents, interest, capital gains, or income from qualified or excepted trusts.</p>
-      </li>
-    </ul>
-
-    <h4>General Notes on Financial Disclosures</h4>
-    <ol>
-      <li><p>We attempted identify all redactions within each disclosure. When a line in the disclosure contains a redaction, it will usually have a <code>redacted</code> field present and set to <code>True</code>. This is your hint that you may want to investigate that row more carefully.
-      </p></li>
-      <li><p><code>Investments</code>, <code>Debts</code>,and <code>Gifts</code> use form based value codes to indicate monetary ranges instead of exact values. Place an <code>OPTIONS</code> request to these endpoints to learn the values of those fields.
-      </p></li>
-      <li>
-        <p><code>Investment</code> objects contain the field <code>has_inferred_values</code>. This field indicates that we inferred an investment <code>description</code> based on the style of data entry. For example, an investment could have been bought in Q1, while a dividend was paid out
-        in Q2 before being sold in Q4. Often, after the first entry of the investment, subsequent rows in the table are mostly blank. In this instance, we infer the values.
-        </p>
-        <p>The table below gives a brief example where we would infer that the blank cell below the cell for <code>AAPL</code> also refers to <code>AAPL</code>:</p>
-        <table class="table">
-          <tr>
-            <th>Description</th>
-            <th>Date</th>
-            <th>Type</th>
-          </tr>
-          <tr>
-            <td>AAPL</td>
-            <td>2020-01-01</td>
-            <td>Bought</td>
-          </tr>
-          <tr>
-            <td>&mdash;</td>
-            <td>2020-02-01</td>
-            <td>Sold</td>
-          </tr>
-        </table>
-        <p>In this (slightly contrived) instance our DB would have two rows in the <code>Investment</code> table. The first would be for the purchase of the <code>AAPL</code> stock, and the second would be for the sale of it.
-        </p>
-      </li>
-    </ol>
-
-    <h4>Useful Examples</h4>
-    <p>One can query for investments by stock name, transaction dates and even gross values. For example, the following query is for financial disclosures with individual investments valued above $50,000,000.00. Note that this uses a value code as explained in the general notes above:</p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "investment-list" version="v3" %}?gross_value_code=P4&fields=investments"</pre>
-    <p>Additionally, one could pinpoint gifts of individual judges when combining the gift database with our judicial database. The following query returns all reported gifts by the late <a href="{% url "view_person" 1213 "ruth-bader-ginsberg" %}">Ruth Bader Ginsburg</a> (her ID is 1213):</p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "financialdisclosure-list" version="v3" %}?person=1213&fields=gifts"</pre>
-
-    <h3 id="recap-endpoint">RECAP Endpoints</h3>
-    <p>The RECAP endpoints provide three high-level features. They allow you to check if a PACER item exists in CourtListener, they allow you to upload items to CourtListener for processing, and they allow you to request that we fetch items from PACER on your behalf.
-    </p>
-    <p>Some of these endpoints require authentication with a CourtListener account that has special permissions. To obtain permission to use these endpoints, please <a href="{% url "contact" %}">get in touch</a>.
-    </p>
-    <p>The endpoints for RECAP are:</p>
-    <ul>
-      <li><p><code>{% url "processingqueue-list" version="v3" %}</code> &mdash; This endpoint is used to upload items and to check on the progress of an upload.</p></li>
-      <li><p><code>{% url "fast-recapdocument-list" version="v3" %}</code> &mdash; This endpoint is used to check if documents are in RECAP.</p></li>
-      <li><p><code>{% url "pacerfetchqueue-list" version="v3" %}</code> &mdash; Use this endpoint to ask our server to fetch an item from PACER on your behalf.</p></li>
-    </ul>
-    <h4 id="processing-queue-endpoint">{% url "processingqueue-list" version="v3" %}</h4>
-    <p>This endpoint can be used to upload PACER content to the RECAP Archive. We describe the process for completing these uploads below, and you can see examples of them in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/recap/tests.py">CourtListener's automated test suite</a>. Uploads to these endpoints should be done using HTTP <code>POST</code> requests and multipart form data.
-    </p>
-    <p>The following parameters apply to all uploads:</p>
-    <ul>
-      <li>
-        <p><code>upload_type</code> <em>(required)</em> &mdash; This field accepts integers representing objects in PACER. Send an HTTP <code>OPTIONS</code> request to this API to learn the possible values for this field. As a simple example, <code>1</code> represents HTML dockets, <code>3</code> represents PDFs, etc.
-        </p>
-      </li>
-      <li>
-        <p><code>filepath_local</code> <em>(required)</em> &mdash; Use this field to upload the binary data you are submitting, whether it HTML of a docket or attachment menu or a PDF file.
-        </p>
-      </li>
-      <li>
-        <p><code>court</code> <em>(required)</em> &mdash; The CourtListener court id, <a href="{% url "court_index" %}">as described here</a>. These are almost all identical to the subdomains of the PACER websites with the exception of the following values that vary due to historical reasons:
-        </p>
-        <pre>
-PACER_TO_CL_IDS = {
-    'azb': 'arb',         // Arizona Bankruptcy Court
-    'cofc': 'uscfc',      // Court of Federal Claims
-    'neb': 'nebraskab',   // Nebraska Bankruptcy
-    'nysb-mega': 'nysb'   // Remove the mega thing
-};</pre>
-      </li>
-      <li>
-        <p><code>debug</code> <em>(optional)</em> &mdash; While you are developing, use this field to test your work. When it is set to <code>true</code>, your uploads will not make changes to the RECAP Archive, but you will create processing requests which will be processed in debug mode.
-        </p>
-      </li>
-    </ul>
-    <p>The following four upload types are supported:</p>
-    <ul>
-      <li>
-        <p><code>District/Bankruptcy Dockets</code> (1), <code>Appellate Dockets</code> (5), <code>Docket History Reports</code> (4), and <code>Claims Registries</code> (9) &mdash; Uploading these types of objects should be fairly easy. In addition to the required fields above, supply the <code>pacer_case_id</code> field.
-        </p>
-      </li>
-      <li>
-        <p><code>PDFs</code> (3) &mdash; To upload PDFs, you must include the <code>pacer_doc_id</code> and <code>document_number</code> fields. If you are uploading an attachment, you must also provide the <code>attachment_number</code> field. Because some cases share documents, the <code>pacer_case_id</code> field should also be provided, though it's not a required field if it's unknown.
-        </p>
-        <p><code>pacer_doc_id</code> is the number you see in URLs when purchasing documents on PACER and in the HTML when clicking document numbers on docket pages. For example, in the URL <code>ecf.flp.uscourts.gov/doc1/035021404350</code>, the <code>pacer_doc_id</code> is <code>035021404350</code>.
-        </p>
-        <p>There are three variables embedded in each <code>pacer_doc_id</code> number.The first three digits (in this case, <code>035</code>) are a code indicating the court. The fourth digit is a zero or one, and is used by PACER to determine if URL should load an attachment page for the document or instead take you directly to the purchase page (we believe this digit is why the URL mentions <code>/doc1/</code>). The remaining digits are the serial number of the document itself. <strong>When uploading to this endpoint, the fourth digit must always be normalized to a zero before uploading.</strong>
-        </p>
-        <p>The <code>document_number</code> is the number for the document that you see on the docket page and elsewhere. The <code>attachment_number</code> is the number you see on the attachment page and elsewhere.</p>
-        <p>PDF uploads will only succeed when they can be associated with a docket. If the RECAP Archive does not already have a docket for the <code>pacer_doc_id</code> you uploaded, your upload will be re-queued and retried several times in the hopes that the docket gets processed in the meantime. If, after retrying several times, the docket cannot be found, your upload will be marked as an orphan document. Later, if the docket is found, your PDF will be automatically associated with it, but until then it's not visible to users or any API.
-        </p>
-      </li>
-      <li>
-        <p><code>Document Zips</code> (10) &mdash; From the attachment page in district court PACER websites, there is a link to get all the documents for a particular docket entry as a zip. Such zips can be uploaded using the same parameters as PDFs, using the <code>upload_type</code> of <code>10</code>.
-        </p>
-      </li>
-      <li>
-        <p><code>Attachment Menus</code> (2) &mdash; These are the HTML pages that you will see that list the attachments for a docket entry. The only required field for this upload type is <code>pacer_case_id</code>.
-        </p>
-      </li>
-    </ul>
-    <p>When you complete your upload, you will create a <code>Processing Queue</code> object in the CourtListener database. This object will be returned in the HTTP response to your upload so you will know its ID. This object will contain the fields you uploaded, and the following fields will be populated as the item is processed:
-    </p>
-    <ul>
-      <li><code>status</code> &mdash; When you upload an item, it is only placed into a queue until processing resources are available to merge it into the RECAP Archive. Use this field to determine where in that process your item is. To see the possible values, place an <code>OPTIONS</code> request to this endpoint.
-      </li>
-      <li><code>error_message</code> &mdash; This field will provide you information about whether your upload was processed successfully or will explain any errors that occurred.
-      </li>
-      <li><code>docket</code>, <code>docket_entry</code>, and <code>recap_document</code> &mdash; After an item is successfully processed, these fields will be populated with the IDs of the items that were created or updated. The <code>docket</code> field will be populated for dockets that were created or updated, and all three fields will be populated for uploaded PDFs.
-      </li>
-      <li><code>date_created</code> and <code>date_modified</code></li>
-    </ul>
-
-    <h5>An Example</h5>
-    <p>Pulling this all together, a docket upload might look like:</p>
-    <pre class=scrollable">curl -v \
-    --form upload_type=1 \
-    --form "filepath_local=@docket.html" \
-    --form court=dcd \
-    --form pacer_case_id=&lt;some-value&gt; \
-    --form debug=true \
-    '{% get_full_host %}{% url "processingqueue-list" version="v3" %}'
-    --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
-    <p>And once you've completed your upload, you would have a <code>Processing Queue</code> object that you could monitor for completeness. Once its <code>status</code> field indicated that it was processed successfully, it would have  a link to the docket that was created or updated.
-    </p>
-    <h4 id="recap-query">{% url "fast-recapdocument-list" version="v3" %}</h4>
-    <p>To check if a document is in RECAP, simply complete a query like so:
-    </p>
-    <pre class="scrollable">curl '{% get_full_host %}{% url "fast-recapdocument-list" version="v3" %}?docket_entry__docket__court=dcd&pacer_doc_id__in=04505578698,04505578717' \
-    --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
-    <p>The ID fields in that query are the CourtListener court abbreviation and the document ID numbers as found in PACER. Several document ID numbers can be provided, separated by commas. A maximum of 300 items will be returned per page.
-    </p>
-    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Take care:</strong> The fourth digit of a PACER document ID can be a zero or one. We always normalize it to zero and you will need to do so as well in your queries. For more on these IDs, see the <a href="https://github.com/freelawproject/juriscraper">Juriscraper Project</a>.
-    </p>
-    <p>To query whether a case is in the RECAP Archive, use the <code>Docket</code> endpoint described above.
-    </p>
-
-    <h4 id="pacer-fetch">{% url "pacerfetchqueue-list" version="v3" %}</h4>
-    <p>Use this API to add PACER content to our system so that it is available via our website, APIs, and replicated database. This API can currently use your PACER credentials to download dockets, PDFs, or attachment pages from PACER.
-    </p>
-    <p>Because downloading content from PACER takes time, this API is asynchronous. After it receives a <code>POST</code> request, it immediately responds with an ID for the request and it enqueues the request for downloading. Typically, requests are fulfilled within seconds.
-    </p>
-    <p>As the request is processed, it will have one of several statuses:
-    </p>
-    <ul>
-      <li><code>(1)</code> Awaiting processing in queue</li>
-      <li><code>(2)</code> Item processed successfully</li>
-      <li><code>(3)</code> Item encountered an error while processing</li>
-      <li><code>(4)</code> Item is currently being processed</li>
-      <li><code>(5)</code> Item failed processing, but will be retried</li>
-      <li><code>(6)</code> Item failed validity tests</li>
-      <li><code>(7)</code> There was insufficient metadata to complete the task</li>
-    </ul>
-    <p>To monitor your request, you can either poll the API for your request, or you can use our <a href="{% url "webhooks_docs" %}#recap-fetch">Fetch Webhook endpoint</a> to get immediate updates without polling. We recommend using the webhook endpoint, since it reduces traffic and load on our servers.
-    </p>
-    <p>Dockets are more complicated than PDFs or attachment pages because there are a handful of options available when purchasing dockets on PACER. Accordingly, we explain the simpler PDFs and attachment pages first.
-    </p>
-    <p><strong>To purchase a PDF:</strong></p>
-    <ol>
-      <li><p>Set <code>request_type</code> to <code>2</code>, which indicates PDFs.</p></li>
-      <li><p>Identify the PDF you wish to add to our system. To identify the PDF use the <code>recap_document</code> field to provide the RECAP Document ID of the item you wish to download.</p></li>
-    </ol>
-    <p>An example of downloading a PDF by <code>recap_document</code> ID might be:
-    </p>
-    <pre class="scrollable">curl -X POST \
-    --data 'request_type=2' \
-    --data 'pacer_username=xxx' \
-    --data 'pacer_password=yyy' \
-    --data 'recap_document=112' \
-    --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-    "{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
-
-    <p>If you have a client code, you can provide it to the API with the <code>client_code</code> parameter.</p>
-
-    <p>A known issue we currently have is that if we do not have the <code>pacer_doc_id</code> for a particular <code>recap_document</code>, we will not be able to download it. If that's the case, you'll get an error message asking you to download the docket, which will get us the <code>pacer_doc_id</code> we need.
-    </p>
-
-    <p><strong>Attachment pages</strong> are the pages that you see in PACER after you click to download a document, if that document has attachments. These pages are free in PACER. Fetching attachment pages is done same as PDFs, above, but with <code>request_type</code> set to <code>3</code>.
-    </p>
-
-    <p><strong>Fetching dockets</strong> is done similarly:</p>
-    <ol>
-      <li><p>Provide the <code>request_type</code> of <code>1</code> for dockets.</p></li>
-      <li>
-        <p>Indicate the docket you want by either a CourtListener <code>docket</code> ID, a <code>pacer_case_id</code>-<code>court</code> pair or a <code>docket_number</code>-<code>court</code> pair:</p>
-        <ul>
-          <li><p><code>pacer_case_id</code> is the internal ID in the PACER system.</p></li>
-          <li><p><code>docket_number</code> is the visible docket number humans use to refer to the case.</p></li>
-          <li><p><code>court</code> is the CourtListener court ID, <em>not</em> the PACER court ID (see the mapping above under <code>PACER_TO_CL_IDS</code>).</p>
-          </li>
-        </ul>
-      </li>
-      <li><p>Set any options you need for the docket purchase itself (place an HTTP <code>OPTIONS</code> request to this API for details on the available fields).</p></li>
-    </ol>
-    <p>For example, this request identifies a case by docket number and court:</p>
-    <pre class="scrollable">curl -X POST \
-  --data 'request_type=1' \
-  --data 'pacer_username=xxx' \
-  --data 'pacer_password=yyy' \
-  --data 'docket_number=5:16-cv-00432' \
-  --data 'court=okwd' \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
-    <p>This is the same, but includes parties and counsel:</p>
-    <pre class="scrollable">curl -X POST \
-  --data 'request_type=1' \
-  --data 'pacer_username=xxx' \
-  --data 'pacer_password=yyy' \
-  --data 'docket_number=5:16-cv-00432' \
-  --data 'court=okwd' \
-  --data 'show_parties_and_counsel=true' \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
-    <p>For the full list of options on a docket request, do an HTTP <code>OPTIONS</code> request to the endpoint.</p>
-    <p>Finally, this request updates an existing docket in CourtListener by its ID, but only gets the parties and counsel. Docket entries are excluded by requesting only ones from before 1980:
-    </p>
-    <pre class="scrollable">curl -X POST \
-  --data 'request_type=1' \
-  --data 'pacer_username=xxx' \
-  --data 'pacer_password=yyy' \
-  --data 'docket=5' \
-  --data 'show_parties_and_counsel=true' \
-  --data 'de_date_end=1980-01-01' \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "pacerfetchqueue-list" version="v3" %}"</pre>
-    <p>A few general notes:</p>
-    <ol>
-      <li>
-        <p>Whenever a docket is created or updated, we look for PDFs that we already have from that case, and we link them up to the newly created or updated docket. As a result, some docket updates may immediately have PDFs associated with them.</p>
-      </li>
-      <li>
-        <p>Your first request in a while will take longer than subsequent requests because we will need to gather your PACER cookies by logging you in. Subsequent requests within the same hour will use your cached cookies.</p>
-      </li>
-      <li>
-        <p>As explained in the security section below, we cache your PACER cookies once we get them. As a result, if we already have your cookies due to a successful previous request, we may not throw an error if your credentials are wrong on a subsequent request &mdash; after all, we never save your password, and since we have the cached cookies, we don't need to test the credentials you just sent.</p>
-      </li>
-    </ol>
-
-    <h4>Security of RECAP Fetch API</h4>
-    <p>A security maxim is to never share your password. This API requires that you violate this maxim. Why should you do so, and how do we handle your password securely?
-    </p>
-    <p>While we prefer not to have unhashed user passwords, PACER lacks any permissions-based or granular authentication system. This means that the only way we can act on your behalf is to have your credentials.
-    </p>
-    <p>Once we have your password, we work to rid ourselves of it as quickly as possible. We do not store it in our database or logs at any time. Instead, we use it to immediately log into the PACER system. That gives us cookies for your account, which we store in our in-memory database with a one hour expiration period. As soon as we have the cookies, we throw away your username and password.
-    </p>
-    <p>The result of this system is that we have your password only until we have logged you in, and after that point, we only have a cache of your cookies for one hour.
-    </p>
-    <p>This API gets content on your behalf using <em>your</em> access rights. This means that if you use this API to request a sealed item from PACER, we will go get it and add it to our system, just like you asked. <strong>Do not do this</strong>. If you do this accidentally, please get in touch as soon as possible so we can revert the error.
-    </p>
-    <p>If you have questions about our approach, please see <a href="https://free.law/vulnerability-disclosure-policy/">our vulnerability reporting policy and bug bounty program</a>, where you'll find details on contacting us.
-    </p>
-
-    <h3 id="alerts-endpoint">{% url "alert-list" version="v3" %}</h3>
-    <p><a href="{% url "alert_help" %}#search-alerts">Search alerts</a> can be made, viewed, modified, and deleted using this endpoint. This can be extremely useful for organizations that need alerts on many topics or on a changing array of topics. To create an alert, send:
-    </p>
-    <ul>
-      <li><strong><code>name</code></strong> &mdash; A human-friendly name for the alert.</li>
-      <li><strong><code>query</code></strong> &mdash; The URL parameters you would get when creating the alert on the front end.</li>
-      <li><strong><code>rate</code></strong> &mdash; How frequently you want your alert query to be checked and alert emails to be sent.</li>
-    </ul>
-    <p>Here's an example of making an alert realtime (<code>rt</code>) instead of weekly (<code>wly</code>).</p>
-    <pre class="scrollable">curl -X PATCH \
-  --data rate=rt \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "alert-detail" version="v3" pk=9999 %}"</pre>
-    <p>As always, for more details place an <code>OPTIONS</code> request to the endpoint.</p>
-
-    <h3 id="docket-alerts-endpoint">{% url "docket-alert-list" version="v3" %}</h3>
-    <p><a href="{% url "alert_help" %}#recap-alerts">Docket Alerts</a> can be made, viewed, modified, and deleted using this endpoint. This can be useful for organizations using <a href="{% url 'webhooks_docs' %}#docket-alerts">Docket Alert Webhooks</a> or if you need docket alerts on many dockets.
-    </p>
-    <p>To create a docket alert, send a POST request with the <code>docket</code> ID you wish to subscribe to.
-    </p>
-    <p>An optional secondary argument, <code>alert_type</code>, may also be sent. This argument works with our auto-subscribe feature. When auto-subscribe is enabled in your account and your <a href="{% url 'recap_email_help' %}">@recap.email</a> email address receives a notification from PACER, we will automatically subscribe you to that case. If instead you wish to <em>not</em> get notifications for that case, while keeping auto-subscribe on, you must "unsubscribe" from the case. To do this, create a docket alert with the <code>alert_type</code> set to <code>0</code>, which represents an unsubscription.
-    </p>
-    <p>For more details place an <code>OPTIONS</code> request to the endpoint.</p>
-
-    <p>Here’s an example of creating a docket alert subscription on a docket with <code>ID</code> 1.</p>
-    <pre class="scrollable">curl -X POST \
-  --data 'docket=1' \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "docket-alert-list" version="v3" %}"</pre>
-
-    <h3 id="visualization-endpoint">{% url "scotusmap-list" version="v3" %}
-      <span class="alt">&amp;</span> {% url "jsonversion-list" version="v3" %}</h3>
-    <p>These endpoints allow you to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener. All visualizations are associated with a user and are private by default. When you GET these endpoints, you will see data for visualizations that have been made public by their owners or that you have created yourself.
-    </p>
-    <p>
-
-    </p>
-      To create a new visualization, POST a title, a starting cluster ID and an ending cluster ID to <strong>{% url "scotusmap-list" version="v3" %}</strong>:</p>
-    <pre class="scrollable">curl -X POST \
-  --data 'cluster_start=/api/rest/v3/clusters/105659/' \
-  --data 'cluster_end=/api/rest/v3/clusters/111891/' \
-  --data 'title=A map from Trop to Salerno' \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "scotusmap-list" version="v3" %}"</pre>
-    <p>Note that the <code>cluster_start</code> and <code>cluster_end</code> parameters use URLs instead of IDs. This is in keeping with our API, which uses hyperlinks as identifiers.</p>
-    <p>Once <code>POST</code>ed, a visualization will be created unless there are no connections between the start and end clusters or the network becomes too large to generate. Once created, the visualization will have nested JSON data representing the visualization itself, a list of clusters that are in it, and various other metadata.</p>
-    <p>Changing data for an existing item can be done via <code>PATCH</code> requests. For example, to make an item <code>published</code> (so it's publicly viewable), you can do:</p>
-    <pre class="scrollable">curl -X PATCH \
-  --data 'published=True' \
-  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "scotusmap-detail" version="v3" pk="1" %}"</pre>
-    <p>Similar commands can be used to update other non-readonly fields if desired.</p>
-    <p>Visualizations can be marked as deleted by flipping the <code>deleted</code> field to <code>True</code>, or can be deleted forthright via a <code>DELETE</code> request.</p>
-
-    <h2>Footnotes</h2>
-    <p id="fn1"><sup>1</sup> The <code>search</code> endpoint is handled by our search engine, not our database. Filters and ordering are thus applied using the same <code>GET</code> parameters as are created when using the front end of the website. Our recommendation is to hone your query there, then move the parameters to the API. See more details in <a href="#search-endpoint">the search section of this document</a>.
-    </p>
-    <p><a href="#fn-ref-1">Back to reference 1 &#8617;</a></p>
-    <p><a href="#fn-ref-2">Back to reference 2 &#8617;</a></p>
-  </div>
-
-
-
-  <div class="col-sm-5">
     <div class="well">
       <h3 class="top">Your Authorization Token</h3>
       {% if user.is_authenticated %}
@@ -1061,82 +121,406 @@ PACER_TO_CL_IDS = {
       {% endif %}
     </div>
 
-    {% include "includes/toc_sidebar.html" %}
 
-    <div class="sidebar-section">
-      <h3><span>Available Jurisdictions</span></h3>
-      <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available can <a href="{% url "court_index" %}">be found here</a>.
+    <h3 id="authentication">Authentication</h3>
+    <p>Authentication is necessary to monitor and throttle usage of the system, and so we can assist with any errors that may occur.
+    </p>
+    <p>Per our <a href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.
+    </p>
+    <p>There are currently three types of authentication available on the API:
+    </p>
+    <ol>
+      <li>
+        <a href="https://www.django-rest-framework.org/api-guide/authentication/#tokenauthentication">HTTP Token Authentication</a>
+      </li>
+      <li>
+        <a href="https://docs.djangoproject.com/en/dev/topics/auth/" target="_blank">Cookie/Session Authentication</a>
+      </li>
+      <li>
+        <a href="https://en.wikipedia.org/wiki/Basic_access_authentication">HTTP Basic Authentication</a>
+      </li>
+    </ol>
+    <p>All of these methods are secure, so the choice of which to use is generally a question of what's most convenient for the context of your work. Our recommendations are:
+    </p>
+    <ul>
+      <li>Use Token Authentication for programmatic API access.
+      </li>
+      <li>Use Cookie/Session Authentication if you already have a user's cookie or are developing a system where you can ask the user to log into CourtListener.
+      </li>
+      <li>Use Basic Authentication if that's all your client supports.</li>
+    </ul>
+
+    <h4 id="token-auth">Token Authentication</h4>
+    <p>To use token authentication, use the <code>Authorization</code> HTTP Header. The key should prefix the <code>Token</code>, with whitespace separating the two strings. For example:
+    </p>
+    <pre class="scrollable">Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}</pre>
+    <p>Using curl, this looks like:</p>
+    <pre class="scrollable">curl "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}" \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'</pre>
+    <p>Note that quotes are used to enclose the whitespace in the header.</p>
+    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Careful!</strong> A common mistake is to forget the word "Token" in the header.
+    </p>
+    {% if user.is_authenticated %}
+      <p>Your permanent token for use with this API is being used in the examples above and is:</p>
+      <pre class="scrollable">{{ user.auth_token }}</pre>
+      <p>Do not share this value publicly via code check ins, emails, etc. Treat this value as you would a password. Do not email it to us.
       </p>
-      <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.</p>
-      <div id="scrollable-jurisdictions">
-        <table class="table settings-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th title="Gathered from Blue Book, Cornell.edu and ALWD">Abbreviation</th>
-              <th title="The number of cases in this jurisdiction on CourtListener">Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for court in courts %}
-            <tr>
-              <td>{{ court.full_name }}</td>
-              <td>
-                <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc"
-                   rel="nofollow"
-                >{{ court.pk }}</a>
-              </td>
-              <td>{{ court.count }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-
-
-
-    <div class="sidebar-section">
-      <h3><span>Powered By</span></h3>
-      <p> If you are interested, we have a variety of <a href="https://free.law/press-assets/">"Powered By" logos</a> available for your website or application. We appreciate a reference, and it supports our work, but it's not currently required.
+    {% else %}
+      <p><a href="{% url "sign-in" %}?next={{ request.path }}#token-auth">Sign in</a> to see your authorization token in this documentation.
       </p>
-      <a href="https://free.law/press-assets/">
-        <img src="{% static "png/logo-long-w350.png" %}" width="350" height="81">
+    {% endif %}
+
+    <h4 id="session-auth">Cookie Authentication</h4>
+    <p>To use Cookie Authentication <a href="{% url 'sign-in' %}">log into Courtlistener</a> and pass the cookie value using the standard cookie headers.
+    </p>
+
+    <h4 id="basic-auth">HTTP Basic Authentication</h4>
+    <p>To do HTTP Basic Authentication using curl, you might do something like this:
+    </p>
+    <pre class="scrollable">curl --user "harvey:your-password" \
+  "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}"</pre>
+    <p>You can also do it in your browser with a url like:</p>
+    <pre class="scrollable">{% get_full_host username='harvey' password='your-password' %}{% url "opinioncluster-list" version="v3" %}</pre>
+    <p>But if you're using your browser, <a href="{% url 'sign-in' %}">you might as well just log in</a>.
+    </p>
+
+
+    <h3 id="formats">Serialization Formats</h3>
+    <p>Requests may be serialized as HTML, JSON, or XML. JSON is the default if no format is specified. The format you wish to receive is requested via the HTTP <code>Accept</code> header.
+    </p>
+    <p>The following media types and parameters can be used:
+    </p>
+    <ul>
+      <li><strong>HTML</strong>: The media type for HTML is <code>text/html</code>.</li>
+      <li><strong>JSON</strong>: The media type for JSON is <code>application/json</code>. Providing the <code>indent</code> media type parameter allows clients to set the indenting for the response, for example: <code>Accept: application/json; indent=2</code>.
+      </li>
+      <li><strong>XML</strong>: The media type for XML is <code>application/xml</code>.</li>
+    </ul>
+    <p>By default, browsers send an <code>Accept</code> header similar to:
+    </p>
+    <pre class="scrollable">text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8</pre>
+    <p>This states that <code>text/html</code> is the preferred serialization format. The API respects that, returning HTML when requested by a browser and returning JSON when no <code>Accept</code> header is provided, because JSON is the default.
+    </p>
+    <p>If you wish to set the <code>Accept</code> header using a tool like cURL, you can do so using the <code>--header</code> flag:
+    </p>
+    <pre class="scrollable">curl --header "Accept: application/xml" \
+  "{% get_full_host %}{% url "opinioncluster-list" version="v3" %}"</pre>
+    <p>All data is serialized using the utf-8 charset.</p>
+
+
+    <h3 id="parsing">Parsing Uploaded Content</h3>
+    <p>If you are a user that has write access to these APIs (most users do not), you will need to use the <code>Content-Type</code> HTTP header to explicitly set the format of the content you are uploading. The header can be set to any of the values that are available for serialization or to <code>application/x-www-form-urlencoded</code> or <code>multipart/form-data</code>, if you are sending form data.
+    </p>
+
+
+    <h3 id="filtering">Filtering</h3>
+    <p>With the exception of the search API, these APIs can be filtered using a technique similar to <a href="https://docs.djangoproject.com/en/dev/ref/models/querysets/#field-lookups">Django's field lookups</a>.
+    </p>
+    <p>To see how an endpoint can be filtered, do an <code>OPTIONS</code> request on the API and inspect the <code>filters</code> key in the response.
+    </p>
+    <p>In the <code>filters</code> key, you'll find a dictionary listing the fields that can be used for filtering along with their types, lookup fields, and any values (aka choices) that can be used for specific lookups.
+    </p>
+    <p>For example, this uses <code>jq</code> to look at the filters on the docket API:</p>
+    <pre class="pre-scrollable">curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v3" %}" | jq '.filters'</pre>
+    <p>That returns something like:</p>
+    <pre class="pre-scrollable tall">{
+  "id": {
+    "type": "NumberRangeFilter",
+    "lookup_types": [
+      "exact",
+      "gte",
+      "gt",
+      "lte",
+      "lt",
+      "range"
+    ]
+  },
+...</pre>
+    <p>This means that you can filter dockets using the ID field, and that you can do exact, greater than or equal, greater than, less than or equal, less than, or range filtering.
+    </p>
+    <p>You can use these filters with a double underscore. For example, this gets IDs greater than 500 and less than 1,000:</p>
+    <pre class="pre-scrollable">curl \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v3" %}?id__gt=500&id__lt=1000" | jq '.count'
+499</pre>
+    <p>It also allows ranges (inclusive):</p>
+    <pre class="pre-scrollable">curl \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v3" %}?id__range=500,1000" | jq '.count'
+501</pre>
+    <p>Filters can be combined using multiple <code>GET</code> parameters.</p>
+    <p>There are a few special types of filters. The first are <code>Related Filters</code>, which allow you to join filters across APIs. For example, when you are using the docket API, you'll see that it has a filter for the court API:
+    </p>
+    <pre>
+"court": {
+    "type": "RelatedFilter",
+    "lookup_types": "See available filters for 'Courts'"
+}</pre>
+    <p>This means that you can use any of the court filters on the docket API. If you do an <code>OPTIONS</code> request on the court API, you'll see its filters:
+    </p>
+    <pre class="pre-scrollable">curl -X OPTIONS \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "court-list" version="v3" %}" | jq '.filters'</pre>
+    <p>Again, one of the fitlers is the ID field, but it only allows exact values on this API:</p>
+    <pre>
+"id": {
+    "type": "CharFilter",
+    "lookup_types": [
+        "exact"
+    ]
+}</pre>
+    <p>Putting this together, here's how you look up dockets for a particular court:
+    </p>
+    <pre class="pre-scrollable">curl \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docket-list" version="v3" %}?court=scotus&id__range=500,1000" | jq '.count'
+36</pre>
+    <p>This opens up many possibilities. For example, another filter on the <code>Court</code> endpoint is for <code>jurisdictions</code>. To use it, you would use a GET parameter like <code>court__jurisdictions=FD</code>. In this case, the double underscore allows you to join the filter from the other court API to the docket API.
+    </p>
+    <p>If you want to join a filter, you could do something like <code>court__full_name__startswith=district</code>. That would return dockets in courts where the court's name starts with "district".
+    </p>
+    <p><code>RelatedFilters</code> can span many objects. For example, if you want to get all the Supreme Court <code>Opinion</code> objects, you will need to do that with a query such as:
+    </p>
+    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v3" %}?cluster__docket__court=scotus"</pre>
+    <p>This uses the <code>Opinion</code> API to get <code>Opinions</code> that are part of <code>Opinion Clusters</code> that are on <code>Dockets</code> in the <code>Court</code> with the ID of <code>scotus</code>. To understand this data model better, see the <a href="{% url "case_law_api_help" %}">case law API documentation</a>.
+    </p>
+    <p>To use date filters, supply dates in <a href="https://en.wikipedia.org/wiki/ISO_8601" target="_blank">ISO-8601 format</a>.
+    </p>
+    <p>A final trick that can be used with the filters is the exclusion parameter. Any filter can be converted into an exclusion filter by prepending it with an exclamation mark. For example, this returns <code>Dockets</code> from non-Federal Appellate jurisdictions:
+    </p>
+    <pre class=pre-scrollable>curl "{% get_full_host %}{% url "docket-list" version="v3" %}?court__jurisdiction!=F"</pre>
+    <p>You can see more examples of filters in <a href="https://github.com/freelawproject/courtlistener/blob/main/cl/api/tests.py" target="_blank">our automated tests</a>.
+    </p>
+
+
+
+    <h3 id="ordering">Ordering</h3>
+    <p>With the exception of the search API, you can see which fields can be used for ordering, by looking at the <code>ordering</code> key in an <code>OPTIONS</code> request. For example, the <code>Position</code> endpoint contains this:
+    </p>
+    <pre class="pre-scrollable tall">
+"ordering": [
+    "id",
+    "date_created",
+    "date_modified",
+    "date_nominated",
+    "date_elected",
+    "date_recess_appointment",
+    "date_referred_to_judicial_committee",
+    "date_judicial_committee_action",
+    "date_hearing",
+    "date_confirmation",
+    "date_start",
+    "date_retirement",
+    "date_termination"
+]</pre>
+    <p>Thus, you can order using any of these fields in conjunction with the <code>order_by</code> parameter.
+    </p>
+    <p>Descending order can be done using a minus sign. Multiple fields can be requested using a comma-separated list. This, for example, returns judicial <code>Positions</code> ordered by the most recently modified, then by the most recently elected:
+    </p>
+    <pre class="scrollable">curl "{% get_full_host %}{% url "position-list" version="v3" %}?order_by=-date_modified,-date_elected"</pre>
+    <p>Ordering by fields with duplicate values is non-deterministic. If you wish to order by such a field, you should provide a second field as a tie-breaker to consistently order results. For example, ordering by <code>date_filed</code> will not return consistent ordering for items that have the same date, but this can be fixed by ordering by <code>date_filed,id</code>. In that case, if two items have the same <code>date_filed</code> value, the tie will be broken by the <code>id</code> field.
+    </p>
+
+
+    <h3 id="field-selection">Field Selection</h3>
+    <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields.
+    </p>
+    <p>For example, to only receive the <code>educations</code> and <code>date_modified</code> fields from the <code>Judge</code> endpoint you could do so with:
+    </p>
+    <pre class="scrollable">curl "{% get_full_host %}{% url "person-list" version="v3" %}?fields=educations,date_modified"
+{
+  "educations": [
+    {
+      "resource_uri": "https://www.courtlistener.com/api/rest/v3/educations/12856/",
+      "id": 12856,
+      "school": {
+        "resource_uri": "https://www.courtlistener.com/api/rest/v3/schools/4240/",
+        "id": 4240,
+        "is_alias_of": null,
+        "date_created": "2010-06-07T17:00:00-07:00",
+        "date_modified": "2010-06-07T17:00:00-07:00",
+        "name": "University of Maine",
+        "ein": 16000769
+      },
+      "person": "https://www.courtlistener.com/api/rest/v3/people/16214/",
+      "date_created": "2023-03-31T07:15:28.556198-07:00",
+      "date_modified": "2023-03-31T07:15:28.556222-07:00",
+      "degree_level": "jd",
+      "degree_detail": "",
+      "degree_year": 1979
+    }
+  ],
+  "date_modified": "2023-03-31T07:15:28.409594-07:00"
+},
+...</pre>
+    <p>You can also exclude fields using <code>fields!=educations,date_modified</code>.
+    </p>
+    <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/wimglenn/djangorestframework-queryfields/issues/8" target="_blank">there is an open issue tracking this</a>.
+    </p>
+
+
+    <h3 id="rates">Rate Limits</h3>
+    <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation.
+    </p>
+    <p>To debug throttling issues:</p>
+    <ol>
+      <li>Try browsing the API while logged into the website. If this works and your code fails, it usually means that your token authentication is not configured properly, and your code is getting throttled as an anonymous user, not according to your token.
+      </li>
+      <li>Review your recent API usage by looking in your <a href="{% url "view_api" %}#usage">profile</a>, but remember that it will show stats for the browsable API as well.
+      </li>
+      <li>Review the <a href="https://github.com/freelawproject/courtlistener/discussions/1497
+">authentication/throttling tips in our forum</a>.</li>
+    </ol>
+    <p>If, after checking the above, you need your rate limit increased, <a href="{% url "contact" %}">please get in touch</a> so we can help.
+    </p>
+
+
+    <h3 id="performance-tips">Performance Tips</h3>
+    <p>A few things to consider that may increase your performance:</p>
+    <ol>
+      <li>
+        <p>When doing deep crawls of the data, going to very high page numbers will incur increasingly bad performance. This is common in databases because to go to a high page number means sorting the entire data set, then counting to the correct location. Page 50 isn't a big deal. Page 2,000 starts getting slower.
+        </p>
+        <p>The fix to this solution is often to work with "slices" of the data. Instead of paginating across the whole result set, use a date field or another range-type field to only paginate over a smaller set of the data. For example, you could slice a large result set by the month of the date filing field to prevent deep pagination.
+        </p>
+        <p>Be careful to slice using a field with a normal distribution. Do not use one like <code>date_created</code>, which could have extreme spikes of activity.
+        </p>
+      </li>
+      <li>
+        <p>Avoid doing queries like <code>court__id=xyz</code> when you can instead do <code>court=xyz</code>. Doing queries with the extra <code>__id</code> introduces a join that can be expensive.</p>
+      </li>
+      <li>
+        <p>In general, less data is easier and faster to get than more. Could you use a field to filter your result set down to something smaller?
+        </p>
+      </li>
+      <li>
+        <p>When using the <code>search</code> endpoint, smaller result sets are faster. It isn't always possible to tweak your query to return fewer results, but sometimes it is possible to do a more precise query first, thus making a broader query unnecessary. For example, a search for an individual in their expected jurisdiction will be faster than doing it in the entire corpus. This will benefit from profiling in your use case and application.
+        </p>
+      </li>
+    </ol>
+
+    <h3 id="field-details">Advanced Field Definitions</h3>
+    <p>Placing an HTTP <code>OPTIONS</code> request on an API is the best way to learn about its fields, but some fields require further explanation. Click below to learn about these fields.
+    </p>
+    <p>
+      <a href="{% url "field_api_help" %}" class="btn btn-lg btn-default">Learn About Fields</a>
+    </p>
+
+
+    <h2 id="apis">APIs</h2>
+    <h3 id="case-law-apis">Case Law APIs</h3>
+    <p>We started collecting case law in 2009 and launched this API in 2013 as the <a href="https://free.law/2013/11/19/free-law-project-unveils-api-for-american-opinions/">first</a> API for legal decisions.
+    </p>
+    <p>Use this API to build your own collection of case law, complete complex legal research, and more.
+    </p>
+    <p>
+      <a href="{% url "case_law_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="pacer-apis">PACER Data APIs</h3>
+    <p>We have almost half a billion PACER-related objects in the RECAP Archive. Use these APIs to access and understand this data.
+    </p>
+    <p>
+      <a href="{% url "pacer_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="recap-apis">RECAP APIs</h3>
+    <p>Use these APIs to gather data from PACER and to share your PACER data with the public.
+    </p>
+    <p>
+      <a href="{% url "recap_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="search-api">Search API</h3>
+    <p>CourtListener allows you to search across hundreds of millions of items with advanced fields and operators. Use this API to automate the CourtListener search engine.
+    </p>
+    <p>
+      <a href="{% url "search_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+    </p>
+
+    <h3 id="judge-apis">Judge APIs</h3>
+    <p>Use these APIs to query and analyze thousands of federal and state court judges, including their biographical information, political affiliations, education and employment histories, and more.
+    </p>
+    <p>
+      <a href="{% url "judge_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="disclosure-apis">Financial Disclosure APIs</h3>
+    <p>All federal judges and many state judges must file financial disclosure documents to indicate any real or perceived biases they may have.
+    </p>
+    <p>Use these APIs to work with this information.</p>
+    <p>
+      <a href="{% url "financial_disclosures_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="oral-argument-apis">Oral Argument APIs</h3>
+    <p>CourtListener is home to the largest collection of oral argument recordings on the Internet. Use thees APIs to gather and analyze our collection.
+    </p>
+    <p>
+      <a href="{% url "oral_argument_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="citation-lookup">Citation Lookup and Verification&nbsp;API</h3>
+    <p>Use this API to look up citations in CourtListener's database of millions of citations.</p>
+    <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
+    </p>
+    <p>
+      <a href="{% url "citation_lookup_api" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="citation-network-apis">Citation Network APIs</h3>
+    <p>Use these APIs to traverse and analyze our network of citations between legal decisions.
+    </p>
+    <p>
+      <a href="{% url "citation_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+    </p>
+
+    <h3 id="alerts">Alert APIs</h3>
+    <p>CourtListener is a scalable system for sending alerts by email or <a href="{% url "webhooks_getting_started" %}">webhook</a> based on search queries or for particular cases. Use these APIs to create, modify, list, and delete alerts.</p>
+    <p>
+      <a href="{% url "alert_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+    </p>
+
+    <h3 id="visualizations">Visualization APIs</h3>
+    <p>To see and make Supreme Court case visualizations, use these APIs.</p>
+    <p>
+      <a href="{% url "visualization_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+    </p>
+
+
+
+    <h2 id="available-jurisdictions"><span>Available Jurisdictions</span></h2>
+    <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available, including all abbreviations, can <a href="{% url "court_index" %}">be found here</a>.
+    </p>
+
+    <h2 id="upgrades">Upgrades and Fixes</h2>
+    <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are encouraged. Just get in touch via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
+    </p>
+    <p>Getting this kind support is one of the most rewarding things possible for an organization like ours and is a major goal of <a href="https://free.law">Free Law Project</a>. Many of the features you use on CourtListener were built this way. We're building something together.
+    </p>
+
+    <h2 id="maintenance-schedule"><span>Maintenance Schedule</span></h2>
+    <p>There is a weekly maintenance window from 21:00-23:59PT on Thursday nights. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
+    </p>
+    <p>Additionally, we regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. You may encounter larger delays while bulk processing jobs are running.
+    </p>
+
+
+    <h2 id="api-change-log">API Change Log</h2>
+    <p><a href="{% url "rest_change_log" %}"
+          class="btn btn-lg btn-primary">View the Change Log</a>
+    </p>
+
+    <h2 id="copyright"><span>Copyright</span></h2>
+    <p>Our data is free of known copyright restrictions.<br />
+      <a rel="license" href="https://creativecommons.org/publicdomain/mark/1.0/">
+        <img src="{% static "png/cc-pd.png" %}" alt="Public Domain Mark" height="31" width="88"/>
       </a>
-    </div>
+    </p>
 
-    <div class="sidebar-section">
-      <h3><span>CiteGeist Scores</span></h3>
-      <p>If you are interested in the CiteGeist score for each opinion, it is now available via our <a href="{% url "bulk_data_index" %}#citegeist">bulk data API</a>.
-      </p>
-      <p>This data is not available via the REST API because a single new citation between cases causes a ripple effect through every value in the database.
-      </p>
-    </div>
+    {% include "includes/donate_footer_plea.html" %}
 
-    <div class="sidebar-section">
-      <h3><span>Maintenance Schedule</span></h3>
-      <p>Generally, we keep the APIs up and running around the clock, but for the rare times where maintenance requires downtime, we will schedule that downtime during a weekly maintenance window from 21:00-23:59PT on a Thursday night. If you are scheduling cron jobs or otherwise crawling the API, you may experience downtime during this window.
-      </p>
-      <p>Additionally, we regularly perform bulk tasks on our servers and maintain <a href="https://www.google.com/calendar/embed?src=michaeljaylissner.com_fvcq09gchprghkghqa69be5hl0@group.calendar.google.com&ctz=America/Los_Angeles">a public calendar</a> for tracking them. You may encounter larger delays while bulk processing jobs are running.
-      </p>
-    </div>
-
-    <div class="sidebar-section">
-      <h3><span>Browser Tools</span></h3>
-      <p>Several tools are available to help view JSON in your browser. If you are using Firefox, check out <a href="https://addons.mozilla.org/en-US/firefox/addon/jsonovich/">JSONovitch</a>. If you are using Chrome, check out <a href="https://chrome.google.com/webstore/detail/jsonview/chklaanhfefbnpoihckbnefhakgolnmc?hl=en">JSONView</a>.
-      </p>
-    </div>
-
-    {% include "includes/deprecated_sidebar_section.html" %}
-
-    <div class="sidebar-section">
-      <h3 id="copyright"><span>Copyright</span></h3>
-      <p>Our data is free of known copyright restrictions.<br />
-        <a rel="license" href="http://creativecommons.org/publicdomain/mark/1.0/">
-          <img src="https://i.creativecommons.org/p/mark/1.0/88x31.png" alt="Public Domain Mark" height="31" width="88"/>
-        </a>
-      </p>
-    </div>
   </div>
 {% endblock %}

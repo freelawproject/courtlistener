@@ -4,7 +4,11 @@ from rest_framework.authtoken.models import Token
 
 from cl.alerts.admin import AlertInline, DocketAlertInline
 from cl.api.admin import WebhookInline
-from cl.donate.admin import DonationInline, MonthlyDonationInline
+from cl.donate.admin import (
+    DonationInline,
+    MonthlyDonationInline,
+    NeonMembershipInline,
+)
 from cl.favorites.admin import NoteInline, UserTagInline
 from cl.lib.admin import AdminTweaksMixin
 from cl.users.models import (
@@ -49,6 +53,7 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         NoteInline,
         UserTagInline,
         TokenInline,
+        NeonMembershipInline,
     )
     list_display = (
         "username",

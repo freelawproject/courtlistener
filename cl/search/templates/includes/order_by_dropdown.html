@@ -13,7 +13,7 @@
                 selected="selected"
                 {% endif %}>Relevance</option>
 
-        {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or v == SEARCH_TYPES.DOCKETS %}
+        {% if v == SEARCH_TYPES.OPINION or v == SEARCH_TYPES.RECAP or v == SEARCH_TYPES.DOCKETS or v == SEARCH_TYPES.PARENTHETICAL %}
             <option value="dateFiled desc"
                     {% if search_form.order_by.value == "dateFiled desc" %}
                     selected="selected"

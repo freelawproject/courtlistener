@@ -11,7 +11,7 @@ class ExtraSolrInterface(SolrInterface):
     hl_fields = None
 
     def __init__(self, *args, **kwargs):
-        super(ExtraSolrInterface, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def query(self, *args, **kwargs):
         """
@@ -71,7 +71,7 @@ class ExtraSolrSearch(SolrSearch):
     )
 
     def _init_common_modules(self):
-        super(ExtraSolrSearch, self)._init_common_modules()
+        super()._init_common_modules()
         self.extra = ExtraOptions()
 
     def add_extra(self, **kwargs):

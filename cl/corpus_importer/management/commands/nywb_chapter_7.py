@@ -3,7 +3,6 @@ import csv
 import os
 
 from celery.canvas import chain
-from juriscraper.pacer import PacerSession
 
 from cl.corpus_importer.bulk_utils import (
     get_petitions,
@@ -15,6 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", "UNKNOWN!")
@@ -30,7 +30,7 @@ def get_dockets(options):
     reader = csv.DictReader(f)
     q = options["queue"]
     throttle = CeleryThrottle(queue_name=q)
-    pacer_session = PacerSession(
+    pacer_session = ProxyPacerSession(
         username=PACER_USERNAME, password=PACER_PASSWORD
     )
     pacer_session.login()
@@ -41,13 +41,17 @@ def get_dockets(options):
             break
 
         if i % 1000 == 0:
-            pacer_session = PacerSession(
+            pacer_session = ProxyPacerSession(
                 username=PACER_USERNAME, password=PACER_PASSWORD
             )
             pacer_session.login()
             logger.info(f"Sent {i} tasks to celery so far.")
         logger.info("Doing row %s", i)
         throttle.maybe_wait()
+        session_data = SessionData(
+            pacer_session.cookies,
+            pacer_session.proxy_address,
+        )
         chain(
             get_pacer_case_id_and_title.s(
                 pass_through=None,
@@ -55,13 +59,13 @@ def get_dockets(options):
                     row["DOCKET"], row["OFFICE"]
                 ),
                 court_id="nywb",
-                cookies=pacer_session.cookies,
+                session_data=session_data,
                 office_number=row["OFFICE"],
                 docket_number_letters="bk",
             ).set(queue=q),
             get_docket_by_pacer_case_id.s(
                 court_id="nywb",
-                cookies=pacer_session.cookies,
+                session_data=session_data,
                 tag_names=[TAG],
                 **{
                     "doc_num_start": 1,
