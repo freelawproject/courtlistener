@@ -1,5 +1,5 @@
-from typing import Any, cast, Set, TYPE_CHECKING
 from inspect import isclass
+from typing import TYPE_CHECKING, Any, Set, cast
 
 if TYPE_CHECKING:
     from pip._vendor.rich.console import RenderableType

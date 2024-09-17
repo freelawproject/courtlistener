@@ -42,7 +42,11 @@ class SSLTransport:
                 )
 
     def __init__(
-        self, socket, ssl_context, server_hostname=None, suppress_ragged_eofs=True
+        self,
+        socket,
+        ssl_context,
+        server_hostname=None,
+        suppress_ragged_eofs=True,
     ):
         """
         Create an SSLTransport around socket using the provided ssl_context.
@@ -79,7 +83,9 @@ class SSLTransport:
 
     def recv_into(self, buffer, nbytes=None, flags=0):
         if flags != 0:
-            raise ValueError("non-zero flags not allowed in calls to recv_into")
+            raise ValueError(
+                "non-zero flags not allowed in calls to recv_into"
+            )
         if buffer and (nbytes is None):
             nbytes = len(buffer)
         elif nbytes is None:
@@ -103,7 +109,12 @@ class SSLTransport:
         return response
 
     def makefile(
-        self, mode="r", buffering=None, encoding=None, errors=None, newline=None
+        self,
+        mode="r",
+        buffering=None,
+        encoding=None,
+        errors=None,
+        newline=None,
     ):
         """
         Python's httpclient uses makefile and buffered io when reading HTTP
@@ -113,7 +124,9 @@ class SSLTransport:
         changes to point to the socket directly.
         """
         if not set(mode) <= {"r", "w", "b"}:
-            raise ValueError("invalid mode %r (only r, w, b allowed)" % (mode,))
+            raise ValueError(
+                "invalid mode %r (only r, w, b allowed)" % (mode,)
+            )
 
         writing = "w" in mode
         reading = "r" in mode or not writing
@@ -202,7 +215,10 @@ class SSLTransport:
             try:
                 ret = func(*args)
             except ssl.SSLError as e:
-                if e.errno not in (ssl.SSL_ERROR_WANT_READ, ssl.SSL_ERROR_WANT_WRITE):
+                if e.errno not in (
+                    ssl.SSL_ERROR_WANT_READ,
+                    ssl.SSL_ERROR_WANT_WRITE,
+                ):
                     # WANT_READ, and WANT_WRITE are expected, others are not.
                     raise e
                 errno = e.errno

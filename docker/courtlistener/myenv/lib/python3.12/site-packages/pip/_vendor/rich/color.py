@@ -339,7 +339,10 @@ class Color(NamedTuple):
     @property
     def is_system_defined(self) -> bool:
         """Check if the color is ultimately defined by the system."""
-        return self.system not in (ColorSystem.EIGHT_BIT, ColorSystem.TRUECOLOR)
+        return self.system not in (
+            ColorSystem.EIGHT_BIT,
+            ColorSystem.TRUECOLOR,
+        )
 
     @property
     def is_default(self) -> bool:
@@ -375,7 +378,11 @@ class Color(NamedTuple):
             return WINDOWS_PALETTE[self.number]
         else:  # self.type == ColorType.DEFAULT:
             assert self.number is None
-            return theme.foreground_color if foreground else theme.background_color
+            return (
+                theme.foreground_color
+                if foreground
+                else theme.background_color
+            )
 
     @classmethod
     def from_ansi(cls, number: int) -> "Color":
@@ -442,7 +449,11 @@ class Color(NamedTuple):
         if color_number is not None:
             return cls(
                 color,
-                type=(ColorType.STANDARD if color_number < 16 else ColorType.EIGHT_BIT),
+                type=(
+                    ColorType.STANDARD
+                    if color_number < 16
+                    else ColorType.EIGHT_BIT
+                ),
                 number=color_number,
             )
 
@@ -453,17 +464,23 @@ class Color(NamedTuple):
         color_24, color_8, color_rgb = color_match.groups()
         if color_24:
             triplet = ColorTriplet(
-                int(color_24[0:2], 16), int(color_24[2:4], 16), int(color_24[4:6], 16)
+                int(color_24[0:2], 16),
+                int(color_24[2:4], 16),
+                int(color_24[4:6], 16),
             )
             return cls(color, ColorType.TRUECOLOR, triplet=triplet)
 
         elif color_8:
             number = int(color_8)
             if number > 255:
-                raise ColorParseError(f"color number must be <= 255 in {color!r}")
+                raise ColorParseError(
+                    f"color number must be <= 255 in {color!r}"
+                )
             return cls(
                 color,
-                type=(ColorType.STANDARD if number < 16 else ColorType.EIGHT_BIT),
+                type=(
+                    ColorType.STANDARD if number < 16 else ColorType.EIGHT_BIT
+                ),
                 number=number,
             )
 
@@ -507,7 +524,13 @@ class Color(NamedTuple):
         else:  # self.standard == ColorStandard.TRUECOLOR:
             assert self.triplet is not None
             red, green, blue = self.triplet
-            return ("38" if foreground else "48", "2", str(red), str(green), str(blue))
+            return (
+                "38" if foreground else "48",
+                "2",
+                str(red),
+                str(green),
+                str(blue),
+            )
 
     @lru_cache(maxsize=1024)
     def downgrade(self, system: ColorSystem) -> "Color":
@@ -516,7 +539,10 @@ class Color(NamedTuple):
         if self.type in (ColorType.DEFAULT, system):
             return self
         # Convert to 8-bit color from truecolor color
-        if system == ColorSystem.EIGHT_BIT and self.system == ColorSystem.TRUECOLOR:
+        if (
+            system == ColorSystem.EIGHT_BIT
+            and self.system == ColorSystem.TRUECOLOR
+        ):
             assert self.triplet is not None
             _h, l, s = rgb_to_hls(*self.triplet.normalized)
             # If saturation is under 15% assume it is grayscale
@@ -528,7 +554,9 @@ class Color(NamedTuple):
                     color_number = 231
                 else:
                     color_number = 231 + gray
-                return Color(self.name, ColorType.EIGHT_BIT, number=color_number)
+                return Color(
+                    self.name, ColorType.EIGHT_BIT, number=color_number
+                )
 
             red, green, blue = self.triplet
             six_red = red / 95 if red < 95 else 1 + (red - 95) / 40
@@ -536,7 +564,10 @@ class Color(NamedTuple):
             six_blue = blue / 95 if blue < 95 else 1 + (blue - 95) / 40
 
             color_number = (
-                16 + 36 * round(six_red) + 6 * round(six_green) + round(six_blue)
+                16
+                + 36 * round(six_red)
+                + 6 * round(six_green)
+                + round(six_blue)
             )
             return Color(self.name, ColorType.EIGHT_BIT, number=color_number)
 
@@ -559,7 +590,9 @@ class Color(NamedTuple):
             else:  # self.system == ColorSystem.EIGHT_BIT
                 assert self.number is not None
                 if self.number < 16:
-                    return Color(self.name, ColorType.WINDOWS, number=self.number)
+                    return Color(
+                        self.name, ColorType.WINDOWS, number=self.number
+                    )
                 triplet = ColorTriplet(*EIGHT_BIT_PALETTE[self.number])
 
             color_number = WINDOWS_PALETTE.match(triplet)
@@ -572,7 +605,9 @@ def parse_rgb_hex(hex_color: str) -> ColorTriplet:
     """Parse six hex characters in to RGB triplet."""
     assert len(hex_color) == 6, "must be 6 characters"
     color = ColorTriplet(
-        int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+        int(hex_color[0:2], 16),
+        int(hex_color[2:4], 16),
+        int(hex_color[4:6], 16),
     )
     return color
 
@@ -615,7 +650,11 @@ if __name__ == "__main__":  # pragma: no cover
         else:
             color = EIGHT_BIT_PALETTE[color_number]  # type: ignore[has-type]
             table.add_row(
-                color_cell, str(color_number), Text(f'"{name}"'), color.hex, color.rgb
+                color_cell,
+                str(color_number),
+                Text(f'"{name}"'),
+                color.hex,
+                color.rgb,
             )
 
     console.print(table)

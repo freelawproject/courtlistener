@@ -75,7 +75,8 @@ class LiveRender:
             _, height = self._shape
             return Control(
                 ControlType.CARRIAGE_RETURN,
-                *((ControlType.CURSOR_UP, 1), (ControlType.ERASE_IN_LINE, 2)) * height
+                *((ControlType.CURSOR_UP, 1), (ControlType.ERASE_IN_LINE, 2))
+                * height
             )
         return Control()
 
@@ -84,7 +85,9 @@ class LiveRender:
     ) -> RenderResult:
         renderable = self.renderable
         style = console.get_style(self.style)
-        lines = console.render_lines(renderable, options, style=style, pad=False)
+        lines = console.render_lines(
+            renderable, options, style=style, pad=False
+        )
         shape = Segment.get_shape(lines)
 
         _, height = shape

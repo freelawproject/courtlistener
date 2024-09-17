@@ -79,11 +79,16 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
+from cl.search.models import (
+    SEARCH_TYPES,
+    Court,
+    Opinion,
+    OpinionCluster,
+    SearchQuery,
+)
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
-from cl.search.models import SearchQuery 
 
 logger = logging.getLogger(__name__)
 
@@ -532,7 +537,10 @@ def show_results(request: HttpRequest) -> HttpResponse:
                             search_results = do_es_search(request.GET.copy())
                         else:
                             search_results = do_search(request.GET.copy())
-                    elif search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+                    elif search_type in [
+                        SEARCH_TYPES.RECAP,
+                        SEARCH_TYPES.DOCKETS,
+                    ]:
                         if waffle.flag_is_active(request, "r-es-active"):
                             search_results = do_es_search(request.GET.copy())
                         else:
@@ -550,17 +558,19 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     render_dict.update(search_results)
 
                     # Check if the search hit the cache
-                    if 'query_time' in search_results:
-                        query_time = search_results['query_time']
-                        hit_cache = search_results.get('hit_cache', False)
+                    if "query_time" in search_results:
+                        query_time = search_results["query_time"]
+                        hit_cache = search_results.get("hit_cache", False)
                     else:
-                        query_time = 0  # Default if query_time is not available
+                        query_time = (
+                            0  # Default if query_time is not available
+                        )
 
                     # Create and save the SearchQuery object
                     SearchQuery.objects.create(
                         get_params=request.GET.urlencode(),
                         query_time_ms=query_time,
-                        hit_cache=hit_cache
+                        hit_cache=hit_cache,
                     )
 
                 # Create bare-bones alert form.

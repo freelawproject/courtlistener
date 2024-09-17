@@ -1,5 +1,5 @@
-
 from django.db import models
+
 
 class SearchQuery(models.Model):
     date_created = models.DateTimeField(auto_now_add=True, db_index=True)

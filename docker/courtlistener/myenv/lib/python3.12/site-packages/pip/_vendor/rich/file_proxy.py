@@ -27,7 +27,9 @@ class FileProxy(io.TextIOBase):
 
     def write(self, text: str) -> int:
         if not isinstance(text, str):
-            raise TypeError(f"write() argument must be str, not {type(text).__name__}")
+            raise TypeError(
+                f"write() argument must be str, not {type(text).__name__}"
+            )
         buffer = self.__buffer
         lines: List[str] = []
         while text:

@@ -82,12 +82,16 @@ if __name__ == "__main__":  # pragma: no cover
     from .console import Console
 
     console = Console(width=10)
-    console.print("12345 abcdefghijklmnopqrstuvwyxzABCDEFGHIJKLMNOPQRSTUVWXYZ 12345")
+    console.print(
+        "12345 abcdefghijklmnopqrstuvwyxzABCDEFGHIJKLMNOPQRSTUVWXYZ 12345"
+    )
     print(chop_cells("abcdefghijklmnopqrstuvwxyz", 10))
 
     console = Console(width=20)
     console.rule()
-    console.print("TextualはPythonの高速アプリケーション開発フレームワークです")
+    console.print(
+        "TextualはPythonの高速アプリケーション開発フレームワークです"
+    )
 
     console.rule()
     console.print("アプリケーションは1670万色を使用でき")

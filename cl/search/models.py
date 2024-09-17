@@ -48,6 +48,7 @@ from cl.search.docket_sources import DocketSources
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
+
 class SearchQuery(models.Model):
     date_created = models.DateTimeField(auto_now_add=True, db_index=True)
     date_modified = models.DateTimeField(auto_now=True, db_index=True)
@@ -57,7 +58,7 @@ class SearchQuery(models.Model):
 
     def __str__(self):
         return f"Query: {self.get_params} at {self.date_created}"
-    
+
 
 class PRECEDENTIAL_STATUS:
     PUBLISHED = "Published"

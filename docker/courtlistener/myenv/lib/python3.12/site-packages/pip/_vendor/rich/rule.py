@@ -82,7 +82,9 @@ class Rule(JupyterMixin):
             side_width = (width - cell_len(title_text.plain)) // 2
             left = Text(characters * (side_width // chars_len + 1))
             left.truncate(side_width - 1)
-            right_length = width - cell_len(left.plain) - cell_len(title_text.plain)
+            right_length = (
+                width - cell_len(left.plain) - cell_len(title_text.plain)
+            )
             right = Text(characters * (side_width // chars_len + 1))
             right.truncate(right_length)
             rule_text.append(left.plain + " ", self.style)
@@ -92,10 +94,14 @@ class Rule(JupyterMixin):
             title_text.truncate(truncate_width, overflow="ellipsis")
             rule_text.append(title_text)
             rule_text.append(" ")
-            rule_text.append(characters * (width - rule_text.cell_len), self.style)
+            rule_text.append(
+                characters * (width - rule_text.cell_len), self.style
+            )
         elif self.align == "right":
             title_text.truncate(truncate_width, overflow="ellipsis")
-            rule_text.append(characters * (width - title_text.cell_len - 1), self.style)
+            rule_text.append(
+                characters * (width - title_text.cell_len - 1), self.style
+            )
             rule_text.append(" ")
             rule_text.append(title_text)
 
@@ -103,7 +109,9 @@ class Rule(JupyterMixin):
         yield rule_text
 
     def _rule_line(self, chars_len: int, width: int) -> Text:
-        rule_text = Text(self.characters * ((width // chars_len) + 1), self.style)
+        rule_text = Text(
+            self.characters * ((width // chars_len) + 1), self.style
+        )
         rule_text.truncate(width)
         rule_text.plain = set_cell_size(rule_text.plain, width)
         return rule_text

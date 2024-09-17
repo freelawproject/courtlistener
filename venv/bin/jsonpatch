@@ -1,5 +1,4 @@
 #!/Users/pinguin/courtlistener/venv/bin/python
-# -*- coding: utf-8 -*-
 
 import sys
 import os.path
@@ -10,22 +9,46 @@ import argparse
 
 
 parser = argparse.ArgumentParser(
-    description='Apply a JSON patch on a JSON file')
-parser.add_argument('ORIGINAL', type=argparse.FileType('r'),
-                    help='Original file')
-parser.add_argument('PATCH', type=argparse.FileType('r'),
-                    nargs='?', default=sys.stdin,
-                    help='Patch file (read from stdin if omitted)')
-parser.add_argument('--indent', type=int, default=None,
-                    help='Indent output by n spaces')
-parser.add_argument('-b', '--backup', action='store_true',
-                    help='Back up ORIGINAL if modifying in-place')
-parser.add_argument('-i', '--in-place', action='store_true',
-                    help='Modify ORIGINAL in-place instead of to stdout')
-parser.add_argument('-v', '--version', action='version',
-                    version='%(prog)s ' + jsonpatch.__version__)
-parser.add_argument('-u', '--preserve-unicode', action='store_true',
-                    help='Output Unicode character as-is without using Code Point')
+    description="Apply a JSON patch on a JSON file"
+)
+parser.add_argument(
+    "ORIGINAL", type=argparse.FileType("r"), help="Original file"
+)
+parser.add_argument(
+    "PATCH",
+    type=argparse.FileType("r"),
+    nargs="?",
+    default=sys.stdin,
+    help="Patch file (read from stdin if omitted)",
+)
+parser.add_argument(
+    "--indent", type=int, default=None, help="Indent output by n spaces"
+)
+parser.add_argument(
+    "-b",
+    "--backup",
+    action="store_true",
+    help="Back up ORIGINAL if modifying in-place",
+)
+parser.add_argument(
+    "-i",
+    "--in-place",
+    action="store_true",
+    help="Modify ORIGINAL in-place instead of to stdout",
+)
+parser.add_argument(
+    "-v",
+    "--version",
+    action="version",
+    version="%(prog)s " + jsonpatch.__version__,
+)
+parser.add_argument(
+    "-u",
+    "--preserve-unicode",
+    action="store_true",
+    help="Output Unicode character as-is without using Code Point",
+)
+
 
 def main():
     try:
@@ -35,7 +58,7 @@ def main():
 
 
 def patch_files():
-    """ Diffs two JSON files and prints a patch """
+    """Diffs two JSON files and prints a patch"""
     args = parser.parse_args()
     doc = json.load(args.ORIGINAL)
     patch = json.load(args.PATCH)
@@ -49,10 +72,10 @@ def patch_files():
             # creating a temporary file in the same directory as the
             # original file so we can atomically move the new file over
             # the original later.  (This is done in the same directory
-	    # because atomic renames do not work across mount points.)
+            # because atomic renames do not work across mount points.)
 
             fd, pathname = tempfile.mkstemp(dir=dirname)
-            fp = os.fdopen(fd, 'w')
+            fp = os.fdopen(fd, "w")
             atomic = True
 
         except OSError:
@@ -61,8 +84,8 @@ def patch_files():
             # the original (if desired) and writing a new file.
 
             if args.backup:
-                os.rename(args.ORIGINAL.name, args.ORIGINAL.name + '.orig')
-            fp = open(args.ORIGINAL.name, 'w')
+                os.rename(args.ORIGINAL.name, args.ORIGINAL.name + ".orig")
+            fp = open(args.ORIGINAL.name, "w")
             atomic = False
 
     else:
@@ -71,11 +94,16 @@ def patch_files():
 
         fp = sys.stdout
 
-    # By this point we have some sort of file object we can write the 
+    # By this point we have some sort of file object we can write the
     # modified JSON to.
-    
-    json.dump(result, fp, indent=args.indent, ensure_ascii=not(args.preserve_unicode))
-    fp.write('\n')
+
+    json.dump(
+        result,
+        fp,
+        indent=args.indent,
+        ensure_ascii=not (args.preserve_unicode),
+    )
+    fp.write("\n")
 
     if args.in_place:
         # Close the new file.  If we aren't replacing atomically, this
@@ -90,7 +118,7 @@ def patch_files():
                 # on the temporary file, and moving it into place.
 
                 if args.backup:
-                    os.link(args.ORIGINAL.name, args.ORIGINAL.name + '.orig')
+                    os.link(args.ORIGINAL.name, args.ORIGINAL.name + ".orig")
                 os.chmod(pathname, os.stat(args.ORIGINAL.name).st_mode)
                 os.rename(pathname, args.ORIGINAL.name)
 
@@ -98,7 +126,7 @@ def patch_files():
                 # In the event we could not actually do the atomic
                 # replace, unlink the original to move it out of the
                 # way and finally move the temporary file into place.
-                
+
                 os.unlink(args.ORIGINAL.name)
                 os.rename(pathname, args.ORIGINAL.name)
 

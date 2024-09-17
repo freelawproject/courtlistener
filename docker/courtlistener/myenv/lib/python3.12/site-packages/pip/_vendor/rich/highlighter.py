@@ -229,4 +229,6 @@ if __name__ == "__main__":  # pragma: no cover
     )
     import json
 
-    console.print_json(json.dumps(obj={"name": "apple", "count": 1}), indent=None)
+    console.print_json(
+        json.dumps(obj={"name": "apple", "count": 1}), indent=None
+    )

@@ -63,11 +63,13 @@ class Control:
 
     def __init__(self, *codes: Union[ControlType, ControlCode]) -> None:
         control_codes: List[ControlCode] = [
-            (code,) if isinstance(code, ControlType) else code for code in codes
+            (code,) if isinstance(code, ControlType) else code
+            for code in codes
         ]
         _format_map = CONTROL_CODES_FORMAT
         rendered_codes = "".join(
-            _format_map[code](*parameters) for code, *parameters in control_codes
+            _format_map[code](*parameters)
+            for code, *parameters in control_codes
         )
         self.segment = Segment(rendered_codes, None, control_codes)
 
@@ -98,7 +100,11 @@ class Control:
             control = ControlType
             if x:
                 yield (
-                    control.CURSOR_FORWARD if x > 0 else control.CURSOR_BACKWARD,
+                    (
+                        control.CURSOR_FORWARD
+                        if x > 0
+                        else control.CURSOR_BACKWARD
+                    ),
                     abs(x),
                 )
             if y:
@@ -126,7 +132,11 @@ class Control:
             cls(
                 (ControlType.CURSOR_MOVE_TO_COLUMN, x),
                 (
-                    ControlType.CURSOR_DOWN if y > 0 else ControlType.CURSOR_UP,
+                    (
+                        ControlType.CURSOR_DOWN
+                        if y > 0
+                        else ControlType.CURSOR_UP
+                    ),
                     abs(y),
                 ),
             )
@@ -155,7 +165,9 @@ class Control:
     @classmethod
     def show_cursor(cls, show: bool) -> "Control":
         """Show or hide the cursor."""
-        return cls(ControlType.SHOW_CURSOR if show else ControlType.HIDE_CURSOR)
+        return cls(
+            ControlType.SHOW_CURSOR if show else ControlType.HIDE_CURSOR
+        )
 
     @classmethod
     def alt_screen(cls, enable: bool) -> "Control":

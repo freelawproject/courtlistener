@@ -82,7 +82,10 @@ class ProgressBar(JupyterMixin):
         """
         bar = "-" if ascii else "━"
         segments: List[Segment] = []
-        if color_system not in ("standard", "eight_bit", "truecolor") or no_color:
+        if (
+            color_system not in ("standard", "eight_bit", "truecolor")
+            or no_color
+        ):
             segments += [Segment(bar, fore_style)] * (PULSE_SIZE // 2)
             segments += [Segment(" " if no_color else bar, back_style)] * (
                 PULSE_SIZE - (PULSE_SIZE // 2)
@@ -142,7 +145,11 @@ class ProgressBar(JupyterMixin):
         back_style = console.get_style(self.style, default="black")
 
         pulse_segments = self._get_pulse_segments(
-            fore_style, back_style, console.color_system, console.no_color, ascii=ascii
+            fore_style,
+            back_style,
+            console.color_system,
+            console.no_color,
+            ascii=ascii,
         )
         segment_count = len(pulse_segments)
         current_time = (
@@ -164,7 +171,9 @@ class ProgressBar(JupyterMixin):
             return
 
         completed: Optional[float] = (
-            min(self.total, max(0, self.completed)) if self.total is not None else None
+            min(self.total, max(0, self.completed))
+            if self.total is not None
+            else None
         )
 
         bar = "-" if ascii else "━"

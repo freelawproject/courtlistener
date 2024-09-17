@@ -77,7 +77,10 @@ class Measurement(NamedTuple):
 
     @classmethod
     def get(
-        cls, console: "Console", options: "ConsoleOptions", renderable: "RenderableType"
+        cls,
+        console: "Console",
+        options: "ConsoleOptions",
+        renderable: "RenderableType",
     ) -> "Measurement":
         """Get a measurement for a renderable.
 
@@ -142,7 +145,8 @@ def measure_renderables(
         return Measurement(0, 0)
     get_measurement = Measurement.get
     measurements = [
-        get_measurement(console, options, renderable) for renderable in renderables
+        get_measurement(console, options, renderable)
+        for renderable in renderables
     ]
     measured_width = Measurement(
         max(measurements, key=itemgetter(0)).minimum,

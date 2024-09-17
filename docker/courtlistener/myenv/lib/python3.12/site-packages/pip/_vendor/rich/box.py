@@ -33,7 +33,9 @@ class Box:
     def __init__(self, box: str, *, ascii: bool = False) -> None:
         self._box = box
         self.ascii = ascii
-        line1, line2, line3, line4, line5, line6, line7, line8 = box.splitlines()
+        line1, line2, line3, line4, line5, line6, line7, line8 = (
+            box.splitlines()
+        )
         # top
         self.top_left, self.top, self.top_divider, self.top_right = iter(line1)
         # head
@@ -49,7 +51,9 @@ class Box:
         # mid
         self.mid_left, _, self.mid_vertical, self.mid_right = iter(line4)
         # row
-        self.row_left, self.row_horizontal, self.row_cross, self.row_right = iter(line5)
+        self.row_left, self.row_horizontal, self.row_cross, self.row_right = (
+            iter(line5)
+        )
         # foot_row
         (
             self.foot_row_left,
@@ -60,9 +64,12 @@ class Box:
         # foot
         self.foot_left, _, self.foot_vertical, self.foot_right = iter(line7)
         # bottom
-        self.bottom_left, self.bottom, self.bottom_divider, self.bottom_right = iter(
-            line8
-        )
+        (
+            self.bottom_left,
+            self.bottom,
+            self.bottom_divider,
+            self.bottom_right,
+        ) = iter(line8)
 
     def __repr__(self) -> str:
         return "Box(...)"
@@ -70,7 +77,9 @@ class Box:
     def __str__(self) -> str:
         return self._box
 
-    def substitute(self, options: "ConsoleOptions", safe: bool = True) -> "Box":
+    def substitute(
+        self, options: "ConsoleOptions", safe: bool = True
+    ) -> "Box":
         """Substitute this box for another if it won't render due to platform issues.
 
         Args:
@@ -460,7 +469,9 @@ if __name__ == "__main__":  # pragma: no cover
         "MARKDOWN",
     ]
 
-    console.print(Panel("[bold green]Box Constants", style="green"), justify="center")
+    console.print(
+        Panel("[bold green]Box Constants", style="green"), justify="center"
+    )
     console.print()
 
     columns = Columns(expand=True, padding=2)

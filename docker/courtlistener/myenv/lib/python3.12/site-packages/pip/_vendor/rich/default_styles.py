@@ -79,11 +79,15 @@ DEFAULT_STYLES: Dict[str, Style] = {
     "repr.attrib_equal": Style(bold=True),
     "repr.attrib_value": Style(color="magenta", italic=False),
     "repr.number": Style(color="cyan", bold=True, italic=False),
-    "repr.number_complex": Style(color="cyan", bold=True, italic=False),  # same
+    "repr.number_complex": Style(
+        color="cyan", bold=True, italic=False
+    ),  # same
     "repr.bool_true": Style(color="bright_green", italic=True),
     "repr.bool_false": Style(color="bright_red", italic=True),
     "repr.none": Style(color="magenta", italic=True),
-    "repr.url": Style(underline=True, color="bright_blue", italic=False, bold=False),
+    "repr.url": Style(
+        underline=True, color="bright_blue", italic=False, bold=False
+    ),
     "repr.uuid": Style(color="bright_yellow", bold=False),
     "repr.call": Style(color="magenta", bold=True),
     "repr.path": Style(color="magenta"),
@@ -139,7 +143,9 @@ DEFAULT_STYLES: Dict[str, Style] = {
     "markdown.paragraph": Style(),
     "markdown.text": Style(),
     "markdown.em": Style(italic=True),
-    "markdown.emph": Style(italic=True),  # For commonmark backwards compatibility
+    "markdown.emph": Style(
+        italic=True
+    ),  # For commonmark backwards compatibility
     "markdown.strong": Style(bold=True),
     "markdown.code": Style(bold=True, color="cyan", bgcolor="black"),
     "markdown.code_block": Style(color="cyan", bgcolor="black"),
@@ -175,10 +181,16 @@ if __name__ == "__main__":  # pragma: no cover
     from pip._vendor.rich.text import Text
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--html", action="store_true", help="Export as HTML table")
+    parser.add_argument(
+        "--html", action="store_true", help="Export as HTML table"
+    )
     args = parser.parse_args()
     html: bool = args.html
-    console = Console(record=True, width=70, file=io.StringIO()) if html else Console()
+    console = (
+        Console(record=True, width=70, file=io.StringIO())
+        if html
+        else Console()
+    )
 
     table = Table("Name", "Styling")
 

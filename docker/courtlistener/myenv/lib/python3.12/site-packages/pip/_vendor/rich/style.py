@@ -193,7 +193,9 @@ class Style:
             f"{randint(0, 999999)}{hash(self._meta)}" if (link or meta) else ""
         )
         self._hash: Optional[int] = None
-        self._null = not (self._set_attributes or color or bgcolor or link or meta)
+        self._null = not (
+            self._set_attributes or color or bgcolor or link or meta
+        )
 
     @classmethod
     def null(cls) -> "Style":
@@ -246,7 +248,9 @@ class Style:
         return style
 
     @classmethod
-    def on(cls, meta: Optional[Dict[str, Any]] = None, **handlers: Any) -> "Style":
+    def on(
+        cls, meta: Optional[Dict[str, Any]] = None, **handlers: Any
+    ) -> "Style":
         """Create a blank style with meta information.
 
         Example:
@@ -310,7 +314,9 @@ class Style:
                     append("strike" if self.strike else "not strike")
             if bits & 0b1111000000000:
                 if bits & (1 << 9):
-                    append("underline2" if self.underline2 else "not underline2")
+                    append(
+                        "underline2" if self.underline2 else "not underline2"
+                    )
                 if bits & (1 << 10):
                     append("frame" if self.frame else "not frame")
                 if bits & (1 << 11):
@@ -365,7 +371,9 @@ class Style:
                         if attributes & (1 << bit):
                             append(_style_map[bit])
             if self._color is not None:
-                sgr.extend(self._color.downgrade(color_system).get_ansi_codes())
+                sgr.extend(
+                    self._color.downgrade(color_system).get_ansi_codes()
+                )
             if self._bgcolor is not None:
                 sgr.extend(
                     self._bgcolor.downgrade(color_system).get_ansi_codes(
@@ -472,7 +480,11 @@ class Style:
     @property
     def meta(self) -> Dict[str, Any]:
         """Get meta information (can not be changed after construction)."""
-        return {} if self._meta is None else cast(Dict[str, Any], loads(self._meta))
+        return (
+            {}
+            if self._meta is None
+            else cast(Dict[str, Any], loads(self._meta))
+        )
 
     @property
     def without_color(self) -> "Style":
@@ -573,7 +585,9 @@ class Style:
             color, bgcolor = bgcolor, color
         if self.dim:
             foreground_color = (
-                theme.foreground_color if color is None else color.get_truecolor(theme)
+                theme.foreground_color
+                if color is None
+                else color.get_truecolor(theme)
             )
             color = Color.from_triplet(
                 blend_rgb(foreground_color, theme.background_color, 0.5)
@@ -712,9 +726,7 @@ class Style:
         attrs = self._ansi or self._make_ansi_codes(color_system)
         rendered = f"\x1b[{attrs}m{text}\x1b[0m" if attrs else text
         if self._link and not legacy_windows:
-            rendered = (
-                f"\x1b]8;id={self._link_id};{self._link}\x1b\\{rendered}\x1b]8;;\x1b\\"
-            )
+            rendered = f"\x1b]8;id={self._link_id};{self._link}\x1b\\{rendered}\x1b]8;;\x1b\\"
         return rendered
 
     def test(self, text: Optional[str] = None) -> None:
@@ -743,7 +755,9 @@ class Style:
         new_style._attributes = (self._attributes & ~style._set_attributes) | (
             style._attributes & style._set_attributes
         )
-        new_style._set_attributes = self._set_attributes | style._set_attributes
+        new_style._set_attributes = (
+            self._set_attributes | style._set_attributes
+        )
         new_style._link = style._link or self._link
         new_style._link_id = style._link_id or self._link_id
         new_style._null = style._null

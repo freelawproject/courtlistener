@@ -76,14 +76,14 @@ class Lines:
         return iter(self._lines)
 
     @overload
-    def __getitem__(self, index: int) -> "Text":
-        ...
+    def __getitem__(self, index: int) -> "Text": ...
 
     @overload
-    def __getitem__(self, index: slice) -> List["Text"]:
-        ...
+    def __getitem__(self, index: slice) -> List["Text"]: ...
 
-    def __getitem__(self, index: Union[slice, int]) -> Union["Text", List["Text"]]:
+    def __getitem__(
+        self, index: Union[slice, int]
+    ) -> Union["Text", List["Text"]]:
         return self._lines[index]
 
     def __setitem__(self, index: int, value: "Text") -> "Lines":
@@ -162,6 +162,10 @@ class Lines:
                     if index < len(spaces):
                         style = word.get_style_at_offset(console, -1)
                         next_style = next_word.get_style_at_offset(console, 0)
-                        space_style = style if style == next_style else line.style
-                        tokens.append(Text(" " * spaces[index], style=space_style))
+                        space_style = (
+                            style if style == next_style else line.style
+                        )
+                        tokens.append(
+                            Text(" " * spaces[index], style=space_style)
+                        )
                 self[line_index] = Text("").join(tokens)

@@ -136,7 +136,9 @@ def make_setuptools_egg_info_args(
     egg_info_dir: Optional[str],
     no_user_config: bool,
 ) -> List[str]:
-    args = make_setuptools_shim_args(setup_py_path, no_user_config=no_user_config)
+    args = make_setuptools_shim_args(
+        setup_py_path, no_user_config=no_user_config
+    )
 
     args += ["egg_info"]
 

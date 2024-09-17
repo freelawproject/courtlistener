@@ -69,7 +69,9 @@ else:
 
 def select_wait_for_socket(sock, read=False, write=False, timeout=None):
     if not read and not write:
-        raise RuntimeError("must specify at least one of read=True, write=True")
+        raise RuntimeError(
+            "must specify at least one of read=True, write=True"
+        )
     rcheck = []
     wcheck = []
     if read:
@@ -88,7 +90,9 @@ def select_wait_for_socket(sock, read=False, write=False, timeout=None):
 
 def poll_wait_for_socket(sock, read=False, write=False, timeout=None):
     if not read and not write:
-        raise RuntimeError("must specify at least one of read=True, write=True")
+        raise RuntimeError(
+            "must specify at least one of read=True, write=True"
+        )
     mask = 0
     if read:
         mask |= select.POLLIN

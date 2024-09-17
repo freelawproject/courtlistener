@@ -32,7 +32,9 @@ def _configure_context(ctx: ssl.SSLContext) -> typing.Iterator[None]:
     #   and verifying that that path exists
     # In addition we'll check whether capath appears to contain certs.
     defaults = ssl.get_default_verify_paths()
-    if defaults.cafile or (defaults.capath and _capath_contains_certs(defaults.capath)):
+    if defaults.cafile or (
+        defaults.capath and _capath_contains_certs(defaults.capath)
+    ):
         ctx.set_default_verify_paths()
     else:
         # cafile from OpenSSL doesn't exist

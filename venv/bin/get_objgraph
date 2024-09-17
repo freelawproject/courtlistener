@@ -20,35 +20,40 @@ Examples::
 """
 
 import dill as pickle
-#pickle.debug.trace(True)
-#import pickle
+
+# pickle.debug.trace(True)
+# import pickle
 
 # get all objects for testing
 from dill import load_types
-load_types(pickleable=True,unpickleable=True)
+
+load_types(pickleable=True, unpickleable=True)
 from dill import objects
 
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) != 2:
-        print ("Please provide exactly one file or type name (e.g. 'IntType')")
+        print("Please provide exactly one file or type name (e.g. 'IntType')")
         msg = "\n"
         for objtype in list(objects.keys())[:40]:
-            msg += objtype + ', '
-        print (msg + "...")
+            msg += objtype + ", "
+        print(msg + "...")
     else:
         objtype = str(sys.argv[-1])
         try:
             obj = objects[objtype]
         except KeyError:
-            obj = pickle.load(open(objtype,'rb'))
+            obj = pickle.load(open(objtype, "rb"))
             import os
+
             objtype = os.path.splitext(objtype)[0]
         try:
             import objgraph
-            objgraph.show_refs(obj, filename=objtype+'.png')
+
+            objgraph.show_refs(obj, filename=objtype + ".png")
         except ImportError:
-            print ("Please install 'objgraph' to view object graphs")
+            print("Please install 'objgraph' to view object graphs")
 
 
 # EOF

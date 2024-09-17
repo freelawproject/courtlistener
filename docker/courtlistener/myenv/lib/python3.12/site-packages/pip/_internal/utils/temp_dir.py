@@ -148,7 +148,9 @@ class TempDirectory:
 
     @property
     def path(self) -> str:
-        assert not self._deleted, f"Attempted to access deleted path: {self._path}"
+        assert (
+            not self._deleted
+        ), f"Attempted to access deleted path: {self._path}"
         return self._path
 
     def __repr__(self) -> str:
@@ -203,7 +205,9 @@ class TempDirectory:
                     formatted_exc,
                 )
             else:
-                logger.debug("%s failed with %s.", func.__qualname__, formatted_exc)
+                logger.debug(
+                    "%s failed with %s.", func.__qualname__, formatted_exc
+                )
             errors.append(exc_val)
 
         if self.ignore_cleanup_errors:

@@ -50,7 +50,9 @@ else:
         except LegacyWindowsError:
             console_mode = 0
             success = False
-        vt = bool(success and console_mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+        vt = bool(
+            success and console_mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        )
         truecolor = False
         if vt:
             win_version = sys.getwindowsversion()

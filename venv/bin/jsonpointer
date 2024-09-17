@@ -1,5 +1,4 @@
 #!/Users/pinguin/courtlistener/venv/bin/python
-# -*- coding: utf-8 -*-
 
 from __future__ import print_function
 
@@ -11,24 +10,39 @@ import argparse
 
 
 parser = argparse.ArgumentParser(
-    description='Resolve a JSON pointer on JSON files')
+    description="Resolve a JSON pointer on JSON files"
+)
 
 # Accept pointer as argument or as file
 ptr_group = parser.add_mutually_exclusive_group(required=True)
 
-ptr_group.add_argument('-f', '--pointer-file', type=argparse.FileType('r'),
-                       nargs='?',
-                       help='File containing a JSON pointer expression')
+ptr_group.add_argument(
+    "-f",
+    "--pointer-file",
+    type=argparse.FileType("r"),
+    nargs="?",
+    help="File containing a JSON pointer expression",
+)
 
-ptr_group.add_argument('POINTER',  type=str, nargs='?',
-                       help='A JSON pointer expression')
+ptr_group.add_argument(
+    "POINTER", type=str, nargs="?", help="A JSON pointer expression"
+)
 
-parser.add_argument('FILE', type=argparse.FileType('r'), nargs='+',
-                    help='Files for which the pointer should be resolved')
-parser.add_argument('--indent', type=int, default=None,
-                    help='Indent output by n spaces')
-parser.add_argument('-v', '--version', action='version',
-                    version='%(prog)s ' + jsonpointer.__version__)
+parser.add_argument(
+    "FILE",
+    type=argparse.FileType("r"),
+    nargs="+",
+    help="Files for which the pointer should be resolved",
+)
+parser.add_argument(
+    "--indent", type=int, default=None, help="Indent output by n spaces"
+)
+parser.add_argument(
+    "-v",
+    "--version",
+    action="version",
+    version="%(prog)s " + jsonpointer.__version__,
+)
 
 
 def main():
@@ -51,7 +65,7 @@ def parse_pointer(args):
 
 
 def resolve_files():
-    """ Resolve a JSON pointer on JSON files """
+    """Resolve a JSON pointer on JSON files"""
     args = parser.parse_args()
 
     ptr = parse_pointer(args)
@@ -62,7 +76,7 @@ def resolve_files():
             result = jsonpointer.resolve_pointer(doc, ptr)
             print(json.dumps(result, indent=args.indent))
         except jsonpointer.JsonPointerException as e:
-            print('Could not resolve pointer: %s' % str(e), file=sys.stderr)
+            print("Could not resolve pointer: %s" % str(e), file=sys.stderr)
 
 
 if __name__ == "__main__":

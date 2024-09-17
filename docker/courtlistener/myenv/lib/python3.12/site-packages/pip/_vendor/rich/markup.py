@@ -1,7 +1,16 @@
 import re
 from ast import literal_eval
 from operator import attrgetter
-from typing import Callable, Iterable, List, Match, NamedTuple, Optional, Tuple, Union
+from typing import (
+    Callable,
+    Iterable,
+    List,
+    Match,
+    NamedTuple,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from ._emoji_replace import _emoji_replace
 from .emoji import EmojiVariant
@@ -27,7 +36,9 @@ class Tag(NamedTuple):
 
     def __str__(self) -> str:
         return (
-            self.name if self.parameters is None else f"{self.name} {self.parameters}"
+            self.name
+            if self.parameters is None
+            else f"{self.name} {self.parameters}"
         )
 
     @property
@@ -42,7 +53,9 @@ class Tag(NamedTuple):
 
 _ReStringMatch = Match[str]  # regex match object
 _ReSubCallable = Callable[[_ReStringMatch], str]  # Callable invoked by re.sub
-_EscapeSubMethod = Callable[[_ReSubCallable, str], str]  # Sub method of a compiled re
+_EscapeSubMethod = Callable[
+    [_ReSubCallable, str], str
+]  # Sub method of a compiled re
 
 
 def escape(
@@ -127,7 +140,11 @@ def render(
     emoji_replace = _emoji_replace
     if "[" not in markup:
         return Text(
-            emoji_replace(markup, default_variant=emoji_variant) if emoji else markup,
+            (
+                emoji_replace(markup, default_variant=emoji_variant)
+                if emoji
+                else markup
+            ),
             style=style,
         )
     text = Text(style=style)
@@ -181,9 +198,13 @@ def render(
                         parameters = open_tag.parameters.strip()
                         handler_match = RE_HANDLER.match(parameters)
                         if handler_match is not None:
-                            handler_name, match_parameters = handler_match.groups()
+                            handler_name, match_parameters = (
+                                handler_match.groups()
+                            )
                             parameters = (
-                                "()" if match_parameters is None else match_parameters
+                                "()"
+                                if match_parameters is None
+                                else match_parameters
                             )
 
                         try:
@@ -200,9 +221,11 @@ def render(
                         if handler_name:
                             meta_params = (
                                 handler_name,
-                                meta_params
-                                if isinstance(meta_params, tuple)
-                                else (meta_params,),
+                                (
+                                    meta_params
+                                    if isinstance(meta_params, tuple)
+                                    else (meta_params,)
+                                ),
                             )
 
                     else:
@@ -210,7 +233,9 @@ def render(
 
                     append_span(
                         _Span(
-                            start, len(text), Style(meta={open_tag.name: meta_params})
+                            start,
+                            len(text),
+                            Style(meta={open_tag.name: meta_params}),
                         )
                     )
                 else:

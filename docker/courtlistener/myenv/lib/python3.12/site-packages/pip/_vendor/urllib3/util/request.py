@@ -76,7 +76,9 @@ def make_headers(
         headers["connection"] = "keep-alive"
 
     if basic_auth:
-        headers["authorization"] = "Basic " + b64encode(b(basic_auth)).decode("utf-8")
+        headers["authorization"] = "Basic " + b64encode(b(basic_auth)).decode(
+            "utf-8"
+        )
 
     if proxy_basic_auth:
         headers["proxy-authorization"] = "Basic " + b64encode(
@@ -133,5 +135,6 @@ def rewind_body(body, body_pos):
         )
     else:
         raise ValueError(
-            "body_pos must be of type integer, instead it was %s." % type(body_pos)
+            "body_pos must be of type integer, instead it was %s."
+            % type(body_pos)
         )

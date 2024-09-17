@@ -138,7 +138,9 @@ class ConfigurationCommand(Command):
 
         return SUCCESS
 
-    def _determine_file(self, options: Values, need_value: bool) -> Optional[Kind]:
+    def _determine_file(
+        self, options: Values, need_value: bool
+    ) -> Optional[Kind]:
         file_options = [
             key
             for key, value in (
@@ -210,7 +212,9 @@ class ConfigurationCommand(Command):
 
     def print_config_file_values(self, variant: Kind) -> None:
         """Get key-value pairs from the file of a variant"""
-        for name, value in self.configuration.get_values_in_config(variant).items():
+        for name, value in self.configuration.get_values_in_config(
+            variant
+        ).items():
             with indent_log():
                 write_output("%s: %s", name, value)
 
@@ -242,7 +246,9 @@ class ConfigurationCommand(Command):
                 e.filename = editor
             raise
         except subprocess.CalledProcessError as e:
-            raise PipError(f"Editor Subprocess exited with exit code {e.returncode}")
+            raise PipError(
+                f"Editor Subprocess exited with exit code {e.returncode}"
+            )
 
     def _get_n_args(self, args: List[str], example: str, n: int) -> Any:
         """Helper to make sure the command got the right number of arguments"""

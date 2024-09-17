@@ -59,7 +59,11 @@ class JupyterMixin:
 def _render_segments(segments: Iterable[Segment]) -> str:
     def escape(text: str) -> str:
         """Escape html."""
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        return (
+            text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
 
     fragments: List[str] = []
     append_fragment = fragments.append

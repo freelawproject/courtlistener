@@ -128,7 +128,9 @@ class Live(JupyterMixin, RenderHook):
                     self.stop()
                     raise
             if self.auto_refresh:
-                self._refresh_thread = _RefreshThread(self, self.refresh_per_second)
+                self._refresh_thread = _RefreshThread(
+                    self, self.refresh_per_second
+                )
                 self._refresh_thread.start()
 
     def stop(self) -> None:
@@ -158,7 +160,9 @@ class Live(JupyterMixin, RenderHook):
                         self.console.set_alt_screen(False)
 
                     if self.transient and not self._alt_screen:
-                        self.console.control(self._live_render.restore_cursor())
+                        self.console.control(
+                            self._live_render.restore_cursor()
+                        )
                     if self.ipy_widget is not None and self.transient:
                         self.ipy_widget.close()  # pragma: no cover
 
@@ -179,10 +183,14 @@ class Live(JupyterMixin, RenderHook):
         if self.console.is_terminal or self.console.is_jupyter:
             if self._redirect_stdout and not isinstance(sys.stdout, FileProxy):
                 self._restore_stdout = sys.stdout
-                sys.stdout = cast("TextIO", FileProxy(self.console, sys.stdout))
+                sys.stdout = cast(
+                    "TextIO", FileProxy(self.console, sys.stdout)
+                )
             if self._redirect_stderr and not isinstance(sys.stderr, FileProxy):
                 self._restore_stderr = sys.stderr
-                sys.stderr = cast("TextIO", FileProxy(self.console, sys.stderr))
+                sys.stderr = cast(
+                    "TextIO", FileProxy(self.console, sys.stderr)
+                )
 
     def _disable_redirect_io(self) -> None:
         """Disable redirecting of stdout / stderr."""
@@ -203,7 +211,9 @@ class Live(JupyterMixin, RenderHook):
         renderable = self.get_renderable()
         return Screen(renderable) if self._alt_screen else renderable
 
-    def update(self, renderable: RenderableType, *, refresh: bool = False) -> None:
+    def update(
+        self, renderable: RenderableType, *, refresh: bool = False
+    ) -> None:
         """Update the renderable that is being displayed
 
         Args:
@@ -237,7 +247,9 @@ class Live(JupyterMixin, RenderHook):
                     with self.ipy_widget:
                         self.ipy_widget.clear_output(wait=True)
                         self.console.print(self._live_render.renderable)
-            elif self.console.is_terminal and not self.console.is_dumb_terminal:
+            elif (
+                self.console.is_terminal and not self.console.is_dumb_terminal
+            ):
                 with self.console:
                     self.console.print(Control())
             elif (
@@ -362,7 +374,10 @@ if __name__ == "__main__":  # pragma: no cover
                 table.add_column("Destination Currency")
                 table.add_column("Exchange Rate")
 
-                for (source, dest), exchange_rate in exchange_rate_dict.items():
+                for (
+                    source,
+                    dest,
+                ), exchange_rate in exchange_rate_dict.items():
                     table.add_row(
                         source,
                         dest,

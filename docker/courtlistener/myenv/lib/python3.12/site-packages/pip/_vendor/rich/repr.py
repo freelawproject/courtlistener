@@ -16,7 +16,9 @@ from typing import (
 T = TypeVar("T")
 
 
-Result = Iterable[Union[Any, Tuple[Any], Tuple[str, Any], Tuple[str, Any, Any]]]
+Result = Iterable[
+    Union[Any, Tuple[Any], Tuple[str, Any], Tuple[str, Any, Any]]
+]
 RichReprResult = Result
 
 
@@ -25,13 +27,11 @@ class ReprError(Exception):
 
 
 @overload
-def auto(cls: Optional[Type[T]]) -> Type[T]:
-    ...
+def auto(cls: Optional[Type[T]]) -> Type[T]: ...
 
 
 @overload
-def auto(*, angular: bool = False) -> Callable[[Type[T]], Type[T]]:
-    ...
+def auto(*, angular: bool = False) -> Callable[[Type[T]], Type[T]]: ...
 
 
 def auto(
@@ -79,7 +79,9 @@ def auto(
                         if param.default is param.empty:
                             yield getattr(self, param.name)
                         else:
-                            yield param.name, getattr(self, param.name), param.default
+                            yield param.name, getattr(
+                                self, param.name
+                            ), param.default
             except Exception as error:
                 raise ReprError(
                     f"Failed to auto generate __rich_repr__; {error}"
@@ -102,13 +104,11 @@ def auto(
 
 
 @overload
-def rich_repr(cls: Optional[Type[T]]) -> Type[T]:
-    ...
+def rich_repr(cls: Optional[Type[T]]) -> Type[T]: ...
 
 
 @overload
-def rich_repr(*, angular: bool = False) -> Callable[[Type[T]], Type[T]]:
-    ...
+def rich_repr(*, angular: bool = False) -> Callable[[Type[T]], Type[T]]: ...
 
 
 def rich_repr(

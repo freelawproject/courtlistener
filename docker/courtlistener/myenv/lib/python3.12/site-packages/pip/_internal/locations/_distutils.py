@@ -106,7 +106,9 @@ def distutils_scheme(
         )
 
         if root is not None:
-            path_no_drive = os.path.splitdrive(os.path.abspath(scheme["headers"]))[1]
+            path_no_drive = os.path.splitdrive(
+                os.path.abspath(scheme["headers"])
+            )[1]
             scheme["headers"] = os.path.join(root, path_no_drive[1:])
 
     return scheme

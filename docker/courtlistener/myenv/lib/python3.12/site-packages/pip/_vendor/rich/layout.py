@@ -232,7 +232,9 @@ class Layout:
             table = Table.grid(padding=(0, 1, 0, 0))
 
             text: RenderableType = (
-                Pretty(layout) if layout.visible else Styled(Pretty(layout), "dim")
+                Pretty(layout)
+                if layout.visible
+                else Styled(Pretty(layout), "dim")
             )
             table.add_row(icon, text)
             _summary = table
@@ -344,7 +346,9 @@ class Layout:
 
     def _make_region_map(self, width: int, height: int) -> RegionMap:
         """Create a dict that maps layout on to Region."""
-        stack: List[Tuple[Layout, Region]] = [(self, Region(0, 0, width, height))]
+        stack: List[Tuple[Layout, Region]] = [
+            (self, Region(0, 0, width, height))
+        ]
         push = stack.append
         pop = stack.pop
         layout_regions: List[Tuple[Layout, Region]] = []
@@ -354,7 +358,9 @@ class Layout:
             layout, region = layout_regions[-1]
             children = layout.children
             if children:
-                for child_and_region in layout.splitter.divide(children, region):
+                for child_and_region in layout.splitter.divide(
+                    children, region
+                ):
                     push(child_and_region)
 
         region_map = {
@@ -387,7 +393,8 @@ class Layout:
 
         for layout, region in layout_regions:
             lines = render_lines(
-                layout.renderable, update_dimensions(region.width, region.height)
+                layout.renderable,
+                update_dimensions(region.width, region.height),
             )
             render_map[layout] = LayoutRender(region, lines)
         return render_map
@@ -398,7 +405,9 @@ class Layout:
         with self._lock:
             width = options.max_width or console.width
             height = options.height or console.height
-            render_map = self.render(console, options.update_dimensions(width, height))
+            render_map = self.render(
+                console, options.update_dimensions(width, height)
+            )
             self._render_map = render_map
             layout_lines: List[List[Segment]] = [[] for _ in range(height)]
             _islice = islice
@@ -429,13 +438,17 @@ if __name__ == "__main__":
 
     layout["main"].split_row(Layout(name="side"), Layout(name="body", ratio=2))
 
-    layout["body"].split_row(Layout(name="content", ratio=2), Layout(name="s2"))
+    layout["body"].split_row(
+        Layout(name="content", ratio=2), Layout(name="s2")
+    )
 
     layout["s2"].split_column(
         Layout(name="top"), Layout(name="middle"), Layout(name="bottom")
     )
 
-    layout["side"].split_column(Layout(layout.tree, name="left1"), Layout(name="left2"))
+    layout["side"].split_column(
+        Layout(layout.tree, name="left1"), Layout(name="left2")
+    )
 
     layout["content"].update("foo")
 

@@ -176,7 +176,11 @@ class Inspect(JupyterMixin):
             key_text = Text.assemble(
                 (
                     key,
-                    "inspect.attr.dunder" if key.startswith("__") else "inspect.attr",
+                    (
+                        "inspect.attr.dunder"
+                        if key.startswith("__")
+                        else "inspect.attr"
+                    ),
                 ),
                 (" =", "inspect.equals"),
             )
@@ -197,7 +201,9 @@ class Inspect(JupyterMixin):
                     if self.docs:
                         docs = self._get_formatted_doc(value)
                         if docs is not None:
-                            _signature_text.append("\n" if "\n" in docs else " ")
+                            _signature_text.append(
+                                "\n" if "\n" in docs else " "
+                            )
                             doc = highlighter(docs)
                             doc.stylize("inspect.doc")
                             _signature_text.append(doc)

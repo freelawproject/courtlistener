@@ -1,6 +1,9 @@
 from __future__ import absolute_import
 
-from email.errors import MultipartInvariantViolationDefect, StartBoundaryNotFoundDefect
+from email.errors import (
+    MultipartInvariantViolationDefect,
+    StartBoundaryNotFoundDefect,
+)
 
 from ..exceptions import HeaderParsingError
 from ..packages.six.moves import http_client as httplib
@@ -53,7 +56,9 @@ def assert_header_parsing(headers):
     # This will fail silently if we pass in the wrong kind of parameter.
     # To make debugging easier add an explicit check.
     if not isinstance(headers, httplib.HTTPMessage):
-        raise TypeError("expected httplib.Message, got {0}.".format(type(headers)))
+        raise TypeError(
+            "expected httplib.Message, got {0}.".format(type(headers))
+        )
 
     defects = getattr(headers, "defects", None)
     get_payload = getattr(headers, "get_payload", None)
@@ -83,7 +88,11 @@ def assert_header_parsing(headers):
             defect
             for defect in defects
             if not isinstance(
-                defect, (StartBoundaryNotFoundDefect, MultipartInvariantViolationDefect)
+                defect,
+                (
+                    StartBoundaryNotFoundDefect,
+                    MultipartInvariantViolationDefect,
+                ),
             )
         ]
 

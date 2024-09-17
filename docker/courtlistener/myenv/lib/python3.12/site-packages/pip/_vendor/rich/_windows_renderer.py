@@ -1,10 +1,15 @@
 from typing import Iterable, Sequence, Tuple, cast
 
-from pip._vendor.rich._win32_console import LegacyWindowsTerm, WindowsCoordinates
+from pip._vendor.rich._win32_console import (
+    LegacyWindowsTerm,
+    WindowsCoordinates,
+)
 from pip._vendor.rich.segment import ControlCode, ControlType, Segment
 
 
-def legacy_windows_render(buffer: Iterable[Segment], term: LegacyWindowsTerm) -> None:
+def legacy_windows_render(
+    buffer: Iterable[Segment], term: LegacyWindowsTerm
+) -> None:
     """Makes appropriate Windows Console API calls based on the segments in the buffer.
 
     Args:
@@ -23,7 +28,9 @@ def legacy_windows_render(buffer: Iterable[Segment], term: LegacyWindowsTerm) ->
                 control_type = control_code[0]
                 if control_type == ControlType.CURSOR_MOVE_TO:
                     _, x, y = cast(Tuple[ControlType, int, int], control_code)
-                    term.move_cursor_to(WindowsCoordinates(row=y - 1, col=x - 1))
+                    term.move_cursor_to(
+                        WindowsCoordinates(row=y - 1, col=x - 1)
+                    )
                 elif control_type == ControlType.CARRIAGE_RETURN:
                     term.write_text("\r")
                 elif control_type == ControlType.HOME:
