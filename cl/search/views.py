@@ -83,6 +83,7 @@ from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
+from cl.search.models import SearchQuery 
 
 logger = logging.getLogger(__name__)
 
@@ -513,6 +514,54 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 # Just a regular search
                 if not is_bot(request):
                     async_to_sync(tally_stat)("search.results")
+
+                    # Perform the search
+                    search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
+                    hit_cache = False  # Initialize hit_cache
+
+                    if search_type == SEARCH_TYPES.PARENTHETICAL:
+                        search_results = do_es_search(request.GET.copy())
+                    elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
+                        # Check if waffle flag is active.
+                        if waffle.flag_is_active(request, "oa-es-active"):
+                            search_results = do_es_search(request.GET.copy())
+                        else:
+                            search_results = do_search(request.GET.copy())
+                    elif search_type == SEARCH_TYPES.PEOPLE:
+                        if waffle.flag_is_active(request, "p-es-active"):
+                            search_results = do_es_search(request.GET.copy())
+                        else:
+                            search_results = do_search(request.GET.copy())
+                    elif search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+                        if waffle.flag_is_active(request, "r-es-active"):
+                            search_results = do_es_search(request.GET.copy())
+                        else:
+                            search_results = do_search(request.GET.copy())
+                    elif search_type == SEARCH_TYPES.OPINION:
+                        if waffle.flag_is_active(request, "o-es-active"):
+                            search_results = do_es_search(request.GET.copy())
+                        else:
+                            search_results = do_search(request.GET.copy())
+                    elif search_type == SEARCH_TYPES.RECAP_DOCUMENT:
+                        search_results = do_es_search(request.GET.copy())
+                    else:
+                        search_results = do_search(request.GET.copy())
+
+                    render_dict.update(search_results)
+
+                    # Check if the search hit the cache
+                    if 'query_time' in search_results:
+                        query_time = search_results['query_time']
+                        hit_cache = search_results.get('hit_cache', False)
+                    else:
+                        query_time = 0  # Default if query_time is not available
+
+                    # Create and save the SearchQuery object
+                    SearchQuery.objects.create(
+                        get_params=request.GET.urlencode(),
+                        query_time_ms=query_time,
+                        hit_cache=hit_cache
+                    )
 
                 # Create bare-bones alert form.
                 alert_form = CreateAlertForm(
