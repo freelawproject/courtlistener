@@ -316,16 +316,32 @@ def get_pdfs(
     throttle = CeleryThrottle(queue_name=q)
     completed = 0
     cycle_checker = CycleChecker()
+    current_court = None
+    prev_court = None
     for row in rows.iterator():
         # Wait until the queue is short enough
         throttle.maybe_wait()
 
-        if cycle_checker.check_if_cycled(row.court_id):
-            print(
-                f"Court cycle completed. Sleep 1 second before starting the next cycle."
-            )
-            time.sleep(1)
+        # Keep track of current and previous processed court
+        prev_court = current_court
+        current_court = row.court_id
 
+        if cycle_checker.check_if_cycled(row.court_id):
+            if prev_court != current_court:
+                # We are cycling different courts, wait 1s before start next cycle
+                sleep = 1
+            else:
+                # We are cycling the same court over and over again, waiting longer
+                # before queuing up more items from the same court
+                sleep = 3
+
+            logger.info(
+                f"Court cycle completed for: {row.court_id}. Current iteration: {cycle_checker.current_iteration}. Sleep {sleep} second(s) "
+                f"before starting the next cycle."
+            )
+            time.sleep(sleep)
+
+        logger.info(f"Processing row id: {row.id} from {row.court_id}")
         c = chain(
             process_free_opinion_result.si(
                 row.pk,

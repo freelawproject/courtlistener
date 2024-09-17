@@ -444,7 +444,6 @@ def get_and_save_free_document_report(
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-@throttle_task("1/4s", key="court_id")
 def process_free_opinion_result(
     self,
     row_pk: int,
@@ -595,7 +594,6 @@ def process_free_opinion_result(
     interval_step=5,
     ignore_result=True,
 )
-@throttle_task("1/6s", key="court_id")
 def get_and_process_free_pdf(
     self: Task,
     data: TaskData,
