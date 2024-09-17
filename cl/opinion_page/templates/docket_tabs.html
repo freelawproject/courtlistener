@@ -445,7 +445,7 @@
       <ul>
         {% for af in docket.audio_files.all %}
           <li>
-            <a href="{{ af.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+            <a href="{{ af.get_absolute_url }}{% querystring %}">
                 {{ af|best_case_name|safe|v_wrapper }}
             </a>
             {% if perms.audio.change_audio %}
