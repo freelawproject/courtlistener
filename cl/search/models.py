@@ -59,6 +59,7 @@ class SearchQuery(models.Model):
     def str(self):
         return f"Query: {self.get_params} at {self.date_created}"
 
+
 class PRECEDENTIAL_STATUS:
     PUBLISHED = "Published"
     UNPUBLISHED = "Unpublished"

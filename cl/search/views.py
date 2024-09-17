@@ -79,12 +79,19 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster, SearchQuery
+from cl.search.models import (
+    SEARCH_TYPES,
+    Court,
+    Opinion,
+    OpinionCluster,
+    SearchQuery,
+)
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
 
 logger = logging.getLogger(__name__)
+
 
 def check_pagination_depth(page_number):
     """Check if the pagination is too deep (indicating a crawler)"""
@@ -511,7 +518,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 # Just a regular search
                 if not is_bot(request):
                     async_to_sync(tally_stat)("search.results")
-                    
+
                     # Perform the search
                     search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
 
@@ -520,15 +527,22 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
                         # Check if waffle flag is active.
                         if waffle.flag_is_active(request, "oa-es-active"):
-                            render_dict.update(do_es_search(request.GET.copy()))
+                            render_dict.update(
+                                do_es_search(request.GET.copy())
+                            )
                         else:
                             render_dict.update(do_search(request.GET.copy()))
                     elif search_type == SEARCH_TYPES.PEOPLE:
                         if waffle.flag_is_active(request, "p-es-active"):
-                            render_dict.update(do_es_search(request.GET.copy()))
+                            render_dict.update(
+                                do_es_search(request.GET.copy())
+                            )
                         else:
                             render_dict.update(do_search(request.GET.copy()))
-                    elif search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
+                    elif search_type in [
+                        SEARCH_TYPES.RECAP,
+                        SEARCH_TYPES.DOCKETS,
+                    ]:
                         if waffle.flag_is_active(request, "r-es-active"):
                             search_results = do_es_search(request.GET.copy())
                         else:
@@ -536,7 +550,9 @@ def show_results(request: HttpRequest) -> HttpResponse:
                         render_dict.update(search_results)
                     elif search_type == SEARCH_TYPES.OPINION:
                         if waffle.flag_is_active(request, "o-es-active"):
-                            render_dict.update(do_es_search(request.GET.copy()))
+                            render_dict.update(
+                                do_es_search(request.GET.copy())
+                            )
                         else:
                             render_dict.update(do_search(request.GET.copy()))
                     elif search_type == SEARCH_TYPES.RECAP_DOCUMENT:
@@ -547,8 +563,8 @@ def show_results(request: HttpRequest) -> HttpResponse:
                     # Create and save the SearchQuery object
                     SearchQuery.objects.create(
                         get_params=request.GET.urlencode(),
-                        query_time_ms=render_dict.get('query_time', 0),
-                        hit_cache=render_dict.get('hit_cache', False)
+                        query_time_ms=render_dict.get("query_time", 0),
+                        hit_cache=render_dict.get("hit_cache", False),
                     )
 
                 # Create bare-bones alert form.
@@ -564,6 +580,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             render_dict.update({"alert_form": alert_form})
 
             return TemplateResponse(request, "search.html", render_dict)
+
 
 def advanced(request: HttpRequest) -> HttpResponse:
     render_dict = {"private": False}
