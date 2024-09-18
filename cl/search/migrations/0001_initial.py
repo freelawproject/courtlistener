@@ -419,17 +419,17 @@ class Migration(migrations.Migration):
             name='recapdocument',
             unique_together={('docket_entry', 'document_number', 'attachment_number')},
         ),
-        migrations.AlterIndexTogether(
-            name='recapdocument',
-            index_together={('document_type', 'document_number', 'attachment_number')},
+        migrations.AddIndex(
+            model_name='recapdocument',
+            index=models.Index(fields=['document_type', 'document_number', 'attachment_number'], name='search_recapdocument_document_type_303cccac79571217_idx'),
         ),
         migrations.AlterUniqueTogether(
             name='opinionscited',
             unique_together={('citing_opinion', 'cited_opinion')},
         ),
-        migrations.AlterIndexTogether(
-            name='docketentry',
-            index_together={('recap_sequence_number', 'entry_number')},
+        migrations.AddIndex(
+            model_name='docketentry',
+            index=models.Index(fields=['recap_sequence_number', 'entry_number'], name='search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx')
         ),
         migrations.AddIndex(
             model_name='docket',
@@ -439,16 +439,17 @@ class Migration(migrations.Migration):
             name='docket',
             unique_together={('docket_number', 'pacer_case_id', 'court')},
         ),
-        migrations.AlterIndexTogether(
-            name='docket',
-            index_together={('ia_upload_failure_count', 'ia_needs_upload', 'ia_date_first_change')},
-        ),
         migrations.AlterUniqueTogether(
             name='citation',
             unique_together={('cluster', 'volume', 'reporter', 'page')},
         ),
-        migrations.AlterIndexTogether(
-            name='citation',
-            index_together={('volume', 'reporter', 'page'), ('volume', 'reporter')},
+        migrations.AddIndex(
+            model_name='citation',
+            index=models.Index(fields=['volume', 'reporter', 'page'], name='search_citation_volume_ae340b5b02e8912_idx')
         ),
+        migrations.AddIndex(
+            model_name='citation',
+            index=models.Index(fields=['volume', 'reporter'], name='search_citation_volume_251bc1d270a8abee_idx')
+        ),
+
     ]

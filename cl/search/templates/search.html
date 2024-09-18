@@ -28,7 +28,7 @@
             <link rel="alternate"
                   type="application/rss+xml"
                   title="Atom Feed for These Search Results"
-                  href="/feed/search/?{{ get_string }}" />
+                  href="/feed/search/{% querystring %}" />
           {% endif %}
         {% endif %}
     {% endif %}
@@ -304,12 +304,12 @@
                               Judge{{ results.paginator.count|pluralize }}
                         {% endif %}
                         {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
-                            <a href="/feed/search/?{{ get_string }}">
+                            <a href="/feed/search/{% querystring %}">
                                 <i class="gray fa fa-rss"
                                    title="Subscribe to a feed of these results"></i>
                             </a>
                         {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
-                            <a href="/podcast/search/?{{ get_string }}">
+                            <a href="/podcast/search/{% querystring %}">
                                 <i class="gray fa fa-podcast"
                                    title="Subscribe to a podcast of these results"></i>
                             </a>

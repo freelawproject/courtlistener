@@ -182,7 +182,6 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     return TemplateResponse(request, template, render_dict)
 
 
-@sync_to_async
 @group_required(
     "tenn_work_uploaders",
     "uploaders_tennworkcompcl",
@@ -195,7 +194,6 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
     "uploaders_miss",
     "uploaders_missctapp",
 )
-@async_to_sync
 async def court_publish_page(request: HttpRequest, pk: str) -> HttpResponse:
     """Display upload form and intake Opinions for partner courts
 

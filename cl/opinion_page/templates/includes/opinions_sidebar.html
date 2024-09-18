@@ -3,7 +3,7 @@
 <ul>
   {% for opinion in opinions %}
       <li>
-          <a href="{{ opinion.absolute_url }}?{{ request.META.QUERY_STRING }}">
+        <a href="{{ opinion.absolute_url }}{% querystring %}">
               {% with opinion.title as title  %}
                 {{ opinion.caseName|default:title|default_if_none:"N/A"|safe|truncatewords:10|v_wrapper }}
               {% endwith %}

@@ -100,7 +100,7 @@
             {% endfor %}
           </ul>
           <h4>
-            <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}?{{ request.META.QUERY_STRING }}"
+            <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}{% querystring %}"
                class="btn btn-default">
               View All Summaries
             </a>
@@ -123,7 +123,7 @@
             <ul>
               {% for citing_cluster in citing_clusters %}
                 <li>
-                  <a href="{{ citing_cluster.absolute_url }}?{{ request.META.QUERY_STRING }}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }} ({{ citing_cluster.dateFiled|date:"Y" }})</a>
+                  <a href="{{ citing_cluster.absolute_url }}{% querystring %}">{{ citing_cluster.caseName|safe|truncatewords:12|v_wrapper }} ({{ citing_cluster.dateFiled|date:"Y" }})</a>
                 </li>
               {% endfor %}
             </ul>
