@@ -367,4 +367,13 @@ urlpatterns = [
         "api/replication/",
         RedirectView.as_view(pattern_name="replication_docs", permanent=True),
     ),
+    # V4 Migration guide
+    path(
+        "help/api/migration-docs/",
+        TemplateView.as_view(
+            template_name="migration-docs.html",
+            extra_context={"private": False},
+        ),
+        name="migration_docs",
+    ),
 ]
