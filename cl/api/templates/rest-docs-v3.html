@@ -25,6 +25,13 @@
     {% include "includes/toc_sidebar.html" %}
   </div>
   <div class="col-xs-12 col-md-8 col-lg-6">
+    <div class="alert-danger alert">
+      <p class="bottom">These notes are for a version of the API that has
+          been deprecated and will soon be disabled completely. Please use
+          the <a href="{% url "rest_docs" %}">latest version</a>, as
+          these notes are only maintained to help with migrations.
+      </p>
+    </div>
     <h1 id="about">REST API &ndash; v3.15</h1>
 
     <p class="lead">APIs for developers and researchers that need granular legal data.
