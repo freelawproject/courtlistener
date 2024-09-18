@@ -203,7 +203,9 @@ def resolve_fullcase_citation(
         if waffle.switch_is_active("es_resolve_citations"):
             # Revolve citations using ES; enable once all the opinions are
             # indexed.
-            db_search_results = es_search_db_for_full_citation(full_citation)
+            db_search_results, _ = es_search_db_for_full_citation(
+                full_citation
+            )
         else:
             db_search_results = search_db_for_fullcitation(full_citation)
         # If there is one search result, try to return it

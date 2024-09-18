@@ -230,11 +230,13 @@ def merge_form_with_courts(
         "district": [],
         "state": [],
         "special": [],
+        "military": [],
+        "tribal": [],
     }
     bap_bundle = []
     b_bundle = []
-    state_bundle: List = []
-    state_bundles = []
+    states = []
+    territories = []
     for court in courts:
         if court.jurisdiction == Court.FEDERAL_APPELLATE:
             court_tabs["federal"].append(court)
@@ -247,36 +249,25 @@ def merge_form_with_courts(
             else:
                 b_bundle.append(court)
         elif court.jurisdiction in Court.STATE_JURISDICTIONS:
-            # State courts get bundled by supreme courts
-            if court.jurisdiction == Court.STATE_SUPREME:
-                # Whenever we hit a state supreme court, we append the
-                # previous bundle and start a new one.
-                if state_bundle:
-                    state_bundles.append(state_bundle)
-                state_bundle = [court]
-            else:
-                state_bundle.append(court)
+            states.append(court)
+        elif court.jurisdiction in Court.TERRITORY_JURISDICTIONS:
+            territories.append(court)
         elif court.jurisdiction in [
             Court.FEDERAL_SPECIAL,
             Court.COMMITTEE,
             Court.INTERNATIONAL,
-            Court.MILITARY_APPELLATE,
-            Court.MILITARY_TRIAL,
         ]:
             court_tabs["special"].append(court)
-
-    # append the final state bundle after the loop ends. Hack?
-    state_bundles.append(state_bundle)
+        elif court.jurisdiction in Court.MILITARY_JURISDICTIONS:
+            court_tabs["military"].append(court)
+        elif court.jurisdiction in Court.TRIBAL_JURISDICTIONS:
+            court_tabs["tribal"].append(court)
 
     # Put the bankruptcy bundles in the courts dict
     if bap_bundle:
         court_tabs["bankruptcy_panel"] = [bap_bundle]
     court_tabs["bankruptcy"] = [b_bundle]
-
-    # Divide the state bundles into the correct partitions
-    court_tabs["state"].append(state_bundles[:17])
-    court_tabs["state"].append(state_bundles[17:34])
-    court_tabs["state"].append(state_bundles[34:])
+    court_tabs["state"] = [states, territories]
 
     return court_tabs, court_count_human, court_count
 

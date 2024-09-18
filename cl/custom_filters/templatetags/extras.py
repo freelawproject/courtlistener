@@ -1,5 +1,6 @@
 import random
 import re
+from datetime import date, datetime
 
 from django import template
 from django.core.exceptions import ValidationError
@@ -10,7 +11,7 @@ from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
 from elasticsearch_dsl import AttrDict, AttrList
 
-from cl.search.models import Docket, DocketEntry
+from cl.search.models import Court, Docket, DocketEntry
 
 register = template.Library()
 
@@ -243,3 +244,59 @@ def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
         original_value = result.get(field, "")
 
     return render_string_or_list(hl_value) if hl_value else original_value
+
+
+@register.filter
+def group_courts(courts: list[Court], num_columns: int) -> list:
+    """Divide courts in equal groupings while keeping related courts together
+
+    :param courts: Courts to group.
+    :param num_columns: Number of groups wanted
+    :return: The courts grouped together
+    """
+
+    column_len = len(courts) // num_columns
+    remainder = len(courts) % num_columns
+
+    groups = []
+    start = 0
+    for index in range(num_columns):
+        # Calculate the end index for this chunk
+        end = start + column_len + (1 if index < remainder else 0)
+
+        # Find the next COLR as a starting point (Court of last resort)
+        COLRs = [Court.TERRITORY_SUPREME, Court.STATE_SUPREME]
+        while end < len(courts) and courts[end].jurisdiction not in COLRs:
+            end += 1
+
+        # Create the column and add it to result
+        groups.append(courts[start:end])
+        start = end
+
+    return groups
+
+
+@register.filter
+def format_date(date_str: str) -> str:
+    """Formats a date string in the format 'F jS, Y'. Useful for formatting
+    ES child document results where dates are not date objects."""
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        return date_obj.strftime("%B %dth, %Y")
+    except (ValueError, TypeError):
+        return date_str
+
+
+@register.filter
+def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
+    """Build a query string that includes the docket ID and any existing query
+    parameters.
+
+    :param request_q: The current query string, if present.
+    :param docket_id: The docket_id to append to the query string.
+    :return:The query string with the docket_id included.
+    """
+
+    if request_q:
+        return f"({request_q}) AND docket_id:{docket_id}"
+    return f"docket_id:{docket_id}"

@@ -13,9 +13,9 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.cache import caches
 from django.core.paginator import EmptyPage, Page
-from django.db.models import Case
+from django.db.models import Case, CharField
 from django.db.models import Q as QObject
-from django.db.models import QuerySet, TextField, When
+from django.db.models import QuerySet, TextField, Value, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
 from django.http import HttpRequest
@@ -70,6 +70,7 @@ from cl.search.constants import (
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     api_child_highlight_map,
+    cardinality_query_unique_ids,
 )
 from cl.search.exception import (
     BadProximityQuery,
@@ -170,7 +171,7 @@ def build_daterange_query(
 
 def build_more_like_this_query(related_id: list[str]):
     document_list = [{"_id": f"o_{id}"} for id in related_id]
-    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS
+    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
     more_like_this_fields.extend(
         [
             "type",
@@ -215,6 +216,7 @@ def add_fields_boosting(
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
+        SEARCH_TYPES.OPINION,
     ]:
         qf = BOOSTS["es"][cd["type"]].copy()
 
@@ -240,7 +242,7 @@ def add_fields_boosting(
         matter_of_query = query.lower().startswith("matter of ")
         ex_parte_query = query.lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({"caseName": 50})
+            qf.update({"caseName.exact": 50})
 
     if fields:
         qf = {key: value for key, value in qf.items() if key in fields}
@@ -727,7 +729,7 @@ def build_es_plain_filters(cd: CleanData) -> List:
         )
         # Build caseName terms filter
         queries_list.extend(
-            build_text_filter("caseName", cd.get("case_name", ""))
+            build_text_filter("caseName.exact", cd.get("case_name", ""))
         )
         # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
@@ -1147,7 +1149,7 @@ def build_es_base_query(
                         "description",
                         # Docket Fields
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1158,7 +1160,7 @@ def build_es_base_query(
                     cd,
                     [
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1184,7 +1186,7 @@ def build_es_base_query(
                     [
                         "type",
                         "text",
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 ),
@@ -1195,7 +1197,7 @@ def build_es_base_query(
                 add_fields_boosting(
                     cd,
                     [
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 )
@@ -1662,7 +1664,7 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
 
 
 def fill_position_mapping(
-    positions: QuerySet[Position],
+    positions: QuerySet[Position, Position],
     request_type: Literal["frontend", "v3", "v4"] = "frontend",
 ) -> BasePositionMapping | ApiPositionMapping:
     """Extract all the data from the position queryset and
@@ -1787,6 +1789,95 @@ def merge_unavailable_fields_on_parent_document(
                     result["plain_text"] = recap_docs_dict.get(
                         result["id"], ""
                     )
+
+        case (
+            SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
+        ) if request_type == "frontend":
+            # Merge initial document button to the frontend search results.
+            docket_ids = {doc["docket_id"] for doc in results}
+            # This query retrieves initial documents considering two
+            # possibilities:
+            # 1. For district, bankruptcy, and appellate entries where we don't know
+            #    if the entry contains attachments, it considers:
+            #    document_number=1 and attachment_number=None and document_type=PACER_DOCUMENT
+            #    This represents the main document with document_number 1.
+            # 2. For appellate entries where the attachment page has already been
+            #    merged, it considers:
+            #    document_number=1 and attachment_number=1 and document_type=ATTACHMENT
+            #    This represents document_number 1 that has been converted to an attachment.
+
+            appellate_court_ids = (
+                Court.federal_courts.appellate_pacer_courts().values_list(
+                    "pk", flat=True
+                )
+            )
+            initial_documents = (
+                RECAPDocument.objects.filter(
+                    QObject(
+                        QObject(
+                            attachment_number=None,
+                            document_type=RECAPDocument.PACER_DOCUMENT,
+                        )
+                        | QObject(
+                            attachment_number=1,
+                            document_type=RECAPDocument.ATTACHMENT,
+                            docket_entry__docket__court_id__in=appellate_court_ids,
+                        )
+                    ),
+                    docket_entry__docket_id__in=docket_ids,
+                    document_number="1",
+                )
+                .select_related(
+                    "docket_entry",
+                    "docket_entry__docket",
+                    "docket_entry__docket__court",
+                )
+                .only(
+                    "pk",
+                    "document_type",
+                    "document_number",
+                    "attachment_number",
+                    "pacer_doc_id",
+                    "is_available",
+                    "filepath_local",
+                    "docket_entry__docket_id",
+                    "docket_entry__docket__slug",
+                    "docket_entry__docket__pacer_case_id",
+                    "docket_entry__docket__court__jurisdiction",
+                    "docket_entry__docket__court_id",
+                )
+            )
+
+            initial_documents_in_page = {}
+            for initial_document in initial_documents:
+                if initial_document.has_valid_pdf:
+                    # Initial Document available
+                    initial_documents_in_page[
+                        initial_document.docket_entry.docket_id
+                    ] = (
+                        initial_document.get_absolute_url(),
+                        None,
+                        "Initial Document",
+                    )
+                else:
+                    # Initial Document not available. Buy button.
+                    initial_documents_in_page[
+                        initial_document.docket_entry.docket_id
+                    ] = (
+                        None,
+                        initial_document.pacer_url,
+                        "Buy Initial Document",
+                    )
+
+            for result in results:
+                document_url, buy_document_url, text_button = (
+                    initial_documents_in_page.get(
+                        result.docket_id, (None, None, "")
+                    )
+                )
+                result["initial_document_url"] = document_url
+                result["buy_initial_document_url"] = buy_document_url
+                result["initial_document_text"] = text_button
 
         case SEARCH_TYPES.OPINION if request_type == "v4" and not highlight:
             # Retrieves the Opinion plain_text from the DB to fill the snippet
@@ -1933,17 +2024,24 @@ def fetch_es_results(
     es_from = (page - 1) * rows_per_page
     error = True
     try:
-        main_query = search_query.extra(from_=es_from, size=rows_per_page)
-        main_doc_count_query = clean_count_query(search_query)
-        # Set size to 0 to avoid retrieving documents in the count queries for
-        # better performance. Set track_total_hits to True to consider all the
-        # documents.
-        main_doc_count_query = main_doc_count_query.extra(
-            size=0, track_total_hits=True
+        # Set track_total_hits False to avoid retrieving the hit count in the main query.
+        main_query = search_query.extra(
+            from_=es_from, size=rows_per_page, track_total_hits=False
         )
+        main_doc_count_query = clean_count_query(search_query)
+
+        search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+        parent_unique_field = cardinality_query_unique_ids[search_type]
+        main_doc_count_query = build_cardinality_count(
+            main_doc_count_query, parent_unique_field
+        )
+
         if child_docs_count_query:
-            child_total_query = child_docs_count_query.extra(
-                size=0, track_total_hits=True
+            child_unique_field = cardinality_query_unique_ids[
+                SEARCH_TYPES.RECAP_DOCUMENT
+            ]
+            child_total_query = build_cardinality_count(
+                child_docs_count_query, child_unique_field
             )
 
         # Execute the ES main query + count queries in a single request.
@@ -1955,10 +2053,14 @@ def fetch_es_results(
 
         main_response = responses[0]
         main_doc_count_response = responses[1]
-        parent_total = main_doc_count_response.hits.total.value
+        parent_total = simplify_estimated_count(
+            main_doc_count_response.aggregations.unique_documents.value
+        )
         if child_total_query:
             child_doc_count_response = responses[2]
-            child_total = child_doc_count_response.hits.total.value
+            child_total = simplify_estimated_count(
+                child_doc_count_response.aggregations.unique_documents.value
+            )
 
         query_time = main_response.took
         search_type = get_params.get("type", SEARCH_TYPES.OPINION)
@@ -2081,7 +2183,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_term_query(
                     "docketNumber",
                     cd.get("docket_number", ""),
@@ -2120,7 +2222,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_daterange_query(
                     "dateFiled",
                     cd.get("filed_before", ""),
@@ -2927,31 +3029,30 @@ def do_es_api_query(
     return main_query, child_docs_query
 
 
-def build_cardinality_count(
-    base_query: Search, query: Query, unique_field: str
-) -> Search:
+def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
     """Build an Elasticsearch cardinality aggregation.
     This aggregation estimates the count of unique documents based on the
     specified unique field. The precision_threshold, set by
     ELASTICSEARCH_CARDINALITY_PRECISION, determines the point at which the
-    count begins to trade accuracy for performance.
+    count begins to trade accuracy for performance. The error in the
+    approximation count using this method ranges from 1% to 6%.
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-cardinality-aggregation.html#_counts_are_approximate
 
-    :param base_query: The Elasticsearch DSL Search object.
-    :param query: The ES Query object to perform the count query.
+    :param count_query: The Elasticsearch DSL Search object containing the
+    count query.
     :param unique_field: The field name on which the cardinality aggregation
     will be based to estimate uniqueness.
 
     :return: The ES cardinality aggregation query.
     """
 
-    search_query = base_query.query(query)
-    search_query.aggs.bucket(
+    count_query.aggs.bucket(
         "unique_documents",
         "cardinality",
         field=unique_field,
         precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
     )
-    return search_query.extra(size=0, track_total_hits=True)
+    return count_query.extra(size=0, track_total_hits=False)
 
 
 def do_collapse_count_query(
@@ -2970,7 +3071,8 @@ def do_collapse_count_query(
     unique_field = (
         "cluster_id" if search_type == SEARCH_TYPES.OPINION else "docket_id"
     )
-    search_query = build_cardinality_count(main_query, query, unique_field)
+    count_query = main_query.query(query)
+    search_query = build_cardinality_count(count_query, unique_field)
     try:
         total_results = (
             search_query.execute().aggregations.unique_documents.value
@@ -3014,3 +3116,30 @@ def do_es_alert_estimation_query(
     estimation_query, _ = build_es_base_query(search_query, cd)
 
     return estimation_query.count()
+
+
+def compute_lowest_possible_estimate(precision_threshold: int) -> int:
+    """Estimates can be below reality by as much as 6%. Round numbers below that threshold.
+    :return: The lowest possible estimate.
+    """
+    return int(precision_threshold * 0.94)
+
+
+def simplify_estimated_count(search_count: int) -> int:
+    """Simplify the estimated search count to the nearest rounded figure.
+    It only applies this rounding if the search_count exceeds the
+    ELASTICSEARCH_CARDINALITY_PRECISION threshold.
+
+    :param search_count: The original search count.
+    :return: The simplified search_count, rounded to the nearest significant
+    figure or the original search_count if below the threshold.
+    """
+
+    if search_count >= compute_lowest_possible_estimate(
+        settings.ELASTICSEARCH_CARDINALITY_PRECISION
+    ):
+        search_count_str = str(search_count)
+        first_two = search_count_str[:2]
+        zeroes = (len(search_count_str) - 2) * "0"
+        return int(first_two + zeroes)
+    return search_count

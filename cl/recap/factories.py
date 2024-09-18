@@ -33,7 +33,7 @@ class ProcessingQueueFactory(DjangoModelFactory):
 
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     upload_type = FuzzyChoice(UPLOAD_TYPE.NAMES, getter=lambda c: c[0])
-    filepath_local = FileField(filename=None)
+    filepath_local = FileField(filename="document.html")
 
 
 class PacerFetchQueueFactory(DjangoModelFactory):
@@ -132,3 +132,20 @@ class DocketDataFactory(DictFactory):
     docket_number = Faker("federal_district_docket_number")
     date_filed = Faker("date_object")
     ordered_by = "date_filed"
+    federal_dn_office_code = Faker("pyint", min_value=1, max_value=10)
+    federal_dn_case_type = FuzzyText(length=2, chars=string.ascii_lowercase)
+    federal_dn_judge_initials_assigned = FuzzyText(
+        length=5, chars=string.ascii_lowercase
+    )
+    federal_dn_judge_initials_referred = FuzzyText(
+        length=5, chars=string.ascii_lowercase
+    )
+    federal_defendant_number = Faker("pyint", min_value=1, max_value=999)
+
+
+class DocketEntryWithAttachmentsDataFactory(MinuteDocketEntryDataFactory):
+    attachments = List([SubFactory(AppellateAttachmentPageFactory)])
+
+
+class DocketDataWithAttachmentsFactory(DocketDataFactory):
+    docket_entries = List([SubFactory(DocketEntryWithAttachmentsDataFactory)])

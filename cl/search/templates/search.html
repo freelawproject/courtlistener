@@ -28,7 +28,7 @@
             <link rel="alternate"
                   type="application/rss+xml"
                   title="Atom Feed for These Search Results"
-                  href="/feed/search/?{{ get_string }}" />
+                  href="/feed/search/{% querystring %}" />
           {% endif %}
         {% endif %}
     {% endif %}
@@ -50,6 +50,7 @@
 {% endblock %}
 
 {% block footer-scripts %}
+  <script src="{% static "js/progress-bar.js" %}"></script>
   {% include "includes/date_picker.html" %}
   {% if alert_form.errors or request.GET.show_alert_modal %}
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
@@ -137,7 +138,6 @@
               {% if query_citation %}
                 <div class="col-xs-9">
                   <p><i class="fa fa-info-circle fa-lg"></i> It looks like you're trying to search for <a class="alert-link" href="{{ query_citation.absolute_url }}">{{ query_citation.caseName|safe }}</a>, from {{ query_citation.dateFiled.year }}.</p>
-
                 </div>
                 <div class="col-xs-3 text-right">
                   <a class="btn btn-primary btn-sm"
@@ -218,6 +218,19 @@
             </div>
         </div>
 
+        {% if search_form.type.value == SEARCH_TYPES.OPINION and missing_citations %}
+          <div class="alert alert-info" role="alert">
+            <div class="row">
+                <div class="col-xs-12">
+                  <p id="missing-citations"><i class="fa fa-info-circle fa-lg"></i>
+                    Showing results for <strong>"{{ suggested_query }}"</strong> without citation{{ missing_citations|pluralize }}
+                    {% for citation in missing_citations %} <strong>"{{ citation }}"</strong>{% if not forloop.last %}, {% endif %}{% endfor %}.
+                    It appears we don't yet have {{ missing_citations|pluralize:"that citation,those citations" }}.
+                  </p>
+                </div>
+            </div>
+          </div>
+        {% endif %}
         {% if results.paginator.count > 0 %}
             <div class="row">
                 <div class="col-sm-12">
@@ -237,8 +250,13 @@
                     {% endif %}
 
                     <h2 id="result-count" class="bottom">
+                        {% if  results_details.1 >= estimated_count_threshold or results_details.3 >= estimated_count_threshold %}About{% endif %}
                         {% if type == SEARCH_TYPES.OPINION %}
+                          {% flag "o-es-active" %}
+                            {{ results_details.1|intcomma }} Opinion{{ results_details.1|pluralize }}
+                          {% else %}
                             {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
+                          {% endflag %}
                           {% if cited_cluster %}
                             <span class="gray alt">cite{{ results.paginator.count|pluralize:"s," }}</span> {{ cited_cluster.caption|safe|v_wrapper }}
                           {% endif %}
@@ -252,7 +270,7 @@
                             {% with matches=results_details.3 count=results_details.1 %}
                               {{ count|intcomma }} Case{{ count|pluralize }}
                               {% if matches %}
-                                <span class="gray">&mdash;</span>
+                                <span class="gray">and</span>
                                 {{ matches|intcomma }} Docket&nbsp;Entr{{ matches|pluralize:"y,ies" }}
                               {% endif %}
                             {% endwith %}
@@ -279,12 +297,12 @@
                               Judge{{ results.paginator.count|pluralize }}
                         {% endif %}
                         {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
-                            <a href="/feed/search/?{{ get_string }}">
+                            <a href="/feed/search/{% querystring %}">
                                 <i class="gray fa fa-rss"
                                    title="Subscribe to a feed of these results"></i>
                             </a>
                         {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
-                            <a href="/podcast/search/?{{ get_string }}">
+                            <a href="/podcast/search/{% querystring %}">
                                 <i class="gray fa fa-podcast"
                                    title="Subscribe to a podcast of these results"></i>
                             </a>

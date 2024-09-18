@@ -340,7 +340,12 @@ def merge_rss_feed_contents(self, feed_data, court_pk, metadata_only=False):
                 # in another thread/process and we had a race condition.
                 continue
             d = async_to_sync(find_docket_object)(
-                court_pk, docket["pacer_case_id"], docket["docket_number"]
+                court_pk,
+                docket["pacer_case_id"],
+                docket["docket_number"],
+                docket.get("federal_defendant_number"),
+                docket.get("federal_dn_judge_initials_assigned"),
+                docket.get("federal_dn_judge_initials_referred"),
             )
 
             d.add_recap_source()

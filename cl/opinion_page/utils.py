@@ -1,3 +1,5 @@
+import csv
+from io import StringIO
 from typing import Dict, Tuple, Union
 
 from asgiref.sync import sync_to_async
@@ -42,7 +44,7 @@ async def core_docket_data(
     pk: int,
 ) -> Tuple[Docket, Dict[str, Union[bool, str, Docket, NoteForm]]]:
     """Gather the core data for a docket, party, or IDB page."""
-    docket = await aget_object_or_404(Docket, pk=pk)
+    docket: Docket = await aget_object_or_404(Docket, pk=pk)
     title = make_docket_title(docket)
 
     try:
@@ -60,7 +62,7 @@ async def core_docket_data(
     else:
         note_form = NoteForm(instance=note)
 
-    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[attr-defined]
+    has_alert = await user_has_alert(await request.auser(), docket)  # type: ignore[arg-type]
 
     return (
         docket,
@@ -131,3 +133,32 @@ async def es_get_citing_clusters_with_cache(
             cache_key, (citing_clusters, citing_cluster_count), a_week
         )
     return citing_clusters, citing_cluster_count
+
+
+def generate_docket_entries_csv_data(docket_entries):
+    """Get str representing in memory file from docket_entries.
+
+    :param docket_entries: List of DocketEntry that implements CSVExportMixin.
+    :returns str with csv in memory content
+    """
+    output: StringIO = StringIO()
+    csvwriter = csv.writer(output, quotechar='"', quoting=csv.QUOTE_ALL)
+    columns = []
+
+    columns = docket_entries[0].get_csv_columns(get_column_name=True)
+    columns += (
+        docket_entries[0]
+        .recap_documents.first()
+        .get_csv_columns(get_column_name=True)
+    )
+    csvwriter.writerow(columns)
+
+    for docket_entry in docket_entries:
+        for recap_doc in docket_entry.recap_documents.all():
+            csvwriter.writerow(
+                docket_entry.to_csv_row() + recap_doc.to_csv_row()
+            )
+
+    csv_content: str = output.getvalue()
+    output.close()
+    return csv_content

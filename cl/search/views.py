@@ -1,4 +1,5 @@
 import logging
+import pickle
 import traceback
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
@@ -21,6 +22,7 @@ from django.urls import reverse
 from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
 from django_elasticsearch_dsl.search import Search
+from eyecite.models import FullCaseCitation
 from requests import RequestException, Session
 from scorched.exc import SolrError
 from waffle.decorators import waffle_flag
@@ -28,10 +30,13 @@ from waffle.decorators import waffle_flag
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.citations.match_citations_queries import es_get_query_citation
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.crypto import sha256
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
     fetch_es_results,
     get_facet_dict_for_search_query,
@@ -40,6 +45,7 @@ from cl.lib.elasticsearch_utils import (
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
+    simplify_estimated_count,
 )
 from cl.lib.paginators import ESPaginator
 from cl.lib.redis_utils import get_redis_interface
@@ -54,6 +60,7 @@ from cl.lib.search_utils import (
     merge_form_with_courts,
     regroup_snippets,
 )
+from cl.lib.types import CleanData
 from cl.lib.utils import (
     sanitize_unbalanced_parenthesis,
     sanitize_unbalanced_quotes,
@@ -664,6 +671,30 @@ def es_search(request: HttpRequest) -> HttpResponse:
     return render(request, template, render_dict)
 
 
+def remove_missing_citations(
+    missing_citations: list[FullCaseCitation], cd: CleanData
+) -> tuple[list[str], str]:
+    """Removes missing citations from the query and returns the missing
+    citations as strings and the modified query.
+
+    :param missing_citations: A list of FullCaseCitation objects representing
+    the citations that are missing from the query.
+    :param cd: A CleanData object containing the query string.
+    :return: A two-tuple containing a list of missing citation strings and the
+    suggested query string with missing citations removed.
+    """
+    missing_citations_str = [
+        citation.corrected_citation() for citation in missing_citations
+    ]
+    query_string = cd["q"]
+    for citation in missing_citations_str:
+        query_string = query_string.replace(citation, "")
+    suggested_query = (
+        " ".join(query_string.split()) if missing_citations_str else ""
+    )
+    return missing_citations_str, suggested_query
+
+
 def do_es_search(
     get_params: QueryDict,
     rows: int = settings.SEARCH_PAGE_SIZE,
@@ -683,7 +714,6 @@ def do_es_search(
     other location.
     """
     paged_results = None
-    # One court?
     courts = Court.objects.filter(in_use=True)
     query_time = total_query_results = 0
     top_hits_limit = 5
@@ -695,6 +725,7 @@ def do_es_search(
     cited_cluster = None
     query_citation = None
     facet_fields = []
+    missing_citations_str = []
 
     search_form = SearchForm(get_params, is_es_form=True, courts=courts)
     match get_params.get("type", SEARCH_TYPES.OPINION):
@@ -712,10 +743,25 @@ def do_es_search(
             document_type = OpinionClusterDocument
 
     if search_form.is_valid() and document_type:
-        cd = search_form.cleaned_data
+        # Copy cleaned_data to preserve the original data when displaying the form
+        cd = search_form.cleaned_data.copy()
         try:
             # Create necessary filters to execute ES query
             search_query = document_type.search()
+
+            if cd["type"] in [
+                SEARCH_TYPES.OPINION,
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+            ]:
+                query_citation, missing_citations = es_get_query_citation(cd)
+                if cd["type"] in [
+                    SEARCH_TYPES.OPINION,
+                ]:
+                    missing_citations_str, suggested_query = (
+                        remove_missing_citations(missing_citations, cd)
+                    )
+                    cd["q"] = suggested_query if suggested_query else cd["q"]
             (
                 s,
                 child_docs_count_query,
@@ -739,13 +785,6 @@ def do_es_search(
                 search_data=cd,
                 search_results=paged_results,
             )
-
-            if cd["type"] in [
-                SEARCH_TYPES.OPINION,
-                SEARCH_TYPES.RECAP,
-                SEARCH_TYPES.DOCKETS,
-            ]:
-                query_citation = get_query_citation(cd)
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
@@ -816,7 +855,41 @@ def do_es_search(
         "cited_cluster": cited_cluster,
         "query_citation": query_citation,
         "facet_fields": facet_fields,
+        "estimated_count_threshold": simplify_estimated_count(
+            compute_lowest_possible_estimate(
+                settings.ELASTICSEARCH_CARDINALITY_PRECISION
+            )
+        ),
+        "missing_citations": missing_citations_str,
     }
+
+
+def retrieve_cached_search_results(
+    get_params: QueryDict,
+) -> tuple[dict[str, Page | int] | None, str]:
+    """
+    Retrieve cached search results based on the GET parameters.
+
+    :param get_params: The GET parameters provided by the user.
+    :return: A two-tuple containing either the cached search results and the
+    cache key based ona prefix and the get parameters, or None and the cache key
+    if no cached results were found.
+    """
+
+    params = get_params.copy()
+    # If no page is present in the parameters, set it to 1 to generate the same
+    # hash for page 1, regardless of whether the page parameter is included.
+    # Apply the same to the q parameter when it is not present in params.
+    params.setdefault("page", "1")
+    params.setdefault("q", "")
+    sorted_params = dict(sorted(params.items()))
+    key_prefix = "search_results_cache:"
+    params_hash = sha256(pickle.dumps(sorted_params))
+    cache_key = f"{key_prefix}{params_hash}"
+    cached_results = cache.get(cache_key)
+    if cached_results:
+        return pickle.loads(cached_results), cache_key
+    return None, cache_key
 
 
 def fetch_and_paginate_results(
@@ -841,9 +914,22 @@ def fetch_and_paginate_results(
 
     # Run the query and set up pagination
     if cache_key is not None:
+        # Check cache for displaying insights on the Home Page.
         results = cache.get(cache_key)
         if results is not None:
             return results, 0, False, None, None
+
+    # Check micro-cache for all other search requests.
+    results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
+    if results_dict:
+        # Return results and counts. Set query time to 1ms.
+        return (
+            results_dict["results"],
+            1,
+            False,
+            results_dict["main_total"],
+            results_dict["child_total"],
+        )
 
     try:
         page = int(get_params.get("page", 1))
@@ -877,5 +963,20 @@ def fetch_and_paginate_results(
     merge_unavailable_fields_on_parent_document(results, search_type)
 
     if cache_key is not None:
+        # Cache only Page results for displaying insights on the Home Page.
         cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
+    elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
+        # Cache Page results and counts for all other search requests.
+        results_dict = {
+            "results": results,
+            "main_total": main_total,
+            "child_total": child_total,
+        }
+        serialized_data = pickle.dumps(results_dict)
+        cache.set(
+            micro_cache_key,
+            serialized_data,
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+
     return results, query_time, error, main_total, child_total

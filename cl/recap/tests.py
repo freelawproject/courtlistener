@@ -16,7 +16,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from juriscraper.pacer import PacerRssFeed
@@ -56,8 +56,10 @@ from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
     DocketDataFactory,
+    DocketDataWithAttachmentsFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
+    DocketEntryWithAttachmentsDataFactory,
     FjcIntegratedDatabaseFactory,
     MinuteDocketEntryDataFactory,
     PacerFetchQueueFactory,
@@ -79,6 +81,7 @@ from cl.recap.mergers import (
     add_parties_and_attorneys,
     find_docket_object,
     get_order_of_docket,
+    merge_attachment_page_data,
     normalize_long_description,
     update_case_names,
     update_docket_metadata,
@@ -771,7 +774,6 @@ class RecapUploadsTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
-    side_effect=lambda x: True,
 )
 class RecapDocketFetchApiTest(TestCase):
     """Tests for the RECAP docket Fetch API
@@ -1046,10 +1048,7 @@ class RecapFetchApiSerializationTestCase(SimpleTestCase):
     "cl.corpus_importer.tasks.FreeOpinionReport",
     new=fakes.FakeFreeOpinionReport,
 )
-@mock.patch(
-    "cl.recap.tasks.get_pacer_cookie_from_cache",
-    return_value={"cookie": "foo"},
-)
+@mock.patch("cl.recap.tasks.get_pacer_cookie_from_cache")
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
     side_effect=lambda a: True,
@@ -1151,7 +1150,6 @@ class RecapAttPageFetchApiTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.get_pacer_cookie_from_cache",
-        return_value={"pacer_cookie": "foo"},
     )
     @mock.patch(
         "cl.corpus_importer.tasks.AttachmentPage",
@@ -1234,6 +1232,9 @@ def mock_bucket_open(message_id, r, read_file=False):
     return recap_mail_example
 
 
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
 class RecapEmailToEmailProcessingQueueTest(TestCase):
     """Test the rest endpoint, but exclude the processing tasks."""
 
@@ -1292,10 +1293,7 @@ class RecapEmailToEmailProcessingQueueTest(TestCase):
         "cl.recap.tasks.RecapEmailSESStorage.open",
         side_effect=mock_bucket_open,
     )
-    @mock.patch(
-        "cl.recap.tasks.get_or_cache_pacer_cookies",
-        side_effect=lambda x, y, z: None,
-    )
+    @mock.patch("cl.recap.tasks.get_or_cache_pacer_cookies")
     @mock.patch(
         "cl.recap.tasks.is_docket_entry_sealed",
         return_value=False,
@@ -2036,7 +2034,12 @@ class RecapMinuteEntriesTest(TestCase):
         rss_feed._parse_text(text)
         docket = rss_feed.data[0]
         d = async_to_sync(find_docket_object)(
-            court_id, docket["pacer_case_id"], docket["docket_number"]
+            court_id,
+            docket["pacer_case_id"],
+            docket["docket_number"],
+            docket["federal_defendant_number"],
+            docket["federal_dn_judge_initials_assigned"],
+            docket["federal_dn_judge_initials_referred"],
         )
         async_to_sync(update_docket_metadata)(d, docket)
         d.save()
@@ -2197,6 +2200,45 @@ class RecapMinuteEntriesTest(TestCase):
         self.assertEqual(docket.docket_entries.count(), 1)
         self.assertEqual(docket.assigned_to_str, "John Marshall")
         self.assertEqual(docket.referred_to_str, "Sophia Clinton")
+
+    def test_avoid_deleting_short_description(self) -> None:
+        """Test that merging identical docket entries without a
+        short_description does not delete or overwrite the existing short_description
+        """
+        court_ca10 = CourtFactory(id="ca10", jurisdiction="F")
+        rss_feed = PacerRssFeed(court_ca10.pk)
+        with open(self.make_path("rss_ca10.xml"), "rb") as f:
+            text = f.read().decode()
+        rss_feed._parse_text(text)
+        docket = rss_feed.data[0]
+        d = async_to_sync(find_docket_object)(
+            court_ca10.pk,
+            docket["pacer_case_id"],
+            docket["docket_number"],
+            docket["federal_defendant_number"],
+            docket["federal_dn_judge_initials_assigned"],
+            docket["federal_dn_judge_initials_referred"],
+        )
+        async_to_sync(update_docket_metadata)(d, docket)
+        d.save()
+        async_to_sync(add_docket_entries)(d, docket["docket_entries"])
+        rd = RECAPDocument.objects.all().first()
+        self.assertEqual(rd.description, "Case termination for COA")
+
+        # Merge the identical entry without a short_description.
+        # It should not be removed.
+        docket_entries = [
+            MinuteDocketEntryDataFactory(
+                description="Lorem ipsum",
+                short_description=None,
+                pacer_doc_id="010010808570",
+                document_number="010010808570",
+            ),
+        ]
+        async_to_sync(add_docket_entries)(d, docket_entries)
+        rd = RECAPDocument.objects.all().first()
+        self.assertEqual(d.docket_entries.count(), 1)
+        self.assertEqual(rd.description, "Case termination for COA")
 
 
 class DescriptionCleanupTest(SimpleTestCase):
@@ -2561,12 +2603,46 @@ class RecapDocketTaskTest(TestCase):
                 )
         d.delete()
 
+    def test_merge_docket_number_components(
+        self,
+    ) -> None:
+        """Confirm docket_number components are properly merged into the
+        docket instance.
+        """
+
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+        )
+
+        docket_data = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00070-TKW-MAL-1",
+            federal_dn_office_code="3",
+            federal_dn_case_type="cr",
+            federal_dn_judge_initials_assigned="TKW",
+            federal_dn_judge_initials_referred="MAL",
+            federal_defendant_number="1",
+        )
+        async_to_sync(update_docket_metadata)(d, docket_data)
+        d.save()
+        d.refresh_from_db()
+
+        self.assertEqual(d.federal_dn_office_code, "3")
+        self.assertEqual(d.federal_dn_case_type, "cr")
+        self.assertEqual(d.federal_dn_judge_initials_assigned, "TKW")
+        self.assertEqual(d.federal_dn_judge_initials_referred, "MAL")
+        self.assertEqual(d.federal_defendant_number, 1)
+
+        d.delete()
+
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")
 class RecapDocketAttachmentTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls):
-        CourtFactory(id="cand", jurisdiction="FD")
+        cls.court = CourtFactory(id="cand", jurisdiction="FD")
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -2588,9 +2664,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         self.pq.filepath_local.delete()
         self.pq.delete()
         Docket.objects.all().delete()
-        RECAPDocument.objects.filter(
-            document_type=RECAPDocument.ATTACHMENT,
-        ).delete()
+        RECAPDocument.objects.all().delete()
 
     def test_attachments_get_created(self, mock):
         """Do attachments get created if we have a RECAPDocument to match
@@ -2605,6 +2679,239 @@ class RecapDocketAttachmentTaskTest(TestCase):
         )
         self.pq.refresh_from_db()
         self.assertEqual(self.pq.status, PROCESSING_STATUS.SUCCESSFUL)
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_main_document_doesnt_match_attachment_zero_on_creation(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that attachment 0 is properly set as the Main document if
+        the docket entry's pacer_doc_id does not match the Main document's
+        pacer_doc_id on creation.
+        """
+        docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            pacer_case_id="238743",
+        )
+        docket_data = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="1234567",
+                    short_description="Complaint",
+                    attachments=[
+                        AppellateAttachmentFactory(
+                            attachment_number=0,
+                            pacer_doc_id="1234566",
+                            description="Main Document",
+                        ),
+                        AppellateAttachmentFactory(
+                            attachment_number=1,
+                            pacer_doc_id="1234567",
+                            description="Attachment 1",
+                        ),
+                    ],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data["docket_entries"]
+        )
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234566")
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_main_document_doesnt_match_attachment_zero_existing(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that attachment 0 is properly set as the Main document if
+        the docket entry's pacer_doc_id does not match the Main document's
+        pacer_doc_id on an existing document.
+        """
+        docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            pacer_case_id="238743",
+        )
+        docket_data_no_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1, pacer_doc_id="1234567", attachments=[]
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data_no_att["docket_entries"]
+        )
+
+        # When attachment data is unknown, the main PACER_DOCUMENT should be
+        # set to pacer_doc_id 1234567.
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+
+        docket_data_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="1234567",
+                    short_description="Complaint",
+                    attachments=[
+                        AppellateAttachmentFactory(
+                            attachment_number=0,
+                            pacer_doc_id="1234566",
+                            description="Main Document",
+                        ),
+                        AppellateAttachmentFactory(
+                            attachment_number=1,
+                            pacer_doc_id="1234567",
+                            description="Attachment 1",
+                        ),
+                    ],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data_att["docket_entries"]
+        )
+
+        # After merging attachments, the main PACER_DOCUMENT should now be set
+        # to attachment 0 with pacer_doc_id 1234566.
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="1234566")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        # pacer_doc_id 1234567 should now be an attachment.
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="1234567")
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
+
+    @mock.patch(
+        "cl.api.webhooks.requests.post",
+        side_effect=lambda *args, **kwargs: MockResponse(200, mock_raw=True),
+    )
+    def test_main_rd_lookup_fallback_for_attachment_merging(
+        self,
+        mock_solr,
+        mock_webhook_post,
+    ):
+        """Confirm that attachment data can be properly merged when the current
+        main_rd pacer_doc_id mismatches the main document's pacer_doc_id from
+        the attachment page.
+        """
+        docket = DocketFactory(
+            source=Docket.RECAP,
+            court=self.court,
+            pacer_case_id="238743",
+        )
+        docket_data_no_att = DocketDataWithAttachmentsFactory(
+            docket_entries=[
+                DocketEntryWithAttachmentsDataFactory(
+                    document_number=1,
+                    pacer_doc_id="12606200429",
+                    short_description="Complaint",
+                    attachments=[],
+                ),
+            ],
+        )
+        async_to_sync(add_docket_entries)(
+            docket, docket_data_no_att["docket_entries"]
+        )
+
+        # When attachment data is unknown, the main PACER_DOCUMENT is the one
+        # with pacer_doc_id: 12606200429
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="12606200429")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+
+        # Merge attachment data where the main_document pacer_doc_id has a
+        # different pacer_doc_id: 12606201629
+        attachments_data = AppellateAttachmentPageFactory(
+            document_number=1,
+            pacer_doc_id="12606201629",
+            attachments=[
+                AppellateAttachmentFactory(
+                    attachment_number=1,
+                    pacer_doc_id="12606200429",
+                    description="Attachment 1",
+                ),
+            ],
+        )
+        async_to_sync(merge_attachment_page_data)(
+            docket.court,
+            docket.pacer_case_id,
+            attachments_data["pacer_doc_id"],
+            None,
+            "",
+            attachments_data["attachments"],
+        )
+
+        # Now we should have 2 RDs in the entry: the main document + 1 attachment
+        de_rds = RECAPDocument.objects.all()
+        self.assertEqual(de_rds.count(), 2)
+
+        # Confirm main_rd is now the one with pacer_doc_id:12606201629
+        main_rd = RECAPDocument.objects.get(pacer_doc_id="12606201629")
+        self.assertEqual(
+            main_rd.document_type,
+            RECAPDocument.PACER_DOCUMENT,
+            msg="PACER_DOCUMENT type didn't match.",
+        )
+        self.assertEqual(main_rd.attachment_number, None)
+        self.assertEqual(main_rd.description, "Complaint")
+
+        # Confirm attachment 1 is the one with pacer_doc_id:12606200429
+        attachment_1 = RECAPDocument.objects.get(pacer_doc_id="12606200429")
+        self.assertEqual(
+            attachment_1.document_type,
+            RECAPDocument.ATTACHMENT,
+            msg="ATTACHMENT type didn't match.",
+        )
+        self.assertEqual(attachment_1.attachment_number, 1)
+        self.assertEqual(attachment_1.description, "Attachment 1")
 
 
 class ClaimsRegistryTaskTest(TestCase):
@@ -2946,7 +3253,7 @@ class IdbMergeTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: None,
+    side_effect=lambda x, y, z: (None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -3125,7 +3432,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3200,7 +3507,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3293,7 +3600,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3356,7 +3663,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3447,7 +3754,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
@@ -3494,7 +3801,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3650,7 +3957,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3720,7 +4027,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3814,7 +4121,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -3965,7 +4272,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -4051,7 +4358,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4208,7 +4515,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -4254,7 +4561,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4309,7 +4616,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4381,7 +4688,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -4452,7 +4759,7 @@ class RecapEmailDocketAlerts(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b"Hello World"),
             "OK",
         ),
@@ -4623,7 +4930,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -4709,7 +5016,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             None,
             "Document not available from magic link.",
         ),
@@ -4757,7 +5064,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -5075,7 +5382,7 @@ class RecapEmailDocketAlerts(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     @mock.patch(
         "cl.api.webhooks.requests.post",
@@ -5240,7 +5547,7 @@ class GetAndCopyRecapAttachments(TestCase):
     )
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b"Hello World from magic"),
             "OK",
         ),
@@ -5404,7 +5711,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: "Cookie",
+    side_effect=lambda x, y, z: ("Cookie", settings.EGRESS_PROXY_HOSTS[0]),
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
@@ -5473,7 +5780,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open("nda_document.pdf", "rb", True),
@@ -5511,7 +5818,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -5558,7 +5865,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -5604,7 +5911,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -5643,7 +5950,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             MockResponse(200, b""),
             "OK",
         ),
@@ -5693,7 +6000,7 @@ class GetDocumentNumberForAppellateDocuments(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (
+        side_effect=lambda z, x, c, v, b, d, e: (
             None,
             "Document not available from magic link.",
         ),
@@ -5778,7 +6085,7 @@ class CheckCourtConnectivityTest(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_or_cache_pacer_cookies",
-    side_effect=lambda x, y, z: None,
+    side_effect=lambda x, y, z: (None, None),
 )
 @mock.patch(
     "cl.recap.tasks.is_pacer_court_accessible",
@@ -6089,7 +6396,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_update_webhook_after_http_error(
         self,
@@ -6161,7 +6468,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_update_webhook_after_network_error(
         self,
@@ -6234,7 +6541,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_success_webhook_delivery(
         self,
@@ -6300,7 +6607,7 @@ class WebhooksRetries(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
-        side_effect=lambda z, x, c, v, b, d: (None, ""),
+        side_effect=lambda z, x, c, v, b, d, e: (None, ""),
     )
     async def test_retry_webhooks_integration(
         self,
@@ -6965,7 +7272,6 @@ class WebhooksRetries(TestCase):
 )
 @mock.patch(
     "cl.recap.tasks.get_pacer_cookie_from_cache",
-    side_effect=lambda x: True,
 )
 class RecapFetchWebhooksTest(TestCase):
     """Test RECAP Fetch Webhooks"""
@@ -7113,7 +7419,7 @@ class RecapFetchWebhooksTest(TestCase):
 
     @mock.patch(
         "cl.recap.tasks.download_pacer_pdf_by_rd",
-        side_effect=lambda z, x, c, v, b: (
+        side_effect=lambda z, x, c, v, b, de_seq_num: (
             MockResponse(
                 200,
                 mock_bucket_open(
@@ -7386,7 +7692,12 @@ class LookupDocketsTest(TestCase):
         """
 
         d = async_to_sync(find_docket_object)(
-            self.court.pk, "12345", self.docket_data["docket_number"]
+            self.court.pk,
+            "12345",
+            self.docket_data["docket_number"],
+            None,
+            "",
+            "",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
@@ -7405,7 +7716,12 @@ class LookupDocketsTest(TestCase):
         dockets = Docket.objects.all()
         self.assertEqual(dockets.count(), 4)
         d = async_to_sync(find_docket_object)(
-            self.court.pk, "12346", self.docket_data["docket_number"]
+            self.court.pk,
+            "12346",
+            self.docket_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
@@ -7421,7 +7737,12 @@ class LookupDocketsTest(TestCase):
         """Confirm if lookup by only pacer_case_id works properly."""
 
         d = async_to_sync(find_docket_object)(
-            self.court.pk, "54321", self.docket_data["docket_number"]
+            self.court.pk,
+            "54321",
+            self.docket_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_data)
         d.save()
@@ -7439,6 +7760,9 @@ class LookupDocketsTest(TestCase):
             self.court.pk,
             None,
             self.docket_core_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_core_data)
         d.save()
@@ -7456,6 +7780,9 @@ class LookupDocketsTest(TestCase):
             self.court.pk,
             None,
             self.docket_no_core_data["docket_number"],
+            None,
+            "",
+            "",
         )
         async_to_sync(update_docket_metadata)(d, self.docket_no_core_data)
         d.save()
@@ -7475,6 +7802,9 @@ class LookupDocketsTest(TestCase):
             self.court.pk,
             self.docket_data["docket_entries"][0]["pacer_case_id"],
             self.docket_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
 
         async_to_sync(update_docket_metadata)(d, self.docket_data)
@@ -7503,6 +7833,9 @@ class LookupDocketsTest(TestCase):
             self.court.pk,
             self.docket_data["docket_entries"][0]["pacer_case_id"],
             self.docket_data["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
 
         async_to_sync(update_docket_metadata)(d, self.docket_data)
@@ -7537,11 +7870,226 @@ class LookupDocketsTest(TestCase):
             self.court_appellate.pk,
             None,
             docket_data_lower_number["docket_number"],
+            1,
+            "RM",
+            "LM",
         )
         async_to_sync(update_docket_metadata)(new_d, docket_data_lower_number)
         new_d.save()
         # The existing docket is matched instead of creating a new one.
         self.assertEqual(new_d.pk, d.pk)
+
+    def test_lookup_by_docket_number_components(self):
+        """Can we match a docket using the components of the docket number?
+        If two or more dockets are found without a matching pacer_case_id, and
+        they are matched by docket_number or docket_number_core, use the
+        components of the docket number as a last resort to find the correct
+        match. If a single docket is matched, and it contains DN components use
+        them to confirm the docket matched is the right one.
+        """
+
+        # Single docket doesn't match.
+        d_1 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00076",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+            federal_dn_case_type="cv",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00076",
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="ML",
+            federal_dn_judge_initials_referred="DHL",
+        )
+        self.assertNotEqual(docket_matched.pk, d_1.pk)
+
+        # Single docket match.
+        d_1_2 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00073",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00073",
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+        )
+        self.assertEqual(docket_matched.pk, d_1_2.pk)
+
+        # Partial DN components single docket match.
+        d_1_2_3 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00072",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00072",
+            federal_defendant_number=2,
+            federal_dn_judge_initials_assigned="MA",
+            federal_dn_judge_initials_referred="DH",
+        )
+        self.assertEqual(docket_matched.pk, d_1_2_3.pk)
+        docket_data = self.docket_data.copy()
+        docket_data["federal_dn_judge_initials_assigned"] = "MA"
+        async_to_sync(update_docket_metadata)(docket_matched, docket_data)
+        docket_matched.save()
+        docket_matched.refresh_from_db()
+        self.assertEqual(
+            docket_matched.federal_dn_judge_initials_assigned, "MA"
+        )
+
+        # Two or more Dockets matched. Partial DN components matched.
+        d_2 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00050",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00050",
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="",
+        )
+        self.assertEqual(docket_matched.pk, d_2.pk)
+
+        # Two or more Dockets matched. All DN components matched.
+        d_3 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00076",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=1,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="DLH",
+            federal_dn_case_type="cr",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00076",
+            federal_defendant_number=1,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="DLH",
+        )
+        self.assertEqual(docket_matched.pk, d_3.pk)
+
+    def test_avoid_lookup_by_docket_number_components(self):
+        """If either the docket or the docket_data contains None values for
+        DN components. Avoid using them to match the docket.
+        """
+
+        # Dockets in DB contains docket_number components but the incoming data
+        # doesn't.
+        oldest_d = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00075",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="LM",
+            federal_dn_case_type="cv",
+            federal_dn_office_code="1",
+        )
+        DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00075",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="LM",
+            federal_dn_case_type="cv",
+            federal_dn_office_code="1",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00075",
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="",
+            federal_dn_judge_initials_referred="",
+        )
+        # DN components are not used to match the docket. The oldest one is
+        # selected instead.
+        self.assertEqual(docket_matched.pk, oldest_d.pk)
+
+        # Dockets in DB lacks of docket_number components.
+        oldest_d_1 = DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00076",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="",
+            federal_dn_office_code="",
+        )
+        DocketFactory(
+            case_name="Young v. State",
+            docket_number="1:03-cr-00076",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+            federal_defendant_number=None,
+            federal_dn_judge_initials_assigned="",
+            federal_dn_judge_initials_referred="",
+            federal_dn_case_type="",
+            federal_dn_office_code="",
+        )
+        docket_matched = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            None,
+            "1:03-cr-00076",
+            federal_defendant_number=1,
+            federal_dn_judge_initials_assigned="MR",
+            federal_dn_judge_initials_referred="DLH",
+        )
+        # DN components are not used to match the docket. The oldest one is
+        # selected instead.
+        self.assertEqual(docket_matched.pk, oldest_d_1.pk)
 
 
 class CleanUpDuplicateAppellateEntries(TestCase):
