@@ -490,7 +490,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
             return TemplateResponse(request, "homepage.html", render_dict)
         else:
-            # User placed a search or is trying to edit an alert
             if request.GET.get("edit_alert"):
                 # They're editing an alert
                 if request.user.is_anonymous:
@@ -519,60 +518,57 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 if not is_bot(request):
                     async_to_sync(tally_stat)("search.results")
 
-                    # Perform the search
-                    search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
-
-                    if search_type == SEARCH_TYPES.PARENTHETICAL:
-                        render_dict.update(do_es_search(request.GET.copy()))
-                    elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
-                        # Check if waffle flag is active.
-                        if waffle.flag_is_active(request, "oa-es-active"):
-                            render_dict.update(
-                                do_es_search(request.GET.copy())
-                            )
-                        else:
-                            render_dict.update(do_search(request.GET.copy()))
-                    elif search_type == SEARCH_TYPES.PEOPLE:
-                        if waffle.flag_is_active(request, "p-es-active"):
-                            render_dict.update(
-                                do_es_search(request.GET.copy())
-                            )
-                        else:
-                            render_dict.update(do_search(request.GET.copy()))
-                    elif search_type in [
-                        SEARCH_TYPES.RECAP,
-                        SEARCH_TYPES.DOCKETS,
-                    ]:
-                        if waffle.flag_is_active(request, "r-es-active"):
-                            search_results = do_es_search(request.GET.copy())
-                        else:
-                            search_results = do_search(request.GET.copy())
-                        render_dict.update(search_results)
-                    elif search_type == SEARCH_TYPES.OPINION:
-                        if waffle.flag_is_active(request, "o-es-active"):
-                            render_dict.update(
-                                do_es_search(request.GET.copy())
-                            )
-                        else:
-                            render_dict.update(do_search(request.GET.copy()))
-                    elif search_type == SEARCH_TYPES.RECAP_DOCUMENT:
-                        render_dict.update(do_es_search(request.GET.copy()))
-                    else:
-                        render_dict.update(do_search(request.GET.copy()))
-
-                    # Create and save the SearchQuery object
-                    SearchQuery.objects.create(
-                        get_params=request.GET.urlencode(),
-                        query_time_ms=render_dict.get("query_time", 0),
-                        hit_cache=render_dict.get("hit_cache", False),
-                    )
-
                 # Create bare-bones alert form.
                 alert_form = CreateAlertForm(
                     initial={"query": get_string, "rate": "dly"},
                     user=request.user,
                 )
+            search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
+            
+            match search_type:
+                case SEARCH_TYPES.PARENTHETICAL:
+                    render_dict.update(do_es_search(request.GET.copy()))
+                case SEARCH_TYPES.ORAL_ARGUMENT:
+                    if waffle.flag_is_active(request, "oa-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.PEOPLE:
+                    if waffle.flag_is_active(request, "p-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+                    if waffle.flag_is_active(request, "r-es-active"):
+                        search_results = do_es_search(request.GET.copy())
+                    else:
+                        search_results = do_search(request.GET.copy())
+                    render_dict.update(search_results)
+                case SEARCH_TYPES.OPINION:
+                    if waffle.flag_is_active(request, "o-es-active"):
+                        render_dict.update(do_es_search(request.GET.copy()))
+                    else:
+                        render_dict.update(do_search(request.GET.copy()))
+                case SEARCH_TYPES.RECAP_DOCUMENT:
+                    render_dict.update(do_es_search(request.GET.copy()))
+                case _:
+                    render_dict.update(do_search(request.GET.copy()))
+            
+            query_time = render_dict.get("query_time")
+            hit_cache = render_dict.get("hit_cache")
 
+            if query_time is None:
+                logger.warning("Query time not found in render_dict")
+
+            if hit_cache is None:
+                logger.warning("Hit cache not found in render_dict")
+
+            SearchQuery.objects.create(
+                get_params=request.GET.urlencode(),
+                query_time_ms=query_time,
+                hit_cache=hit_cache
+            )
+            
             # Set the value to the query as a convenience
             alert_form.fields["name"].widget.attrs["value"] = render_dict[
                 "search_summary_str"

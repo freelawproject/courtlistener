@@ -49,16 +49,38 @@ from cl.search.docket_sources import DocketSources
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
-class SearchQuery(models.Model):
-    date_created = models.DateTimeField(auto_now_add=True, db_index=True)
-    date_modified = models.DateTimeField(auto_now=True, db_index=True)
-    get_params = models.CharField(max_length=255)
-    query_time_ms = models.IntegerField()
-    hit_cache = models.BooleanField()
+from django.contrib.auth.models import User
+from django.db import models
+from cl.lib.models import AbstractDateTimeModel
 
-    def str(self):
-        return f"Query: {self.get_params} at {self.date_created}"
+class SearchQuery(AbstractDateTimeModel):
+    user = models.ForeignKey(
+        User,
+        help_text="The user who performed this search query.",
+        related_name="search_queries",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    get_params = models.TextField(
+        help_text="The GET parameters of the search query."
+    )
+    query_time_ms = models.IntegerField(
+        help_text="The time taken to execute the query, in milliseconds."
+    )
+    hit_cache = models.BooleanField(
+        help_text="Whether the query hit the cache or not."
+    )
 
+    def __str__(self):
+        return f"Query: {self.get_params[:50]}... at {self.date_created}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['date_created']),
+            models.Index(fields=['date_modified']),
+            models.Index(fields=['user']),
+        ]
 
 class PRECEDENTIAL_STATUS:
     PUBLISHED = "Published"
