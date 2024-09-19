@@ -1,12 +1,12 @@
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
-from django.contrib.auth.models import User
 
 import pghistory
 import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
@@ -252,8 +252,6 @@ class SearchQuery(AbstractDateTimeModel):
     hit_cache = models.BooleanField(
         help_text="Whether the query hit the cache or not."
     )
-
-    
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())

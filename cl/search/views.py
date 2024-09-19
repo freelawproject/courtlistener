@@ -79,7 +79,13 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster, SearchQuery
+from cl.search.models import (
+    SEARCH_TYPES,
+    Court,
+    Opinion,
+    OpinionCluster,
+    SearchQuery,
+)
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
@@ -514,14 +520,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
                 if not is_bot(request):
                     async_to_sync(tally_stat)("search.results")
 
-
                     # Create and save the SearchQuery object
                     SearchQuery.objects.create(
                         get_params=request.GET.urlencode(),
                         query_time_ms=render_dict["query_time"],
-                        hit_cache=render_dict["hit_cache"]
+                        hit_cache=render_dict["hit_cache"],
                     )
-
 
                 # Create bare-bones alert form.
                 alert_form = CreateAlertForm(
