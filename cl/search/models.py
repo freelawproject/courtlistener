@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
+from django.contrib.auth.models import User
 
 import pghistory
 import pytz
@@ -231,6 +232,28 @@ class SOURCES:
             "recap",
         ),
     )
+
+
+class SearchQuery(AbstractDateTimeModel):
+    user = models.ForeignKey(
+        User,
+        help_text="The user who performed this search query.",
+        related_name="search_queries",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    get_params = models.TextField(
+        help_text="The GET parameters of the search query."
+    )
+    query_time_ms = models.IntegerField(
+        help_text="The time taken to execute the query, in milliseconds."
+    )
+    hit_cache = models.BooleanField(
+        help_text="Whether the query hit the cache or not."
+    )
+
+    
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
