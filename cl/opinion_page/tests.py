@@ -14,7 +14,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import RequestFactory, override_settings
+from django.test import AsyncRequestFactory, RequestFactory, override_settings
 from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
@@ -38,7 +38,7 @@ from cl.opinion_page.forms import (
     TennWorkCompClUploadForm,
 )
 from cl.opinion_page.utils import (
-    es_get_citing_clusters_with_cache,
+    es_get_citing_and_related_clusters_with_cache,
     generate_docket_entries_csv_data,
     make_docket_title,
 )
@@ -191,13 +191,17 @@ class OpinionPageLoadTest(
         self.assertIn("33 state 1", response.content.decode())
 
     async def test_es_get_citing_clusters_with_cache(self) -> None:
-        """Does es_get_citing_clusters_with_cache return the correct clusters
-        citing and the total cites count?
+        """Does es_get_citing_and_related_clusters_with_cache return the
+        correct clusters citing and the total cites count?
         """
 
-        clusters, count = await es_get_citing_clusters_with_cache(
-            self.o_cluster_3
+        request = AsyncRequestFactory().get("/")
+        result = await es_get_citing_and_related_clusters_with_cache(
+            self.o_cluster_3, request
         )
+        clusters = result.citing_clusters
+        count = result.citing_cluster_count
+
         c_list_names = [c["caseName"] for c in clusters]
         expected_clusters = [
             self.o_cluster_1.case_name,
