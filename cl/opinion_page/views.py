@@ -819,17 +819,15 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     )
     queries_timeout = False
     if es_flag_for_o:
-        (
-            related_clusters,
-            sub_opinion_ids,
-            related_search_params,
-            citing_clusters,
-            citing_cluster_count,
-            queries_timeout,
-        ) = await es_get_citing_and_related_clusters_with_cache(
+        results = await es_get_citing_and_related_clusters_with_cache(
             cluster, request
         )
-
+        related_clusters = results.related_clusters
+        sub_opinion_ids = results.sub_opinion_pks
+        related_search_params = results.url_search_params
+        citing_clusters = results.citing_clusters
+        citing_cluster_count = results.citing_cluster_count
+        queries_timeout = results.timeout
     else:
         (
             related_clusters,

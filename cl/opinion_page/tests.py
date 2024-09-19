@@ -196,11 +196,12 @@ class OpinionPageLoadTest(
         """
 
         request = AsyncRequestFactory().get("/")
-        _, _, _, clusters, count, _ = (
-            await es_get_citing_and_related_clusters_with_cache(
-                self.o_cluster_3, request
-            )
+        result = await es_get_citing_and_related_clusters_with_cache(
+            self.o_cluster_3, request
         )
+        clusters = result.citing_clusters
+        count = result.citing_cluster_count
+
         c_list_names = [c["caseName"] for c in clusters]
         expected_clusters = [
             self.o_cluster_1.case_name,

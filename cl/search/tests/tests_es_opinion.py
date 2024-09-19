@@ -15,6 +15,7 @@ from django.test import AsyncRequestFactory, override_settings
 from django.urls import reverse
 from django.utils.html import strip_tags
 from django.utils.timezone import now
+from elasticsearch.exceptions import ConnectionTimeout
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
@@ -2307,6 +2308,15 @@ class RelatedSearchTest(
         admin.user.is_staff = True
         admin.user.save()
 
+        # Clean cached results before starting the test.
+        r = get_redis_interface("CACHE")
+        keys_cited = r.keys("clusters-cited-es")
+        if keys_cited:
+            r.delete(*keys_cited)
+        keys_mlt = r.keys("clusters-mlt-es")
+        if keys_mlt:
+            r.delete(*keys_mlt)
+
         super().setUp()
 
     def get_article_count(self, r):
@@ -2461,29 +2471,171 @@ class RelatedSearchTest(
 
         tree = html.fromstring(r.content.decode())
 
-        recomendations_actual = [
+        recommendations_actual = [
             (a.get("href"), a.text_content().strip())
             for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
         ]
         recommendations_expected = [
             (
-                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/?",
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
                 "Debbas v. Franklin",
             ),
             (
-                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/?",
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
                 "Howard v. Honda",
             ),
             (
-                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/?",
+                f"/opinion/{self.opinion_cluster_3.pk}/{self.opinion_cluster_3.slug}/",
                 "case name cluster 3",
             ),
         ]
         # Test if related opinion exist in expected order
         self.assertEqual(
             recommendations_expected,
-            recomendations_actual,
+            recommendations_actual,
             msg="Unexpected opinion recommendations.",
+        )
+        await sync_to_async(self.async_client.logout)()
+
+    async def test_es_get_citing_and_related_clusters_no_cache_timeout(
+        self,
+    ) -> None:
+        """Confirm that 'Unable to retrieve clusters...' message is shown if
+        the MLT and citing query time out."""
+        seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
+
+        # Login as staff user (related items are by default disabled for guests)
+        self.assertTrue(
+            await sync_to_async(self.async_client.login)(
+                username="admin", password="password"
+            )
+        )
+
+        with mock.patch(
+            "elasticsearch_dsl.MultiSearch.execute"
+        ) as mock_m_search_execute:
+            mock_m_search_execute.side_effect = ConnectionTimeout(
+                "Connection timeout"
+            )
+            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+
+        self.assertEqual(r.status_code, 200)
+        tree = html.fromstring(r.content.decode())
+        recommendations_text = tree.xpath("//*[@id='recommendations']")[
+            0
+        ].text_content()
+        citing_text = tree.xpath("//*[@id='cited-by']")[0].text_content()
+        self.assertIn(
+            "Unable to retrieve related clusters.", recommendations_text
+        )
+        self.assertIn("Unable to retrieve citing clusters.", citing_text)
+        await sync_to_async(self.async_client.logout)()
+
+    async def test_es_get_citing_and_related_clusters_no_cache_connection_error(
+        self,
+    ) -> None:
+        """Confirm that there are no related clusters, and display 'This case
+        has not yet been cited in our system.' if the query raised a
+        connection error."""
+
+        seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
+
+        # Login as staff user (related items are by default disabled for guests)
+        self.assertTrue(
+            await sync_to_async(self.async_client.login)(
+                username="admin", password="password"
+            )
+        )
+
+        with mock.patch(
+            "elasticsearch_dsl.MultiSearch.execute"
+        ) as mock_m_search_execute:
+            mock_m_search_execute.side_effect = ConnectionError()
+            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+
+        self.assertEqual(r.status_code, 200)
+        tree = html.fromstring(r.content.decode())
+        recommendations_text = tree.xpath("//*[@id='recommendations']")
+        citing_text = tree.xpath("//*[@id='cited-by']")[0].text_content()
+        self.assertEqual([], recommendations_text)
+        self.assertIn(
+            "This case has not yet been cited in our system.", citing_text
+        )
+        await sync_to_async(self.async_client.logout)()
+
+    async def test_es_get_citing_and_related_clusters_cache_timeout(
+        self,
+    ) -> None:
+        """Confirm that related and citing clusters are properly displayed if
+        the MLT and citing queries time out but cached results are available.
+        """
+        seed_pk = self.opinion_cluster_3.pk  # case name cluster 3
+
+        # Login as staff user (related items are by default disabled for guests)
+        self.assertTrue(
+            await sync_to_async(self.async_client.login)(
+                username="admin", password="password"
+            )
+        )
+        # Initial successful request. Results are cached.
+        r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+        self.assertEqual(r.status_code, 200)
+
+        # Timeout Request.
+        with mock.patch(
+            "elasticsearch_dsl.MultiSearch.execute"
+        ) as mock_m_search_execute:
+            mock_m_search_execute.side_effect = ConnectionTimeout(
+                "Connection timeout"
+            )
+            r = await self.async_client.get("/opinion/%i/asdf/" % seed_pk)
+
+        self.assertEqual(r.status_code, 200)
+        tree = html.fromstring(r.content.decode())
+
+        # Results are returned from cache.
+        recommendations_actual = [
+            (a.get("href"), a.text_content().strip())
+            for a in tree.xpath("//*[@id='recommendations']/ul/li/a")
+        ]
+        citing_actual = [
+            (a.get("href"), a.text_content().strip())
+            for a in tree.xpath("//*[@id='cited-by']/ul/li/a")
+        ]
+        recommendations_expected = [
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
+                "Debbas v. Franklin",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                "Howard v. Honda",
+            ),
+            (
+                f"/opinion/{self.cluster_4.pk}/{self.cluster_4.slug}/",
+                "Voutila v. Bonvini",
+            ),
+        ]
+        self.assertEqual(
+            recommendations_expected,
+            recommendations_actual,
+            msg="Unexpected opinion recommendations.",
+        )
+
+        citing_expected = [
+            (
+                f"/opinion/{self.opinion_cluster_2.pk}/{self.opinion_cluster_2.slug}/",
+                f"Howard v. Honda (1895)",
+            ),
+            (
+                f"/opinion/{self.opinion_cluster_1.pk}/{self.opinion_cluster_1.slug}/",
+                "Debbas v. Franklin (2015)",
+            ),
+        ]
+        self.assertEqual(
+            citing_expected,
+            citing_actual,
+            msg="Unexpected opinion cited.",
         )
         await sync_to_async(self.async_client.logout)()
 
