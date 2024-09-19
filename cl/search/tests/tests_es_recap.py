@@ -1,6 +1,7 @@
 import datetime
 import math
 import re
+import urllib.parse
 from http import HTTPStatus
 from unittest import mock
 
@@ -1384,14 +1385,28 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=False,
             )
 
-        params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "docket_number": "1:21-bk-1234",
+            "q": "SUBPOENAS SERVED ON",
+        }
         # Frontend
         r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
         # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 5, "docket_number")
 
-        # Confirm view additional results button is shown.
+        # Confirm view additional results button is shown and link params are correct.
         self.assertIn("View Additional Results for", r.content.decode())
+        tree = html.fromstring(r.content.decode())
+        docket_id_link = tree.xpath(
+            '//a[@class="btn-default btn view-additional-results"]/@href'
+        )[0]
+        decoded_url = urllib.parse.unquote(docket_id_link)
+        self.assertIn(
+            f"(SUBPOENAS+SERVED+ON)+AND+docket_id:{self.de.docket_id}",
+            decoded_url,
+        )
+        self.assertIn("docket_number=1:21-bk-1234", decoded_url)
 
         # View additional results:
         params = {

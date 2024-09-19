@@ -1246,7 +1246,10 @@ class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
                 name="entry_number_idx",
                 condition=Q(entry_number=1),
             ),
-            models.Index(fields=["recap_sequence_number", "entry_number"]),
+            models.Index(
+                fields=["recap_sequence_number", "entry_number"],
+                name="search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx",
+            ),
         ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1423,7 +1426,8 @@ class RECAPDocument(
                     "document_type",
                     "document_number",
                     "attachment_number",
-                ]
+                ],
+                name="search_recapdocument_document_type_303cccac79571217_idx",
             ),
             models.Index(
                 fields=["filepath_local"],
@@ -3250,9 +3254,15 @@ class Citation(models.Model):
     class Meta:
         indexes = [
             # To look up individual citations
-            models.Index(fields=["volume", "reporter", "page"]),
+            models.Index(
+                fields=["volume", "reporter", "page"],
+                name="search_citation_volume_ae340b5b02e8912_idx",
+            ),
             # To generate reporter volume lists
-            models.Index(fields=["volume", "reporter"]),
+            models.Index(
+                fields=["volume", "reporter"],
+                name="search_citation_volume_251bc1d270a8abee_idx",
+            ),
         ]
         unique_together = (("cluster", "volume", "reporter", "page"),)
 
