@@ -375,6 +375,14 @@
                                 </li>
                             {% endif %}
                         {% endfor %}
+                    {% if cluster.filepath_pdf_harvard %}
+                        <li role="separator" class="divider"></li>
+                        <li>
+                            <a href="{{ cluster.filepath_pdf_harvard }}" rel="nofollow">
+                                Scanned Decision from CaseLaw Access Project
+                            </a>
+                        </li>
+                    {% endif %}
                     </ul>
                 </div>
             {% endif %}
