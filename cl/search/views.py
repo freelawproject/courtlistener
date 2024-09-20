@@ -788,9 +788,9 @@ def do_es_search(
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
-                related_cluster = OpinionCluster.objects.get(
+                related_cluster = OpinionCluster.objects.filter(
                     sub_opinions__pk__in=related_pks
-                )
+                ).distinct("pk")
         except UnbalancedParenthesesQuery as e:
             error = True
             error_message = "unbalanced_parentheses"
