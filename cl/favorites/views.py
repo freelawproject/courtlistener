@@ -1,15 +1,9 @@
-from datetime import timedelta
-from typing import Optional
-
-from asgiref.sync import async_to_sync, sync_to_async
-from django.conf import settings
+from asgiref.sync import sync_to_async
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
-from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField
-from django.db.models.functions import Cast, Extract, Now, Sqrt
 from django.http import (
     Http404,
     HttpRequest,
@@ -19,14 +13,13 @@ from django.http import (
 )
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
-from django.utils import timezone
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
-from cl.favorites.models import DocketTag, Note, Prayer, UserTag
+from cl.favorites.models import DocketTag, Note, UserTag
+from cl.favorites.utils import get_top_prayers
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
-from cl.search.models import RECAPDocument
 
 
 async def get_note(request: HttpRequest) -> HttpResponse:
@@ -183,69 +176,10 @@ async def view_tags(request, username):
     )
 
 
-def prayer_eligible(user: User) -> bool:
-
-    allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
-
-    now = timezone.now()
-    last_24_hours = now - timedelta(hours=24)
-
-    # Count the number of prayers made by this user in the last 24 hours
-    prayer_count = Prayer.objects.filter(
-        user=user, date_created__gte=last_24_hours
-    ).count()
-
-    if prayer_count < allowed_prayer_count:
-        return True
-    return False
-
-
-def new_prayer(user: User, recap_document: RECAPDocument) -> Optional[Prayer]:
-
-    if prayer_eligible(User) and not (RECAPDocument.is_available):
-        new_prayer = Prayer.objects.create(
-            user=user, recap_document=recap_document, status=Prayer.WAITING
-        )
-        return new_prayer
-
-    return None
-
-
-def get_top_prayers() -> list[RECAPDocument]:
-    # Calculate the age of each prayer
-    prayer_age = ExpressionWrapper(
-        Extract(Now() - F("prayers__date_created"), "epoch"),
-        output_field=FloatField(),
-    )
-
-    # Annotate each RECAPDocument with the number of prayers and the average prayer age
-    documents = (
-        RECAPDocument.objects.annotate(
-            prayer_count=Count("prayers"), avg_prayer_age=Avg(prayer_age)
-        )
-        .annotate(
-            # Calculate the geometric mean with explicit type casting
-            geometric_mean=Sqrt(
-                Cast(
-                    F("prayer_count")
-                    * Cast(F("avg_prayer_age"), FloatField()),
-                    FloatField(),
-                )
-            )
-        )
-        .order_by("-geometric_mean")[:50]
-    )
-
-    return list(documents)
-
-
-async def get_top_prayers_async():
-    return await sync_to_async(get_top_prayers)()
-
-
-async def open_prayers(request):
+async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
-    top_prayers = await get_top_prayers_async()
+
+    top_prayers = await get_top_prayers()
     return TemplateResponse(
         request,
         "recap_requests.html",
