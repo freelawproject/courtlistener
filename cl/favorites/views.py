@@ -14,6 +14,8 @@ from django.http import (
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, UserTag
@@ -175,16 +177,16 @@ async def view_tags(request, username):
         },
     )
 
-
+@cache_page(30)  # Cache for 30 seconds
 async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
 
     top_prayers = await get_top_prayers()
     return TemplateResponse(
         request,
-        "recap_requests.html",
+        "top_prayers.html",
         {
             "top_prayers": top_prayers,
-            "private": True,  # temporary to prevent Google indexing
+            "private": False,  # temporary to prevent Google indexing
         },
     )

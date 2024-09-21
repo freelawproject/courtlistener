@@ -23,5 +23,5 @@ urlpatterns = [
         name="view_tag",
     ),
     path("tags/<str:username>/", view_tags, name="tag_list"),
-    path("recap_requests/", open_prayers, name="recap_requests"),
+    path("prayers/top/", open_prayers, name="top_prayers"),
 ]
