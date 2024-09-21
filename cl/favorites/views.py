@@ -14,8 +14,8 @@ from django.http import (
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
-from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, UserTag
@@ -176,6 +176,7 @@ async def view_tags(request, username):
             "private": False,
         },
     )
+
 
 @cache_page(30)  # Cache for 30 seconds
 async def open_prayers(request: HttpRequest) -> HttpResponse:
