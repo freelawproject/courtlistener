@@ -36,10 +36,15 @@ async def create_prayer(
     user: User, recap_document: RECAPDocument
 ) -> Prayer | None:
     if await prayer_eligible(user) and not recap_document.is_available:
-        new_prayer = await Prayer.objects.acreate(
-            user=user, recap_document=recap_document, status=Prayer.WAITING
-        )
-        return new_prayer
+        existing_prayer = await Prayer.objects.filter(
+            user=user, recap_document=recap_document
+        ).afirst()
+
+        if not existing_prayer:
+            new_prayer = await Prayer.objects.acreate(
+                user=user, recap_document=recap_document, status=Prayer.WAITING
+            )
+            return new_prayer
 
     return None
 
