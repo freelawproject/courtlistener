@@ -169,8 +169,8 @@ class Prayer(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=['user', 'recap_document'],
-                name='unique_prayer_for_user_document'
+                fields=["user", "recap_document"],
+                name="unique_prayer_for_user_document",
             ),
         ]
         indexes = [
