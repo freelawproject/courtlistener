@@ -239,7 +239,7 @@ class SearchQuery(AbstractDateTimeModel):
         User,
         help_text="The user who performed this search query.",
         related_name="search_queries",
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )

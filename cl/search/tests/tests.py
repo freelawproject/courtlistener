@@ -90,6 +90,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     RECAPDocument,
+    SearchQuery,
     sort_cites,
 )
 from cl.search.tasks import (
@@ -1134,7 +1135,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
-        UserProfileWithParentsFactory.create(
+        self.pandora_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
@@ -1522,6 +1523,23 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         bootstrap_btns = self.browser.find_elements(By.CSS_SELECTOR, "a.btn")
         self.assertIn("Sign Back In", [btn.text for btn in bootstrap_btns])
+
+        # We are taking advantage of the queries done with authenticated and
+        # anonymous user to see if SearchQuery collection is working
+        lookup = {
+            "get_params": "q=lissner",
+            "user": None,
+            "query_time_ms__gte": 0,
+        }
+        self.assertTrue(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "a SearchQuery with get_params 'q=lissner' and anonymous user should have been created",
+        )
+        lookup["user"] = self.pandora_profile.user
+        self.assertTrue(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "a SearchQuery with get_params 'q=lissner' and 'pandora' user should have been created",
+        )
 
 
 class CaptionTest(TestCase):
