@@ -17,7 +17,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -26,7 +26,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -80,9 +80,9 @@
     <li><code>case_name_full</code>: This is the full list of plaintiffs and defendants in a case, sometimes going on for hundreds of words, and often including titles or other information. For example: <em>Roe Et Al v. Wade, District Attorney of Dallas County</em>.
     </li>
   </ol>
-  <p>All cases have at least one of these values, many have two values, and some have all three. A <code>case_name_short</code> was generated algorithmically for every case possible, but about 40% of cases were too complicated for our program to process and so they were left blank. Human editors have ensured that every Supreme Court case from 1945 to 2018 has a <code>case_name_short</code> value.
+  <p>All cases have at least one of these values, many have two values, and some have all three. A <code>case_name_short</code> was generated algorithmically for every case possible, but about 40% of cases were too complicated for our program to process and so they were left blank. Editors have ensured that every Supreme Court case from 1945 to 2018 has a <code>case_name_short</code> value.
   </p>
-  <p><code>case_name</code> is available for the majority of cases, except those that were imported from Resource.org, which only provided <code>case_name_full</code> values. When that happened, there was no way for us to condense a <code>case_name_full</code>, so until a human editor is available to review them, they will lack this value. All cases have either a <code>case_name</code> or a <code>case_name_full</code> value.
+  <p><code>case_name</code> is available for the majority of cases, except those that were imported from Resource.org, which only provided <code>case_name_full</code> values. When that happened, there was no way for us to condense a <code>case_name_full</code>, so until an editor is available to review them, they will lack this value. All cases have either a <code>case_name</code> or a <code>case_name_full</code> value.
   </p>
   <p>Our advice is to use a <code>case_name</code> if it is available and to fall back on the <code>case_name_full</code> if it is not. If you are interested in sponsoring trained humans to improve this data, please <a href="{% url "contact" %}">get in touch</a>.
   </p>
@@ -100,7 +100,7 @@
       <strong>$type</strong>: This is the type of object that has been returned, for example, "docket" indicates that you have gotten a docket as your result.
     </li>
     <li>
-      <strong>$id</strong>: This is a numeric ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not always sequential, but they will never be duplicated within an document type.
+      <strong>$id</strong>: This is a numeric ID for the document. This value increments as we add content to the system. Note that due to deletions and modifications the numeric IDs are not always sequential, but they will never be duplicated within a document type.
     </li>
     <li>
       <p><strong>$name-of-the-case</strong>: This is the "<a href="https://en.wikipedia.org/wiki/Slug_%28publishing%29">slug</a>" of the document, and generally mirrors its case name. This value can change if we clean up a case name, but provided it is not omitted completely, this part of the URL can be any value without affecting the page that is loaded.
