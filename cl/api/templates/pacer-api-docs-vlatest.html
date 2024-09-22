@@ -189,7 +189,7 @@
   "{% get_full_host %}{% url "party-list" version=version %}?docket=123"</pre>
   <p>It returns something like:</p>
   <pre class="pre-scrollable tall">{
-① "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&page=2",
+① "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&cursor=cD0xMjA5NjAyMg%3D%3D&docket=4214664",",
   "previous": null,
   "results": [
     {
@@ -266,7 +266,7 @@
   "{% get_full_host %}{% url "attorney-list" version=version %}?docket=4214664"</pre>
   <p>Returns:</p>
   <pre class="pre-scrollable tall">{
-    "next": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/?docket=4214664&page=2",
+    "next": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/?docket=4214664&cursor=cD0xMjA5NjAyMg%3D%3D&docket=4214664",
     "previous": null,
     "results": [
         {

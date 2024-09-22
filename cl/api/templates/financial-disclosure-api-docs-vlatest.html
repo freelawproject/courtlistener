@@ -184,7 +184,7 @@
   <pre class="pre-scrollable tall">curl "{% get_full_host %}{% url "investment-list" version=version %}?redacted=True" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
 {
-  "next": "https://www.courtlistener.com/api/rest/{{ version }}/investments/?page=2&redacted=True",
+  "next": "https://www.courtlistener.com/api/rest/{{ version }}/investments/?page=2&redacted=True&cursor=cD0xMjA5NjAyMg%3D%3D",
   "previous": null,
   "results": [
     {
