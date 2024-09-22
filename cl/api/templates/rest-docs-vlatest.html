@@ -1,6 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
-{% load extras %}
+{% load static extras humanize %}
 
 {% block title %}REST API, v4 &ndash; CourtListener.com{% endblock %}
 {% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
@@ -29,7 +28,7 @@
 
     <p class="lead">APIs for developers and researchers that need granular legal data.
     </p>
-    <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Update!</strong> V4 of the API is now live! We encourage you to use the latest version. You can view information on previous versions of the API <a href="{% url "rest_change_log" %}">here</a>.
+    <p class="alert alert-warning">A new version of the API is now live! Please read <a href="{% url "migration_guide" %}">our migration guide</a> to update. The <a href="{% url "rest_docs" version="v4" %}">old version of the documentation</a> is maintained for migration purposes only.
     </p>
     <p>After more than a decade of development, these APIs are powerful. Our <a href="{% url "case_law_api_help" %}">case law API</a> was the first. Our <a href="{% url "pacer_api_help" %}">PACER</a> and <a href="{% url "oral_argument_api_help" %}">oral argument</a> APIs are the biggest. Our <a href="{% url "webhooks_getting_started" %}">webhooks</a> push data to you. Our <a href="{% url "citation_lookup_api" %}">citation lookup tool</a> can fight hallucinations in AI tools.
     </p>
@@ -47,7 +46,7 @@
     </p>
     <p>The APIs listed in this response can be used to make queries against our database or search engine.
     </p>
-    <p>To learn more about an API, you can send an <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/OPTIONS">HTTP OPTIONS</a> request to it, like so:
+    <p>To learn more about an API, you can send an <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods/OPTIONS">HTTP OPTIONS</a> request, like so:
     </p>
     <pre class="scrollable">curl -X OPTIONS "{% get_full_host %}{% url "api-root" version="v4" %}"</pre>
     <p>An <code>OPTIONS</code> request is one of the best ways to understand the API.
@@ -115,7 +114,7 @@
         <h4><code>{{ user.auth_token }}</code></h4>
         <p>Do not share your API token. Keep it private like a password.
         </p>
-        <p class="text-right"><a class="btn btn-default" href="{% url "view_api" %}#usage">See Usage</a></p>
+        <p class="text-right"><a class="btn btn-default" href="{% url "view_api_usage" %}">See Your Usage</a></p>
       {% else %}
         <p><a href="{% url "sign-in" %}?next={{ request.path }}"
                 class="btn btn-primary btn-lg">Sign In To See Your Token</a>
@@ -125,7 +124,7 @@
 
 
     <h3 id="authentication">Authentication</h3>
-    <p>Authentication is necessary to monitor and throttle usage of the system, and so we can assist with any errors that may occur.
+    <p>Authentication is necessary to monitor and throttle the system, and so we can assist with any errors that may occur.
     </p>
     <p>Per our <a href="{% url "terms" %}#privacy">privacy policy</a>, we do not track your queries in the API, though we do collect statistical information for system monitoring.
     </p>
@@ -362,9 +361,15 @@
     <p>Unfortunately, this cannot be used for nested resources, though <a href="https://github.com/wimglenn/djangorestframework-queryfields/issues/8" target="_blank">there is an open issue tracking this</a>.
     </p>
 
-    <h3 id="pagination">Cursor-based Pagination</h3> <! -- I'm not sure what the "id" should be. -->
-    <p>Search API crawls are no longer limited to 100 pages. Deep pagination of search results is now possible. Users cannot directly jump to a specific page. Look at and follow the <code>next</code> and <code>previous</code> parameters provided in each response. Navigation of the API is exclusively through those keys in each API response.
+    <h3 id="pagination">Pagination</h3>
+    <p>Most APIs can be paginated by using the <code>page</code> GET parameter, but that will be limited to 100 pages of results.</p>
+    <p>As of API v4, deep pagination is generally enabled for requests that are ordered by the <code>id</code>, <code>date_modified</code>, or <code>date_created</code> field. When sorting by these fields, the <code>next</code> and <code>previous</code> keys of the response are how you must paginate results, and the <code>page</code> parameter will not work.
     </p>
+    <p>Some API endpoints support slightly different fields for deep pagination:</p>
+    <ol>
+      <li><code>{% url "pacerfetchqueue-list" version="v4" %}</code> also supports the <code>date_completed</code> field.</li>
+      <li><code>{% url "alert-list" version="v4" %}</code> and <code>{% url "docket-alert-list" version="v4" %}</code> only support the <code>date_created</code> field.</li>
+    </ol>
 
     <h3 id="rates">Rate Limits</h3>
     <p>Our APIs allow 5,000 queries per hour to authenticated users. Unauthenticated users are allowed 100 queries per day for experimentation.
@@ -489,9 +494,8 @@
 
 
     <h2 id="available-jurisdictions"><span>Available Jurisdictions</span></h2>
-    <p>We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available, including all abbreviations, can <a href="{% url "court_index" %}">be found here</a>.
+    <p>We currently have <strong>{{ court_count|intcomma }}</strong> jurisdictions that can be accessed with our APIs. Details about the jurisdictions that are available, including all abbreviations, can <a href="{% url "court_index" %}">be found here</a>.
     </p>
-    <!-- Jurisdictions court count shows 0, but should be 3k+ -->
 
     <h2 id="upgrades">Upgrades and Fixes</h2>
     <p>Like the rest of the CourtListener platform, this API and its documentation are <a href="https://github.com/freelawproject/courtlistener">open source</a>. If it lacks functionality that you desire or if you find this documentation lacking, pull requests providing improvements are encouraged. Just get in touch via our <a href="{% url "contact" %}">contact form</a> to discuss your ideas. Or, if it's something quick, just go ahead and send us a pull request.
