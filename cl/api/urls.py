@@ -369,7 +369,7 @@ urlpatterns = [
     ),
     # V4 Migration guide
     path(
-        "help/api/v4/migration-guide/",
+        "help/api/rest/v4/migration-guide/",
         TemplateView.as_view(
             template_name="migration-guide.html",
             extra_context={"private": False},
