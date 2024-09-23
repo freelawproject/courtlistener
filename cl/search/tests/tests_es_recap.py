@@ -2088,10 +2088,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "August 19th, 2015"
         )
         self._compare_child_entry_date_filed(
-            1, r.content.decode(), 0, "July 19th, 2014"
+            1, r.content.decode(), 0, "July 5th, 2014"
         )
         self._compare_child_entry_date_filed(
-            2, r.content.decode(), 0, "February 23th, 1732"
+            2, r.content.decode(), 0, "February 23rd, 1732"
         )
 
         # Order by entry_date_filed asc
@@ -2116,10 +2116,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Confirm entry date filed are properly displayed.
         self._compare_child_entry_date_filed(
-            0, r.content.decode(), 0, "February 23th, 1732"
+            0, r.content.decode(), 0, "February 23rd, 1732"
         )
         self._compare_child_entry_date_filed(
-            1, r.content.decode(), 0, "July 19th, 2014"
+            1, r.content.decode(), 0, "July 5th, 2014"
         )
         self._compare_child_entry_date_filed(
             2, r.content.decode(), 0, "August 19th, 2015"
