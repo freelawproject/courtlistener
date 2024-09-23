@@ -720,6 +720,10 @@ class RECAPPrayAndPay(TestCase):
         prayer_created = await create_prayer(self.user, self.rd_2)
         self.assertTrue(prayer_created)
 
+        # Ensure that a user cannot "pray" for the same document more than once
+        same_prayer_created = await create_prayer(self.user, self.rd_2)
+        self.assertIsNone(same_prayer_created)
+
     async def test_get_top_prayers_by_number(self) -> None:
         """Does the get_top_prayers method works properly?"""
 
