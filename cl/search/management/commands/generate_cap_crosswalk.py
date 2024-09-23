@@ -2,13 +2,17 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
+from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.models import Q
+from django.db.models import QuerySet
 from tqdm import tqdm
 
+from eyecite.find import get_citations
+from eyecite.models import FullCaseCitation
 from cl.lib.command_utils import CommandUtils
 from cl.search.models import Citation, Court, OpinionCluster
 
@@ -44,7 +48,7 @@ class Command(CommandUtils, BaseCommand):
             help="Directory to save crosswalk files (default: cl/search/crosswalks)",
         )
 
-    def handle(self, *args, **options):
+    def handle(self, *args: Any, **options: Any) -> None:
         if options["verbose"]:
             logger.setLevel(logging.DEBUG)
 
@@ -66,8 +70,12 @@ class Command(CommandUtils, BaseCommand):
 
         self.print_statistics()
 
-    def setup_s3_client(self, mock_client=None):
-        # Set up S3 client for accessing CAP data in R2. Ensure env has appropriate values set
+    def setup_s3_client(self, mock_client: Optional[Any] = None) -> None:
+        """Set up S3 client for accessing CAP data in R2.
+
+        :param mock_client: Optional mock client for testing.
+        :return: None
+        """
         if mock_client:
             self.s3_client = mock_client
         else:
@@ -79,7 +87,12 @@ class Command(CommandUtils, BaseCommand):
             )
         self.bucket_name = settings.CAP_R2_BUCKET_NAME
 
-    def generate_complete_crosswalk(self):
+    def generate_complete_crosswalk(self) -> None:
+        """Generate a complete crosswalk for all reporters or a specific reporter.
+
+        :return: No return, generates and saves the crosswalk file
+        """
+
         reporters = self.fetch_reporters_metadata()
 
         if self.single_reporter:
@@ -92,7 +105,15 @@ class Command(CommandUtils, BaseCommand):
         ):
             self.generate_crosswalk_for_reporter(reporter, i)
 
-    def generate_crosswalk_for_reporter(self, reporter, index):
+    def generate_crosswalk_for_reporter(
+        self, reporter: Dict[str, Any], index: int
+    ) -> None:
+        """Generate crosswalk for a specific reporter.
+
+        :param reporter: Dictionary containing reporter metadata.
+        :param index: Index of the reporter being processed.
+        :return: None
+        """
         crosswalk = []
         reporter_name = reporter["short_name"]
         volumes = self.fetch_volumes_for_reporter(reporter["slug"])
@@ -147,57 +168,81 @@ class Command(CommandUtils, BaseCommand):
                 f"Processed {self.total_cases_processed} cases for {reporter_name}, found {self.total_matches_found} matches"
             )
 
-    def fetch_volumes_for_reporter(self, reporter_slug):
-        # Fetch volume directories for a given reporter from R2
+    def fetch_volumes_for_reporter(self, reporter_slug: str) -> List[str]:
+        """Fetch volume directories for a given reporter from R2 using a paginator.
+
+        :param reporter_slug: The slug of the reporter.
+        :return: A list of volume directory names.
+        """
+        volume_directories = []
+
         try:
-            response = self.s3_client.list_objects_v2(
+            # Create a paginator
+            paginator = self.s3_client.get_paginator("list_objects_v2")
+
+            page_iterator = paginator.paginate(
                 Bucket=self.bucket_name,
                 Prefix=f"{reporter_slug}/",
                 Delimiter="/",
             )
-            volume_directories = [
-                o["Prefix"].split("/")[-2]
-                for o in response.get("CommonPrefixes", [])
-            ]
-            return sorted(volume_directories)
-        except Exception as e:
+
+            for page in page_iterator:
+                volume_directories.extend(
+                    [
+                        o["Prefix"].split("/")[-2]
+                        for o in page.get("CommonPrefixes", [])
+                    ]
+                )
+
+            logger.info(
+                f"Found {len(volume_directories)} volumes for reporter {reporter_slug}"
+            )
+
+        except ClientError as e:
             logger.error(
                 f"Error fetching volume directories for {reporter_slug}: {str(e)}"
             )
-            return []
 
-    def find_matching_case(self, case_meta):
+        return sorted(volume_directories)
+
+    def find_matching_case(
+        self, case_meta: Dict[str, Any]
+    ) -> Optional[OpinionCluster]:
+        """Find a matching case in CourtListener database."""
         try:
-            citation = case_meta["citations"][0]["cite"].split()
-            volume, reporter, page = citation[0], citation[1], citation[2]
+            citation_text = case_meta["citations"][0]["cite"]
+            citations = get_citations(citation_text)
 
-            logger.debug(f"Searching for citation: {volume} {reporter} {page}")
+            for citation in citations:
+                if isinstance(citation, FullCaseCitation):
+                    logger.debug(f"Searching for citation: {citation}")
 
-            matches = OpinionCluster.objects.filter(
-                citations__volume=volume,
-                citations__reporter=reporter,
-                citations__page=page,
-            ).distinct()
+                    # Use the groups attribute to access volume, reporter, and page
+                    matches = OpinionCluster.objects.filter(
+                        citations__volume=citation.groups["volume"],
+                        citations__reporter=citation.corrected_reporter(),
+                        citations__page=citation.groups["page"],
+                    ).distinct()
 
-            match_count = matches.count()
+                    match_count = matches.count()
 
-            if match_count == 1:
-                matched_case = matches.first()
-                logger.debug(
-                    f"Single match found: {matched_case.case_name} (CL ID: {matched_case.id})"
-                )
-                return matched_case
-            elif match_count > 1:
-                logger.warning(
-                    f"Multiple matches ({match_count}) found for citation: {volume} {reporter} {page}"
-                )
-                return (
-                    matches.first()
-                )  # Return the first match, but log a warning
-            else:
-                logger.debug(
-                    f"No match found for citation: {volume} {reporter} {page}"
-                )
+                    if match_count == 1:
+                        matched_case = matches.first()
+                        logger.debug(
+                            f"Single match found: {matched_case.case_name} (CL ID: {matched_case.id})"
+                        )
+                        return matched_case
+                    elif match_count > 1:
+                        logger.warning(
+                            f"Multiple matches ({match_count}) found for citation: {citation}"
+                        )
+                        return (
+                            matches.first()
+                        )  # Return the first match, but log a warning
+                    else:
+                        logger.debug(
+                            f"No match found for citation: {citation}"
+                        )
 
         except Exception as e:
             logger.error(
@@ -207,8 +252,15 @@ class Command(CommandUtils, BaseCommand):
 
         return None
 
-    def fetch_cases_metadata(self, reporter_slug, volume):
-        # Fetch CasesMetadata.json for a specific reporter and volume from R2
+    def fetch_cases_metadata(
+        self, reporter_slug: str, volume: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch CasesMetadata.json for a specific reporter and volume from R2.
+
+        :param reporter_slug: The slug of the reporter.
+        :param volume: The volume number.
+        :return: A list of case metadata dictionaries.
+        """
         key = f"{reporter_slug}/{volume}/CasesMetadata.json"
         try:
             response = self.s3_client.get_object(
@@ -221,8 +273,11 @@ class Command(CommandUtils, BaseCommand):
             )
             return []
 
-    def fetch_reporters_metadata(self):
-        # Fetch ReportersMetadata.json from R2
+    def fetch_reporters_metadata(self) -> List[Dict[str, Any]]:
+        """Fetch ReportersMetadata.json from R2.
+
+        :return: A list of reporter metadata dictionaries.
+        """
         try:
             response = self.s3_client.get_object(
                 Bucket=self.bucket_name, Key="ReportersMetadata.json"
@@ -232,8 +287,12 @@ class Command(CommandUtils, BaseCommand):
             logger.error(f"Error fetching ReportersMetadata.json: {str(e)}")
             return []
 
-    def is_valid_case_metadata(self, case_meta):
-        # Check if case metadata contains all required fields
+    def is_valid_case_metadata(self, case_meta: Dict[str, Any]) -> bool:
+        """Check if case metadata contains all required fields.
+
+        :param case_meta: Case metadata dictionary.
+        :return: True if metadata is valid, False otherwise.
+        """
         required_fields = [
             "id",
             "name_abbreviation",
@@ -246,7 +305,11 @@ class Command(CommandUtils, BaseCommand):
             and case_meta["citations"]
         )
 
-    def print_statistics(self):
+    def print_statistics(self) -> None:
+        """Print statistics about the crosswalk generation process.
+
+        :return: None
+        """
         self.stdout.write(
             self.style.SUCCESS(
                 f"Total cases processed from R2: {self.total_cases_processed}"
@@ -267,7 +330,16 @@ class Command(CommandUtils, BaseCommand):
         else:
             self.stdout.write(self.style.WARNING("No cases processed"))
 
-    def save_crosswalk(self, crosswalk, reporter_name, index):
+    def save_crosswalk(
+        self, crosswalk: List[Dict[str, Any]], reporter_name: str, index: int
+    ) -> None:
+        """Save the generated crosswalk to a JSON file.
+
+        :param crosswalk: List of crosswalk entries.
+        :param reporter_name: Name of the reporter.
+        :param index: Index of the reporter being processed.
+        :return: None
+        """
         filename = f"{reporter_name.replace(' ', '_').replace('.', '_')}.json"
         filepath = os.path.join(self.output_dir, filename)
         with open(filepath, "w") as f:
