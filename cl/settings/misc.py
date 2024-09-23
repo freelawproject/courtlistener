@@ -53,3 +53,6 @@ FUNDRAISING_MODE = env("FUNDRAISING_MODE", default=False)
 # Key for Follow the Money API
 FTM_KEY = env("FTM_KEY", default="")
 FTM_LAST_UPDATED = env("FTM_LAST_UPDATED", default=date.today())
+
+# Pay and Pray quota
+ALLOWED_PRAYER_COUNT = env.int("ALLOWED_PRAYER_COUNT", default=5)
