@@ -1,18 +1,18 @@
 import json
 import logging
-from unittest.mock import MagicMock, patch, mock_open
 from contextlib import redirect_stdout
+from unittest.mock import MagicMock, mock_open, patch
 
 from django.core.management import call_command
 from django.test import override_settings
-from cl.tests.cases import TestCase
 
-from cl.search.models import Court, Docket, OpinionCluster
 from cl.search.factories import (
     CourtFactory,
     DocketFactory,
     OpinionClusterFactory,
 )
+from cl.search.models import Court, Docket, OpinionCluster
+from cl.tests.cases import TestCase
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
