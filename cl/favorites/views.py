@@ -188,6 +188,6 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
         "top_prayers.html",
         {
             "top_prayers": top_prayers,
-            "private": False,  # temporary to prevent Google indexing
+            "private": True,  # temporary to prevent Google indexing
         },
     )
