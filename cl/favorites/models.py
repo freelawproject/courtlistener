@@ -172,6 +172,12 @@ class Prayer(models.Model):
     )
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "recap_document"],
+                name="unique_prayer_for_user_document",
+            ),
+        ]
         indexes = [
             # When adding a new document to RECAP, we'll ask: What outstanding
             # prayers do we have for this document?

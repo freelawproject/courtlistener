@@ -1260,7 +1260,7 @@ class RECAPSearchTestCase(SimpleTestCase):
                 source=Docket.COLUMBIA_AND_RECAP,
             ),
             entry_number=3,
-            date_filed=datetime.date(2014, 7, 19),
+            date_filed=datetime.date(2014, 7, 5),
             description="MOTION for Leave to File Amicus Discharging Debtor",
         )
         cls.rd_2 = RECAPDocumentFactory(
