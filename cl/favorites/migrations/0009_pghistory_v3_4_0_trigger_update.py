@@ -7,11 +7,9 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+
     dependencies = [
-        (
-            "favorites",
-            "0007_rename_prayer_recap_document_status_favorites_p_recap_d_00e8c5_idx_and_more",
-        ),
+        ("favorites", "0008_prayer_unique_prayer_for_user_document"),
     ]
 
     operations = [
