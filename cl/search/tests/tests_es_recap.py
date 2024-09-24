@@ -2887,7 +2887,9 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             cited_opinion=cls.opinion,
             depth=1,
         )
-        BankruptcyInformationFactory(docket=cls.de_api.docket)
+        BankruptcyInformationFactory(
+            docket=cls.de_api.docket, trustee_str="Lorem Ipsum"
+        )
 
         cls.de_empty_fields_api = DocketEntryWithParentsFactory(
             docket=DocketFactory(
@@ -2909,6 +2911,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             court=cls.court_api,
             date_argued=None,
             source=Docket.RECAP_AND_IDB,
+            case_name_full="",
         )
 
     async def _test_api_results_count(
@@ -3825,6 +3828,7 @@ class RECAPSearchAPIV4Test(
             docket_entry_recent = DocketEntryWithParentsFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Lorem Ipsum",
+                docket__case_name_full="",
                 docket__date_filed=datetime.date(2024, 2, 23),
                 date_filed=datetime.date(2022, 2, 23),
             )
