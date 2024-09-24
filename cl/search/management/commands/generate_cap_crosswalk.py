@@ -7,10 +7,11 @@ import boto3
 from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from tqdm import tqdm
 
 from eyecite.find import get_citations
 from eyecite.models import FullCaseCitation
+from tqdm import tqdm
+
 from cl.lib.command_utils import CommandUtils
 from cl.search.models import OpinionCluster
 
