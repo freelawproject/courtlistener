@@ -1,20 +1,18 @@
 import json
 import logging
 import os
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import boto3
 from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.models import QuerySet
 from tqdm import tqdm
 
 from eyecite.find import get_citations
 from eyecite.models import FullCaseCitation
 from cl.lib.command_utils import CommandUtils
-from cl.search.models import Citation, Court, OpinionCluster
+from cl.search.models import OpinionCluster
 
 logger = logging.getLogger(__name__)
 

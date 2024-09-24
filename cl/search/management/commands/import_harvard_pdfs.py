@@ -2,28 +2,17 @@ import json
 import logging
 import os
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import boto3
-from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
-from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
-from storages.backends.s3boto3 import S3Boto3Storage
 from tqdm import tqdm
+from cl.lib.storage import HarvardPDFStorage
 
-from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.search.models import OpinionCluster
 
 logger = logging.getLogger(__name__)
-
-
-class HarvardPDFStorage(S3Boto3Storage):
-    bucket_name = settings.AWS_STORAGE_BUCKET_NAME
-    custom_domain = settings.AWS_S3_CUSTOM_DOMAIN
-    default_acl = settings.AWS_DEFAULT_ACL
-    querystring_auth = settings.AWS_QUERYSTRING_AUTH
-    max_memory_size = settings.AWS_S3_MAX_MEMORY_SIZE
 
 
 class Command(BaseCommand):
@@ -64,7 +53,6 @@ class Command(BaseCommand):
         :return: None
         """
         logger.info("Starting import_harvard_pdfs command")
-        # Set logging level if verbose option is provided
         if options["verbose"]:
             logger.setLevel(logging.DEBUG)
 
