@@ -1173,18 +1173,18 @@ Django = ">=3.2"
 
 [[package]]
 name = "django-pghistory"
-version = "2.9.0"
+version = "3.4.3"
 description = "History tracking for Django and Postgres"
 optional = false
-python-versions = ">=3.8.0,<4"
+python-versions = "<4,>=3.8.0"
 files = [
-    {file = "django_pghistory-2.9.0-py3-none-any.whl", hash = "sha256:d0202a18cfb9163b15c607fcd4550fd4265ecfe1fcd37891eb5c5967cf732b41"},
-    {file = "django_pghistory-2.9.0.tar.gz", hash = "sha256:14be238e3e83fd99887c2a10d72886f00b015e515d04e93fa8a3c8a52f1a30e8"},
+    {file = "django_pghistory-3.4.3-py3-none-any.whl", hash = "sha256:963afbc7cccea09398e7fa040df8fec557d48e142fbad8804739bab76bfe2998"},
+    {file = "django_pghistory-3.4.3.tar.gz", hash = "sha256:10f929e9481e832bf08ca572d54facb63a3161ee0942f03e86abef9c424a9c1a"},
 ]
 
 [package.dependencies]
-django = ">=3"
-django-pgtrigger = ">=4.7.0"
+django = ">=4"
+django-pgtrigger = ">=4.12.0"
 
 [[package]]
 name = "django-pgtrigger"
@@ -5545,4 +5545,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "9cf210b92e926afc233a55cd20518f1ce02ca4afb1df8811275c700d1229ddb0"
+content-hash = "782ac46985871d10326f8f8c1b06475198a68d251ceaac69482df47e5023600d"
