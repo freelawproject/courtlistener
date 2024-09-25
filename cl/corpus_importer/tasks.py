@@ -397,8 +397,9 @@ def get_and_save_free_document_report(
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
 
-    if log_id:
-        # We only save the html when the script is run automatically every day
+    if log_id and not settings.DEVELOPMENT:
+        # We only save the html when the script is run automatically every day and
+        # not in development environment
         log = PACERFreeDocumentLog.objects.get(pk=log_id)
         if hasattr(report, "responses_with_params"):
             for result in report.responses_with_params:
