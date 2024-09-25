@@ -8,8 +8,8 @@ import boto3
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from tqdm import tqdm
-from cl.lib.storage import HarvardPDFStorage
 
+from cl.lib.storage import HarvardPDFStorage
 from cl.search.models import OpinionCluster
 
 logger = logging.getLogger(__name__)
