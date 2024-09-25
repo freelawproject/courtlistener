@@ -1146,7 +1146,7 @@ class CycleChecker:
         self.court_counts: defaultdict = defaultdict(int)
         self.current_iteration: int = 1
         self.count_prev_iteration_courts: int = 0
-        self.prev_iteration_courts = set()
+        self.prev_iteration_courts: set = set()
 
     def check_if_cycled(self, court_id: str) -> bool:
         """Check if the cycle repeated
