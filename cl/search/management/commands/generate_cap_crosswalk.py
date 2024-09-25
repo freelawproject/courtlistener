@@ -207,7 +207,11 @@ class Command(CommandUtils, BaseCommand):
     def find_matching_case(
         self, case_meta: Dict[str, Any]
     ) -> Optional[OpinionCluster]:
-        """Find a matching case in CourtListener database."""
+        """Find a matching case in CourtListener database.
+
+        :param case_meta: Case metadata dictionary.
+        :return Optional[OpinionCluster]: returns an OpinionCluster object if a match is found, otherwise returns None.
+        """
         try:
             citation_text = case_meta["citations"][0]["cite"]
             citations = get_citations(citation_text)
