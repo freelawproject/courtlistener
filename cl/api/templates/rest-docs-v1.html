@@ -559,31 +559,6 @@
                 We currently have <strong>{{ court_count }}</strong> jurisdictions that can be accessed with our APIs.
                 Details about the jurisdictions that are available can be found <a href="{% url "court_index" %}">here</a>.
             </p>
-            <p>Below is a cheat sheet listing the abbreviations for all available jurisdictions.</p>
-            <div id="scrollable-jurisdictions">
-                <table class="table settings-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th title="Gathered from Blue Book, Cornell.edu and ALWD">Abbreviation</th>
-                            <th title="The number of cases in this jurisdiction on CourtListener">Count</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for court in courts %}
-                        <tr>
-                            <td>{{ court.full_name }}</td>
-                            <td>
-                                <a href="/?q=&court_{{ court.pk }}=on&order_by=score+desc"
-                                   rel="nofollow"
-                                >{{ court.pk }}</a>
-                            </td>
-                            <td>{{ court.count }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
         </div>
 
         <div class="sidebar-section">
