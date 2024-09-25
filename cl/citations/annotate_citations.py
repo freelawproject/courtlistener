@@ -15,8 +15,14 @@ def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
 
     :param document: The Opinion or RECAPDocument whose text should be parsed
     """
-    for attr in ["html_anon_2020", "html_columbia", "html_lawbox", "html"]:
-        text = getattr(document, attr, None)
+    for attr in [
+        "xml_harvard",
+        "html_anon_2020",
+        "html_columbia",
+        "html_lawbox",
+        "html",
+    ]:
+        text = getattr(document, attr, None).encode("utf-8")
         if text:
             document.source_text = text
             document.cleaned_text = clean_text(
