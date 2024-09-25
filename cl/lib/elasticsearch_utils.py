@@ -247,7 +247,7 @@ def add_fields_boosting(
         matter_of_query = query.lower().startswith("matter of ")
         ex_parte_query = query.lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({"caseName.exact": 50})
+            qf.update({"caseName.exact": 75})
 
     if fields:
         qf = {key: value for key, value in qf.items() if key in fields}
@@ -385,12 +385,12 @@ def build_fulltext_query(
 
 
 def build_term_query(
-    field: str, value: str | list, make_phrase: bool = False, slop: int = 0
+    field: str, value: str | list, make_phrase: bool = False, slop: int = 1  # slop of 1 allows for small variations like Google LLC v Oracle Inc.
 ) -> list:
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
     "term" Returns documents that contain an exact term in a provided field
-    NOTE: Use it only whe you want an exact match, avoid using this with text fields
+    NOTE: Use it only when you want an exact match, avoid using this with text fields
     "terms" Returns documents that contain one or more exact terms in a provided field.
 
     :param field: elasticsearch index fieldname
@@ -409,7 +409,14 @@ def build_term_query(
         validate_query_syntax(value, QueryType.FILTER)
 
     if make_phrase:
-        return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
+        # Use match_phrase with slop, and give it a boost to prioritize the phrase match to ensure that Google v Oracle returns exactly this order and not Oracle v Google as the first priority 
+        return [Q("match_phrase", **{
+            field: {
+                "query": value, 
+                "slop": slop, 
+                "boost": 2  # Boosting the phrase match to ensure it's ranked higher than individual term matches
+            }
+        })]
 
     if isinstance(value, list):
         value = list(filter(None, value))
