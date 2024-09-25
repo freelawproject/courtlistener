@@ -385,7 +385,10 @@ def build_fulltext_query(
 
 
 def build_term_query(
-    field: str, value: str | list, make_phrase: bool = False, slop: int = 1  # slop of 1 allows for small variations like Google LLC v Oracle Inc.
+    field: str,
+    value: str | list,
+    make_phrase: bool = False,
+    slop: int = 1,  # slop of 1 allows for small variations like Google LLC v Oracle Inc.
 ) -> list:
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
@@ -409,14 +412,19 @@ def build_term_query(
         validate_query_syntax(value, QueryType.FILTER)
 
     if make_phrase:
-        # Use match_phrase with slop, and give it a boost to prioritize the phrase match to ensure that Google v Oracle returns exactly this order and not Oracle v Google as the first priority 
-        return [Q("match_phrase", **{
-            field: {
-                "query": value, 
-                "slop": slop, 
-                "boost": 2  # Boosting the phrase match to ensure it's ranked higher than individual term matches
-            }
-        })]
+        # Use match_phrase with slop, and give it a boost to prioritize the phrase match to ensure that Google v Oracle returns exactly this order and not Oracle v Google as the first priority
+        return [
+            Q(
+                "match_phrase",
+                **{
+                    field: {
+                        "query": value,
+                        "slop": slop,
+                        "boost": 2,  # Boosting the phrase match to ensure it's ranked higher than individual term matches
+                    }
+                },
+            )
+        ]
 
     if isinstance(value, list):
         value = list(filter(None, value))
