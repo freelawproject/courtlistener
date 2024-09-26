@@ -37,7 +37,7 @@
         </div>
         <div class="col-xs-6 text-right">
             <p>
-                <a href="{{ viz.get_absolute_url }}?{{ request.GET.urlencode }}" class="btn btn-primary"
+                <a href="{{ viz.get_absolute_url }}{% querystring %}" class="btn btn-primary"
                    target="_blank">View Original</a>
             </p>
         </div>

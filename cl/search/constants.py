@@ -102,13 +102,18 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "citation",
     "judge",
     "caseNameFull",
-    "caseName",
     "status",
     "suitNature",
     "attorney",
     "procedural_history",
     "posture",
     "syllabus",
+]
+SEARCH_MLT_OPINION_QUERY_FIELDS = [
+    "procedural_history",
+    "posture",
+    "syllabus",
+    "text",
 ]
 
 # ES fields that are used for highlighting
@@ -225,12 +230,19 @@ recap_boosts_qf = {
 }
 recap_boosts_es = {
     # Docket fields
-    "caseName": 4.0,
+    "caseName.exact": 4.0,
     "docketNumber": 3.0,
     # RECAPDocument fields:
     "description": 2.0,
 }
 recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
+opinion_boosts_es = {
+    "text": 1.0,
+    "type": 1.0,
+    # Cluster fields
+    "caseName.exact": 4.0,
+    "docketNumber": 2.0,
+}
 BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
@@ -245,7 +257,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
             "text": 1.0,
-            "caseName": 4.0,
+            "caseName.exact": 4.0,
             "docketNumber": 2.0,
         },
         SEARCH_TYPES.PEOPLE: {
@@ -263,6 +275,7 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         SEARCH_TYPES.RECAP: recap_boosts_es,
         SEARCH_TYPES.DOCKETS: recap_boosts_es,
         SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_es,
+        SEARCH_TYPES.OPINION: opinion_boosts_es,
     },
     # Phrase-based boosts.
     "pf": {
@@ -309,3 +322,20 @@ recap_document_indexed_fields = [
     "page_count",
     "cites",
 ]
+
+recap_document_filters = [
+    "available_only",
+    "description",
+    "document_number",
+    "attachment_number",
+]
+
+cardinality_query_unique_ids = {
+    SEARCH_TYPES.RECAP: "docket_id",
+    SEARCH_TYPES.DOCKETS: "docket_id",
+    SEARCH_TYPES.RECAP_DOCUMENT: "id",
+    SEARCH_TYPES.OPINION: "cluster_id",
+    SEARCH_TYPES.PEOPLE: "id",
+    SEARCH_TYPES.ORAL_ARGUMENT: "id",
+    SEARCH_TYPES.PARENTHETICAL: "id",
+}

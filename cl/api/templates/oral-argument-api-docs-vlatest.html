@@ -19,7 +19,7 @@
 <div class="col-xs-12 hidden-md hidden-lg">
   <h4 class="v-offset-below-2">
     <i class="fa fa-arrow-circle-o-left gray"></i>
-    <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+    <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
   </h4>
 </div>
 
@@ -28,7 +28,7 @@
   <div id="toc">
     <h4 class="v-offset-below-3">
       <i class="fa fa-arrow-circle-o-left gray"></i>
-      <a href="{% url "rest_docs" version="v3" %}">Back to API Docs</a>
+      <a href="{% url "rest_docs" version=version %}">Back to API Docs</a>
     </h4>
     <h3>Table of Contents</h3>
     <ul>
@@ -50,7 +50,7 @@
 
 
   <h2 id="apis">The APIs</h2>
-  <h3 id="audio-endpoint">Oral Argument Recordings <small> — <nobr><code>{% url "audio-list" version="v3" %}</code></nobr></small></h3>
+  <h3 id="audio-endpoint">Oral Argument Recordings <small> — <nobr><code>{% url "audio-list" version=version %}</code></nobr></small></h3>
   <p>Use this API to gather data about oral argument recordings. This API is linked to the docket API (below), which contains data about each case. It is also linked to the <a href="{% url "judge_api_help" %}">judge API</a>, which has information about the judges in the case.
   </p>
   <p>The audio files we gather from court websites come in many formats. After we gather the files, we convert them into optimized MP3s that have a 22050Hz sample rate and 48k bitrate. After converting the files, we set the ID3 tags to better values that we scraped. Finally, we set the cover art for the MP3 to the seal of the court, and set the publisher album art to our logo.
@@ -64,10 +64,10 @@
   <pre class="pre-scrollable">curl -v \
   -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
-  "{% get_full_host %}{% url "audio-list" version="v3" %}"</pre>
+  "{% get_full_host %}{% url "audio-list" version=version %}"</pre>
 
 
-  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version="v3" %}</code></small></h3>
+  <h3 id="docket-endpoint">Dockets <small> — <code>{% url "docket-list" version=version %}</code></small></h3>
   {% include "includes/docket-endpoint.html" %}
 
   {% include "includes/donate_footer_plea.html" %}

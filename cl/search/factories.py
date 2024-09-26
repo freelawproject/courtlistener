@@ -209,20 +209,22 @@ class OpinionClusterWithParentsFactory(
     pass
 
 
-class RECAPDocumentFactory(DjangoModelFactory):
-    class Meta:
-        model = RECAPDocument
-
-    description = Faker("text", max_nb_chars=750)
-    document_type = RECAPDocument.PACER_DOCUMENT
-    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
-
-
 class DocketEntryFactory(DjangoModelFactory):
     class Meta:
         model = DocketEntry
 
     description = Faker("text", max_nb_chars=750)
+    docket = SubFactory("cl.search.factories.DocketFactory")
+
+
+class RECAPDocumentFactory(DjangoModelFactory):
+    class Meta:
+        model = RECAPDocument
+
+    description = Faker("text", max_nb_chars=750)
+    docket_entry = SubFactory(DocketEntryFactory)
+    document_type = RECAPDocument.PACER_DOCUMENT
+    pacer_doc_id = Faker("pyint", min_value=100_000, max_value=400_000)
 
 
 class DocketReuseParentMixin(DjangoModelFactory):
@@ -279,7 +281,7 @@ class DocketFactory(DjangoModelFactory):
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
-    filepath_local = FileField(filename=None)
+    filepath_local = FileField(filename="docket.xml")
     date_argued = Faker("date_object")
 
 

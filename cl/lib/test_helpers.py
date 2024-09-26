@@ -1260,7 +1260,7 @@ class RECAPSearchTestCase(SimpleTestCase):
                 source=Docket.COLUMBIA_AND_RECAP,
             ),
             entry_number=3,
-            date_filed=datetime.date(2014, 7, 19),
+            date_filed=datetime.date(2014, 7, 5),
             description="MOTION for Leave to File Amicus Discharging Debtor",
         )
         cls.rd_2 = RECAPDocumentFactory(
@@ -1533,7 +1533,7 @@ class AudioESTestCase(SimpleTestCase):
             sha1="a49ada009774496ac01fb49818837e2296705c92",
         )
         cls.audio_3 = AudioFactory.create(
-            case_name="Hong Liu Yang v. Lynch-Loretta E.",
+            case_name="Hong Liu Yang v. Lynch-Loretta E. Howell",
             docket_id=cls.docket_3.pk,
             duration=653,
             judges="Joseph Information Deposition H Administrative magazine",
@@ -1552,10 +1552,10 @@ class AudioESTestCase(SimpleTestCase):
         )
         cls.audio_4.panel.add(cls.author)
         cls.audio_5 = AudioFactory.create(
-            case_name="Freedom of Inform Wikileaks",
+            case_name="Freedom of Inform Wikileaks Howells",
             docket_id=cls.docket_4.pk,
             duration=400,
-            judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate",
+            judges="Wallace to Friedland ⚖️ Deposit xx-xxxx apa magistrate Freedom of Inform Wikileaks",
             sha1="a49ada009774496ac01fb49818837e2296705c95",
         )
         cls.audio_1.panel.add(cls.author)

@@ -280,6 +280,9 @@ async def merge_rss_data(
             court_id,
             docket["pacer_case_id"],
             docket["docket_number"],
+            docket.get("federal_defendant_number"),
+            docket.get("federal_dn_judge_initials_assigned"),
+            docket.get("federal_dn_judge_initials_referred"),
         )
         docket_entry = docket["docket_entries"][0]
         document_number = docket["docket_entries"][0]["document_number"]
@@ -669,7 +672,7 @@ class Command(VerboseCommand):
                 "The 'file' argument is required for that action."
             )
 
-        threads: list[threading.Thread] = []
+        threads = []
         try:
             iterate_and_import_files(options, threads)
         except KeyboardInterrupt:

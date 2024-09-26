@@ -14,7 +14,7 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.pacer_session import ProxyPacerSession
+from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.recap.tasks import process_recap_attachment
@@ -83,9 +83,10 @@ def get_attachment_pages(options):
             throttle.maybe_wait()
             chain(
                 # Query the attachment page and process it
-                get_attachment_page_by_rd.s(result["id"], session.cookies).set(
-                    queue=q
-                ),
+                get_attachment_page_by_rd.s(
+                    result["id"],
+                    SessionData(session.cookies, session.proxy_address),
+                ).set(queue=q),
                 # Take that in a new task and make a PQ object
                 make_attachment_pq_object.s(result["id"], recap_user.pk).set(
                     queue=q
@@ -150,9 +151,11 @@ def get_documents(options):
             continue
 
         chain(
-            get_pacer_doc_by_rd.s(rd.pk, session.cookies, tag=TAG_PHASE_2).set(
-                queue=q
-            ),
+            get_pacer_doc_by_rd.s(
+                rd.pk,
+                SessionData(session.cookies, session.proxy_address),
+                tag=TAG_PHASE_2,
+            ).set(queue=q),
             extract_recap_pdf.si(rd.pk).set(queue=q),
             add_items_to_solr.si([rd.pk], "search.RECAPDocument").set(queue=q),
         ).apply_async()

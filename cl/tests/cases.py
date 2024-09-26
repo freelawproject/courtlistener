@@ -212,6 +212,16 @@ class ESIndexTestCase(SimpleTestCase):
 
         return xml_tree
 
+    @staticmethod
+    def _get_frontend_counts_text(r):
+        """Extract and clean frontend counts text from the response content."""
+        tree = html.fromstring(r.content.decode())
+        counts_h2_element = tree.xpath('//h2[@id="result-count"]')[0]
+        counts_text = " ".join(counts_h2_element.xpath(".//text()"))
+        counts_text = counts_text.replace("&nbsp;", " ")
+        counts_text = counts_text.split()
+        return " ".join(counts_text)
+
 
 class CountESTasksTestCase(SimpleTestCase):
     def setUp(self):

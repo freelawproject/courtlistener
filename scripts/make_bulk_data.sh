@@ -52,7 +52,9 @@ docket_fields='(id, date_created, date_modified, source, appeal_from_str,
 	       appellate_fee_status, appellate_case_type_information, mdl_status,
 	       filepath_local, filepath_ia, filepath_ia_json, ia_upload_failure_count, ia_needs_upload,
 	       ia_date_first_change, view_count, date_blocked, blocked, appeal_from_id, assigned_to_id,
-	       court_id, idb_data_id, originating_court_information_id, referred_to_id
+	       court_id, idb_data_id, originating_court_information_id, referred_to_id,
+	       federal_dn_case_type, federal_dn_office_code, federal_dn_judge_initials_assigned,
+	       federal_dn_judge_initials_referred, federal_defendant_number, parent_docket_id
 	       )'
 dockets_csv_filename="dockets-$(date -I).csv"
 
@@ -82,15 +84,15 @@ fjcintegrateddatabase_csv_filename="fjc-integrated-database-$(date -I).csv"
 
 # search_opinioncluster
 opinioncluster_fields='(
-	       id, date_created, date_modified, judges, date_filed,
-	       date_filed_is_approximate, slug, case_name_short, case_name,
-	       case_name_full, scdb_id, scdb_decision_direction, scdb_votes_majority,
-	       scdb_votes_minority, source, procedural_history, attorneys,
-	       nature_of_suit, posture, syllabus, headnotes, summary, disposition,
-	       history, other_dates, cross_reference, correction, citation_count,
-	       precedential_status, date_blocked, blocked, filepath_json_harvard, docket_id,
-	       arguments, headmatter
-	   )'
+       id, date_created, date_modified, judges, date_filed,
+       date_filed_is_approximate, slug, case_name_short, case_name,
+       case_name_full, scdb_id, scdb_decision_direction, scdb_votes_majority,
+       scdb_votes_minority, source, procedural_history, attorneys,
+       nature_of_suit, posture, syllabus, headnotes, summary, disposition,
+       history, other_dates, cross_reference, correction, citation_count,
+       precedential_status, date_blocked, blocked, filepath_json_harvard,
+	       filepath_pdf_harvard, docket_id, arguments, headmatter
+   )'
 opinioncluster_csv_filename="opinion-clusters-$(date -I).csv"
 
 search_opinion_joined_by_fields='(
@@ -335,7 +337,7 @@ echo "Streaming ${lst[0]} to S3"
 psql \
 	--command \
 	  "set statement_timeout to 0;
-	   COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, QUOTE '`', FORCE_QUOTE *)" \
+	   COPY ${lst[0]} ${lst[1]} TO STDOUT WITH (FORMAT csv, ENCODING utf8, HEADER, QUOTE \"\`\", FORCE_QUOTE *)" \
 	--quiet \
 	--host "$DB_HOST" \
 	--username "$DB_USER" \
@@ -416,7 +418,7 @@ declare -a lst="$group"
 cat >> "$OUT" <<- EOF
 echo "Loading ${lst[2]} to database"
 psql --command \
-"COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, QUOTE '`', HEADER)" \
+"\COPY public.${lst[0]} ${lst[1]} FROM '\$BULK_DIR/${lst[2]}' WITH (FORMAT csv, ENCODING utf8, QUOTE \'\`\', HEADER)" \
 --host "\$BULK_DB_HOST" \
 --username "\$BULK_DB_USER" \
 --dbname "\$BULK_DB_NAME"
