@@ -1,4 +1,5 @@
 import logging
+from http import HTTPStatus
 from urllib.parse import urljoin
 
 from celery import Task
@@ -7,7 +8,7 @@ from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.template import loader
 from django.utils.timezone import now
-from requests.exceptions import Timeout
+from requests.exceptions import HTTPError, Timeout
 
 from cl.api.models import Webhook, WebhookEvent
 from cl.celery_init import app
@@ -77,7 +78,15 @@ def create_neon_account(self: Task, user_id: int) -> None:
 
     if len(neon_accounts) == 0:
         # No account found, create one
-        new_account_id = neon_client.create_account(user)
+        try:
+            new_account_id = neon_client.create_account(user)
+        except HTTPError as exc:
+            if (
+                exc.response.status_code != HTTPStatus.INTERNAL_SERVER_ERROR
+                or self.request.retries == self.max_retries
+            ):
+                raise exc
+            raise self.retry(exc=exc)
         profile.neon_account_id = new_account_id
         profile.save(update_fields=["neon_account_id"])
 

@@ -9,16 +9,14 @@ from dataclasses import fields
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync
 from django.conf import settings
-from django.core.cache import caches
-from django.core.paginator import EmptyPage, Page
+from django.core.paginator import Page
 from django.db.models import Case
 from django.db.models import Q as QObject
 from django.db.models import QuerySet, TextField, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
-from django.http import HttpRequest
 from django.http.request import QueryDict
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
@@ -31,9 +29,7 @@ from elasticsearch_dsl.utils import AttrDict
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
-from cl.lib.bot_detector import is_bot
 from cl.lib.date_time import midnight_pt
-from cl.lib.paginators import ESPaginator
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -59,6 +55,7 @@ from cl.search.constants import (
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
+    SEARCH_MLT_OPINION_QUERY_FIELDS,
     SEARCH_OPINION_HL_FIELDS,
     SEARCH_OPINION_QUERY_FIELDS,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
@@ -70,6 +67,7 @@ from cl.search.constants import (
     SEARCH_RECAP_HL_FIELDS,
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     api_child_highlight_map,
+    cardinality_query_unique_ids,
 )
 from cl.search.exception import (
     BadProximityQuery,
@@ -80,7 +78,6 @@ from cl.search.exception import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
-    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Court,
     Opinion,
@@ -168,24 +165,33 @@ def build_daterange_query(
     return []
 
 
-def build_more_like_this_query(related_id: list[str]):
-    document_list = [{"_id": f"o_{id}"} for id in related_id]
-    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS
-    more_like_this_fields.extend(
-        [
-            "type",
-            "text",
-            "caseName",
-            "docketNumber",
-        ]
-    )
-    return Q(
+async def build_more_like_this_query(related_ids: list[str]) -> Query:
+    """Build an ES "more like this" query based on related Opinion IDs.
+
+    :param related_ids: A list of related Opinion IDs to build the query on.
+    :return: An ES query object with "more like this" query and
+    exclusions for specific opinion clusters.
+    """
+
+    document_list = [{"_id": f"o_{id}"} for id in related_ids]
+    more_like_this_fields = SEARCH_MLT_OPINION_QUERY_FIELDS.copy()
+    mlt_query = Q(
         "more_like_this",
         fields=more_like_this_fields,
         like=document_list,
         min_term_freq=1,
         max_query_terms=12,
     )
+    # Exclude opinion clusters to which the related IDs to query belong.
+    cluster_ids_to_exclude = (
+        OpinionCluster.objects.filter(sub_opinions__pk__in=related_ids)
+        .distinct("pk")
+        .values_list("pk", flat=True)
+    )
+    cluster_ids_list = [pk async for pk in cluster_ids_to_exclude.aiterator()]
+    exclude_cluster_ids = [Q("terms", cluster_id=cluster_ids_list)]
+    bool_query = Q("bool", must=[mlt_query], must_not=exclude_cluster_ids)
+    return bool_query
 
 
 def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
@@ -215,6 +221,7 @@ def add_fields_boosting(
         SEARCH_TYPES.RECAP,
         SEARCH_TYPES.DOCKETS,
         SEARCH_TYPES.RECAP_DOCUMENT,
+        SEARCH_TYPES.OPINION,
     ]:
         qf = BOOSTS["es"][cd["type"]].copy()
 
@@ -240,7 +247,7 @@ def add_fields_boosting(
         matter_of_query = query.lower().startswith("matter of ")
         ex_parte_query = query.lower().startswith("ex parte ")
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({"caseName": 50})
+            qf.update({"caseName.exact": 50})
 
     if fields:
         qf = {key: value for key, value in qf.items() if key in fields}
@@ -727,7 +734,7 @@ def build_es_plain_filters(cd: CleanData) -> List:
         )
         # Build caseName terms filter
         queries_list.extend(
-            build_text_filter("caseName", cd.get("case_name", ""))
+            build_text_filter("caseName.exact", cd.get("case_name", ""))
         )
         # Build judge terms filter
         queries_list.extend(build_text_filter("judge", cd.get("judge", "")))
@@ -1155,7 +1162,7 @@ def build_es_base_query(
                         "description",
                         # Docket Fields
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1166,7 +1173,7 @@ def build_es_base_query(
                     cd,
                     [
                         "docketNumber",
-                        "caseName",
+                        "caseName.exact",
                     ],
                 )
             )
@@ -1187,7 +1194,19 @@ def build_es_base_query(
             mlt_query = None
             if related_match:
                 cluster_pks = related_match.group("pks").split(",")
-                mlt_query = build_more_like_this_query(cluster_pks)
+                mlt_query = async_to_sync(build_more_like_this_query)(
+                    cluster_pks
+                )
+                main_query, join_query = build_full_join_es_queries(
+                    cd,
+                    {"opinion": []},
+                    [],
+                    mlt_query,
+                    child_highlighting=False,
+                    api_version=api_version,
+                )
+                return search_query.query(main_query), join_query
+
             opinion_search_fields = SEARCH_OPINION_QUERY_FIELDS
             child_fields = opinion_search_fields.copy()
             child_fields.extend(
@@ -1196,7 +1215,7 @@ def build_es_base_query(
                     [
                         "type",
                         "text",
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 ),
@@ -1207,7 +1226,7 @@ def build_es_base_query(
                 add_fields_boosting(
                     cd,
                     [
-                        "caseName",
+                        "caseName.exact",
                         "docketNumber",
                     ],
                 )
@@ -1455,6 +1474,12 @@ def add_es_highlighting(
     :param highlighting: Whether highlighting should be enabled in docs.
     :return: The modified Elasticsearch search query object with highlights set
     """
+
+    # Avoid highlighting for the related cluster query.
+    related_match = RELATED_PATTERN.search(cd.get("q", ""))
+    if related_match:
+        return search_query
+
     highlighting_fields = {}
     highlighting_keyword_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
@@ -1678,7 +1703,7 @@ def merge_courts_from_db(results: Page, search_type: str) -> None:
 
 
 def fill_position_mapping(
-    positions: QuerySet[Position],
+    positions: QuerySet[Position, Position],
     request_type: Literal["frontend", "v3", "v4"] = "frontend",
 ) -> BasePositionMapping | ApiPositionMapping:
     """Extract all the data from the position queryset and
@@ -1803,6 +1828,95 @@ def merge_unavailable_fields_on_parent_document(
                     result["plain_text"] = recap_docs_dict.get(
                         result["id"], ""
                     )
+
+        case (
+            SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
+        ) if request_type == "frontend":
+            # Merge initial document button to the frontend search results.
+            docket_ids = {doc["docket_id"] for doc in results}
+            # This query retrieves initial documents considering two
+            # possibilities:
+            # 1. For district, bankruptcy, and appellate entries where we don't know
+            #    if the entry contains attachments, it considers:
+            #    document_number=1 and attachment_number=None and document_type=PACER_DOCUMENT
+            #    This represents the main document with document_number 1.
+            # 2. For appellate entries where the attachment page has already been
+            #    merged, it considers:
+            #    document_number=1 and attachment_number=1 and document_type=ATTACHMENT
+            #    This represents document_number 1 that has been converted to an attachment.
+
+            appellate_court_ids = (
+                Court.federal_courts.appellate_pacer_courts().values_list(
+                    "pk", flat=True
+                )
+            )
+            initial_documents = (
+                RECAPDocument.objects.filter(
+                    QObject(
+                        QObject(
+                            attachment_number=None,
+                            document_type=RECAPDocument.PACER_DOCUMENT,
+                        )
+                        | QObject(
+                            attachment_number=1,
+                            document_type=RECAPDocument.ATTACHMENT,
+                            docket_entry__docket__court_id__in=appellate_court_ids,
+                        )
+                    ),
+                    docket_entry__docket_id__in=docket_ids,
+                    document_number="1",
+                )
+                .select_related(
+                    "docket_entry",
+                    "docket_entry__docket",
+                    "docket_entry__docket__court",
+                )
+                .only(
+                    "pk",
+                    "document_type",
+                    "document_number",
+                    "attachment_number",
+                    "pacer_doc_id",
+                    "is_available",
+                    "filepath_local",
+                    "docket_entry__docket_id",
+                    "docket_entry__docket__slug",
+                    "docket_entry__docket__pacer_case_id",
+                    "docket_entry__docket__court__jurisdiction",
+                    "docket_entry__docket__court_id",
+                )
+            )
+
+            initial_documents_in_page = {}
+            for initial_document in initial_documents:
+                if initial_document.has_valid_pdf:
+                    # Initial Document available
+                    initial_documents_in_page[
+                        initial_document.docket_entry.docket_id
+                    ] = (
+                        initial_document.get_absolute_url(),
+                        None,
+                        "Initial Document",
+                    )
+                else:
+                    # Initial Document not available. Buy button.
+                    initial_documents_in_page[
+                        initial_document.docket_entry.docket_id
+                    ] = (
+                        None,
+                        initial_document.pacer_url,
+                        "Buy Initial Document",
+                    )
+
+            for result in results:
+                document_url, buy_document_url, text_button = (
+                    initial_documents_in_page.get(
+                        result.docket_id, (None, None, "")
+                    )
+                )
+                result["initial_document_url"] = document_url
+                result["buy_initial_document_url"] = buy_document_url
+                result["initial_document_text"] = text_button
 
         case SEARCH_TYPES.OPINION if request_type == "v4" and not highlight:
             # Retrieves the Opinion plain_text from the DB to fill the snippet
@@ -1949,17 +2063,23 @@ def fetch_es_results(
     es_from = (page - 1) * rows_per_page
     error = True
     try:
-        main_query = search_query.extra(from_=es_from, size=rows_per_page)
+        # Set track_total_hits False to avoid retrieving the hit count in the main query.
+        main_query = search_query.extra(
+            from_=es_from, size=rows_per_page, track_total_hits=False
+        )
         main_doc_count_query = clean_count_query(search_query)
-        # Set size to 0 to avoid retrieving documents in the count queries for
-        # better performance. Set track_total_hits to True to consider all the
-        # documents.
-        main_doc_count_query = main_doc_count_query.extra(
-            size=0, track_total_hits=True
+
+        search_type = get_params.get("type", SEARCH_TYPES.OPINION)
+        parent_unique_field = cardinality_query_unique_ids[search_type]
+        main_doc_count_query = build_cardinality_count(
+            main_doc_count_query, parent_unique_field
         )
         if child_docs_count_query:
-            child_total_query = child_docs_count_query.extra(
-                size=0, track_total_hits=True
+            child_unique_field = cardinality_query_unique_ids[
+                SEARCH_TYPES.RECAP_DOCUMENT
+            ]
+            child_total_query = build_cardinality_count(
+                child_docs_count_query, child_unique_field
             )
 
         # Execute the ES main query + count queries in a single request.
@@ -1971,10 +2091,14 @@ def fetch_es_results(
 
         main_response = responses[0]
         main_doc_count_response = responses[1]
-        parent_total = main_doc_count_response.hits.total.value
+        parent_total = simplify_estimated_count(
+            main_doc_count_response.aggregations.unique_documents.value
+        )
         if child_total_query:
             child_doc_count_response = responses[2]
-            child_total = child_doc_count_response.hits.total.value
+            child_total = simplify_estimated_count(
+                child_doc_count_response.aggregations.unique_documents.value
+            )
 
         query_time = main_response.took
         search_type = get_params.get("type", SEARCH_TYPES.OPINION)
@@ -2107,7 +2231,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_term_query(
                     "docketNumber",
                     cd.get("docket_number", ""),
@@ -2146,7 +2270,7 @@ def build_join_es_filters(cd: CleanData) -> List:
                         cd.get("court", "").split()
                     ),
                 ),
-                *build_text_filter("caseName", cd.get("case_name", "")),
+                *build_text_filter("caseName.exact", cd.get("case_name", "")),
                 *build_daterange_query(
                     "dateFiled",
                     cd.get("filed_before", ""),
@@ -2389,12 +2513,13 @@ def build_full_join_es_queries(
         child_filters_original = deepcopy(child_filters)
         # Build child text query.
         child_fields = child_query_fields[child_type]
-        child_text_query = build_fulltext_query(
-            child_fields, cd.get("q", ""), only_queries=True
-        )
 
         if mlt_query:
-            child_text_query.append(mlt_query)
+            child_text_query = [mlt_query]
+        else:
+            child_text_query = build_fulltext_query(
+                child_fields, cd.get("q", ""), only_queries=True
+            )
 
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
@@ -2532,7 +2657,7 @@ def build_full_join_es_queries(
                     should=string_query,
                     minimum_should_match=1,
                 )
-        if parent_query:
+        if parent_query and not mlt_query:
             q_should.append(parent_query)
 
     if not q_should:
@@ -2683,91 +2808,6 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
         result["joined_by_ids"] = opinion["joined_by_ids"]
         result["court_exact"] = opinion["joined_by_ids"]
         result["status_exact"] = result["status"]
-
-
-async def get_related_clusters_with_cache_and_es(
-    search: Search,
-    cluster: OpinionCluster,
-    request: HttpRequest,
-) -> tuple[Page | list, list[int], dict[str, str]]:
-    """Retrieve related opinion clusters from ES or cache.
-
-    :param search: The ES Search object.
-    :param cluster: The current OpinionCluster.
-    :param request: The HttpRequest object.
-    :return: A three tuple containing a Page containing opinion clusters or an
-    empty list. A list containing the cluster sub opinions ids. A dic containing
-    the url_search_params.
-    """
-
-    # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
-    # attributes (since they're indexed in ES) instead of the NAMES values.
-    available_statuses = [status[0] for status in PRECEDENTIAL_STATUS.NAMES]
-    url_search_params = {f"stat_{v}": "on" for v in available_statuses}
-    search_params: CleanData = {}
-    # Opinions that belong to the targeted cluster
-    sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
-    sub_opinion_pks = [pk async for pk in sub_opinion_ids]
-    if is_bot(request) or not sub_opinion_pks:
-        # If it is a bot or lacks sub-opinion IDs, return empty results
-        return [], [], url_search_params
-
-    # Use cache if enabled
-    cache = caches["db_cache"]
-    mlt_cache_key = f"mlt-cluster-es:{cluster.pk}"
-    related_clusters = (
-        await cache.aget(mlt_cache_key) if settings.RELATED_USE_CACHE else None
-    )
-
-    if settings.RELATED_FILTER_BY_STATUS:
-        # Filter results by status (e.g., Precedential)
-        # Update URL parameters accordingly
-        search_params[
-            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}"
-        ] = True
-        url_search_params = {
-            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
-        }
-
-    if related_clusters is None:
-        sub_opinion_queries = ",".join(str(pk) for pk in sub_opinion_pks)
-        search_params["q"] = f"related:{sub_opinion_queries}"
-        search_params["type"] = SEARCH_TYPES.OPINION
-        query_dict = QueryDict("", mutable=True)
-        query_dict.update(search_params)
-        search_query, child_docs_count_query, _ = await sync_to_async(
-            build_es_main_query
-        )(search, search_params)
-        hits, _, error, total_query_results, _ = await sync_to_async(
-            fetch_es_results
-        )(
-            query_dict,
-            search_query,
-            child_docs_count_query,
-            1,
-            settings.RELATED_COUNT,
-        )
-        if error:
-            return [], [], url_search_params
-
-        @sync_to_async
-        def paginate_related_clusters(total_results: int, results: Response):
-            paginator = ESPaginator(
-                total_results, results, settings.RELATED_COUNT
-            )
-            try:
-                return paginator.page(1)
-            except EmptyPage:
-                return paginator.page(paginator.num_pages)
-
-        related_clusters = await paginate_related_clusters(
-            total_query_results, hits
-        )
-
-        await cache.aset(
-            mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
-        )
-    return related_clusters, sub_opinion_pks, url_search_params
 
 
 def make_es_stats_variable(
@@ -2954,31 +2994,30 @@ def do_es_api_query(
     return main_query, child_docs_query
 
 
-def build_cardinality_count(
-    base_query: Search, query: Query, unique_field: str
-) -> Search:
+def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
     """Build an Elasticsearch cardinality aggregation.
     This aggregation estimates the count of unique documents based on the
     specified unique field. The precision_threshold, set by
     ELASTICSEARCH_CARDINALITY_PRECISION, determines the point at which the
-    count begins to trade accuracy for performance.
+    count begins to trade accuracy for performance. The error in the
+    approximation count using this method ranges from 1% to 6%.
+    https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-cardinality-aggregation.html#_counts_are_approximate
 
-    :param base_query: The Elasticsearch DSL Search object.
-    :param query: The ES Query object to perform the count query.
+    :param count_query: The Elasticsearch DSL Search object containing the
+    count query.
     :param unique_field: The field name on which the cardinality aggregation
     will be based to estimate uniqueness.
 
     :return: The ES cardinality aggregation query.
     """
 
-    search_query = base_query.query(query)
-    search_query.aggs.bucket(
+    count_query.aggs.bucket(
         "unique_documents",
         "cardinality",
         field=unique_field,
         precision_threshold=settings.ELASTICSEARCH_CARDINALITY_PRECISION,
     )
-    return search_query.extra(size=0, track_total_hits=True)
+    return count_query.extra(size=0, track_total_hits=False)
 
 
 def do_collapse_count_query(
@@ -2997,7 +3036,8 @@ def do_collapse_count_query(
     unique_field = (
         "cluster_id" if search_type == SEARCH_TYPES.OPINION else "docket_id"
     )
-    search_query = build_cardinality_count(main_query, query, unique_field)
+    count_query = main_query.query(query)
+    search_query = build_cardinality_count(count_query, unique_field)
     try:
         total_results = (
             search_query.execute().aggregations.unique_documents.value
@@ -3152,3 +3192,30 @@ def do_es_sweep_alert_query(
             result["child_docs"] = child_result_objects
 
     return main_results, docket_results, rd_results
+
+
+def compute_lowest_possible_estimate(precision_threshold: int) -> int:
+    """Estimates can be below reality by as much as 6%. Round numbers below that threshold.
+    :return: The lowest possible estimate.
+    """
+    return int(precision_threshold * 0.94)
+
+
+def simplify_estimated_count(search_count: int) -> int:
+    """Simplify the estimated search count to the nearest rounded figure.
+    It only applies this rounding if the search_count exceeds the
+    ELASTICSEARCH_CARDINALITY_PRECISION threshold.
+
+    :param search_count: The original search count.
+    :return: The simplified search_count, rounded to the nearest significant
+    figure or the original search_count if below the threshold.
+    """
+
+    if search_count >= compute_lowest_possible_estimate(
+        settings.ELASTICSEARCH_CARDINALITY_PRECISION
+    ):
+        search_count_str = str(search_count)
+        first_two = search_count_str[:2]
+        zeroes = (len(search_count_str) - 2) * "0"
+        return int(first_two + zeroes)
+    return search_count

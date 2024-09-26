@@ -30,6 +30,7 @@ class UPLOAD_TYPE:
     APPELLATE_CASE_QUERY_RESULT_PAGE = 15
     ACMS_DOCKET_JSON = 16
     ACMS_ATTACHMENT_PAGE = 17
+    FREE_OPINIONS_REPORT = 18
     NAMES = (
         (DOCKET, "HTML Docket"),
         (ATTACHMENT_PAGE, "HTML attachment page"),
@@ -48,6 +49,7 @@ class UPLOAD_TYPE:
         (APPELLATE_CASE_QUERY_RESULT_PAGE, "Appellate Case query result page"),
         (ACMS_DOCKET_JSON, "ACMS docket JSON object"),
         (ACMS_ATTACHMENT_PAGE, "ACMS attachmente page JSON object"),
+        (FREE_OPINIONS_REPORT, "Free opinions report"),
     )
 
 
@@ -904,4 +906,9 @@ class FjcIntegratedDatabase(AbstractDateTimeModel):
 
     class Meta:
         verbose_name_plural = "FJC Integrated Database Entries"
-        indexes = [models.Index(fields=["district", "docket_number"])]
+        indexes = [
+            models.Index(
+                fields=["district", "docket_number"],
+                name="recap_fjcintegrateddatabase_district_id_455568623a9da568_idx",
+            )
+        ]

@@ -23,7 +23,7 @@ from cl.lib.elasticsearch_utils import (
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.utils import map_to_docket_entry_sorting
-from cl.search.constants import SEARCH_HL_TAG
+from cl.search.constants import SEARCH_HL_TAG, cardinality_query_unique_ids
 from cl.search.documents import (
     AudioDocument,
     DocketDocument,
@@ -289,13 +289,13 @@ class CursorESList:
     well as the pagination logic for cursor-based pagination.
     """
 
-    cardinality_query = {
-        SEARCH_TYPES.RECAP: ("docket_id", DocketDocument),
-        SEARCH_TYPES.DOCKETS: ("docket_id", DocketDocument),
-        SEARCH_TYPES.RECAP_DOCUMENT: ("id", DocketDocument),
-        SEARCH_TYPES.OPINION: ("cluster_id", OpinionClusterDocument),
-        SEARCH_TYPES.PEOPLE: ("id", PersonDocument),
-        SEARCH_TYPES.ORAL_ARGUMENT: ("id", AudioDocument),
+    cardinality_base_document = {
+        SEARCH_TYPES.RECAP: DocketDocument,
+        SEARCH_TYPES.DOCKETS: DocketDocument,
+        SEARCH_TYPES.RECAP_DOCUMENT: DocketDocument,
+        SEARCH_TYPES.OPINION: OpinionClusterDocument,
+        SEARCH_TYPES.PEOPLE: PersonDocument,
+        SEARCH_TYPES.ORAL_ARGUMENT: AudioDocument,
     }
 
     def __init__(
@@ -350,23 +350,27 @@ class CursorESList:
 
         # Cardinality query parameters
         query = Q(self.main_query.to_dict(count=True)["query"])
-        unique_field, search_document = self.cardinality_query[
+        unique_field = cardinality_query_unique_ids[self.clean_data["type"]]
+        search_document = self.cardinality_base_document[
             self.clean_data["type"]
         ]
-        base_search = search_document.search()
+        main_count_query = search_document.search().query(query)
         cardinality_query = build_cardinality_count(
-            base_search, query, unique_field
+            main_count_query, unique_field
         )
 
         # Build a cardinality query to count child documents.
         child_cardinality_query = None
         child_cardinality_count_response = None
         if self.child_docs_query:
-            child_unique_field, _ = self.cardinality_query[
+            child_unique_field = cardinality_query_unique_ids[
                 SEARCH_TYPES.RECAP_DOCUMENT
             ]
+            child_count_query = search_document.search().query(
+                self.child_docs_query
+            )
             child_cardinality_query = build_cardinality_count(
-                base_search, self.child_docs_query, child_unique_field
+                child_count_query, child_unique_field
             )
         try:
             multi_search = MultiSearch()
@@ -476,8 +480,7 @@ class CursorESList:
         default_unique_order = {
             "type": self.clean_data["type"],
         }
-
-        unique_field, _ = self.cardinality_query[self.clean_data["type"]]
+        unique_field = cardinality_query_unique_ids[self.clean_data["type"]]
         # Use a document unique field as a unique sorting key for the current
         # search type.
         default_unique_order.update(

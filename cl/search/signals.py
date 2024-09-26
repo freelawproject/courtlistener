@@ -6,6 +6,7 @@ from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
+from cl.favorites.models import Prayer
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
@@ -280,7 +281,7 @@ docket_field_mapping = {
     "save": {
         Docket: {
             "self": {
-                "case_name": ["caseName"],
+                "case_name": ["caseName", "party"],
                 "case_name_short": ["caseName"],
                 "case_name_full": ["case_name_full", "caseName"],
                 "docket_number": ["docketNumber"],
@@ -329,11 +330,11 @@ recap_document_field_mapping = {
         RECAPDocument: {
             "self": {
                 "description": ["short_description"],
-                "document_type": ["document_type"],
+                "document_type": ["document_type", "absolute_url"],
                 "document_number": ["document_number", "absolute_url"],
                 "pacer_doc_id": ["pacer_doc_id"],
                 "plain_text": ["plain_text"],
-                "attachment_number": ["attachment_number"],
+                "attachment_number": ["attachment_number", "absolute_url"],
                 "is_available": ["is_available"],
                 "page_count": ["page_count"],
                 "filepath_local": ["filepath_local"],
@@ -364,6 +365,7 @@ recap_document_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "pacer_case_id": ["pacer_case_id"],
+                "slug": ["absolute_url"],
             }
         },
         Person: {
@@ -567,3 +569,11 @@ def handle_recap_doc_change(
             find_citations_and_parantheticals_for_recap_documents.apply_async(
                 args=([instance.pk],)
             )
+
+    if (
+        instance.es_rd_field_tracker.has_changed("is_available")
+        and instance.is_available == True
+    ):
+        Prayer.objects.filter(
+            recap_document=instance, status=Prayer.WAITING
+        ).update(status=Prayer.GRANTED)

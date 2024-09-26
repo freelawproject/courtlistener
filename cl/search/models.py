@@ -28,6 +28,8 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
+    CSVExportMixin,
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_recap_path,
     make_upload_path,
@@ -327,6 +329,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         null=True,
     )
 
+    @property
+    def administrative_link(self):
+        return linkify_orig_docket_number(
+            self.docket.appeal_from_str, self.docket_number
+        )
+
     def get_absolute_url(self) -> str:
         return self.docket.get_absolute_url()
 
@@ -364,6 +372,17 @@ class Docket(AbstractDateTimeModel, DocketSources):
         on_delete=models.RESTRICT,
         blank=True,
         null=True,
+    )
+    parent_docket = models.ForeignKey(
+        "self",
+        help_text="In criminal cases (and some magistrate) PACER creates "
+        "a parent docket and one or more child dockets. Child dockets "
+        "contain docket information for each individual defendant "
+        "while parent dockets are a superset of all docket entries.",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="child_dockets",
     )
     appeal_from_str = models.TextField(
         help_text=(
@@ -544,6 +563,44 @@ class Docket(AbstractDateTimeModel, DocketSources):
         max_length=20,
         blank=True,
         db_index=True,
+    )
+    federal_dn_office_code = models.CharField(
+        help_text="A one digit statistical code (either alphabetic or numeric) "
+        "of the office within the federal district. In this "
+        "example, 2:07-cv-34911-MJL, the 2 preceding "
+        "the : is the office code.",
+        max_length=3,
+        blank=True,
+    )
+    federal_dn_case_type = models.CharField(
+        help_text="Case type, e.g., civil (cv), magistrate (mj), criminal (cr), "
+        "petty offense (po), and miscellaneous (mc). These codes "
+        "can be upper case or lower case, and may vary in number of "
+        "characters.",
+        max_length=6,
+        blank=True,
+    )
+    federal_dn_judge_initials_assigned = models.CharField(
+        help_text="A typically three-letter upper cased abbreviation "
+        "of the judge's initials. In the example 2:07-cv-34911-MJL, "
+        "MJL is the judge's initials. Judge initials change if a "
+        "new judge takes over a case.",
+        max_length=5,
+        blank=True,
+    )
+    federal_dn_judge_initials_referred = models.CharField(
+        help_text="A typically three-letter upper cased abbreviation "
+        "of the judge's initials. In the example 2:07-cv-34911-MJL-GOG, "
+        "GOG is the magistrate judge initials.",
+        max_length=5,
+        blank=True,
+    )
+    federal_defendant_number = models.SmallIntegerField(
+        help_text="A unique number assigned to each defendant in a case, "
+        "typically found in pacer criminal cases as a -1, -2 after "
+        "the judge initials. Example: 1:14-cr-10363-RGS-1.",
+        null=True,
+        blank=True,
     )
     # Nullable for unique constraint requirements.
     pacer_case_id = fields.CharNullField(
@@ -1080,7 +1137,7 @@ class DocketPanel(Docket.panel.through):
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class DocketEntry(AbstractDateTimeModel):
+class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
         Docket,
         help_text=(
@@ -1180,7 +1237,10 @@ class DocketEntry(AbstractDateTimeModel):
                 name="entry_number_idx",
                 condition=Q(entry_number=1),
             ),
-            models.Index(fields=["recap_sequence_number", "entry_number"]),
+            models.Index(
+                fields=["recap_sequence_number", "entry_number"],
+                name="search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx",
+            ),
         ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1200,6 +1260,27 @@ class DocketEntry(AbstractDateTimeModel):
                 datetime.combine(self.date_filed, self.time_filed)
             )
         return None
+
+    def get_csv_columns(self, get_column_name=False):
+        columns = [
+            "id",
+            "entry_number",
+            "date_filed",
+            "time_filed",
+            "pacer_sequence_number",
+            "recap_sequence_number",
+            "description",
+        ]
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
+        return columns
+
+    def get_column_function(self):
+        """Get dict of attrs: fucntion to apply on field value if it needs
+        to be pre-processed before being add to csv
+
+        returns: dict -- > {attr1: function}"""
+        return {}
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
@@ -1262,7 +1343,9 @@ class AbstractPacerDocument(models.Model):
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot())
-class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
+class RECAPDocument(
+    AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel, CSVExportMixin
+):
     """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
@@ -1332,7 +1415,8 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                     "document_type",
                     "document_number",
                     "attachment_number",
-                ]
+                ],
+                name="search_recapdocument_document_type_303cccac79571217_idx",
             ),
             models.Index(
                 fields=["filepath_local"],
@@ -1408,11 +1492,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
             if self.pacer_doc_id.count("-") > 1:
-                # It seems like loading the ACMS Download Page using links is not
-                # possible. we've implemented a modal window that explains this
-                # issue and guides users towards using the button to access the
-                # docket report.
-                return self.docket_entry.docket.pacer_docket_url
+                return (
+                    f"https://{court_id}-showdoc.azurewebsites.us/docs/"
+                    f"{self.docket_entry.docket.pacer_case_id}/"
+                    f"{self.pacer_doc_id}"
+                )
             elif court.jurisdiction == Court.FEDERAL_APPELLATE:
                 template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
@@ -1679,6 +1763,53 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         out["text"] = text_template.render({"item": self}).translate(null_map)
 
         return normalize_search_dicts(out)
+
+    def get_csv_columns(self, get_column_name=False):
+        columns = [
+            "id",
+            "document_type",
+            "description",
+            "acms_document_guid",
+            "date_upload",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "is_free_on_pacer",
+            "is_available",
+            "is_sealed",
+            "sha1",
+            "page_count",
+            "file_size",
+            "filepath_local",
+            "filepath_ia",
+            "ocr_status",
+        ]
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
+        return columns
+
+    def _get_readable_document_type(self, *args, **kwargs):
+        return self.get_document_type_display()
+
+    def _get_readable_ocr_status(self, *args, **kwargs):
+        return self.get_ocr_status_display()
+
+    def _get_full_filepath_local(self, *args, **kwargs):
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    def get_column_function(self):
+        """Get dict of attrs: function to apply on field value if it needs
+        to be pre-processed before being add to csv
+        If not functions returns empty dict
+
+        returns: dict -- > {attr1: function}"""
+        return {
+            "document_type": self._get_readable_document_type,
+            "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
+        }
 
 
 @pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
@@ -2575,6 +2706,12 @@ class OpinionCluster(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    filepath_pdf_harvard = models.FileField(
+        help_text="The case PDF from the Caselaw Access Project for this cluster",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
+    )
     arguments = models.TextField(
         help_text="The attorney(s) and legal arguments presented as HTML text. "
         "This is primarily seen in older opinions and can contain "
@@ -3096,9 +3233,15 @@ class Citation(models.Model):
     class Meta:
         indexes = [
             # To look up individual citations
-            models.Index(fields=["volume", "reporter", "page"]),
+            models.Index(
+                fields=["volume", "reporter", "page"],
+                name="search_citation_volume_ae340b5b02e8912_idx",
+            ),
             # To generate reporter volume lists
-            models.Index(fields=["volume", "reporter"]),
+            models.Index(
+                fields=["volume", "reporter"],
+                name="search_citation_volume_251bc1d270a8abee_idx",
+            ),
         ]
         unique_together = (("cluster", "volume", "reporter", "page"),)
 
@@ -3320,6 +3463,15 @@ class Opinion(AbstractDateTimeModel):
             "sha1",
         ]
     )
+    ordering_key = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cluster_id", "ordering_key"],
+                name="unique_opinion_ordering_key",
+            )
+        ]
 
     @property
     def siblings(self) -> QuerySet:
@@ -3338,6 +3490,10 @@ class Opinion(AbstractDateTimeModel):
     def clean(self) -> None:
         if self.type == "":
             raise ValidationError("'type' is a required field.")
+        if isinstance(self.ordering_key, int) and self.ordering_key < 1:
+            raise ValidationError(
+                {"ordering_key": "Ordering key cannot be zero or negative"}
+            )
 
     def save(
         self,
@@ -3346,6 +3502,7 @@ class Opinion(AbstractDateTimeModel):
         *args: List,
         **kwargs: Dict,
     ) -> None:
+        self.clean()
         super().save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr

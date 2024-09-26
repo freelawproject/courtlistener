@@ -1957,6 +1957,34 @@ class PeopleSearchTestElasticSearch(
         r = self._test_article_count(params, 1, "q")
         self.assertIn("<mark>Independent</mark>", r.content.decode())
 
+    def test_frontend_judges_count(self) -> None:
+        """Assert Judges search results counts in the fronted. Below and
+        above the estimation threshold.
+        """
+        search_params = {
+            "type": SEARCH_TYPES.PEOPLE,
+            "q": "",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        counts_text = self._get_frontend_counts_text(r)
+        # 2 cases and 3 Docket entries in counts are returned
+        self.assertIn("2 Judges", counts_text)
+
+        # Assert estimated counts above the threshold.
+        with mock.patch(
+            "cl.lib.elasticsearch_utils.simplify_estimated_count",
+            return_value=2300,
+        ):
+            r = self.client.get(
+                reverse("show_results"),
+                search_params,
+            )
+        counts_text = self._get_frontend_counts_text(r)
+        self.assertIn("About 2,300 Judges", counts_text)
+
 
 class IndexJudgesPositionsCommandTest(
     CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase

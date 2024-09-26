@@ -34,7 +34,10 @@ from scorched.exc import SolrError
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.search_index_utils import InvalidDocumentError
+from cl.lib.search_index_utils import (
+    InvalidDocumentError,
+    get_parties_from_case_name,
+)
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
@@ -451,7 +454,19 @@ def document_fields_to_update(
                     if prepare_method:
                         field_value = prepare_method(main_instance)
                     else:
-                        field_value = getattr(related_instance, field)
+                        if (
+                            es_document == DocketDocument
+                            and doc_field == "party"
+                        ):
+                            # Get party from docket case_name if no normalized
+                            # parties are available.
+                            if main_instance.parties.exists():
+                                continue
+                            field_value = get_parties_from_case_name(
+                                main_instance.case_name
+                            )
+                        else:
+                            field_value = getattr(related_instance, field)
                     fields_to_update[doc_field] = field_value
     else:
         # No fields_map is provided, extract field values only using the main

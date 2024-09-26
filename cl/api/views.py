@@ -10,6 +10,7 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
+from django.views.generic import TemplateView
 from requests import Session
 
 from cl.lib.elasticsearch_utils import do_es_alert_estimation_query
@@ -82,9 +83,8 @@ async def court_index(request: HttpRequest) -> HttpResponse:
 
 async def rest_docs(request, version=None):
     """Show the correct version of the rest docs"""
-    courts = []  # await make_court_variable()
-    court_count = len(courts)
-    context = {"court_count": court_count, "courts": courts, "private": False}
+    court_count = await Court.objects.acount()
+    context = {"court_count": court_count, "private": False}
     return TemplateResponse(
         request,
         [f"rest-docs-{version}.html", "rest-docs-vlatest.html"],
@@ -132,7 +132,10 @@ def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
     return int(num), duration_as_str[period[0]]
 
 
-async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
+async def citation_lookup_api(
+    request: HttpRequest, version=None
+) -> HttpResponse:
+
     cite_count = await Citation.objects.acount()
     rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
     default_throttle_rate = parse_throttle_rate_for_template(rate)
@@ -145,13 +148,17 @@ async def citation_lookup_api(request: HttpRequest) -> HttpResponse:
 
     return TemplateResponse(
         request,
-        "citation-lookup-api.html",
+        [
+            f"citation-lookup-api-{version}.html",
+            "citation-lookup-api-vlatest.html",
+        ],
         {
             "cite_count": cite_count,
             "default_throttle_rate": default_throttle_rate,
             "custom_throttle_rate": custom_throttle_rate,
             "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
             "private": False,
+            "version": version if version else "v4",
         },
     )
 
@@ -356,3 +363,19 @@ async def webhooks_docs(request, version=None):
         [f"webhooks-docs-{version}.html", "webhooks-docs-vlatest.html"],
         context,
     )
+
+
+class VersionedTemplateView(TemplateView):
+    """Custom template view to handle the right template based on the path
+    version requested.
+    """
+
+    def get_template_names(self):
+        version = self.kwargs.get("version", "vlatest")
+        base_template = self.template_name.replace("-vlatest", f"-{version}")
+        return [base_template, self.template_name]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["version"] = self.kwargs.get("version", "v4")
+        return context

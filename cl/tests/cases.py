@@ -8,7 +8,7 @@ from django.contrib.staticfiles import testing
 from django.core.management import call_command
 from django.urls import reverse
 from django_elasticsearch_dsl.registries import registry
-from lxml import etree
+from lxml import etree, html
 from rest_framework.test import APITestCase
 from rest_framework.utils.serializer_helpers import ReturnList
 
@@ -209,6 +209,16 @@ class ESIndexTestCase(SimpleTestCase):
                 )
 
         return xml_tree
+
+    @staticmethod
+    def _get_frontend_counts_text(r):
+        """Extract and clean frontend counts text from the response content."""
+        tree = html.fromstring(r.content.decode())
+        counts_h2_element = tree.xpath('//h2[@id="result-count"]')[0]
+        counts_text = " ".join(counts_h2_element.xpath(".//text()"))
+        counts_text = counts_text.replace("&nbsp;", " ")
+        counts_text = counts_text.split()
+        return " ".join(counts_text)
 
 
 class CountESTasksTestCase(SimpleTestCase):
