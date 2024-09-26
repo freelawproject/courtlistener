@@ -1,4 +1,5 @@
 import html
+import re
 from typing import Dict, List
 
 from eyecite import annotate_citations, clean_text
@@ -24,7 +25,9 @@ def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
     ]:
         text = getattr(document, attr, None)
         if text:
-            document.source_text = text.encode("utf-8")
+            document.source_text = text
+            # Remove XML encodings from xml_harvard
+            text = re.sub(r"^<\?xml.*?\?>", "", text, count=1)
             document.cleaned_text = clean_text(
                 text, ["html", "all_whitespace"]
             )

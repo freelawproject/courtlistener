@@ -276,6 +276,48 @@ class CitationTextTest(SimpleTestCase):
                     msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
                 )
 
+    def test_make_html_from_harvard_xml(self) -> None:
+        """Can we convert the XML of an opinion into modified HTML?"""
+        # fmt: off
+
+        test_pairs = [
+            # Citation with XML encoding
+            ('<?xml version="1.0" encoding="utf-8"?><opinion type="majority">'
+             '<p id="b148-5"> <em> Swift &amp; Co. </em>v. '
+             '<em> United States,</em> 196 U. S. 375:</p></opinion>',
+             '<?xml version="1.0" encoding="utf-8"?><opinion type="majority">'
+             '<p id="b148-5"> <em> Swift &amp; Co. </em>v. '
+             '<em> United States,</em> '
+             '<span class="citation no-link">196 U. S. 375</span>:</p>'
+             '</opinion>'),
+        ]
+
+        # fmt: on
+        for s, expected_html in test_pairs:
+            with self.subTest(
+                f"Testing html to html conversion for {s}...",
+                s=s,
+                expected_html=expected_html,
+            ):
+                opinion = Opinion(html=s)
+                get_and_clean_opinion_text(opinion)
+                citations = get_citations(
+                    opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+                )
+
+                # Stub out fake output from do_resolve_citations(), since the
+                # purpose of this test is not to test that. We just need
+                # something that looks like what create_cited_html() expects
+                # to receive.
+                citation_resolutions = {NO_MATCH_RESOURCE: citations}
+
+                created_html = create_cited_html(opinion, citation_resolutions)
+                self.assertEqual(
+                    created_html,
+                    expected_html,
+                    msg=f"\n{created_html}\n\n    !=\n\n{expected_html}",
+                )
+
     def test_make_html_from_matched_citation_objects(self) -> None:
         """Can we render matched citation objects as HTML?"""
         # This test case is similar to the two above, except it allows us to
