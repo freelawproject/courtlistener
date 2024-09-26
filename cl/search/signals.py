@@ -578,7 +578,7 @@ def handle_recap_doc_change(
     ):
         open__prayers = Prayer.objects.filter(
             recap_document=instance, status=Prayer.WAITING
-        ).select_related('user')
+        ).select_related("user")
 
         open__prayers.update(status=Prayer.AVAILABLE)
 
