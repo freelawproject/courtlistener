@@ -1247,15 +1247,15 @@ class RECAPAlertsSweepIndexTest(
                 description="MOTION for Leave to File Amicus Curiae Lorem Served",
             )
             rd_descriptions = []
-            for i in range(6):
+            for i in range(4):
                 rd = RECAPDocumentFactory(
                     docket_entry=alert_de,
                     description=f"Motion to File {i+1}",
                     document_number=f"{i+1}",
                     pacer_doc_id=f"018036652436{i+1}",
                 )
-                if i < 5:
-                    # Omit the last alert to compare. Only up to 5 should be
+                if i < 3:
+                    # Omit the last alert to compare. Only up to 3 should be
                     # included in the case.
                     rd_descriptions.append(rd.description)
 
@@ -1286,13 +1286,13 @@ class RECAPAlertsSweepIndexTest(
         html_content = self.get_html_content_from_email(mail.outbox[0])
         self.assertIn(recap_only_alert.name, html_content)
         self._confirm_number_of_alerts(html_content, 1)
-        # The case alert should contain up to 5 child hits.
+        # The case alert should contain up to 3 child hits.
         self._count_alert_hits_and_child_hits(
             html_content,
             recap_only_alert.name,
             1,
             self.de.docket.case_name,
-            5,
+            3,
         )
         self._assert_child_hits_content(
             html_content,
