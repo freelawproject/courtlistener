@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import inspect
+import math
 import os
 import time
 from typing import Callable, Dict, List, Optional, cast
@@ -321,11 +322,25 @@ def get_pdfs(
         throttle.maybe_wait()
 
         if cycle_checker.check_if_cycled(row.court_id):
-            print(
-                f"Court cycle completed. Sleep 1 second before starting the next cycle."
-            )
-            time.sleep(1)
+            # How many courts we cycled in the previous cycle
+            cycled_items_count = cycle_checker.count_prev_iteration_courts
 
+            # Update the queue size where the max number is close to the number
+            # of courts we did on the previous cycle, that way we can try to avoid
+            # having more than one item of each court of in the queue until it shortens
+            min_items = math.ceil(cycled_items_count / 2)
+            if min_items < 50:
+                # we set the limit to 50 to keep this number less than the defaults
+                # from the class to avoid having a lot of items
+                throttle.update_min_items(min_items)
+
+            logger.info(
+                f"Court cycle completed for: {row.court_id}. Current iteration: {cycle_checker.current_iteration}. Sleep 2 seconds "
+                f"before starting the next cycle."
+            )
+            time.sleep(2)
+
+        logger.info(f"Processing row id: {row.id} from {row.court_id}")
         c = chain(
             process_free_opinion_result.si(
                 row.pk,
@@ -450,7 +465,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--queue",
             type=str,
-            default="batch1",
+            default="pacerdoc1",
             help="The celery queue where the tasks should be processed.",
         )
         parser.add_argument(
