@@ -3,6 +3,7 @@ from django.core.management.base import CommandParser
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.api.factories import WebhookEventWithParentsFactory
 from cl.audio.factories import AudioWithParentsFactory
+from cl.favorites.factories import PrayerFactory
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.factories import PersonFactory, PersonWithChildrenFactory
 from cl.recap.factories import FjcIntegratedDatabaseFactory
@@ -17,6 +18,7 @@ from cl.search.factories import (
     OpinionClusterWithParentsFactory,
     OpinionWithParentsFactory,
     ParentheticalWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.users.factories import UserFactory
 
@@ -31,6 +33,8 @@ FACTORIES = {
     106: FjcIntegratedDatabaseFactory,
     107: DocketEntryForDocketFactory,
     108: DocketEntryReuseParentsFactory,
+    109: RECAPDocumentFactory,
+    110: PrayerFactory,
     # People DB app
     200: PersonFactory,
     201: PersonWithChildrenFactory,

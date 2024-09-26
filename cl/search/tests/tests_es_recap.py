@@ -1,6 +1,7 @@
 import datetime
 import math
 import re
+import urllib.parse
 from http import HTTPStatus
 from unittest import mock
 
@@ -1384,14 +1385,28 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 is_available=False,
             )
 
-        params = {"type": SEARCH_TYPES.RECAP, "docket_number": "1:21-bk-1234"}
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "docket_number": "1:21-bk-1234",
+            "q": "SUBPOENAS SERVED ON",
+        }
         # Frontend
         r = async_to_sync(self._test_article_count)(params, 1, "docket_number")
         # Count child documents under docket.
         self._count_child_documents(0, r.content.decode(), 5, "docket_number")
 
-        # Confirm view additional results button is shown.
+        # Confirm view additional results button is shown and link params are correct.
         self.assertIn("View Additional Results for", r.content.decode())
+        tree = html.fromstring(r.content.decode())
+        docket_id_link = tree.xpath(
+            '//a[@class="btn-default btn view-additional-results"]/@href'
+        )[0]
+        decoded_url = urllib.parse.unquote(docket_id_link)
+        self.assertIn(
+            f"(SUBPOENAS+SERVED+ON)+AND+docket_id:{self.de.docket_id}",
+            decoded_url,
+        )
+        self.assertIn("docket_number=1:21-bk-1234", decoded_url)
 
         # View additional results:
         params = {
@@ -2073,10 +2088,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "August 19th, 2015"
         )
         self._compare_child_entry_date_filed(
-            1, r.content.decode(), 0, "July 19th, 2014"
+            1, r.content.decode(), 0, "July 5th, 2014"
         )
         self._compare_child_entry_date_filed(
-            2, r.content.decode(), 0, "February 23th, 1732"
+            2, r.content.decode(), 0, "February 23rd, 1732"
         )
 
         # Order by entry_date_filed asc
@@ -2101,10 +2116,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Confirm entry date filed are properly displayed.
         self._compare_child_entry_date_filed(
-            0, r.content.decode(), 0, "February 23th, 1732"
+            0, r.content.decode(), 0, "February 23rd, 1732"
         )
         self._compare_child_entry_date_filed(
-            1, r.content.decode(), 0, "July 19th, 2014"
+            1, r.content.decode(), 0, "July 5th, 2014"
         )
         self._compare_child_entry_date_filed(
             2, r.content.decode(), 0, "August 19th, 2015"
@@ -2872,7 +2887,9 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             cited_opinion=cls.opinion,
             depth=1,
         )
-        BankruptcyInformationFactory(docket=cls.de_api.docket)
+        BankruptcyInformationFactory(
+            docket=cls.de_api.docket, trustee_str="Lorem Ipsum"
+        )
 
         cls.de_empty_fields_api = DocketEntryWithParentsFactory(
             docket=DocketFactory(
@@ -2894,6 +2911,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             court=cls.court_api,
             date_argued=None,
             source=Docket.RECAP_AND_IDB,
+            case_name_full="",
         )
 
     async def _test_api_results_count(
@@ -3810,6 +3828,7 @@ class RECAPSearchAPIV4Test(
             docket_entry_recent = DocketEntryWithParentsFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Lorem Ipsum",
+                docket__case_name_full="",
                 docket__date_filed=datetime.date(2024, 2, 23),
                 date_filed=datetime.date(2022, 2, 23),
             )

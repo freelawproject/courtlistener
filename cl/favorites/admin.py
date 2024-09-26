@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from cl.favorites.models import DocketTag, Note, UserTag
+from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 
 
 class NoteInline(admin.TabularInline):
@@ -49,3 +49,9 @@ class UserTagAdmin(admin.ModelAdmin):
 class UserTagInline(admin.StackedInline):
     model = UserTag
     extra = 0
+
+
+@admin.register(Prayer)
+class PrayerAdmin(admin.ModelAdmin):
+    raw_id_fields = ("user", "recap_document")
+    readonly_fields = ("date_created",)
