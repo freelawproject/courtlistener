@@ -165,6 +165,8 @@ def clone_opinion_cluster(
             session,
             [docket_id],
             add_docket_entries,
+            False,
+            False,
             person_positions,
             add_to_solr,
         )[0]
@@ -350,6 +352,7 @@ def clone_docket(
     docket_ids: list,
     add_docket_entries: bool,
     add_audio_files: bool,
+    add_clusters: bool,
     person_positions: bool = False,
     add_to_solr: bool = False,
     object_type="search.Docket",
@@ -397,6 +400,13 @@ def clone_docket(
                     session, docket_data.get("audio_files", []), docket
                 )
 
+            if add_clusters:
+                docket_data = get_json_data(docket_url, session)
+                cluster_ids = [
+                    c.split("/")[-2] for c in docket_data.get("clusters", [])
+                ]
+                clone_opinion_cluster(session, cluster_ids, True, False)
+
             continue
         except model.DoesNotExist:
             pass
@@ -410,7 +420,6 @@ def clone_docket(
             "resource_uri",
             "original_court_info",
             "absolute_url",
-            "clusters",
             "tags",
             "panel",
             "idb_data",
@@ -456,6 +465,7 @@ def clone_docket(
             )
 
             audio_files = docket_data.pop("audio_files", [])
+            clusters = docket_data.pop("clusters", [])
 
             docket = model.objects.create(**docket_data)
 
@@ -463,6 +473,9 @@ def clone_docket(
 
             if add_audio_files:
                 clone_audio_files(session, audio_files, docket)
+            if add_clusters:
+                cluster_ids = [c.split("/")[-2] for c in clusters]
+                clone_opinion_cluster(session, cluster_ids, True, False)
 
             if add_docket_entries:
                 clone_docket_entries(session, docket.pk)
@@ -1106,6 +1119,14 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
+            "--add-clusters",
+            action="store_true",
+            default=False,
+            help="Use this flag to clone docket clusters when cloning "
+            "a docket.",
+        )
+
+        parser.add_argument(
             "--clone-person-positions",
             action="store_true",
             default=False,
@@ -1155,6 +1176,7 @@ class Command(BaseCommand):
                     self.ids,
                     self.add_docket_entries,
                     options["add_audio_files"],
+                    options["add_clusters"],
                     self.clone_person_positions,
                     self.add_to_solr,
                     self.type,
