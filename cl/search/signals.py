@@ -592,7 +592,7 @@ def handle_recap_doc_change(
             txt = txt_template.render(context)
             html = html_template.render(context)
 
-            context = {"document": document}
+            context = {"document": RECAPDocument.get_absolute_url(instance)}
 
             msg = EmailMultiAlternatives(
                 subject,
