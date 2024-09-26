@@ -22,9 +22,9 @@ def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
         "html_lawbox",
         "html",
     ]:
-        text = getattr(document, attr, None).encode("utf-8")
+        text = getattr(document, attr, None)
         if text:
-            document.source_text = text
+            document.source_text = text.encode("utf-8")
             document.cleaned_text = clean_text(
                 text, ["html", "all_whitespace"]
             )
