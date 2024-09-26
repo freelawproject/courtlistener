@@ -349,7 +349,7 @@ def build_fulltext_query(
                 )
 
         # Used for the phrase query_string, no conjunctions appended.
-        query_value = cleanup_main_query(value) 
+        query_value = cleanup_main_query(value)
         # To enable the search of each term in the query across multiple fields
         # it's necessary to include an "AND" conjunction between each term.
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-multi-field
@@ -357,49 +357,53 @@ def build_fulltext_query(
 
         query_value_with_conjunctions = append_query_conjunctions(query_value)
 
-        # The idea here is to capture if it is a case name 
-        vs_query = any([" v " in query_value, " v. " in query_value, " vs. " in query_value, " vs " in query_value])
+        # The idea here is to capture if it is a case name
+        vs_query = any(
+            [
+                " v " in query_value,
+                " v. " in query_value,
+                " vs. " in query_value,
+                " vs " in query_value,
+            ]
+        )
         in_re_query = query_value.lower().startswith("in re ")
         matter_of_query = query_value.lower().startswith("matter of ")
         ex_parte_query = query_value.lower().startswith("ex parte ")
-        
-        
-        q_should = [] 
+
+        q_should = []
 
         # If it looks like a case name, we are boosting a match query
         if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
             q_should.append(
                 Q(
                     "match_phrase",
-                    caseName={
-                        "query": query_value,
-                        "boost": 2,
-                        "slop": 1
-                    }
+                    caseName={"query": query_value, "boost": 2, "slop": 1},
                 )
-            ) 
+            )
 
-            q_should.extend([
-            Q(
-                "query_string",
-                fields=fields,
-                query=query_value_with_conjunctions,
-                quote_field_suffix=".exact",
-                default_operator="AND",
-                tie_breaker=0.3,
-                fuzziness=2,
-            ),
-            Q(
-                "query_string",
-                fields=fields,
-                query=query_value,
-                quote_field_suffix=".exact",
-                default_operator="AND",
-                type="phrase",
-                fuzziness=2,
-            ),
-        ]) 
-        
+            q_should.extend(
+                [
+                    Q(
+                        "query_string",
+                        fields=fields,
+                        query=query_value_with_conjunctions,
+                        quote_field_suffix=".exact",
+                        default_operator="AND",
+                        tie_breaker=0.3,
+                        fuzziness=2,
+                    ),
+                    Q(
+                        "query_string",
+                        fields=fields,
+                        query=query_value,
+                        quote_field_suffix=".exact",
+                        default_operator="AND",
+                        type="phrase",
+                        fuzziness=2,
+                    ),
+                ]
+            )
+
         if only_queries:
             return q_should
         return Q("bool", should=q_should)
