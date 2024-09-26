@@ -19,7 +19,7 @@
     <div class="sidebar-section">
       <h4 class="bottom">
         <i class="fa fa-arrow-circle-o-left gray"></i>
-        <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+        <a href="{{ cluster.get_absolute_url }}{% querystring %}"
            {% if cluster.blocked %}rel="nofollow"{% endif %}>Back to Opinion</a>
       </h4>
     </div>
@@ -29,7 +29,7 @@
 {% block content %}
   <div class="col-sm-9">
     <h2>
-      <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}"
+      <a href="{{ cluster.get_absolute_url }}{% querystring %}"
          class="black-link no-underline"
          {% if cluster.blocked %}rel="nofollow"{% endif %}>{{ caption|safe|v_wrapper }}</a>
     </h2>
@@ -53,7 +53,7 @@
                 <div class="summary-group-metadata">
                   <span class="bullet-tail">{{ representative_cluster.date_filed }}</span>
                   <span class="bullet-tail">
-                    <a href="{{ representative_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                    <a href="{{ representative_cluster.get_absolute_url }}{% querystring %}">
                         {{ representative_cluster|best_case_name|safe }}
                     </a>
                   </span>
@@ -78,7 +78,7 @@
                         <br/>
                         <span class="bullet-tail">{{ describing_cluster.date_filed }}</span>
                         <span class="bullet-tail">
-                          <a href="{{ describing_cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">
+                          <a href="{{ describing_cluster.get_absolute_url }}{% querystring %}">
                               {{ describing_cluster|best_case_name|safe }}
                           </a>
                         </span>

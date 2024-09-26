@@ -92,8 +92,8 @@ class Migration(migrations.Migration):
             name='uploader',
             field=models.ForeignKey(help_text='The user that sent in the email for processing.', on_delete=django.db.models.deletion.CASCADE, related_name='recap_email_processing_queue', to=settings.AUTH_USER_MODEL),
         ),
-        migrations.AlterIndexTogether(
-            name='fjcintegrateddatabase',
-            index_together={('district', 'docket_number')},
+        migrations.AddIndex(
+            model_name='fjcintegrateddatabase',
+            index=models.Index(fields=['district', 'docket_number'], name='recap_fjcintegrateddatabase_district_id_455568623a9da568_idx'),
         ),
     ]

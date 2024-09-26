@@ -28,7 +28,7 @@
             <link rel="alternate"
                   type="application/rss+xml"
                   title="Atom Feed for These Search Results"
-                  href="/feed/search/?{{ get_string }}" />
+                  href="/feed/search/{% querystring %}" />
           {% endif %}
         {% endif %}
     {% endif %}
@@ -261,7 +261,14 @@
                             <span class="gray alt">cite{{ results.paginator.count|pluralize:"s," }}</span> {{ cited_cluster.caption|safe|v_wrapper }}
                           {% endif %}
                           {% if related_cluster %}
-                            <span class="gray alt">related to</span> {{ related_cluster.caption|safe|v_wrapper }}
+                            <span class="gray alt">related to</span>
+                            {% flag "o-es-active" %}
+                              {% for cluster in related_cluster %}
+                                {{ cluster.caption|safe|v_wrapper }}{% if not forloop.last %}, {% endif %}
+                              {% endfor %}
+                            {% else %}
+                              {{ related_cluster.caption|safe|v_wrapper }}
+                            {% endflag %}
                           {% endif %}
                         {% elif type == SEARCH_TYPES.PARENTHETICAL %}
                             {{ results_details.1|intcomma }} Parenthetical{{ results_details.1|pluralize }} Summarizing {{ results.paginator.count|intcomma }} Opinion{{ results.paginator.count|pluralize }}
@@ -297,12 +304,12 @@
                               Judge{{ results.paginator.count|pluralize }}
                         {% endif %}
                         {% if type == SEARCH_TYPES.OPINION or type == SEARCH_TYPES.RECAP or type == SEARCH_TYPES.DOCKETS %}
-                            <a href="/feed/search/?{{ get_string }}">
+                            <a href="/feed/search/{% querystring %}">
                                 <i class="gray fa fa-rss"
                                    title="Subscribe to a feed of these results"></i>
                             </a>
                         {% elif type == SEARCH_TYPES.ORAL_ARGUMENT %}
-                            <a href="/podcast/search/?{{ get_string }}">
+                            <a href="/podcast/search/{% querystring %}">
                                 <i class="gray fa fa-podcast"
                                    title="Subscribe to a podcast of these results"></i>
                             </a>

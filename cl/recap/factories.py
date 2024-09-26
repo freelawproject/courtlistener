@@ -33,7 +33,7 @@ class ProcessingQueueFactory(DjangoModelFactory):
 
     pacer_case_id = Faker("pyint", min_value=100_000, max_value=400_000)
     upload_type = FuzzyChoice(UPLOAD_TYPE.NAMES, getter=lambda c: c[0])
-    filepath_local = FileField(filename=None)
+    filepath_local = FileField(filename="document.html")
 
 
 class PacerFetchQueueFactory(DjangoModelFactory):

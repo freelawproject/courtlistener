@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RenameIndex(
             model_name="fjcintegrateddatabase",
-            new_name="recap_fjcin_distric_731c7b_idx",
+            new_name="recap_fjcintegrateddatabase_district_id_455568623a9da568_idx",
             old_fields=("district", "docket_number"),
         ),
     ]

@@ -1,10 +1,11 @@
 import random
 import re
-from datetime import date, datetime
+from datetime import datetime
 
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
+from django.template.defaultfilters import date as date_filter
 from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
@@ -282,6 +283,21 @@ def format_date(date_str: str) -> str:
     ES child document results where dates are not date objects."""
     try:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        return date_obj.strftime("%B %dth, %Y")
+        return date_filter(date_obj, "F jS, Y")
     except (ValueError, TypeError):
         return date_str
+
+
+@register.filter
+def build_docket_id_q_param(request_q: str, docket_id: str) -> str:
+    """Build a query string that includes the docket ID and any existing query
+    parameters.
+
+    :param request_q: The current query string, if present.
+    :param docket_id: The docket_id to append to the query string.
+    :return:The query string with the docket_id included.
+    """
+
+    if request_q:
+        return f"({request_q}) AND docket_id:{docket_id}"
+    return f"docket_id:{docket_id}"
