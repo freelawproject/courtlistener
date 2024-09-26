@@ -580,7 +580,7 @@ def handle_recap_doc_change(
             recap_document=instance, status=Prayer.WAITING
         ).select_related("user")
 
-        open__prayers.update(status=Prayer.AVAILABLE)
+        open__prayers.update(status=Prayer.GRANTED)
 
         if open__prayers:
             subject = f"A document you requested is now on CourtListener"
