@@ -1,6 +1,8 @@
 from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.template import loader
 
 from cl.audio.models import Audio
 from cl.citations.tasks import (
@@ -574,6 +576,30 @@ def handle_recap_doc_change(
         instance.es_rd_field_tracker.has_changed("is_available")
         and instance.is_available == True
     ):
-        Prayer.objects.filter(
+        open__prayers = Prayer.objects.filter(
             recap_document=instance, status=Prayer.WAITING
-        ).update(status=Prayer.GRANTED)
+        ).select_related('user')
+
+        open__prayers.update(status=Prayer.AVAILABLE)
+
+        if open__prayers:
+            subject = f"A document you requested is now on CourtListener"
+            txt_template = loader.get_template("prayer_email.txt")
+            html_template = loader.get_template("prayer_email.html")
+
+            receipients = [prayer.user.email for prayer in open__prayers]
+
+            txt = txt_template.render(context)
+            html = html_template.render(context)
+
+            context = {"document": document}
+
+            msg = EmailMultiAlternatives(
+                subject,
+                txt,
+                settings.DEFAULT_ALERTS_EMAIL,
+                bcc=receipients,
+                headers=headers,
+            )
+            msg.attach_alternative(html, "text/html")
+            msg.send(fail_silently=False)
