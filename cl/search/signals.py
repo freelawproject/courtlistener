@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.template import loader
@@ -576,30 +576,34 @@ def handle_recap_doc_change(
         instance.es_rd_field_tracker.has_changed("is_available")
         and instance.is_available == True
     ):
-        open__prayers = Prayer.objects.filter(
+        open_prayers = Prayer.objects.filter(
             recap_document=instance, status=Prayer.WAITING
         ).select_related("user")
+        # Retrieve email recipients before updating granted prayers.
+        email_recipients = [
+            email
+            for email in open_prayers.values_list("user__email", flat=True)
+        ]
+        open_prayers.update(status=Prayer.GRANTED)
 
-        open__prayers.update(status=Prayer.GRANTED)
-
-        if open__prayers:
+        # Send email notifications in bulk.
+        if email_recipients:
             subject = f"A document you requested is now on CourtListener"
             txt_template = loader.get_template("prayer_email.txt")
             html_template = loader.get_template("prayer_email.html")
-
-            receipients = [prayer.user.email for prayer in open__prayers]
-
+            context = {"document": instance.get_absolute_url()}
             txt = txt_template.render(context)
             html = html_template.render(context)
-
-            context = {"document": RECAPDocument.get_absolute_url(instance)}
-
-            msg = EmailMultiAlternatives(
-                subject,
-                txt,
-                settings.DEFAULT_ALERTS_EMAIL,
-                bcc=receipients,
-                headers=headers,
-            )
-            msg.attach_alternative(html, "text/html")
-            msg.send(fail_silently=False)
+            messages = []
+            for email_recipient in email_recipients:
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=txt,
+                    from_email=settings.DEFAULT_ALERTS_EMAIL,
+                    to=[email_recipient],
+                    headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
+                )
+                msg.attach_alternative(html, "text/html")
+                messages.append(msg)
+            connection = get_connection()
+            connection.send_messages(messages)

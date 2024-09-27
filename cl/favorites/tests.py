@@ -6,6 +6,7 @@ from http import HTTPStatus
 import time_machine
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
+from django.core import mail
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -895,6 +896,35 @@ class RECAPPrayAndPay(TestCase):
             await granted_prays.acount(),
             2,
             msg="Wrong number of granted prayers",
+        )
+
+        # Assert that prayer granted email notifications are properly sent to users.
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Wrong number of emails sent."
+        )
+        self.assertIn(
+            "A document you requested is now on CourtListener",
+            mail.outbox[0].subject,
+        )
+
+        email_text_content = mail.outbox[0].body
+        html_content = None
+        for content, content_type in mail.outbox[0].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        self.assertIn(
+            f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
+            email_text_content,
+        )
+        self.assertIn(
+            f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
+            html_content,
+        )
+        email_recipients = {email.to[0] for email in mail.outbox}
+        self.assertEqual(
+            email_recipients, {self.user_2.email, self.user.email}
         )
 
         top_prayers = await get_top_prayers()
