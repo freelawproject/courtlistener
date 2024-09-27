@@ -1197,15 +1197,21 @@ def build_es_base_query(
                 mlt_query = async_to_sync(build_more_like_this_query)(
                     cluster_pks
                 )
-                main_query, join_query = build_full_join_es_queries(
-                    cd,
-                    {"opinion": []},
-                    [],
-                    mlt_query,
-                    child_highlighting=False,
-                    api_version=api_version,
+                main_query, child_docs_query, parent_query = (
+                    build_full_join_es_queries(
+                        cd,
+                        {"opinion": []},
+                        [],
+                        mlt_query,
+                        child_highlighting=False,
+                        api_version=api_version,
+                    )
                 )
-                return search_query.query(main_query), join_query
+                return (
+                    search_query.query(main_query),
+                    child_docs_query,
+                    parent_query,
+                )
 
             opinion_search_fields = SEARCH_OPINION_QUERY_FIELDS
             child_fields = opinion_search_fields.copy()
