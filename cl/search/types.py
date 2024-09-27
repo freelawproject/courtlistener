@@ -13,6 +13,7 @@ from cl.search.documents import (
     AudioDocument,
     AudioPercolator,
     DocketDocument,
+    ESRECAPBaseDocument,
     ESRECAPDocument,
     OpinionClusterDocument,
     OpinionDocument,
@@ -58,6 +59,7 @@ ESModelClassType = Union[
     Type[Position],
     Type[Education],
     Type[RECAPDocument],
+    Type[ESRECAPBaseDocument],
 ]
 
 ESDocumentInstanceType = Union[
@@ -97,9 +99,16 @@ ESDocumentNameType = Literal[
 
 ESDictDocument = dict[str, Any]
 
+# TODO: Remove after scheduled OA alerts have been processed.
 PercolatorResponseType = tuple[list[Hit], ESDictDocument]
 
+PercolatorResponsesType = tuple[
+    list[Hit], list[Hit], list[Hit], ESDictDocument, str
+]
+# TODO: Remove after scheduled OA alerts have been processed.
 SaveDocumentResponseType = tuple[str, ESDictDocument]
+
+SaveESDocumentReturnType = tuple[str, ESDictDocument, str]
 
 SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 

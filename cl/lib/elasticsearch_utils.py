@@ -68,6 +68,7 @@ from cl.search.constants import (
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     api_child_highlight_map,
     cardinality_query_unique_ids,
+    recap_boosts_es,
 )
 from cl.search.exception import (
     BadProximityQuery,
@@ -1158,12 +1159,7 @@ def build_es_base_query(
             child_fields.extend(
                 add_fields_boosting(
                     cd,
-                    [
-                        "description",
-                        # Docket Fields
-                        "docketNumber",
-                        "caseName.exact",
-                    ],
+                    list(recap_boosts_es.keys()),
                 )
             )
             child_query_fields = {"recap_document": child_fields}
@@ -2854,6 +2850,7 @@ def make_es_stats_variable(
     return facet_fields
 
 
+# TODO: Remove after scheduled OA alerts have been processed.
 def fetch_all_search_results(
     fetch_method: Callable, initial_response: Response, *args
 ) -> list[Hit]:

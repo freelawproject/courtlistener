@@ -14,7 +14,7 @@ from lxml import html
 from waffle.testutils import override_flag
 
 from cl.alerts.models import Alert
-from cl.alerts.utils import percolate_document
+from cl.alerts.utils import percolate_es_document
 from cl.audio.factories import AudioFactory
 from cl.audio.models import Audio
 from cl.lib.elasticsearch_utils import (
@@ -2248,12 +2248,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
-            str(self.audio_2.pk), oral_argument_index_alias
+        responses = percolate_es_document(
+            str(self.audio_2.pk),
+            AudioPercolator._index._name,
+            oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2264,12 +2268,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
-            str(self.audio_2.pk), oral_argument_index_alias
+        responses = percolate_es_document(
+            str(self.audio_2.pk),
+            AudioPercolator._index._name,
+            oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2279,12 +2287,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
-            str(self.audio_1.pk), oral_argument_index_alias
+        responses = percolate_es_document(
+            str(self.audio_1.pk),
+            AudioPercolator._index._name,
+            oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2296,12 +2308,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
-            str(self.audio_5.pk), oral_argument_index_alias
+        responses = percolate_es_document(
+            str(self.audio_5.pk),
+            AudioPercolator._index._name,
+            oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2314,12 +2330,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
-            str(self.audio_1.pk), oral_argument_index_alias
+        responses = percolate_es_document(
+            str(self.audio_1.pk),
+            AudioPercolator._index._name,
+            oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2331,12 +2351,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         }
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
-            str(self.audio_2.pk), oral_argument_index_alias
+        responses = percolate_es_document(
+            str(self.audio_2.pk),
+            AudioPercolator._index._name,
+            oral_argument_index_alias,
         )
         expected_queries = 3
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         cd = {
             "type": SEARCH_TYPES.ORAL_ARGUMENT,
@@ -2348,12 +2372,16 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
 
         query_id = self.save_percolator_query(cd)
         created_queries_ids.append(query_id)
-        response = percolate_document(
-            str(self.audio_4.pk), oral_argument_index_alias
+        responses = percolate_es_document(
+            str(self.audio_4.pk),
+            AudioPercolator._index._name,
+            oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(response), expected_queries)
-        self.assertEqual(self.confirm_query_matched(response, query_id), True)
+        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            self.confirm_query_matched(responses[0], query_id), True
+        )
 
         self.delete_documents_from_index(
             AudioPercolator._index._name, created_queries_ids
@@ -2603,7 +2631,7 @@ class OralArgumentIndexingTest(
 
         # Update an Audio without changes.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2614,7 +2642,7 @@ class OralArgumentIndexingTest(
 
         # Update an Audio tracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2627,7 +2655,7 @@ class OralArgumentIndexingTest(
         self.assertEqual(a_doc.caseName, "Bank vs America")
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
@@ -2647,7 +2675,7 @@ class OralArgumentIndexingTest(
         self.assertFalse(AudioDocument.exists(id=audio.pk))
         # Audio creation on update.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
                 update_es_document, *args, **kwargs
             ),
