@@ -34,6 +34,7 @@ from cl.search.constants import (
     SEARCH_RECAP_CHILD_HL_FIELDS,
     SEARCH_RECAP_CHILD_QUERY_FIELDS,
     SEARCH_RECAP_HL_FIELDS,
+    recap_boosts_es,
 )
 from cl.search.documents import (
     AudioDocument,
@@ -457,28 +458,6 @@ def scheduled_alert_hits_limit_reached(
     return False
 
 
-def recap_document_hl_matched(rd_hit: Hit) -> bool:
-    """Determine whether HL matched a RECAPDocument text field.
-
-    :param rd_hit: The ES hit.
-    :return: True if the hit matched a RECAPDocument field. Otherwise, False.
-    """
-
-    matched_rd_hl: set[str] = set()
-    rd_hl_fields = set(SEARCH_RECAP_CHILD_HL_FIELDS.keys())
-    if hasattr(rd_hit, "highlight"):
-        highlights = rd_hit.highlight.to_dict()
-        matched_rd_hl.update(
-            hl_key
-            for hl_key, hl_value in highlights.items()
-            for hl in hl_value
-            if f"<{ALERTS_HL_TAG}>" in hl
-        )
-    if matched_rd_hl and matched_rd_hl.issubset(rd_hl_fields):
-        return True
-    return False
-
-
 def get_alerts_set_prefix() -> str:
     """Simple tool for getting the prefix for the alert hits set.
     Useful for avoiding test collisions.
@@ -546,12 +525,7 @@ def build_plain_percolator_query(cd: CleanData) -> Query:
             text_fields.extend(
                 add_fields_boosting(
                     cd,
-                    [
-                        "description",
-                        # Docket Fields
-                        "docketNumber",
-                        "caseName",
-                    ],
+                    list(recap_boosts_es.keys()),
                 )
             )
             child_filters = build_has_child_filters(cd)

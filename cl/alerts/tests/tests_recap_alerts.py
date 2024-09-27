@@ -2,7 +2,6 @@ import datetime
 from unittest import mock
 
 import time_machine
-from asgiref.sync import sync_to_async
 from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
@@ -24,12 +23,10 @@ from cl.alerts.utils import (
     build_plain_percolator_query,
     percolate_es_document,
     prepare_percolator_content,
-    recap_document_hl_matched,
 )
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.donate.models import NeonMembership
-from cl.lib.elasticsearch_utils import do_es_sweep_alert_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
 from cl.people_db.factories import (
@@ -101,73 +98,6 @@ class RECAPAlertsSweepIndexTest(
         keys = self.r.keys("alert_hits_sweep:*")
         if keys:
             self.r.delete(*keys)
-
-    async def test_recap_document_hl_matched(self, mock_prefix) -> None:
-        """Test recap_document_hl_matched method that determines weather a hit
-        contains RECAPDocument HL fields."""
-
-        # Index base document factories.
-        with time_machine.travel(self.mock_date, tick=False):
-            index_daily_recap_documents(
-                self.r,
-                DocketDocument._index._name,
-                RECAPSweepDocument,
-                testing=True,
-            )
-
-        # Docket-only query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": '"401 Civil"',
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, False)
-
-        # RECAPDocument-only query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": '"Mauris iaculis, leo sit amet hendrerit vehicula"',
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, True)
-
-        # Cross-object query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": "SUBPOENAS SERVED OFF Mauris iaculis",
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, True)
 
     def test_filter_recap_alerts_to_send(self, mock_prefix) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:
@@ -1563,7 +1493,6 @@ class RECAPAlertsSweepIndexTest(
         """Integration test to confirm alerts missing by the percolator approach
         are properly send by the sweep index without duplicating alerts.
         """
-
         # Rename percolator index for this test to avoid collisions.
         RECAPPercolator._index._name = "recap_percolator_sweep"
         RECAPPercolator._index.delete(ignore=404)
@@ -1939,7 +1868,7 @@ class RECAPAlertsPercolatorTest(
         cd = {
             "type": SEARCH_TYPES.RECAP,
             "q": '"Mauris iaculis" AND pacer_doc_id:016156723121 AND '
-            "entry_date_filed:[2014-07-18T00:00:00Z TO 2014-07-20T00:00:00Z]",
+            "entry_date_filed:[2014-07-04T00:00:00Z TO 2014-07-20T00:00:00Z]",
             "document_number": "3",
             "description": "Leave to File",
             "order_by": "score desc",
@@ -1951,7 +1880,11 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd_2.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            len(responses[0]),
+            expected_queries,
+            msg="Matched queries didn't match.",
+        )
         self.assertEqual(
             self.confirm_query_matched(responses[0], query_id), True
         )
@@ -1970,7 +1903,11 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd_att.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            len(responses[0]),
+            expected_queries,
+            msg="Matched queries didn't match.",
+        )
         self.assertEqual(
             self.confirm_query_matched(responses[0], query_id), True
         )
@@ -1989,7 +1926,11 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            len(responses[0]),
+            expected_queries,
+            msg="Matched queries didn't match.",
+        )
         self.assertEqual(
             self.confirm_query_matched(responses[0], query_id), True
         )
@@ -2006,7 +1947,11 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd.pk)
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(
+            len(responses[0]),
+            expected_queries,
+            msg="Matched queries didn't match.",
+        )
         self.assertEqual(
             self.confirm_query_matched(responses[0], query_id), True
         )
@@ -2582,7 +2527,9 @@ class RECAPAlertsPercolatorTest(
             f"<strong>{rd.docket_entry.description}</strong>", html_content
         )
 
-    @override_settings(SCHEDULED_ALERT_HITS_LIMIT=3)
+    @override_settings(
+        SCHEDULED_ALERT_HITS_LIMIT=3, RECAP_CHILD_HITS_PER_RESULT=5
+    )
     def test_group_percolator_alerts(self, mock_prefix) -> None:
         """Test group Percolator RECAP Alerts in an email and hits."""
 

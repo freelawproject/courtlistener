@@ -68,6 +68,7 @@ from cl.search.constants import (
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     api_child_highlight_map,
     cardinality_query_unique_ids,
+    recap_boosts_es,
 )
 from cl.search.exception import (
     BadProximityQuery,
@@ -1158,12 +1159,7 @@ def build_es_base_query(
             child_fields.extend(
                 add_fields_boosting(
                     cd,
-                    [
-                        "description",
-                        # Docket Fields
-                        "docketNumber",
-                        "caseName.exact",
-                    ],
+                    list(recap_boosts_es.keys()),
                 )
             )
             child_query_fields = {"recap_document": child_fields}
@@ -1197,15 +1193,21 @@ def build_es_base_query(
                 mlt_query = async_to_sync(build_more_like_this_query)(
                     cluster_pks
                 )
-                main_query, join_query = build_full_join_es_queries(
-                    cd,
-                    {"opinion": []},
-                    [],
-                    mlt_query,
-                    child_highlighting=False,
-                    api_version=api_version,
+                main_query, child_docs_query, parent_query = (
+                    build_full_join_es_queries(
+                        cd,
+                        {"opinion": []},
+                        [],
+                        mlt_query,
+                        child_highlighting=False,
+                        api_version=api_version,
+                    )
                 )
-                return search_query.query(main_query), join_query
+                return (
+                    search_query.query(main_query),
+                    child_docs_query,
+                    parent_query,
+                )
 
             opinion_search_fields = SEARCH_OPINION_QUERY_FIELDS
             child_fields = opinion_search_fields.copy()
