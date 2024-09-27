@@ -17,7 +17,6 @@ from cl.alerts.management.commands.cl_send_recap_alerts import (
     index_daily_recap_documents,
 )
 from cl.alerts.models import SEARCH_TYPES, Alert, ScheduledAlertHit
-from cl.alerts.utils import recap_document_hl_matched
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.donate.models import NeonMembership
@@ -240,73 +239,6 @@ class RECAPAlertsSweepIndexTest(
                             msg=f"Did not get the right number of child documents for the case %s. "
                             % case_title,
                         )
-
-    async def test_recap_document_hl_matched(self) -> None:
-        """Test recap_document_hl_matched method that determines weather a hit
-        contains RECAPDocument HL fields."""
-
-        # Index base document factories.
-        with time_machine.travel(self.mock_date, tick=False):
-            index_daily_recap_documents(
-                self.r,
-                DocketDocument._index._name,
-                RECAPSweepDocument,
-                testing=True,
-            )
-
-        # Docket-only query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": '"401 Civil"',
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, False)
-
-        # RECAPDocument-only query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": '"Mauris iaculis, leo sit amet hendrerit vehicula"',
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, True)
-
-        # Cross-object query
-        search_params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": "SUBPOENAS SERVED OFF Mauris iaculis",
-        }
-        search_query = RECAPSweepDocument.search()
-        results, parent_results, _ = await sync_to_async(
-            do_es_sweep_alert_query
-        )(
-            search_query,
-            search_query,
-            search_params,
-        )
-        docket_result = results[0]
-        for rd in docket_result["child_docs"]:
-            rd_field_matched = recap_document_hl_matched(rd)
-            self.assertEqual(rd_field_matched, True)
 
     def test_filter_recap_alerts_to_send(self) -> None:
         """Test filter RECAP alerts that met the conditions to be sent:

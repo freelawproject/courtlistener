@@ -22,7 +22,6 @@ from cl.alerts.utils import (
     add_document_hit_to_alert_set,
     alert_hits_limit_reached,
     has_document_alert_hit_been_triggered,
-    recap_document_hl_matched,
 )
 from cl.api.models import WebhookEventType
 from cl.api.tasks import send_search_alert_webhook_es
@@ -407,7 +406,7 @@ def filter_rd_alert_hits(
     alert_id: int,
     rd_hits: AttrList,
     rd_ids: list[int],
-    check_rd_hl=False,
+    check_rd_matched=False,
 ):
     """Filter RECAP document hits based on specified conditions.
 
@@ -416,8 +415,8 @@ def filter_rd_alert_hits(
     :param rd_hits: A list of RECAPDocument hits to be processed.
     :param rd_ids: A list of RECAPDocument IDs that matched the RECAPDocument
     only query.
-    :param check_rd_hl: A boolean indicating whether to check if the RECAP
-    document hit matched RD HLs.
+    :param check_rd_matched: A boolean indicating whether to check if the RECAP
+     document hit from the main query also matches the RECAPDocument-only query
     :return: A list of RECAP document hits that meet all specified conditions.
     """
 
@@ -428,11 +427,10 @@ def filter_rd_alert_hits(
                 r, alert_id, "r", rd_hit["_source"]["id"]
             )
         ]
-        if check_rd_hl:
-            if not recap_document_hl_matched(rd_hit):
-                # If the RECAPDocument hit didn't match any HL. Check if it should be included
-                # due to it matched the RECAPDocument only query.
-                conditions.append(rd_hit["_source"]["id"] in rd_ids)
+        if check_rd_matched:
+            # Add condition to check if the RD hit is within the RD IDS returned
+            # by the RECAPDocument-only query.
+            conditions.append(rd_hit["_source"]["id"] in rd_ids)
         if all(conditions):
             rds_to_send.append(rd_hit)
             add_document_hit_to_alert_set(
@@ -495,7 +493,11 @@ def process_alert_hits(
             if hit.docket_id in docket_ids:
                 # Possible Docket-only alert
                 rds_to_send = filter_rd_alert_hits(
-                    r, alert_id, hit["child_docs"], rd_ids, check_rd_hl=True
+                    r,
+                    alert_id,
+                    hit["child_docs"],
+                    rd_ids,
+                    check_rd_matched=True,
                 )
                 if rds_to_send:
                     # Docket OR RECAPDocument alert.
