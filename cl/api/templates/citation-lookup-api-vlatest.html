@@ -47,6 +47,9 @@
 </div>
 
 <div class="col-xs-12 col-md-8 col-lg-6">
+  {% if version == "v3" %}
+    {% include "includes/v3-deprecated-warning.html" %}
+  {% endif %}
   <h1 id="about">Citation Lookup and Verification&nbsp;API</h1>
   <h2><code>{% url "citation-lookup-list" version=version %}</code></h2>
   <p class="lead v-offset-above-3">Use this API to look up citations in CourtListener's database of {{ cite_count|intcomma }} citations.</p>
