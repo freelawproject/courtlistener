@@ -1168,6 +1168,8 @@ class CycleChecker:
     def __init__(self) -> None:
         self.court_counts: defaultdict = defaultdict(int)
         self.current_iteration: int = 1
+        self.count_prev_iteration_courts: int = 0
+        self.prev_iteration_courts: set = set()
 
     def check_if_cycled(self, court_id: str) -> bool:
         """Check if the cycle repeated
@@ -1176,10 +1178,19 @@ class CycleChecker:
         :return True if the cycle started over, else False
         """
         self.court_counts[court_id] += 1
+
         if self.court_counts[court_id] == self.current_iteration:
+            # Keep track of processed courts in last cycle
+            self.prev_iteration_courts.add(court_id)
             return False
         else:
             # Finished cycle and court has been seen more times than the
             # iteration count. Bump the iteration count and return True.
             self.current_iteration += 1
+            self.count_prev_iteration_courts = len(self.prev_iteration_courts)
+            # Clear set of previous courts processed
+            self.prev_iteration_courts.clear()
+            # Add the first item for the new iteration,
+            # when self.court_counts[court_id] != self.current_iteration
+            self.prev_iteration_courts.add(court_id)
             return True

@@ -40,6 +40,9 @@
 
 
 <div class="col-xs-12 col-md-8 col-lg-6">
+  {% if version == "v3" %}
+    {% include "includes/v3-deprecated-warning.html" %}
+  {% endif %}
   <h1 id="about">Legal Citation&nbsp;API</h1>
   <p class="lead">Use these APIs to analyze and query the network of citations between legal cases.</p>
   <p>These APIs are powered by <a href="https://free.law/projects/eyecite">Eyecite</a>, our tool for identifying citations in legal text. Using that tool, we have identified millions of citations between legal decisions, which you can query using these APIs.
