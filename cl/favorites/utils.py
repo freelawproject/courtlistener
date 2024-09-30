@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import (
     Avg,
     Count,
@@ -12,8 +13,10 @@ from django.db.models import (
     Subquery,
 )
 from django.db.models.functions import Cast, Extract, Now, Sqrt
+from django.template import loader
 from django.utils import timezone
 
+from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.models import Prayer
 from cl.search.models import RECAPDocument
 
@@ -93,3 +96,54 @@ async def get_top_prayers() -> list[RECAPDocument]:
         .order_by("-geometric_mean")[:50]
     )
     return [doc async for doc in documents.aiterator()]
+
+def send_prayer_emails(instance: RECAPDocument) -> None:
+    open_prayers = Prayer.objects.filter(
+            recap_document=instance, status=Prayer.WAITING
+        ).select_related("user")
+    # Retrieve email recipients before updating granted prayers.
+    email_recipients = [
+        {
+            "email": prayer["user__email"],
+            "date_created": prayer["date_created"],
+        }
+        for prayer in open_prayers.values("user__email", "date_created")
+    ]
+    open_prayers.update(status=Prayer.GRANTED)
+
+    # Send email notifications in bulk.
+    if email_recipients:
+        subject = f"A document you requested is now on CourtListener"
+        txt_template = loader.get_template("prayer_email.txt")
+        html_template = loader.get_template("prayer_email.html")
+
+        docket = instance.docket_entry.docket
+        docket_entry = instance.docket_entry
+        document_url = instance.get_absolute_url()
+        num_waiting = len(email_recipients)
+        doc_price = price(instance)
+
+        messages = []
+        for email_recipient in email_recipients:
+            context = {
+                "docket": docket,
+                "docket_entry": docket_entry,
+                "rd": instance,
+                "document_url": document_url,
+                "num_waiting": num_waiting,
+                "price": doc_price,
+                "date_created": email_recipient["date_created"],
+            }
+            txt = txt_template.render(context)
+            html = html_template.render(context)
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=txt,
+                from_email=settings.DEFAULT_ALERTS_EMAIL,
+                to=[email_recipient["email"]],
+                headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
+            )
+            msg.attach_alternative(html, "text/html")
+            messages.append(msg)
+        connection = get_connection()
+        connection.send_messages(messages)
