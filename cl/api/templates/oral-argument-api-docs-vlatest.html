@@ -44,7 +44,10 @@
 
 
 <div class="col-xs-12 col-md-8 col-lg-6">
-  <h1 id="about">Oral Argument Recoding&nbsp;APIs</h1>
+  {% if version == "v3" %}
+    {% include "includes/v3-deprecated-warning.html" %}
+  {% endif %}
+  <h1 id="about">Oral Argument Recordings&nbsp;APIs</h1>
   <p class="lead">Use these APIs to gather and analyze the largest collection of oral argument recordings on the Internet.
   </p>
 

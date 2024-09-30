@@ -559,6 +559,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             return TemplateResponse(request, "search.html", render_dict)
 
 
+@never_cache
 def advanced(request: HttpRequest) -> HttpResponse:
     render_dict = {"private": False}
 
