@@ -593,9 +593,11 @@ def handle_recap_doc_change(
             txt_template = loader.get_template("prayer_email.txt")
             html_template = loader.get_template("prayer_email.html")
 
+            case_name = instance.docket_entry.docket.case_name
+            court = instance.docket_entry.docket.court
             document = instance.get_absolute_url()
             num_waiting = len(email_recipients)
-            price = price(instance)
+            doc_price = price(instance)
 
             messages = []
             for email_recipient in email_recipients:
@@ -603,7 +605,7 @@ def handle_recap_doc_change(
                 context = {
                     "document": document,
                     "num_waiting": num_waiting,
-                    "price": price,
+                    "price": doc_price,
                     "date_created": email_recipient["date_created"],
                 }
 
