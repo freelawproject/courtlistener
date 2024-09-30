@@ -11,7 +11,8 @@ A document you requested to be purchased is now available on CourtListener.
  - View this item on our site: https://www.courtlistener.com{{document}}
 
  Somebody paid ${{price}} for this document.
- {{num_waiting}} people requested it.
+ You requested it on {{date_created}}.
+ {{num_waiting}} people in total requested it.
 
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project

@@ -604,8 +604,7 @@ def handle_recap_doc_change(
                     "document": document,
                     "num_waiting": num_waiting,
                     "price": price,
-                    "recipient_email": email_recipient["email"],
-                    "recipient_date_created": email_recipient["date_created"],
+                    "date_created": email_recipient["date_created"],
                         }
 
                 txt = txt_template.render(context)
