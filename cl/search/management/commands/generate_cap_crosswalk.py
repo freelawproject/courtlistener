@@ -114,7 +114,8 @@ class Command(CommandUtils, BaseCommand):
         """
         crosswalk = []
         reporter_name = reporter["short_name"]
-        volumes = self.fetch_volumes_for_reporter(reporter["slug"])
+        reporter_slug = reporter["slug"]
+        volumes = self.fetch_volumes_for_reporter(reporter_slug)
 
         if self.single_volume:
             volumes = (
@@ -124,27 +125,27 @@ class Command(CommandUtils, BaseCommand):
             )
 
         for volume in volumes:
-            cases_metadata = self.fetch_cases_metadata(
-                reporter["slug"], volume
-            )
+            cases_metadata = self.fetch_cases_metadata(reporter_slug, volume)
             logger.info(
                 f"Processing {len(cases_metadata)} cases for {reporter_name} volume {volume}"
             )
 
-            # Sort cases by ID to ensure consistent processing order
-            cases_metadata.sort(key=lambda x: x["id"])
-
             for case_meta in cases_metadata:
                 self.total_cases_processed += 1
+                logger.debug(
+                    f"Processing case: {case_meta['id']} - {case_meta['name_abbreviation']}"
+                )
                 if self.is_valid_case_metadata(case_meta):
-                    cl_case = self.find_matching_case(case_meta)
+                    cl_case = self.find_matching_case(
+                        case_meta, reporter_slug, volume
+                    )
                     if cl_case:
                         self.total_matches_found += 1
                         crosswalk.append(
                             {
                                 "cap_case_id": case_meta["id"],
                                 "cl_cluster_id": cl_case.id,
-                                "cap_path": f"/{reporter['slug']}/{volume}/cases/{case_meta['file_name']}.json",
+                                "cap_path": f"/{reporter_slug}/{volume}/cases/{case_meta['file_name']}.json",
                             }
                         )
                         logger.info(
@@ -154,6 +155,10 @@ class Command(CommandUtils, BaseCommand):
                         logger.info(
                             f"No match found for CAP ID {case_meta['id']}"
                         )
+                else:
+                    logger.warning(
+                        f"Invalid case metadata for CAP ID {case_meta['id']}"
+                    )
 
             if not self.dry_run:
                 self.save_crosswalk(crosswalk, reporter_name, index)
@@ -204,52 +209,39 @@ class Command(CommandUtils, BaseCommand):
         return sorted(volume_directories)
 
     def find_matching_case(
-        self, case_meta: Dict[str, Any]
+        self, case_meta: Dict[str, Any], reporter_slug: str, volume: str
     ) -> Optional[OpinionCluster]:
-        """Find a matching case in CourtListener database.
+        """Find a matching case in CourtListener database using the filepath_json_harvard field.
 
-        :param case_meta: Case metadata dictionary.
-        :return Optional[OpinionCluster]: returns an OpinionCluster object if a match is found, otherwise returns None.
+        :param case_meta: Case metadata dictionary from CAP.
+        :param reporter_slug: The slug of the reporter.
+        :param volume: The volume number.
+        :return: An OpinionCluster object if a match is found, otherwise None.
         """
         try:
-            citation_text = case_meta["citations"][0]["cite"]
-            citations = get_citations(citation_text)
+            cap_case_id = str(case_meta["id"])
+            page = str(case_meta["first_page"])
 
-            for citation in citations:
-                if isinstance(citation, FullCaseCitation):
-                    logger.debug(f"Searching for citation: {citation}")
+            query = f"{reporter_slug}.{volume}/{page}.{cap_case_id}"
+            logger.debug(f"Searching for: {query}")
 
-                    # Use the groups attribute to access volume, reporter, and page
-                    matches = OpinionCluster.objects.filter(
-                        citations__volume=citation.groups["volume"],
-                        citations__reporter=citation.corrected_reporter(),
-                        citations__page=citation.groups["page"],
-                    ).distinct()
+            matching_cluster = OpinionCluster.objects.filter(
+                filepath_json_harvard__icontains=query
+            ).first()
 
-                    match_count = matches.count()
-
-                    if match_count == 1:
-                        matched_case = matches.first()
-                        logger.debug(
-                            f"Single match found: {matched_case.case_name} (CL ID: {matched_case.id})"
-                        )
-                        return matched_case
-                    elif match_count > 1:
-                        logger.warning(
-                            f"Multiple matches ({match_count}) found for citation: {citation}"
-                        )
-                        return (
-                            matches.first()
-                        )  # Return the first match, but log a warning
-                    else:
-                        logger.debug(
-                            f"No match found for citation: {citation}"
-                        )
+            if matching_cluster:
+                logger.info(
+                    f"Match found: CAP ID {cap_case_id} -> CL ID {matching_cluster.id}"
+                )
+                return matching_cluster
+            else:
+                logger.info(
+                    f"No match found for CAP ID {cap_case_id} (reporter: {reporter_slug}, volume: {volume}, page: {page})"
+                )
 
         except Exception as e:
             logger.error(
-                f"Error processing case {case_meta.get('id', 'Unknown ID')}: {str(e)}",
-                exc_info=True,
+                f"Error processing case {cap_case_id}: {str(e)}", exc_info=True
             )
 
         return None
