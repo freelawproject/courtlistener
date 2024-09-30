@@ -582,8 +582,8 @@ def handle_recap_doc_change(
         ).select_related("user")
         # Retrieve email recipients before updating granted prayers.
         email_recipients = [
-            email
-            for email in open_prayers.values_list("user__email", flat=True)
+            {"email": prayer.user.email, "date_created": prayer.date_created}
+            for prayer in open_prayers
         ]
         open_prayers.update(status=Prayer.GRANTED)
 
@@ -592,15 +592,24 @@ def handle_recap_doc_change(
             subject = f"A document you requested is now on CourtListener"
             txt_template = loader.get_template("prayer_email.txt")
             html_template = loader.get_template("prayer_email.html")
-            context = {
-                "document": instance.get_absolute_url(),
-                "num_waiting": len(email_recipients),
-                "price": price(instance),
-            }
-            txt = txt_template.render(context)
-            html = html_template.render(context)
+
+            document = instance.get_absolute_url()
+            num_waiting = len(email_recipients)
+            price = price(instance)
+
             messages = []
             for email_recipient in email_recipients:
+                
+                context = {
+                    "document": document,
+                    "num_waiting": num_waiting,
+                    "price": price,
+                    "recipient_email": email_recipient["email"],
+                    "recipient_date_created": email_recipient["date_created"],
+                        }
+
+                txt = txt_template.render(context)
+                html = html_template.render(context)
                 msg = EmailMultiAlternatives(
                     subject=subject,
                     body=txt,
