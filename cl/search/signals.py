@@ -599,13 +599,13 @@ def handle_recap_doc_change(
 
             messages = []
             for email_recipient in email_recipients:
-                
+
                 context = {
                     "document": document,
                     "num_waiting": num_waiting,
                     "price": price,
                     "date_created": email_recipient["date_created"],
-                        }
+                }
 
                 txt = txt_template.render(context)
                 html = html_template.render(context)
