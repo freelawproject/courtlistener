@@ -1,20 +1,26 @@
-{% load text_filters %}{% load humanize %}*****************
+{% load text_filters %}{% load humanize %}{% load tz %}*****************
 CourtListener.com
 *****************
 -------------------------------------------------------
-We have news regarding your alerts at CourtListener.com
+Your Wish Has Been Granted!
 -------------------------------------------------------
 
-A document you requested to be purchased is now available on CourtListener.
+The document you were waiting for is now available in RECAP.
 -------------------------------------------------------
 
-{{case_name}}, {{court}}
+{{ docket|best_case_name|safe }} {% if docket.docket_number %}({{ docket.docket_number }}){% endif %}
+{{ docket.court }}
+~~~
+View Docket: https://www.courtlistener.com{{ docket.get_absolute_url }}?order_by=desc
 
- - View this item on our site: https://www.courtlistener.com{{document}}
-
- Somebody paid ${{price}} for this document.
- You requested it on {{date_created}}.
- {{num_waiting}} people in total requested it.
+Document Number: {{ docket_entry.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}
+Date Filed: {% if docket_entry.datetime_filed %}{{ docket_entry.datetime_filed|timezone:timezone|date:"M j, Y" }}{% else %}{{ docket_entry.date_filed|date:"M j, Y"|default:'Unknown' }}{% endif %}
+Description: {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ docket_entry.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}
+View Document: https://www.courtlistener.com{{document_url}}
+~~~
+You requested it on {{ date_created|date:"M j, Y" }}
+{{num_waiting}} people were also waiting for it.
+Somebody paid ${{ price }} to make it available to all of us.
 
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project

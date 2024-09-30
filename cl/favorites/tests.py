@@ -1,6 +1,6 @@
 import math
 import time
-from datetime import timedelta
+from datetime import date, timedelta
 from http import HTTPStatus
 
 import time_machine
@@ -13,6 +13,7 @@ from django.utils.timezone import now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.utils import create_prayer, get_top_prayers, prayer_eligible
@@ -849,15 +850,19 @@ class RECAPPrayAndPay(TestCase):
         """Integration test for prayers."""
 
         rd_6 = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__entry_number=6,
+            docket_entry__date_filed=date(2015, 8, 16),
             pacer_doc_id="98763427",
             document_number="1",
             is_available=False,
+            page_count=10,
+            description="Dismissing Case",
         )
 
         current_time = now()
         with time_machine.travel(current_time, tick=False):
             # Create prayers
-            await create_prayer(self.user, rd_6)
+            prayer_1 = await create_prayer(self.user, rd_6)
             await create_prayer(self.user_2, rd_6)
             await create_prayer(self.user, self.rd_4)
 
@@ -919,7 +924,32 @@ class RECAPPrayAndPay(TestCase):
             email_text_content,
         )
         self.assertIn(
+            f"You requested it on {prayer_1.date_created.strftime("%b %d, %Y")}",
+            email_text_content,
+        )
+        self.assertIn(
+            f"{len(actual_top_prayers)} people were also waiting for it.",
+            email_text_content,
+        )
+        self.assertIn(
+            f"Somebody paid ${price(rd_6)}",
+            email_text_content,
+        )
+
+        self.assertIn(
             f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
+            html_content,
+        )
+        self.assertIn(
+            f"{len(actual_top_prayers)} people were also waiting for it.",
+            html_content,
+        )
+        self.assertIn(
+            f"You requested it on {prayer_1.date_created.strftime("%b %d, %Y")}",
+            html_content,
+        )
+        self.assertIn(
+            f"Somebody paid ${price(rd_6)}",
             html_content,
         )
         email_recipients = {email.to[0] for email in mail.outbox}
