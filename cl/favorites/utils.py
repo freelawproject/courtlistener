@@ -97,10 +97,11 @@ async def get_top_prayers() -> list[RECAPDocument]:
     )
     return [doc async for doc in documents.aiterator()]
 
+
 def send_prayer_emails(instance: RECAPDocument) -> None:
     open_prayers = Prayer.objects.filter(
-            recap_document=instance, status=Prayer.WAITING
-        ).select_related("user")
+        recap_document=instance, status=Prayer.WAITING
+    ).select_related("user")
     # Retrieve email recipients before updating granted prayers.
     email_recipients = [
         {
