@@ -8,6 +8,7 @@ from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
+from cl.custom_filters.templatetags import pacer
 from cl.favorites.models import Prayer
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
@@ -591,7 +592,7 @@ def handle_recap_doc_change(
             subject = f"A document you requested is now on CourtListener"
             txt_template = loader.get_template("prayer_email.txt")
             html_template = loader.get_template("prayer_email.html")
-            context = {"document": instance.get_absolute_url()}
+            context = {"document": instance.get_absolute_url(), "num_waiting": len(email_recipients), "price": pacer.price(instance)}
             txt = txt_template.render(context)
             html = html_template.render(context)
             messages = []

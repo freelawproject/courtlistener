@@ -9,8 +9,9 @@ A document you requested to be purchased is now available on CourtListener.
 -------------------------------------------------------
 
  - View this item on our site: https://www.courtlistener.com{{document}}
-{% comment %} {% if result.download_url %} - Download original from the court: {{result.download_url}}
-{% endif %}{% if result.local_path %} - Download the original from our backup: https://storage.courtlistener.com/{{ result.local_path }}{% endif %} {% endcomment %}
+
+ Somebody paid ${{price}} for this document.
+ {{num_waiting}} people requested it.
 
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
