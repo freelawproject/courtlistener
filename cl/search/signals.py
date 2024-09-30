@@ -613,7 +613,7 @@ def handle_recap_doc_change(
                     subject=subject,
                     body=txt,
                     from_email=settings.DEFAULT_ALERTS_EMAIL,
-                    to=[email_recipient],
+                    to=[email_recipient["email"]],
                     headers={"X-Entity-Ref-ID": f"prayer.rd.pk:{instance.pk}"},
                 )
                 msg.attach_alternative(html, "text/html")
