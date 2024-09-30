@@ -8,6 +8,8 @@ We have news regarding your alerts at CourtListener.com
 A document you requested to be purchased is now available on CourtListener.
 -------------------------------------------------------
 
+{{case_name}}, {{court}}
+
  - View this item on our site: https://www.courtlistener.com{{document}}
 
  Somebody paid ${{price}} for this document.

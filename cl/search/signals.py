@@ -594,7 +594,7 @@ def handle_recap_doc_change(
             html_template = loader.get_template("prayer_email.html")
 
             case_name = instance.docket_entry.docket.case_name
-            court = instance.docket_entry.docket.court
+            # court = instance.docket_entry.docket.court.citation_string
             document = instance.get_absolute_url()
             num_waiting = len(email_recipients)
             doc_price = price(instance)
@@ -603,6 +603,8 @@ def handle_recap_doc_change(
             for email_recipient in email_recipients:
 
                 context = {
+                    "case_name": case_name,
+                    "court": court,
                     "document": document,
                     "num_waiting": num_waiting,
                     "price": doc_price,
