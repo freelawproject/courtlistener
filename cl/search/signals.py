@@ -592,7 +592,11 @@ def handle_recap_doc_change(
             subject = f"A document you requested is now on CourtListener"
             txt_template = loader.get_template("prayer_email.txt")
             html_template = loader.get_template("prayer_email.html")
-            context = {"document": instance.get_absolute_url(), "num_waiting": len(email_recipients), "price": pacer.price(instance)}
+            context = {
+                "document": instance.get_absolute_url(),
+                "num_waiting": len(email_recipients),
+                "price": pacer.price(instance),
+            }
             txt = txt_template.render(context)
             html = html_template.render(context)
             messages = []
