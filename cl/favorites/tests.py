@@ -7,6 +7,7 @@ import time_machine
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.core import mail
+from django.template.defaultfilters import date as template_date
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -924,7 +925,7 @@ class RECAPPrayAndPay(TestCase):
             email_text_content,
         )
         self.assertIn(
-            f"You requested it on {prayer_1.date_created.strftime("%b %-d, %Y")}",
+            f"You requested it on {template_date(prayer_1.date_created, 'M j, Y')}",
             email_text_content,
         )
         self.assertIn(
@@ -945,8 +946,8 @@ class RECAPPrayAndPay(TestCase):
             html_content,
         )
         self.assertIn(
-            f"You requested it on {prayer_1.date_created.strftime("%b %-d, %Y")}",
-            html_content,
+            f"You requested it on {template_date(prayer_1.date_created, 'M j, Y')}",
+          html_content,
         )
         self.assertIn(
             f"Somebody paid ${price(rd_6)}",
