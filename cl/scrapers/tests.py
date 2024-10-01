@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 from unittest import TestCase, mock
@@ -30,6 +30,7 @@ from cl.scrapers.management.commands import (
     cl_back_scrape_citations,
     cl_scrape_opinions,
     cl_scrape_oral_arguments,
+    update_from_text,
 )
 from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
@@ -866,4 +867,111 @@ class ScraperDocketMatchingTest(TestCase):
         )
         self.assertEqual(
             docket, self.ca2_docket, "Should match using docket number core"
+        )
+
+
+class UpdateFromTestCommandTest(TestCase):
+    """Test the input processing and DB querying for the command"""
+
+    def setUp(self):
+        self.vt = CourtFactory(id="vt")
+        self.sc = CourtFactory(id="sc")
+        self.docket_sc = DocketFactory(court=self.sc, docket_number="20")
+
+        # Different dates, status and courts to test command behaviour
+        self.opinion_2020 = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=DocketFactory(court=self.vt, docket_number="12"),
+                date_filed=date(2020, 6, 1),
+                precedential_status="Published",
+            ),
+            plain_text="""Docket Number: 2020-12
+            Disposition: Affirmed
+            2020 VT 11""",
+        )
+        self.opinion_2020_unpub = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=DocketFactory(court=self.vt, docket_number="13"),
+                date_filed=date(2020, 7, 1),
+                precedential_status="Unpublished",
+            ),
+            plain_text="Docket Number: 2020-13\nDisposition: Affirmed",
+        )
+
+        self.opinion_sc = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=self.docket_sc,
+                date_filed=date(2021, 6, 1),
+                precedential_status="Published",
+            ),
+            plain_text="Some text with no matches",
+            id=101,
+        )
+
+        self.opinion_2022 = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=DocketFactory(court=self.vt, docket_number="13"),
+                date_filed=date(2022, 6, 1),
+                precedential_status="Unpublished",
+            ),
+            id=100,
+            plain_text="Docket Number: 2022-13\n2022 VT 11",
+        )
+
+    def test_inputs(self):
+        """Do all command inputs work properly?"""
+
+        # will target a single opinion, for which extract_from_text
+        # extracts no metadata. No object should be updated
+        cmd = update_from_text.Command()
+        with mock.patch(
+            "cl.scrapers.tasks.get_scraper_object_by_name",
+            return_value=test_opinion_scraper.Site(),
+        ):
+            cmd.handle(juriscraper_module="somepath.sc", opinion_ids=[101])
+
+        self.assertFalse(
+            any(cmd.stats.values()), "No object should be modified"
+        )
+
+        # will target 1 opinion, there are 2 in the time period
+        # and 3 for the court
+        with mock.patch(
+            "cl.scrapers.tasks.get_scraper_object_by_name",
+            return_value=test_opinion_scraper.Site(),
+        ):
+            update_from_text.Command().handle(
+                juriscraper_module="somepath.vt",
+                opinion_ids=[],
+                date_filed_gte="2020/06/01",
+                date_filed_lte="2021/06/01",
+                cluster_status="Published",
+            )
+
+        # Test that objects were actually updated / created
+        self.assertEqual(
+            Citation.objects.filter(cluster=self.opinion_2020.cluster).count(),
+            1,
+            "There should be a single citation for this cluster",
+        )
+        self.opinion_2020.refresh_from_db()
+        self.opinion_2020.cluster.refresh_from_db()
+        self.opinion_2020.cluster.docket.refresh_from_db()
+        self.assertEqual(
+            self.opinion_2020.cluster.disposition,
+            "Affirmed",
+            "OpinionCluster.disposition was not updated",
+        )
+        self.assertEqual(
+            self.opinion_2020.cluster.docket.docket_number,
+            "2020-12",
+            "Docket.docket_number was not updated",
+        )
+
+        # Check that other objects in the time period and court
+        # were not modified. Meaning, the filter worked
+        self.assertEqual(
+            self.opinion_2020_unpub.cluster.docket.docket_number,
+            "13",
+            "Unpublished docket should not be modified",
         )
