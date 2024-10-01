@@ -924,7 +924,7 @@ class RECAPPrayAndPay(TestCase):
             email_text_content,
         )
         self.assertIn(
-            f"You requested it on {prayer_1.date_created.strftime("%b %d, %Y")}",
+            f"You requested it on {prayer_1.date_created.strftime("%b %-d, %Y")}",
             email_text_content,
         )
         self.assertIn(
@@ -945,7 +945,7 @@ class RECAPPrayAndPay(TestCase):
             html_content,
         )
         self.assertIn(
-            f"You requested it on {prayer_1.date_created.strftime("%b %d, %Y")}",
+            f"You requested it on {prayer_1.date_created.strftime("%b %-d, %Y")}",
             html_content,
         )
         self.assertIn(
