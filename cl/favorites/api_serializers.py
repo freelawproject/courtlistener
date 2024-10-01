@@ -38,6 +38,7 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
         model = DocketTag
         fields = "__all__"
 
+
 class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
@@ -50,4 +51,3 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             "recap_document",
             "status",
         )
-
