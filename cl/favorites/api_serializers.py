@@ -37,3 +37,17 @@ class DocketTagSerializer(DynamicFieldsMixin, ModelSerializer):
     class Meta:
         model = DocketTag
         fields = "__all__"
+
+class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+
+    class Meta:
+        model = Prayer
+        fields = "__all__"
+        read_only_fields = (
+            "date_created",
+            "user",
+            "recap_document",
+            "status",
+        )
+
