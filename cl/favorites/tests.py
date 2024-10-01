@@ -1,17 +1,19 @@
 import math
 import time
-from datetime import timedelta
+from datetime import date, timedelta
 from http import HTTPStatus
 
 import time_machine
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
+from django.core import mail
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
+from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.utils import create_prayer, get_top_prayers, prayer_eligible
@@ -363,7 +365,7 @@ class FavoritesTest(TestCase):
         # always contains the latest change
         # Trying to revert objects with untracked fields throws an exception
         with self.assertRaises(RuntimeError):
-            test_tag.event.order_by("-pgh_id")[0].revert()
+            test_tag.events.order_by("-pgh_id")[0].revert()
 
     def test_revert_tracked_model(self):
         # We can revert an object being tracked with django-pghistory
@@ -380,7 +382,7 @@ class FavoritesTest(TestCase):
 
         # Revert object to previous change, we use the last result because it
         # always contains the latest change
-        favorite_obj = favorite_obj.event.order_by("-pgh_id")[0].revert()
+        favorite_obj = favorite_obj.events.order_by("-pgh_id")[0].revert()
         favorite_obj.refresh_from_db()
 
         # Check that the object name was reverted to original name
@@ -848,15 +850,19 @@ class RECAPPrayAndPay(TestCase):
         """Integration test for prayers."""
 
         rd_6 = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__entry_number=6,
+            docket_entry__date_filed=date(2015, 8, 16),
             pacer_doc_id="98763427",
             document_number="1",
             is_available=False,
+            page_count=10,
+            description="Dismissing Case",
         )
 
         current_time = now()
         with time_machine.travel(current_time, tick=False):
             # Create prayers
-            await create_prayer(self.user, rd_6)
+            prayer_1 = await create_prayer(self.user, rd_6)
             await create_prayer(self.user_2, rd_6)
             await create_prayer(self.user, self.rd_4)
 
@@ -895,6 +901,60 @@ class RECAPPrayAndPay(TestCase):
             await granted_prays.acount(),
             2,
             msg="Wrong number of granted prayers",
+        )
+
+        # Assert that prayer granted email notifications are properly sent to users.
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Wrong number of emails sent."
+        )
+        self.assertIn(
+            "A document you requested is now on CourtListener",
+            mail.outbox[0].subject,
+        )
+
+        email_text_content = mail.outbox[0].body
+        html_content = None
+        for content, content_type in mail.outbox[0].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        self.assertIn(
+            f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
+            email_text_content,
+        )
+        self.assertIn(
+            f"You requested it on {prayer_1.date_created.strftime("%b %d, %Y")}",
+            email_text_content,
+        )
+        self.assertIn(
+            f"{len(actual_top_prayers)} people were also waiting for it.",
+            email_text_content,
+        )
+        self.assertIn(
+            f"Somebody paid ${price(rd_6)}",
+            email_text_content,
+        )
+
+        self.assertIn(
+            f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
+            html_content,
+        )
+        self.assertIn(
+            f"{len(actual_top_prayers)} people were also waiting for it.",
+            html_content,
+        )
+        self.assertIn(
+            f"You requested it on {prayer_1.date_created.strftime("%b %d, %Y")}",
+            html_content,
+        )
+        self.assertIn(
+            f"Somebody paid ${price(rd_6)}",
+            html_content,
+        )
+        email_recipients = {email.to[0] for email in mail.outbox}
+        self.assertEqual(
+            email_recipients, {self.user_2.email, self.user.email}
         )
 
         top_prayers = await get_top_prayers()

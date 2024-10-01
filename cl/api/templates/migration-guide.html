@@ -160,7 +160,7 @@
   </ul>
   <h3 id="oa-breaking-changes">Oral Arguments (type=oa)</h3>
   <ul>
-    <li>The <code>snippet</code> field, currently stores a variety of fields. After the change, it will contain the audio transcription only.
+    <li>The <code>snippet</code> field currently stores a variety of fields. After the change, it will contain the audio transcription only.
     </li>
   </ul>
   <h3 id="people-breaking-changes">People</h3>
@@ -168,16 +168,12 @@
     <li>No breaking changes. v3 is already switched to ElasticSearch.</li>
   </ul>
   <h2 id="migrate-db-apis">How Do I Migrate Database APIs to&nbsp;v4?</h2>
-  <h3 id="total-count-results">Total count of results</h3>
-  <ul>
-    <li>The total count of the results is no longer available in the response.
-      Most users don't need this when crawling the API, and computing the count for each response slows down the API.
-      If this value is essential to your service, let us know so we can discuss adding a new API with this feature.
-    </li>
-  </ul>
+  <h3 id="total-count-results">Result Count is Removed</h3>
+  <p>The total count of the results is no longer available in the response. Most users don't need this when using the API, and computing the count for each response slows down the API.
+    If this value is important to your service, let us know so we can discuss adding a new API with this feature.</p>
   <h3 id="invalid-cursor">Invalid cursor error code: 404</h3>
   <p>A new type of error in the v4 API is <strong>Invalid Cursor</strong> with a 404 status code.</p>
-  <p>This can happen when GET parameters are changed without getting a fresh cursor parameter. To prevent this error, do not change the GET parameters while maintaining an existing cursor paramter.
+  <p>This can happen when GET parameters are changed without getting a fresh cursor parameter. To prevent this error, do not change the GET parameters while maintaining an existing cursor parameter.
   </p>
   <h2 id="migrate-search-apis">How Do I Migrate the Search API to&nbsp;v4?</h2>
   <h3 id="enhancements-v4">Enhancements in v4</h3>
