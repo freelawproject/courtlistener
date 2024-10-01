@@ -947,7 +947,7 @@ class RECAPPrayAndPay(TestCase):
         )
         self.assertIn(
             f"You requested it on {template_date(prayer_1.date_created, 'M j, Y')}",
-          html_content,
+            html_content,
         )
         self.assertIn(
             f"Somebody paid ${price(rd_6)}",
