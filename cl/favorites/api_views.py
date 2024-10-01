@@ -7,7 +7,7 @@ from cl.api.pagination import MediumAdjustablePagination
 from cl.favorites.api_permissions import IsTagOwner
 from cl.favorites.api_serializers import DocketTagSerializer, UserTagSerializer
 from cl.favorites.filters import DocketTagFilter, UserTagFilter
-from cl.favorites.models import DocketTag, UserTag
+from cl.favorites.models import DocketTag, Prayer, UserTag
 
 
 class UserTagViewSet(ModelViewSet):
