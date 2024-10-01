@@ -6,7 +6,11 @@ from rest_framework.viewsets import ModelViewSet
 from cl.api.pagination import MediumAdjustablePagination
 from cl.api.utils import LoggingMixin
 from cl.favorites.api_permissions import IsTagOwner
-from cl.favorites.api_serializers import DocketTagSerializer, PrayerSerializer, UserTagSerializer
+from cl.favorites.api_serializers import (
+    DocketTagSerializer,
+    PrayerSerializer,
+    UserTagSerializer,
+)
 from cl.favorites.filters import DocketTagFilter, PrayerFilter, UserTagFilter
 from cl.favorites.models import DocketTag, Prayer, UserTag
 
@@ -53,6 +57,7 @@ class DocketTagViewSet(ModelViewSet):
             Q(tag__user=self.request.user) | Q(tag__published=True)
         )
 
+
 class PrayerViewSet(LoggingMixin, ModelViewSet):
     """A ModelViewset to handle CRUD operations for Prayer."""
 
@@ -60,9 +65,7 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
     serializer_class = PrayerSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = PrayerFilter
-    ordering_fields = (
-        "date_created",
-    )
+    ordering_fields = ("date_created",)
     # Default cursor ordering key
     ordering = "-date_created"
     # Additional cursor ordering fields
@@ -74,4 +77,6 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
         for the currently authenticated user.
         """
         user = self.request.user
-        return Prayer.objects.filter(user=user, status=Prayer.WAITING).order_by("-date_created")
+        return Prayer.objects.filter(
+            user=user, status=Prayer.WAITING
+        ).order_by("-date_created")
