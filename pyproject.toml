@@ -105,7 +105,7 @@ uvicorn = {extras = ["standard"], version = "^0.27.1"}
 daphne = "^4.1.0"
 httpx = {extras = ["http2"], version = "^0.27.2"}
 django-model-utils = "^4.5.1"
-django-permissions-policy = "^4.19.0"
+django-permissions-policy = "^4.21.0"
 tiktoken = "^0.6.0"
 hyperscan = "^0.7.7"
 openai = "^1.31.1"
