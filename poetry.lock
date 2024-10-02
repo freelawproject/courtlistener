@@ -2087,13 +2087,13 @@ files = [
 
 [[package]]
 name = "internetarchive"
-version = "3.6.0"
+version = "4.1.0"
 description = "A Python interface to archive.org."
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "internetarchive-3.6.0-py3-none-any.whl", hash = "sha256:c77490786d7a04c403ab26a5f8278fa84df13379cbe3122772344113b6a52ef9"},
-    {file = "internetarchive-3.6.0.tar.gz", hash = "sha256:86c011e23751f5dff1d5cc6e3bc610b2eca3331d5e502c1cd34c2021068b6bbd"},
+    {file = "internetarchive-4.1.0-py3-none-any.whl", hash = "sha256:0a0e30ade737f7be971b31c38b8c856867a316c5b1d646f055b2b1946aa9cb00"},
+    {file = "internetarchive-4.1.0.tar.gz", hash = "sha256:467188386218d2c77815ca798a51dd18310b326841113bb462b24ea9a71beedc"},
 ]
 
 [package.dependencies]
@@ -5555,4 +5555,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "c85b1edd707a0ab2e808938eed8bd9bccd226914fa978f8ebe1f5bb02d6d7e45"
+content-hash = "e83072c8ecfabab1c75aee1d4058db8c90c1fb98dc77231fe59400f32b4f9a4c"
