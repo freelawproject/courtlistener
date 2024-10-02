@@ -119,7 +119,7 @@ juriscraper = "^2.6.26"
 
 
 [tool.poetry.group.dev.dependencies]
-pre-commit = "^3.7.0"
+pre-commit = "^3.8.0"
 types-redis = "^4.6.0.20240106"
 pylint = "^3.0.3"
 pytest = "^8.0.0"
