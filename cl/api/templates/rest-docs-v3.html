@@ -2,8 +2,8 @@
 {% load static %}
 {% load extras %}
 
-{% block title %}REST API, v3.15 &ndash; CourtListener.com{% endblock %}
-{% block description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
+{% block title %}[Deprecated] REST API, v3.15 &ndash; CourtListener.com{% endblock %}
+{% block description %}Deprecated — REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 {% block og_description %}REST API for federal and state case law, PACER data, the searchable RECAP Archive, oral argument recordings and more. Provided by Free Law Project, a 501(c)(3) non-profit. Please donate to support this service.{% endblock %}
 
 {% block sidebar %}{% endblock %}
@@ -25,14 +25,8 @@
     {% include "includes/toc_sidebar.html" %}
   </div>
   <div class="col-xs-12 col-md-8 col-lg-6">
-    <div class="alert-danger alert">
-      <p class="bottom">These notes are for a version of the API that is deprecated.
-        New implementations should use the <a href="{% url "rest_docs" %}">latest version of the API</a>
-        and existing software <a href="{% url "migration_guide" %}">should be upgraded</a>.
-        These notes are maintained to help with migrations.
-      </p>
-    </div>
-    <h1 id="about">REST API &ndash; v3.15</h1>
+    {% include "includes/v3-deprecated-warning.html" %}
+    <h1 id="about">REST API &ndash; v3.15 (Deprecated)</h1>
 
     <p class="lead">APIs for developers and researchers that need granular legal data.
     </p>
@@ -423,35 +417,35 @@
     <p>Use this API to build your own collection of case law, complete complex legal research, and more.
     </p>
     <p>
-      <a href="{% url "case_law_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+      <a href="{% url "case_law_api_help" version="v3" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
     <h3 id="pacer-apis">PACER Data APIs</h3>
     <p>We have almost half a billion PACER-related objects in the RECAP Archive. Use these APIs to access and understand this data.
     </p>
     <p>
-      <a href="{% url "pacer_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+      <a href="{% url "pacer_api_help" version="v3" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
     <h3 id="recap-apis">RECAP APIs</h3>
     <p>Use these APIs to gather data from PACER and to share your PACER data with the public.
     </p>
     <p>
-      <a href="{% url "recap_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+      <a href="{% url "recap_api_help" version="v3" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
     <h3 id="search-api">Search API</h3>
     <p>CourtListener allows you to search across hundreds of millions of items with advanced fields and operators. Use this API to automate the CourtListener search engine.
     </p>
     <p>
-      <a href="{% url "search_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+      <a href="{% url "search_api_help" version="v3" %}" class="btn btn-lg btn-default">Learn More</a>
     </p>
 
     <h3 id="judge-apis">Judge APIs</h3>
     <p>Use these APIs to query and analyze thousands of federal and state court judges, including their biographical information, political affiliations, education and employment histories, and more.
     </p>
     <p>
-      <a href="{% url "judge_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+      <a href="{% url "judge_api_help" version="v3" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
     <h3 id="disclosure-apis">Financial Disclosure APIs</h3>
@@ -459,14 +453,14 @@
     </p>
     <p>Use these APIs to work with this information.</p>
     <p>
-      <a href="{% url "financial_disclosures_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+      <a href="{% url "financial_disclosures_api_help" version="v3" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
     <h3 id="oral-argument-apis">Oral Argument APIs</h3>
     <p>CourtListener is home to the largest collection of oral argument recordings on the Internet. Use thees APIs to gather and analyze our collection.
     </p>
     <p>
-      <a href="{% url "oral_argument_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+      <a href="{% url "oral_argument_api_help" version="v3" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
     <h3 id="citation-lookup">Citation Lookup and Verification&nbsp;API</h3>
@@ -474,26 +468,26 @@
     <p>This API can look up either an individual citation or can parse and look up every citation in a block of text. This can be useful as a guardrail to help prevent hallucinated citations.
     </p>
     <p>
-      <a href="{% url "citation_lookup_api" %}" class="btn btn-default btn-lg">Learn More</a>
+      <a href="{% url "citation_lookup_api" version="v3" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
     <h3 id="citation-network-apis">Citation Network APIs</h3>
     <p>Use these APIs to traverse and analyze our network of citations between legal decisions.
     </p>
     <p>
-      <a href="{% url "citation_api_help" %}" class="btn btn-default btn-lg">Learn More</a>
+      <a href="{% url "citation_api_help" version="v3" %}" class="btn btn-default btn-lg">Learn More</a>
     </p>
 
     <h3 id="alerts">Alert APIs</h3>
     <p>CourtListener is a scalable system for sending alerts by email or <a href="{% url "webhooks_getting_started" %}">webhook</a> based on search queries or for particular cases. Use these APIs to create, modify, list, and delete alerts.</p>
     <p>
-      <a href="{% url "alert_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+      <a href="{% url "alert_api_help" version="v3" %}" class="btn btn-lg btn-default">Learn More</a>
     </p>
 
     <h3 id="visualizations">Visualization APIs</h3>
     <p>To see and make Supreme Court case visualizations, use these APIs.</p>
     <p>
-      <a href="{% url "visualization_api_help" %}" class="btn btn-lg btn-default">Learn More</a>
+      <a href="{% url "visualization_api_help" version="v3" %}" class="btn btn-lg btn-default">Learn More</a>
     </p>
 
 

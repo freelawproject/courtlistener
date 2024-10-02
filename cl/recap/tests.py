@@ -1485,7 +1485,8 @@ class RecapPdfTaskTest(TestCase):
         Alas, we fail. In theory, this shouldn't happen.
         """
         self.de.delete()
-        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        with mock.patch("cl.recap.tasks.asyncio.sleep"):
+            rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertIsNone(rd)
         self.pq.refresh_from_db()
         # Confirm PQ values.
@@ -1506,7 +1507,9 @@ class RecapPdfTaskTest(TestCase):
         self.assertTrue(rd.is_available)
         self.assertTrue(rd.sha1)
         self.assertTrue(rd.filepath_local)
-        self.assertIn("gov.uscourts.scotus.asdf.1.0", rd.filepath_local.name)
+        file_name = rd.filepath_local.name.split("/")[2]
+        self.assertIn("gov", file_name)
+        self.assertIn("uscourts.scotus.asdf.1.0", file_name)
 
         mock_extract.assert_called_once()
 
@@ -1524,7 +1527,8 @@ class RecapPdfTaskTest(TestCase):
         In practice, this shouldn't happen.
         """
         self.docket.delete()
-        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        with mock.patch("cl.recap.tasks.asyncio.sleep"):
+            rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertIsNone(rd)
         self.pq.refresh_from_db()
         # Confirm PQ values.

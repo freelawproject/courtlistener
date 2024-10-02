@@ -1,15 +1,25 @@
+import math
 import time
+from datetime import date, timedelta
 from http import HTTPStatus
 
+import time_machine
+from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
-from django.test.client import AsyncClient
+from django.core import mail
+from django.template.defaultfilters import date as template_date
+from django.test import AsyncClient, override_settings
 from django.urls import reverse
+from django.utils.timezone import now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
-from cl.favorites.factories import NoteFactory
-from cl.favorites.models import DocketTag, Note, UserTag
+from cl.custom_filters.templatetags.pacer import price
+from cl.favorites.factories import NoteFactory, PrayerFactory
+from cl.favorites.models import DocketTag, Note, Prayer, UserTag
+from cl.favorites.utils import create_prayer, get_top_prayers, prayer_eligible
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
+from cl.search.factories import RECAPDocumentFactory
 from cl.search.views import get_homepage_stats
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import APITestCase, TestCase
@@ -356,7 +366,7 @@ class FavoritesTest(TestCase):
         # always contains the latest change
         # Trying to revert objects with untracked fields throws an exception
         with self.assertRaises(RuntimeError):
-            test_tag.event.order_by("-pgh_id")[0].revert()
+            test_tag.events.order_by("-pgh_id")[0].revert()
 
     def test_revert_tracked_model(self):
         # We can revert an object being tracked with django-pghistory
@@ -373,7 +383,7 @@ class FavoritesTest(TestCase):
 
         # Revert object to previous change, we use the last result because it
         # always contains the latest change
-        favorite_obj = favorite_obj.event.order_by("-pgh_id")[0].revert()
+        favorite_obj = favorite_obj.events.order_by("-pgh_id")[0].revert()
         favorite_obj.refresh_from_db()
 
         # Check that the object name was reverted to original name
@@ -623,3 +633,333 @@ class APITests(APITestCase):
         await UserTag.objects.filter(pk=tag_id).aupdate(published=True)
         response = await self.client2.get(self.docket_path)
         self.assertEqual(response.json()["count"], 1)
+
+
+class RECAPPrayAndPay(TestCase):
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user = UserFactory()
+        cls.user_2 = UserFactory()
+        cls.user_3 = UserFactory()
+
+        cls.rd_1 = RECAPDocumentFactory(
+            pacer_doc_id="98763421",
+            document_number="1",
+            is_available=True,
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            pacer_doc_id="98763422",
+            document_number="2",
+            is_available=False,
+        )
+
+        cls.rd_3 = RECAPDocumentFactory(
+            pacer_doc_id="98763423",
+            document_number="3",
+            is_available=False,
+        )
+        cls.rd_4 = RECAPDocumentFactory(
+            pacer_doc_id="98763424",
+            document_number="4",
+            is_available=False,
+        )
+
+        cls.rd_5 = RECAPDocumentFactory(
+            pacer_doc_id="98763425",
+            document_number="5",
+            is_available=False,
+        )
+
+    @override_settings(ALLOWED_PRAYER_COUNT=2)
+    async def test_prayer_eligible(self) -> None:
+        """Does the prayer_eligible method works properly?"""
+
+        current_time = now()
+        with time_machine.travel(current_time, tick=False):
+            # No user prayers in the last 24 hours yet for this user.
+            user_is_eligible = await prayer_eligible(self.user)
+            self.assertTrue(user_is_eligible)
+
+            # Add prays for this user.
+            await sync_to_async(PrayerFactory)(
+                user=self.user, recap_document=self.rd_1
+            )
+
+            user_prays = Prayer.objects.filter(user=self.user)
+            self.assertEqual(await user_prays.acount(), 1)
+            user_is_eligible = await prayer_eligible(self.user)
+            self.assertTrue(user_is_eligible)
+
+            await sync_to_async(PrayerFactory)(
+                user=self.user, recap_document=self.rd_2
+            )
+            self.assertEqual(await user_prays.acount(), 2)
+
+            # After two prays (ALLOWED_PRAYER_COUNT) in the last 24 hours.
+            # The user is no longer eligible to create more prays
+            user_is_eligible = await prayer_eligible(self.user)
+            self.assertFalse(user_is_eligible)
+
+        with time_machine.travel(
+            current_time + timedelta(hours=25), tick=False
+        ):
+            # After more than 24 hours the user is eligible to create more prays.
+            await sync_to_async(PrayerFactory)(
+                user=self.user, recap_document=self.rd_3
+            )
+            self.assertEqual(await user_prays.acount(), 3)
+            user_is_eligible = await prayer_eligible(self.user)
+            self.assertTrue(user_is_eligible)
+
+    async def test_create_prayer(self) -> None:
+        """Does the create_prayer method works properly?"""
+
+        # Prayer is not created if the document is already available.
+        prayer_created = await create_prayer(self.user, self.rd_1)
+        self.assertEqual(prayer_created, None)
+
+        # Prayer is created if the user eligible and RD is not available.
+        prayer_created = await create_prayer(self.user, self.rd_2)
+        self.assertTrue(prayer_created)
+
+        # Ensure that a user cannot "pray" for the same document more than once
+        same_prayer_created = await create_prayer(self.user, self.rd_2)
+        self.assertIsNone(same_prayer_created)
+
+    async def test_get_top_prayers_by_number(self) -> None:
+        """Does the get_top_prayers method works properly?"""
+
+        # Test top documents based on prayers count.
+        current_time = now()
+        with time_machine.travel(current_time, tick=False):
+            await create_prayer(self.user, self.rd_2)
+            await create_prayer(self.user_2, self.rd_2)
+            await create_prayer(self.user_3, self.rd_2)
+
+            await create_prayer(self.user, self.rd_4)
+            await create_prayer(self.user_3, self.rd_4)
+
+            await create_prayer(self.user_2, self.rd_3)
+
+        prays = Prayer.objects.all()
+        self.assertEqual(await prays.acount(), 6)
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(len(top_prayers), 3)
+        expected_top_prayers = [self.rd_2.pk, self.rd_4.pk, self.rd_3.pk]
+        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on prayers count.",
+        )
+
+    async def test_get_top_prayers_by_age(self) -> None:
+        """Does the get_top_prayers method works properly?"""
+
+        # Test top documents based on prayer age.
+        current_time = now()
+        with time_machine.travel(
+            current_time - timedelta(minutes=1), tick=False
+        ):
+            await create_prayer(self.user, self.rd_4)
+
+        with time_machine.travel(
+            current_time - timedelta(minutes=2), tick=False
+        ):
+            await create_prayer(self.user, self.rd_2)
+
+        with time_machine.travel(
+            current_time - timedelta(minutes=3), tick=False
+        ):
+            await create_prayer(self.user_2, self.rd_3)
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(len(top_prayers), 3)
+        expected_top_prayers = [self.rd_3.pk, self.rd_2.pk, self.rd_4.pk]
+        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on prayers age.",
+        )
+
+    async def test_get_top_prayers_by_number_and_age(self) -> None:
+        """Does the get_top_prayers method works properly?"""
+
+        # Create prayers with different counts and ages
+        current_time = now()
+        with time_machine.travel(current_time - timedelta(days=5), tick=False):
+            await create_prayer(self.user, self.rd_5)  # 1 prayer, 5 days old
+
+        with time_machine.travel(current_time - timedelta(days=3), tick=False):
+            await create_prayer(self.user, self.rd_2)
+            await create_prayer(
+                self.user_2, self.rd_2
+            )  # 2 prayers, 3 days old
+
+        with time_machine.travel(current_time - timedelta(days=1), tick=False):
+            await create_prayer(self.user, self.rd_3)
+            await create_prayer(self.user_2, self.rd_3)
+            await create_prayer(self.user_3, self.rd_3)  # 3 prayers, 1 day old
+
+        with time_machine.travel(current_time - timedelta(days=4), tick=False):
+            await create_prayer(self.user, self.rd_4)
+            await create_prayer(
+                self.user_2, self.rd_4
+            )  # 2 prayers, 4 days old
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(len(top_prayers), 4)
+
+        expected_top_prayers = [
+            self.rd_4.pk,
+            self.rd_2.pk,
+            self.rd_5.pk,
+            self.rd_3.pk,
+        ]
+        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+
+        self.assertEqual(
+            actual_top_prayers,
+            expected_top_prayers,
+            msg="Wrong top_prayers based on combined prayer count and age.",
+        )
+
+        # Compute expected geometric means
+        rd_4_score = math.sqrt(2 * (4 * 3600 * 24))
+        rd_2_score = math.sqrt(2 * (3 * 3600 * 24))
+        rd_5_score = math.sqrt(1 * (5 * 3600 * 24))
+        rd_3_score = math.sqrt(3 * (1 * 3600 * 24))
+
+        self.assertAlmostEqual(
+            top_prayers[0].geometric_mean, rd_4_score, places=2
+        )
+        self.assertAlmostEqual(
+            top_prayers[1].geometric_mean, rd_2_score, places=2
+        )
+        self.assertAlmostEqual(
+            top_prayers[2].geometric_mean, rd_5_score, places=2
+        )
+        self.assertAlmostEqual(
+            top_prayers[3].geometric_mean, rd_3_score, places=2
+        )
+
+    async def test_prayers_integration(self) -> None:
+        """Integration test for prayers."""
+
+        rd_6 = await sync_to_async(RECAPDocumentFactory)(
+            docket_entry__entry_number=6,
+            docket_entry__date_filed=date(2015, 8, 16),
+            pacer_doc_id="98763427",
+            document_number="1",
+            is_available=False,
+            page_count=10,
+            description="Dismissing Case",
+        )
+
+        current_time = now()
+        with time_machine.travel(current_time, tick=False):
+            # Create prayers
+            prayer_1 = await create_prayer(self.user, rd_6)
+            await create_prayer(self.user_2, rd_6)
+            await create_prayer(self.user, self.rd_4)
+
+        # Assert number of Prayer in Waiting status.
+        waiting_prays = Prayer.objects.filter(status=Prayer.WAITING)
+        self.assertEqual(
+            await waiting_prays.acount(),
+            3,
+            msg="Wrong number of waiting prayers",
+        )
+
+        # Confirm top prayers list is as expected.
+        top_prayers = await get_top_prayers()
+        self.assertEqual(
+            len(top_prayers), 2, msg="Wrong number of top prayers"
+        )
+
+        expected_top_prayers = [rd_6.pk, self.rd_4.pk]
+        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        self.assertEqual(
+            actual_top_prayers, expected_top_prayers, msg="Wrong top_prayers."
+        )
+
+        # rd_6 is granted.
+        rd_6.is_available = True
+        await rd_6.asave()
+
+        # Confirm Prayers related to rd_6 are now set to Granted status.
+        self.assertEqual(
+            await waiting_prays.acount(),
+            1,
+            msg="Wrong number of waiting prayers",
+        )
+        granted_prays = Prayer.objects.filter(status=Prayer.GRANTED)
+        self.assertEqual(
+            await granted_prays.acount(),
+            2,
+            msg="Wrong number of granted prayers",
+        )
+
+        # Assert that prayer granted email notifications are properly sent to users.
+        self.assertEqual(
+            len(mail.outbox), 2, msg="Wrong number of emails sent."
+        )
+        self.assertIn(
+            "A document you requested is now on CourtListener",
+            mail.outbox[0].subject,
+        )
+
+        email_text_content = mail.outbox[0].body
+        html_content = None
+        for content, content_type in mail.outbox[0].alternatives:
+            if content_type == "text/html":
+                html_content = content
+                break
+
+        self.assertIn(
+            f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
+            email_text_content,
+        )
+        self.assertIn(
+            f"You requested it on {template_date(prayer_1.date_created, 'M j, Y')}",
+            email_text_content,
+        )
+        self.assertIn(
+            f"{len(actual_top_prayers)} people were also waiting for it.",
+            email_text_content,
+        )
+        self.assertIn(
+            f"Somebody paid ${price(rd_6)}",
+            email_text_content,
+        )
+
+        self.assertIn(
+            f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
+            html_content,
+        )
+        self.assertIn(
+            f"{len(actual_top_prayers)} people were also waiting for it.",
+            html_content,
+        )
+        self.assertIn(
+            f"You requested it on {template_date(prayer_1.date_created, 'M j, Y')}",
+            html_content,
+        )
+        self.assertIn(
+            f"Somebody paid ${price(rd_6)}",
+            html_content,
+        )
+        email_recipients = {email.to[0] for email in mail.outbox}
+        self.assertEqual(
+            email_recipients, {self.user_2.email, self.user.email}
+        )
+
+        top_prayers = await get_top_prayers()
+        self.assertEqual(len(top_prayers), 1, msg="Wrong top_prayers.")
+        self.assertEqual(
+            top_prayers[0], self.rd_4, msg="The top prayer didn't match."
+        )

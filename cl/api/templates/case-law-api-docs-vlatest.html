@@ -52,6 +52,9 @@
 
 
 <div class="col-xs-12 col-md-8 col-lg-6">
+  {% if version == "v3" %}
+    {% include "includes/v3-deprecated-warning.html" %}
+  {% endif %}
   <h1 id="about">Case Law&nbsp;API</h1>
   <p class="lead">Use these APIs to access our huge and growing database of case law.
   </p>
@@ -208,7 +211,7 @@
   "{% get_full_host %}{% url "opinion-list" version=version %}?cluster__docket__court=scotus"</pre>
   <p>That returns:</p>
   <pre class="pre-scrollable">{
-  "next": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/?cluster__docket__court=scotus&page=2",
+  "next": "https://www.courtlistener.com/api/rest/{{ version }}/opinions/?cluster__docket__court=scotus&cursor=cD0xMDUxNjI5NA%3D%3D",
   "previous": null,
   "results": [
       {

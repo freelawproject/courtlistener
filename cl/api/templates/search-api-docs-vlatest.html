@@ -38,6 +38,8 @@
         <li><a href="#ordering">Ordering</a></li>
         <li><a href="#filtering">Filtering</a></li>
         <li><a href="#fields">Fields</a></li>
+        <li><a href="#highlighting">Highlighting</a></li>
+        <li><a href="#counts">Result Counts</a></li>
         <li><a href="#notes">Special Notes</a></li>
       </ul>
       <li><a href="#monitoring">Monitoring a Query</a></li>
@@ -220,6 +222,18 @@
 }</pre>
 
 
+  <h3 id="highlighting">Highlighting Results</h3>
+  <p>To enhance performance, results are not highlighted by default. To enable highlighting, include <code>highlight=on</code> in your request.
+  </p>
+  <p>When highlighting is disabled, the first 500 characters of snippet fields are returned for fields <code>o</code>, <code>r</code>, and <code>rd</code>.
+  </p>
+
+
+  <h3 id="counts">Result Counts</h3>
+  <p><code>type=d</code> and <code>type=r</code> use cardinality aggregation to compute the result count. This enhances performance, but has an error of ±6% if results are over 2000. We recommend noting this in your interface by saying something like, "About 10,000 results."
+  </p>
+
+
   <h3 id="notes">Special Notes</h3>
   <p>A few fields deserve special consideration:</p>
   <ol>
@@ -235,16 +249,6 @@
       <p>This field only displays Opinion text content.
       </p>
     </li>
-    <li>
-      <p>To enhance performance, results are not highlighted by default. To enable highlighting, include <code>highlight=on</code> in your request.
-      </p>
-      <p>When highlighting is disabled, the first 500 characters of snippet fields are returned for fields <code>o</code>, <code>r</code>, and <code>rd</code>.
-      </p>
-    </li>
-     <li>
-      <p><code>type=d</code> and <code>type=r</code> use cardinality aggregation to compute the result count, which has an error of ±6% if results are over 2000.
-      </p>
-     </li>
   </ol>
 
 

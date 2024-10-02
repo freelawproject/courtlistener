@@ -60,6 +60,9 @@
 </div>
 
 <div class="col-xs-12 col-md-8 col-lg-6">
+  {% if version == "v3" %}
+    {% include "includes/v3-deprecated-warning.html" %}
+  {% endif %}
   <h1 id="about">Financial Disclosures&nbsp;API</h1>
   <p class="lead v-offset-above-3">Use these APIs to work with financial disclosure records of current and former federal judges.</p>
   <p>This data was collected from senate records and information requests we sent to the federal judiciary. You can learn more about which disclosures are included and the limitations of these APIs on <a href="{% url "coverage_fds" %}">our coverage page for financial disclosures</a>.
@@ -184,7 +187,7 @@
   <pre class="pre-scrollable tall">curl "{% get_full_host %}{% url "investment-list" version=version %}?redacted=True" \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}'
 {
-  "next": "https://www.courtlistener.com/api/rest/{{ version }}/investments/?page=2&redacted=True",
+  "next": "https://www.courtlistener.com/api/rest/{{ version }}/investments/?page=2&redacted=True&cursor=cD0xMjA5NjAyMg%3D%3D",
   "previous": null,
   "results": [
     {

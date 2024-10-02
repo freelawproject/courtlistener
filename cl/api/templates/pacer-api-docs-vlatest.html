@@ -50,6 +50,9 @@
 
 
 <div class="col-xs-12 col-md-8 col-lg-6">
+  {% if version == "v3" %}
+    {% include "includes/v3-deprecated-warning.html" %}
+  {% endif %}
   <h1 id="about">PACER Data&nbsp;APIs</h1>
   <p class="lead">Use these APIs to access almost half a billion items we have in our collection of PACER data.
   </p>
@@ -189,7 +192,7 @@
   "{% get_full_host %}{% url "party-list" version=version %}?docket=123"</pre>
   <p>It returns something like:</p>
   <pre class="pre-scrollable tall">{
-① "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&page=2",
+① "next": "https://www.courtlistener.com/api/rest/{{ version }}/parties/?docket=123&cursor=cD0xMjA5NjAyMg%3D%3D&docket=4214664",",
   "previous": null,
   "results": [
     {
@@ -266,7 +269,7 @@
   "{% get_full_host %}{% url "attorney-list" version=version %}?docket=4214664"</pre>
   <p>Returns:</p>
   <pre class="pre-scrollable tall">{
-    "next": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/?docket=4214664&page=2",
+    "next": "https://www.courtlistener.com/api/rest/{{ version }}/attorneys/?docket=4214664&cursor=cD0xMjA5NjAyMg%3D%3D&docket=4214664",
     "previous": null,
     "results": [
         {
