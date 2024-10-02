@@ -2632,18 +2632,19 @@ test = ["coverage[toml] (>=7.2.5)", "mypy (>=1.2.0)", "pytest (>=7.3.0)", "pytes
 
 [[package]]
 name = "markdown2"
-version = "2.4.12"
+version = "2.5.0"
 description = "A fast and complete Python implementation of Markdown"
 optional = false
-python-versions = ">=3.5, <4"
+python-versions = "<4,>=3.8"
 files = [
-    {file = "markdown2-2.4.12-py2.py3-none-any.whl", hash = "sha256:98f47591006f0ace0644cbece03fed6f3845513286f6c6e9f8bcf6a575174e2c"},
-    {file = "markdown2-2.4.12.tar.gz", hash = "sha256:1bc8692696954d597778e0e25713c14ca56d87992070dedd95c17eddaf709204"},
+    {file = "markdown2-2.5.0-py2.py3-none-any.whl", hash = "sha256:300d4429b620ebc974ef512339a9e08bc080473f95135a91f33906e24e8280c1"},
+    {file = "markdown2-2.5.0.tar.gz", hash = "sha256:9bff02911f8b617b61eb269c4c1a5f9b2087d7ff051604f66a61b63cab30adc2"},
 ]
 
 [package.extras]
-all = ["pygments (>=2.7.3)", "wavedrom"]
+all = ["latex2mathml", "pygments (>=2.7.3)", "wavedrom"]
 code-syntax-highlighting = ["pygments (>=2.7.3)"]
+latex = ["latex2mathml"]
 wavedrom = ["wavedrom"]
 
 [[package]]
@@ -5545,4 +5546,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12, <3.13"
-content-hash = "782ac46985871d10326f8f8c1b06475198a68d251ceaac69482df47e5023600d"
+content-hash = "9791ffed013e44da7595943d7869304cd66d66a3ca57d4bad96f4bfea075716e"
