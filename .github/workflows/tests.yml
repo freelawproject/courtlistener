@@ -57,7 +57,7 @@ jobs:
         with:
           driver-opts: network=host
       - name: Prebuild docker images
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
