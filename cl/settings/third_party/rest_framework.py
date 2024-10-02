@@ -28,7 +28,10 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
-        # Didn't respone to emails, 2024-08-12
+        # Used a fake email address, 2024-10-02
+        "xinfu.zheng": "10/hour",
+        "fdgbhgope4wuo8049": "10/hour",
+        # Didn't respond to emails, 2024-08-12
         "fruitfranky": "10/hour",
         # Email non-functional; making many requests, 2024-04-23
         "NicolasMadan": "10/hour",
