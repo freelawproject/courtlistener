@@ -43,7 +43,8 @@ class Command(CommandUtils, BaseCommand):
         parser.add_argument(
             "--output-dir",
             type=str,
-            help="Directory to save crosswalk files (default: cl/search/crosswalks)",
+            help="Directory to save crosswalk files",
+            required=True,
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
@@ -53,10 +54,7 @@ class Command(CommandUtils, BaseCommand):
         self.dry_run = options["dry_run"]
         self.single_reporter = options["reporter"]
         self.single_volume = options["volume"]
-        self.output_dir = options["output_dir"] or os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "crosswalks",
-        )
+        self.output_dir = options["output_dir"]
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -241,7 +239,8 @@ class Command(CommandUtils, BaseCommand):
 
         except Exception as e:
             logger.error(
-                f"Error processing case {cap_case_id}: {str(e)}", exc_info=True
+                f"Error processing case {str(case_meta["id"])}: {str(e)}",
+                exc_info=True,
             )
 
         return None
