@@ -154,3 +154,7 @@ async def get_prayer_count(recap_document: RECAPDocument) -> int:
     return await Prayer.objects.filter(
         recap_document=recap_document, status=Prayer.WAITING
     ).acount()
+
+
+async def prayer_exists(user: User, recap_document: RECAPDocument) -> bool:
+    return await Prayer.objects.filter(user=user, recap_document=recap_document).aexists()
