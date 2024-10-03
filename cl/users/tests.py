@@ -173,6 +173,45 @@ class UserTest(LiveServerTestCase):
                         % next_param,
                     )
 
+    async def test_prevent_text_injection_in_success_registration(self):
+        """Can we handle text injection attacks?"""
+        evil_text = "visit https://evil.com/malware.exe to win $100 giftcard"
+        url_params = [
+            # A safe redirect and email
+            (reverse("faq"), "test@free.law", False),
+            # Text injection attack
+            (reverse("faq"), evil_text, True),
+            # open redirect and text injection attack
+            ("https://evil.com&email=e%40e.net", evil_text, True),
+        ]
+
+        for next_param, email, is_evil in url_params:
+            url = "{host}{path}?next={next}&email={email}".format(
+                host=self.live_server_url,
+                path=reverse("register_success"),
+                next=next_param,
+                email=email,
+            )
+            response = await self.async_client.get(url)
+            with self.subTest("Checking url", url=url):
+                if is_evil:
+                    self.assertNotIn(
+                        email,
+                        response.content.decode(),
+                        msg="'%s' found in HTML of response. This indicates a "
+                        "potential security vulnerability. The view likely "
+                        "failed to properly validate it." % email,
+                    )
+                else:
+                    self.assertIn(
+                        email,
+                        response.content.decode(),
+                        msg="'%s' not found in HTML of response. This suggests a "
+                        "a potential issue with the validation logic. The email "
+                        "address may have been incorrectly identified as invalid"
+                        % email,
+                    )
+
     async def test_login_redirects(self) -> None:
         """Do we allow good redirects in login while banning bad ones?"""
         next_params = [

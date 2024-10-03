@@ -1,10 +1,11 @@
 import random
 import re
-from datetime import date, datetime
+from datetime import datetime
 
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
+from django.template.defaultfilters import date as date_filter
 from django.utils.formats import date_format
 from django.utils.html import format_html
 from django.utils.http import urlencode
@@ -282,7 +283,7 @@ def format_date(date_str: str) -> str:
     ES child document results where dates are not date objects."""
     try:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-        return date_obj.strftime("%B %dth, %Y")
+        return date_filter(date_obj, "F jS, Y")
     except (ValueError, TypeError):
         return date_str
 

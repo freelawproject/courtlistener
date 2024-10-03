@@ -2,6 +2,7 @@ from django.urls import path
 
 from cl.favorites.views import (
     delete_note,
+    open_prayers,
     save_or_update_note,
     view_tag,
     view_tags,
@@ -22,4 +23,5 @@ urlpatterns = [
         name="view_tag",
     ),
     path("tags/<str:username>/", view_tags, name="tag_list"),
+    path("prayers/top/", open_prayers, name="top_prayers"),
 ]

@@ -4,6 +4,7 @@ import pickle
 import time
 import traceback
 from datetime import date, datetime, timedelta, timezone
+from math import ceil
 from urllib.parse import quote
 
 import waffle
@@ -515,7 +516,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
             initial={"query": get_string_sans_alert},
             user=request.user,
         )
-        search_query = None
     else:
         # Just a regular search
         if not is_bot(request):
@@ -527,52 +527,60 @@ def show_results(request: HttpRequest) -> HttpResponse:
             user=request.user,
         )
 
-        search_query = SearchQuery(
-            user=None if request.user.is_anonymous else request.user,
-            get_params=request.GET.urlencode(),
-            query_time_ms=0,
-            hit_cache=False,
-        )
-
-    # measure query time for SearchQuery object
-    timer_start = time.perf_counter_ns()
     search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
+    search_results = {}
+
     match search_type:
         case SEARCH_TYPES.PARENTHETICAL:
-            render_dict.update(do_es_search(request.GET.copy()))
+            search_results = do_es_search(request.GET.copy())
         case SEARCH_TYPES.ORAL_ARGUMENT:
             # Check if waffle flag is active.
             if waffle.flag_is_active(request, "oa-es-active"):
-                render_dict.update(do_es_search(request.GET.copy()))
+                search_results = do_es_search(request.GET.copy())
             else:
-                render_dict.update(do_search(request.GET.copy()))
+                search_results = do_search(request.GET.copy())
         case SEARCH_TYPES.PEOPLE:
             if waffle.flag_is_active(request, "p-es-active"):
-                render_dict.update(do_es_search(request.GET.copy()))
+                search_results = do_es_search(request.GET.copy())
             else:
-                render_dict.update(do_search(request.GET.copy()))
+                search_results = do_search(request.GET.copy())
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             if waffle.flag_is_active(request, "r-es-active"):
                 search_results = do_es_search(request.GET.copy())
             else:
                 search_results = do_search(request.GET.copy())
-            render_dict.update(search_results)
         case SEARCH_TYPES.OPINION:
             if waffle.flag_is_active(request, "o-es-active"):
-                render_dict.update(do_es_search(request.GET.copy()))
+                search_results = do_es_search(request.GET.copy())
             else:
-                render_dict.update(do_search(request.GET.copy()))
+                search_results = do_search(request.GET.copy())
         case SEARCH_TYPES.RECAP_DOCUMENT:
-            render_dict.update(do_es_search(request.GET.copy()))
+            search_results = do_es_search(request.GET.copy())
         case _:
-            render_dict.update(do_search(request.GET.copy()))
+            search_results = do_search(request.GET.copy())
 
-    if search_query:
-        # convert nanoseconds to miliseconds
-        query_time_ms = math.ceil(
-            (time.perf_counter_ns() - timer_start) / 1_000_000
-        )
-        search_query.query_time_ms = query_time_ms
+    render_dict.update(search_results)
+
+    search_query = SearchQuery(
+        user=None if request.user.is_anonymous else request.user,
+        get_params=request.GET.urlencode(),
+        hit_cache=False,
+    )
+
+    # ElasticSearch and Solr return different query time / cache hit
+    # information
+    query_time = search_results.get("results_details", [None])[0]
+    if query_time is not None:
+        search_query.query_time_ms = ceil(query_time)
+        # We set ES `query_time` metadata with values 0 or 1 if cache is hit:
+        # 0: homepage cache; 1: micro cache
+        search_query.hit_cache = query_time in [0, 1]
+        search_query.save()
+    elif not search_results.get("error"):
+        query_time = search_results["results"]["object_list"]["QTime"]
+        # Solr searches are not cached unless a cache_key is passed
+        # No cache_key is passed for the endpoints we are storing
+        paginate_cached_solr_results.hit_cache = False
         search_query.save()
 
     # Set the value to the query as a convenience
@@ -584,6 +592,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
     return TemplateResponse(request, "search.html", render_dict)
 
 
+@never_cache
 def advanced(request: HttpRequest) -> HttpResponse:
     render_dict = {"private": False}
 
@@ -813,9 +822,9 @@ def do_es_search(
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
-                related_cluster = OpinionCluster.objects.get(
+                related_cluster = OpinionCluster.objects.filter(
                     sub_opinions__pk__in=related_pks
-                )
+                ).distinct("pk")
         except UnbalancedParenthesesQuery as e:
             error = True
             error_message = "unbalanced_parentheses"

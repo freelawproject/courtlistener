@@ -5,11 +5,10 @@ from django.db import models
 
 from cl.audio.models import Audio
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import Docket, OpinionCluster, RECAPDocument
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Note(models.Model):
     date_created = models.DateTimeField(
         help_text="The original creation date for the item",
@@ -70,7 +69,7 @@ class Note(models.Model):
         )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class DocketTag(models.Model):
     """Through table linking dockets to tags"""
 
@@ -87,7 +86,13 @@ class DocketTag(models.Model):
         unique_together = (("docket", "tag"),)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), exclude=["view_count"])
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+    exclude=["view_count"],
+)
 class UserTag(AbstractDateTimeModel):
     """Tags that can be added by users to various objects"""
 
@@ -135,7 +140,7 @@ class UserTag(AbstractDateTimeModel):
         ]
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Prayer(models.Model):
     WAITING = 1
     GRANTED = 2
@@ -167,6 +172,12 @@ class Prayer(models.Model):
     )
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "recap_document"],
+                name="unique_prayer_for_user_document",
+            ),
+        ]
         indexes = [
             # When adding a new document to RECAP, we'll ask: What outstanding
             # prayers do we have for this document?
