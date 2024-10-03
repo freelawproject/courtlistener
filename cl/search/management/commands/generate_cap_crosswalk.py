@@ -21,6 +21,21 @@ logger = logging.getLogger(__name__)
 # These values must be obtained from the Harvard CAP DevOps team.
 # Ensure these are properly configured in your environment before executing this command.
 
+# Example of generated crosswalk file:
+
+# [
+#   {
+#     "cap_case_id": 3,
+#     "cl_cluster_id": 1,
+#     "cap_path": "/test/100/cases/0036-01.json"
+# },
+# {
+#     "cap_case_id": 4,
+#     "cl_cluster_id": 2,
+#     "cap_path": "/test/100/cases/0040-01.json"
+# }
+# ]
+
 
 class Command(CommandUtils, BaseCommand):
     help = "Generate a comprehensive crosswalk between CAP and CourtListener cases using only CasesMetadata.json"
