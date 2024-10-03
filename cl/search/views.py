@@ -577,10 +577,12 @@ def show_results(request: HttpRequest) -> HttpResponse:
         search_query.hit_cache = query_time in [0, 1]
         search_query.save()
     elif not search_results.get("error"):
-        query_time = search_results["results"]["object_list"]["QTime"]
+        search_query.query_time_ms = ceil(
+            search_results["results"].object_list.QTime
+        )
         # Solr searches are not cached unless a cache_key is passed
         # No cache_key is passed for the endpoints we are storing
-        paginate_cached_solr_results.hit_cache = False
+        search_query.hit_cache = False
         search_query.save()
 
     # Set the value to the query as a convenience
