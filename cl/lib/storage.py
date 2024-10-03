@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from django.conf import settings
 from django.core.files.storage import Storage
 from storages.backends.s3 import S3ManifestStaticStorage, S3Storage
+from storages.backends.s3boto3 import S3Boto3Storage
 
 
 def clobbering_get_name(
@@ -116,3 +117,13 @@ class S3PrivateUUIDStorage(S3Storage):
         dir_name, file_name = os.path.split(name)
         _, file_ext = os.path.splitext(file_name)
         return os.path.join(dir_name, uuid.uuid4().hex + file_ext)
+
+
+class HarvardPDFStorage(S3Boto3Storage):
+    """S3 file storage for Harvard PDFs."""
+
+    bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+    custom_domain = settings.AWS_S3_CUSTOM_DOMAIN
+    default_acl = settings.AWS_DEFAULT_ACL
+    querystring_auth = settings.AWS_QUERYSTRING_AUTH
+    max_memory_size = settings.AWS_S3_MAX_MEMORY_SIZE
