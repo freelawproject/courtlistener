@@ -4,6 +4,7 @@ import os
 from datetime import date
 from pathlib import Path
 from unittest import mock
+from urllib.parse import parse_qs
 
 import pytz
 import time_machine
@@ -15,7 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
-from django.test import override_settings
+from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch_dsl import Q
@@ -25,6 +26,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import simplify_estimated_count
@@ -90,6 +92,7 @@ from cl.search.models import (
     Opinion,
     OpinionCluster,
     RECAPDocument,
+    SearchQuery,
     sort_cites,
 )
 from cl.search.tasks import (
@@ -1134,7 +1137,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
-        UserProfileWithParentsFactory.create(
+        self.pandora_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
@@ -1522,6 +1525,88 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         bootstrap_btns = self.browser.find_elements(By.CSS_SELECTOR, "a.btn")
         self.assertIn("Sign Back In", [btn.text for btn in bootstrap_btns])
+
+        # We are taking advantage of the queries done with authenticated and
+        # anonymous user to see if SearchQuery collection is working
+        lookup = {
+            "get_params": "q=lissner",
+            "user": None,
+            "query_time_ms__gte": 0,
+        }
+        self.assertTrue(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "a SearchQuery with get_params 'q=lissner' and anonymous user should have been created",
+        )
+        SearchQuery.objects.filter(user=None).delete()
+
+        lookup["user"] = self.pandora_profile.user
+        self.assertTrue(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "a SearchQuery with get_params 'q=lissner' and 'pandora' user should have been created",
+        )
+
+        # Test if the SearchQuery get's deleted when the user is deleted
+        self.pandora_profile.user.delete()
+        lookup.pop("user")
+        self.assertFalse(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "SearchQuery should have been deleted when the user was deleted",
+        )
+
+
+class SaveSearchQueryTest(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        # Using plain text, fielded queries and manual filters
+        self.searches = [
+            # Recap
+            r"type=r&q=trump&type=r&order_by=score%20desc&description=Notice",
+            # Audio
+            r"type=oa&q=company%20court_id:illappct&type=oa&order_by=score desc",
+            # People
+            r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
+            # Repeat the same query, for testing cache
+            r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
+        ]
+        super().setUp()
+
+    @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
+    def test_search_query_saving(self) -> None:
+        """Do we save queries on all public endpoints"""
+        for query in self.searches:
+            url = f"{reverse('show_results')}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings; sometimes the search process
+            # alters the order of the query parameters, or duplicates them
+            last_query = SearchQuery.objects.last()
+            parsed_query = parse_qs(query.replace("%20", "+"))
+            for key, stored_values in parse_qs(last_query.get_params).items():
+                self.assertTrue(
+                    parsed_query[key][0] == stored_values[0],
+                    f"Query was not saved properly for endpoint {query}",
+                )
+
+        self.assertTrue(
+            SearchQuery.objects.last().hit_cache,
+            "Repeated query not marked as having hit cache",
+        )
+
+    # Force Solr use
+    @override_flag("oa-es-active", False)
+    @override_flag("r-es-active", False)
+    @override_flag("p-es-active", False)
+    def test_search_query_saving_solr(self) -> None:
+        """Are queries saved when using solr search (do_search)"""
+        for query in self.searches:
+            url = f"{reverse('show_results')}?{query}"
+            self.client.get(url)
+            last_query = SearchQuery.objects.last()
+            parsed_query = parse_qs(query.replace("%20", "+"))
+            for key, stored_values in parse_qs(last_query.get_params).items():
+                self.assertTrue(
+                    parsed_query[key][0] == stored_values[0],
+                    f"Query was not saved properly for endpoint {query}",
+                )
 
 
 class CaptionTest(TestCase):

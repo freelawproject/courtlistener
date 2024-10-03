@@ -44,6 +44,7 @@ from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
 from cl.search.docket_sources import DocketSources
+from cl.users.models import User
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -3921,3 +3922,32 @@ class SEARCH_TYPES:
         (PARENTHETICAL, "Parenthetical"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
+
+
+class SearchQuery(models.Model):
+    user = models.ForeignKey(
+        User,
+        help_text="The user who performed this search query.",
+        related_name="search_queries",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    get_params = models.TextField(
+        help_text="The GET parameters of the search query."
+    )
+    query_time_ms = models.IntegerField(
+        help_text="The milliseconds to execute the query, as returned in the ElasticSearch or Solr response."
+    )
+    hit_cache = models.BooleanField(
+        help_text="Whether the query hit the cache or not."
+    )
+    date_created = models.DateTimeField(
+        help_text="Datetime when the record was created",
+        auto_now_add=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["date_created"]),
+        ]
