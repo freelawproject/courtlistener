@@ -14,12 +14,11 @@ from django.http import (
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, UserTag
 from cl.favorites.utils import get_top_prayers
+from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
 
@@ -178,7 +177,7 @@ async def view_tags(request, username):
     )
 
 
-@cache_page(30)  # Cache for 30 seconds
+@cache_page_ignore_params(30)  # Cache for 30 seconds
 async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
 
