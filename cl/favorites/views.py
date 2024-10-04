@@ -9,22 +9,21 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
+    HttpResponseRedirect,
     HttpResponseServerError,
 )
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
-from django.utils.datastructures import MultiValueDictKeyError
-from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, UserTag
-from cl.favorites.utils import create_prayer
-from cl.search.models import RECAPDocument
-from cl.favorites.utils import get_top_prayers
+from cl.favorites.utils import create_prayer, get_top_prayers
 from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
+from cl.search.models import RECAPDocument
 
 
 async def get_note(request: HttpRequest) -> HttpResponse:
@@ -195,13 +194,18 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
         },
     )
 
+
 # this is a rough function just to assess the test cases. It needs a lot of work before it's ready for showtime.
 @login_required
-async def create_prayer_view(request: HttpRequest, recap_document: RECAPDocument) -> HttpResponse:
+async def create_prayer_view(
+    request: HttpRequest, recap_document: RECAPDocument
+) -> HttpResponse:
     user = request.user
-    
+
     # Call the create_prayer async function
     new_prayer = await create_prayer(user, recap_document)
-    
+
     # Redirect back to the referring page after creating the prayer
-    return HttpResponseRedirect(request.META.get('HTTP_REFERER', reverse('view_docket')))
+    return HttpResponseRedirect(
+        request.META.get("HTTP_REFERER", reverse("view_docket"))
+    )
