@@ -382,9 +382,8 @@ async def view_docket(
     for entry in await sync_to_async(list)(de_list):
         if await sync_to_async(entry.recap_documents.count)() > 0:
             for rd in await sync_to_async(list)(entry.recap_documents.all()):
-                if rd.pacer_url and not(rd.is_free_on_pacer or rd.is_sealed):
+                if rd.pacer_url and not (rd.is_free_on_pacer or rd.is_sealed):
                     rd.prayer_count = await get_prayer_count(rd)
-                    
 
     page = request.GET.get("page", 1)
 
