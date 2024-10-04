@@ -29,7 +29,7 @@ HttpStatusCodes = models.IntegerChoices(  # type: ignore
     model_name="WebhookHistoryEvent",
 )
 class Webhook(AbstractDateTimeModel):
-    user: models.ForeignKey = models.ForeignKey(
+    user = models.ForeignKey[User, User](
         User,
         help_text="The user that has provisioned the webhook.",
         related_name="webhooks",
@@ -78,7 +78,7 @@ class WEBHOOK_EVENT_STATUS:
 
 
 class WebhookEvent(AbstractDateTimeModel):
-    webhook: models.ForeignKey = models.ForeignKey(
+    webhook = models.ForeignKey[Webhook, Webhook](
         Webhook,
         help_text="The Webhook this event is associated with.",
         related_name="webhook_events",
