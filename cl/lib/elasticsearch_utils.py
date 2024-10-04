@@ -205,6 +205,29 @@ def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
     return [f"{k}^{v}" for k, v in fields.items()]
 
 
+def is_case_name_query(query_value: str) -> bool:
+    """Determines if the given query value is likely a case name query.
+
+    :param query_value: The search query to check.
+    :return: True if the query appears to be a case name, otherwise False.
+    """
+
+    vs_query = any(
+        [
+            " v " in query_value,
+            " v. " in query_value,
+            " vs. " in query_value,
+            " vs " in query_value,
+        ]
+    )
+    query_lower = query_value.lower()
+    in_re_query = query_lower.startswith("in re ")
+    matter_of_query = query_lower.startswith("matter of ")
+    ex_parte_query = query_lower.startswith("ex parte ")
+
+    return any([vs_query, in_re_query, matter_of_query, ex_parte_query])
+
+
 def add_fields_boosting(
     cd: CleanData, fields: list[str] | None = None
 ) -> list[str]:
@@ -235,18 +258,7 @@ def add_fields_boosting(
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         query = cd.get("q", "")
-        vs_query = any(
-            [
-                " v " in query,
-                " v. " in query,
-                " vs. " in query,
-                " vs " in query,
-            ]
-        )
-        in_re_query = query.lower().startswith("in re ")
-        matter_of_query = query.lower().startswith("matter of ")
-        ex_parte_query = query.lower().startswith("ex parte ")
-        if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
+        if is_case_name_query(query):
             qf.update({"caseName.exact": 75})
 
     if fields:
@@ -356,24 +368,9 @@ def build_fulltext_query(
         # Used for the best_fields query_string.
 
         query_value_with_conjunctions = append_query_conjunctions(query_value)
-
-        # The idea here is to capture if it is a case name
-        vs_query = any(
-            [
-                " v " in query_value,
-                " v. " in query_value,
-                " vs. " in query_value,
-                " vs " in query_value,
-            ]
-        )
-        in_re_query = query_value.lower().startswith("in re ")
-        matter_of_query = query_value.lower().startswith("matter of ")
-        ex_parte_query = query_value.lower().startswith("ex parte ")
-
         q_should = []
-
         # If it looks like a case name, we are boosting a match query
-        if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
+        if is_case_name_query(query_value) and '"' not in query_value:
             q_should.append(
                 Q(
                     "match_phrase",
@@ -381,28 +378,28 @@ def build_fulltext_query(
                 )
             )
 
-            q_should.extend(
-                [
-                    Q(
-                        "query_string",
-                        fields=fields,
-                        query=query_value_with_conjunctions,
-                        quote_field_suffix=".exact",
-                        default_operator="AND",
-                        tie_breaker=0.3,
-                        fuzziness=2,
-                    ),
-                    Q(
-                        "query_string",
-                        fields=fields,
-                        query=query_value,
-                        quote_field_suffix=".exact",
-                        default_operator="AND",
-                        type="phrase",
-                        fuzziness=2,
-                    ),
-                ]
-            )
+        q_should.extend(
+            [
+                Q(
+                    "query_string",
+                    fields=fields,
+                    query=query_value_with_conjunctions,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                    tie_breaker=0.3,
+                    fuzziness=2,
+                ),
+                Q(
+                    "query_string",
+                    fields=fields,
+                    query=query_value,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                    type="phrase",
+                    fuzziness=2,
+                ),
+            ]
+        )
 
         if only_queries:
             return q_should
@@ -412,10 +409,7 @@ def build_fulltext_query(
 
 
 def build_term_query(
-    field: str,
-    value: str | list,
-    make_phrase: bool = False,
-    slop: int = 1,  # slop of 1 allows for small variations like Google LLC v Oracle Inc.
+    field: str, value: str | list, make_phrase: bool = False, slop: int = 0
 ) -> list:
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
@@ -439,19 +433,7 @@ def build_term_query(
         validate_query_syntax(value, QueryType.FILTER)
 
     if make_phrase:
-        # Use match_phrase with slop, and give it a boost to prioritize the phrase match to ensure that Google v Oracle returns exactly this order and not Oracle v Google as the first priority
-        return [
-            Q(
-                "match_phrase",
-                **{
-                    field: {
-                        "query": value,
-                        "slop": slop,
-                        "boost": 2,  # Boosting the phrase match to ensure it's ranked higher than individual term matches
-                    }
-                },
-            )
-        ]
+        return [Q("match_phrase", **{field: {"query": value, "slop": slop}})]
 
     if isinstance(value, list):
         value = list(filter(None, value))
@@ -477,14 +459,27 @@ def build_text_filter(field: str, value: str) -> List:
     if value:
         if isinstance(value, str):
             validate_query_syntax(value, QueryType.FILTER)
-        return [
-            Q(
-                "query_string",
-                query=value,
-                fields=[field],
-                default_operator="AND",
+
+        base_query_string = {
+            "query_string": {
+                "query": value,
+                "fields": [field],
+                "default_operator": "AND",
+            }
+        }
+        if "caseName" in field and '"' not in value:
+            # Use phrase with slop, and give it a boost to prioritize the
+            # phrase match to ensure that caseName filtering returns exactly
+            # this order as the first priority.
+            # Avoid applying slop to quoted queries, as they expect exact matches.
+            base_query_string["query_string"].update(
+                {
+                    "type": "phrase",
+                    "phrase_slop": "1",
+                    "boost": "2",  # Boosting the phrase match to ensure it's ranked higher than individual term matches
+                }
             )
-        ]
+        return [Q(base_query_string)]
     return []
 
 
