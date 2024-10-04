@@ -572,8 +572,7 @@ async def lookup_judge_by_full_name_and_set_attr(
     if not full_name:
         return None
     judge = await lookup_judge_by_full_name(full_name, court_id, event_date)
-    if judge is not None:
-        setattr(item, target_field, judge)
+    setattr(item, target_field, judge)
 
 
 async def lookup_judge_by_last_name(
