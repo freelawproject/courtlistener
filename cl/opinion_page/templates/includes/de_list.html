@@ -171,6 +171,10 @@
                             target="_blank"
                             rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
+                        <a href="https://google.com" class="btn btn-default btn-xs" 
+                          style="margin-left: {% if rd.page_count %}8px{% else %}44px{% endif %};">
+                          {{rd.prayer_count}} 🙏
+                        </a>
                       {% endif %}
                     {% endif %}
                   {% endif %}
