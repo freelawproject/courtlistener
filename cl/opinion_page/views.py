@@ -44,6 +44,7 @@ from cl.citations.utils import (
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
+from cl.favorites.utils import get_prayer_count
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.http import is_ajax
@@ -376,6 +377,12 @@ async def view_docket(
             de_list = de_list.order_by(
                 "-recap_sequence_number", "-entry_number"
             )
+
+    for entry in await sync_to_async(list)(de_list):
+        if await sync_to_async(entry.recap_documents.count)() > 0:
+            for rd in await sync_to_async(list)(entry.recap_documents.all()):
+                if rd.pacer_url and not(rd.is_free_on_pacer or rd.is_sealed):
+                    rd.prayer_count = await get_prayer_count(rd)
 
     page = request.GET.get("page", 1)
 
