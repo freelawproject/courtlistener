@@ -1,7 +1,7 @@
 from django.urls import path
 
 from cl.favorites.views import (
-    create_prayer_view,
+    # create_prayer_view,
     delete_note,
     open_prayers,
     save_or_update_note,
