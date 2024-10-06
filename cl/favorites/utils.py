@@ -35,6 +35,18 @@ async def prayer_eligible(user: User) -> bool:
     return prayer_count < allowed_prayer_count
 
 
+async def get_prayer_count(recap_document: RECAPDocument) -> int:
+    return await Prayer.objects.filter(
+        recap_document=recap_document, status=Prayer.WAITING
+    ).acount()
+
+
+async def prayer_exists(user: User, recap_document: RECAPDocument) -> bool:
+    return await Prayer.objects.filter(
+        user=user, recap_document=recap_document
+    ).aexists()
+
+
 async def create_prayer(
     user: User, recap_document: RECAPDocument
 ) -> Prayer | None:
@@ -148,15 +160,3 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
             messages.append(msg)
         connection = get_connection()
         connection.send_messages(messages)
-
-
-async def get_prayer_count(recap_document: RECAPDocument) -> int:
-    return await Prayer.objects.filter(
-        recap_document=recap_document, status=Prayer.WAITING
-    ).acount()
-
-
-async def prayer_exists(user: User, recap_document: RECAPDocument) -> bool:
-    return await Prayer.objects.filter(
-        user=user, recap_document=recap_document
-    ).aexists()
