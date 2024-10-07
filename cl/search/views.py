@@ -337,6 +337,39 @@ def get_homepage_stats():
     return homepage_data
 
 
+def store_search_query(request: HttpRequest, search_results: dict) -> None:
+    """Saves an user's search query in a SearchQuery model
+
+    The `hit_cache` and `query_time_ms` fields computation depend on
+    whether the search was executed via ElasticSearch or Solr
+
+    :param request: the request object
+    :param search_results: the dict returned by `do_search` or
+        `do_es_search` functions
+    :return None
+    """
+    search_query = SearchQuery(
+        user=None if request.user.is_anonymous else request.user,
+        get_params=request.GET.urlencode(),
+    )
+
+    query_time = search_results.get("results_details", [None])[0]
+    if query_time is not None:
+        search_query.query_time_ms = ceil(query_time)
+        # We set ES `query_time` metadata with values 0 or 1 if cache is hit:
+        # 0: homepage cache; 1: micro cache
+        search_query.hit_cache = query_time in [0, 1]
+        search_query.save()
+    elif not search_results.get("error"):
+        search_query.query_time_ms = ceil(
+            search_results["results"].object_list.QTime
+        )
+        # Solr searches are not cached unless a cache_key is passed
+        # No cache_key is passed for the endpoints we are storing
+        search_query.hit_cache = False
+        search_query.save()
+
+
 @never_cache
 def show_results(request: HttpRequest) -> HttpResponse:
     """
@@ -560,30 +593,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             search_results = do_search(request.GET.copy())
 
     render_dict.update(search_results)
-
-    search_query = SearchQuery(
-        user=None if request.user.is_anonymous else request.user,
-        get_params=request.GET.urlencode(),
-        hit_cache=False,
-    )
-
-    # ElasticSearch and Solr return different query time / cache hit
-    # information
-    query_time = search_results.get("results_details", [None])[0]
-    if query_time is not None:
-        search_query.query_time_ms = ceil(query_time)
-        # We set ES `query_time` metadata with values 0 or 1 if cache is hit:
-        # 0: homepage cache; 1: micro cache
-        search_query.hit_cache = query_time in [0, 1]
-        search_query.save()
-    elif not search_results.get("error"):
-        search_query.query_time_ms = ceil(
-            search_results["results"].object_list.QTime
-        )
-        # Solr searches are not cached unless a cache_key is passed
-        # No cache_key is passed for the endpoints we are storing
-        search_query.hit_cache = False
-        search_query.save()
+    store_search_query(request, search_results)
 
     # Set the value to the query as a convenience
     alert_form.fields["name"].widget.attrs["value"] = render_dict[
