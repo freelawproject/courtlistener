@@ -44,6 +44,12 @@ class Command(BaseCommand):
         parser.add_argument(
             "--verbose", action="store_true", help="Increase output verbosity"
         )
+        parser.add_argument(
+            "--crosswalk-dir",
+            type=str,
+            help="Directory for reading crosswalk files",
+            required=True,
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Handle the command execution.
@@ -57,6 +63,14 @@ class Command(BaseCommand):
             logger.setLevel(logging.DEBUG)
 
         self.dry_run = options["dry_run"]
+        self.crosswalk_dir = options["crosswalk_dir"]
+
+        if not os.path.exists(self.crosswalk_dir):
+            logger.warning(
+                f"Crosswalk directory does not exist: {self.crosswalk_dir}"
+            )
+            return
+
         self.setup_s3_clients()
         self.process_crosswalks(options["reporter"], options["resume"])
 
@@ -86,11 +100,9 @@ class Command(BaseCommand):
         logger.info(
             f"Processing crosswalks. Reporter: {specific_reporter}, Resume: {resume}"
         )
-        crosswalk_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "crosswalks",
+        last_reporter_file = os.path.join(
+            self.crosswalk_dir, "last_completed_reporter.txt"
         )
-        last_reporter_file = "last_completed_reporter.txt"
 
         # Load the last completed reporter if resuming
         if resume:
@@ -107,7 +119,7 @@ class Command(BaseCommand):
         else:
             last_completed_reporter = None
 
-        for filename in sorted(os.listdir(crosswalk_dir)):
+        for filename in sorted(os.listdir(self.crosswalk_dir)):
             if filename.endswith(".json"):
                 reporter = filename.replace("_", ".").rstrip(".json")
 
@@ -124,7 +136,7 @@ class Command(BaseCommand):
 
                 logger.info(f"Starting to process reporter: {reporter}")
                 self.process_crosswalk_file(
-                    os.path.join(crosswalk_dir, filename)
+                    os.path.join(self.crosswalk_dir, filename)
                 )
 
                 # Log the completed reporter
