@@ -386,8 +386,12 @@ async def view_docket(
                     rd.prayer_count = await get_prayer_count(rd)
 
                     if request.user.is_authenticated:
-                        rd.prayer_exists = await prayer_exists(request.user, rd)
-                        rd.prayer_eligible = await prayer_eligible(request.user)
+                        rd.prayer_exists = await prayer_exists(
+                            request.user, rd
+                        )
+                        rd.prayer_eligible = await prayer_eligible(
+                            request.user
+                        )
 
     page = request.GET.get("page", 1)
 
