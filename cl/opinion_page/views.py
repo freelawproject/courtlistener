@@ -44,7 +44,7 @@ from cl.citations.utils import (
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
-from cl.favorites.utils import get_prayer_count
+from cl.favorites.utils import get_prayer_count, prayer_eligible, prayer_exists
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import cache_page_ignore_params
@@ -384,6 +384,10 @@ async def view_docket(
             for rd in await sync_to_async(list)(entry.recap_documents.all()):
                 if rd.pacer_url and not (rd.is_free_on_pacer or rd.is_sealed):
                     rd.prayer_count = await get_prayer_count(rd)
+
+                    if request.user.is_authenticated:
+                        rd.prayer_exists = await prayer_exists(request.user, rd)
+                        rd.prayer_eligible = await prayer_eligible(request.user)
 
     page = request.GET.get("page", 1)
 
