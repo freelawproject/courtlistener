@@ -171,10 +171,26 @@
                             target="_blank"
                             rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
-                        <a href="https://google.com" class="btn btn-default btn-xs"
-                          style="margin-left: {% if rd.page_count %}8px{% else %}44px{% endif %};">
-                          {{rd.prayer_count}} 🙏
-                        </a>
+                          {% if request.user.is_authenticated %}
+                          <a href="{% url 'create_prayer' rd.id %}" 
+                            class="btn btn-default btn-xs prayer-button {% if rd.prayer_exists or not rd.prayer_eligible %}disabled{% endif %}"
+                            data-document-id="{{ rd.id }}"
+                            {% if rd.prayer_exists %}
+                              title="You have already requested this document."
+                            {% elif not rd.prayer_eligible %}
+                              title="You have reached your daily request limit."
+                            {% endif %}
+                            style="margin-left: {% if rd.page_count %}8px{% else %}44px{% endif %};">
+                            {{rd.prayer_count}} 🙏
+                          </a>
+                        {% else %}
+                          <a href="{% url 'sign-in' %}?next={{ request.path|urlencode }}"
+                            class="btn btn-default btn-xs"
+                            title="Sign in to request document."
+                            style="margin-left: {% if rd.page_count %}8px{% else %}44px{% endif %};">
+                            {{rd.prayer_count}} 🙏
+                          </a>
+                        {% endif %}
                       {% endif %}
                     {% endif %}
                   {% endif %}
