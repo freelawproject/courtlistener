@@ -81,6 +81,7 @@ async def get_top_prayers() -> list[RECAPDocument]:
             "document_number",
             "attachment_number",
             "pacer_doc_id",
+            "page_count",
             "description",
             "docket_entry__docket_id",
             "docket_entry__docket__slug",
@@ -107,6 +108,7 @@ async def get_top_prayers() -> list[RECAPDocument]:
         )
         .order_by("-geometric_mean")[:50]
     )
+
     return [doc async for doc in documents.aiterator()]
 
 

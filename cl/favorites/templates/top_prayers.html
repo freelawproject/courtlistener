@@ -2,7 +2,7 @@
 {% load extras %}
 {% load text_filters %}
 {% load static %}
-
+{% load pacer %}
 
 {% block title %}RECAP Requests – CourtListener.com{% endblock %}
 {% block og_title %}RECAP Requests – CourtListener.com{% endblock %}
@@ -21,6 +21,7 @@
               <th>Document Number</th>
               <th>PACER Doc ID</th>
               <th>Document Court</th>
+              <th>Buy on Pacer</th>
             </tr>
         </thead>
         <tbody>
@@ -31,6 +32,15 @@
               <td>{{ prayer.document_number }}</td>
               <td>{{ prayer.pacer_doc_id }}</td>
               <td>{{ prayer.docket_entry.docket.court_id }}</td>
+              <td><a href="{{ prayer.pacer_url }}"
+                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                  class="open_buy_pacer_modal btn btn-default btn-xs"
+                  data-toggle="modal" data-target="#modal-buy-pacer"
+                {% else%}
+                  class="btn btn-default btn-xs"
+                {% endif %}
+                  target="_blank"
+                  rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
             </tr>
             {% empty %}
             <tr>
