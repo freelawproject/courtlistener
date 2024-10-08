@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from unittest.mock import MagicMock, mock_open, patch
 
 from django.core.management import call_command
@@ -44,8 +45,10 @@ class TestImportHarvardPDFs(TestCase):
     )
     @patch("cl.search.management.commands.import_harvard_pdfs.boto3.client")
     @patch("cl.search.management.commands.import_harvard_pdfs.os.listdir")
+    @patch("cl.search.management.commands.import_harvard_pdfs.os.path.exists")
     def test_import_harvard_pdfs(
         self,
+        mock_exists,
         mock_listdir,
         mock_boto3_client,
         mock_harvard_storage,
@@ -54,6 +57,10 @@ class TestImportHarvardPDFs(TestCase):
     ):
         # Setup mocks
         mock_listdir.return_value = ["test_crosswalk.json"]
+        mock_exists.side_effect = lambda path: path in [
+            "/mocked_path/crosswalk_dir"
+        ]
+
         mock_s3 = MagicMock()
         mock_boto3_client.return_value = mock_s3
         mock_storage = MagicMock()
@@ -73,8 +80,18 @@ class TestImportHarvardPDFs(TestCase):
 
         # Mock file operations
         m = mock_open(read_data=json.dumps(crosswalk_data))
+
+        # Mock crosswalk_dir
+        crosswalk_dir = "/mocked_path/crosswalk_dir"
+
+        # Verify crosswalk_dir exists
+        self.assertTrue(
+            os.path.exists(crosswalk_dir),
+            f"Crosswalk directory does not exist: {crosswalk_dir}",
+        )
+
         with patch("builtins.open", m):
-            call_command("import_harvard_pdfs")
+            call_command("import_harvard_pdfs", crosswalk_dir=crosswalk_dir)
 
         # Assert expected behavior
         # 1. Downloading the PDF from CAP
