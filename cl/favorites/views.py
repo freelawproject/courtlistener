@@ -201,7 +201,7 @@ async def create_prayer_view(
     request: HttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
-    recap_document =  await RECAPDocument.objects.aget(id=recap_document)
+    recap_document = await RECAPDocument.objects.aget(id=recap_document)
 
     # Call the create_prayer async function
     new_prayer = await create_prayer(user, recap_document)

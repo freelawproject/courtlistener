@@ -25,5 +25,9 @@ urlpatterns = [
     ),
     path("tags/<str:username>/", view_tags, name="tag_list"),
     path("prayers/top/", open_prayers, name="top_prayers"),
-    path("prayer/create/<int:recap_document>/", create_prayer_view, name="create_prayer"),
+    path(
+        "prayer/create/<int:recap_document>/",
+        create_prayer_view,
+        name="create_prayer",
+    ),
 ]
