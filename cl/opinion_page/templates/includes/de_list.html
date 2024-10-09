@@ -184,12 +184,14 @@
                             {{rd.prayer_count}} 🙏
                           </a>
                         {% else %}
-                          <a href="{% url 'sign-in' %}?next={{ request.path|urlencode }}"
+                          <button
                             class="btn btn-default btn-xs"
+                            data-toggle="modal"
+                            data-target="#modal-logged-out"
                             title="Sign in to request document."
                             style="margin-left: {% if rd.page_count %}8px{% else %}44px{% endif %};">
                             {{rd.prayer_count}} 🙏
-                          </a>
+                          </button>
                         {% endif %}
                       {% endif %}
                     {% endif %}
