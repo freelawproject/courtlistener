@@ -1796,9 +1796,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         r = await self._test_article_count(params, 1, "highlights caseName")
         # Count child documents under docket.
-        self.assertIn("<mark>SUBPOENAS</mark>", r.content.decode())
-        self.assertIn("<mark>SERVED</mark>", r.content.decode())
-        self.assertIn("<mark>ON</mark>", r.content.decode())
+        self.assertIn("<mark>SUBPOENAS SERVED ON</mark>", r.content.decode())
 
         # Highlight filter: description
         params = {
@@ -2758,6 +2756,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_number="1:21-bk-1235",
                 source=Docket.RECAP,
             )
+            DocketFactory(
+                court=self.court_2,
+                case_name="Howells v. LLC Indiana",
+                case_name_short="Dolor",
+                case_name_full="Lorem Ipsum",
+                docket_number="1:21-bk-1235",
+                source=Docket.RECAP,
+            )
 
         # case_name filter: Howell
         cd = {
@@ -2789,8 +2795,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "type": SEARCH_TYPES.RECAP,
             "case_name": "Howells",
         }
-        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        r = async_to_sync(self._test_article_count)(cd, 2, "Disable stemming")
         self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # quoted case_name filter: "Howells v. Indiana" expect exact match
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"Howells v. Indiana"',
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells v. Indiana</mark>", r.content.decode())
 
         # text query: Howell
         cd = {
@@ -2805,7 +2819,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "type": SEARCH_TYPES.RECAP,
             "q": "Howells",
         }
-        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        r = async_to_sync(self._test_article_count)(cd, 2, "Disable stemming")
         self.assertIn("<mark>Howells</mark>", r.content.decode())
 
         # text query: Howell ind (stemming and synonyms disabled)
@@ -3705,7 +3719,7 @@ class RECAPSearchAPIV4Test(
             "result": self.rd_api,
             "V4": True,
             "assignedTo": "<mark>George</mark> Doe II",
-            "caseName": "<mark>America</mark> <mark>vs</mark> <mark>API</mark> Lorem",
+            "caseName": "<mark>America vs API</mark> Lorem",
             "cause": "<mark>401</mark> <mark>Civil</mark>",
             "court_citation_string": "<mark>Appeals</mark>. CA9.",
             "docketNumber": "<mark>1:24-bk-0000</mark>",

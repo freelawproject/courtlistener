@@ -42,6 +42,7 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import generate_docket_target_sources
+from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import (
     Attorney,
     AttorneyOrganizationAssociation,
@@ -62,6 +63,7 @@ from cl.recap.factories import (
     DocketEntryWithAttachmentsDataFactory,
     FjcIntegratedDatabaseFactory,
     MinuteDocketEntryDataFactory,
+    OriginatingCourtInformationDataFactory,
     PacerFetchQueueFactory,
     ProcessingQueueFactory,
     RECAPEmailDocketDataFactory,
@@ -84,6 +86,7 @@ from cl.recap.mergers import (
     merge_attachment_page_data,
     normalize_long_description,
     update_case_names,
+    update_docket_appellate_metadata,
     update_docket_metadata,
 )
 from cl.recap.models import (
@@ -1485,7 +1488,8 @@ class RecapPdfTaskTest(TestCase):
         Alas, we fail. In theory, this shouldn't happen.
         """
         self.de.delete()
-        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        with mock.patch("cl.recap.tasks.asyncio.sleep"):
+            rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertIsNone(rd)
         self.pq.refresh_from_db()
         # Confirm PQ values.
@@ -1506,7 +1510,9 @@ class RecapPdfTaskTest(TestCase):
         self.assertTrue(rd.is_available)
         self.assertTrue(rd.sha1)
         self.assertTrue(rd.filepath_local)
-        self.assertIn("gov.uscourts.scotus.asdf.1.0", rd.filepath_local.name)
+        file_name = rd.filepath_local.name.split("/")[2]
+        self.assertIn("gov", file_name)
+        self.assertIn("uscourts.scotus.asdf.1.0", file_name)
 
         mock_extract.assert_called_once()
 
@@ -1524,7 +1530,8 @@ class RecapPdfTaskTest(TestCase):
         In practice, this shouldn't happen.
         """
         self.docket.delete()
-        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        with mock.patch("cl.recap.tasks.asyncio.sleep"):
+            rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertIsNone(rd)
         self.pq.refresh_from_db()
         # Confirm PQ values.
@@ -2636,6 +2643,166 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(d.federal_defendant_number, 1)
 
         d.delete()
+
+    def test_clean_up_docket_judge_fields(
+        self,
+    ) -> None:
+        """Ensure the referred_to or assigned_to fields are cleared if the
+        referred_to_str or assigned_to_str fields are changed and the judges
+        don't exist in people_db.
+        """
+
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+            date_filed=date(2023, 12, 14),
+        )
+        docket_data = DocketDataFactory(
+            court_id=d.court_id,
+            referred_to_str="John Miller",
+            assigned_to_str="Debbie Roe",
+        )
+
+        d_a = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="123421",
+            court_id=self.court.pk,
+            date_filed=date(2023, 12, 14),
+            appeal_from=self.court,
+        )
+        docket_data_a = DocketDataFactory(
+            court_id=d.court_id,
+            originating_court_information=OriginatingCourtInformationDataFactory(
+                assigned_to="Debbie Roe",
+                ordering_judge="John Miller",
+                court_id=self.court.pk,
+                date_filed=date(2022, 12, 14),
+            ),
+        )
+        judge = PersonFactory.create(name_first="John", name_last="Miller")
+        PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court_id=self.court.pk,
+            date_start=date(2020, 11, 10),
+            position_type="c-jud",
+            person=judge,
+            how_selected="a_legis",
+            nomination_process="fed_senate",
+        )
+        judge_2 = PersonFactory.create(name_first="Debbie", name_last="Roe")
+        PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court_id=self.court.pk,
+            date_start=date(2019, 11, 10),
+            position_type="c-jud",
+            person=judge_2,
+            how_selected="a_legis",
+            nomination_process="fed_senate",
+        )
+
+        # Test for district docket. Related judges exist in the people_db
+        async_to_sync(update_docket_metadata)(d, docket_data)
+        d.save()
+        d.refresh_from_db()
+
+        self.assertEqual(d.referred_to_str, "John Miller")
+        self.assertEqual(d.assigned_to_str, "Debbie Roe")
+        self.assertEqual(d.referred_to_id, judge.pk)
+        self.assertEqual(d.assigned_to_id, judge_2.pk)
+
+        # Confirm that related judges are not removed if no referred_to_str or
+        # assigned_to_str are available in the docket metadata.
+        docket_data_updated_no_judge_data = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00034",
+            referred_to_str="",
+            assigned_to_str="",
+        )
+        async_to_sync(update_docket_metadata)(
+            d, docket_data_updated_no_judge_data
+        )
+        d.save()
+        d.refresh_from_db()
+        self.assertEqual(d.referred_to_str, "John Miller")
+        self.assertEqual(d.assigned_to_str, "Debbie Roe")
+        self.assertEqual(d.referred_to_id, judge.pk)
+        self.assertEqual(d.assigned_to_id, judge_2.pk)
+
+        # Judges have changed from the source. Confirm that referred_to_str and
+        # assigned_to_str are updated, while referred_to_id and assigned_to_id
+        # are cleared.
+        docket_data_updated = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00034",
+            referred_to_str="Marcus Carter",
+            assigned_to_str="Evelyn Whitfield",
+        )
+        async_to_sync(update_docket_metadata)(d, docket_data_updated)
+        d.save()
+        d.refresh_from_db()
+        self.assertEqual(d.referred_to_str, "Marcus Carter")
+        self.assertEqual(d.assigned_to_str, "Evelyn Whitfield")
+        self.assertEqual(d.referred_to_id, None)
+        self.assertEqual(d.assigned_to_id, None)
+
+        # Test for appellate Docket originating_court_information.
+        d_a, og_info = async_to_sync(update_docket_appellate_metadata)(
+            d_a, docket_data_a
+        )
+        og_info.save()
+        d_a.originating_court_information = og_info
+        d_a.save()
+        d_a.refresh_from_db()
+
+        self.assertEqual(
+            d_a.originating_court_information.ordering_judge_str, "John Miller"
+        )
+        self.assertEqual(
+            d_a.originating_court_information.assigned_to_str, "Debbie Roe"
+        )
+        self.assertEqual(
+            d_a.originating_court_information.ordering_judge_id, judge.pk
+        )
+        self.assertEqual(
+            d_a.originating_court_information.assigned_to_id, judge_2.pk
+        )
+
+        # Clean up judges in originating_court_information
+        docket_data_a_updated = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00035",
+            originating_court_information=OriginatingCourtInformationDataFactory(
+                assigned_to="Marcus Carter",
+                ordering_judge="Evelyn Whitfield",
+                court_id=self.court.pk,
+                date_filed=date(2022, 12, 14),
+            ),
+        )
+        d_a, og_info = async_to_sync(update_docket_appellate_metadata)(
+            d_a, docket_data_a_updated
+        )
+        og_info.save()
+        d_a.originating_court_information = og_info
+        d_a.save()
+        d_a.refresh_from_db()
+
+        self.assertEqual(
+            d_a.originating_court_information.ordering_judge_str,
+            "Evelyn Whitfield",
+        )
+        self.assertEqual(
+            d_a.originating_court_information.assigned_to_str, "Marcus Carter"
+        )
+        self.assertEqual(
+            d_a.originating_court_information.ordering_judge_id, None
+        )
+        self.assertEqual(
+            d_a.originating_court_information.assigned_to_id, None
+        )
+
+        d.delete()
+        d_a.delete()
 
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")
