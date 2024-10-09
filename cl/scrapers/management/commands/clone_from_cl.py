@@ -363,6 +363,10 @@ def clone_docket(
     :param session: a Requests session
     :param docket_ids: a list of docket ids
     :param add_docket_entries: flag to clone docket entries and recap docs
+    :param add_audio_files: flag to clone related audio files
+        when cloning a docket
+    :param add_clusters: flag to clone related opinion clusters when
+        cloning a docket
     :param person_positions: True is we should clone person positions
     :param person_positions: True is we should clone person positions
     :param add_to_solr: True if we should add objects to solr
