@@ -3493,6 +3493,7 @@ class Opinion(AbstractDateTimeModel):
                 name="unique_opinion_ordering_key",
             )
         ]
+        ordering = ["ordering_key"]
 
     @property
     def siblings(self) -> QuerySet:
