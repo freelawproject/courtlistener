@@ -28,6 +28,8 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Made 1M requests for commercial enterprise
+        "haoren": "10/hour",
         # Used a fake email address, 2024-10-02
         "xinfu.zheng": "10/hour",
         "fdgbhgope4wuo8049": "10/hour",
