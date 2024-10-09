@@ -44,7 +44,11 @@ from cl.citations.utils import (
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
-from cl.favorites.utils import get_prayer_count, prayer_eligible, prayer_exists
+from cl.favorites.utils import (
+    get_existing_prayers_in_bulk,
+    get_prayer_counts_in_bulk,
+    prayer_eligible,
+)
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import cache_page_ignore_params
@@ -379,20 +383,6 @@ async def view_docket(
                 "-recap_sequence_number", "-entry_number"
             )
 
-    for entry in await sync_to_async(list)(de_list):
-        if await sync_to_async(entry.recap_documents.count)() > 0:
-            for rd in await sync_to_async(list)(entry.recap_documents.all()):
-                if rd.pacer_url and not (rd.is_free_on_pacer or rd.is_sealed):
-                    rd.prayer_count = await get_prayer_count(rd)
-
-                    if request.user.is_authenticated:
-                        rd.prayer_exists = await prayer_exists(
-                            request.user, rd
-                        )
-                        rd.prayer_eligible = await prayer_eligible(
-                            request.user
-                        )
-
     page = request.GET.get("page", 1)
 
     @sync_to_async
@@ -405,15 +395,40 @@ async def view_docket(
         except EmptyPage:
             return paginator.page(paginator.num_pages)
 
+    paginated_entries = await paginate_docket_entries(de_list, page)
+
+    # Extract recap documents from the current page.
+    recap_documents = [
+        rd
+        for entry in await sync_to_async(list)(paginated_entries)
+        async for rd in entry.recap_documents.all()
+    ]
+    # Get prayer counts in bulk.
+    prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
+    existing_prayers = {}
+    prayer_is_eligible = False
+    if request.user.is_authenticated:
+        # Check prayer existence in bulk.
+        existing_prayers = await get_existing_prayers_in_bulk(
+            request.user, recap_documents
+        )
+        prayer_is_eligible = await prayer_eligible(request.user)
+
+    # Merge counts and existing prayer status to RECAPDocuments.
+    for rd in recap_documents:
+        rd.prayer_count = prayer_counts.get(rd.id, 0)
+        rd.prayer_exists = existing_prayers.get(rd.id, False)
+
     context.update(
         {
             "parties": await docket.parties.aexists(),
             # Needed to show/hide parties tab.
             "authorities": await docket.ahas_authorities(),
-            "docket_entries": await paginate_docket_entries(de_list, page),
+            "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
+            "prayer_eligible": prayer_is_eligible,
         }
     )
     return TemplateResponse(request, "docket.html", context)

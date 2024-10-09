@@ -97,7 +97,7 @@ router.register(
 )
 
 # Prayers
-router.register(r"prayers", favorite_views.PrayerViewSet, basename="Prayer")
+router.register(r"prayers", favorite_views.PrayerViewSet, basename="prayer")
 
 # Visualizations
 router.register(

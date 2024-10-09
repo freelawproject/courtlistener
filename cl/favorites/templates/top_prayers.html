@@ -52,3 +52,9 @@
     </div>
   </div>
 {% endblock %}
+
+{% block footer-scripts %}
+  <script defer type="text/javascript"
+            src="{% static "js/buy_pacer_modal.js" %}"></script>
+  {% include "includes/buy_pacer_modal.html" %}
+{% endblock %}

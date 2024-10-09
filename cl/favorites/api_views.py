@@ -70,6 +70,8 @@ class PrayerViewSet(LoggingMixin, ModelViewSet):
     ordering = "-date_created"
     # Additional cursor ordering fields
     cursor_ordering_fields = ["date_created"]
+    # Only allow these methods. Restricting PUT and PATCH.
+    http_method_names = ["get", "post", "delete", "head", "options"]
 
     def get_queryset(self):
         """
