@@ -46,6 +46,53 @@ async def create_prayer(
     return None
 
 
+async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
+    deleted, _ = await Prayer.objects.filter(
+        user=user, recap_document=recap_document, status=Prayer.WAITING
+    ).adelete()
+
+    return deleted > 0
+
+
+async def get_prayer_counts_in_bulk(
+    recap_documents: list[RECAPDocument],
+) -> dict[str, int]:
+    """Retrieve the count of prayers with a status of "WAITING" for a list of recap documents.
+
+    :param recap_documents: A list of RECAPDocument instances to filter prayers.
+    :return: A dictionary where keys are RECAPDocument IDs and values are the
+    count of "WAITING" prayers for each document.
+    """
+
+    prayer_counts = (
+        Prayer.objects.filter(
+            recap_document__in=recap_documents, status=Prayer.WAITING
+        )
+        .values("recap_document")
+        .annotate(count=Count("id"))
+    )
+    return {
+        prayer_count["recap_document"]: prayer_count["count"]
+        async for prayer_count in prayer_counts
+    }
+
+
+async def get_existing_prayers_in_bulk(
+    user: User, recap_documents: list[RECAPDocument]
+) -> dict[int, bool]:
+    """Check if prayers exist for a user and a list of recap documents.
+
+    :param user: The user for whom to check prayer existence.
+    :param recap_documents: A list of RECAPDocument instances to check prayers.
+    :return: A dictionary where keys are RECAPDocument IDs and values are True
+     if a prayer exists for the user and RD.
+    """
+    existing_prayers = Prayer.objects.filter(
+        user=user, recap_document__in=recap_documents
+    ).values_list("recap_document_id", flat=True)
+    return {rd_id: True async for rd_id in existing_prayers}
+
+
 async def get_top_prayers() -> list[RECAPDocument]:
     # Calculate the age of each prayer
     prayer_age = ExpressionWrapper(
@@ -69,6 +116,7 @@ async def get_top_prayers() -> list[RECAPDocument]:
             "document_number",
             "attachment_number",
             "pacer_doc_id",
+            "page_count",
             "description",
             "docket_entry__docket_id",
             "docket_entry__docket__slug",
@@ -95,6 +143,7 @@ async def get_top_prayers() -> list[RECAPDocument]:
         )
         .order_by("-geometric_mean")[:50]
     )
+
     return [doc async for doc in documents.aiterator()]
 
 
@@ -148,3 +197,15 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
             messages.append(msg)
         connection = get_connection()
         connection.send_messages(messages)
+
+
+async def get_user_prayer_history(user: User) -> tuple[int, float]:
+    filtered_list = Prayer.objects.filter(user=user, status=Prayer.GRANTED)
+
+    count = await filtered_list.acount()
+
+    total_cost = 0
+    async for prayer in filtered_list:
+        total_cost += float(price(prayer.recap_document))
+
+    return count, total_cost

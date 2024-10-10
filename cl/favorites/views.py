@@ -9,18 +9,26 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
+    HttpResponseRedirect,
     HttpResponseServerError,
 )
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, UserTag
-from cl.favorites.utils import get_top_prayers
+from cl.favorites.utils import (
+    create_prayer,
+    delete_prayer,
+    get_top_prayers,
+    get_user_prayer_history,
+)
 from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
+from cl.search.models import RECAPDocument
 
 
 async def get_note(request: HttpRequest) -> HttpResponse:
@@ -182,11 +190,48 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
 
     top_prayers = await get_top_prayers()
-    return TemplateResponse(
-        request,
-        "top_prayers.html",
-        {
-            "top_prayers": top_prayers,
-            "private": True,  # temporary to prevent Google indexing
-        },
-    )
+
+    context = {
+        "top_prayers": top_prayers,
+        "private": True,  # Temporary to prevent Google indexing
+    }
+
+    if request.user.is_authenticated:
+        user_prayer_count, user_prayer_cost = await get_user_prayer_history(
+            request.user
+        )
+
+        context.update(
+            {
+                "user_prayer_count": user_prayer_count,
+                "user_prayer_cost": user_prayer_cost,
+            }
+        )
+
+    return TemplateResponse(request, "top_prayers.html", context)
+
+
+@login_required
+async def create_prayer_view(
+    request: HttpRequest, recap_document: int
+) -> HttpResponse:
+    user = request.user
+    recap_document = await RECAPDocument.objects.aget(id=recap_document)
+
+    # Call the create_prayer async function
+    new_prayer = await create_prayer(user, recap_document)
+
+    return HttpResponse("It worked.")
+
+
+@login_required
+async def delete_prayer_view(
+    request: HttpRequest, recap_document: int
+) -> HttpResponse:
+    user = request.user
+    recap_document = await RECAPDocument.objects.aget(id=recap_document)
+
+    # Call the delete_prayer async function
+    await delete_prayer(user, recap_document)
+
+    return HttpResponse("It worked.")
