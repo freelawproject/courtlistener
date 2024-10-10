@@ -20,6 +20,7 @@ from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.utils import (
     create_prayer,
+    delete_prayer,
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
     get_top_prayers,
@@ -678,9 +679,15 @@ class RECAPPrayAndPay(TestCase):
             is_available=False,
         )
 
+        cls.rd_6 = RECAPDocumentFactory(
+            pacer_doc_id="98763426",
+            document_number="6",
+            is_available=False,
+        )
+
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
-        """Does the prayer_eligible method works properly?"""
+        """Does the prayer_eligible method work properly?"""
 
         current_time = timezone.now()
         with time_machine.travel(current_time, tick=False):
@@ -720,7 +727,7 @@ class RECAPPrayAndPay(TestCase):
             self.assertTrue(user_is_eligible)
 
     async def test_create_prayer(self) -> None:
-        """Does the create_prayer method works properly?"""
+        """Does the create_prayer method work properly?"""
 
         # Prayer is not created if the document is already available.
         prayer_created = await create_prayer(self.user, self.rd_1)
@@ -734,8 +741,28 @@ class RECAPPrayAndPay(TestCase):
         same_prayer_created = await create_prayer(self.user, self.rd_2)
         self.assertIsNone(same_prayer_created)
 
+    async def test_delete_prayer(self) -> None:
+        """Does the delete_prayer method work properly?"""
+
+        # Prayer is added, then deleted successfully
+        prayer_created = await create_prayer(self.user, self.rd_2)
+        prayer_deleted = await delete_prayer(self.user, self.rd_2)
+        self.assertFalse(prayer_deleted)
+
+        # Prayer is created, then document is made available to check that a user can't delete a prayer that has been granted
+        prayer_created = await create_prayer(self.user, self.rd_6)
+        self.rd_6.is_available = True
+        prayer_deleted = await delete_prayer(self.user, self.rd_6)
+        self.assertFalse(prayer_deleted)
+
+        # Ensure that a user cannot delete the same prayer twice
+        prayer_created = await create_prayer(self.user, self.rd_2)
+        prayer_deleted = await delete_prayer(self.user, self.rd_2)
+        prayer_deleted = await delete_prayer(self.user, self.rd_2)
+        self.assertFalse(prayer_deleted)
+
     async def test_get_top_prayers_by_number(self) -> None:
-        """Does the get_top_prayers method works properly?"""
+        """Does the get_top_prayers method work properly?"""
 
         # Test top documents based on prayers count.
         current_time = timezone.now()
@@ -763,7 +790,7 @@ class RECAPPrayAndPay(TestCase):
         )
 
     async def test_get_top_prayers_by_age(self) -> None:
-        """Does the get_top_prayers method works properly?"""
+        """Does the get_top_prayers method work properly?"""
 
         # Test top documents based on prayer age.
         current_time = timezone.now()
@@ -794,7 +821,7 @@ class RECAPPrayAndPay(TestCase):
         )
 
     async def test_get_top_prayers_by_number_and_age(self) -> None:
-        """Does the get_top_prayers method works properly?"""
+        """Does the get_top_prayers method work properly?"""
 
         # Create prayers with different counts and ages
         current_time = timezone.now()
@@ -999,7 +1026,7 @@ class RECAPPrayAndPay(TestCase):
 
 
 class PrayerAPITests(APITestCase):
-    """Check that Prayer API operations works as expected."""
+    """Check that Prayer API operations work as expected."""
 
     @classmethod
     def setUpTestData(cls) -> None:
