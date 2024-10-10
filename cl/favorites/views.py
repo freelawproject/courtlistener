@@ -195,7 +195,6 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
     )
 
 
-# # this is a rough function just to assess the test cases. It needs a lot of work before it's ready for showtime.
 @login_required
 async def create_prayer_view(
     request: HttpRequest, recap_document: int
@@ -216,7 +215,7 @@ async def delete_prayer_view(
     user = request.user
     recap_document = await RECAPDocument.objects.aget(id=recap_document)
 
-    # Call the create_prayer async function
+    # Call the delete_prayer async function
     await delete_prayer(user, recap_document)
 
     return HttpResponse("It worked.")
