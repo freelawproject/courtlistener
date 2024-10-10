@@ -199,3 +199,14 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
             messages.append(msg)
         connection = get_connection()
         connection.send_messages(messages)
+
+async def get_user_prayer_history(user: User):
+    filtered_list = Prayer.objects.filter(user=user, status=Prayer.GRANTED)
+
+    count = await filtered_list.acount()
+
+    total_cost = 0
+    async for prayer in filtered_list:
+        total_cost += float(price(prayer.recap_document))
+
+    return count, total_cost

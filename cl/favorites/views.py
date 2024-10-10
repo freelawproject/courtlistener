@@ -19,7 +19,7 @@ from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, UserTag
-from cl.favorites.utils import create_prayer, delete_prayer, get_top_prayers
+from cl.favorites.utils import create_prayer, delete_prayer, get_top_prayers, get_user_prayer_history
 from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
@@ -185,14 +185,22 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
 
     top_prayers = await get_top_prayers()
-    return TemplateResponse(
-        request,
-        "top_prayers.html",
-        {
-            "top_prayers": top_prayers,
-            "private": True,  # temporary to prevent Google indexing
-        },
-    )
+
+    context = {
+        "top_prayers": top_prayers,
+        "private": True,  # Temporary to prevent Google indexing
+    }
+
+    if request.user.is_authenticated:
+        user_prayer_count, user_prayer_cost = await get_user_prayer_history(request.user)
+        
+        context.update({
+            "user_prayer_count": user_prayer_count,
+            "user_prayer_cost": user_prayer_cost,
+        })
+
+    return TemplateResponse(request, "top_prayers.html", context)
+
 
 
 @login_required
