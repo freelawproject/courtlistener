@@ -5,6 +5,7 @@ from http import HTTPStatus
 
 import time_machine
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core import mail
 from django.template.defaultfilters import date as template_date
@@ -924,7 +925,7 @@ class RECAPPrayAndPay(TestCase):
             f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
             email_text_content,
         )
-        with timezone.override("America/Los_Angeles"):
+        with timezone.override(settings.TIME_ZONE):
             localized_date = timezone.localtime(prayer_1.date_created)
             formatted_date = template_date(localized_date, "M j, Y")
             self.assertIn(
@@ -948,7 +949,7 @@ class RECAPPrayAndPay(TestCase):
             f"{len(actual_top_prayers)} people were also waiting for it.",
             html_content,
         )
-        with timezone.override("America/Los_Angeles"):
+        with timezone.override(settings.TIME_ZONE):
             localized_date = timezone.localtime(prayer_1.date_created)
             formatted_date = template_date(localized_date, "M j, Y")
             self.assertIn(
