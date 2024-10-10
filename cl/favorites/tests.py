@@ -752,7 +752,7 @@ class RECAPPrayAndPay(TestCase):
         # Prayer is created, then document is made available to check that a user can't delete a prayer that has been granted
         prayer_created = await create_prayer(self.user, self.rd_6)
         self.rd_6.is_available = True
-        self.rd_6.save()
+        await sync_to_async(self.rd_6.save)()
         prayer_deleted = await delete_prayer(self.user, self.rd_6)
         self.assertFalse(prayer_deleted)
 
