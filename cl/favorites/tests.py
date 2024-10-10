@@ -5,13 +5,13 @@ from http import HTTPStatus
 
 import time_machine
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from django.core import mail
 from django.template.defaultfilters import date as template_date
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.timezone import now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -682,7 +682,7 @@ class RECAPPrayAndPay(TestCase):
     async def test_prayer_eligible(self) -> None:
         """Does the prayer_eligible method works properly?"""
 
-        current_time = now()
+        current_time = timezone.now()
         with time_machine.travel(current_time, tick=False):
             # No user prayers in the last 24 hours yet for this user.
             user_is_eligible = await prayer_eligible(self.user)
@@ -738,7 +738,7 @@ class RECAPPrayAndPay(TestCase):
         """Does the get_top_prayers method works properly?"""
 
         # Test top documents based on prayers count.
-        current_time = now()
+        current_time = timezone.now()
         with time_machine.travel(current_time, tick=False):
             await create_prayer(self.user, self.rd_2)
             await create_prayer(self.user_2, self.rd_2)
@@ -766,7 +766,7 @@ class RECAPPrayAndPay(TestCase):
         """Does the get_top_prayers method works properly?"""
 
         # Test top documents based on prayer age.
-        current_time = now()
+        current_time = timezone.now()
         with time_machine.travel(
             current_time - timedelta(minutes=1), tick=False
         ):
@@ -797,7 +797,7 @@ class RECAPPrayAndPay(TestCase):
         """Does the get_top_prayers method works properly?"""
 
         # Create prayers with different counts and ages
-        current_time = now()
+        current_time = timezone.now()
         with time_machine.travel(current_time - timedelta(days=5), tick=False):
             await create_prayer(self.user, self.rd_5)  # 1 prayer, 5 days old
 
@@ -867,7 +867,7 @@ class RECAPPrayAndPay(TestCase):
             description="Dismissing Case",
         )
 
-        current_time = now()
+        current_time = timezone.now()
         with time_machine.travel(current_time, tick=False):
             # Create prayers
             prayer_1 = await create_prayer(self.user, rd_6)
@@ -951,7 +951,7 @@ class RECAPPrayAndPay(TestCase):
             f"https://www.courtlistener.com{rd_6.get_absolute_url()}",
             email_text_content,
         )
-        with timezone.override("America/Los_Angeles"):
+        with timezone.override(settings.TIME_ZONE):
             localized_date = timezone.localtime(prayer_1.date_created)
             formatted_date = template_date(localized_date, "M j, Y")
             self.assertIn(
@@ -975,7 +975,7 @@ class RECAPPrayAndPay(TestCase):
             f"{len(actual_top_prayers)} people were also waiting for it.",
             html_content,
         )
-        with timezone.override("America/Los_Angeles"):
+        with timezone.override(settings.TIME_ZONE):
             localized_date = timezone.localtime(prayer_1.date_created)
             formatted_date = template_date(localized_date, "M j, Y")
             self.assertIn(
