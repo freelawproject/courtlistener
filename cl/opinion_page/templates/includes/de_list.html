@@ -1,6 +1,6 @@
 {% load pacer %}
 {% load tz %}
-
+{% load waffle_tags %}
 
 <div class="fake-table col-xs-12" id="docket-entry-table">
   <div class="row bold">
@@ -171,7 +171,8 @@
                             target="_blank"
                             rel="nofollow">Buy on PACER {% if rd.page_count %}(${{ rd|price }}){% endif %}
                         </a>
-                          {% if request.user.is_authenticated %}
+                        {% flag "pray-and-pay" %}
+                        {% if request.user.is_authenticated %}
                           <a href="{% url 'create_prayer' rd.id %}"
                             class="btn btn-default btn-xs prayer-button {% if rd.prayer_exists or not prayer_eligible %}disabled{% endif %}"
                             data-document-id="{{ rd.id }}"
@@ -193,6 +194,7 @@
                             {{rd.prayer_count}} 🙏
                           </button>
                         {% endif %}
+                        {% endflag %}
                       {% endif %}
                     {% endif %}
                   {% endif %}
