@@ -19,7 +19,7 @@ from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, UserTag
-from cl.favorites.utils import create_prayer, get_top_prayers
+from cl.favorites.utils import create_prayer, delete_prayer, get_top_prayers
 from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
@@ -205,5 +205,17 @@ async def create_prayer_view(
 
     # Call the create_prayer async function
     new_prayer = await create_prayer(user, recap_document)
+
+    return HttpResponse("It worked.")
+
+@login_required
+async def delete_prayer_view(
+    request: HttpRequest, recap_document: int
+) -> HttpResponse:
+    user = request.user
+    recap_document = await RECAPDocument.objects.aget(id=recap_document)
+
+    # Call the create_prayer async function
+    await delete_prayer(user, recap_document)
 
     return HttpResponse("It worked.")
