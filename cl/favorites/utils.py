@@ -46,12 +46,14 @@ async def create_prayer(
     return None
 
 
-async def delete_prayer(
-    user: User, recap_document: RECAPDocument
-) -> bool:
-    await Prayer.objects.filter.adelete(user=user, recap_document=recap_document)
+async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
+    await Prayer.objects.filter.adelete(
+        user=user, recap_document=recap_document
+    )
 
-    return await Prayer.objects.filter(user=user, recap_document=recap_document).aexists()
+    return await Prayer.objects.filter(
+        user=user, recap_document=recap_document
+    ).aexists()
 
 
 async def get_prayer_counts_in_bulk(
