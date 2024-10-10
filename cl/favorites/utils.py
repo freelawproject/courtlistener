@@ -47,7 +47,9 @@ async def create_prayer(
 
 
 async def delete_prayer(user: User, recap_document: RECAPDocument) -> bool:
-    await Prayer.objects.filter(user=user, recap_document=recap_document).adelete()
+    await Prayer.objects.filter(
+        user=user, recap_document=recap_document
+    ).adelete()
 
     return await Prayer.objects.filter(
         user=user, recap_document=recap_document
