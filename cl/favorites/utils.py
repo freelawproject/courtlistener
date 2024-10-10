@@ -201,7 +201,7 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
         connection.send_messages(messages)
 
 
-async def get_user_prayer_history(user: User):
+async def get_user_prayer_history(user: User) -> tuple[int, float]:
     filtered_list = Prayer.objects.filter(user=user, status=Prayer.GRANTED)
 
     count = await filtered_list.acount()
