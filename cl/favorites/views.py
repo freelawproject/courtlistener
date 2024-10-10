@@ -208,6 +208,7 @@ async def create_prayer_view(
 
     return HttpResponse("It worked.")
 
+
 @login_required
 async def delete_prayer_view(
     request: HttpRequest, recap_document: int

@@ -31,7 +31,7 @@ urlpatterns = [
         create_prayer_view,
         name="create_prayer",
     ),
-        path(
+    path(
         "prayer/delete/<int:recap_document>/",
         delete_prayer_view,
         name="delete_prayer",
