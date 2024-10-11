@@ -1,6 +1,5 @@
-from datetime import timedelta
-
 import asyncio
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -206,7 +205,12 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
 
     count = await filtered_list.acount()
 
-    prices = await asyncio.gather(*[price(prayer.recap_document) for prayer in await filtered_list.alist()])
+    prices = await asyncio.gather(
+        *[
+            price(prayer.recap_document)
+            for prayer in await filtered_list.alist()
+        ]
+    )
     total_cost = sum(map(float, prices))
 
     return count, total_cost
@@ -218,10 +222,14 @@ async def get_lifetime_prayer_stats() -> tuple[int, int, float]:
 
     count = await filtered_list.acount()
 
-    distinct_documents = filtered_list.values_list('recap_document', flat=True).distinct()
+    distinct_documents = filtered_list.values_list(
+        "recap_document", flat=True
+    ).distinct()
     num_distinct_purchases = len(distinct_documents)
 
-    prices = await asyncio.gather(*[price(recap_document) for recap_document in distinct_documents])
+    prices = await asyncio.gather(
+        *[price(recap_document) for recap_document in distinct_documents]
+    )
     total_cost = sum(map(float, prices))
 
     return count, num_distinct_purchases, total_cost
