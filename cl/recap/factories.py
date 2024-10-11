@@ -149,3 +149,9 @@ class DocketEntryWithAttachmentsDataFactory(MinuteDocketEntryDataFactory):
 
 class DocketDataWithAttachmentsFactory(DocketDataFactory):
     docket_entries = List([SubFactory(DocketEntryWithAttachmentsDataFactory)])
+
+
+class OriginatingCourtInformationDataFactory(DictFactory):
+    assigned_to = Faker("name")
+    court_id = FuzzyText(length=4, chars=string.ascii_lowercase, suffix="d")
+    ordering_judge = Faker("name")
