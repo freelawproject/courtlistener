@@ -25,8 +25,11 @@ def find_and_fix_docket_judges(
     dockets_with_judges = Docket.objects.filter(
         Q(referred_to__isnull=False) | Q(assigned_to__isnull=False)
     )
+    total_dockets = dockets_with_judges.count()
+    logger.info(f"Total dockets to process: {total_dockets}")
+
     fixed_dockets = 0
-    for d in dockets_with_judges.iterator():
+    for iteration, d in enumerate(dockets_with_judges.iterator(), start=1):
         new_referred = (
             async_to_sync(lookup_judge_by_full_name)(
                 d.referred_to_str, d.court_id, d.date_filed
@@ -52,7 +55,16 @@ def find_and_fix_docket_judges(
                 # This will hit ES. So better to do it slowly.
                 time.sleep(iteration_wait)
 
-    logger.info("Fixed: %s Dockets", fixed_dockets)
+        # Log progress every 100 items.
+        if iteration % 100 == 0 or iteration == total_dockets:
+            progress_percentage = (iteration / total_dockets) * 100
+            logger.info(
+                f"Progress: {iteration}/{total_dockets} ({progress_percentage:.2f}%) dockets processed. Fixed: {fixed_dockets}"
+            )
+
+    logger.info(
+        f"Completed. Total dockets processed: {total_dockets}, Fixed: {fixed_dockets} Dockets"
+    )
 
 
 class Command(VerboseCommand):
