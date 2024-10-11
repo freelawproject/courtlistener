@@ -1,3 +1,5 @@
+import time
+
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
@@ -19,6 +21,13 @@ class Command(cl_scrape_opinions.Command):
             "--backscrape-end",
             dest="backscrape_end",
             help="End value for backscraper iterable creation.",
+        )
+        parser.add_argument(
+            "--backscrape-wait",
+            type=int,
+            default=0,
+            help="Seconds to wait after consuming each element "
+            "of the backscrape iterable",
         )
 
     def parse_and_scrape_site(
@@ -49,6 +58,13 @@ class Command(cl_scrape_opinions.Command):
         ):
             site.parse()
             self.scrape_court(site, full_crawl=True)
+
+            if wait := options["backscrape_wait"]:
+                logger.info(
+                    "Sleeping for %s seconds before continuing backscrape",
+                    wait,
+                )
+                time.sleep(wait)
 
     def save_everything(self, items, index=False, backscrape=True):
         super().save_everything(items, index, backscrape)
