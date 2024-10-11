@@ -205,13 +205,9 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
 
     count = await filtered_list.acount()
 
-    prices = await asyncio.gather(
-        *[
-            price(prayer.recap_document)
-            for prayer in await filtered_list.alist()
-        ]
-    )
-    total_cost = sum(map(float, prices))
+    total_cost = 0
+    async for prayer in filtered_list:
+        total_cost += float(price(prayer.recap_document))
 
     return count, total_cost
 
@@ -222,14 +218,13 @@ async def get_lifetime_prayer_stats() -> tuple[int, int, float]:
 
     count = await filtered_list.acount()
 
-    distinct_documents = filtered_list.values_list(
-        "recap_document", flat=True
-    ).distinct()
-    num_distinct_purchases = len(distinct_documents)
+    total_cost = 0
+    distinct_documents = set()
 
-    prices = await asyncio.gather(
-        *[price(recap_document) for recap_document in distinct_documents]
-    )
-    total_cost = sum(map(float, prices))
+    async for prayer in filtered_list:
+        distinct_documents.add(prayer.recap_document)
+        total_cost += float(await price(prayer.recap_document))
+
+    num_distinct_purchases = len(distinct_documents)
 
     return count, num_distinct_purchases, total_cost
