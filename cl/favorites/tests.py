@@ -10,7 +10,7 @@ from django.core import mail
 from django.template.defaultfilters import date as template_date
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
-from django.utils.timezone import now
+from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
 
@@ -925,7 +925,7 @@ class RECAPPrayAndPay(TestCase):
             email_text_content,
         )
         self.assertIn(
-            f"You requested it on {template_date(prayer_1.date_created, 'M j, Y')}",
+            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'M j, Y')}",
             email_text_content,
         )
         self.assertIn(
@@ -946,7 +946,7 @@ class RECAPPrayAndPay(TestCase):
             html_content,
         )
         self.assertIn(
-            f"You requested it on {template_date(prayer_1.date_created, 'M j, Y')}",
+            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'M j, Y')}",
             html_content,
         )
         self.assertIn(
