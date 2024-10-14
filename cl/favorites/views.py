@@ -9,12 +9,10 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseNotAllowed,
-    HttpResponseRedirect,
     HttpResponseServerError,
 )
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
-from django.urls import reverse
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
