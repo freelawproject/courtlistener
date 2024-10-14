@@ -20,7 +20,6 @@ from cl.favorites.models import DocketTag, Note, UserTag
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
-    get_lifetime_prayer_stats,
     get_top_prayers,
     get_user_prayer_history,
 )
