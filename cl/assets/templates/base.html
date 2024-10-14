@@ -231,9 +231,11 @@
                 <li>
                   <a href="https://free.law/recap/" tabindex="202">Install RECAP</a>
                 </li>
-                {% comment %} <li>
-                  <a href="{% url "top_prayers" %}#recap-alerts" tabindex="203">Pray and Pay Project</a>
-                </li> {% endcomment %}
+                {% flag "pray-and-pay" %}
+                  <li>
+                    <a href="{% url "top_prayers" %}#recap-alerts" tabindex="203">Pray and Pay Project</a>
+                  </li>
+                {% endflag %}
                 <li>
                   <a href="{% url "alert_help" %}#recap-alerts" tabindex="204">Get Case Alerts</a>
                 </li>
