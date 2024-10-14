@@ -1,13 +1,31 @@
 # !/usr/bin/python
 # -*- coding: utf-8 -*-
 import time
+from functools import lru_cache
 
 from asgiref.sync import async_to_sync
 from django.db.models import Q
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.people_db.lookup_utils import lookup_judge_by_full_name
+from cl.people_db.models import Person
 from cl.search.models import Docket
+
+
+@lru_cache(maxsize=30_000)
+def cached_lookup_judge_by_full_name(
+    full_name: str, court_id: int, date_filed: str
+) -> Person | None:
+    """Fetch a judge by full name with LRU caching. Store 30,000 judge lookups.
+
+    :param full_name: The full name of the judge.
+    :param court_id: The ID of the court.
+    :param date_filed: The date the case was filed.
+    :return: A Person object if the judge is found, otherwise None.
+    """
+    return async_to_sync(lookup_judge_by_full_name)(
+        full_name, court_id, date_filed
+    )
 
 
 def find_and_fix_docket_judges(
@@ -31,14 +49,14 @@ def find_and_fix_docket_judges(
     fixed_dockets = 0
     for iteration, d in enumerate(dockets_with_judges.iterator(), start=1):
         new_referred = (
-            async_to_sync(lookup_judge_by_full_name)(
+            cached_lookup_judge_by_full_name(
                 d.referred_to_str, d.court_id, d.date_filed
             )
             if d.referred_to_str
             else None
         )
         new_assigned = (
-            async_to_sync(lookup_judge_by_full_name)(
+            cached_lookup_judge_by_full_name(
                 d.assigned_to_str, d.court_id, d.date_filed
             )
             if d.assigned_to_str
