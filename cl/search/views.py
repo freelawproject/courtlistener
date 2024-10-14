@@ -1,10 +1,7 @@
 import logging
-import math
 import pickle
-import time
 import traceback
 from datetime import date, datetime, timedelta, timezone
-from math import ceil
 from urllib.parse import quote
 
 import waffle
@@ -62,6 +59,7 @@ from cl.lib.search_utils import (
     make_stats_variable,
     merge_form_with_courts,
     regroup_snippets,
+    store_search_query,
 )
 from cl.lib.types import CleanData
 from cl.lib.utils import (
@@ -82,13 +80,7 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm, _clean_form
-from cl.search.models import (
-    SEARCH_TYPES,
-    Court,
-    Opinion,
-    OpinionCluster,
-    SearchQuery,
-)
+from cl.search.models import SEARCH_TYPES, Court, Opinion, OpinionCluster
 from cl.stats.models import Stat
 from cl.stats.utils import tally_stat
 from cl.visualizations.models import SCOTUSMap
@@ -266,17 +258,17 @@ def do_search(
     )
     return {
         "results": paged_results,
-        "facet_fields": make_stats_variable(search_form, paged_results),
         "search_form": search_form,
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
+        "error": error,
         "courts": courts,
         "court_count_human": court_count_human,
         "court_count": court_count,
         "query_citation": query_citation,
-        "error": error,
         "cited_cluster": cited_cluster,
         "related_cluster": related_cluster,
+        "facet_fields": make_stats_variable(search_form, paged_results),
     }
 
 
@@ -335,39 +327,6 @@ def get_homepage_stats():
         "private": False,  # VERY IMPORTANT!
     }
     return homepage_data
-
-
-def store_search_query(request: HttpRequest, search_results: dict) -> None:
-    """Saves an user's search query in a SearchQuery model
-
-    The `hit_cache` and `query_time_ms` fields computation depend on
-    whether the search was executed via ElasticSearch or Solr
-
-    :param request: the request object
-    :param search_results: the dict returned by `do_search` or
-        `do_es_search` functions
-    :return None
-    """
-    search_query = SearchQuery(
-        user=None if request.user.is_anonymous else request.user,
-        get_params=request.GET.urlencode(),
-    )
-
-    query_time = search_results.get("results_details", [None])[0]
-    if query_time is not None:
-        search_query.query_time_ms = ceil(query_time)
-        # We set ES `query_time` metadata with values 0 or 1 if cache is hit:
-        # 0: homepage cache; 1: micro cache
-        search_query.hit_cache = query_time in [0, 1]
-        search_query.save()
-    elif not search_results.get("error"):
-        search_query.query_time_ms = ceil(
-            search_results["results"].object_list.QTime
-        )
-        # Solr searches are not cached unless a cache_key is passed
-        # No cache_key is passed for the endpoints we are storing
-        search_query.hit_cache = False
-        search_query.save()
 
 
 @never_cache
@@ -561,8 +520,6 @@ def show_results(request: HttpRequest) -> HttpResponse:
         )
 
     search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
-    search_results = {}
-
     match search_type:
         case SEARCH_TYPES.PARENTHETICAL:
             search_results = do_es_search(request.GET.copy())
@@ -895,12 +852,12 @@ def do_es_search(
         "courts": courts,
         "court_count_human": court_count_human,
         "court_count": court_count,
+        "query_citation": query_citation,
+        "cited_cluster": cited_cluster,
+        "related_cluster": related_cluster,
+        "facet_fields": facet_fields,
         "error_message": error_message,
         "suggested_query": suggested_query,
-        "related_cluster": related_cluster,
-        "cited_cluster": cited_cluster,
-        "query_citation": query_citation,
-        "facet_fields": facet_fields,
         "estimated_count_threshold": simplify_estimated_count(
             compute_lowest_possible_estimate(
                 settings.ELASTICSEARCH_CARDINALITY_PRECISION

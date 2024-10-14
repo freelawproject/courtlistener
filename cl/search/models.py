@@ -3926,6 +3926,18 @@ class SEARCH_TYPES:
 
 
 class SearchQuery(models.Model):
+    WEBSITE = 1
+    API = 2
+    SOURCES = (
+        (WEBSITE, "Website"),
+        (API, "API request"),
+    )
+    ELASTICSEARCH = 1
+    SOLR = 2
+    ENGINES = (
+        (ELASTICSEARCH, "Elasticsearch"),
+        (SOLR, "Solr"),
+    )
     user = models.ForeignKey(
         User,
         help_text="The user who performed this search query.",
@@ -3934,17 +3946,28 @@ class SearchQuery(models.Model):
         null=True,
         blank=True,
     )
+    source = models.SmallIntegerField(
+        help_text="The interface used to perform the query.", choices=SOURCES
+    )
     get_params = models.TextField(
         help_text="The GET parameters of the search query."
     )
     query_time_ms = models.IntegerField(
-        help_text="The milliseconds to execute the query, as returned in the ElasticSearch or Solr response."
+        help_text="The milliseconds to execute the query, as returned in "
+        "the ElasticSearch or Solr response.",
+        null=True,
     )
     hit_cache = models.BooleanField(
         help_text="Whether the query hit the cache or not."
     )
+    failed = models.BooleanField(
+        help_text="True if there was an error executing the query."
+    )
+    engine = models.SmallIntegerField(
+        help_text="The engine that executed the search", choices=ENGINES
+    )
     date_created = models.DateTimeField(
-        help_text="Datetime when the record was created",
+        help_text="Datetime when the record was created.",
         auto_now_add=True,
     )
 

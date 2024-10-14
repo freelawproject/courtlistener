@@ -1585,6 +1585,8 @@ class SaveSearchQueryTest(TestCase):
                     parsed_query[key][0] == stored_values[0],
                     f"Query was not saved properly for endpoint {query}",
                 )
+                self.assertEqual(last_query.engine, SearchQuery.ELASTICSEARCH)
+                self.assertEqual(last_query.source, SearchQuery.WEBSITE)
 
         self.assertTrue(
             SearchQuery.objects.last().hit_cache,
@@ -1607,6 +1609,18 @@ class SaveSearchQueryTest(TestCase):
                     parsed_query[key][0] == stored_values[0],
                     f"Query was not saved properly for endpoint {query}",
                 )
+            self.assertEqual(last_query.engine, SearchQuery.SOLR)
+            self.assertEqual(last_query.source, SearchQuery.WEBSITE)
+
+    def test_failed_es_search_queries(self) -> None:
+        """Do we flag failed ElasticSearch queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse('show_results')}?{query}"
+        self.client.get(url)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed)
+        self.assertEqual(last_query.query_time_ms, None)
+        self.assertEqual(last_query.engine, SearchQuery.ELASTICSEARCH)
 
 
 class CaptionTest(TestCase):
