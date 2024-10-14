@@ -173,27 +173,7 @@
                         </a>
                         {% flag "pray-and-pay" %}
                           <div class="prayer-button" data-gap-size="{% if rd.page_count %}small{% else %}large{% endif %}">
-                            {% if request.user.is_authenticated %}
-                            <form method="POST" action="{% if rd.prayer_exists %}{% url 'delete_prayer' rd.id %}{% else %}{% url 'create_prayer' rd.id %}{% endif %}" style="display:inline;">
-                              {% csrf_token %}
-                              <button type="submit"
-                                      class="btn btn-default btn-xs prayer-button {% if not prayer_eligible %}disabled{% endif %}"
-                                      data-document-id="{{ rd.id }}"
-                                      title="{% if rd.prayer_exists %}Click to remove your request.{% elif not prayer_eligible %}You have reached your daily request limit.{% else %}Click to request this document.{% endif %}"
-                                      >
-                                {{rd.prayer_count}} 🙏
-                              </button>
-                            </form>
-                            {% else %}
-                              <button
-                                class="btn btn-default btn-xs"
-                                data-toggle="modal"
-                                data-target="#modal-logged-out"
-                                title="Sign in to request document."
-                                >
-                                {{rd.prayer_count}} 🙏
-                              </button>
-                            {% endif %}
+                            {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
                           </div>
                         {% endflag %}
                       {% endif %}

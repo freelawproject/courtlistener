@@ -1,0 +1,21 @@
+{% if request.user.is_authenticated %}
+  <form method="POST" action="{% if prayer_exists %}{% url 'delete_prayer' document_id %}{% else %}{% url 'create_prayer' document_id %}{% endif %}" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit"
+            class="btn btn-default btn-xs prayer-button {% if not prayer_eligible %}disabled{% endif %}"
+            data-document-id="{{ document_id }}"
+            title="{% if prayer_exists %}Click to remove your request.{% elif not prayer_eligible %}You have reached your daily request limit.{% else %}Click to request this document.{% endif %}"
+            >
+      {{count}} 🙏
+    </button>
+  </form>
+{% else %}
+  <button
+    class="btn btn-default btn-xs"
+    data-toggle="modal"
+    data-target="#modal-logged-out"
+    title="Sign in to request document."
+    >
+    {{count}} 🙏
+  </button>
+{% endif %}
