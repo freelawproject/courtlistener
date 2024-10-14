@@ -192,7 +192,7 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
 
     context = {
         "top_prayers": top_prayers,
-        "private": True,  # Temporary to prevent Google indexing
+        "private": False,
     }
 
     if request.user.is_authenticated:
