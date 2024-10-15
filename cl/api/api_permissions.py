@@ -5,7 +5,6 @@ from rest_framework import permissions
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
 
-from cl.api.utils import get_logging_prefix
 from cl.lib.redis_utils import get_redis_interface
 
 
@@ -24,15 +23,14 @@ class V3APIPermission(permissions.BasePermission):
 
     def is_new_v3_user(self, user: User) -> bool:
         """Check if the user is new for V3 by determining their presence in the
-        V3 API stats.
+        v3-user-list.
 
         :param user: The User to check.
         :return: True if the user is new for V3, False otherwise.
         """
-        api_prefix = get_logging_prefix("v3")
-        set_key = f"{api_prefix}.user.counts"
-        score = self.r.zscore(set_key, user.id)
-        return score is None
+
+        is_new_user = self.r.sismember("v3-user-list", user.id) != 1
+        return is_new_user
 
     @staticmethod
     def is_v3_api_request(request: HttpRequest) -> bool:

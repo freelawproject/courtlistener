@@ -422,7 +422,8 @@ class ApiEventCreationTestCase(TestCase):
 
 @override_settings(BLOCK_NEW_V3_USERS=True)
 @mock.patch(
-    "cl.api.api_permissions.get_logging_prefix", return_value="api-block:v3"
+    "cl.api.api_permissions.get_logging_prefix",
+    return_value="api-block-test:v3",
 )
 class BlockV3APITests(TestCase):
     """Check that V3 API is restricted for anonymous and new users."""
@@ -445,9 +446,20 @@ class BlockV3APITests(TestCase):
         self.flush_stats()
 
     def flush_stats(self) -> None:
-        keys = self.r.keys("api-block:*")
+        keys = self.r.keys("api-block-test:*")
         if keys:
             self.r.delete(*keys)
+
+        v3_user_list = self.r.keys("v3-user-list")
+        if v3_user_list:
+            self.r.delete(*v3_user_list)
+
+    def create_v3_user_list(self) -> None:
+        v3_stats_members = self.r.zrange(
+            "api-block-test:v3.user.counts", 0, -1
+        )
+        if v3_stats_members:
+            self.r.sadd("v3-user-list", *v3_stats_members)
 
     async def test_block_v3_for_new_users(self, mock_api_prefix) -> None:
         """Confirm new v3 API users are blocked"""
@@ -460,7 +472,11 @@ class BlockV3APITests(TestCase):
 
     async def test_allow_v3_for_existing_users(self, mock_api_prefix) -> None:
         """Confirm that existing v3 API users are granted access to use it"""
-        self.r.zincrby("api-block:v3.user.counts", 1, self.user_2.pk)
+
+        # Simulate v3 existing user and create v3 user list.
+        self.r.zincrby("api-block-test:v3.user.counts", 1, self.user_2.pk)
+        self.create_v3_user_list()
+
         response = await self.client_2.get(self.audio_path_v3, format="json")
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
