@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -2298,6 +2299,28 @@ class RecapDocketTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.judge = PersonFactory.create(name_first="John", name_last="Miller")
+        PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court_id=cls.court.pk,
+            date_start=date(2020, 11, 10),
+            position_type="c-jud",
+            person=cls.judge,
+            how_selected="a_legis",
+            nomination_process="fed_senate",
+        )
+        cls.judge_2 = PersonFactory.create(
+            name_first="Debbie", name_last="Roe"
+        )
+        PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court_id=cls.court.pk,
+            date_start=date(2019, 11, 10),
+            position_type="c-jud",
+            person=cls.judge_2,
+            how_selected="a_legis",
+            nomination_process="fed_senate",
+        )
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -2680,26 +2703,6 @@ class RecapDocketTaskTest(TestCase):
                 date_filed=date(2022, 12, 14),
             ),
         )
-        judge = PersonFactory.create(name_first="John", name_last="Miller")
-        PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court_id=self.court.pk,
-            date_start=date(2020, 11, 10),
-            position_type="c-jud",
-            person=judge,
-            how_selected="a_legis",
-            nomination_process="fed_senate",
-        )
-        judge_2 = PersonFactory.create(name_first="Debbie", name_last="Roe")
-        PositionFactory.create(
-            date_granularity_start="%Y-%m-%d",
-            court_id=self.court.pk,
-            date_start=date(2019, 11, 10),
-            position_type="c-jud",
-            person=judge_2,
-            how_selected="a_legis",
-            nomination_process="fed_senate",
-        )
 
         # Test for district docket. Related judges exist in the people_db
         async_to_sync(update_docket_metadata)(d, docket_data)
@@ -2708,8 +2711,8 @@ class RecapDocketTaskTest(TestCase):
 
         self.assertEqual(d.referred_to_str, "John Miller")
         self.assertEqual(d.assigned_to_str, "Debbie Roe")
-        self.assertEqual(d.referred_to_id, judge.pk)
-        self.assertEqual(d.assigned_to_id, judge_2.pk)
+        self.assertEqual(d.referred_to_id, self.judge.pk)
+        self.assertEqual(d.assigned_to_id, self.judge_2.pk)
 
         # Confirm that related judges are not removed if no referred_to_str or
         # assigned_to_str are available in the docket metadata.
@@ -2726,8 +2729,8 @@ class RecapDocketTaskTest(TestCase):
         d.refresh_from_db()
         self.assertEqual(d.referred_to_str, "John Miller")
         self.assertEqual(d.assigned_to_str, "Debbie Roe")
-        self.assertEqual(d.referred_to_id, judge.pk)
-        self.assertEqual(d.assigned_to_id, judge_2.pk)
+        self.assertEqual(d.referred_to_id, self.judge.pk)
+        self.assertEqual(d.assigned_to_id, self.judge_2.pk)
 
         # Judges have changed from the source. Confirm that referred_to_str and
         # assigned_to_str are updated, while referred_to_id and assigned_to_id
@@ -2762,10 +2765,10 @@ class RecapDocketTaskTest(TestCase):
             d_a.originating_court_information.assigned_to_str, "Debbie Roe"
         )
         self.assertEqual(
-            d_a.originating_court_information.ordering_judge_id, judge.pk
+            d_a.originating_court_information.ordering_judge_id, self.judge.pk
         )
         self.assertEqual(
-            d_a.originating_court_information.assigned_to_id, judge_2.pk
+            d_a.originating_court_information.assigned_to_id, self.judge_2.pk
         )
 
         # Clean up judges in originating_court_information
@@ -2800,9 +2803,59 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(
             d_a.originating_court_information.assigned_to_id, None
         )
-
         d.delete()
         d_a.delete()
+
+    def test_clean_up_docket_judge_fields_command(
+        self,
+    ) -> None:
+        """Ensure the command clean_up_docket_judges works correct.
+        The referred_to or assigned_to fields are cleared if the
+        referred_to_str or assigned_to_str judges don't exist in people_db.
+        """
+
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+            date_filed=date(2023, 12, 14),
+            referred_to_str="Marcus Carter",
+            assigned_to_str="Evelyn Whitfield",
+            referred_to_id=self.judge.pk,
+            assigned_to_id=self.judge_2.pk,
+        )
+
+        d_a = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="123421",
+            court_id=self.court.pk,
+            date_filed=date(2023, 12, 14),
+            appeal_from=self.court,
+            referred_to_str="Marcus Carter",
+            assigned_to_str="John Miller",
+            referred_to_id=self.judge.pk,
+            assigned_to_id=self.judge_2.pk,
+        )
+
+        self.assertEqual(d.referred_to_str, "Marcus Carter")
+        self.assertEqual(d.assigned_to_str, "Evelyn Whitfield")
+        self.assertEqual(d.referred_to_id, self.judge.pk)
+        self.assertEqual(d.assigned_to_id, self.judge_2.pk)
+
+        call_command("clean_up_docket_judges", testing_mode=True)
+
+        d.refresh_from_db()
+        self.assertEqual(d.referred_to_str, "Marcus Carter")
+        self.assertEqual(d.assigned_to_str, "Evelyn Whitfield")
+        self.assertEqual(d.referred_to_id, None)
+        self.assertEqual(d.assigned_to_id, None)
+
+        # Only one Judge should be cleaned up.
+        d_a.refresh_from_db()
+        self.assertEqual(d_a.referred_to_str, "Marcus Carter")
+        self.assertEqual(d_a.assigned_to_str, "John Miller")
+        self.assertEqual(d_a.referred_to_id, None)
+        self.assertEqual(d_a.assigned_to_id, self.judge.pk)
 
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")
