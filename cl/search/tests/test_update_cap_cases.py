@@ -173,158 +173,124 @@ class UpdateCapCasesTest(TestCase):
             changes,
         )
 
-    # def test_update_cap_html_with_extra_cap_opinion(self):
-    #     # Case: CAP HTML includes an data not present in CL XML
-    #     cap_html = """
-    #     <section class="casebody">
-    #         <article class="opinion" data-type="majority">
-    #             <p class="author" id="b1">AUTHOR NAME</p>
-    #             <p id="b2">Some opinion text</p>
-    #         </article>
-    #         <article class="opinion" data-type="dissent">
-    #             <p class="author" id="b3">DISSENTING JUDGE</p>
-    #             <p id="b4">Dissent text</p>
-    #         </article>
-    #     </section>
-    #     """
+    def test_update_cap_html_with_extra_cap_opinion(self):
+        # Case: CAP HTML includes an opinion not present in CL XML
+        cap_html = """
+        <section class="casebody">
+            <article class="opinion" data-type="majority">
+                <p class="author" id="b1">AUTHOR NAME</p>
+                <p id="b2">Some opinion text</p>
+            </article>
+            <article class="opinion" data-type="dissent">
+                <p class="author" id="b3">DISSENTING JUDGE</p>
+                <p id="b4">Dissent text</p>
+            </article>
+        </section>
+        """
 
-    #     cl_xml_list = [
-    #         {
-    #             "id": 1,
-    #             "type": "majority",
-    #             "xml": """
-    #     <opinion type="majority">
-    #         <author id="b1">UPDATED AUTHOR NAME</author>
-    #         <p id="b2">Updated opinion text</p>
-    #     </opinion>
-    #     """,
-    #         }
-    #     ]
+        cl_xml_list = [
+            {
+                "id": 1,
+                "type": "majority",
+                "xml": """
+        <opinion type="majority">
+            <author id="b1">UPDATED AUTHOR NAME</author>
+            <p id="b2">Updated opinion text</p>
+        </opinion>
+        """,
+            }
+        ]
 
-    #     processed_opinions, changes = self.command.update_cap_html_with_cl_xml(
-    #         cap_html, cl_xml_list
-    #     )
+        processed_opinions, changes = self.command.update_cap_html_with_cl_xml(
+            cap_html, cl_xml_list
+        )
 
-    #     # Check the number of processed opinions
-    #     self.assertEqual(
-    #         len(processed_opinions), 2, "Both opinions should be processed"
-    #     )
+        # Check the number of processed opinions
+        self.assertEqual(
+            len(processed_opinions),
+            1,
+            "Only the majority opinion should be processed",
+        )
 
-    #     # Check that both majority and dissent opinions are in the processed opinions
-    #     opinion_types = [op["type"] for op in processed_opinions]
-    #     self.assertIn(
-    #         "majority",
-    #         opinion_types,
-    #         "The majority opinion should be in the processed opinions",
-    #     )
-    #     self.assertIn(
-    #         "dissent",
-    #         opinion_types,
-    #         "The dissent opinion should be in the processed opinions",
-    #     )
+        # Check that only the majority opinion is in the processed opinions
+        self.assertEqual(
+            processed_opinions[0]["type"],
+            "majority",
+            "Only the majority opinion should be in the processed opinions",
+        )
 
-    #     # Check the content of the majority opinion
-    #     majority_opinion = next(
-    #         op for op in processed_opinions if op["type"] == "majority"
-    #     )
-    #     majority_soup = BeautifulSoup(majority_opinion["xml"], "xml")
-    #     self.assertEqual(
-    #         majority_soup.author.text,
-    #         "UPDATED AUTHOR NAME",
-    #         "The author name should be updated from CL XML",
-    #     )
-    #     self.assertEqual(
-    #         majority_soup.p.text,
-    #         "Updated opinion text",
-    #         "The opinion text should be updated from CL XML",
-    #     )
+        # Check the content of the majority opinion
+        majority_soup = BeautifulSoup(processed_opinions[0]["xml"], "xml")
+        self.assertEqual(
+            majority_soup.author.text,
+            "AUTHOR NAME",
+            "The author name should be preserved from CAP HTML",
+        )
+        self.assertEqual(
+            majority_soup.p.text,
+            "Some opinion text",
+            "The opinion text should be preserved from CAP HTML",
+        )
 
-    #     # Check the content of the dissent opinion
-    #     dissent_opinion = next(
-    #         op for op in processed_opinions if op["type"] == "dissent"
-    #     )
-    #     dissent_soup = BeautifulSoup(dissent_opinion["xml"], "xml")
-    #     self.assertEqual(
-    #         dissent_soup.author.text,
-    #         "DISSENTING JUDGE",
-    #         "The dissent author should be preserved from CAP HTML",
-    #     )
-    #     self.assertEqual(
-    #         dissent_soup.p.text,
-    #         "Dissent text",
-    #         "The dissent text should be preserved from CAP HTML",
-    #     )
+        # Check that there's no note about the dissent opinion
+        self.assertNotIn("Preserved dissent opinion from CAP HTML", changes)
+        self.assertNotIn("Updated content for majority opinion", changes)
 
-    #     # Check that changes reflect the update to the majority opinion
-    #     self.assertIn("Updated content for majority opinion", changes)
+    def test_update_cap_html_with_extra_cap_content(self):
+        # Case: CAP HTML includes extra content within a matching opinion
+        cap_html = """
+        <section class="casebody">
+            <article class="opinion" data-type="majority">
+                <p class="author" id="b1">AUTHOR NAME</p>
+                <p id="b2">Some opinion text</p>
+                <p id="b3">Extra CAP content</p>
+            </article>
+        </section>
+        """
 
-    #     # Check that there's a note about preserving the dissent opinion
-    #     self.assertIn("Preserved dissent opinion from CAP HTML", changes)
+        cl_xml_list = [
+            {
+                "id": 1,
+                "type": "majority",
+                "xml": """
+        <opinion type="majority">
+            <author id="b1">UPDATED AUTHOR NAME</author>
+            <p id="b2">Updated opinion text</p>
+        </opinion>
+        """,
+            }
+        ]
 
-    # def test_update_cap_html_with_extra_cap_content(self):
-    #     # Case: CAP HTML includes extra content within a matching opinion
-    #     cap_html = """
-    #     <section class="casebody">
-    #         <article class="opinion" data-type="majority">
-    #             <p class="author" id="b1">AUTHOR NAME</p>
-    #             <p id="b2">Some opinion text</p>
-    #             <p id="b3">Extra CAP content</p>
-    #         </article>
-    #     </section>
-    #     """
+        processed_opinions, changes = self.command.update_cap_html_with_cl_xml(
+            cap_html, cl_xml_list
+        )
 
-    #     cl_xml_list = [
-    #         {
-    #             "id": 1,
-    #             "type": "majority",
-    #             "xml": """
-    #     <opinion type="majority">
-    #         <author id="b1">UPDATED AUTHOR NAME</author>
-    #         <p id="b2">Updated opinion text</p>
-    #     </opinion>
-    #     """,
-    #         }
-    #     ]
+        self.assertEqual(
+            len(processed_opinions), 1, "One opinion should be processed"
+        )
 
-    #     processed_opinions, changes = self.command.update_cap_html_with_cl_xml(
-    #         cap_html, cl_xml_list
-    #     )
+        majority_opinion = processed_opinions[0]
+        self.assertEqual(majority_opinion["type"], "majority")
 
-    #     self.assertEqual(
-    #         len(processed_opinions), 1, "One opinion should be processed"
-    #     )
+        majority_soup = BeautifulSoup(majority_opinion["xml"], "xml")
 
-    #     majority_opinion = processed_opinions[0]
-    #     self.assertEqual(majority_opinion["type"], "majority")
-
-    #     majority_soup = BeautifulSoup(majority_opinion["xml"], "xml")
-
-    #     # Check that CL updates are applied
-    #     self.assertEqual(
-    #         majority_soup.author.text,
-    #         "UPDATED AUTHOR NAME",
-    #         "The author name should be updated from CL XML",
-    #     )
-    #     self.assertEqual(
-    #         majority_soup.find("p", id="b2").text,
-    #         "Updated opinion text",
-    #         "The opinion text should be updated from CL XML",
-    #     )
-
-    #     # Check that extra CAP content is preserved
-    #     self.assertIsNotNone(
-    #         majority_soup.find("p", id="b3"),
-    #         "Extra CAP content should be preserved",
-    #     )
-    #     self.assertEqual(
-    #         majority_soup.find("p", id="b3").text,
-    #         "Extra CAP content",
-    #         "Extra CAP content should be unchanged",
-    #     )
-
-    #     # Check that changes reflect the update to the majority opinion and preservation of extra content
-    #     self.assertIn("Updated content for majority opinion", changes)
-    #     self.assertIn(
-    #         "Preserved extra content in majority opinion from CAP HTML",
-    #         changes,
-    #     )
+        # Check that CAP content is preserved
+        self.assertEqual(
+            majority_soup.author.text,
+            "AUTHOR NAME",
+            "The author name should be preserved from CAP HTML",
+        )
+        self.assertEqual(
+            majority_soup.find("p", id="b2").text,
+            "Some opinion text",
+            "The opinion text should be preserved from CAP HTML",
+        )
+        self.assertIsNotNone(
+            majority_soup.find("p", id="b3"),
+            "Extra CAP content should be preserved",
+        )
+        self.assertEqual(
+            majority_soup.find("p", id="b3").text,
+            "Extra CAP content",
+            "Extra CAP content should be unchanged",
+        )
