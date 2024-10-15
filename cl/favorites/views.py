@@ -202,7 +202,19 @@ async def create_prayer_view(
     request: HttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
+    is_htmx_request = request.META.get("HTTP_HX_REQUEST", False)
     if not await prayer_eligible(request.user):
+        if is_htmx_request:
+            return TemplateResponse(
+                request,
+                "includes/pray_and_pay_htmx/pray_button.html",
+                {
+                    "prayer_exists": False,
+                    "document_id": recap_document,
+                    "count": 0,
+                    "daily_limit_reached": True,
+                },
+            )
         return HttpResponseServerError(
             "User have reached your daily request limit"
         )
@@ -211,8 +223,7 @@ async def create_prayer_view(
 
     # Call the create_prayer async function
     await create_prayer(user, recap_document)
-
-    if request.META.get("HTTP_HX_REQUEST"):
+    if is_htmx_request:
         return TemplateResponse(
             request,
             "includes/pray_and_pay_htmx/pray_button.html",
@@ -220,6 +231,7 @@ async def create_prayer_view(
                 "prayer_exists": True,
                 "document_id": recap_document.pk,
                 "count": 0,
+                "daily_limit_reached": False,
             },
         )
     return HttpResponse("It worked.")

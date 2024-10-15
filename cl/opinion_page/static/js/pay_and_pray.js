@@ -48,8 +48,18 @@ document.addEventListener('htmx:oobBeforeSwap', function (event) {
   // fragment to avoid unnecessary server calculations.
   let form = event.detail.elt;
   let button = form.querySelector('button');
+  // If the daily limit tooltip is present in the fragment, it means the user
+  // has reached their limit. Therefore, we should revert any changes made to
+  // the prayer button.
+  if (event.detail.fragment.querySelector('#daily_limit_tooltip')) {
+    updatePrayerButton(button);
+  }
   let documentId = button.dataset.documentId;
   let prayerCounterSpan = document.querySelector(`#counter_${documentId}`);
   let prayerCount = parseInt(prayerCounterSpan.innerText, 10);
   event.detail.fragment.getElementById(`counter_${documentId}`).innerText = prayerCount;
+});
+
+document.addEventListener('htmx:oobAfterSwap', function (event) {
+  $('[data-toggle="tooltip"]').tooltip();
 });
