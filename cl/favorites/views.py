@@ -22,6 +22,7 @@ from cl.favorites.utils import (
     delete_prayer,
     get_top_prayers,
     get_user_prayer_history,
+    prayer_eligible,
 )
 from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
@@ -214,11 +215,26 @@ async def create_prayer_view(
     request: HttpRequest, recap_document: int
 ) -> HttpResponse:
     user = request.user
+    if not await prayer_eligible(request.user):
+        return HttpResponseServerError(
+            "User have reached your daily request limit"
+        )
+
     recap_document = await RECAPDocument.objects.aget(id=recap_document)
 
     # Call the create_prayer async function
-    new_prayer = await create_prayer(user, recap_document)
+    await create_prayer(user, recap_document)
 
+    if request.META.get("HTTP_HX_REQUEST"):
+        return TemplateResponse(
+            request,
+            "includes/pray_and_pay_htmx/pray_button.html",
+            {
+                "prayer_exists": True,
+                "document_id": recap_document.pk,
+                "count": 0,
+            },
+        )
     return HttpResponse("It worked.")
 
 
@@ -232,4 +248,14 @@ async def delete_prayer_view(
     # Call the delete_prayer async function
     await delete_prayer(user, recap_document)
 
+    if request.META.get("HTTP_HX_REQUEST"):
+        return TemplateResponse(
+            request,
+            "includes/pray_and_pay_htmx/pray_button.html",
+            {
+                "prayer_exists": False,
+                "document_id": recap_document.pk,
+                "count": 0,
+            },
+        )
     return HttpResponse("It worked.")
