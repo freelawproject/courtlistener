@@ -136,6 +136,7 @@ ROOT_URLCONF = "cl.urls"
 
 INSTALLED_APPS = [
     "daphne",
+    "pghistory.admin",
     "django.contrib.admin",
     "django.contrib.admindocs",
     "django.contrib.contenttypes",
@@ -189,6 +190,8 @@ if DEVELOPMENT:
 
 ASGI_APPLICATION = "cl.asgi.application"
 
+# Disable /admin/pghistory/events/ view that shows all the events without any filter
+PGHISTORY_ADMIN_ALL_EVENTS = False
 
 ################
 # Misc. Django #
