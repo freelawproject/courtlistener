@@ -116,3 +116,5 @@ REST_FRAMEWORK = {
 
 if DEVELOPMENT:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = "10000/day"  # type: ignore
+
+BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)

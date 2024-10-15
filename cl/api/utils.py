@@ -186,11 +186,11 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
-def get_logging_prefix() -> str:
+def get_logging_prefix(api_version: str) -> str:
     """Simple tool for getting the prefix for logging API requests. Useful for
     mocking the logger.
     """
-    return "api:v3"
+    return f"api:{api_version}"
 
 
 class LoggingMixin:
@@ -255,7 +255,7 @@ class LoggingMixin:
 
         r = get_redis_interface("STATS")
         pipe = r.pipeline()
-        api_prefix = get_logging_prefix()
+        api_prefix = get_logging_prefix(request.version)
 
         # Global and daily tallies for all URLs.
         pipe.incr(f"{api_prefix}.count")

@@ -11,6 +11,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
+from django.test import override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -24,6 +25,7 @@ from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import VersionBasedPagination
+from cl.api.utils import get_logging_prefix
 from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
@@ -326,8 +328,8 @@ class ApiEventCreationTestCase(TestCase):
         if keys:
             self.r.delete(*keys)
 
-    async def hit_the_api(self) -> None:
-        path = reverse("audio-list", kwargs={"version": "v3"})
+    async def hit_the_api(self, api_version) -> None:
+        path = reverse("audio-list", kwargs={"version": f"{api_version}"})
         request = AsyncRequestFactory().get(path)
 
         # Create the view and change the milestones to be something we can test
@@ -337,8 +339,7 @@ class ApiEventCreationTestCase(TestCase):
 
         # Set the attributes needed in the absence of middleware
         request.user = self.user
-
-        await sync_to_async(view)(request)
+        await sync_to_async(view)(request, **{"version": f"{api_version}"})
 
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
@@ -348,7 +349,7 @@ class ApiEventCreationTestCase(TestCase):
         self, mock_logging_prefix
     ) -> None:
         """Are event objects created as API requests are made?"""
-        await self.hit_the_api()
+        await self.hit_the_api("v3")
 
         expected_event_count = 1
         self.assertEqual(expected_event_count, await Event.objects.acount())
@@ -357,34 +358,125 @@ class ApiEventCreationTestCase(TestCase):
     # run in parallel do not affect this one.
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        return_value="api:Test",
+        side_effect=lambda *args, **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
     async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
         self.assertEqual(mock_logging_prefix.called, 0)
-        await self.hit_the_api()
+        await self.hit_the_api("v3")
         self.assertEqual(mock_logging_prefix.called, 1)
-        self.assertEqual(int(self.r.get("api:Test.count")), 1)
+        self.assertEqual(int(self.r.get("api:v3-Test.count")), 1)
 
         # User stats
         self.assertEqual(
-            self.r.zscore("api:Test.user.counts", self.user.pk), 1.0
+            self.r.zscore("api:v3-Test.user.counts", self.user.pk), 1.0
         )
 
         # IP address
-        keys = self.r.keys("api:Test.d:*")
+        keys = self.r.keys("api:v3-Test.d:*")
         ip_key = [k for k in keys if k.endswith("ip_map")][0]
         self.assertEqual(self.r.hlen(ip_key), 1)
 
         # Endpoints
         self.assertEqual(
-            self.r.zscore("api:Test.endpoint.counts", self.endpoint_name), 1
+            self.r.zscore("api:v3-Test.endpoint.counts", self.endpoint_name), 1
         )
 
         # Timings
         self.assertAlmostEqual(
-            int(self.r.get("api:Test.timing")), 10, delta=2000
+            int(self.r.get("api:v3-Test.timing")), 10, delta=2000
         )
+
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        side_effect=lambda *args, **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+    )
+    async def test_api_logged_correctly_v4(self, mock_logging_prefix) -> None:
+        # Global stats
+        self.assertEqual(mock_logging_prefix.called, 0)
+        await self.hit_the_api("v4")
+
+        self.assertEqual(mock_logging_prefix.called, 1)
+        self.assertEqual(int(self.r.get("api:v4-Test.count")), 1)
+
+        # User stats
+        self.assertEqual(
+            self.r.zscore("api:v4-Test.user.counts", self.user.pk), 1.0
+        )
+
+        # IP address
+        keys = self.r.keys("api:v4-Test.d:*")
+        ip_key = [k for k in keys if k.endswith("ip_map")][0]
+        self.assertEqual(self.r.hlen(ip_key), 1)
+
+        # Endpoints
+        self.assertEqual(
+            self.r.zscore("api:v4-Test.endpoint.counts", self.endpoint_name), 1
+        )
+
+        # Timings
+        self.assertAlmostEqual(
+            int(self.r.get("api:v4-Test.timing")), 10, delta=2000
+        )
+
+
+@override_settings(BLOCK_NEW_V3_USERS=True)
+@mock.patch(
+    "cl.api.api_permissions.get_logging_prefix", return_value="api-block:v3"
+)
+class BlockV3APITests(TestCase):
+    """Check that V3 API is restricted for anonymous and new users."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+        cls.client_1 = make_client(cls.user_1.pk)
+        cls.client_2 = make_client(cls.user_2.pk)
+
+        cls.audio_path_v3 = reverse("audio-list", kwargs={"version": "v3"})
+        cls.audio_path_v4 = reverse("audio-list", kwargs={"version": "v4"})
+
+    def setUp(self) -> None:
+        self.r = get_redis_interface("STATS")
+        self.flush_stats()
+
+    def tearDown(self) -> None:
+        self.flush_stats()
+
+    def flush_stats(self) -> None:
+        keys = self.r.keys("api-block:*")
+        if keys:
+            self.r.delete(*keys)
+
+    async def test_block_v3_for_new_users(self, mock_api_prefix) -> None:
+        """Confirm new v3 API users are blocked"""
+        response = await self.client_1.get(self.audio_path_v3, format="json")
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(
+            response.json()["detail"],
+            "As a new user, you don't have permission to access V3 of the API. Please use V4 instead.",
+        )
+
+    async def test_allow_v3_for_existing_users(self, mock_api_prefix) -> None:
+        """Confirm that existing v3 API users are granted access to use it"""
+        self.r.zincrby("api-block:v3.user.counts", 1, self.user_2.pk)
+        response = await self.client_2.get(self.audio_path_v3, format="json")
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    async def test_block_v3_for_anonymous_users(self, mock_api_prefix) -> None:
+        """Confirm anonymous v3 API users are blocked"""
+        response = await self.async_client.get(self.audio_path_v3)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(
+            response.json()["detail"],
+            "Anonymous users don't have permission to access V3 of the API. Please use V4 instead.",
+        )
+
+    async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
+        """Confirm new API users are allowed to use V4 of the API"""
+        response = await self.client_2.get(self.audio_path_v4, format="json")
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
 class DRFOrderingTests(TestCase):
