@@ -190,9 +190,6 @@ if DEVELOPMENT:
 
 ASGI_APPLICATION = "cl.asgi.application"
 
-# Disable /admin/pghistory/events/ view that shows all the events without any filter
-PGHISTORY_ADMIN_ALL_EVENTS = False
-
 ################
 # Misc. Django #
 ################
