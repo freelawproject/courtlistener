@@ -1569,6 +1569,9 @@ class SaveSearchQueryTest(TestCase):
             r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
         ]
         super().setUp()
+        self.source_error_message = (
+            f"Saved wrong `engine` value, expected {SearchQuery.WEBSITE}"
+        )
 
     @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
     def test_search_query_saving(self) -> None:
@@ -1585,8 +1588,16 @@ class SaveSearchQueryTest(TestCase):
                     parsed_query[key][0] == stored_values[0],
                     f"Query was not saved properly for endpoint {query}",
                 )
-                self.assertEqual(last_query.engine, SearchQuery.ELASTICSEARCH)
-                self.assertEqual(last_query.source, SearchQuery.WEBSITE)
+                self.assertEqual(
+                    last_query.engine,
+                    SearchQuery.ELASTICSEARCH,
+                    f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+                )
+                self.assertEqual(
+                    last_query.source,
+                    SearchQuery.WEBSITE,
+                    self.source_error_message,
+                )
 
         self.assertTrue(
             SearchQuery.objects.last().hit_cache,
@@ -1609,8 +1620,16 @@ class SaveSearchQueryTest(TestCase):
                     parsed_query[key][0] == stored_values[0],
                     f"Query was not saved properly for endpoint {query}",
                 )
-            self.assertEqual(last_query.engine, SearchQuery.SOLR)
-            self.assertEqual(last_query.source, SearchQuery.WEBSITE)
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.SOLR,
+                f"Saved wrong `engine` value, expected {SearchQuery.SOLR}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.WEBSITE,
+                self.source_error_message,
+            )
 
     def test_failed_es_search_queries(self) -> None:
         """Do we flag failed ElasticSearch queries properly?"""
@@ -1618,9 +1637,15 @@ class SaveSearchQueryTest(TestCase):
         url = f"{reverse('show_results')}?{query}"
         self.client.get(url)
         last_query = SearchQuery.objects.last()
-        self.assertTrue(last_query.failed)
-        self.assertEqual(last_query.query_time_ms, None)
-        self.assertEqual(last_query.engine, SearchQuery.ELASTICSEARCH)
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
 
 
 class CaptionTest(TestCase):

@@ -1229,10 +1229,9 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         return
 
     if is_es_search:
-        # We set ES `query_time` metadata with values 0 or 1 if cache is hit:
-        # 0: homepage cache; 1: micro cache
         search_query.query_time_ms = ceil(search_results["results_details"][0])
-        search_query.hit_cache = search_query.query_time_ms in [0, 1]
+        # do_es_search returns 1 as query time if the micro cache was hit
+        search_query.hit_cache = search_query.query_time_ms == 1
     else:
         # Solr searches are not cached unless a cache_key is passed
         # No cache_key is passed for the endpoints we are storing
