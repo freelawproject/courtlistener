@@ -10,6 +10,10 @@ from lxml import etree
 import re
 from django.utils.safestring import mark_safe
 import html
+from typing import List, Dict, Tuple, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +22,12 @@ class Command(BaseCommand):
     help = "Update CL cases with the latest CAP data using crosswalk files"
 
     def add_arguments(self, parser):
+        """
+        Add command line arguments to the parser.
+
+        :param parser: The argument parser
+        :type parser: argparse.ArgumentParser
+        """
         parser.add_argument(
             "--reporter",
             type=str,
@@ -26,6 +36,13 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        """
+        Handle the command execution.
+
+        :param args: Additional arguments
+        :param options: Command options
+        :type options: Dict[str, Any]
+        """
         reporter = options.get("reporter")
 
         self.setup_s3_client()
@@ -36,6 +53,7 @@ class Command(BaseCommand):
             self.process_all_crosswalks()
 
     def setup_s3_client(self):
+        """Set up the S3 client for accessing CAP data."""
         self.s3_client = boto3.client(
             "s3",
             endpoint_url=settings.CAP_R2_ENDPOINT_URL,
@@ -45,16 +63,43 @@ class Command(BaseCommand):
         self.bucket_name = settings.CAP_R2_BUCKET_NAME
 
     def process_all_crosswalks(self):
+        """Process all crosswalk files in the specified directory."""
         crosswalk_dir = "cl/search/crosswalks"
-        for filename in os.listdir(crosswalk_dir):
-            if filename.endswith(".json"):
-                reporter = filename[:-5]  # Remove the .json extension
-                self.stdout.write(
-                    self.style.SUCCESS(f"Processing reporter: {reporter}")
-                )
-                self.process_crosswalk(reporter)
+        crosswalk_files = [
+            f for f in os.listdir(crosswalk_dir) if f.endswith(".json")
+        ]
 
-    def process_crosswalk(self, reporter):
+        with tqdm(
+            total=len(crosswalk_files), desc="Processing crosswalks"
+        ) as pbar:
+            with ThreadPoolExecutor(
+                max_workers=multiprocessing.cpu_count() * 2
+            ) as executor:
+                futures = []
+                for filename in crosswalk_files:
+                    reporter = filename[:-5]
+                    futures.append(
+                        executor.submit(self.process_crosswalk, reporter)
+                    )
+
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        self.stdout.write(
+                            self.style.ERROR(
+                                f"Error processing crosswalk: {str(e)}"
+                            )
+                        )
+                    pbar.update(1)
+
+    def process_crosswalk(self, reporter: str):
+        """
+        Process a single crosswalk file for the given reporter.
+
+        :param reporter: The reporter to process
+        :type reporter: str
+        """
         crosswalk_path = f"cl/search/crosswalks/{reporter}.json"
 
         try:
@@ -166,7 +211,15 @@ class Command(BaseCommand):
                     )
                 )
 
-    def convert_xml_to_html(self, xml_content):
+    def convert_xml_to_html(self, xml_content: str) -> str:
+        """
+        Convert XML content to HTML.
+
+        :param xml_content: The XML content to convert
+        :type xml_content: str
+        :return: The converted HTML content
+        :rtype: str
+        """
         soup = BeautifulSoup(xml_content, "xml")
 
         # Convert opinion tags
@@ -185,7 +238,15 @@ class Command(BaseCommand):
 
         return str(soup)
 
-    def fetch_cap_html(self, cap_path):
+    def fetch_cap_html(self, cap_path: str) -> Optional[str]:
+        """
+        Fetch CAP HTML content from S3.
+
+        :param cap_path: The path to the CAP HTML file in S3
+        :type cap_path: str
+        :return: The fetched HTML content or None if an error occurred
+        :rtype: Optional[str]
+        """
         try:
             # Remove leading slash if present and change extension to .html
             cap_path = cap_path.lstrip("/")
@@ -212,7 +273,15 @@ class Command(BaseCommand):
             )
         return None
 
-    def fetch_cl_xml(self, cluster_id):
+    def fetch_cl_xml(self, cluster_id: int) -> Optional[List[Dict[str, str]]]:
+        """
+        Fetch CL XML content for a given cluster ID.
+
+        :param cluster_id: The ID of the opinion cluster
+        :type cluster_id: int
+        :return: A list of dictionaries containing opinion data, or None if an error occurred
+        :rtype: Optional[List[Dict[str, str]]]
+        """
         try:
             cluster = OpinionCluster.objects.get(id=cluster_id)
             opinions = Opinion.objects.filter(cluster=cluster)
@@ -248,7 +317,19 @@ class Command(BaseCommand):
             )
             return None
 
-    def update_cap_html_with_cl_xml(self, cap_html, cl_xml_list):
+    def update_cap_html_with_cl_xml(
+        self, cap_html: str, cl_xml_list: List[Dict[str, str]]
+    ) -> Tuple[List[Dict[str, str]], List[str]]:
+        """
+        Update CAP HTML content with CL XML information.
+
+        :param cap_html: The CAP HTML content
+        :type cap_html: str
+        :param cl_xml_list: A list of dictionaries containing CL XML data
+        :type cl_xml_list: List[Dict[str, str]]
+        :return: A tuple containing processed opinions and a list of changes made
+        :rtype: Tuple[List[Dict[str, str]], List[str]]
+        """
         cap_soup = BeautifulSoup(cap_html, "html.parser")
         processed_opinions = []
         changes_made = []
@@ -347,7 +428,15 @@ class Command(BaseCommand):
 
         return processed_opinions, changes_made
 
-    def convert_html_to_xml(self, html_content):
+    def convert_html_to_xml(self, html_content: str) -> str:
+        """
+        Convert HTML content to XML.
+
+        :param html_content: The HTML content to convert
+        :type html_content: str
+        :return: The converted XML content
+        :rtype: str
+        """
         print("Input to convert_html_to_xml:", html_content)
 
         soup = BeautifulSoup(html_content, "html.parser")
@@ -397,7 +486,13 @@ class Command(BaseCommand):
         print("Output from convert_html_to_xml:", xml_string)
         return xml_string
 
-    def save_updated_xml(self, processed_opinions):
+    def save_updated_xml(self, processed_opinions: List[Dict[str, str]]):
+        """
+        Save the updated XML for processed opinions.
+
+        :param processed_opinions: A list of dictionaries containing processed opinion data
+        :type processed_opinions: List[Dict[str, str]]
+        """
         for opinion_data in processed_opinions:
             try:
                 opinion = Opinion.objects.get(id=opinion_data["id"])

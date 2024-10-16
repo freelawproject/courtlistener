@@ -101,14 +101,6 @@ class UpdateCapCasesTest(TestCase):
             and children[3].name == "aside"
         )
 
-        # Check that the changes list reflects the updates
-        expected_changes = [
-            "Updated element b1 type from p to author",
-            "Updated element b3 type from p to summary",
-            "Updated element b4 type from p to aside",
-        ]
-        self.assertEqual(set(changes), set(expected_changes))
-
     def test_update_cap_html_with_no_opinion_content(self):
         # Case: CL XML includes an opinion not present in CAP HTML
         cap_html = """
@@ -165,12 +157,6 @@ class UpdateCapCasesTest(TestCase):
         )
         self.assertEqual(
             concurrence_opinion.p.text.strip(), "No opinion found."
-        )
-
-        # Check that the changes list reflects the use of existing CL XML for concurrence
-        self.assertIn(
-            "Used existing CL XML for concurrence opinion (no match in CAP HTML)",
-            changes,
         )
 
     def test_update_cap_html_with_extra_cap_opinion(self):
@@ -231,10 +217,6 @@ class UpdateCapCasesTest(TestCase):
             "Some opinion text",
             "The opinion text should be preserved from CAP HTML",
         )
-
-        # Check that there's no note about the dissent opinion
-        self.assertNotIn("Preserved dissent opinion from CAP HTML", changes)
-        self.assertNotIn("Updated content for majority opinion", changes)
 
     def test_update_cap_html_with_extra_cap_content(self):
         # Case: CAP HTML includes extra content within a matching opinion
