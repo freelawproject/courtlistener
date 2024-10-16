@@ -264,11 +264,15 @@ async def delete_prayer_view(
 async def user_prayers_view(
     request: HttpRequest, username: str
 ) -> HttpResponse:
-    user = await aget_object_or_404(User, username=username)
-    prayers = await get_user_prayers(user)
+    requested_user = await aget_object_or_404(User, username=username)
+    is_page_owner = await request.auser() == requested_user
+
+    prayers = await get_user_prayers(requested_user)
 
     context = {
         "prayers": prayers,
+        "requested_user": requested_user,
+        "is_page_owner": is_page_owner,
         "private": False,
     }
 
