@@ -752,7 +752,6 @@ async def view_recap_document(
         rd.prayer_count = prayer_counts.get(rd.id, 0)
         rd.prayer_exists = existing_prayers.get(rd.id, False)
 
-
     return TemplateResponse(
         request,
         "recap_document.html",
