@@ -186,11 +186,6 @@
             <div class="col-sm-12 alert-warning alert">
               <p class="bottom">This item is not yet in the RECAP collection.
                 <span class="float-right">
-                  {% flag "pray-and-pay" %}
-                  <div class="prayer-button" data-gap-size="10px">
-                    {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
-                  </div>
-                  {% endflag %}
                   {% if rd.pacer_url %}
                     <a class="btn btn-primary btn-sm"
                        href="{{ rd.pacer_url }}"
@@ -201,6 +196,11 @@
                     <a href="https://free.law/recap/"
                        class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
                   {% endif %}
+                  {% flag "pray-and-pay" %}
+                  <div class="prayer-button" data-gap-size="2px">
+                    {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
+                  </div>
+                  {% endflag %}
                 </span>
               </p>
             </div>
