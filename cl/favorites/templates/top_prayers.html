@@ -12,28 +12,38 @@
 
 
 {% block content %}
-
+  <div class="col-xs-12">
+    <h1 class="text-center">Community's Most Requested Documents</h1>
+  </div>
   <div class="col-xs-12">
     <div class="table-responsive">
       <table class="settings-table table">
         <thead>
             <tr>
-              <th>User Preference</th>
-              <th>Document Description</th>
+              <th>Court</th>
+              <th>Case Name</th>
               <th>Document Number</th>
-              <th>PACER Doc ID</th>
-              <th>Document Court</th>
+              <th>Document Description</th>
               <th>Buy on Pacer</th>
             </tr>
         </thead>
         <tbody>
             {% for prayer in top_prayers %}
             <tr>
-              <td>{{ forloop.counter }}</td>
+              <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
+              {% with docket=prayer.docket_entry.docket %}
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}">
+                  {{ prayer.docket_entry.docket|best_case_name|safe|v_wrapper }} ({{ prayer.docket_entry.docket.docket_number }})
+                </a>
+              </td>
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}#entry-{{ prayer.docket_entry.entry_number }}">
+                  {{ prayer.document_number }}
+                </a>
+              </td>
+              {% endwith %}
               <td>{{ prayer.description }}</td>
-              <td>{{ prayer.document_number }}</td>
-              <td>{{ prayer.pacer_doc_id }}</td>
-              <td>{{ prayer.docket_entry.docket.court_id }}</td>
               <td><a href="{{ prayer.pacer_url }}"
                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                   class="open_buy_pacer_modal btn btn-default btn-xs"
