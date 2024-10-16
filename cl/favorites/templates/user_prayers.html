@@ -44,7 +44,7 @@
               </td>
               {% endwith %}
               <td>{{ prayer.description }}</td>
-              <td> {{ prayer.date_created }} </td>
+              <td>{{ prayer.date_created|date:"M j, Y"  }}</td>
               <td>{{ prayer.status }}</td>
               {% comment %} <td><a href="{{ prayer.pacer_url }}"
                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
