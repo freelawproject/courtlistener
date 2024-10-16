@@ -4,11 +4,10 @@
 {% load static %}
 {% load pacer %}
 
-{% block title %}Your RECAP Requests – CourtListener.com{% endblock %}
-{% block og_title %}Your RECAP Requests – CourtListener.com{% endblock %}
-
-{% block description %}Your RECAP Requests on CourtListener.{% endblock %}
-{% block og_description %}Your RECAP Requests on CourtListener.{% endblock %}
+{% block title %}{% if is_page_owner %} Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block og_title %}{% if is_page_owner %} Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
+{% block og_description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
 
 
 {% block content %}
