@@ -17,16 +17,10 @@ from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import DocketTag, Note, UserTag
-from cl.favorites.utils import (
-    create_prayer,
-    delete_prayer,
-    get_top_prayers,
-    prayer_eligible,
-)
+from cl.favorites.utils import get_top_prayers
 from cl.lib.decorators import cache_page_ignore_params
 from cl.lib.http import is_ajax
 from cl.lib.view_utils import increment_view_count
-from cl.search.models import RECAPDocument
 
 
 async def get_note(request: HttpRequest) -> HttpResponse:
@@ -188,73 +182,11 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
 
     top_prayers = await get_top_prayers()
-
-    context = {
-        "top_prayers": top_prayers,
-        "private": False,
-    }
-
-    return TemplateResponse(request, "top_prayers.html", context)
-
-
-@login_required
-async def create_prayer_view(
-    request: HttpRequest, recap_document: int
-) -> HttpResponse:
-    user = request.user
-    is_htmx_request = request.META.get("HTTP_HX_REQUEST", False)
-    if not await prayer_eligible(request.user):
-        if is_htmx_request:
-            return TemplateResponse(
-                request,
-                "includes/pray_and_pay_htmx/pray_button.html",
-                {
-                    "prayer_exists": False,
-                    "document_id": recap_document,
-                    "count": 0,
-                    "daily_limit_reached": True,
-                },
-            )
-        return HttpResponseServerError(
-            "User have reached your daily request limit"
-        )
-
-    recap_document = await RECAPDocument.objects.aget(id=recap_document)
-
-    # Call the create_prayer async function
-    await create_prayer(user, recap_document)
-    if is_htmx_request:
-        return TemplateResponse(
-            request,
-            "includes/pray_and_pay_htmx/pray_button.html",
-            {
-                "prayer_exists": True,
-                "document_id": recap_document.pk,
-                "count": 0,
-                "daily_limit_reached": False,
-            },
-        )
-    return HttpResponse("It worked.")
-
-
-@login_required
-async def delete_prayer_view(
-    request: HttpRequest, recap_document: int
-) -> HttpResponse:
-    user = request.user
-    recap_document = await RECAPDocument.objects.aget(id=recap_document)
-
-    # Call the delete_prayer async function
-    await delete_prayer(user, recap_document)
-
-    if request.META.get("HTTP_HX_REQUEST"):
-        return TemplateResponse(
-            request,
-            "includes/pray_and_pay_htmx/pray_button.html",
-            {
-                "prayer_exists": False,
-                "document_id": recap_document.pk,
-                "count": 0,
-            },
-        )
-    return HttpResponse("It worked.")
+    return TemplateResponse(
+        request,
+        "top_prayers.html",
+        {
+            "top_prayers": top_prayers,
+            "private": True,  # temporary to prevent Google indexing
+        },
+    )

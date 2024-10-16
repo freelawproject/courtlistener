@@ -1723,11 +1723,3 @@ rect.series-segment {
     opacity 150ms 150ms ease-in;
   transform: translate3d(0, 0, 0);
 }
-
-.prayer-button[data-gap-size="small"] {
-  margin-left: 8px;
-}
-
-.prayer-button[data-gap-size="large"]{
-  margin-left: 44px;
-}

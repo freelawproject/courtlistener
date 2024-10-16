@@ -10,7 +10,6 @@ from django.core import mail
 from django.template.defaultfilters import date as template_date
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
-from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
@@ -18,14 +17,7 @@ from timeout_decorator import timeout_decorator
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.factories import NoteFactory, PrayerFactory
 from cl.favorites.models import DocketTag, Note, Prayer, UserTag
-from cl.favorites.utils import (
-    create_prayer,
-    delete_prayer,
-    get_existing_prayers_in_bulk,
-    get_prayer_counts_in_bulk,
-    get_top_prayers,
-    prayer_eligible,
-)
+from cl.favorites.utils import create_prayer, get_top_prayers, prayer_eligible
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.search.factories import RECAPDocumentFactory
 from cl.search.views import get_homepage_stats
@@ -679,15 +671,9 @@ class RECAPPrayAndPay(TestCase):
             is_available=False,
         )
 
-        cls.rd_6 = RECAPDocumentFactory(
-            pacer_doc_id="98763426",
-            document_number="6",
-            is_available=False,
-        )
-
     @override_settings(ALLOWED_PRAYER_COUNT=2)
     async def test_prayer_eligible(self) -> None:
-        """Does the prayer_eligible method work properly?"""
+        """Does the prayer_eligible method works properly?"""
 
         current_time = now()
         with time_machine.travel(current_time, tick=False):
@@ -727,7 +713,7 @@ class RECAPPrayAndPay(TestCase):
             self.assertTrue(user_is_eligible)
 
     async def test_create_prayer(self) -> None:
-        """Does the create_prayer method work properly?"""
+        """Does the create_prayer method works properly?"""
 
         # Prayer is not created if the document is already available.
         prayer_created = await create_prayer(self.user, self.rd_1)
@@ -741,29 +727,8 @@ class RECAPPrayAndPay(TestCase):
         same_prayer_created = await create_prayer(self.user, self.rd_2)
         self.assertIsNone(same_prayer_created)
 
-    async def test_delete_prayer(self) -> None:
-        """Does the delete_prayer method work properly?"""
-
-        # Prayer is added, then deleted successfully
-        prayer_created = await create_prayer(self.user, self.rd_2)
-        prayer_deleted = await delete_prayer(self.user, self.rd_2)
-        self.assertTrue(prayer_deleted)
-
-        # Prayer is created, then document is made available to check that a user can't delete a prayer that has been granted
-        prayer_created = await create_prayer(self.user, self.rd_6)
-        self.rd_6.is_available = True
-        await sync_to_async(self.rd_6.save)()
-        prayer_deleted = await delete_prayer(self.user, self.rd_6)
-        self.assertFalse(prayer_deleted)
-
-        # Ensure that a user cannot delete the same prayer twice
-        prayer_created = await create_prayer(self.user, self.rd_2)
-        prayer_deleted = await delete_prayer(self.user, self.rd_2)
-        prayer_deleted = await delete_prayer(self.user, self.rd_2)
-        self.assertFalse(prayer_deleted)
-
     async def test_get_top_prayers_by_number(self) -> None:
-        """Does the get_top_prayers method work properly?"""
+        """Does the get_top_prayers method works properly?"""
 
         # Test top documents based on prayers count.
         current_time = now()
@@ -791,7 +756,7 @@ class RECAPPrayAndPay(TestCase):
         )
 
     async def test_get_top_prayers_by_age(self) -> None:
-        """Does the get_top_prayers method work properly?"""
+        """Does the get_top_prayers method works properly?"""
 
         # Test top documents based on prayer age.
         current_time = now()
@@ -822,7 +787,7 @@ class RECAPPrayAndPay(TestCase):
         )
 
     async def test_get_top_prayers_by_number_and_age(self) -> None:
-        """Does the get_top_prayers method work properly?"""
+        """Does the get_top_prayers method works properly?"""
 
         # Create prayers with different counts and ages
         current_time = now()
@@ -922,26 +887,6 @@ class RECAPPrayAndPay(TestCase):
             actual_top_prayers, expected_top_prayers, msg="Wrong top_prayers."
         )
 
-        # Assert prayer_counts dict.
-        prayers_counts_dict = await get_prayer_counts_in_bulk(
-            [rd_6, self.rd_4]
-        )
-        self.assertEqual({rd_6.pk: 2, self.rd_4.pk: 1}, prayers_counts_dict)
-
-        # Assert existing_prayers dict for user
-        existing_prayers_dict = await get_existing_prayers_in_bulk(
-            self.user, [rd_6, self.rd_4]
-        )
-        self.assertEqual(
-            {rd_6.pk: True, self.rd_4.pk: True}, existing_prayers_dict
-        )
-
-        # Assert existing_prayers dict for user_2
-        existing_prayers_dict = await get_existing_prayers_in_bulk(
-            self.user_2, [rd_6, self.rd_4]
-        )
-        self.assertEqual({rd_6.pk: True}, existing_prayers_dict)
-
         # rd_6 is granted.
         rd_6.is_available = True
         await rd_6.asave()
@@ -1018,189 +963,3 @@ class RECAPPrayAndPay(TestCase):
         self.assertEqual(
             top_prayers[0], self.rd_4, msg="The top prayer didn't match."
         )
-
-
-class PrayerAPITests(APITestCase):
-    """Check that Prayer API operations work as expected."""
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        cls.user_1 = UserFactory()
-        cls.user_2 = UserFactory()
-
-        cls.rd_1 = RECAPDocumentFactory(
-            pacer_doc_id="98763421",
-            document_number="1",
-            is_available=True,
-        )
-        cls.rd_2 = RECAPDocumentFactory(
-            pacer_doc_id="98763422",
-            document_number="2",
-            is_available=False,
-        )
-        cls.rd_3 = RECAPDocumentFactory(
-            pacer_doc_id="98763423",
-            document_number="3",
-            is_available=False,
-        )
-
-    def setUp(self) -> None:
-        self.prayer_path = reverse("prayer-list", kwargs={"version": "v4"})
-        self.client = make_client(self.user_1.pk)
-        self.client_2 = make_client(self.user_2.pk)
-
-    async def make_a_prayer(
-        self,
-        client,
-        recap_doc_id,
-    ):
-        data = {
-            "recap_document": recap_doc_id,
-        }
-        return await client.post(self.prayer_path, data, format="json")
-
-    async def test_make_a_prayer(self) -> None:
-        """Can we make a prayer?"""
-
-        prayer = Prayer.objects.all()
-        response = await self.make_a_prayer(self.client, self.rd_1.pk)
-        prayer_first = await prayer.afirst()
-        self.assertIsNotNone(prayer_first)
-        self.assertEqual(await prayer.acount(), 1)
-        self.assertEqual(response.status_code, HTTPStatus.CREATED)
-
-    async def test_duplicate_prayer_fails(self) -> None:
-        """Ensure a user can't create multiple prayers for the same document
-        and user.
-        """
-        await self.make_a_prayer(self.client, self.rd_1.pk)
-        response = await self.make_a_prayer(self.client, self.rd_1.pk)
-        self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
-
-    async def test_list_users_prayers(self) -> None:
-        """Can we list user's own prayers?"""
-
-        # Make two prayers for user_1
-        await self.make_a_prayer(self.client, self.rd_1.pk)
-        await self.make_a_prayer(self.client, self.rd_3.id)
-
-        # Make one prayer for user_2
-        await self.make_a_prayer(self.client_2, self.rd_1.pk)
-
-        # Get the prayers for user_1, should be 2
-        response = await self.client.get(self.prayer_path)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-        self.assertEqual(len(response.json()["results"]), 2)
-
-        # Get the prayers for user_2, should be 1
-        response_2 = await self.client_2.get(self.prayer_path)
-        self.assertEqual(response_2.status_code, HTTPStatus.OK)
-        self.assertEqual(len(response_2.json()["results"]), 1)
-
-    async def test_delete_prayer(self) -> None:
-        """Can we delete a prayer?
-        Avoid users from deleting other users' prayers.
-        """
-
-        # Make two prayers for user_1
-        prayer_1 = await self.make_a_prayer(self.client, self.rd_1.pk)
-        prayer_2 = await self.make_a_prayer(self.client, self.rd_3.id)
-
-        prayer = Prayer.objects.all()
-        self.assertEqual(await prayer.acount(), 2)
-
-        prayer_1_path_detail = reverse(
-            "prayer-detail",
-            kwargs={"pk": prayer_1.json()["id"], "version": "v4"},
-        )
-
-        # Delete the prayer for user_1
-        response = await self.client.delete(prayer_1_path_detail)
-        self.assertEqual(response.status_code, HTTPStatus.NO_CONTENT)
-        self.assertEqual(await prayer.acount(), 1)
-
-        prayer_2_path_detail = reverse(
-            "prayer-detail",
-            kwargs={"pk": prayer_2.json()["id"], "version": "v3"},
-        )
-
-        # user_2 tries to delete a user_1 prayer, it should fail
-        response = await self.client_2.delete(prayer_2_path_detail)
-        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-        self.assertEqual(await prayer.acount(), 1)
-
-    async def test_prayer_detail(self) -> None:
-        """Can we get the detail for a prayer? Avoid users from getting other
-        users prayers.
-        """
-
-        # Make one prayer for user_1
-        prayer_1 = await self.make_a_prayer(self.client, self.rd_1.pk)
-        prayer = Prayer.objects.all()
-        self.assertEqual(await prayer.acount(), 1)
-        prayer_1_path_detail = reverse(
-            "prayer-detail",
-            kwargs={"pk": prayer_1.json()["id"], "version": "v3"},
-        )
-
-        # Get the prayer detail for user_1
-        response = await self.client.get(prayer_1_path_detail)
-        self.assertEqual(response.status_code, HTTPStatus.OK)
-
-        # user_2 tries to get user_1 prayer, it should fail
-        response = await self.client_2.get(prayer_1_path_detail)
-        self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
-
-    async def test_prayer_update_fails(self) -> None:
-        """PUT AND PATCH methods are restricted."""
-
-        # Make one prayer for user_1
-        prayer_1 = await self.make_a_prayer(self.client, self.rd_1.pk)
-        prayer_1_path_detail = reverse(
-            "prayer-detail",
-            kwargs={"pk": prayer_1.json()["id"], "version": "v3"},
-        )
-        # PATCH not allowed
-        data = {"status": 2}
-        response = await self.client.patch(
-            prayer_1_path_detail, data, format="json"
-        )
-        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
-
-        # PUT not allowed
-        data = {"status": 2, "recap_document": self.rd_1.pk}
-        response = await self.client.put(
-            prayer_1_path_detail, data, format="json"
-        )
-        self.assertEqual(response.status_code, HTTPStatus.METHOD_NOT_ALLOWED)
-
-    @override_settings(ALLOWED_PRAYER_COUNT=2)
-    async def test_prayer_creation_eligibility(self):
-        """Test the prayer creation eligibility and limits in the API."""
-        current_time = timezone.now()
-        prayers = Prayer.objects.all()
-
-        with time_machine.travel(current_time, tick=False):
-            # First prayer succeed
-            response = await self.make_a_prayer(self.client, self.rd_1.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 1)
-
-            # Second prayer succeed
-            response = await self.make_a_prayer(self.client, self.rd_2.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 2)
-
-            # Third prayer fails due to limit
-            response = await self.make_a_prayer(self.client, self.rd_3.pk)
-            self.assertEqual(response.status_code, HTTPStatus.BAD_REQUEST)
-            self.assertIn("maximum number of prayers", str(response.data))
-            self.assertEqual(await prayers.acount(), 2)
-
-        # After more than 24 hours the user is eligible to create more prays.
-        with time_machine.travel(
-            current_time + timedelta(hours=25), tick=False
-        ):
-            response = await self.make_a_prayer(self.client, self.rd_3.pk)
-            self.assertEqual(response.status_code, HTTPStatus.CREATED)
-            self.assertEqual(await prayers.acount(), 3)
