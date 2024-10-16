@@ -458,6 +458,10 @@ class BlockV3APITests(TestCase):
         if v3_user_list:
             self.r.delete(*v3_user_list)
 
+        v3_user_blocked_list = self.r.keys("v3-blocked-users-list")
+        if v3_user_blocked_list:
+            self.r.delete(*v3_user_blocked_list)
+
     def create_v3_user_list(self) -> None:
         v3_stats_members = self.r.zrange(
             "api-block-test:v3.user.counts", 0, -1
@@ -524,7 +528,16 @@ class BlockV3APITests(TestCase):
 
     async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
         """Confirm new API users are allowed to use V4 of the API"""
-        response = await self.client_2.get(self.audio_path_v4, format="json")
+        with time_machine.travel(self.date_check_request, tick=False):
+            response = await self.client_2.get(
+                self.audio_path_v4, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    async def test_allow_v4_for_anonymous_users(self, mock_api_prefix) -> None:
+        """Confirm V4 anonymous API users are allowed to use V4 of the API"""
+        with time_machine.travel(self.date_check_request, tick=False):
+            response = await self.async_client.get(self.audio_path_v4)
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 

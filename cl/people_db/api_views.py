@@ -279,10 +279,9 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = PartySerializer
     filterset_class = PartyFilter
-    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -305,10 +304,9 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = AttorneySerializer
     filterset_class = AttorneyFilter
-    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",

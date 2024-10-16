@@ -65,6 +65,7 @@ from cl.search.models import (
 
 class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     serializer_class = OriginalCourtInformationSerializer
+    permission_classes = [V3APIPermission]
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
@@ -111,10 +112,9 @@ class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
-    permission_classes = [V3APIPermission]
     ordering_fields = ("id", "date_created", "date_modified", "date_filed")
     # Default cursor ordering key
     ordering = "-id"
@@ -140,10 +140,9 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
 class RECAPDocumentViewSet(
     LoggingMixin, CacheListMixin, viewsets.ModelViewSet
 ):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = RECAPDocumentSerializer
     filterset_class = RECAPDocumentFilter
-    permission_classes = [V3APIPermission]
     ordering_fields = ("id", "date_created", "date_modified", "date_upload")
     # Default cursor ordering key
     ordering = "-id"
@@ -243,9 +242,8 @@ class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
 
 
 class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
-    permission_classes = (RECAPUsersReadOnly,)
+    permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = TagSerializer
-    permission_classes = [V3APIPermission]
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields

@@ -71,6 +71,13 @@ class V3APIPermission(permissions.BasePermission):
         :return: True if the user has permission to access V3, False if not.
         """
 
+        if (
+            not self.is_v3_api_request(request)
+            or not settings.BLOCK_NEW_V3_USERS  # type: ignore
+        ):
+            # Allow the request if it is not a V3 request
+            return True
+
         user = request.user
         if isinstance(user, AnonymousUser):
             # Block V3 for all Anonymous users.
@@ -82,13 +89,6 @@ class V3APIPermission(permissions.BasePermission):
         if self.is_user_v3_blocked(user):
             # Check if user has been blocked from V3.
             raise PermissionDenied(self.v3_blocked_message)
-
-        if (
-            not self.is_v3_api_request(request)
-            or not settings.BLOCK_NEW_V3_USERS  # type: ignore
-        ):
-            # Allow the request if it is not a V3 request
-            return True
 
         if not self.check_request():
             return True

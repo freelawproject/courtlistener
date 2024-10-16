@@ -17,7 +17,10 @@ from cl.favorites.models import DocketTag, Prayer, UserTag
 
 
 class UserTagViewSet(ModelViewSet):
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [
+        permissions.IsAuthenticatedOrReadOnly,
+        V3APIPermission,
+    ]
     serializer_class = UserTagSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = UserTagFilter
@@ -44,7 +47,7 @@ class UserTagViewSet(ModelViewSet):
 
 
 class DocketTagViewSet(ModelViewSet):
-    permission_classes = [IsAuthenticated, IsTagOwner]
+    permission_classes = [IsAuthenticated, IsTagOwner, V3APIPermission]
     serializer_class = DocketTagSerializer
     filterset_class = DocketTagFilter
     pagination_class = MediumAdjustablePagination
