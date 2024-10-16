@@ -37,5 +37,5 @@ urlpatterns = [
         delete_prayer_view,
         name="delete_prayer",
     ),
-    path("prayers/<str:username>/", user_prayers_view, name="user_prayers")
+    path("prayers/<str:username>/", user_prayers_view, name="user_prayers"),
 ]

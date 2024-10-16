@@ -260,7 +260,10 @@ async def delete_prayer_view(
         )
     return HttpResponse("It worked.")
 
-async def user_prayers_view(request: HttpRequest, username: str)  -> HttpResponse:
+
+async def user_prayers_view(
+    request: HttpRequest, username: str
+) -> HttpResponse:
     user = await aget_object_or_404(User, username=username)
     prayers = await get_user_prayers(user)
 
