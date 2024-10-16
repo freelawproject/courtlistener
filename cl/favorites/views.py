@@ -21,6 +21,7 @@ from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
     get_top_prayers,
+    get_user_prayers,
     prayer_eligible,
 )
 from cl.lib.decorators import cache_page_ignore_params
@@ -258,3 +259,15 @@ async def delete_prayer_view(
             },
         )
     return HttpResponse("It worked.")
+
+async def user_prayers_view(request: HttpRequest, username: str)  -> HttpResponse:
+    user = await aget_object_or_404(User, username=username)
+    prayers = await get_user_prayers(user)
+
+    context = {
+        "prayers": prayers,
+        "private": False,
+    }
+
+    # I want this to include the following things - show date submitted, date fulfilled, link to docket, link to file, etc. Include the summary statistics as well. What else?
+    return TemplateResponse(request, "user_prayers.html", context)

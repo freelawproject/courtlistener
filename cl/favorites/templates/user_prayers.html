@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load extras %}
+{% load text_filters %}
+{% load static %}
+{% load pacer %}
+
+{% block title %}Your RECAP Requests – CourtListener.com{% endblock %}
+{% block og_title %}Your RECAP Requests – CourtListener.com{% endblock %}
+
+{% block description %}Your RECAP Requests on CourtListener.{% endblock %}
+{% block og_description %}Your RECAP Requests on CourtListener.{% endblock %}
+
+
+{% block content %}
+  <div class="col-xs-12">
+    <h1 class="text-center">Your Requested Documents</h1>
+  </div>
+  <div class="col-xs-12">
+    <div class="table-responsive">
+      <table class="settings-table table">
+        <thead>
+            <tr>
+              <th>Court</th>
+              <th>Case Name</th>
+              <th>Document Number</th>
+              <th>Document Description</th>
+              <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prayer in prayers %}
+            <tr>
+              <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
+              {% with docket=prayer.docket_entry.docket %}
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}">
+                  {{ prayer.docket_entry.docket|best_case_name|safe|v_wrapper }} ({{ prayer.docket_entry.docket.docket_number }})
+                </a>
+              </td>
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}#entry-{{ prayer.docket_entry.entry_number }}">
+                  {{ prayer.document_number }}
+                </a>
+              </td>
+              {% endwith %}
+              <td>{{ prayer.description }}</td>
+              <td>{{ prayer.status }}</td>
+              {% comment %} <td><a href="{{ prayer.pacer_url }}"
+                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                  class="open_buy_pacer_modal btn btn-default btn-xs"
+                  data-toggle="modal" data-target="#modal-buy-pacer"
+                {% else%}
+                  class="btn btn-default btn-xs"
+                {% endif %}
+                  target="_blank"
+                  rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td> {% endcomment %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2">No document requests made. Consider making one!</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+
+{% block footer-scripts %}
+  <script defer type="text/javascript"
+            src="{% static "js/buy_pacer_modal.js" %}"></script>
+  {% include "includes/buy_pacer_modal.html" %}
+{% endblock %}

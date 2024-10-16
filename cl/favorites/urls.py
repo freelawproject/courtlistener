@@ -6,6 +6,7 @@ from cl.favorites.views import (
     delete_prayer_view,
     open_prayers,
     save_or_update_note,
+    user_prayers_view,
     view_tag,
     view_tags,
 )
@@ -36,4 +37,5 @@ urlpatterns = [
         delete_prayer_view,
         name="delete_prayer",
     ),
+    path("prayers/<str:username>/", user_prayers_view, name="user_prayers")
 ]
