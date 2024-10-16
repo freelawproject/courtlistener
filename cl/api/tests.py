@@ -26,7 +26,7 @@ from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import VersionBasedPagination
-from cl.api.utils import get_logging_prefix
+from cl.api.utils import LoggingMixin, get_logging_prefix
 from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
@@ -346,14 +346,47 @@ class ApiEventCreationTestCase(TestCase):
         "cl.api.utils.get_logging_prefix",
         return_value="api:Test",
     )
-    async def test_are_events_created_properly(
+    @mock.patch.object(LoggingMixin, "milestones", new=[1])
+    async def test_are_v3_events_created_properly(
         self, mock_logging_prefix
     ) -> None:
-        """Are event objects created as API requests are made?"""
+        """Are event objects created as v3 API requests are made?"""
         await self.hit_the_api("v3")
 
-        expected_event_count = 1
+        expected_event_count = 2
         self.assertEqual(expected_event_count, await Event.objects.acount())
+        event_descriptions = {
+            event.description async for event in Event.objects.all()
+        }
+        expected_descriptions = set()
+        expected_descriptions.add("API v3 has logged 1 total requests.")
+        expected_descriptions.add(
+            f"User '{self.user.username}' has placed their 1st API v3 request."
+        )
+        self.assertEqual(event_descriptions, expected_descriptions)
+
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    @mock.patch.object(LoggingMixin, "milestones", new=[1])
+    async def test_are_v4_events_created_properly(
+        self, mock_logging_prefix
+    ) -> None:
+        """Are event objects created as V4 API requests are made?"""
+        await self.hit_the_api("v4")
+
+        expected_event_count = 2
+        self.assertEqual(expected_event_count, await Event.objects.acount())
+        event_descriptions = {
+            event.description async for event in Event.objects.all()
+        }
+        expected_descriptions = set()
+        expected_descriptions.add("API v4 has logged 1 total requests.")
+        expected_descriptions.add(
+            f"User '{self.user.username}' has placed their 1st API v4 request."
+        )
+        self.assertEqual(event_descriptions, expected_descriptions)
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.
