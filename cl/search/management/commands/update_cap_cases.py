@@ -1,7 +1,7 @@
 import json
 import os
 import boto3
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from cl.search.models import Opinion, OpinionCluster
 import logging
@@ -14,12 +14,18 @@ from typing import List, Dict, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
 from tqdm import tqdm
+import sys
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
     help = "Update CL cases with the latest CAP data using crosswalk files"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.verbose = False
+        self.logger = logging.getLogger(__name__)
 
     def add_arguments(self, parser):
         """
@@ -34,6 +40,11 @@ class Command(BaseCommand):
             help="Specific reporter to update (e.g., 'A_2d'). If not provided, all reporters will be processed.",
             required=False,
         )
+        parser.add_argument(
+            "--verbose",
+            action="store_true",
+            help="Increase output verbosity for tracking changes and debugging",
+        )
 
     def handle(self, *args, **options):
         """
@@ -43,14 +54,18 @@ class Command(BaseCommand):
         :param options: Command options
         :type options: Dict[str, Any]
         """
-        reporter = options.get("reporter")
+        self.verbose = options.get("verbose", False)
 
-        self.setup_s3_client()
-
-        if reporter:
-            self.process_crosswalk(reporter)
+        # Set up logging
+        if self.verbose:
+            logging.basicConfig(level=logging.DEBUG)
         else:
-            self.process_all_crosswalks()
+            logging.basicConfig(
+                level=logging.CRITICAL
+            )  # Only log critical errors
+
+        reporter = options.get("reporter")
+        self.process_crosswalks(reporter)
 
     def setup_s3_client(self):
         """Set up the S3 client for accessing CAP data."""
@@ -70,7 +85,8 @@ class Command(BaseCommand):
         ]
 
         with tqdm(
-            total=len(crosswalk_files), desc="Processing crosswalks"
+            total=len(crosswalk_files),
+            desc="Processing crosswalks",
         ) as pbar:
             with ThreadPoolExecutor(
                 max_workers=multiprocessing.cpu_count() * 2
@@ -86,10 +102,9 @@ class Command(BaseCommand):
                     try:
                         future.result()
                     except Exception as e:
-                        self.stdout.write(
-                            self.style.ERROR(
-                                f"Error processing crosswalk: {str(e)}"
-                            )
+                        self.log(
+                            f"Error processing crosswalk: {str(e)}",
+                            logging.ERROR,
                         )
                     pbar.update(1)
 
@@ -106,15 +121,15 @@ class Command(BaseCommand):
             with open(crosswalk_path, "r") as file:
                 crosswalk_data = json.load(file)
         except FileNotFoundError:
-            self.stdout.write(
-                self.style.ERROR(f"Crosswalk file not found: {crosswalk_path}")
+            self.log(
+                f"Crosswalk file not found: {crosswalk_path}",
+                logging.ERROR,
             )
             return
         except json.JSONDecodeError:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"Invalid JSON in crosswalk file: {crosswalk_path}"
-                )
+            self.log(
+                f"Invalid JSON in crosswalk file: {crosswalk_path}",
+                logging.ERROR,
             )
             return
 
@@ -122,25 +137,23 @@ class Command(BaseCommand):
             cap_path = entry["cap_path"]
             cl_cluster_id = entry["cl_cluster_id"]
 
-            self.stdout.write(
-                self.style.WARNING(
-                    f"Processing cluster {cl_cluster_id} with CAP path: {cap_path}"
-                )
+            self.log(f"Processing entry: {entry['cap_path']}", logging.DEBUG)
+
+            self.log(
+                f"Processing cluster {cl_cluster_id} with CAP path: {cap_path}",
+                logging.WARNING,
             )
 
             cap_html = self.fetch_cap_html(cap_path)
             cl_xml_list = self.fetch_cl_xml(cl_cluster_id)
 
             if cap_html and cl_xml_list:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Successfully fetched CAP HTML and CL XML for cluster {cl_cluster_id}"
-                    )
+                self.log(
+                    f"Successfully fetched CAP HTML and CL XML for cluster {cl_cluster_id}",
+                    logging.SUCCESS,
                 )
-                self.stdout.write(
-                    self.style.WARNING("\nOriginal CAP HTML Content:\n\n")
-                )
-                self.stdout.write(cap_html)
+                self.log("\nOriginal CAP HTML Content:\n\n", logging.DEBUG)
+                self.log(cap_html, logging.DEBUG)
 
                 # Update CAP HTML with CL XML information
                 processed_opinions, changes = self.update_cap_html_with_cl_xml(
@@ -150,65 +163,53 @@ class Command(BaseCommand):
                 if processed_opinions:
                     self.save_updated_xml(processed_opinions)
 
-                self.stdout.write(
-                    self.style.WARNING("\n\nUpdated CAP HTML Content:\n\n")
-                )
+                self.log("\n\nUpdated CAP HTML Content:\n\n", logging.DEBUG)
                 for opinion in processed_opinions:
-                    # Check if the opinion XML is not empty
                     if opinion["xml"]:
-                        # Unescape the HTML
-                        opinion_str = html.unescape(opinion["xml"])
-
-                        # Parse and prettify
                         try:
                             opinion_soup = BeautifulSoup(
-                                opinion_str, "html.parser"
+                                html.unescape(opinion["xml"]), "html.parser"
                             )
                             pretty_opinion = opinion_soup.prettify()
-
-                            # Write to output
-                            self.stdout.write(mark_safe(pretty_opinion))
-                            self.stdout.write("\n\n")
+                            self.log(mark_safe(pretty_opinion), logging.DEBUG)
+                            self.log("\n\n", logging.DEBUG)
                         except Exception as e:
-                            self.stdout.write(
-                                self.style.ERROR(
-                                    f"Error processing opinion XML: {str(e)}"
-                                )
+                            self.log(
+                                f"Error processing opinion XML: {str(e)}",
+                                logging.ERROR,
                             )
                     else:
-                        self.stdout.write(
-                            self.style.WARNING(
-                                f"Empty XML for opinion type {opinion['type']}"
-                            )
+                        self.log(
+                            f"Empty XML for opinion type {opinion['type']}",
+                            logging.WARNING,
                         )
 
-                self.stdout.write(
-                    self.style.WARNING("\n\nCL XML Content:\n\n")
-                )
+                self.log("\n\nCL XML Content:\n\n", logging.DEBUG)
                 for opinion in cl_xml_list:
-                    self.stdout.write(
-                        f"Opinion ID: {opinion['id']}, Type: {opinion['type']}\n"
+                    self.log(
+                        f"Opinion ID: {opinion['id']}, Type: {opinion['type']}\n",
+                        logging.DEBUG,
                     )
-                    self.stdout.write(opinion["xml"])
-                    self.stdout.write("\n\n")
+                    self.log(opinion["xml"], logging.DEBUG)
+                    self.log("\n\n", logging.DEBUG)
 
                 if changes:
-                    self.stdout.write(self.style.WARNING("Changes made:"))
+                    self.log(
+                        f"Changes made to {entry['cap_path']}:", logging.INFO
+                    )
                     for change in changes:
-                        self.stdout.write(f"  - {change}")
+                        self.log(f"  - {change}", logging.INFO)
                 else:
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            "No changes needed for this document."
-                        )
+                    self.log(
+                        f"No changes needed for {entry['cap_path']}",
+                        logging.DEBUG,
                     )
 
                 # TODO: update cl xml in db
             else:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Failed to fetch either CAP HTML or CL XML for cluster {cl_cluster_id}"
-                    )
+                self.log(
+                    f"Failed to fetch either CAP HTML or CL XML for cluster {cl_cluster_id}",
+                    logging.WARNING,
                 )
 
     def convert_xml_to_html(self, xml_content: str) -> str:
@@ -255,22 +256,16 @@ class Command(BaseCommand):
             )
             # Print the full S3 path for debugging
             full_s3_path = f"s3://{self.bucket_name}/{html_path}"
-            self.stdout.write(
-                self.style.WARNING(f"Attempting to fetch: {full_s3_path}")
-            )
+            self.log(f"Attempting to fetch: {full_s3_path}", logging.WARNING)
 
             response = self.s3_client.get_object(
                 Bucket=self.bucket_name, Key=html_path
             )
             return response["Body"].read().decode("utf-8")
         except self.s3_client.exceptions.NoSuchKey:
-            self.stdout.write(
-                self.style.ERROR(f"File not found in S3: {full_s3_path}")
-            )
+            self.log(f"File not found in S3: {full_s3_path}", logging.ERROR)
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"Error fetching CAP HTML: {str(e)}")
-            )
+            self.log(f"Error fetching CAP HTML: {str(e)}", logging.ERROR)
         return None
 
     def fetch_cl_xml(self, cluster_id: int) -> Optional[List[Dict[str, str]]]:
@@ -296,24 +291,21 @@ class Command(BaseCommand):
                     }
                 )
 
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"Successfully fetched XML for cluster {cluster_id} ({len(xml_data)} opinions)"
-                )
+            self.log(
+                f"Successfully fetched XML for cluster {cluster_id} ({len(xml_data)} opinions)",
+                logging.SUCCESS,
             )
             return xml_data
         except OpinionCluster.DoesNotExist:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"OpinionCluster with id {cluster_id} does not exist"
-                )
+            self.log(
+                f"OpinionCluster with id {cluster_id} does not exist",
+                logging.ERROR,
             )
             return None
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(
-                    f"Error fetching XML for cluster {cluster_id}: {str(e)}"
-                )
+            self.log(
+                f"Error fetching XML for cluster {cluster_id}: {str(e)}",
+                logging.ERROR,
             )
             return None
 
@@ -394,12 +386,11 @@ class Command(BaseCommand):
                 updated_xml = self.convert_html_to_xml(str(new_opinion))
                 print("After conversion to XML:", updated_xml)
 
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"\nUpdated XML for opinion type {opinion_type}:"
-                    )
+                self.log(
+                    f"\nUpdated XML for opinion type {opinion_type}:",
+                    logging.DEBUG,
                 )
-                self.stdout.write(self.style.WARNING(updated_xml))
+                self.log(updated_xml, logging.DEBUG)
 
             else:
                 # No matching opinion in CAP HTML, use CL XML as-is
@@ -418,13 +409,11 @@ class Command(BaseCommand):
 
         # Log changes
         if changes_made:
-            self.stdout.write(self.style.WARNING("\nChanges made:"))
+            self.log("\nChanges made:", logging.INFO)
             for change in changes_made:
-                self.stdout.write(self.style.WARNING(f"  - {change}"))
+                self.log(f"  - {change}", logging.INFO)
         else:
-            self.stdout.write(
-                self.style.WARNING("\nNo changes were necessary.")
-            )
+            self.log("\nNo changes were necessary.", logging.INFO)
 
         return processed_opinions, changes_made
 
@@ -498,20 +487,25 @@ class Command(BaseCommand):
                 opinion = Opinion.objects.get(id=opinion_data["id"])
                 opinion.xml_harvard = opinion_data["xml"]
                 opinion.save()
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"Successfully updated XML for opinion {opinion.id} (type: {opinion_data['type']})"
-                    )
+                self.log(
+                    f"Successfully updated XML for opinion {opinion.id} (type: {opinion_data['type']})",
+                    logging.INFO,
                 )
             except Opinion.DoesNotExist:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Opinion with id {opinion_data['id']} does not exist"
-                    )
+                self.log(
+                    f"Opinion with id {opinion_data['id']} does not exist",
+                    logging.ERROR,
                 )
             except Exception as e:
-                self.stdout.write(
-                    self.style.ERROR(
-                        f"Error updating XML for opinion {opinion_data['id']}: {str(e)}"
-                    )
+                self.log(
+                    f"Error updating XML for opinion {opinion_data['id']}: {str(e)}",
+                    logging.ERROR,
                 )
+
+    def log(self, message, level=logging.INFO):
+        if getattr(self, "verbose", False):
+            if level >= logging.WARNING:
+                self.stderr.write(self.style.WARNING(message))
+            else:
+                self.stdout.write(message)
+        self.logger.log(level, message)
