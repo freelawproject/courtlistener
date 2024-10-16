@@ -44,6 +44,11 @@ from cl.citations.utils import (
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.forms import NoteForm
 from cl.favorites.models import Note
+from cl.favorites.utils import (
+    get_existing_prayers_in_bulk,
+    get_prayer_counts_in_bulk,
+    prayer_eligible,
+)
 from cl.lib.auth import group_required
 from cl.lib.bot_detector import is_og_bot
 from cl.lib.decorators import cache_page_ignore_params
@@ -390,15 +395,45 @@ async def view_docket(
         except EmptyPage:
             return paginator.page(paginator.num_pages)
 
+    paginated_entries = await paginate_docket_entries(de_list, page)
+
+    prayer_is_eligible = False
+    flag_for_prayers = await sync_to_async(waffle.flag_is_active)(
+        request, "pray-and-pay"
+    )
+    if flag_for_prayers:
+        # Extract recap documents from the current page.
+        recap_documents = [
+            rd
+            for entry in await sync_to_async(list)(paginated_entries)
+            async for rd in entry.recap_documents.all()
+        ]
+        # Get prayer counts in bulk.
+        prayer_counts = await get_prayer_counts_in_bulk(recap_documents)
+        existing_prayers = {}
+
+        if request.user.is_authenticated:
+            # Check prayer existence in bulk.
+            existing_prayers = await get_existing_prayers_in_bulk(
+                request.user, recap_documents
+            )
+            prayer_is_eligible = await prayer_eligible(request.user)
+
+        # Merge counts and existing prayer status to RECAPDocuments.
+        for rd in recap_documents:
+            rd.prayer_count = prayer_counts.get(rd.id, 0)
+            rd.prayer_exists = existing_prayers.get(rd.id, False)
+
     context.update(
         {
             "parties": await docket.parties.aexists(),
             # Needed to show/hide parties tab.
             "authorities": await docket.ahas_authorities(),
-            "docket_entries": await paginate_docket_entries(de_list, page),
+            "docket_entries": paginated_entries,
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
+            "prayer_eligible": prayer_is_eligible,
         }
     )
     return TemplateResponse(request, "docket.html", context)
@@ -975,7 +1010,9 @@ async def throw_404(request: HttpRequest, context: Dict) -> HttpResponse:
     )
 
 
-async def get_prev_next_volumes(reporter: str, volume: str) -> tuple[int, int]:
+async def get_prev_next_volumes(
+    reporter: str, volume: str
+) -> tuple[int | None, int | None]:
     """Get the volume before and after the current one.
 
     :param reporter: The reporter where the volume is found

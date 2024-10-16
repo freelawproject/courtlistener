@@ -6,6 +6,7 @@ import pghistory
 import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
@@ -44,6 +45,7 @@ from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
 from cl.search.docket_sources import DocketSources
+from cl.users.models import User
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -3921,3 +3923,55 @@ class SEARCH_TYPES:
         (PARENTHETICAL, "Parenthetical"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
+
+
+class SearchQuery(models.Model):
+    WEBSITE = 1
+    API = 2
+    SOURCES = (
+        (WEBSITE, "Website"),
+        (API, "API request"),
+    )
+    ELASTICSEARCH = 1
+    SOLR = 2
+    ENGINES = (
+        (ELASTICSEARCH, "Elasticsearch"),
+        (SOLR, "Solr"),
+    )
+    user = models.ForeignKey(
+        User,
+        help_text="The user who performed this search query.",
+        related_name="search_queries",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    source = models.SmallIntegerField(
+        help_text="The interface used to perform the query.", choices=SOURCES
+    )
+    get_params = models.TextField(
+        help_text="The GET parameters of the search query."
+    )
+    query_time_ms = models.IntegerField(
+        help_text="The milliseconds to execute the query, as returned in "
+        "the ElasticSearch or Solr response.",
+        null=True,
+    )
+    hit_cache = models.BooleanField(
+        help_text="Whether the query hit the cache or not."
+    )
+    failed = models.BooleanField(
+        help_text="True if there was an error executing the query."
+    )
+    engine = models.SmallIntegerField(
+        help_text="The engine that executed the search", choices=ENGINES
+    )
+    date_created = models.DateTimeField(
+        help_text="Datetime when the record was created.",
+        auto_now_add=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["date_created"]),
+        ]
