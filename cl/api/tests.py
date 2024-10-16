@@ -5,6 +5,7 @@ from typing import Any, Dict
 from unittest import mock
 from urllib.parse import parse_qs, urlparse
 
+import time_machine
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
@@ -422,7 +423,7 @@ class ApiEventCreationTestCase(TestCase):
 
 @override_settings(BLOCK_NEW_V3_USERS=True)
 @mock.patch(
-    "cl.api.api_permissions.get_logging_prefix",
+    "cl.api.utils.get_logging_prefix",
     return_value="api-block-test:v3",
 )
 class BlockV3APITests(TestCase):
@@ -438,6 +439,9 @@ class BlockV3APITests(TestCase):
         cls.audio_path_v3 = reverse("audio-list", kwargs={"version": "v3"})
         cls.audio_path_v4 = reverse("audio-list", kwargs={"version": "v4"})
 
+        cls.date_check_request = now().replace(second=10)
+        cls.date_dont_check_request = now().replace(second=3)
+
     def setUp(self) -> None:
         self.r = get_redis_interface("STATS")
         self.flush_stats()
@@ -450,7 +454,7 @@ class BlockV3APITests(TestCase):
         if keys:
             self.r.delete(*keys)
 
-        v3_user_list = self.r.keys("v3-user-list")
+        v3_user_list = self.r.keys("v3-users-list")
         if v3_user_list:
             self.r.delete(*v3_user_list)
 
@@ -459,12 +463,38 @@ class BlockV3APITests(TestCase):
             "api-block-test:v3.user.counts", 0, -1
         )
         if v3_stats_members:
-            self.r.sadd("v3-user-list", *v3_stats_members)
+            self.r.sadd("v3-users-list", *v3_stats_members)
 
     async def test_block_v3_for_new_users(self, mock_api_prefix) -> None:
         """Confirm new v3 API users are blocked"""
-        response = await self.client_1.get(self.audio_path_v3, format="json")
+
+        # A new user request is not detected because we only check some
+        # requests. In this case, it's not checked.
+        with time_machine.travel(self.date_dont_check_request, tick=False):
+            response = await self.client_1.get(
+                self.audio_path_v3, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        # Now check the request and block the request and user.
+        with time_machine.travel(self.date_check_request, tick=False):
+            response = await self.client_1.get(
+                self.audio_path_v3, format="json"
+            )
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(
+            response.json()["detail"],
+            "As a new user, you don't have permission to access V3 of the API. Please use V4 instead.",
+        )
+
+        # Once the user is caught, they are added to the V3 blocked list, so
+        # every consecutive request from the user is blocked.
+        response = await self.client_1.get(self.audio_path_v3, format="json")
+        self.assertEqual(
+            response.status_code,
+            HTTPStatus.FORBIDDEN,
+            msg="Consecutive request.",
+        )
         self.assertEqual(
             response.json()["detail"],
             "As a new user, you don't have permission to access V3 of the API. Please use V4 instead.",
@@ -476,13 +506,16 @@ class BlockV3APITests(TestCase):
         # Simulate v3 existing user and create v3 user list.
         self.r.zincrby("api-block-test:v3.user.counts", 1, self.user_2.pk)
         self.create_v3_user_list()
-
-        response = await self.client_2.get(self.audio_path_v3, format="json")
+        with time_machine.travel(self.date_check_request, tick=False):
+            response = await self.client_2.get(
+                self.audio_path_v3, format="json"
+            )
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
     async def test_block_v3_for_anonymous_users(self, mock_api_prefix) -> None:
         """Confirm anonymous v3 API users are blocked"""
-        response = await self.async_client.get(self.audio_path_v3)
+        with time_machine.travel(self.date_check_request, tick=False):
+            response = await self.async_client.get(self.audio_path_v3)
         self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
         self.assertEqual(
             response.json()["detail"],
