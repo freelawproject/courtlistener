@@ -96,9 +96,6 @@ router.register(
     r"docket-tags", favorite_views.DocketTagViewSet, basename="DocketTag"
 )
 
-# Prayers
-router.register(r"prayers", favorite_views.PrayerViewSet, basename="prayer")
-
 # Visualizations
 router.register(
     r"visualizations/json", viz_views.JSONViewSet, basename="jsonversion"
