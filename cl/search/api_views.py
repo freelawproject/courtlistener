@@ -5,6 +5,7 @@ from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 
+from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
 from cl.api.utils import CacheListMixin, LoggingMixin, RECAPUsersReadOnly
 from cl.lib.elasticsearch_utils import do_es_api_query
@@ -78,6 +79,7 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -112,6 +114,7 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = ("id", "date_created", "date_modified", "date_filed")
     # Default cursor ordering key
     ordering = "-id"
@@ -140,6 +143,7 @@ class RECAPDocumentViewSet(
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = RECAPDocumentSerializer
     filterset_class = RECAPDocumentFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = ("id", "date_created", "date_modified", "date_upload")
     # Default cursor ordering key
     ordering = "-id"
@@ -161,6 +165,7 @@ class RECAPDocumentViewSet(
 class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = CourtSerializer
     filterset_class = CourtFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_modified",
@@ -180,6 +185,7 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -204,6 +210,7 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -227,6 +234,7 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
 class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
+    permission_classes = [V3APIPermission]
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
@@ -237,6 +245,7 @@ class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
 class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = TagSerializer
+    permission_classes = [V3APIPermission]
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
@@ -251,7 +260,7 @@ class TagViewSet(LoggingMixin, viewsets.ModelViewSet):
 class SearchViewSet(LoggingMixin, viewsets.ViewSet):
     # Default permissions use Django permissions, so here we AllowAny,
     # but folks will need to log in to get past the thresholds.
-    permission_classes = (permissions.AllowAny,)
+    permission_classes = (permissions.AllowAny, V3APIPermission)
 
     def list(self, request, *args, **kwargs):
 
@@ -306,7 +315,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
 class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
     # Default permissions use Django permissions, so here we AllowAny,
     # but folks will need to log in to get past the thresholds.
-    permission_classes = (permissions.AllowAny,)
+    permission_classes = (permissions.AllowAny, V3APIPermission)
 
     supported_search_types = {
         SEARCH_TYPES.RECAP: {

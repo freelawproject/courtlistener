@@ -3,6 +3,7 @@ from rest_framework import permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
+from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import MediumAdjustablePagination
 from cl.api.utils import LoggingMixin
 from cl.favorites.api_permissions import IsTagOwner
@@ -61,7 +62,7 @@ class DocketTagViewSet(ModelViewSet):
 class PrayerViewSet(LoggingMixin, ModelViewSet):
     """A ModelViewset to handle CRUD operations for Prayer."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, V3APIPermission]
     serializer_class = PrayerSerializer
     pagination_class = MediumAdjustablePagination
     filterset_class = PrayerFilter

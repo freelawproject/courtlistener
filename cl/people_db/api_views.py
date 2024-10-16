@@ -1,6 +1,7 @@
 from django.db.models import Exists, OuterRef, Prefetch
 from rest_framework import viewsets
 
+from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import TinyAdjustablePagination
 from cl.api.utils import LoggingMixin, RECAPUsersReadOnly
 from cl.disclosures.models import FinancialDisclosure
@@ -89,6 +90,7 @@ class PersonDisclosureViewSet(viewsets.ModelViewSet):
     serializer_class = PersonDisclosureSerializer
     filterset_class = PersonDisclosureFilter
     pagination_class = TinyAdjustablePagination
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -120,6 +122,7 @@ class PersonViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
     serializer_class = PersonSerializer
     filterset_class = PersonFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -142,6 +145,7 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Position.objects.all().order_by("-id")
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -171,6 +175,7 @@ class RetentionEventViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = RetentionEvent.objects.all().order_by("-id")
     serializer_class = RetentionEventSerializer
     filterset_class = RetentionEventFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = ("id", "date_created", "date_modified", "date_retention")
     # Default cursor ordering key
     ordering = "-id"
@@ -186,6 +191,7 @@ class EducationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Education.objects.all().order_by("-id")
     serializer_class = EducationSerializer
     filterset_class = EducationFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
@@ -201,6 +207,7 @@ class SchoolViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = School.objects.all().order_by("-id")
     serializer_class = SchoolSerializer
     filterset_class = SchoolFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = ("id", "date_created", "date_modified", "name")
     # Default cursor ordering key
     ordering = "-id"
@@ -216,6 +223,7 @@ class PoliticalAffiliationViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = PoliticalAffiliation.objects.all().order_by("-id")
     serializer_class = PoliticalAffiliationSerializer
     filterset_class = PoliticalAffiliationFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -237,6 +245,7 @@ class SourceViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Source.objects.all().order_by("-id")
     serializer_class = SourceSerializer
     filterset_class = SourceFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_modified",
@@ -252,6 +261,7 @@ class ABARatingViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = ABARating.objects.all().order_by("-id")
     serializer_class = ABARatingSerializer
     filterset_class = ABARatingFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -272,6 +282,7 @@ class PartyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = PartySerializer
     filterset_class = PartyFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
@@ -297,6 +308,7 @@ class AttorneyViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly,)
     serializer_class = AttorneySerializer
     filterset_class = AttorneyFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
