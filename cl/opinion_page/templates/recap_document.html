@@ -3,6 +3,7 @@
 {% load extras %}
 {% load admin_urls %}
 {% load static %}
+{% load waffle_tags %}
 
 
 {% block title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
@@ -29,6 +30,13 @@
             src="{% static "js/save-notes.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/buy_pacer_modal.js" %}"></script>
+      {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
+  <script src="{% static "js/pay_and_pray.js" %}"></script>
 {% endblock %}
 
 {% block sidebar %}
@@ -178,6 +186,11 @@
             <div class="col-sm-12 alert-warning alert">
               <p class="bottom">This item is not yet in the RECAP collection.
                 <span class="float-right">
+                  {% flag "pray-and-pay" %}
+                  <div class="prayer-button" data-gap-size="10px">
+                    {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
+                  </div>
+                  {% endflag %}
                   {% if rd.pacer_url %}
                     <a class="btn btn-primary btn-sm"
                        href="{{ rd.pacer_url }}"
