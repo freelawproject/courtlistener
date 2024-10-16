@@ -4,15 +4,15 @@
 {% load static %}
 {% load pacer %}
 
-{% block title %}{% if is_page_owner %} Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
-{% block og_title %}{% if is_page_owner %} Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block og_title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
 {% block description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
 {% block og_description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
 
 
 {% block content %}
   <div class="col-xs-12">
-    <h1 class="text-center">{% if is_page_owner %} Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %}</h1>
+    <h1 class="text-center">{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %}</h1>
   </div>
   <div class="col-xs-12">
     <div class="table-responsive">
@@ -44,7 +44,7 @@
               </td>
               {% endwith %}
               <td>{{ prayer.description }}</td>
-              <td></td>
+              <td> {{ prayer.date_created }} </td>
               <td>{{ prayer.status }}</td>
               {% comment %} <td><a href="{{ prayer.pacer_url }}"
                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
