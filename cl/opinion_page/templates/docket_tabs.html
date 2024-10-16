@@ -4,6 +4,7 @@
 {% load static %}
 {% load text_filters %}
 {% load tz %}
+{% load waffle_tags %}
 
 
 {% block canonical %}{% get_canonical_element %}{% endblock %}
@@ -54,6 +55,9 @@
             src="{% static "js/react/vendor.js" %}"></script>
 
     <script type="text/javascript" src="{% static "js/export-csv.js" %}"></script>
+    {% flag "pray-and-pay" %}
+    <script src="{% static "js/pay_and_pray.js" %}"></script>
+    {% endflag %}
 {% endblock %}
 
 {% block nav %}
