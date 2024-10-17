@@ -25,6 +25,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import simplify_estimated_count
@@ -1120,6 +1121,7 @@ class PagerankTest(TestCase):
             )
 
 
+@override_flag("ui_flag_for_o", False)
 class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -1260,6 +1262,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         for result in search_results.find_elements(By.TAG_NAME, "article"):
             self.assertIn("1337", result.text)
 
+    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self) -> None:
         # Dora navitages to CL and does a simple wild card search

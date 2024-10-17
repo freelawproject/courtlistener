@@ -5,6 +5,7 @@ Functional tests for the Visualization feature of CourtListener
 from django.contrib.auth.hashers import make_password
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.users.factories import UserProfileWithParentsFactory
@@ -30,6 +31,7 @@ class VisualizationCrudTests(BaseSeleniumTest):
         SCOTUSMap.objects.all().delete()
         JSONVersion.objects.all().delete()
 
+    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_creating_new_visualization(self) -> None:
         """Test if a user can create a new Visualization"""

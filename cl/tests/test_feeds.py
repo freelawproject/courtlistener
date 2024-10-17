@@ -10,6 +10,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.search.models import Court
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
@@ -28,6 +29,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         "functest_audio.json",
     ]
 
+    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_can_get_to_feeds_from_homepage(self) -> None:
         """Can we get to the feeds/podcasts page from the homepage?"""
@@ -49,6 +51,7 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assert_text_in_node("Podcasts", "body")
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    @override_flag("ui_flag_for_o", False)
     def test_feeds_page_shows_jurisdiction_links(self) -> None:
         """
         Does the feeds page show all the proper links for each jurisdiction?

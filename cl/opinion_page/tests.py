@@ -19,6 +19,7 @@ from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
 from factory import RelatedFactory
+from waffle.models import Flag
 from waffle.testutils import override_flag
 
 from cl.lib.models import THUMBNAIL_STATUSES
@@ -111,6 +112,7 @@ class SimpleLoadTest(TestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
+@override_flag("ui_flag_for_o", False)
 class OpinionPageLoadTest(
     ESIndexTestCase,
     CourtTestCase,
@@ -649,6 +651,7 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_next, None)
 
     @override_flag("o-es-active", False)
+    @override_flag("ui_flag_for_o", False)
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
