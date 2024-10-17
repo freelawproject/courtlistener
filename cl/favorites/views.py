@@ -21,8 +21,8 @@ from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
     get_top_prayers,
-    get_user_prayers,
     get_user_prayer_history,
+    get_user_prayers,
     prayer_eligible,
 )
 from cl.lib.decorators import cache_page_ignore_params
