@@ -71,7 +71,6 @@ RUN mkdir /var/log/courtlistener \
 WORKDIR /opt/courtlistener
 
 
-## Needs to be two commands so second one can use variables from first.
 ENV PYTHONPATH="${PYTHONPATH}:/opt/courtlistener"
 
 USER root
