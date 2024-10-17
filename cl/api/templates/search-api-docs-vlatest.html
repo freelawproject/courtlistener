@@ -211,7 +211,7 @@
   <pre class="pre-scrollable">curl -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "docket-list" version=version %}" \
-  | jq '.actions.POST.docket_number</pre>
+  | jq '.actions.POST.docket_number'</pre>
   <p>After filtering through <a href="https://github.com/jqlang/jq"><code>jq</code></a>, that returns:</p>
   <pre class="pre-scrollable">{
   "type": "string",
