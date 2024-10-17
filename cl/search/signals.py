@@ -6,6 +6,7 @@ from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
+from cl.favorites.utils import send_prayer_emails
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
@@ -568,3 +569,9 @@ def handle_recap_doc_change(
             find_citations_and_parantheticals_for_recap_documents.apply_async(
                 args=([instance.pk],)
             )
+
+    if (
+        instance.es_rd_field_tracker.has_changed("is_available")
+        and instance.is_available == True
+    ):
+        send_prayer_emails(instance)

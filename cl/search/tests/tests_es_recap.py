@@ -1796,9 +1796,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         }
         r = await self._test_article_count(params, 1, "highlights caseName")
         # Count child documents under docket.
-        self.assertIn("<mark>SUBPOENAS</mark>", r.content.decode())
-        self.assertIn("<mark>SERVED</mark>", r.content.decode())
-        self.assertIn("<mark>ON</mark>", r.content.decode())
+        self.assertIn("<mark>SUBPOENAS SERVED ON</mark>", r.content.decode())
 
         # Highlight filter: description
         params = {
@@ -2088,10 +2086,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             0, r.content.decode(), 1, "August 19th, 2015"
         )
         self._compare_child_entry_date_filed(
-            1, r.content.decode(), 0, "July 19th, 2014"
+            1, r.content.decode(), 0, "July 5th, 2014"
         )
         self._compare_child_entry_date_filed(
-            2, r.content.decode(), 0, "February 23th, 1732"
+            2, r.content.decode(), 0, "February 23rd, 1732"
         )
 
         # Order by entry_date_filed asc
@@ -2116,10 +2114,10 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
 
         # Confirm entry date filed are properly displayed.
         self._compare_child_entry_date_filed(
-            0, r.content.decode(), 0, "February 23th, 1732"
+            0, r.content.decode(), 0, "February 23rd, 1732"
         )
         self._compare_child_entry_date_filed(
-            1, r.content.decode(), 0, "July 19th, 2014"
+            1, r.content.decode(), 0, "July 5th, 2014"
         )
         self._compare_child_entry_date_filed(
             2, r.content.decode(), 0, "August 19th, 2015"
@@ -2758,6 +2756,14 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 docket_number="1:21-bk-1235",
                 source=Docket.RECAP,
             )
+            DocketFactory(
+                court=self.court_2,
+                case_name="Howells v. LLC Indiana",
+                case_name_short="Dolor",
+                case_name_full="Lorem Ipsum",
+                docket_number="1:21-bk-1235",
+                source=Docket.RECAP,
+            )
 
         # case_name filter: Howell
         cd = {
@@ -2789,8 +2795,16 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "type": SEARCH_TYPES.RECAP,
             "case_name": "Howells",
         }
-        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        r = async_to_sync(self._test_article_count)(cd, 2, "Disable stemming")
         self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+        # quoted case_name filter: "Howells v. Indiana" expect exact match
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"Howells v. Indiana"',
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        self.assertIn("<mark>Howells v. Indiana</mark>", r.content.decode())
 
         # text query: Howell
         cd = {
@@ -2805,7 +2819,7 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "type": SEARCH_TYPES.RECAP,
             "q": "Howells",
         }
-        r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
+        r = async_to_sync(self._test_article_count)(cd, 2, "Disable stemming")
         self.assertIn("<mark>Howells</mark>", r.content.decode())
 
         # text query: Howell ind (stemming and synonyms disabled)
@@ -2887,7 +2901,9 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             cited_opinion=cls.opinion,
             depth=1,
         )
-        BankruptcyInformationFactory(docket=cls.de_api.docket)
+        BankruptcyInformationFactory(
+            docket=cls.de_api.docket, trustee_str="Lorem Ipsum"
+        )
 
         cls.de_empty_fields_api = DocketEntryWithParentsFactory(
             docket=DocketFactory(
@@ -2909,6 +2925,7 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
             court=cls.court_api,
             date_argued=None,
             source=Docket.RECAP_AND_IDB,
+            case_name_full="",
         )
 
     async def _test_api_results_count(
@@ -3702,7 +3719,7 @@ class RECAPSearchAPIV4Test(
             "result": self.rd_api,
             "V4": True,
             "assignedTo": "<mark>George</mark> Doe II",
-            "caseName": "<mark>America</mark> <mark>vs</mark> <mark>API</mark> Lorem",
+            "caseName": "<mark>America vs API</mark> Lorem",
             "cause": "<mark>401</mark> <mark>Civil</mark>",
             "court_citation_string": "<mark>Appeals</mark>. CA9.",
             "docketNumber": "<mark>1:24-bk-0000</mark>",
@@ -3825,6 +3842,7 @@ class RECAPSearchAPIV4Test(
             docket_entry_recent = DocketEntryWithParentsFactory(
                 docket__source=Docket.RECAP,
                 docket__case_name="Lorem Ipsum",
+                docket__case_name_full="",
                 docket__date_filed=datetime.date(2024, 2, 23),
                 date_filed=datetime.date(2022, 2, 23),
             )

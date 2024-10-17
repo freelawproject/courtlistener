@@ -134,7 +134,17 @@
               >View Citing Opinions</a>
             </p>
           {% else %}
-            <p>This case has not yet been cited in our system.</p>
+            {% if queries_timeout %}
+              <p>Unable to retrieve citing clusters. Please try by clicking the button below:</p>
+              <p>
+                <a href="/?q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+                   rel="nofollow"
+                   class="btn btn-default"
+                >View Citing Opinions</a>
+              </p>
+            {% else %}
+               <p>This case has not yet been cited in our system.</p>
+            {% endif %}
           {% endif %}
           <div class="btn-group">
             <a href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
@@ -159,14 +169,13 @@
 
 
         {# Related opinions #}
-        {% if related_clusters %}
+        {% if related_clusters or queries_timeout %}
             <div id="recommendations" class="sidebar-section">
                 <h3><span>Related Case Law</span></h3>
-
-                <p class="bottom">The following case law covers similar topics:</p>
-
+                {% if not related_clusters and queries_timeout %}
+                    <p class="bottom">Unable to retrieve related clusters. Please try by clicking the button below:</p>
+                {% endif %}
                 {% url 'show_results' as show_results_url %}
-
                 {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
                 {% with opinions=related_clusters full_list_url=show_results_url|add:"?q=related:"|add:sub_opinion_ids_list|add:related_search_params %}
 

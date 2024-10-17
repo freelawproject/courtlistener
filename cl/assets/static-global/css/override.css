@@ -1798,3 +1798,11 @@ rect.series-segment {
     transform: rotate(180deg); /* Rotate to point up when expanded */
   }
 }
+
+.prayer-button[data-gap-size="small"] {
+  margin-left: 8px;
+}
+
+.prayer-button[data-gap-size="large"]{
+  margin-left: 44px;
+}
