@@ -268,6 +268,7 @@ async def user_prayers_view(
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
 
+    # this is a temporary restriction for the MVP. The intention is to eventually treat like tags.
     if not is_page_owner:
         return redirect("top_prayers")
 
