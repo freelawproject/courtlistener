@@ -1,4 +1,4 @@
-import time
+import random
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
@@ -57,9 +57,8 @@ class V3APIPermission(permissions.BasePermission):
 
     @staticmethod
     def check_request() -> bool:
-        # Check requests every 10 seconds.
-        # Notice that all requests within that second will be checked.
-        if int(time.time()) % 10 == 0:
+        # Check 1 in 50 requests.
+        if random.randint(1, 50) == 1:
             return True
         return False
 
