@@ -160,7 +160,6 @@ SEARCH_RECAP_HL_FIELDS = {
     "referredTo": 0,
     "suitNature": 0,
 }
-
 SEARCH_OPINION_HL_FIELDS = {
     "caseName": 0,
     "citation": 0,
@@ -306,6 +305,30 @@ o_type_index_map = {
     Opinion.ON_MOTION_TO_STRIKE: "on-motion-to-strike",
     Opinion.TRIAL_COURT: "trial-court-document",
 }
+
+recap_document_indexed_fields = [
+    "id",
+    "docket_entry_id",
+    "description",
+    "entry_number",
+    "entry_date_filed",
+    "short_description",
+    "document_type",
+    "document_number",
+    "pacer_doc_id",
+    "plain_text",
+    "attachment_number",
+    "is_available",
+    "page_count",
+    "cites",
+]
+
+recap_document_filters = [
+    "available_only",
+    "description",
+    "document_number",
+    "attachment_number",
+]
 
 cardinality_query_unique_ids = {
     SEARCH_TYPES.RECAP: "docket_id",
