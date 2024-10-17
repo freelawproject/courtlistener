@@ -1,6 +1,5 @@
 import re
 from datetime import date, datetime, timedelta
-from math import ceil
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
@@ -1229,15 +1228,15 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         return
 
     if is_es_search:
-        search_query.query_time_ms = ceil(search_results["results_details"][0])
+        search_query.query_time_ms = search_results["results_details"][0]
         # do_es_search returns 1 as query time if the micro cache was hit
         search_query.hit_cache = search_query.query_time_ms == 1
     else:
         # Solr searches are not cached unless a cache_key is passed
         # No cache_key is passed for the endpoints we are storing
-        search_query.query_time_ms = ceil(
-            search_results["results"].object_list.QTime
-        )
+        search_query.query_time_ms = search_results[
+            "results"
+        ].object_list.QTime
 
     search_query.save()
 
