@@ -1792,6 +1792,15 @@ async def merge_attachment_page_data(
         if not all(sanity_checks):
             continue
 
+        # Missing on some restricted docs (see Juriscraper)
+        # Attachment 0 may not have page count since it is the main rd.
+        if (
+            "page_count" in attachment
+            and attachment["page_count"] is None
+            and attachment["attachment_number"] != 0
+        ):
+            continue
+
         # Appellate entries with attachments don't have a main RD, transform it
         # to an attachment. In ACMS attachment pages, all the documents use the
         # same pacer_doc_id, so we need to make sure only one is matched to the
