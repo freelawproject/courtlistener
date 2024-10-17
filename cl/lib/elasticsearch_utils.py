@@ -2780,7 +2780,7 @@ def get_child_top_hits_limit(
 
 def do_count_query(
     search_query: Search,
-) -> int | None:
+) -> int:
     """Execute an Elasticsearch count query and catch errors.
     :param search_query: Elasticsearch DSL Search object.
     :return: The results count.
@@ -2792,7 +2792,8 @@ def do_count_query(
             f"Error on count query request: {search_query.to_dict()}"
         )
         logger.warning(f"Error was: {e}")
-        total_results = None
+        # Required for the paginator class to work, as it expects an integer.
+        total_results = 0
     return total_results
 
 

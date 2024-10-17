@@ -19,6 +19,8 @@ from elasticsearch.exceptions import ConnectionTimeout
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
@@ -492,6 +494,7 @@ class OpinionV3APISearchTest(
             "order_by": "dateFiled desc",
             "highlight": False,
         }
+        request = Request(APIRequestFactory().get("/"))
         for page in range(1, total_pages + 1):
             search_query = OpinionClusterDocument.search()
             offset = max(0, (page - 1) * page_size)
@@ -499,6 +502,7 @@ class OpinionV3APISearchTest(
                 search_query, cd, {"text": 500}, SEARCH_HL_TAG, "v3"
             )
             hits = ESList(
+                request=request,
                 main_query=main_query,
                 offset=offset,
                 page_size=page_size,
