@@ -186,11 +186,11 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
-def get_logging_prefix() -> str:
+def get_logging_prefix(api_version: str) -> str:
     """Simple tool for getting the prefix for logging API requests. Useful for
     mocking the logger.
     """
-    return "api:v3"
+    return f"api:{api_version}"
 
 
 class LoggingMixin:
@@ -227,7 +227,7 @@ class LoggingMixin:
             # noinspection PyBroadException
             try:
                 results = self._log_request(request)
-                self._handle_events(results, request.user)
+                self._handle_events(results, request.user, request.version)
             except Exception as e:
                 logger.exception(
                     "Unable to log API response timing info: %s", e
@@ -255,7 +255,7 @@ class LoggingMixin:
 
         r = get_redis_interface("STATS")
         pipe = r.pipeline()
-        api_prefix = get_logging_prefix()
+        api_prefix = get_logging_prefix(request.version)
 
         # Global and daily tallies for all URLs.
         pipe.incr(f"{api_prefix}.count")
@@ -291,19 +291,23 @@ class LoggingMixin:
         results = pipe.execute()
         return results
 
-    def _handle_events(self, results, user):
+    def _handle_events(self, results, user, api_version):
         total_count = results[0]
         user_count = results[4]
 
         if total_count in MILESTONES_FLAT:
             Event.objects.create(
-                description=f"API has logged {total_count} total requests."
+                description=f"API {api_version} has logged {total_count} total requests."
             )
         if user.is_authenticated:
             if user_count in self.milestones:
                 Event.objects.create(
-                    description="User '%s' has placed their %s API request."
-                    % (user.username, intcomma(ordinal(user_count))),
+                    description="User '%s' has placed their %s API %s request."
+                    % (
+                        user.username,
+                        intcomma(ordinal(user_count)),
+                        api_version,
+                    ),
                     user=user,
                 )
 
