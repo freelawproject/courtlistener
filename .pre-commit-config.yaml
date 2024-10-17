@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 exclude: migrations
 default_language_version:
-  python: "python3.12"
+  python: "python3.13"
 ci:
   autoupdate_schedule: quarterly
 repos:
