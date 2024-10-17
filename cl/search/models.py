@@ -2853,6 +2853,26 @@ class OpinionCluster(AbstractDateTimeModel):
         return caption
 
     @property
+    def display_citation(self):
+        citation_list = [citation for citation in self.citations.all()]
+        citations = sorted(citation_list, key=sort_cites)
+        citation = ""
+        if not citations:
+            return ""
+        else:
+            if citations[0].type == Citation.NEUTRAL:
+                return citations[0]
+            elif (
+                len(citations) >= 2
+                and citations[0].type == Citation.WEST
+                and citations[1].type == Citation.LEXIS
+            ):
+                citation += f"{citations[0]}, {citations[1]}"
+            else:
+                citation += f"{citations[0]}"
+        return citation
+
+    @property
     def citation_string(self):
         """Make a citation string, joined by commas"""
         citations = sorted(self.citations.all(), key=sort_cites)
@@ -2990,6 +3010,18 @@ class OpinionCluster(AbstractDateTimeModel):
 
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
+
+    def ordered_opinions(self):
+        # Fetch all sub-opinions ordered by ordering_key
+        sub_opinions = self.sub_opinions.all().order_by("ordering_key")
+
+        # Check if there is more than one sub-opinion
+        if sub_opinions.count() > 1:
+            # Return only sub-opinions with an ordering key
+            return sub_opinions.exclude(ordering_key__isnull=True)
+
+        # If there's only one or no sub-opinions, return the main opinion
+        return sub_opinions
 
     def save(
         self,
