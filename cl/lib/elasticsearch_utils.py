@@ -9,16 +9,14 @@ from dataclasses import fields
 from functools import reduce, wraps
 from typing import Any, Callable, Dict, List, Literal
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync
 from django.conf import settings
-from django.core.cache import caches
-from django.core.paginator import EmptyPage, Page
-from django.db.models import Case, CharField
+from django.core.paginator import Page
+from django.db.models import Case
 from django.db.models import Q as QObject
-from django.db.models import QuerySet, TextField, Value, When
+from django.db.models import QuerySet, TextField, When
 from django.db.models.functions import Substr
 from django.forms.boundfield import BoundField
-from django.http import HttpRequest
 from django.http.request import QueryDict
 from django.utils.html import strip_tags
 from django_elasticsearch_dsl.search import Search
@@ -31,9 +29,7 @@ from elasticsearch_dsl.utils import AttrDict
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
-from cl.lib.bot_detector import is_bot
 from cl.lib.date_time import midnight_pt
-from cl.lib.paginators import ESPaginator
 from cl.lib.string_utils import trunc
 from cl.lib.types import (
     ApiPositionMapping,
@@ -59,6 +55,7 @@ from cl.search.constants import (
     RELATED_PATTERN,
     SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS,
     SEARCH_HL_TAG,
+    SEARCH_MLT_OPINION_QUERY_FIELDS,
     SEARCH_OPINION_HL_FIELDS,
     SEARCH_OPINION_QUERY_FIELDS,
     SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS,
@@ -81,7 +78,6 @@ from cl.search.exception import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
-    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Court,
     Opinion,
@@ -169,24 +165,33 @@ def build_daterange_query(
     return []
 
 
-def build_more_like_this_query(related_id: list[str]):
-    document_list = [{"_id": f"o_{id}"} for id in related_id]
-    more_like_this_fields = SEARCH_OPINION_QUERY_FIELDS.copy()
-    more_like_this_fields.extend(
-        [
-            "type",
-            "text",
-            "caseName",
-            "docketNumber",
-        ]
-    )
-    return Q(
+async def build_more_like_this_query(related_ids: list[str]) -> Query:
+    """Build an ES "more like this" query based on related Opinion IDs.
+
+    :param related_ids: A list of related Opinion IDs to build the query on.
+    :return: An ES query object with "more like this" query and
+    exclusions for specific opinion clusters.
+    """
+
+    document_list = [{"_id": f"o_{id}"} for id in related_ids]
+    more_like_this_fields = SEARCH_MLT_OPINION_QUERY_FIELDS.copy()
+    mlt_query = Q(
         "more_like_this",
         fields=more_like_this_fields,
         like=document_list,
         min_term_freq=1,
         max_query_terms=12,
     )
+    # Exclude opinion clusters to which the related IDs to query belong.
+    cluster_ids_to_exclude = (
+        OpinionCluster.objects.filter(sub_opinions__pk__in=related_ids)
+        .distinct("pk")
+        .values_list("pk", flat=True)
+    )
+    cluster_ids_list = [pk async for pk in cluster_ids_to_exclude.aiterator()]
+    exclude_cluster_ids = [Q("terms", cluster_id=cluster_ids_list)]
+    bool_query = Q("bool", must=[mlt_query], must_not=exclude_cluster_ids)
+    return bool_query
 
 
 def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
@@ -198,6 +203,29 @@ def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
     :return: A list of Elasticsearch fields with boost values formatted as 'field_name^boost_value'.
     """
     return [f"{k}^{v}" for k, v in fields.items()]
+
+
+def is_case_name_query(query_value: str) -> bool:
+    """Determines if the given query value is likely a case name query.
+
+    :param query_value: The search query to check.
+    :return: True if the query appears to be a case name, otherwise False.
+    """
+
+    vs_query = any(
+        [
+            " v " in query_value,
+            " v. " in query_value,
+            " vs. " in query_value,
+            " vs " in query_value,
+        ]
+    )
+    query_lower = query_value.lower()
+    in_re_query = query_lower.startswith("in re ")
+    matter_of_query = query_lower.startswith("matter of ")
+    ex_parte_query = query_lower.startswith("ex parte ")
+
+    return any([vs_query, in_re_query, matter_of_query, ex_parte_query])
 
 
 def add_fields_boosting(
@@ -230,19 +258,8 @@ def add_fields_boosting(
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         query = cd.get("q", "")
-        vs_query = any(
-            [
-                " v " in query,
-                " v. " in query,
-                " vs. " in query,
-                " vs " in query,
-            ]
-        )
-        in_re_query = query.lower().startswith("in re ")
-        matter_of_query = query.lower().startswith("matter of ")
-        ex_parte_query = query.lower().startswith("ex parte ")
-        if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({"caseName.exact": 50})
+        if is_case_name_query(query):
+            qf.update({"caseName.exact": 75})
 
     if fields:
         qf = {key: value for key, value in qf.items() if key in fields}
@@ -345,33 +362,45 @@ def build_fulltext_query(
 
         # Used for the phrase query_string, no conjunctions appended.
         query_value = cleanup_main_query(value)
-
         # To enable the search of each term in the query across multiple fields
         # it's necessary to include an "AND" conjunction between each term.
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-multi-field
         # Used for the best_fields query_string.
-        query_value_with_conjunctions = append_query_conjunctions(query_value)
 
-        q_should = [
-            Q(
-                "query_string",
-                fields=fields,
-                query=query_value_with_conjunctions,
-                quote_field_suffix=".exact",
-                default_operator="AND",
-                tie_breaker=0.3,
-                fuzziness=2,
-            ),
-            Q(
-                "query_string",
-                fields=fields,
-                query=query_value,
-                quote_field_suffix=".exact",
-                default_operator="AND",
-                type="phrase",
-                fuzziness=2,
-            ),
-        ]
+        query_value_with_conjunctions = append_query_conjunctions(query_value)
+        q_should = []
+        # If it looks like a case name, we are boosting a match query
+        if is_case_name_query(query_value) and '"' not in query_value:
+            q_should.append(
+                Q(
+                    "match_phrase",
+                    caseName={"query": query_value, "boost": 2, "slop": 1},
+                )
+            )
+
+        q_should.extend(
+            [
+                Q(
+                    "query_string",
+                    fields=fields,
+                    query=query_value_with_conjunctions,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                    tie_breaker=0.3,
+                    fuzziness=2,
+                ),
+                Q(
+                    "query_string",
+                    fields=fields,
+                    query=query_value,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                    type="phrase",
+                    fuzziness=2,
+                ),
+            ]
+        )
+
         if only_queries:
             return q_should
         return Q("bool", should=q_should)
@@ -385,7 +414,7 @@ def build_term_query(
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
     "term" Returns documents that contain an exact term in a provided field
-    NOTE: Use it only whe you want an exact match, avoid using this with text fields
+    NOTE: Use it only when you want an exact match, avoid using this with text fields
     "terms" Returns documents that contain one or more exact terms in a provided field.
 
     :param field: elasticsearch index fieldname
@@ -430,14 +459,27 @@ def build_text_filter(field: str, value: str) -> List:
     if value:
         if isinstance(value, str):
             validate_query_syntax(value, QueryType.FILTER)
-        return [
-            Q(
-                "query_string",
-                query=value,
-                fields=[field],
-                default_operator="AND",
+
+        base_query_string = {
+            "query_string": {
+                "query": value,
+                "fields": [field],
+                "default_operator": "AND",
+            }
+        }
+        if "caseName" in field and '"' not in value:
+            # Use phrase with slop, and give it a boost to prioritize the
+            # phrase match to ensure that caseName filtering returns exactly
+            # this order as the first priority.
+            # Avoid applying slop to quoted queries, as they expect exact matches.
+            base_query_string["query_string"].update(
+                {
+                    "type": "phrase",
+                    "phrase_slop": "1",
+                    "boost": "2",  # Boosting the phrase match to ensure it's ranked higher than individual term matches
+                }
             )
-        ]
+        return [Q(base_query_string)]
     return []
 
 
@@ -1177,7 +1219,19 @@ def build_es_base_query(
             mlt_query = None
             if related_match:
                 cluster_pks = related_match.group("pks").split(",")
-                mlt_query = build_more_like_this_query(cluster_pks)
+                mlt_query = async_to_sync(build_more_like_this_query)(
+                    cluster_pks
+                )
+                main_query, join_query = build_full_join_es_queries(
+                    cd,
+                    {"opinion": []},
+                    [],
+                    mlt_query,
+                    child_highlighting=False,
+                    api_version=api_version,
+                )
+                return search_query.query(main_query), join_query
+
             opinion_search_fields = SEARCH_OPINION_QUERY_FIELDS
             child_fields = opinion_search_fields.copy()
             child_fields.extend(
@@ -1441,6 +1495,12 @@ def add_es_highlighting(
     :param highlighting: Whether highlighting should be enabled in docs.
     :return: The modified Elasticsearch search query object with highlights set
     """
+
+    # Avoid highlighting for the related cluster query.
+    related_match = RELATED_PATTERN.search(cd.get("q", ""))
+    if related_match:
+        return search_query
+
     highlighting_fields = {}
     highlighting_keyword_fields = []
     hl_tag = ALERTS_HL_TAG if alerts else SEARCH_HL_TAG
@@ -2035,7 +2095,6 @@ def fetch_es_results(
         main_doc_count_query = build_cardinality_count(
             main_doc_count_query, parent_unique_field
         )
-
         if child_docs_count_query:
             child_unique_field = cardinality_query_unique_ids[
                 SEARCH_TYPES.RECAP_DOCUMENT
@@ -2461,12 +2520,13 @@ def build_full_join_es_queries(
         child_filters_original = deepcopy(child_filters)
         # Build child text query.
         child_fields = child_query_fields[child_type]
-        child_text_query = build_fulltext_query(
-            child_fields, cd.get("q", ""), only_queries=True
-        )
 
         if mlt_query:
-            child_text_query.append(mlt_query)
+            child_text_query = [mlt_query]
+        else:
+            child_text_query = build_fulltext_query(
+                child_fields, cd.get("q", ""), only_queries=True
+            )
 
         # Build parent filters.
         parent_filters = build_join_es_filters(cd)
@@ -2602,7 +2662,7 @@ def build_full_join_es_queries(
                     should=string_query,
                     minimum_should_match=1,
                 )
-        if parent_query:
+        if parent_query and not mlt_query:
             q_should.append(parent_query)
 
     if not q_should:
@@ -2720,7 +2780,7 @@ def get_child_top_hits_limit(
 
 def do_count_query(
     search_query: Search,
-) -> int | None:
+) -> int:
     """Execute an Elasticsearch count query and catch errors.
     :param search_query: Elasticsearch DSL Search object.
     :return: The results count.
@@ -2732,7 +2792,8 @@ def do_count_query(
             f"Error on count query request: {search_query.to_dict()}"
         )
         logger.warning(f"Error was: {e}")
-        total_results = None
+        # Required for the paginator class to work, as it expects an integer.
+        total_results = 0
     return total_results
 
 
@@ -2756,91 +2817,6 @@ def merge_opinion_and_cluster(results: Page | dict) -> None:
         result["joined_by_ids"] = opinion["joined_by_ids"]
         result["court_exact"] = opinion["joined_by_ids"]
         result["status_exact"] = result["status"]
-
-
-async def get_related_clusters_with_cache_and_es(
-    search: Search,
-    cluster: OpinionCluster,
-    request: HttpRequest,
-) -> tuple[Page | list, list[int], dict[str, str]]:
-    """Retrieve related opinion clusters from ES or cache.
-
-    :param search: The ES Search object.
-    :param cluster: The current OpinionCluster.
-    :param request: The HttpRequest object.
-    :return: A three tuple containing a Page containing opinion clusters or an
-    empty list. A list containing the cluster sub opinions ids. A dic containing
-    the url_search_params.
-    """
-
-    # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
-    # attributes (since they're indexed in ES) instead of the NAMES values.
-    available_statuses = [status[0] for status in PRECEDENTIAL_STATUS.NAMES]
-    url_search_params = {f"stat_{v}": "on" for v in available_statuses}
-    search_params: CleanData = {}
-    # Opinions that belong to the targeted cluster
-    sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
-    sub_opinion_pks = [pk async for pk in sub_opinion_ids]
-    if is_bot(request) or not sub_opinion_pks:
-        # If it is a bot or lacks sub-opinion IDs, return empty results
-        return [], [], url_search_params
-
-    # Use cache if enabled
-    cache = caches["db_cache"]
-    mlt_cache_key = f"mlt-cluster-es:{cluster.pk}"
-    related_clusters = (
-        await cache.aget(mlt_cache_key) if settings.RELATED_USE_CACHE else None
-    )
-
-    if settings.RELATED_FILTER_BY_STATUS:
-        # Filter results by status (e.g., Precedential)
-        # Update URL parameters accordingly
-        search_params[
-            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}"
-        ] = True
-        url_search_params = {
-            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
-        }
-
-    if related_clusters is None:
-        sub_opinion_queries = ",".join(str(pk) for pk in sub_opinion_pks)
-        search_params["q"] = f"related:{sub_opinion_queries}"
-        search_params["type"] = SEARCH_TYPES.OPINION
-        query_dict = QueryDict("", mutable=True)
-        query_dict.update(search_params)
-        search_query, child_docs_count_query, _ = await sync_to_async(
-            build_es_main_query
-        )(search, search_params)
-        hits, _, error, total_query_results, _ = await sync_to_async(
-            fetch_es_results
-        )(
-            query_dict,
-            search_query,
-            child_docs_count_query,
-            1,
-            settings.RELATED_COUNT,
-        )
-        if error:
-            return [], [], url_search_params
-
-        @sync_to_async
-        def paginate_related_clusters(total_results: int, results: Response):
-            paginator = ESPaginator(
-                total_results, results, settings.RELATED_COUNT
-            )
-            try:
-                return paginator.page(1)
-            except EmptyPage:
-                return paginator.page(paginator.num_pages)
-
-        related_clusters = await paginate_related_clusters(
-            total_query_results, hits
-        )
-
-        await cache.aset(
-            mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
-        )
-    return related_clusters, sub_opinion_pks, url_search_params
 
 
 def make_es_stats_variable(

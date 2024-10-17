@@ -39,6 +39,7 @@ from cl.search.models import (
     Court,
     OpinionCluster,
     RECAPDocument,
+    SearchQuery,
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
@@ -1199,3 +1200,65 @@ async def clean_up_recap_document_file(item: RECAPDocument) -> None:
         item.page_count = None
         item.is_available = False
         await item.asave()
+
+
+def store_search_query(request: HttpRequest, search_results: dict) -> None:
+    """Saves an user's search query in a SearchQuery model
+
+    :param request: the request object
+    :param search_results: the dict returned by `do_search` or
+        `do_es_search` functions
+    :return None
+    """
+    is_error = search_results.get("error")
+    is_es_search = search_results.get("results_details") is not None
+
+    search_query = SearchQuery(
+        user=None if request.user.is_anonymous else request.user,
+        get_params=request.GET.urlencode(),
+        failed=is_error,
+        query_time_ms=None,
+        hit_cache=False,
+        source=SearchQuery.WEBSITE,
+        engine=SearchQuery.ELASTICSEARCH if is_es_search else SearchQuery.SOLR,
+    )
+    if is_error:
+        # Leave `query_time_ms` as None if there is an error
+        search_query.save()
+        return
+
+    if is_es_search:
+        search_query.query_time_ms = search_results["results_details"][0]
+        # do_es_search returns 1 as query time if the micro cache was hit
+        search_query.hit_cache = search_query.query_time_ms == 1
+    else:
+        # Solr searches are not cached unless a cache_key is passed
+        # No cache_key is passed for the endpoints we are storing
+        search_query.query_time_ms = search_results[
+            "results"
+        ].object_list.QTime
+
+    search_query.save()
+
+
+def store_search_api_query(
+    request: HttpRequest, failed: bool, query_time: int | None, engine: int
+) -> None:
+    """Store the search query from the Search API.
+
+    :param request: The HTTP request object.
+    :param failed: Boolean indicating if the query execution failed.
+    :param query_time: The time taken to execute the query in milliseconds or
+    None if not applicable.
+    :param engine: The search engine used to execute the query.
+    :return: None
+    """
+    SearchQuery.objects.create(
+        user=None if request.user.is_anonymous else request.user,
+        get_params=request.GET.urlencode(),
+        failed=failed,
+        query_time_ms=query_time,
+        hit_cache=False,
+        source=SearchQuery.API,
+        engine=engine,
+    )

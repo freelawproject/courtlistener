@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load text_filters %}
+{% load text_filters humanize %}
 
 {% block title %}Available Jurisdictions – CourtListener.com{% endblock %}
 {% block description %} A list of the hundreds of jurisdictions available on CourtListener.{% endblock %}
@@ -11,12 +11,12 @@
         <h2>Available Jurisdictions</h2>
 
         <p>
-            We currently have <span id="jurisdiction-count">{{ courts.count }}</span> jurisdictions available on CourtListener. These jurisdictions are available via
+            We currently have <span id="jurisdiction-count">{{ courts.count|intcomma }}</span> jurisdictions available on CourtListener. These jurisdictions are available via
             our API or can be used in our bulk data queries.
         </p>
 
         <p>
-            Some of the data below is incomplete, missing dates or other information. If you are a legal researcher
+            Some data below is incomplete, missing dates or other information. If you are a legal researcher
             interested in helping us research this or other data, please get in touch via our <a href="{% url "contact" %}">contact
             form</a>. We welcome your contribution.
         </p>
@@ -52,7 +52,7 @@
                 {% for court in courts %}
                     <tr>
                         <td>{{ court.full_name }}</td>
-                        <td>{{ court.count }}</td>
+                        <td>{{ court.count|intcomma }}</td>
                         <td>{{ court.get_jurisdiction_display|nbsp }}</td>
                         <td title="{{ court.url }}">
                             <a href="{{ court.url }}" target="_blank">
