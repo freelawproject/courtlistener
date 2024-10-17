@@ -137,12 +137,14 @@ async def prayer_help(request: HttpRequest) -> HttpResponse:
     cache_key = "prayer-help-stats"
     data = await cache.aget(cache_key)
     if data is None:
-        count, num_distinct_purchases, total_cost = await get_lifetime_prayer_stats()
+        count, num_distinct_purchases, total_cost = (
+            await get_lifetime_prayer_stats()
+        )
         data = {
             "count": count,
             "num_distinct_purchases": num_distinct_purchases,
             "total_cost": total_cost,
-            "daily_quota": await settings.ALLOWED_PRAYER_COUNT
+            "daily_quota": await settings.ALLOWED_PRAYER_COUNT,
         }
         one_day = 60 * 60 * 24
         await cache.aset(cache_key, data, one_day)
@@ -152,9 +154,7 @@ async def prayer_help(request: HttpRequest) -> HttpResponse:
     }
     context.update(data)
 
-    return TemplateResponse(
-        request, "help/prayer_help.html", context
-    )
+    return TemplateResponse(request, "help/prayer_help.html", context)
 
 
 async def tag_notes_help(request: HttpRequest) -> HttpResponse:
