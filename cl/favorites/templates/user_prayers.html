@@ -33,6 +33,7 @@
               <th>Document Description</th>
               <th>Requested On</th>
               <th>Status</th>
+              {% if is_page_owner %}<th>Delete</th>{% endif %}
             </tr>
         </thead>
         <tbody>
@@ -54,6 +55,7 @@
               <td>{{ prayer.description }}</td>
               <td>{{ prayer.date_created|date:"M j, Y"  }}</td>
               <td>{% if prayer.status == WAITING %} WAITING {% elif prayer.status == GRANTED %} Granted on {% endif %}</td>
+              {% if is_page_owner %}<td><a href="{% url 'delete_prayer' recap_document=prayer.pk %}">Delete</a></td>{% endif %}
               {% comment %} <td><a href="{{ prayer.pacer_url }}"
                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                   class="open_buy_pacer_modal btn btn-default btn-xs"
