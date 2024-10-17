@@ -1240,3 +1240,26 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         )
 
     search_query.save()
+
+
+def store_search_api_query(
+    request: HttpRequest, failed: bool, query_time: int | None, engine: int
+) -> None:
+    """Store the search query from the Search API.
+
+    :param request: The HTTP request object.
+    :param failed: Boolean indicating if the query execution failed.
+    :param query_time: The time taken to execute the query in milliseconds or
+    None if not applicable.
+    :param engine: The search engine used to execute the query.
+    :return: None
+    """
+    SearchQuery.objects.create(
+        user=None if request.user.is_anonymous else request.user,
+        get_params=request.GET.urlencode(),
+        failed=failed,
+        query_time_ms=query_time,
+        hit_cache=False,
+        source=SearchQuery.API,
+        engine=engine,
+    )
