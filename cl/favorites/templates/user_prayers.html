@@ -9,11 +9,19 @@
 {% block description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
 {% block og_description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
 
-
 {% block content %}
   <div class="col-xs-12">
     <h1 class="text-center">{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %}</h1>
   </div>
+
+  <div class="col-xs-12">
+    <div class="well well-sm">
+      {% if is_page_owner %}
+        You have had <b>{{ count }}</b> requests fulfilled for documents that cost <b>${{ total_cost }}</b>.
+      {% endif %}
+    </div>
+  </div>
+
   <div class="col-xs-12">
     <div class="table-responsive">
       <table class="settings-table table">
@@ -45,7 +53,7 @@
               {% endwith %}
               <td>{{ prayer.description }}</td>
               <td>{{ prayer.date_created|date:"M j, Y"  }}</td>
-              <td>{{ prayer.status }}</td>
+              <td>{% if prayer.status == WAITING %} WAITING {% elif prayer.status == GRANTED %} Granted on {% endif %}</td>
               {% comment %} <td><a href="{{ prayer.pacer_url }}"
                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                   class="open_buy_pacer_modal btn btn-default btn-xs"

@@ -26,6 +26,7 @@ urlpatterns = [
         name="view_tag",
     ),
     path("tags/<str:username>/", view_tags, name="tag_list"),
+    # Prayer pages
     path("prayers/top/", open_prayers, name="top_prayers"),
     path(
         "prayer/create/<int:recap_document>/",
