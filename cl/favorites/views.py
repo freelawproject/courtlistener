@@ -11,7 +11,7 @@ from django.http import (
     HttpResponseNotAllowed,
     HttpResponseServerError,
 )
-from django.shortcuts import aget_object_or_404
+from django.shortcuts import aget_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
 
@@ -268,6 +268,9 @@ async def user_prayers_view(
     requested_user = await aget_object_or_404(User, username=username)
     is_page_owner = await request.auser() == requested_user
 
+    if not is_page_owner:
+        return redirect("top_prayers")
+
     prayers = await get_user_prayers(requested_user)
 
     count, total_cost = await get_user_prayer_history(requested_user)
@@ -281,5 +284,5 @@ async def user_prayers_view(
         "private": False,
     }
 
-    # I want this to include the following things - show date submitted, date fulfilled, link to docket, link to file, etc. Include the summary statistics as well. What else?
+    # I want this to include the following things - show date fulfilled, link to file, etc. What else?
     return TemplateResponse(request, "user_prayers.html", context)
