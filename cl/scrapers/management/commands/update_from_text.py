@@ -7,11 +7,15 @@ from cl.scrapers.tasks import update_document_from_text
 from cl.search.models import PRECEDENTIAL_STATUS, Opinion, OpinionCluster
 
 
-def update_from_text(
+def rerun_extract_from_text(
     opinion: Opinion, juriscraper_module: str, stats: dict[str, int]
 ):
-    """Calls `update_document_from_text` as used in the scraper flow
-    and calls the corresponding model's .save()
+    """
+    Reruns `update_document_from_text` from the scraper flow, saving changes
+
+    `update_document_from_text` calls `Site.extract_from_text` and assigns
+    any changes to the proper objets, in place, but they are not saved.
+    This method saves the ones with actual changes
 
     :param opinion: the Opinion on which to apply extract_from_text
     :param juriscraper_module: the scraper module path
@@ -125,7 +129,7 @@ class Command(VerboseCommand):
         if options["opinion_ids"]:
             opinions = Opinion.objects.filter(id__in=options["opinion_ids"])
             for op in opinions:
-                update_from_text(op, juriscraper_module, stats)
+                rerun_extract_from_text(op, juriscraper_module, stats)
 
             logger.info("Modified objects counts: %s", stats)
             return
@@ -153,7 +157,7 @@ class Command(VerboseCommand):
         for cluster in qs:
             opinions = cluster.sub_opinions.all()
             for op in opinions:
-                update_from_text(op, juriscraper_module, stats)
+                rerun_extract_from_text(op, juriscraper_module, stats)
 
         logger.info("Modified objects counts: %s", stats)
         self.stats = stats
