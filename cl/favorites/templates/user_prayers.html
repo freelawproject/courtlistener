@@ -4,17 +4,24 @@
 {% load static %}
 {% load pacer %}
 
-{% block title %}RECAP Requests – CourtListener.com{% endblock %}
-{% block og_title %}RECAP Requests – CourtListener.com{% endblock %}
-
-{% block description %}RECAP Requests on CourtListener.{% endblock %}
-{% block og_description %}RECAP Requests on CourtListener.{% endblock %}
-
+{% block title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block og_title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
+{% block og_description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
 
 {% block content %}
   <div class="col-xs-12">
-    <h1 class="text-center">Community's Most Requested Documents</h1>
+    <h1 class="text-center">{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %}</h1>
   </div>
+
+  <div class="col-xs-12">
+    <div class="well well-sm">
+      {% if is_page_owner %}
+        You have had <b>{{ count }}</b> requests fulfilled for documents that cost <b>${{ total_cost }}</b>.
+      {% endif %}
+    </div>
+  </div>
+
   <div class="col-xs-12">
     <div class="table-responsive">
       <table class="settings-table table">
@@ -24,11 +31,13 @@
               <th>Case Name</th>
               <th>Document Number</th>
               <th>Document Description</th>
-              <th>Buy on Pacer</th>
+              <th>Requested On</th>
+              <th>Status</th>
+              {% if is_page_owner %}<th>Delete</th>{% endif %}
             </tr>
         </thead>
         <tbody>
-            {% for prayer in top_prayers %}
+            {% for prayer in prayers %}
             <tr>
               <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
               {% with docket=prayer.docket_entry.docket %}
@@ -44,7 +53,10 @@
               </td>
               {% endwith %}
               <td>{{ prayer.description }}</td>
-              <td><a href="{{ prayer.pacer_url }}"
+              <td>{{ prayer.date_created|date:"M j, Y"  }}</td>
+              <td>{% if prayer.status == WAITING %} WAITING {% elif prayer.status == GRANTED %} Granted on {% endif %}</td>
+              {% if is_page_owner %}<td><a href="{% url 'delete_prayer' recap_document=prayer.pk %}">Delete</a></td>{% endif %}
+              {% comment %} <td><a href="{{ prayer.pacer_url }}"
                 {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                   class="open_buy_pacer_modal btn btn-default btn-xs"
                   data-toggle="modal" data-target="#modal-buy-pacer"
@@ -52,11 +64,11 @@
                   class="btn btn-default btn-xs"
                 {% endif %}
                   target="_blank"
-                  rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td>
+                  rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td> {% endcomment %}
             </tr>
             {% empty %}
             <tr>
-                <td colspan="2">No document requests open. Consider making one!</td>
+                <td colspan="2">No document requests made. Consider making one!</td>
             </tr>
             {% endfor %}
         </tbody>
