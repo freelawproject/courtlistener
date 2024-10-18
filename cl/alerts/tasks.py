@@ -657,13 +657,12 @@ def percolator_response_processing(response: PercolatorResponsesType) -> None:
     scheduled_hits_to_create = []
     email_alerts_to_send = []
     rt_alerts_to_send = []
-    (
-        main_alerts_triggered,
-        rd_alerts_triggered,
-        d_alerts_triggered,
-        document_content,
-        app_label_model,
-    ) = response
+
+    main_alerts_triggered = response.main_alerts_triggered
+    rd_alerts_triggered = response.rd_alerts_triggered
+    d_alerts_triggered = response.d_alerts_triggered
+    document_content = response.document_content
+    app_label_model = response.app_label_model
     app_label_str, model_str = app_label_model.split(".")
     instance_content_type = ContentType.objects.get(
         app_label=app_label_str, model=model_str.lower()
@@ -937,12 +936,12 @@ def send_or_schedule_search_alerts(
         )
     )
 
-    return (
-        main_alerts_triggered,
-        rd_alerts_triggered,
-        d_alerts_triggered,
-        document_content,
-        app_label,
+    return PercolatorResponsesType(
+        main_alerts_triggered=main_alerts_triggered,
+        rd_alerts_triggered=rd_alerts_triggered,
+        d_alerts_triggered=d_alerts_triggered,
+        document_content=document_content,
+        app_label_model=app_label,
     )
 
 

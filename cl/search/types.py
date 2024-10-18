@@ -102,9 +102,16 @@ ESDictDocument = dict[str, Any]
 # TODO: Remove after scheduled OA alerts have been processed.
 PercolatorResponseType = tuple[list[Hit], ESDictDocument]
 
-PercolatorResponsesType = tuple[
-    list[Hit], list[Hit], list[Hit], ESDictDocument, str
-]
+
+@dataclass
+class PercolatorResponsesType:
+    main_alerts_triggered: list[Hit]
+    rd_alerts_triggered: list[Hit]
+    d_alerts_triggered: list[Hit]
+    document_content: ESDictDocument
+    app_label_model: str
+
+
 # TODO: Remove after scheduled OA alerts have been processed.
 SaveDocumentResponseType = tuple[str, ESDictDocument]
 

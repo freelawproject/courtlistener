@@ -44,8 +44,6 @@ from cl.search.documents import (
     ESRECAPDocumentPlain,
     RECAPPercolator,
 )
-from cl.lib.elasticsearch_utils import add_es_highlighting
-from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES, Docket
 from cl.search.types import ESDictDocument, ESModelClassType
 
