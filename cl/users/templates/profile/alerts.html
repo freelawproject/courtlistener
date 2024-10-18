@@ -70,6 +70,8 @@
           <tr>
               <th><a class="no-underline black-link" href="?{% url_replace request 'name' %}">Case Name{% sort_caret request 'name' %}</a></th>
               <th><a class="no-underline black-link" href="?{% url_replace request 'court' %}">Court{% sort_caret request 'court' %}</a></th>
+              <th><a class="no-underline black-link" href="?{% url_replace request 'docket_number' %}">Docket Number{% sort_caret request 'docket_number' %}</a></th>
+              <th><a class="no-underline black-link" href="?{% url_replace request 'date_filed' %}">Date Filed{% sort_caret request 'date_filed' %}</a></th>
               <th colspan="2"><a class="no-underline black-link" href="?{% url_replace request 'hit' %}"> Last&nbsp;Hit{% sort_caret request 'hit' %}</a></th>
           </tr>
           </thead>
@@ -80,15 +82,22 @@
                 <p class="bottom">
                   <a href="{{ alert.docket.get_absolute_url }}">
                     {{ alert.docket|best_case_name|safe|v_wrapper }}
-                    {% if docket.docket_number %}
-                      ({{ docket.docket_number }})
-                    {% endif %}
                   </a>
                 </p>
               </td>
               <td>
                 <p class="bottom">
                   {{ alert.docket.court.short_name }}
+                </p>
+              </td>
+              <td>
+                <p class="bottom">
+                  {{ alert.docket.docket_number }}
+                </p>
+              </td>
+              <td>
+                <p class="bottom">
+                  {{ alert.docket.date_filed }}
                 </p>
               </td>
               <td>{{ alert.date_last_hit|default:"Never" }}</td>
