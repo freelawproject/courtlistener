@@ -2233,7 +2233,7 @@ def update_rd_metadata(
     if response.is_success:
         rd.page_count = int(response.text)
 
-    assert isinstance(rd.page_count, int), "page_count must be an int or None."
+    assert isinstance(rd.page_count, (int, type(None))), "page_count must be an int or None."
 
     # Save and extract, skipping OCR.
     rd.save()
