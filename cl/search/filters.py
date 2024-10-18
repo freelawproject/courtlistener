@@ -42,6 +42,7 @@ class CourtFilter(NoEmptyFilterSet):
             "end_date": DATE_LOOKUPS,
             "short_name": ALL_TEXT_LOOKUPS,
             "full_name": ALL_TEXT_LOOKUPS,
+            "citation_string": ALL_TEXT_LOOKUPS,
         }
 
 

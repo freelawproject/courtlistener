@@ -19,6 +19,8 @@ from elasticsearch.exceptions import ConnectionTimeout
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
@@ -492,6 +494,7 @@ class OpinionV3APISearchTest(
             "order_by": "dateFiled desc",
             "highlight": False,
         }
+        request = Request(APIRequestFactory().get("/"))
         for page in range(1, total_pages + 1):
             search_query = OpinionClusterDocument.search()
             offset = max(0, (page - 1) * page_size)
@@ -499,6 +502,7 @@ class OpinionV3APISearchTest(
                 search_query, cd, {"text": 500}, SEARCH_HL_TAG, "v3"
             )
             hits = ESList(
+                request=request,
                 main_query=main_query,
                 offset=offset,
                 page_size=page_size,
@@ -2213,7 +2217,7 @@ class OpinionsESSearchTest(
         r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
-        self.assertIn("<mark>Howell</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas Howell</mark>", r.content.decode())
 
         # case_name filter: Howells
         search_params = {
@@ -2223,7 +2227,7 @@ class OpinionsESSearchTest(
         r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
-        self.assertIn("<mark>Howells</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas Howells</mark>", r.content.decode())
 
         # text query: Howell
         search_params = {

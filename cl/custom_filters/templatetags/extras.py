@@ -291,14 +291,9 @@ def alerts_supported(context: RequestContext, search_type: str) -> str:
     """
 
     request = context["request"]
-    return (
-        search_type == SEARCH_TYPES.OPINION
-        or search_type == SEARCH_TYPES.ORAL_ARGUMENT
-        or (
-            search_type == SEARCH_TYPES.RECAP
-            and waffle.flag_is_active(request, "recap-alerts-active")
-        )
-    )
+    if search_type == SEARCH_TYPES.RECAP:
+        return waffle.flag_is_active(request, "recap-alerts-active")
+    return search_type in (SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT)
 
 
 @register.filter
