@@ -15,13 +15,6 @@ from cl.alerts.models import (
 )
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import add_es_highlighting
-from cl.lib.types import CleanData
-from cl.search.constants import (
-    ALERTS_HL_TAG,
-    SEARCH_RECAP_CHILD_HL_FIELDS,
-    recap_document_filters,
-    recap_document_indexed_fields,
-)
 from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES, Docket
 
