@@ -147,6 +147,40 @@ async def get_top_prayers() -> list[RECAPDocument]:
     return [doc async for doc in documents.aiterator()]
 
 
+async def get_user_prayers(user: User) -> list[Prayer]:
+    user_prayers = Prayer.objects.filter(user=user).values("recap_document_id")
+
+    documents = (
+        RECAPDocument.objects.filter(id__in=Subquery(user_prayers))
+        .select_related(
+            "docket_entry",
+            "docket_entry__docket",
+            "docket_entry__docket__court",
+        )
+        .only(
+            "pk",
+            "document_type",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "page_count",
+            "description",
+            "docket_entry__docket_id",
+            "docket_entry__docket__slug",
+            "docket_entry__docket__pacer_case_id",
+            "docket_entry__docket__court__jurisdiction",
+            "docket_entry__docket__court_id",
+        )
+        .annotate(
+            prayer_status=F("prayers__status"),
+            prayer_date_created=F("prayers__date_created"),
+        )
+        .order_by("prayers__date_created")
+    )
+
+    return [document async for document in documents.aiterator()]
+
+
 def send_prayer_emails(instance: RECAPDocument) -> None:
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
