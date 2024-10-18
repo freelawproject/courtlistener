@@ -2367,6 +2367,10 @@ div.footnote:first-of-type {
     width: 0;
   }
 
+  div.counsel > a.page-label::after {
+    right: -2.5em;
+  }
+
   footnote > p > a.page-label::after {
     display: none;
   }

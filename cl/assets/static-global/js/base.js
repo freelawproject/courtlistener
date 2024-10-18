@@ -391,8 +391,22 @@ document.querySelectorAll('p').forEach(function (element) {
 // Pagination //
 ////////////////
 
+// Star pagination weirdness for ANON 2020 dataset -
+
 $('.star-pagination').each(function (index, element) {
-  $(this).attr('label', this.textContent.trim().replace('*Page ', ''));
+  if ($(this).attr('pagescheme')) {
+    // For ANON 2020 this has two sets of numbers but only one can be
+    // verified with other databses so only showing one
+    var number = $(this).attr('number')
+    if (number.indexOf("P") > -1) {
+      $(this).attr('label', "");
+    }
+    else {
+      $(this).attr('label', number);
+    }
+  } else {
+    $(this).attr('label', this.textContent.trim().replace('*Page ', ''));
+  }
 });
 
 // Systematize page numbers
