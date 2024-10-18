@@ -51,11 +51,11 @@ from cl.recap.constants import COURT_TIMEZONES
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
     ESDocumentNameType,
-    PercolatorResponsesType,
     PercolatorResponseType,
     SaveDocumentResponseType,
     SaveESDocumentReturnType,
     SearchAlertHitType,
+    SendAlertsResponse,
 )
 from cl.stats.utils import tally_stat
 from cl.users.models import UserProfile
@@ -643,7 +643,7 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
 
 
 @app.task(ignore_result=True)
-def percolator_response_processing(response: PercolatorResponsesType) -> None:
+def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
      the percolator query.
 
@@ -876,7 +876,7 @@ def send_or_schedule_alerts(
 )
 def send_or_schedule_search_alerts(
     self: Task, response: SaveESDocumentReturnType | None
-) -> PercolatorResponsesType | None:
+) -> SendAlertsResponse | None:
     """Send real-time alerts based on the Elasticsearch search response.
 
     Or schedule other rates alerts to send them later.
@@ -891,8 +891,10 @@ def send_or_schedule_search_alerts(
     :param self: The celery task
     :param response: A two tuple, the document ID to be percolated in
     ES index and the document data that triggered the alert.
-    :return: A two tuple, a list of Alerts triggered and the document data that
-    triggered the alert.
+    :return: A SendAlertsResponse dataclass containing the main alerts
+    triggered, the recap documents alerts triggered, the docket alerts
+    triggered, the document content that triggered the alert, and the related
+    app label model.
     """
 
     if not response or not settings.PERCOLATOR_SEARCH_ALERTS_ENABLED:
@@ -916,7 +918,7 @@ def send_or_schedule_search_alerts(
         documents_to_percolate,
         app_label,
     )
-    if not percolator_responses[0]:
+    if not percolator_responses.main_response:
         self.request.chain = None
         return None
 
@@ -936,7 +938,7 @@ def send_or_schedule_search_alerts(
         )
     )
 
-    return PercolatorResponsesType(
+    return SendAlertsResponse(
         main_alerts_triggered=main_alerts_triggered,
         rd_alerts_triggered=rd_alerts_triggered,
         d_alerts_triggered=d_alerts_triggered,

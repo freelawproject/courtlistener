@@ -2734,7 +2734,9 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             AudioPercolator._index._name,
             document_index,
         )
-        ids_in_results = [result.id for result in percolator_responses[0].hits]
+        ids_in_results = [
+            result.id for result in percolator_responses.main_response.hits
+        ]
 
         # Update the first in the previous batch.
         alert_to_modify = alerts_created[0]
@@ -2742,7 +2744,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         alert_to_modify.save()
 
         # Percolate the next page.
-        search_after = percolator_responses[0].hits[-1].meta.sort
+        search_after = percolator_responses.main_response.hits[-1].meta.sort
         percolator_responses = percolate_es_document(
             str(rt_oral_argument.pk),
             AudioPercolator._index._name,
@@ -2752,7 +2754,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # The document updated shouldn't be retrieved again.
         # Since documents are ordered by asc date_created instead of timestamp.
-        for result in percolator_responses[0].hits:
+        for result in percolator_responses.main_response.hits:
             self.assertNotIn(result.id, ids_in_results)
             ids_in_results.append(result.id)
 

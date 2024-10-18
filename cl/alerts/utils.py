@@ -45,7 +45,11 @@ from cl.search.documents import (
     RECAPPercolator,
 )
 from cl.search.models import SEARCH_TYPES, Docket
-from cl.search.types import ESDictDocument, ESModelClassType
+from cl.search.types import (
+    ESDictDocument,
+    ESModelClassType,
+    PercolatorResponses,
+)
 
 
 @dataclass
@@ -155,7 +159,7 @@ def percolate_es_document(
     main_search_after: int | None = None,
     rd_search_after: int | None = None,
     d_search_after: int | None = None,
-) -> tuple[Response, Response | None, Response | None]:
+) -> PercolatorResponses:
     """Percolate a document against a defined Elasticsearch Percolator query.
 
     :param document_id: The document ID in ES index to be percolated.
@@ -172,9 +176,9 @@ def percolate_es_document(
     search_after param  for deep pagination.
     :param d_search_after: Optional the ES Docket document percolator query
     search_after param  for deep pagination.
-    :return: A three-tuple containing the main percolator response, the
-    RECAPDocument percolator response (if applicable), and the Docket
-    percolator response (if applicable).
+    :return: A PercolatorResponses dataclass containing the main percolator
+    response, the RECAPDocument percolator response (if applicable), and the
+    Docket percolator response (if applicable).
     """
 
     if document_index:
@@ -271,17 +275,22 @@ def percolate_es_document(
         rd_response = responses[1]
     if s_d:
         d_response = responses[2]
-    return main_response, rd_response, d_response
+    return PercolatorResponses(
+        main_response=main_response,
+        rd_response=rd_response,
+        d_response=d_response,
+    )
 
 
 def fetch_all_search_alerts_results(
-    initial_responses: tuple[Response, Response | None, Response | None], *args
+    initial_responses: PercolatorResponses, *args
 ) -> tuple[list[Hit], list[Hit], list[Hit]]:
     """Fetches all search alerts results based on a given percolator query and
     the initial responses. It retrieves all the search results that exceed the
     initial batch size by iteratively calling percolate_es_document method with
     the necessary pagination parameters.
-    :param initial_responses: The initial ES Responses tuple.
+    :param initial_responses: A PercolatorResponses dataclass containing the
+    initial ES Percolator Responses.
     :param args: Additional arguments to pass to the percolate_es_document method.
     :return: A three-tuple containing the main percolator results, the
     RECAPDocument percolator results (if applicable), and the Docket
@@ -292,62 +301,60 @@ def fetch_all_search_alerts_results(
     all_rd_alert_hits = []
     all_d_alert_hits = []
 
-    main_response = initial_responses[0]
+    main_response = initial_responses.main_response
     all_main_alert_hits.extend(main_response.hits)
     main_total_hits = main_response.hits.total.value
     main_alerts_returned = len(main_response.hits.hits)
     rd_response = d_response = None
-    if initial_responses[1]:
-        rd_response = initial_responses[1]
+    if initial_responses.rd_response:
+        rd_response = initial_responses.rd_response
         all_rd_alert_hits.extend(rd_response.hits)
-    if initial_responses[2]:
-        d_response = initial_responses[2]
+    if initial_responses.d_response:
+        d_response = initial_responses.d_response
         all_d_alert_hits.extend(d_response.hits)
 
-    if main_total_hits > settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE:
-        alerts_retrieved = main_alerts_returned
-        main_search_after = main_response.hits[-1].meta.sort
-        rd_search_after = (
-            rd_response.hits[-1].meta.sort if rd_response else None
-        )
-        d_search_after = d_response.hits[-1].meta.sort if d_response else None
-        while True:
-            search_after_params = {
-                "main_search_after": main_search_after,
-                "rd_search_after": rd_search_after,
-                "d_search_after": d_search_after,
-            }
-            responses = percolate_es_document(*args, **search_after_params)
-            if not responses[0]:
-                break
+    if main_total_hits <= settings.ELASTICSEARCH_PAGINATION_BATCH_SIZE:
+        return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
-            all_main_alert_hits.extend(responses[0].hits)
-            main_alerts_returned = len(responses[0].hits.hits)
-            alerts_retrieved += main_alerts_returned
+    alerts_retrieved = main_alerts_returned
+    main_search_after = main_response.hits[-1].meta.sort
+    rd_search_after = rd_response.hits[-1].meta.sort if rd_response else None
+    d_search_after = d_response.hits[-1].meta.sort if d_response else None
+    while True:
+        search_after_params = {
+            "main_search_after": main_search_after,
+            "rd_search_after": rd_search_after,
+            "d_search_after": d_search_after,
+        }
+        responses = percolate_es_document(*args, **search_after_params)
+        if not responses.main_response:
+            break
 
-            if responses[1]:
-                all_rd_alert_hits.extend(responses[1].hits)
-            if responses[2]:
-                all_d_alert_hits.extend(responses[2].hits)
-            # Check if all results have been retrieved. If so break the loop
-            # Otherwise, increase search_after.
-            if (
-                alerts_retrieved >= main_total_hits
-                or main_alerts_returned == 0
-            ):
-                break
-            else:
-                main_search_after = responses[0].hits[-1].meta.sort
-                rd_search_after = (
-                    responses[1].hits[-1].meta.sort
-                    if responses[1] and len(responses[1].hits.hits)
-                    else None
-                )
-                d_search_after = (
-                    responses[2].hits[-1].meta.sort
-                    if responses[2] and len(responses[2].hits.hits)
-                    else None
-                )
+        all_main_alert_hits.extend(responses.main_response.hits)
+        main_alerts_returned = len(responses.main_response.hits.hits)
+        alerts_retrieved += main_alerts_returned
+
+        if responses.rd_response:
+            all_rd_alert_hits.extend(responses.rd_response.hits)
+        if responses.d_response:
+            all_d_alert_hits.extend(responses.d_response.hits)
+        # Check if all results have been retrieved. If so break the loop
+        # Otherwise, increase search_after.
+        if alerts_retrieved >= main_total_hits or main_alerts_returned == 0:
+            break
+        else:
+            main_search_after = responses.main_response.hits[-1].meta.sort
+            rd_search_after = (
+                responses.rd_response.hits[-1].meta.sort
+                if responses.rd_response and len(responses[1].hits.hits)
+                else None
+            )
+            d_search_after = (
+                responses.d_response.hits[-1].meta.sort
+                if responses.d_response and len(responses[2].hits.hits)
+                else None
+            )
+
     return all_main_alert_hits, all_rd_alert_hits, all_d_alert_hits
 
 
@@ -605,15 +612,9 @@ def include_recap_document_hit(
 
     alert_in_rd_hits = alert_id in recap_document_hits
     alert_in_docket_hits = alert_id in docket_hits
-    if not alert_in_docket_hits and not alert_in_rd_hits:
-        return True
-    elif not alert_in_docket_hits and alert_in_rd_hits:
-        return True
-    elif alert_in_docket_hits and not alert_in_rd_hits:
+    if alert_in_docket_hits and not alert_in_rd_hits:
         return False
-    elif alert_in_docket_hits and alert_in_rd_hits:
-        return True
-    return False
+    return True
 
 
 def get_field_names(mapping_dict):
@@ -700,7 +701,6 @@ def prepare_percolator_content(app_label: str, document_id: str) -> tuple[
                 "docket_slug",
                 "docket_absolute_url",
                 "court_exact",
-                "docket_child",
                 "timestamp",
             }
             parent_document_content = select_es_document_fields(

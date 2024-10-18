@@ -1786,9 +1786,9 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd_att.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -1805,9 +1805,10 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd.pk)
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_1), True
+            self.confirm_query_matched(responses.main_response, query_id_1),
+            True,
         )
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -1823,12 +1824,14 @@ class RECAPAlertsPercolatorTest(
             app_label, str(self.rd.pk)
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_1), True
+            self.confirm_query_matched(responses.main_response, query_id_1),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
 
         # Test Percolate a RECAPDocument. It should match the query containing
@@ -1845,18 +1848,21 @@ class RECAPAlertsPercolatorTest(
         )
         expected_queries = 3
         self.assertEqual(
-            len(responses[0]),
+            len(responses.main_response),
             expected_queries,
             msg="Wrong number of queries matched.",
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_1), True
+            self.confirm_query_matched(responses.main_response, query_id_1),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_3), True
+            self.confirm_query_matched(responses.main_response, query_id_3),
+            True,
         )
 
     def test_recap_document_percolator(self, mock_prefix) -> None:
@@ -1881,12 +1887,12 @@ class RECAPAlertsPercolatorTest(
         )
         expected_queries = 1
         self.assertEqual(
-            len(responses[0]),
+            len(responses.main_response),
             expected_queries,
             msg="Matched queries didn't match.",
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         # Test percolate only filters combination.
@@ -1904,12 +1910,12 @@ class RECAPAlertsPercolatorTest(
         )
         expected_queries = 1
         self.assertEqual(
-            len(responses[0]),
+            len(responses.main_response),
             expected_queries,
             msg="Matched queries didn't match.",
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         # Test percolate a different document targeting a different filters
@@ -1927,12 +1933,12 @@ class RECAPAlertsPercolatorTest(
         )
         expected_queries = 1
         self.assertEqual(
-            len(responses[0]),
+            len(responses.main_response),
             expected_queries,
             msg="Matched queries didn't match.",
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         # Test percolate the same document loosen the query.
@@ -1948,15 +1954,16 @@ class RECAPAlertsPercolatorTest(
         )
         expected_queries = 2
         self.assertEqual(
-            len(responses[0]),
+            len(responses.main_response),
             expected_queries,
             msg="Matched queries didn't match.",
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
 
     def test_docket_percolator(self, mock_prefix) -> None:
@@ -1981,7 +1988,7 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 0
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
 
         # Test Percolate a docket object. It shouldn't match the query
         # containing text query terms contained only in a RD.
@@ -1998,7 +2005,7 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 0
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
 
         # Test Percolate a docket object. Combining docket terms OR RECAPDocument
         # fields. This query can be triggered only by the Docket document.
@@ -2015,9 +2022,12 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries, msg="error 1")
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            len(responses.main_response), expected_queries, msg="error 1"
+        )
+        self.assertEqual(
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
 
         # Test percolate text query + different filters.
@@ -2037,12 +2047,14 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_3), True
+            self.confirm_query_matched(responses.main_response, query_id_3),
+            True,
         )
 
         # Test percolate text query + case_name filter.
@@ -2060,9 +2072,10 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_4), True
+            self.confirm_query_matched(responses.main_response, query_id_4),
+            True,
         )
 
         # Test percolate one filter.
@@ -2079,9 +2092,10 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_5), True
+            self.confirm_query_matched(responses.main_response, query_id_5),
+            True,
         )
 
         # Test percolate text query.
@@ -2098,15 +2112,18 @@ class RECAPAlertsPercolatorTest(
             document_index_alias,
         )
         expected_queries = 3
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_2), True
+            self.confirm_query_matched(responses.main_response, query_id_2),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_3), True
+            self.confirm_query_matched(responses.main_response, query_id_3),
+            True,
         )
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id_6), True
+            self.confirm_query_matched(responses.main_response, query_id_6),
+            True,
         )
 
     def test_index_and_delete_recap_alerts_from_percolator(

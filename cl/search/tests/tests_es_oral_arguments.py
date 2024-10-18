@@ -2254,9 +2254,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         cd = {
@@ -2274,9 +2274,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         cd = {
@@ -2293,9 +2293,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         cd = {
@@ -2314,9 +2314,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             oral_argument_index_alias,
         )
         expected_queries = 1
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         cd = {
@@ -2336,9 +2336,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         cd = {
@@ -2357,9 +2357,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             oral_argument_index_alias,
         )
         expected_queries = 3
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         cd = {
@@ -2378,9 +2378,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
             oral_argument_index_alias,
         )
         expected_queries = 2
-        self.assertEqual(len(responses[0]), expected_queries)
+        self.assertEqual(len(responses.main_response), expected_queries)
         self.assertEqual(
-            self.confirm_query_matched(responses[0], query_id), True
+            self.confirm_query_matched(responses.main_response, query_id), True
         )
 
         self.delete_documents_from_index(
