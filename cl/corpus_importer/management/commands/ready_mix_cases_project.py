@@ -198,7 +198,8 @@ def query_results_in_es(options):
     }
 
     search_query = DocketDocument.search()
-    s, _ = build_es_base_query(search_query, cd)
+    es_queries = build_es_base_query(search_query, cd)
+    s = es_queries.search_query
     s = s.extra(size=options["results_size"])
     response = s.execute().to_dict()
     extracted_data = [

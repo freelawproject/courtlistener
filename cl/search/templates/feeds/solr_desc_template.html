@@ -7,7 +7,7 @@
     {% else %}
       {% flag "o-es-active" %}
         {% if doc0.child_docs %}
-          {% with doc=doc0.child_docs.0|get_attrdict:"_source" %}
+          {% with doc=doc0.child_docs.0|get_es_doc_content %}
             <p>{{ doc.text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
           {% endwith %}
         {% else %}
