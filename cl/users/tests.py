@@ -1414,14 +1414,14 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
 
         msg = EmailMultiAlternatives(
             subject="This is the subject",
-            body="Body goes here",
+            body="Body goes here 世界 ñ ⚖️",
             from_email="testing@courtlistener.com",
             to=["success@simulator.amazonses.com"],
             bcc=["bcc_success@simulator.amazonses.com"],
             cc=["cc_success@simulator.amazonses.com"],
             headers={"X-Entity-Ref-ID": "9598e6b0-d88c-488e"},
         )
-        html = "<p>Body goes here</p>"
+        html = "<p>Body goes here 世界 ñ ⚖️</p>"
         msg.attach_alternative(html, "text/html")
         msg.send()
 
@@ -1431,8 +1431,10 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         self.assertEqual(
             stored_email[0].to, ["success@simulator.amazonses.com"]
         )
-        self.assertEqual(stored_email[0].plain_text, "Body goes here")
-        self.assertEqual(stored_email[0].html_message, "<p>Body goes here</p>")
+        self.assertEqual(stored_email[0].plain_text, "Body goes here 世界 ñ ⚖️")
+        self.assertEqual(
+            stored_email[0].html_message, "<p>Body goes here 世界 ñ ⚖️</p>"
+        )
         self.assertEqual(
             stored_email[0].bcc, ["bcc_success@simulator.amazonses.com"]
         )
@@ -1455,8 +1457,8 @@ class CustomBackendEmailTest(RestartSentEmailQuotaMixin, TestCase):
         # Verify if the email unique identifier "X-CL-ID" header was added
         self.assertTrue(message_sent.extra_headers["X-CL-ID"])
         # Compare body contents, this message has a plain and html version
-        self.assertEqual(plaintext_body, "Body goes here")
-        self.assertEqual(html_body, "<p>Body goes here</p>")
+        self.assertEqual(plaintext_body, "Body goes here 世界 ñ ⚖️")
+        self.assertEqual(html_body, "<p>Body goes here 世界 ñ ⚖️</p>")
 
     def test_multialternative_only_plain_email(self) -> None:
         """This test checks if Django EmailMultiAlternatives class works

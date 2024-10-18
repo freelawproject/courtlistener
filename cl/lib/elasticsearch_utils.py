@@ -205,6 +205,29 @@ def make_es_boost_list(fields: Dict[str, float]) -> list[str]:
     return [f"{k}^{v}" for k, v in fields.items()]
 
 
+def is_case_name_query(query_value: str) -> bool:
+    """Determines if the given query value is likely a case name query.
+
+    :param query_value: The search query to check.
+    :return: True if the query appears to be a case name, otherwise False.
+    """
+
+    vs_query = any(
+        [
+            " v " in query_value,
+            " v. " in query_value,
+            " vs. " in query_value,
+            " vs " in query_value,
+        ]
+    )
+    query_lower = query_value.lower()
+    in_re_query = query_lower.startswith("in re ")
+    matter_of_query = query_lower.startswith("matter of ")
+    ex_parte_query = query_lower.startswith("ex parte ")
+
+    return any([vs_query, in_re_query, matter_of_query, ex_parte_query])
+
+
 def add_fields_boosting(
     cd: CleanData, fields: list[str] | None = None
 ) -> list[str]:
@@ -235,19 +258,8 @@ def add_fields_boosting(
         # Give a boost on the case_name field if it's obviously a case_name
         # query.
         query = cd.get("q", "")
-        vs_query = any(
-            [
-                " v " in query,
-                " v. " in query,
-                " vs. " in query,
-                " vs " in query,
-            ]
-        )
-        in_re_query = query.lower().startswith("in re ")
-        matter_of_query = query.lower().startswith("matter of ")
-        ex_parte_query = query.lower().startswith("ex parte ")
-        if any([vs_query, in_re_query, matter_of_query, ex_parte_query]):
-            qf.update({"caseName.exact": 50})
+        if is_case_name_query(query):
+            qf.update({"caseName.exact": 75})
 
     if fields:
         qf = {key: value for key, value in qf.items() if key in fields}
@@ -350,33 +362,45 @@ def build_fulltext_query(
 
         # Used for the phrase query_string, no conjunctions appended.
         query_value = cleanup_main_query(value)
-
         # To enable the search of each term in the query across multiple fields
         # it's necessary to include an "AND" conjunction between each term.
         # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-multi-field
         # Used for the best_fields query_string.
-        query_value_with_conjunctions = append_query_conjunctions(query_value)
 
-        q_should = [
-            Q(
-                "query_string",
-                fields=fields,
-                query=query_value_with_conjunctions,
-                quote_field_suffix=".exact",
-                default_operator="AND",
-                tie_breaker=0.3,
-                fuzziness=2,
-            ),
-            Q(
-                "query_string",
-                fields=fields,
-                query=query_value,
-                quote_field_suffix=".exact",
-                default_operator="AND",
-                type="phrase",
-                fuzziness=2,
-            ),
-        ]
+        query_value_with_conjunctions = append_query_conjunctions(query_value)
+        q_should = []
+        # If it looks like a case name, we are boosting a match query
+        if is_case_name_query(query_value) and '"' not in query_value:
+            q_should.append(
+                Q(
+                    "match_phrase",
+                    caseName={"query": query_value, "boost": 2, "slop": 1},
+                )
+            )
+
+        q_should.extend(
+            [
+                Q(
+                    "query_string",
+                    fields=fields,
+                    query=query_value_with_conjunctions,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                    tie_breaker=0.3,
+                    fuzziness=2,
+                ),
+                Q(
+                    "query_string",
+                    fields=fields,
+                    query=query_value,
+                    quote_field_suffix=".exact",
+                    default_operator="AND",
+                    type="phrase",
+                    fuzziness=2,
+                ),
+            ]
+        )
+
         if only_queries:
             return q_should
         return Q("bool", should=q_should)
@@ -390,7 +414,7 @@ def build_term_query(
     """Given field name and value or list of values, return Elasticsearch term
     or terms query or [].
     "term" Returns documents that contain an exact term in a provided field
-    NOTE: Use it only whe you want an exact match, avoid using this with text fields
+    NOTE: Use it only when you want an exact match, avoid using this with text fields
     "terms" Returns documents that contain one or more exact terms in a provided field.
 
     :param field: elasticsearch index fieldname
@@ -435,14 +459,27 @@ def build_text_filter(field: str, value: str) -> List:
     if value:
         if isinstance(value, str):
             validate_query_syntax(value, QueryType.FILTER)
-        return [
-            Q(
-                "query_string",
-                query=value,
-                fields=[field],
-                default_operator="AND",
+
+        base_query_string = {
+            "query_string": {
+                "query": value,
+                "fields": [field],
+                "default_operator": "AND",
+            }
+        }
+        if "caseName" in field and '"' not in value:
+            # Use phrase with slop, and give it a boost to prioritize the
+            # phrase match to ensure that caseName filtering returns exactly
+            # this order as the first priority.
+            # Avoid applying slop to quoted queries, as they expect exact matches.
+            base_query_string["query_string"].update(
+                {
+                    "type": "phrase",
+                    "phrase_slop": "1",
+                    "boost": "2",  # Boosting the phrase match to ensure it's ranked higher than individual term matches
+                }
             )
-        ]
+        return [Q(base_query_string)]
     return []
 
 
@@ -2778,7 +2815,7 @@ def get_child_top_hits_limit(
 
 def do_count_query(
     search_query: Search,
-) -> int | None:
+) -> int:
     """Execute an Elasticsearch count query and catch errors.
     :param search_query: Elasticsearch DSL Search object.
     :return: The results count.
@@ -2790,7 +2827,8 @@ def do_count_query(
             f"Error on count query request: {search_query.to_dict()}"
         )
         logger.warning(f"Error was: {e}")
-        total_results = None
+        # Required for the paginator class to work, as it expects an integer.
+        total_results = 0
     return total_results
 
 
