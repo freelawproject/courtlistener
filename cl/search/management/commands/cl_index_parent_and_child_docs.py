@@ -342,11 +342,6 @@ class Command(VerboseCommand):
             action="store_true",
             help="Use this flag to only index documents missing in the index.",
         )
-        parser.add_argument(
-            "--sweep-index",
-            action="store_true",
-            help="Whether to perform an indexing for the sweep index.",
-        )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
