@@ -2420,8 +2420,9 @@ div.footnote:first-of-type {
       display: none;
     }
   }
+
 }
 
-html {
-  scroll-behavior: smooth;
+html.smooth-scroll {
+    scroll-behavior: smooth;
 }

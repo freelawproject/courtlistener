@@ -367,6 +367,14 @@ if (form && button) {
   });
 }
 
+
+//////////////////////////////////
+// Smooth Scrolling on Opinions //
+/////////////////////////////////
+if (document.body.classList.contains('opinion-body')) {
+    document.documentElement.classList.add('smooth-scroll');
+}
+
 //////////////////
 // SCOTUS STYLE //
 //////////////////

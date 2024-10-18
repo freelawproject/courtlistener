@@ -31,7 +31,6 @@ class VisualizationCrudTests(BaseSeleniumTest):
         SCOTUSMap.objects.all().delete()
         JSONVersion.objects.all().delete()
 
-    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_creating_new_visualization(self) -> None:
         """Test if a user can create a new Visualization"""

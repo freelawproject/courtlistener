@@ -29,7 +29,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         "functest_audio.json",
     ]
 
-    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_can_get_to_feeds_from_homepage(self) -> None:
         """Can we get to the feeds/podcasts page from the homepage?"""
@@ -51,7 +50,6 @@ class FeedsFunctionalTest(BaseSeleniumTest):
         self.assert_text_in_node("Podcasts", "body")
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
-    @override_flag("ui_flag_for_o", False)
     def test_feeds_page_shows_jurisdiction_links(self) -> None:
         """
         Does the feeds page show all the proper links for each jurisdiction?
@@ -67,7 +65,8 @@ class FeedsFunctionalTest(BaseSeleniumTest):
                 link.get_attribute("href"),
                 f"{self.live_server_url}/feed/court/{court.pk}/",
             )
-            link.click()
+            with self.wait_for_page_load(timeout=10):
+                link.click()
             print("clicked...", end=" ")
             self.assertIn(
                 'feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom"',
