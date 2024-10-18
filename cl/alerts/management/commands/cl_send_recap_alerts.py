@@ -588,21 +588,22 @@ def query_and_send_alerts(
             results_to_send = process_alert_hits(
                 r, results, parent_results, child_results, alert.pk, query_date
             )
-            if results_to_send:
-                hits.append(
-                    [
-                        alert,
-                        search_type,
-                        results_to_send,
-                        len(results_to_send),
-                    ]
-                )
-                alert.query_run = search_params.urlencode()  # type: ignore
-                alert.date_last_hit = timezone.now()
-                alert.save()
+            if not results_to_send:
+                continue
+            hits.append(
+                [
+                    alert,
+                    search_type,
+                    results_to_send,
+                    len(results_to_send),
+                ]
+            )
+            alert.query_run = search_params.urlencode()  # type: ignore
+            alert.date_last_hit = timezone.now()
+            alert.save()
 
-                # Send webhooks
-                send_search_alert_webhooks(user, results_to_send, alert.pk)
+            # Send webhooks
+            send_search_alert_webhooks(user, results_to_send, alert.pk)
 
         if hits:
             send_search_alert_emails.delay([(user.pk, hits)])
@@ -644,31 +645,32 @@ def query_and_schedule_alerts(
             results_to_send = process_alert_hits(
                 r, results, parent_results, child_results, alert.pk, query_date
             )
-            if results_to_send:
-                for hit in results_to_send:
-                    # Schedule DAILY, WEEKLY and MONTHLY Alerts
-                    if alert_hits_limit_reached(alert.pk, user.pk):
-                        # Skip storing hits for this alert-user combination because
-                        # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
-                        continue
+            if not results_to_send:
+                continue
+            for hit in results_to_send:
+                # Schedule DAILY, WEEKLY and MONTHLY Alerts
+                if alert_hits_limit_reached(alert.pk, user.pk):
+                    # Skip storing hits for this alert-user combination because
+                    # the SCHEDULED_ALERT_HITS_LIMIT has been reached.
+                    continue
 
-                    child_result_objects = []
-                    hit_copy = copy.deepcopy(hit)
-                    if hasattr(hit_copy, "child_docs"):
-                        for child_doc in hit_copy.child_docs:
-                            child_result_objects.append(
-                                child_doc["_source"].to_dict()
-                            )
-                    hit_copy["child_docs"] = child_result_objects
-                    scheduled_hits_to_create.append(
-                        ScheduledAlertHit(
-                            user=user,
-                            alert=alert,
-                            document_content=hit_copy.to_dict(),
+                child_result_objects = []
+                hit_copy = copy.deepcopy(hit)
+                if hasattr(hit_copy, "child_docs"):
+                    for child_doc in hit_copy.child_docs:
+                        child_result_objects.append(
+                            child_doc["_source"].to_dict()
                         )
+                hit_copy["child_docs"] = child_result_objects
+                scheduled_hits_to_create.append(
+                    ScheduledAlertHit(
+                        user=user,
+                        alert=alert,
+                        document_content=hit_copy.to_dict(),
                     )
-                    # Send webhooks
-                    send_search_alert_webhooks(user, results_to_send, alert.pk)
+                )
+                # Send webhooks
+                send_search_alert_webhooks(user, results_to_send, alert.pk)
 
         # Create scheduled WEEKLY and MONTHLY Alerts in bulk.
         if scheduled_hits_to_create:
