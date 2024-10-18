@@ -1,5 +1,6 @@
 from rest_framework import viewsets
 
+from cl.api.api_permissions import V3APIPermission
 from cl.api.utils import LoggingMixin
 from cl.audio.api_serializers import AudioSerializer
 from cl.audio.filters import AudioFilter
@@ -9,6 +10,7 @@ from cl.audio.models import Audio
 class AudioViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = AudioSerializer
     filterset_class = AudioFilter
+    permission_classes = [V3APIPermission]
     ordering_fields = (
         "id",
         "date_created",
