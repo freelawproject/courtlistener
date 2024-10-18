@@ -2,7 +2,7 @@ import copy
 import datetime
 import time
 import traceback
-from typing import Any, Literal, Type
+from typing import Any, Literal
 
 import pytz
 from asgiref.sync import async_to_sync
@@ -120,7 +120,7 @@ def retrieve_task_info(task_info: dict[str, Any]) -> dict[str, Any]:
 def index_daily_recap_documents(
     r: Redis,
     source_index_name: str,
-    target_index: Type[RECAPSweepDocument] | Type[ESRECAPSweepDocument],
+    target_index: type[RECAPSweepDocument] | type[ESRECAPSweepDocument],
     testing: bool = False,
     only_rd: bool = False,
 ) -> int:
