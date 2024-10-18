@@ -19,6 +19,7 @@ from redis import Redis
 from cl.alerts.models import Alert, ScheduledAlertHit
 from cl.alerts.tasks import send_search_alert_emails
 from cl.alerts.utils import (
+    TaskCompletionStatus,
     add_document_hit_to_alert_set,
     alert_hits_limit_reached,
     has_document_alert_hit_been_triggered,
@@ -64,27 +65,34 @@ def get_task_status(task_id: str, es: Elasticsearch) -> dict[str, Any]:
 
 
 def compute_estimated_remaining_time(
-    initial_wait: float, start_time_millis: int, created: int, total: int
+    initial_wait: float, task_status: TaskCompletionStatus
 ) -> float:
     """Compute the estimated remaining time for the re_index task to complete.
 
     :param initial_wait: The default wait time in seconds.
-    :param start_time_millis: The start time in milliseconds epoch.
-    :param created: The number of items created so far.
-    :param total: The total number of items to be created.
+    :param task_status: An instance of `TaskCompletionStatus` containing task
+    information.
     :return: The estimated remaining time in seconds. If the start time,
     created, or total are invalid, the initial default time is returned.
     """
 
-    if start_time_millis is None or not created or not total:
+    if (
+        task_status.start_time_millis is None
+        or not task_status.created
+        or not task_status.total
+    ):
         return initial_wait
 
-    start_time = datetime.datetime.fromtimestamp(start_time_millis / 1000.0)
+    start_time = datetime.datetime.fromtimestamp(
+        task_status.start_time_millis / 1000.0
+    )
     time_now = datetime.datetime.now()
     estimated_time_remaining = max(
         datetime.timedelta(
-            seconds=((time_now - start_time).total_seconds() / created)
-            * (total - created)
+            seconds=(
+                (time_now - start_time).total_seconds() / task_status.created
+            )
+            * (task_status.total - task_status.created)
         ).total_seconds(),
         initial_wait,
     )
@@ -92,29 +100,23 @@ def compute_estimated_remaining_time(
     return estimated_time_remaining
 
 
-def retrieve_task_info(task_info: dict[str, Any]) -> dict[str, Any]:
+def retrieve_task_info(task_info: dict[str, Any]) -> TaskCompletionStatus:
     """Retrieve task information from the given task dict.
 
     :param task_info: A dictionary containing the task status information.
-    :return: A dictionary with the task completion status, created documents
-    count, total documents count, and the task start time in milliseconds.
-    Retrieve default values in case task_info is not valid.
+    :return: A `TaskCompletionStatus` object representing the extracted task
+    information.
     """
 
     if task_info:
         status = task_info["task"]["status"]
-        return {
-            "completed": task_info["completed"],
-            "created": status["created"],
-            "total": status["total"],
-            "start_time_millis": task_info["task"]["start_time_in_millis"],
-        }
-    return {
-        "completed": False,
-        "created": 0,
-        "total": 0,
-        "start_time_millis": None,
-    }
+        return TaskCompletionStatus(
+            completed=task_info["completed"],
+            created=status["created"],
+            total=status["total"],
+            start_time_millis=task_info["task"]["start_time_in_millis"],
+        )
+    return TaskCompletionStatus()
 
 
 def index_daily_recap_documents(
@@ -338,41 +340,35 @@ def index_daily_recap_documents(
 
     initial_wait = 0.01 if testing else 60.0
     time.sleep(initial_wait)
-    get_task_info = retrieve_task_info(get_task_status(task_id, es))
+    task_info = retrieve_task_info(get_task_status(task_id, es))
     iterations_count = 0
     estimated_time_remaining = compute_estimated_remaining_time(
-        initial_wait,
-        get_task_info["start_time_millis"],
-        get_task_info["created"],
-        get_task_info["total"],
+        initial_wait, task_info
     )
-    while not get_task_info["completed"]:
+    while not task_info.completed:
         logger.info(
-            f"Task progress: {get_task_info['created']}/{get_task_info['total']} documents. "
+            f"Task progress: {task_info.created}/{task_info.total} documents. "
             f"Estimated time to finish: {estimated_time_remaining} seconds."
         )
-        task_info = get_task_status(task_id, es)
-        get_task_info = retrieve_task_info(task_info)
+        task_status = get_task_status(task_id, es)
+        task_info = retrieve_task_info(task_status)
         time.sleep(estimated_time_remaining)
-        if task_info and not get_task_info["completed"]:
+        if task_info and not task_info.completed:
             estimated_time_remaining = compute_estimated_remaining_time(
-                initial_wait,
-                get_task_info["start_time_millis"],
-                get_task_info["created"],
-                get_task_info["total"],
+                initial_wait, task_info
             )
         if not task_info:
             iterations_count += 1
         if iterations_count > 10:
             logger.error(
                 "Re_index alert sweep index task has failed: %s/%s",
-                get_task_info["created"],
-                get_task_info["total"],
+                task_info.created,
+                task_info.total,
             )
             break
 
     r.delete("alert_sweep:task_id")
-    return get_task_info["total"]
+    return task_info.total
 
 
 def should_docket_hit_be_included(

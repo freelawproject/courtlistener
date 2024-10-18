@@ -25,6 +25,14 @@ class DocketAlertReportObject:
     docket: Docket
 
 
+@dataclass
+class TaskCompletionStatus:
+    completed: bool = False
+    created: int = 0
+    total: int = 0
+    start_time_millis: int | None = None
+
+
 class OldAlertReport:
     def __init__(self):
         self.old_alerts = []
