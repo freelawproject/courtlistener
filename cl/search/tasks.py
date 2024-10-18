@@ -8,6 +8,7 @@ from typing import Any, Generator
 import scorched
 import waffle
 from celery import Task
+from celery.canvas import chain
 from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -31,6 +32,10 @@ from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
 from requests import Session
 from scorched.exc import SolrError
 
+from cl.alerts.tasks import (
+    percolator_response_processing,
+    send_or_schedule_search_alerts,
+)
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.lib.elasticsearch_utils import build_daterange_query
@@ -68,10 +73,10 @@ from cl.search.types import (
     ESModelClassType,
     ESModelType,
     EventTable,
-    SaveDocumentResponseType,
+    SaveESDocumentReturnType,
 )
 
-models_alert_support = [Audio]
+percolator_alerts_models_supported = [Audio, RECAPDocument, Docket]
 
 logger = logging.getLogger(__name__)
 
@@ -300,7 +305,7 @@ def es_save_document(
     instance_id: int,
     app_label: str,
     es_document_name: ESDocumentNameType,
-) -> SaveDocumentResponseType | None:
+) -> SaveESDocumentReturnType | None:
     """Save a document in Elasticsearch using a provided callable.
 
     :param self: The celery task
@@ -308,7 +313,7 @@ def es_save_document(
     :param app_label: The app label and model that belongs to the document
     being added.
     :param es_document_name: A Elasticsearch DSL document name.
-    :return: SaveDocumentResponseType or None
+    :return: SaveESDocumentReturnType or None
     """
 
     es_args = {}
@@ -386,7 +391,10 @@ def es_save_document(
         return_doc_meta=True,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
-    if type(instance) in models_alert_support and response["_version"] == 1:
+    if (
+        type(instance) in percolator_alerts_models_supported
+        and response["_version"] == 1
+    ):
         # Only send search alerts when a new instance of a model that support
         # Alerts is indexed in ES _version:1
         if es_document == AudioDocument and not waffle.switch_is_active(
@@ -395,7 +403,7 @@ def es_save_document(
             # Disable ES Alerts if oa-es-alerts-active switch is not enabled
             self.request.chain = None
             return None
-        return response["_id"], doc
+        return response["_id"].split("_")[-1], doc, app_label
     else:
         self.request.chain = None
         return None
@@ -504,7 +512,7 @@ def update_es_document(
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
-) -> None:
+) -> SaveESDocumentReturnType | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param es_document_name: The Elasticsearch document type name.
@@ -533,6 +541,7 @@ def update_es_document(
 
     related_instance = None
     # If provided, get the related instance from DB to extract the latest values.
+    related_instance_app_label = None
     if related_instance_data:
         related_instance_app_label, related_instance_id = related_instance_data
         related_instance_model = apps.get_model(related_instance_app_label)
@@ -559,6 +568,17 @@ def update_es_document(
         **fields_values_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+    if (
+        main_app_label in ["search.RECAPDocument", "search.Docket"]
+        and not related_instance_app_label == "search.DocketEntry"
+        or related_instance_app_label in ["search.BankruptcyInformation"]
+    ):
+        doc = es_doc.prepare(main_model_instance)
+        return str(main_instance_id), doc, main_app_label
+
+    # Abort subsequent percolation tasks for not supported models.
+    self.request.chain = None
+    return None
 
 
 def get_es_doc_id_and_parent_id(
@@ -857,9 +877,19 @@ def index_docket_parties_in_es(
     docket = get_instance_from_db(docket_id, Docket)
     if not docket:
         return
-    parties_prepared = DocketDocument().prepare_parties(docket)
+    docket_document_dict = DocketDocument().prepare(docket)
+    party_fields = [
+        "party_id",
+        "party",
+        "attorney_id",
+        "attorney",
+        "firm_id",
+        "firm",
+    ]
     fields_to_update = {
-        key: list(set_values) for key, set_values in parties_prepared.items()
+        key: values
+        for key, values in docket_document_dict.items()
+        if key in party_fields
     }
     docket_document = DocketDocument.get(id=docket_id)
     Document.update(
@@ -867,6 +897,13 @@ def index_docket_parties_in_es(
         **fields_to_update,
         refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH,
     )
+    # Percolate Docket after parties are up-to-date.
+    chain(
+        send_or_schedule_search_alerts.s(
+            (str(docket_id), docket_document_dict, "search.Docket")
+        ),
+        percolator_response_processing.s(),
+    ).apply_async()
 
 
 def bulk_indexing_generator(
@@ -1227,9 +1264,11 @@ def remove_document_from_es_index(
             # Set auto-refresh, used for testing.
             es_document._index.refresh()
     except NotFoundError:
-        model_label = es_document.Django.model.__name__.capitalize()
-        logger.warning(
-            f"The {model_label} can't be deleted from the ES index, it doesn't exist."
+        logger.info(
+            f"The document with ID: %s can't be deleted from the %s index,"
+            f" it doesn't exist.",
+            instance_id,
+            es_document._index._name,
         )
 
 
