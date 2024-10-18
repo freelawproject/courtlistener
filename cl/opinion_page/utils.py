@@ -3,7 +3,7 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import Dict, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -334,14 +334,9 @@ async def es_get_related_clusters_with_cache(
     related_cluster_result.has_related_cases = True if response else False
 
     if timeout_related == False:
-        # print("SETTING", (
-        #         related_cluster_result.related_clusters,
-        #         timeout_related,
-        #         related_cluster_result.has_related_cases,
-        #      ))
         await cache.aset(
             mlt_cache_key,
-            (results.related_clusters, timeout_related),
+            (related_cluster_result.related_clusters, timeout_related),
             settings.RELATED_CACHE_TIMEOUT,
         )
 
@@ -375,7 +370,7 @@ async def es_get_cited_clusters_with_cache(
         async for pk in cluster.sub_opinions.values_list("pk", flat=True)
     ]
     if is_bot(request) or not sub_opinion_pks:
-        return related_cluster_result
+        return (None, False, False)
 
     cached_citing_results, cahced_citing_clusters_count, timeout_cited = (
         await cache.aget(cache_citing_key) or (None, False, False)
@@ -402,7 +397,7 @@ async def es_get_cited_clusters_with_cache(
         logger.warning("Error getting cited and related clusters: %s", e)
         if settings.DEBUG is True:
             traceback.print_exc()
-        return related_cluster_result
+        return (None, False, False)
     except ConnectionTimeout as e:
         logger.warning(
             "ConnectionTimeout getting cited and related clusters: %s", e
@@ -561,7 +556,7 @@ async def es_get_citing_and_related_clusters_with_cache(
     return results
 
 
-async def es_cited_case_count(cluster_id, sub_opinion_pks: [int]):
+async def es_cited_case_count(cluster_id: int, sub_opinion_pks: List[str]):
     """Elastic quick cited by count query
 
     :param cluster_id: The cluster id to search with
@@ -594,7 +589,7 @@ async def es_cited_case_count(cluster_id, sub_opinion_pks: [int]):
     return cited_by_count
 
 
-async def es_related_case_count(cluster_id, sub_opinion_pks: [int]):
+async def es_related_case_count(cluster_id, sub_opinion_pks: List[str]):
     """Elastic quick related cases count
 
     :param cluster_id: The cluster id of the object

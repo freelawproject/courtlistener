@@ -996,14 +996,14 @@ async def setup_opinion_context(
 
 
 async def render_opinion_view(
-    request: HttpRequest, pk: int, tab: str, additional_context: dict = None
+    request: HttpRequest, pk: int, tab: str, additional_context: dict = {}
 ) -> HttpResponse:
     """Helper function to render opinion views with common context.
 
     :param request: The HttpRequest object
     :param pk: The primary key for the OpinionCluster
-    :param tab: The tab name to display
-    :param additional_context: Any additional context to be passed to the template
+    :param tab: The selected tab
+    :param additional_context: Any additional context to be passed to the view
     :return: HttpResponse
     """
     cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
