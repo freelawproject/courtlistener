@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from os.path import join
 
@@ -53,3 +54,23 @@ class Site(OpinionSite):
     def _get_judges(self):
         path = "//judge/text()"
         return list(self.html.xpath(path))
+
+    def extract_from_text(self, scraped_text):
+        metadata = {}
+        docket_regex = r"Docket Number: (?P<docket>\d+-\d+)"
+        disposition_regex = r"Disposition: (?P<disposition>\w+)"
+        citation_regex = r"(?P<volume>20\d{2}) (?P<reporter>VT) (?P<page>\d+)"
+        if docket_match := re.search(docket_regex, scraped_text):
+            metadata["Docket"] = {
+                "docket_number": docket_match.group("docket")
+            }
+
+        if disposition_match := re.search(disposition_regex, scraped_text):
+            metadata["OpinionCluster"] = {
+                "disposition": disposition_match.group("disposition")
+            }
+
+        if citation_match := re.search(citation_regex, scraped_text):
+            metadata["Citation"] = {**citation_match.groupdict(), "type": 8}
+
+        return metadata
