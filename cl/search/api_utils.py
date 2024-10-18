@@ -22,6 +22,7 @@ from cl.lib.elasticsearch_utils import (
     set_results_highlights,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
+from cl.lib.search_utils import store_search_api_query
 from cl.lib.utils import map_to_docket_entry_sorting
 from cl.search.constants import SEARCH_HL_TAG, cardinality_query_unique_ids
 from cl.search.documents import (
@@ -33,7 +34,7 @@ from cl.search.documents import (
     PersonDocument,
 )
 from cl.search.exception import ElasticBadRequestError, ElasticServerError
-from cl.search.models import SEARCH_TYPES
+from cl.search.models import SEARCH_TYPES, SearchQuery
 from cl.search.types import ESCursor
 
 logger = logging.getLogger(__name__)
@@ -119,13 +120,19 @@ def get_object_list(request, cd, paginator):
         or is_recap_active
     ):
         sl = ESList(
+            request=request,
             main_query=main_query,
             offset=offset,
             page_size=page_size,
             type=cd["type"],
         )
     else:
-        sl = SolrList(main_query=main_query, offset=offset, type=cd["type"])
+        sl = SolrList(
+            request=request,
+            main_query=main_query,
+            offset=offset,
+            type=cd["type"],
+        )
 
     return sl
 
@@ -135,8 +142,11 @@ class ESList:
     as they are queried.
     """
 
-    def __init__(self, main_query, offset, page_size, type, length=None):
+    def __init__(
+        self, request, main_query, offset, page_size, type, length=None
+    ):
         super().__init__()
+        self.request = request
         self.main_query = main_query
         self.offset = offset
         self.page_size = page_size
@@ -170,7 +180,29 @@ class ESList:
         self.main_query = self.main_query[
             self.offset : self.offset + self.page_size
         ]
-        results = self.main_query.execute()
+
+        error_to_raise = None
+        try:
+            results = self.main_query.execute()
+        except (TransportError, ConnectionError, RequestError) as e:
+            error_to_raise = ElasticServerError
+        except ApiError as e:
+            if "Failed to parse query" in str(e):
+                error_to_raise = ElasticBadRequestError
+            else:
+                logger.error("Multi-search API Error: %s", e)
+                error_to_raise = ElasticServerError
+
+        # Store search query.
+        store_search_api_query(
+            request=self.request,
+            failed=bool(error_to_raise),
+            query_time=results.took if not error_to_raise else None,
+            engine=SearchQuery.ELASTICSEARCH,
+        )
+
+        if error_to_raise:
+            raise error_to_raise()
 
         # Merge unavailable fields in ES by pulling data from the DB to make
         # the API backwards compatible for People.
@@ -210,8 +242,9 @@ class SolrList:
     queried.
     """
 
-    def __init__(self, main_query, offset, type, length=None):
+    def __init__(self, request, main_query, offset, type, length=None):
         super().__init__()
+        self.request = request
         self.main_query = main_query
         self.offset = offset
         self.type = type
@@ -245,6 +278,13 @@ class SolrList:
         self.main_query["start"] = self.offset
         r = self.conn.query().add_extra(**self.main_query).execute()
         self.conn.conn.http_connection.close()
+        # Store search query.
+        store_search_api_query(
+            request=self.request,
+            failed=False,
+            query_time=r.QTime,
+            engine=SearchQuery.SOLR,
+        )
         if r.group_field is None:
             # Pull the text snippet up a level
             for result in r.result.docs:
@@ -305,12 +345,14 @@ class CursorESList:
         page_size,
         search_after,
         clean_data,
+        request,
     ):
         self.main_query = main_query
         self.child_docs_query = child_docs_query
         self.page_size = page_size
         self.search_after = search_after
         self.clean_data = clean_data
+        self.request = request
         self.cursor = None
         self.results = None
         self.reverse = False
@@ -372,6 +414,8 @@ class CursorESList:
             child_cardinality_query = build_cardinality_count(
                 child_count_query, child_unique_field
             )
+
+        error_to_raise = None
         try:
             multi_search = MultiSearch()
             multi_search = multi_search.add(self.main_query).add(
@@ -388,15 +432,25 @@ class CursorESList:
             if child_cardinality_query:
                 child_cardinality_count_response = responses[2]
         except (TransportError, ConnectionError, RequestError) as e:
-            raise ElasticServerError()
+            error_to_raise = ElasticServerError
         except ApiError as e:
             if "Failed to parse query" in str(e):
-                raise ElasticBadRequestError()
+                error_to_raise = ElasticBadRequestError
             else:
                 logger.error("Multi-search API Error: %s", e)
-                raise ElasticServerError()
-        self.process_results(self.results)
+                error_to_raise = ElasticServerError
 
+        # Store search query.
+        store_search_api_query(
+            request=self.request,
+            failed=bool(error_to_raise),
+            query_time=self.results.took if not error_to_raise else None,
+            engine=SearchQuery.ELASTICSEARCH,
+        )
+        if error_to_raise:
+            raise error_to_raise()
+
+        self.process_results(self.results)
         main_query_hits = self.results.hits.total.value
         es_results_items = [
             defaultdict(lambda: None, result.to_dict(skip_empty=False))
