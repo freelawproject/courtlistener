@@ -1,3 +1,5 @@
+import time
+
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
@@ -27,6 +29,14 @@ def add_backscraper_arguments(parser) -> None:
         "imposes a limit of returned documents",
         type=int,
     )
+    parser.add_argument(
+        "--backscrape-wait",
+        type=int,
+        default=0,
+        help="Seconds to wait after consuming each element "
+        "of the backscrape iterable. Useful to avoid overloading"
+        " a target server when backscraping.",
+    )
 
 
 class Command(cl_scrape_opinions.Command):
@@ -41,7 +51,7 @@ class Command(cl_scrape_opinions.Command):
     ) -> None:
         """Parse the site and scrape it using the backscraper
 
-        :param mod: The jusriscraper Site object to scrape
+        :param mod: The juriscraper Site object to scrape
         :param options: argparse kwargs dictionary. May contain the following keys:
             - full_crawl: Whether or not to do a full crawl (Ignored value)
             - backscrape_start: string which may be a date, year, index, etc.
@@ -50,6 +60,8 @@ class Command(cl_scrape_opinions.Command):
             - backscrape_end: end value for backscraper range
             - days_interval: days between each (start, end) date pairs in the
                 Site.back_scrape_iterable
+            - backscrape_wait: Seconds to wait after consuming each element
+                of the backscrape iterable
 
         :return: None
         """
@@ -65,6 +77,13 @@ class Command(cl_scrape_opinions.Command):
         ):
             site.parse()
             self.scrape_court(site, full_crawl=True)
+
+            if wait := options["backscrape_wait"]:
+                logger.info(
+                    "Sleeping for %s seconds before continuing backscrape",
+                    wait,
+                )
+                time.sleep(wait)
 
     def save_everything(self, items, index=False, backscrape=True):
         super().save_everything(items, index, backscrape)
