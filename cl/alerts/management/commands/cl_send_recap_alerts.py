@@ -564,9 +564,8 @@ def query_and_send_alerts(
     alerts_sent_count = 0
     now_time = datetime.datetime.now()
     for user in alert_users:
-        if rate == Alert.REAL_TIME:
-            if not user.profile.is_member:
-                continue
+        if rate == Alert.REAL_TIME and not user.profile.is_member:
+            continue
         alerts = user.alerts.filter(rate=rate, alert_type=SEARCH_TYPES.RECAP)
         logger.info(f"Running alerts for user '{user}': {alerts}")
 

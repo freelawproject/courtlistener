@@ -35,6 +35,7 @@ from cl.lib.types import (
     ApiPositionMapping,
     BasePositionMapping,
     CleanData,
+    EsMainQueries,
     ESRangeQueryParams,
 )
 from cl.lib.utils import (
@@ -1114,18 +1115,20 @@ def build_es_base_query(
     child_highlighting: bool = True,
     api_version: Literal["v3", "v4"] | None = None,
     alerts: bool = False,
-) -> tuple[Search, QueryString | None, QueryString | None]:
+) -> EsMainQueries:
     """Builds filters and fulltext_query based on the given cleaned
      data and returns an elasticsearch query.
 
     :param search_query: The Elasticsearch search query object.
     :param cd: The cleaned data object containing the query and filters.
-    :param child_highlighting: Whether highlighting should be enabled in child docs.
+    :param child_highlighting: Whether highlighting should be enabled in child
+    docs.
     :param api_version: Optional, the request API version.
     :param alerts: If highlighting is being applied to search Alerts hits.
-    :return: A three-tuple, the Elasticsearch search query object and an ES
-    QueryString for child documents or None if there is no need to query
-    child documents and a QueryString for parent documents or None.
+    :return: An `EsMainQueries` object containing the Elasticsearch search
+    query object and an ES QueryString for child documents or None if there is
+    no need to query child documents and a QueryString for parent documents or
+    None.
     """
 
     main_query = None
@@ -1244,10 +1247,10 @@ def build_es_base_query(
                         api_version=api_version,
                     )
                 )
-                return (
-                    search_query.query(main_query),
-                    child_docs_query,
-                    parent_query,
+                return EsMainQueries(
+                    search_query=search_query.query(main_query),
+                    parent_query=parent_query,
+                    child_query=child_docs_query,
                 )
 
             opinion_search_fields = SEARCH_OPINION_QUERY_FIELDS
@@ -1291,7 +1294,11 @@ def build_es_base_query(
         match_all_query = get_match_all_query(
             cd, search_query, api_version, child_highlighting
         )
-        return match_all_query, child_docs_query, parent_query
+        return EsMainQueries(
+            search_query=match_all_query,
+            parent_query=parent_query,
+            child_query=child_docs_query,
+        )
 
     if plain_doc:
         # Combine the filters and string query for plain documents like Oral
@@ -1300,7 +1307,11 @@ def build_es_base_query(
             cd, filters, string_query, api_version
         )
 
-    return search_query.query(main_query), child_docs_query, parent_query
+    return EsMainQueries(
+        search_query=search_query.query(main_query),
+        parent_query=parent_query,
+        child_query=child_docs_query,
+    )
 
 
 def build_has_parent_parties_query(
@@ -1442,7 +1453,8 @@ def get_facet_dict_for_search_query(
     """
 
     cd["just_facets_query"] = True
-    search_query, _, _ = build_es_base_query(search_query, cd)
+    es_queries = build_es_base_query(search_query, cd)
+    search_query = es_queries.search_query
     search_query.aggs.bucket("status", A("terms", field="status.raw"))
     search_query = search_query.extra(size=0)
     response = search_query.execute()
@@ -1464,7 +1476,9 @@ def build_es_main_query(
     applicable.
     """
     search_query_base = search_query
-    search_query, child_docs_query, _ = build_es_base_query(search_query, cd)
+    es_queries = build_es_base_query(search_query, cd)
+    search_query = es_queries.search_query
+    child_docs_query = es_queries.child_query
     top_hits_limit = 5
     child_docs_count_query = None
     match cd["type"]:
@@ -2390,7 +2404,9 @@ def build_search_feed_query(
     hl_field = "text"
     if cd["type"] == SEARCH_TYPES.RECAP:
         hl_field = "plain_text"
-    s, child_docs_query, _ = build_es_base_query(search_query, cd)
+    es_queries = build_es_base_query(search_query, cd)
+    s = es_queries.search_query
+    child_docs_query = es_queries.child_query
     if jurisdiction or cd["type"] == SEARCH_TYPES.RECAP:
         # An Opinion Jurisdiction feed or RECAP Search displays child documents
         # Eliminate items that lack the ordering field and apply highlighting
@@ -2952,9 +2968,11 @@ def do_es_api_query(
     """
 
     try:
-        s, child_docs_query, _ = build_es_base_query(
+        es_queries = build_es_base_query(
             search_query, cd, cd["highlight"], api_version
         )
+        s = es_queries.search_query
+        child_docs_query = es_queries.child_query
     except (
         UnbalancedParenthesesQuery,
         UnbalancedQuotesQuery,
@@ -3122,8 +3140,8 @@ def do_es_alert_estimation_query(
         days=int(day_count)
     )
     cd[before_field] = None
-    estimation_query, _, _ = build_es_base_query(search_query, cd)
-
+    es_queries = build_es_base_query(search_query, cd)
+    estimation_query = es_queries.search_query
     if cd["type"] == SEARCH_TYPES.RECAP:
         # The RECAP estimation query consists of two requests: one to estimate
         # Docket hits and one to estimate RECAPDocument hits.
@@ -3144,7 +3162,8 @@ def do_es_alert_estimation_query(
         multi_search = multi_search.add(main_doc_count_query)
 
         # Build RECAPDocuments count query.
-        _, child_docs_query, _ = build_es_base_query(search_query, cd)
+        es_queries = build_es_base_query(search_query, cd)
+        child_docs_query = es_queries.child_query
         child_docs_count_query = build_child_docs_query(child_docs_query, cd)
         child_total = 0
         if child_docs_count_query:
@@ -3186,10 +3205,10 @@ def do_es_sweep_alert_query(
         cd = search_form.cleaned_data
     else:
         return None, None, None
-
-    s, child_query, parent_query = build_es_base_query(
-        search_query, cd, True, alerts=True
-    )
+    es_queries = build_es_base_query(search_query, cd, True, alerts=True)
+    s = es_queries.search_query
+    parent_query = es_queries.parent_query
+    child_query = es_queries.child_query
     main_query = add_es_highlighting(s, cd, alerts=True)
     main_query = main_query.sort(build_sort_results(cd))
     main_query = main_query.extra(
