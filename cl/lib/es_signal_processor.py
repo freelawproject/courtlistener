@@ -191,20 +191,22 @@ def update_es_documents(
                 # Update main document in ES, including fields to be
                 # extracted from a related instance.
                 transaction.on_commit(
-                    lambda: chain(
-                        update_es_document.si(
-                            es_document.__name__,
-                            fields_to_update,
-                            (
-                                compose_app_label(instance),
-                                instance.pk,
+                    partial(
+                        chain(
+                            update_es_document.si(
+                                es_document.__name__,
+                                fields_to_update,
+                                (
+                                    compose_app_label(instance),
+                                    instance.pk,
+                                ),
+                                (compose_app_label(instance), instance.pk),
+                                fields_map,
                             ),
-                            (compose_app_label(instance), instance.pk),
-                            fields_map,
-                        ),
-                        send_or_schedule_search_alerts.s(),
-                        percolator_response_processing.s(),
-                    ).apply_async()
+                            send_or_schedule_search_alerts.s(),
+                            percolator_response_processing.s(),
+                        ).apply_async
+                    )
                 )
             case OpinionCluster() if es_document is OpinionDocument:  # type: ignore
                 transaction.on_commit(
