@@ -1,4 +1,4 @@
-FROM python:3.12-slim as build-base
+FROM python:3.13-slim as build-base
 
 RUN apt-get update --option "Acquire::Retries=3" --quiet=2 && \
     apt-get install \
@@ -24,7 +24,7 @@ ENV PGSSLCERT=/tmp/postgresql.crt
 
 # poetry
 # https://python-poetry.org/docs/configuration/#using-environment-variables
-ENV POETRY_VERSION=1.8.3 \
+ENV POETRY_VERSION=1.8.4 \
     # make poetry install to this location
     POETRY_HOME="/opt/poetry" \
     # Don't build a virtualenv to save space
