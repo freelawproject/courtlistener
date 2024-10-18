@@ -423,6 +423,15 @@ def get_and_save_free_document_report(
 
     document_rows_to_create = []
     for row in results:
+
+        # There is a document without a case number in pacer, skip it (issue #4547)
+        if not row["docket_number"]:
+            logger.warning(
+                f"No case number for document, court: {row["court_id"]}, "
+                f"date_filed: {row["date_filed"]}"
+            )
+            continue
+
         document_row = PACERFreeDocumentRow(
             court_id=row["court_id"],
             pacer_case_id=row["pacer_case_id"],

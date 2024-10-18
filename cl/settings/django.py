@@ -136,6 +136,7 @@ ROOT_URLCONF = "cl.urls"
 
 INSTALLED_APPS = [
     "daphne",
+    "pghistory.admin",
     "django.contrib.admin",
     "django.contrib.admindocs",
     "django.contrib.contenttypes",
@@ -188,7 +189,6 @@ if DEVELOPMENT:
     MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
 ASGI_APPLICATION = "cl.asgi.application"
-
 
 ################
 # Misc. Django #
