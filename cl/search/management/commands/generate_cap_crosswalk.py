@@ -164,10 +164,6 @@ class Command(CommandUtils, BaseCommand):
                         logger.info(
                             f"Match found: CAP ID {case_meta['id']} -> CL ID {cl_case.id}"
                         )
-                    else:
-                        logger.info(
-                            f"No match found for CAP ID {case_meta['id']}"
-                        )
                 else:
                     logger.warning(
                         f"Invalid case metadata for CAP ID {case_meta['id']}"
@@ -235,17 +231,17 @@ class Command(CommandUtils, BaseCommand):
             cap_case_id = str(case_meta["id"])
             page = str(case_meta["first_page"])
 
-            query = f"{reporter_slug}.{volume}/{page}.{cap_case_id}"
+            query = f"law.free.cap.{reporter_slug}.{volume}/{page}.{cap_case_id}.json"
             logger.debug(f"Searching for: {query}")
 
+            # Exact match of the file path in this format, e.g.:
+            # law.free.cap.wis-2d.369/658.6776082.json
             matching_cluster = OpinionCluster.objects.filter(
-                filepath_json_harvard__icontains=query
+                filepath_json_harvard=query
             ).first()
 
             if matching_cluster:
-                logger.info(
-                    f"Match found: CAP ID {cap_case_id} -> CL ID {matching_cluster.id}"
-                )
+                # Match found, return object
                 return matching_cluster
             else:
                 logger.info(
