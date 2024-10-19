@@ -1486,7 +1486,7 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
         alert_de.docket.delete()
 
-    @override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
+    @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_percolator_plus_sweep_alerts_integration(
         self, mock_prefix
     ) -> None:
@@ -1650,7 +1650,7 @@ class RECAPAlertsSweepIndexTest(
         docket.delete()
 
 
-@override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
+@override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
 @mock.patch(
     "cl.alerts.utils.get_alerts_set_prefix",
     return_value="alert_hits_percolator",

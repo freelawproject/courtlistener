@@ -73,7 +73,7 @@ from cl.search.types import (
     ESModelClassType,
     ESModelType,
     EventTable,
-    SaveESDocumentReturnType,
+    SaveESDocumentReturn,
 )
 
 percolator_alerts_models_supported = [Audio, RECAPDocument, Docket]
@@ -305,7 +305,7 @@ def es_save_document(
     instance_id: int,
     app_label: str,
     es_document_name: ESDocumentNameType,
-) -> SaveESDocumentReturnType | None:
+) -> SaveESDocumentReturn | None:
     """Save a document in Elasticsearch using a provided callable.
 
     :param self: The celery task
@@ -313,7 +313,7 @@ def es_save_document(
     :param app_label: The app label and model that belongs to the document
     being added.
     :param es_document_name: A Elasticsearch DSL document name.
-    :return: SaveESDocumentReturnType or None
+    :return: SaveESDocumentReturn or None
     """
 
     es_args = {}
@@ -403,7 +403,11 @@ def es_save_document(
             # Disable ES Alerts if oa-es-alerts-active switch is not enabled
             self.request.chain = None
             return None
-        return response["_id"].split("_")[-1], doc, app_label
+        return SaveESDocumentReturn(
+            document_id=response["_id"].split("_")[-1],
+            document_content=doc,
+            app_label=app_label,
+        )
     else:
         self.request.chain = None
         return None
@@ -512,7 +516,7 @@ def update_es_document(
     main_instance_data: tuple[str, int],
     related_instance_data: tuple[str, int] | None = None,
     fields_map: dict | None = None,
-) -> SaveESDocumentReturnType | None:
+) -> SaveESDocumentReturn | None:
     """Update a document in Elasticsearch.
     :param self: The celery task
     :param es_document_name: The Elasticsearch document type name.
@@ -574,7 +578,11 @@ def update_es_document(
         or related_instance_app_label in ["search.BankruptcyInformation"]
     ):
         doc = es_doc.prepare(main_model_instance)
-        return str(main_instance_id), doc, main_app_label
+        return SaveESDocumentReturn(
+            document_id=str(main_instance_id),
+            document_content=doc,
+            app_label=main_app_label,
+        )
 
     # Abort subsequent percolation tasks for not supported models.
     self.request.chain = None

@@ -563,7 +563,6 @@ class AlertAPITests(APITestCase):
 
 
 @override_switch("o-es-alerts-active", active=True)
-@override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
     """Test Search Alerts Webhooks"""
@@ -1827,7 +1826,6 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
-@override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
 @override_switch("oa-es-alerts-active", active=True)
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 @mock.patch(

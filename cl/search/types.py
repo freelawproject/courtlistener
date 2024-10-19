@@ -122,7 +122,13 @@ class PercolatorResponses:
 # TODO: Remove after scheduled OA alerts have been processed.
 SaveDocumentResponseType = tuple[str, ESDictDocument]
 
-SaveESDocumentReturnType = tuple[str, ESDictDocument, str]
+
+@dataclass
+class SaveESDocumentReturn:
+    document_id: str
+    document_content: ESDictDocument
+    app_label: str
+
 
 SearchAlertHitType = tuple[Alert, str, list[ESDictDocument], int]
 

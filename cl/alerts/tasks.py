@@ -53,7 +53,7 @@ from cl.search.types import (
     ESDocumentNameType,
     PercolatorResponseType,
     SaveDocumentResponseType,
-    SaveESDocumentReturnType,
+    SaveESDocumentReturn,
     SearchAlertHitType,
     SendAlertsResponse,
 )
@@ -875,7 +875,7 @@ def send_or_schedule_alerts(
     interval_start=5,
 )
 def send_or_schedule_search_alerts(
-    self: Task, response: SaveESDocumentReturnType | None
+    self: Task, response: SaveESDocumentReturn | None
 ) -> SendAlertsResponse | None:
     """Send real-time alerts based on the Elasticsearch search response.
 
@@ -897,11 +897,22 @@ def send_or_schedule_search_alerts(
     app label model.
     """
 
-    if not response or not settings.PERCOLATOR_SEARCH_ALERTS_ENABLED:
+    if not response:
         self.request.chain = None
         return None
 
-    document_id, document_content, app_label = response
+    if (
+        not settings.PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED
+        and response.app_label in ["search.RECAPDocument", "search.Docket"]
+    ):
+        # Disable percolation for RECAP search alerts until
+        # PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED is set to True.
+        self.request.chain = None
+        return None
+
+    app_label = response.app_label
+    document_id = response.document_id
+    document_content = response.document_content
 
     # Perform an initial percolator query and process its response.
     percolator_index, es_document_index, documents_to_percolate = (

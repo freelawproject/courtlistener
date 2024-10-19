@@ -220,7 +220,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                             msg="The source does not match.",
                         )
 
-    @override_settings(PERCOLATOR_SEARCH_ALERTS_ENABLED=True)
+    @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
 
