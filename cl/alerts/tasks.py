@@ -25,7 +25,7 @@ from cl.alerts.utils import (
 from cl.api.models import WebhookEventType
 from cl.api.tasks import (
     send_docket_alert_webhook_events,
-    send_es_search_alert_webhook,
+    send_search_alert_webhook_es,
 )
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
@@ -458,22 +458,25 @@ def send_webhook_alert_hits(
             event_type=WebhookEventType.SEARCH_ALERT, enabled=True
         )
         for user_webhook in user_webhooks:
-            send_es_search_alert_webhook.delay(
+            send_search_alert_webhook_es.delay(
                 documents,
                 user_webhook.pk,
-                alert,
+                alert.pk,
             )
 
 
 @app.task(ignore_result=True)
 def send_search_alert_emails(
-    email_alerts_to_send: list[tuple[int, list[SearchAlertHitType]]]
+    email_alerts_to_send: list[tuple[int, list[SearchAlertHitType]]],
+    scheduled_alert: bool = False,
 ) -> None:
     """Send search alert emails for multiple users.
 
     :param email_alerts_to_send: A list of two tuples containing the user to
     whom the alerts should be sent. A list of tuples containing the Search
     Alert, (Alert, search type, documents, and number of documents)
+    :param scheduled_alert: A boolean indicating weather this alert has been
+    scheduled
     :return: None
     """
 
@@ -491,6 +494,7 @@ def send_search_alert_emails(
         context = {
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
+            "scheduled_alert": scheduled_alert,
         }
         headers = {}
         query_string = ""

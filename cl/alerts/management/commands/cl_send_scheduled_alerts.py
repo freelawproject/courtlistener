@@ -99,7 +99,9 @@ def query_and_send_alerts_by_rate(rate: str) -> None:
                 )
             )
         if hits:
-            send_search_alert_emails.delay([(user_id, hits)])
+            send_search_alert_emails.delay(
+                [(user_id, hits)], scheduled_alert=True
+            )
             alerts_sent_count += 1
 
     # Update Alert's date_last_hit in bulk.

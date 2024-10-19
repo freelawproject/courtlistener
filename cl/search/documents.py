@@ -1,8 +1,10 @@
 from datetime import datetime
 
+from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
+from elasticsearch_dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
@@ -363,8 +365,8 @@ class AudioPercolator(AudioDocumentBase):
 
         cd = search_form.cleaned_data
         search_query = AudioDocument.search()
-        query, _ = build_es_base_query(search_query, cd)
-        return query.to_dict()["query"]
+        es_queries = build_es_base_query(search_query, cd)
+        return es_queries.search_query.to_dict()["query"]
 
 
 class ES_CHILD_ID:
@@ -960,8 +962,7 @@ class DocketBaseDocument(Document):
         return datetime.utcnow()
 
 
-@recap_index.document
-class ESRECAPDocument(DocketBaseDocument):
+class ESRECAPBaseDocument(DSLDocument):
     id = fields.IntegerField(attr="pk")
     docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
     description = fields.TextField(
@@ -1028,6 +1029,10 @@ class ESRECAPDocument(DocketBaseDocument):
     cites = fields.ListField(
         fields.IntegerField(multi=True),
     )
+
+
+@recap_index.document
+class ESRECAPDocument(DocketBaseDocument, ESRECAPBaseDocument):
 
     class Django:
         model = RECAPDocument
@@ -1834,3 +1839,24 @@ class OpinionClusterDocument(OpinionBaseDocument):
 
     def prepare_cluster_child(self, instance):
         return "opinion_cluster"
+
+
+class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
+    class Index:
+        name = "recap_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+
+class ESRECAPSweepDocument(ESRECAPBaseDocument):
+
+    class Index:
+        name = "recap_document_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
