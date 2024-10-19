@@ -445,8 +445,8 @@ def scheduled_alert_hits_limit_reached(
                 hit_status=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
                 content_type=content_type,
             )
-            .values("object_id")
-            .distinct()
+            .only("object_id")
+            .distinct("object_id")
         ).count()
         hits_limit = settings.SCHEDULED_ALERT_HITS_LIMIT
 
