@@ -908,7 +908,11 @@ def index_docket_parties_in_es(
     # Percolate Docket after parties are up-to-date.
     chain(
         send_or_schedule_search_alerts.s(
-            (str(docket_id), docket_document_dict, "search.Docket")
+            SaveESDocumentReturn(
+                document_id=str(docket_id),
+                document_content=docket_document_dict,
+                app_label="search.Docket",
+            )
         ),
         percolator_response_processing.s(),
     ).apply_async()
