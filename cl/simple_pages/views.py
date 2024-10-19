@@ -144,12 +144,12 @@ async def prayer_help(request: HttpRequest) -> HttpResponse:
             "count": count,
             "num_distinct_purchases": num_distinct_purchases,
             "total_cost": total_cost,
-            "daily_quota": await settings.ALLOWED_PRAYER_COUNT,
         }
         one_day = 60 * 60 * 24
         await cache.aset(cache_key, data, one_day)
 
     context = {
+        "daily_quota": settings.ALLOWED_PRAYER_COUNT,
         "private": False,
     }
     context.update(data)

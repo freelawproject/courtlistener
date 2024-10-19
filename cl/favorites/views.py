@@ -288,5 +288,4 @@ async def user_prayers_view(
         "private": False,
     }
 
-    # I want this to include the following things - show date fulfilled, link to file, etc. What else?
     return TemplateResponse(request, "user_prayers.html", context)
