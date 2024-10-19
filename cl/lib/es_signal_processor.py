@@ -310,7 +310,8 @@ def update_es_documents(
                         # Update main document in ES, including fields to be
                         # extracted from a related instance.
                         transaction.on_commit(
-                            lambda: update_es_document.si(
+                            partial(
+                                update_es_document.delay,
                                 es_document.__name__,
                                 fields_to_update,
                                 (
@@ -319,7 +320,7 @@ def update_es_documents(
                                 ),
                                 (compose_app_label(instance), instance.pk),
                                 fields_map,
-                            ).delay()
+                            )
                         )
 
 
@@ -367,7 +368,8 @@ def update_m2m_field_in_es_document(
     :return: None
     """
     transaction.on_commit(
-        lambda: update_es_document.si(
+        partial(
+            update_es_document.delay,
             es_document.__name__,
             [
                 affected_field,
@@ -375,7 +377,7 @@ def update_m2m_field_in_es_document(
             (compose_app_label(instance), instance.pk),
             None,
             None,
-        ).delay()
+        )
     )
 
     if es_document is OpinionClusterDocument and isinstance(
@@ -430,17 +432,19 @@ def update_reverse_related_documents(
         if isinstance(main_object, Person) and not main_object.is_judge:
             continue
         transaction.on_commit(
-            lambda: chain(
-                update_es_document.si(
-                    es_document.__name__,
-                    affected_fields,
-                    (compose_app_label(main_object), main_object.pk),
-                    related_instance,
-                    fields_map_to_pass,
-                ),
-                send_or_schedule_search_alerts.s(),
-                percolator_response_processing.s(),
-            ).apply_async()
+            partial(
+                chain(
+                    update_es_document.si(
+                        es_document.__name__,
+                        affected_fields,
+                        (compose_app_label(main_object), main_object.pk),
+                        related_instance,
+                        fields_map_to_pass,
+                    ),
+                    send_or_schedule_search_alerts.s(),
+                    percolator_response_processing.s(),
+                ).apply_async
+            )
         )
 
     match instance:
@@ -511,13 +515,14 @@ def delete_reverse_related_documents(
             # Update the Person document after the reverse instanced is deleted
             # Update parent document in ES.
             transaction.on_commit(
-                lambda: update_es_document.si(
+                partial(
+                    update_es_document.delay,
                     es_document.__name__,
                     affected_fields,
                     (compose_app_label(instance), instance.pk),
                     None,
                     None,
-                ).delay()
+                )
             )
             # Avoid calling update_children_docs_by_query if the Person
             # doesn't have any positions or is not a Judge.
@@ -537,13 +542,14 @@ def delete_reverse_related_documents(
 
             # Update parent document in ES.
             transaction.on_commit(
-                lambda: update_es_document.si(
+                partial(
+                    update_es_document.delay,
                     es_document.__name__,
                     affected_fields,
                     (compose_app_label(instance), instance.pk),
                     None,
                     None,
-                ).delay()
+                )
             )
             # Avoid calling update_children_docs_by_query if the Docket
             # doesn't have any entries.
@@ -561,13 +567,14 @@ def delete_reverse_related_documents(
         case OpinionCluster() if es_document is OpinionClusterDocument:  # type: ignore
             # Update parent document in ES.
             transaction.on_commit(
-                lambda: update_es_document.si(
+                partial(
+                    update_es_document.delay,
                     es_document.__name__,
                     affected_fields,
                     (compose_app_label(instance), instance.pk),
                     None,
                     None,
-                ).delay()
+                )
             )
             # Then update all their child documents (Positions)
             transaction.on_commit(
@@ -585,13 +592,14 @@ def delete_reverse_related_documents(
             for main_object in main_objects:
                 # Update main document in ES.
                 transaction.on_commit(
-                    lambda: update_es_document.si(
+                    partial(
+                        update_es_document.delay,
                         es_document.__name__,
                         affected_fields,
                         (compose_app_label(main_object), main_object.pk),
                         None,
                         None,
-                    ).delay()
+                    )
                 )
 
 

@@ -227,13 +227,14 @@ class CountESTasksTestCase(SimpleTestCase):
     def setUp(self):
         self.task_call_count = 0
 
-    def count_task_calls(self, task, *args, **kwargs) -> None:
+    def count_task_calls(
+        self, task, immutable_signature, *args, **kwargs
+    ) -> None:
         """Wraps the task to count its calls and assert the expected count."""
         # Increment the call count
         self.task_call_count += 1
-
         # Call the task
-        if task.__name__ in ["es_save_document", "update_es_document"]:
+        if immutable_signature:
             return task.s(*args, **kwargs)
         else:
             task.apply_async(args=args, kwargs=kwargs)
