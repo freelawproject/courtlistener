@@ -1,6 +1,6 @@
-from asgiref.sync import sync_to_async
 from datetime import timedelta
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
@@ -250,14 +250,22 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
     return count, total_cost
 
 
-async def get_lifetime_prayer_stats(status: int) -> tuple[int, int, float]: # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
+async def get_lifetime_prayer_stats(
+    status: int,
+) -> tuple[
+    int, int, float
+]:  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
 
     cache_key = f"prayer-stats-{status}"
 
     data = await cache.aget(cache_key)
-    
+
     if data is not None:
-        return data["count"], data["num_distinct_purchases"], data["total_cost"]
+        return (
+            data["count"],
+            data["num_distinct_purchases"],
+            data["total_cost"],
+        )
 
     filtered_list = Prayer.objects.filter(status=status)
 
