@@ -16,10 +16,11 @@ from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
-from cl.favorites.models import DocketTag, Note, UserTag
+from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
+    get_lifetime_prayer_stats,
     get_top_prayers,
     get_user_prayer_history,
     get_user_prayers,
@@ -185,15 +186,28 @@ async def view_tags(request, username):
     )
 
 
-@cache_page_ignore_params(30)  # Cache for 30 seconds
+# @cache_page_ignore_params(30)  # Cache for 30 seconds
 async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
 
     top_prayers = await get_top_prayers()
 
+    granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+    waiting_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+
     context = {
         "top_prayers": top_prayers,
         "private": False,
+        "granted_stats": {
+            "count": granted_stats[0],
+            "num_distinct": granted_stats[1],
+            "total_cost": granted_stats[2],
+        },
+        "waiting_stats": {
+            "count": waiting_stats[0],
+            "num_distinct": waiting_stats[1],
+            "total_cost": waiting_stats[2],
+        },
     }
 
     return TemplateResponse(request, "top_prayers.html", context)

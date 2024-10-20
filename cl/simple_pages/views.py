@@ -29,6 +29,7 @@ from cl.disclosures.models import (
     Reimbursement,
     SpouseIncome,
 )
+from cl.favorites.models import Prayer
 from cl.favorites.utils import get_lifetime_prayer_stats
 from cl.people_db.models import Person
 from cl.search.models import (
@@ -134,25 +135,17 @@ async def markdown_help(request: HttpRequest) -> HttpResponse:
 
 
 async def prayer_help(request: HttpRequest) -> HttpResponse:
-    cache_key = "prayer-help-stats"
-    data = await cache.aget(cache_key)
-    if data is None:
-        count, num_distinct_purchases, total_cost = (
-            await get_lifetime_prayer_stats()
-        )
-        data = {
-            "count": count,
-            "num_distinct_purchases": num_distinct_purchases,
-            "total_cost": total_cost,
-        }
-        one_day = 60 * 60 * 24
-        await cache.aset(cache_key, data, one_day)
+    count, num_distinct, total_cost = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
     context = {
         "daily_quota": settings.ALLOWED_PRAYER_COUNT,
         "private": False,
+        "granted_stats": {
+            "count": count,
+            "num_distinct": num_distinct,
+            "total_cost": total_cost,
+        },
     }
-    context.update(data)
 
     return TemplateResponse(request, "help/prayer_help.html", context)
 

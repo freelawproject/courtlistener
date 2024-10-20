@@ -16,11 +16,20 @@
     <h1 class="text-center">Community's Most Requested Documents</h1>
   </div>
 
-  {% if user.is_authenticated %}
-    <a href="{% url 'user_prayers' user.username %}">View your prayers</a>
-  {% else %}
-    <a href="{% url 'sign-in' %}?next={% url 'top_prayers' %}">Sign in to view your prayers</a>
-  {% endif %}
+
+  <div class="col-xs-12">
+    <div class="well well-sm">
+      <p>There have been <b>{{ granted_stats.count }}</b> requests granted for <b>{{ granted_stats.num_distinct }}</b> unique documents that cost <b>${{ granted_stats.total_cost|floatformat:2 }}</b>.</p>
+      <br>
+      <p>There are <b>{{ waiting_stats.count }}</b> requests pending for <b>{{ waiting_stats.num_distinct }}</b> unique documents that cost at least <b>${{ waiting_stats.total_cost|floatformat:2 }}</b>.</p>
+      <br>
+      <p>{% if user.is_authenticated %}
+      <a href="{% url 'user_prayers' user.username %}">View your prayers</a>
+      {% else %}
+        <a href="{% url 'sign-in' %}?next={% url 'top_prayers' %}">Sign in to view your prayers</a>
+      {% endif %}</p>
+    </div>
+  </div>
 
   <div class="col-xs-12">
     <div class="table-responsive">
