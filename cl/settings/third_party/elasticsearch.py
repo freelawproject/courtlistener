@@ -53,9 +53,13 @@ ELASTICSEARCH_PASSWORD = env(
     "ELASTICSEARCH_PASSWORD",
     default="password",
 )
+ELASTICSEARCH_VERIFY_CERT = env(
+    "ELASTICSEARCH_VERIFY_CERT",
+    default=False,
+)
 ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
-    default="/opt/courtlistener/docker/elastic/ca.crt",
+    default="",
 )
 ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=3500)
 ELASTICSEARCH_FAST_QUERIES_TIMEOUT = env(
@@ -64,7 +68,7 @@ ELASTICSEARCH_FAST_QUERIES_TIMEOUT = env(
 base_connection_params = {
     "hosts": ELASTICSEARCH_DSL_HOST,
     "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
-    "verify_certs": False,
+    "verify_certs": ELASTICSEARCH_VERIFY_CERT,
     "ca_certs": ELASTICSEARCH_CA_CERT,
     "timeout": ELASTICSEARCH_TIMEOUT,
 }

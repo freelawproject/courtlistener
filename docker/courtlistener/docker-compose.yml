@@ -80,6 +80,8 @@ services:
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
+      - ${CL_BASE_DIR:-../../}/docker/postgresql/cl-postgres.crt:/root/.postgresql/root.crt
+      - ${CL_BASE_DIR:-../../}/docker/elastic/cl-es.crt:/run/secrets/cl-es.crt
     networks:
       - cl_net_overlay
     env_file:
@@ -88,6 +90,9 @@ services:
         - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
         - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+        - DB_SSL_MODE=verify-full
+        - ELASTICSEARCH_VERIFY_CERT=True
+        - ELASTICSEARCH_CA_CERT=/run/secrets/cl-es.crt
 
   cl-django:
     container_name: cl-django
@@ -112,7 +117,8 @@ services:
     volumes:
       - ${CL_POSTGRES_RUN_DIR:-/var/run/postgresql}:/var/run/postgresql
       - ${CL_BASE_DIR:-../../}:/opt/courtlistener
-      - ${CL_BASE_DIR:-../../}/.postgresql:/root/.postgresql
+      - ${CL_BASE_DIR:-../../}/docker/postgresql/cl-postgres.crt:/root/.postgresql/root.crt
+      - ${CL_BASE_DIR:-../../}/docker/elastic/cl-es.crt:/run/secrets/cl-es.crt
     networks:
       - cl_net_overlay
     env_file:
@@ -121,6 +127,9 @@ services:
         - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
         - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
         - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+        - DB_SSL_MODE=verify-full
+        - ELASTICSEARCH_VERIFY_CERT=True
+        - ELASTICSEARCH_CA_CERT=/run/secrets/cl-es.crt
 
   cl-selenium:
     container_name: cl-selenium
