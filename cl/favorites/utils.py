@@ -193,6 +193,7 @@ async def get_user_prayers(user: User) -> list[Prayer]:
 
     return documents.all()
 
+
 def send_prayer_emails(instance: RECAPDocument) -> None:
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
