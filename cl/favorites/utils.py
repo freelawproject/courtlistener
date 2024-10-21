@@ -1,7 +1,9 @@
 from datetime import timedelta
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import (
     Avg,
@@ -117,11 +119,16 @@ async def get_top_prayers() -> list[RECAPDocument]:
             "attachment_number",
             "pacer_doc_id",
             "page_count",
+            "is_free_on_pacer",
             "description",
+            "docket_entry__entry_number",
             "docket_entry__docket_id",
             "docket_entry__docket__slug",
+            "docket_entry__docket__case_name",
+            "docket_entry__docket__docket_number",
             "docket_entry__docket__pacer_case_id",
             "docket_entry__docket__court__jurisdiction",
+            "docket_entry__docket__court__citation_string",
             "docket_entry__docket__court_id",
         )
         .annotate(
@@ -144,7 +151,47 @@ async def get_top_prayers() -> list[RECAPDocument]:
         .order_by("-geometric_mean")[:50]
     )
 
-    return [doc async for doc in documents.aiterator()]
+    return documents
+
+
+async def get_user_prayers(user: User) -> list[Prayer]:
+    user_prayers = Prayer.objects.filter(user=user).values("recap_document_id")
+
+    documents = (
+        RECAPDocument.objects.filter(id__in=Subquery(user_prayers))
+        .select_related(
+            "docket_entry",
+            "docket_entry__docket",
+            "docket_entry__docket__court",
+        )
+        .only(
+            "pk",
+            "document_type",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "page_count",
+            "is_free_on_pacer",
+            "description",
+            "date_created",
+            "docket_entry__entry_number",
+            "docket_entry__docket_id",
+            "docket_entry__docket__slug",
+            "docket_entry__docket__case_name",
+            "docket_entry__docket__docket_number",
+            "docket_entry__docket__pacer_case_id",
+            "docket_entry__docket__court__jurisdiction",
+            "docket_entry__docket__court__citation_string",
+            "docket_entry__docket__court_id",
+        )
+        .annotate(
+            prayer_status=F("prayers__status"),
+            prayer_date_created=F("prayers__date_created"),
+        )
+        .order_by("prayers__date_created")
+    )
+
+    return documents.all()
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
@@ -211,9 +258,24 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
     return count, total_cost
 
 
-async def get_lifetime_prayer_stats() -> tuple[int, int, float]:
+async def get_lifetime_prayer_stats(
+    status: int,
+) -> tuple[
+    int, int, float
+]:  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
 
-    filtered_list = Prayer.objects.filter(status=Prayer.GRANTED)
+    cache_key = f"prayer-stats-{status}"
+
+    data = await cache.aget(cache_key)
+
+    if data is not None:
+        return (
+            data["count"],
+            data["num_distinct_purchases"],
+            data["total_cost"],
+        )
+
+    filtered_list = Prayer.objects.filter(status=status)
 
     count = await filtered_list.acount()
 
@@ -221,9 +283,21 @@ async def get_lifetime_prayer_stats() -> tuple[int, int, float]:
     distinct_documents = set()
 
     async for prayer in filtered_list:
-        distinct_documents.add(prayer.recap_document)
-        total_cost += float(await price(prayer.recap_document))
+        recap_document = await sync_to_async(lambda: prayer.recap_document)()
 
-    num_distinct_purchases = len(distinct_documents)
+        distinct_documents.add(recap_document)
 
-    return count, num_distinct_purchases, total_cost
+        document_price = price(recap_document)
+        total_cost += float(document_price) if document_price else 0.0
+
+    num_distinct = len(distinct_documents)
+
+    data = {
+        "count": count,
+        "num_distinct_purchases": num_distinct,
+        "total_cost": total_cost,
+    }
+    one_day = 60 * 60 * 24
+    await cache.aset(cache_key, data, one_day)
+
+    return count, num_distinct, total_cost
