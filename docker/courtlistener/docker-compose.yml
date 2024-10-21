@@ -19,8 +19,8 @@ services:
   cl-postgresql:
     container_name: cl-postgres
     build:
-      context: ../../../courtlistener/docker/postgresql/
-      dockerfile: ../../../courtlistener/docker/postgresql/Dockerfile
+      context: "${CL_BASE_DIR:-../../}/docker/postgresql"
+      dockerfile: "./Dockerfile"
       args:
         POSTGRES_VERSION: 15.2-alpine
     ports:
@@ -67,7 +67,7 @@ services:
   cl-celery:
     container_name: cl-celery
     build:
-      context: "../../"
+      context: "${CL_BASE_DIR:-../../}"
       dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
@@ -92,7 +92,7 @@ services:
   cl-django:
     container_name: cl-django
     build:
-      context: "../../"
+      context: "${CL_BASE_DIR:-../../}"
       dockerfile: "./docker/django/Dockerfile"
       args:
         BUILD_ENV: dev
