@@ -4,6 +4,7 @@
 {% load static %}
 {% load pacer %}
 {% load tz %}
+{% load humanize %}
 
 {% block title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
 {% block og_title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}

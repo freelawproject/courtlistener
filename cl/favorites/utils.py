@@ -314,6 +314,8 @@ async def get_lifetime_prayer_stats(
         .aaggregate(Sum("price", default=0.0))
     )
 
+    total_cost = total_cost["price__sum"]
+
     data = {
         "count": prayer_count,
         "num_distinct_purchases": distinct_prayers,
