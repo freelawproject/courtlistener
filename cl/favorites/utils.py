@@ -7,14 +7,17 @@ from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import (
     Avg,
+    Case,
     Count,
     ExpressionWrapper,
     F,
     FloatField,
     Q,
     Subquery,
+    Sum,
+    Value,
+    When,
 )
-from django.db.models import Case, When, Value, F, Sum
 from django.db.models.functions import Cast, Extract, Now, Sqrt
 from django.template import loader
 from django.utils import timezone
@@ -276,12 +279,13 @@ async def get_lifetime_prayer_stats(
             data["total_cost"],
         )
 
-
     prayer_by_status = Prayer.objects.filter(status=status)
 
     prayer_count = await prayer_by_status.acount()
 
-    distinct_prayers = await prayer_by_status.values("recap_document").distinct().acount()
+    distinct_prayers = (
+        await prayer_by_status.values("recap_document").distinct().acount()
+    )
 
     total_cost = await (
         prayer_by_status.select_related("recap_document")
