@@ -22,7 +22,7 @@ class ContactForm(forms.Form):
 
     issue_type = forms.ChoiceField(
         choices=ISSUE_TYPE_CHOICES,
-        widget=forms.Select(attrs={"class": "form-control"})
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     # This is actually the "Subject" field, but we call it the phone_number
