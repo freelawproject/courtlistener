@@ -264,6 +264,7 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
 
 from dataclasses import dataclass
 
+
 @dataclass
 class PrayerStats:
     prayer_count: int
@@ -273,7 +274,9 @@ class PrayerStats:
 
 async def get_lifetime_prayer_stats(
     status: int,
-) -> PrayerStats:  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
+) -> (
+    PrayerStats
+):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
 
     cache_key = f"prayer-stats-{status}"
 
@@ -321,4 +324,8 @@ async def get_lifetime_prayer_stats(
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
 
-    return PrayerStats(prayer_count=prayer_count, distinct_count=distinct_prayers, total_cost=total_cost)
+    return PrayerStats(
+        prayer_count=prayer_count,
+        distinct_count=distinct_prayers,
+        total_cost=total_cost,
+    )
