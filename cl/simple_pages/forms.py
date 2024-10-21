@@ -6,12 +6,23 @@ from hcaptcha.fields import hCaptchaField
 
 
 class ContactForm(forms.Form):
+    ISSUE_TYPE_CHOICES = [
+        ("removal", "Case Removal Request"),
+        ("bug", "RECAP Extension Bug"),
+        ("support", "Support"),
+    ]
+
     name = forms.CharField(
         widget=forms.TextInput(attrs={"class": "form-control"})
     )
 
     email = forms.EmailField(
         widget=forms.TextInput(attrs={"class": "form-control"})
+    )
+
+    issue_type = forms.ChoiceField(
+        choices=ISSUE_TYPE_CHOICES,
+        widget=forms.Select(attrs={"class": "form-control"})
     )
 
     # This is actually the "Subject" field, but we call it the phone_number
@@ -49,3 +60,7 @@ class ContactForm(forms.Form):
             )
             self.add_error("message", msg)
         return cleaned_data
+
+    def get_issue_type_display(self) -> str:
+        value = self.cleaned_data.get("issue_type")
+        return dict(self.fields["issue_type"].choices).get(value, "Unidentified Type")
