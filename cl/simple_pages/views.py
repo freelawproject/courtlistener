@@ -135,9 +135,7 @@ async def markdown_help(request: HttpRequest) -> HttpResponse:
 
 
 async def prayer_help(request: HttpRequest) -> HttpResponse:
-    stats = await get_lifetime_prayer_stats(
-        Prayer.GRANTED
-    )
+    stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
 
     context = {
         "daily_quota": settings.ALLOWED_PRAYER_COUNT,
