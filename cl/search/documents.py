@@ -1,8 +1,10 @@
 from datetime import datetime
 
+from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
+from elasticsearch_dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
@@ -13,9 +15,14 @@ from cl.custom_filters.templatetags.text_filters import (
 from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import build_es_base_query
 from cl.lib.fields import JoinField, PercolatorField
-from cl.lib.search_index_utils import null_map
+from cl.lib.search_index_utils import get_parties_from_case_name, null_map
 from cl.lib.utils import deepgetattr
-from cl.people_db.models import Person, Position
+from cl.people_db.models import (
+    Attorney,
+    AttorneyOrganization,
+    Person,
+    Position,
+)
 from cl.search.constants import o_type_index_map
 from cl.search.es_indices import (
     opinion_index,
@@ -132,11 +139,13 @@ class AudioDocumentBase(Document):
     absolute_url = fields.KeywordField(index=False)
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
-            )
+                term_vector="with_positions_offsets",
+            ),
         },
         search_analyzer="search_analyzer",
     )
@@ -175,6 +184,7 @@ class AudioDocumentBase(Document):
         attr="docket.court.citation_string",
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        term_vector="with_positions_offsets",
     )
     docket_id = fields.IntegerField(attr="docket.pk")
     dateArgued = fields.DateField(attr="docket.date_argued")
@@ -215,11 +225,13 @@ class AudioDocumentBase(Document):
     docketNumber = fields.TextField(
         attr="docket.docket_number",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 attr="docket.docket_number",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -230,13 +242,13 @@ class AudioDocumentBase(Document):
     file_size_mp3 = fields.IntegerField(index=False)
     id = fields.IntegerField(attr="pk")
     judge = fields.TextField(
-        attr="judges",
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
-                attr="judges",
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -250,15 +262,18 @@ class AudioDocumentBase(Document):
     source = fields.KeywordField(attr="source", index=False)
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
     )
     timestamp = fields.DateField()
+    date_created = fields.DateField(attr="date_created")
 
 
 @oral_arguments_index.document
@@ -300,9 +315,15 @@ class AudioDocument(AudioDocumentBase):
                 return None
             return deepgetattr(instance, "local_path_mp3.name", None)
 
+    def prepare_judge(self, instance):
+        if instance.judges:
+            return instance.judges
+        return ""
+
     def prepare_text(self, instance):
         if instance.stt_status == Audio.STT_COMPLETE:
             return instance.transcript
+        return ""
 
     def prepare_dateArgued_text(self, instance):
         if instance.docket.date_argued:
@@ -323,7 +344,6 @@ class AudioDocument(AudioDocumentBase):
 @oral_arguments_percolator_index.document
 class AudioPercolator(AudioDocumentBase):
     rate = fields.KeywordField(attr="rate")
-    date_created = fields.DateField(attr="date_created")
     percolator_query = PercolatorField()
 
     class Django:
@@ -345,8 +365,8 @@ class AudioPercolator(AudioDocumentBase):
 
         cd = search_form.cleaned_data
         search_query = AudioDocument.search()
-        query, _ = build_es_base_query(search_query, cd)
-        return query.to_dict()["query"]
+        es_queries = build_es_base_query(search_query, cd)
+        return es_queries.search_query.to_dict()["query"]
 
 
 class ES_CHILD_ID:
@@ -382,10 +402,12 @@ class PersonBaseDocument(Document):
     fjc_id = fields.TextField()
     name = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -409,10 +431,12 @@ class PersonBaseDocument(Document):
     dod = fields.DateField(attr="date_dod")
     dob_city = fields.TextField(
         analyzer="text_en_splitting_cl",
+        term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
                 search_analyzer="search_analyzer_exact",
+                term_vector="with_positions_offsets",
             ),
         },
         search_analyzer="search_analyzer",
@@ -431,10 +455,12 @@ class PersonBaseDocument(Document):
     political_affiliation = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
                 "exact": fields.TextField(
                     analyzer="english_exact",
                     search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
                 ),
             },
             search_analyzer="search_analyzer",
@@ -457,10 +483,12 @@ class PersonBaseDocument(Document):
     school = fields.ListField(
         fields.TextField(
             analyzer="text_en_splitting_cl",
+            term_vector="with_positions_offsets",
             fields={
                 "exact": fields.TextField(
                     analyzer="english_exact",
                     search_analyzer="search_analyzer_exact",
+                    term_vector="with_positions_offsets",
                 ),
             },
             search_analyzer="search_analyzer",
@@ -469,6 +497,7 @@ class PersonBaseDocument(Document):
     )
     person_child = JoinField(relations={"person": ["position"]})
     timestamp = fields.DateField()
+    date_created = fields.DateField(attr="date_created")
 
     class Django:
         model = Person
@@ -497,34 +526,34 @@ class PersonBaseDocument(Document):
             pa.get_political_party_display()
             for pa in instance.political_affiliations.all()
             if pa
-        ] or None
+        ]
 
     def prepare_dob_state(self, instance):
         return instance.get_dob_state_display()
 
     def prepare_alias(self, instance):
-        return [r.name_full for r in instance.aliases.all()] or None
+        return [r.name_full for r in instance.aliases.all()]
 
     def prepare_aba_rating(self, instance):
         return [
             r.get_rating_display() for r in instance.aba_ratings.all() if r
-        ] or None
+        ]
 
     def prepare_school(self, instance):
-        return [e.school.name for e in instance.educations.all()] or None
+        return [e.school.name for e in instance.educations.all()]
 
     def prepare_races(self, instance):
-        return [r.get_race_display() for r in instance.race.all()] or None
+        return [r.get_race_display() for r in instance.race.all()]
 
     def prepare_alias_ids(self, instance):
-        return [alias.pk for alias in instance.aliases.all()] or None
+        return [alias.pk for alias in instance.aliases.all()]
 
     def prepare_political_affiliation_id(self, instance):
         return [
             pa.political_party
             for pa in instance.political_affiliations.all()
             if pa
-        ] or None
+        ]
 
 
 @people_db_index.document
@@ -711,37 +740,33 @@ class PositionDocument(PersonBaseDocument):
             pa.get_political_party_display()
             for pa in instance.person.political_affiliations.all()
             if pa
-        ] or None
+        ]
 
     def prepare_alias(self, instance):
-        return [r.name_full for r in instance.person.aliases.all()] or None
+        return [r.name_full for r in instance.person.aliases.all()]
 
     def prepare_aba_rating(self, instance):
         return [
             r.get_rating_display()
             for r in instance.person.aba_ratings.all()
             if r
-        ] or None
+        ]
 
     def prepare_school(self, instance):
-        return [
-            e.school.name for e in instance.person.educations.all()
-        ] or None
+        return [e.school.name for e in instance.person.educations.all()]
 
     def prepare_races(self, instance):
-        return [
-            r.get_race_display() for r in instance.person.race.all()
-        ] or None
+        return [r.get_race_display() for r in instance.person.race.all()]
 
     def prepare_alias_ids(self, instance):
-        return [alias.pk for alias in instance.person.aliases.all()] or None
+        return [alias.pk for alias in instance.person.aliases.all()]
 
     def prepare_political_affiliation_id(self, instance):
         return [
             pa.political_party
             for pa in instance.person.political_affiliations.all()
             if pa
-        ] or None
+        ]
 
 
 @people_db_index.document
@@ -926,6 +951,8 @@ class DocketBaseDocument(Document):
         },
         search_analyzer="search_analyzer",
     )
+    date_created = fields.DateField(attr="date_created")
+    pacer_case_id = fields.KeywordField(attr="pacer_case_id")
 
     class Django:
         model = Docket
@@ -935,8 +962,7 @@ class DocketBaseDocument(Document):
         return datetime.utcnow()
 
 
-@recap_index.document
-class ESRECAPDocument(DocketBaseDocument):
+class ESRECAPBaseDocument(DSLDocument):
     id = fields.IntegerField(attr="pk")
     docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
     description = fields.TextField(
@@ -1003,6 +1029,10 @@ class ESRECAPDocument(DocketBaseDocument):
     cites = fields.ListField(
         fields.IntegerField(multi=True),
     )
+
+
+@recap_index.document
+class ESRECAPDocument(DocketBaseDocument, ESRECAPBaseDocument):
 
     class Django:
         model = RECAPDocument
@@ -1107,6 +1137,9 @@ class ESRECAPDocument(DocketBaseDocument):
             )
         )
 
+    def prepare_pacer_case_id(self, instance):
+        return instance.docket_entry.docket.pacer_case_id
+
 
 @recap_index.document
 class DocketDocument(DocketBaseDocument):
@@ -1196,15 +1229,43 @@ class DocketDocument(DocketBaseDocument):
             "firm_id": set(),
             "firm": set(),
         }
-        for p in instance.prefetched_parties:
-            out["party_id"].add(p.pk)
-            out["party"].add(p.name)
-            for a in p.attys_in_docket:
-                out["attorney_id"].add(a.pk)
-                out["attorney"].add(a.name)
-                for f in a.firms_in_docket:
-                    out["firm_id"].add(f.pk)
-                    out["firm"].add(f.name)
+
+        # Extract only required parties values.
+        party_values = instance.parties.values_list("pk", "name")
+        for pk, name in party_values.iterator():
+            out["party_id"].add(pk)
+            out["party"].add(name)
+
+        if not out["party"]:
+            # Get party from docket case_name if no normalized parties are
+            # available.
+            party_from_case_name = get_parties_from_case_name(
+                instance.case_name
+            )
+            out["party"] = party_from_case_name if party_from_case_name else []
+
+        # Extract only required attorney values.
+        atty_values = (
+            Attorney.objects.filter(roles__docket=instance)
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in atty_values.iterator():
+            out["attorney_id"].add(pk)
+            out["attorney"].add(name)
+
+        # Extract only required firm values.
+        firms_values = (
+            AttorneyOrganization.objects.filter(
+                attorney_organization_associations__docket=instance
+            )
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in firms_values.iterator():
+            out["firm_id"].add(pk)
+            out["firm"].add(name)
+
         return out
 
     def prepare(self, instance):
@@ -1407,6 +1468,7 @@ class OpinionBaseDocument(Document):
     citeCount = fields.IntegerField(attr="citation_count")
     cluster_child = JoinField(relations={"opinion_cluster": ["opinion"]})
     timestamp = fields.DateField()
+    date_created = fields.DateField(attr="date_created")
 
     class Django:
         model = OpinionCluster
@@ -1777,3 +1839,24 @@ class OpinionClusterDocument(OpinionBaseDocument):
 
     def prepare_cluster_child(self, instance):
         return "opinion_cluster"
+
+
+class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
+    class Index:
+        name = "recap_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+
+class ESRECAPSweepDocument(ESRECAPBaseDocument):
+
+    class Index:
+        name = "recap_document_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }

@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, NotRequired, TypedDict, Union
 
 from django.http import HttpRequest
+from django_elasticsearch_dsl.search import Search
+from elasticsearch_dsl.query import QueryString
 
 from cl.users.models import User
 
@@ -188,6 +190,13 @@ class BasePositionMapping:
 
     def get_db_to_dataclass_map(self):
         return self.__db_to_dataclass_map
+
+
+@dataclass
+class EsMainQueries:
+    search_query: Search
+    parent_query: QueryString | None = None
+    child_query: QueryString | None = None
 
 
 @dataclass

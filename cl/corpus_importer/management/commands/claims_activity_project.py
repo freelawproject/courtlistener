@@ -8,11 +8,12 @@ from datetime import date
 
 import pandas as pd
 from django.conf import settings
-from juriscraper.pacer import ClaimsActivity, PacerSession
+from juriscraper.pacer import ClaimsActivity
 
 from cl.lib.argparse_types import valid_date
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.pacer import map_cl_to_pacer_id
+from cl.lib.pacer_session import ProxyPacerSession
 from cl.search.models import Court
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
@@ -44,7 +45,7 @@ def query_and_parse_claims_activity(
         "firmenich": "Firmenich",
     }
 
-    s = PacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
+    s = ProxyPacerSession(username=PACER_USERNAME, password=PACER_PASSWORD)
     s.login()
     for court_id in courts:
         court = map_cl_to_pacer_id(court_id)

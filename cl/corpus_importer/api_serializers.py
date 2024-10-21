@@ -15,6 +15,7 @@ from cl.search.models import (
     ClaimHistory,
     Docket,
     DocketEntry,
+    Opinion,
     OriginatingCourtInformation,
     RECAPDocument,
 )
@@ -133,3 +134,9 @@ class IADocketSerializer(ModelSerializer):
             "ia_needs_upload",
             "ia_date_first_change",
         )
+
+
+class OpinionSerializer(ModelSerializer):
+    class Meta:
+        model = Opinion
+        fields = "__all__"

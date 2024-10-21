@@ -25,10 +25,13 @@ from django.core.management import CommandError
 from django.db import IntegrityError
 from django.utils.encoding import force_bytes
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_diff import gen_diff_ratio
 from cl.search.models import Citation, OpinionCluster
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 # Relevant numbers:
 #  - 7907: After this point we don't seem to have any citations for items.
@@ -169,6 +172,7 @@ class Command(VerboseCommand):
                 citation_obj = get_citations(
                     scdb_info[scdb_field],
                     remove_ambiguous=False,
+                    tokenizer=HYPERSCAN_TOKENIZER,
                 )[0]
             except IndexError:
                 logger.warning(

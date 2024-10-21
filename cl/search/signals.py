@@ -6,6 +6,7 @@ from cl.audio.models import Audio
 from cl.citations.tasks import (
     find_citations_and_parantheticals_for_recap_documents,
 )
+from cl.favorites.utils import send_prayer_emails
 from cl.lib.es_signal_processor import ESSignalProcessor
 from cl.people_db.models import (
     ABARating,
@@ -132,7 +133,6 @@ pa_field_mapping = {
             },
         }
     },
-    "bulk-create": {},
 }
 
 oa_field_mapping = {
@@ -160,7 +160,7 @@ oa_field_mapping = {
                 "judges": ["judge"],
                 "sha1": ["sha1"],
                 "source": ["source"],
-                "stt_google_response": ["prepare"],
+                "stt_transcript": ["prepare"],
                 "docket_id": ["prepare"],
             },
         },
@@ -169,7 +169,6 @@ oa_field_mapping = {
     "m2m": {Audio.panel.through: {"audio": {"panel_ids": "panel_ids"}}},
     "reverse": {},
     "reverse-delete": {},
-    "bulk-create": {},
 }
 
 p_field_mapping = {
@@ -211,7 +210,6 @@ p_field_mapping = {
             }
         },
     },
-    "bulk-create": {},
 }
 
 position_field_mapping = {
@@ -277,14 +275,13 @@ position_field_mapping = {
     "m2m": {Person.race.through: {"person": {"races": "races"}}},
     "reverse": {},
     "reverse-delete": {},
-    "bulk-create": {},
 }
 
 docket_field_mapping = {
     "save": {
         Docket: {
             "self": {
-                "case_name": ["caseName"],
+                "case_name": ["caseName", "party"],
                 "case_name_short": ["caseName"],
                 "case_name_full": ["case_name_full", "caseName"],
                 "docket_number": ["docketNumber"],
@@ -300,6 +297,8 @@ docket_field_mapping = {
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
                 "slug": ["docket_slug", "docket_absolute_url"],
+                "pacer_case_id": ["pacer_case_id"],
+                "source": [""],  # Not indexed field.
             },
         },
         Person: {
@@ -324,7 +323,6 @@ docket_field_mapping = {
     "reverse-delete": {
         BankruptcyInformation: {"docket": {"all": ["chapter", "trustee_str"]}},
     },
-    "bulk-create": {},
 }
 
 recap_document_field_mapping = {
@@ -332,11 +330,11 @@ recap_document_field_mapping = {
         RECAPDocument: {
             "self": {
                 "description": ["short_description"],
-                "document_type": ["document_type"],
+                "document_type": ["document_type", "absolute_url"],
                 "document_number": ["document_number", "absolute_url"],
                 "pacer_doc_id": ["pacer_doc_id"],
                 "plain_text": ["plain_text"],
-                "attachment_number": ["attachment_number"],
+                "attachment_number": ["attachment_number", "absolute_url"],
                 "is_available": ["is_available"],
                 "page_count": ["page_count"],
                 "filepath_local": ["filepath_local"],
@@ -366,6 +364,8 @@ recap_document_field_mapping = {
                 "referred_to_id": ["referred_to_id", "referredTo"],
                 "assigned_to_str": ["assignedTo"],
                 "referred_to_str": ["referredTo"],
+                "pacer_case_id": ["pacer_case_id"],
+                "slug": ["absolute_url"],
             }
         },
         Person: {
@@ -381,9 +381,6 @@ recap_document_field_mapping = {
     "m2m": {},
     "reverse": {},
     "reverse-delete": {},
-    "bulk-create": {
-        OpinionsCitedByRECAPDocument: {"cited_opinions": {"all": ["cites"]}},
-    },
 }
 
 o_field_mapping = {
@@ -411,6 +408,7 @@ o_field_mapping = {
                 "syllabus": ["syllabus"],
                 "scdb_id": ["scdb_id"],
                 "citation_count": ["citeCount"],
+                "slug": ["absolute_url"],
             }
         },
         Opinion: {
@@ -442,7 +440,6 @@ o_field_mapping = {
         OpinionsCited: {"cited_opinions": {"all": ["cites"]}},
     },  # For handling OpinionsCited.save() in add_manual_citations command
     "reverse-delete": {},
-    "bulk-create": {},
 }
 
 o_cluster_field_mapping = {
@@ -502,7 +499,6 @@ o_cluster_field_mapping = {
             "cluster": {"all": ["citation", "neutralCite", "lexisCite"]}
         },
     },
-    "bulk-create": {},
 }
 
 
@@ -565,7 +561,7 @@ def handle_recap_doc_change(
     # When we get updated text for a doc, we want to parse it for citations.
     if update_fields is not None and "plain_text" in update_fields:
         # Even though the task itself filters for qualifying ocr_status,
-        # we don't want to clog the TQ with unncessary items.
+        # we don't want to clog the TQ with unnecessary items.
         if instance.ocr_status in (
             RECAPDocument.OCR_COMPLETE,
             RECAPDocument.OCR_UNNECESSARY,
@@ -573,3 +569,9 @@ def handle_recap_doc_change(
             find_citations_and_parantheticals_for_recap_documents.apply_async(
                 args=([instance.pk],)
             )
+
+    if (
+        instance.es_rd_field_tracker.has_changed("is_available")
+        and instance.is_available == True
+    ):
+        send_prayer_emails(instance)

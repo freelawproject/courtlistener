@@ -1,26 +1,108 @@
 import copy
+import datetime
 from collections import OrderedDict
-from datetime import date, datetime
 
+from dateutil import parser
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import timezone
 from django_elasticsearch_dsl import Document, fields
 from rest_framework import serializers
 from rest_framework.fields import empty
 from rest_framework.utils.field_mapping import get_field_kwargs
+
+from cl.custom_filters.templatetags.extras import render_string_or_list
+
+
+class TimeStampField(serializers.Field):
+    """Handles a naive timestamp field."""
+
+    def __init__(self, default_timezone=None, **kwargs):
+        self.timezone = None
+        if default_timezone is not None:
+            self.timezone = default_timezone
+        super().__init__(**kwargs)
+
+    def to_representation(self, value):
+
+        if isinstance(value, datetime.datetime):
+            if self.timezone:
+                return serializers.DateTimeField(
+                    default_timezone=self.timezone
+                ).to_representation(value)
+            else:
+                if timezone.is_naive(value):
+                    value = timezone.make_aware(value, datetime.timezone.utc)
+                return serializers.DateTimeField().to_representation(
+                    timezone.localtime(value)
+                )
+        if isinstance(value, str):
+            parsed_datetime = parser.parse(value)
+            return serializers.DateTimeField(
+                default_timezone=self.timezone
+            ).to_representation(parsed_datetime)
+        else:
+            raise serializers.ValidationError(
+                "Date or DateTime object expected."
+            )
 
 
 class DateOrDateTimeField(serializers.Field):
     """Handles both datetime and date objects."""
 
     def to_representation(self, value):
-        if isinstance(value, datetime):
+        if isinstance(value, datetime.datetime):
             return serializers.DateTimeField().to_representation(value)
-        elif isinstance(value, date):
+        elif isinstance(value, datetime.date):
             return serializers.DateField().to_representation(value)
         else:
-            raise serializers.ValidationError(
-                "Date or DateTime object expected."
-            )
+            return value
+
+
+class CoerceDateField(serializers.Field):
+    """Coerces datetime-like inputs into a date representation. If the input
+    is not a datetime, it returns the date directly.
+    """
+
+    def to_representation(self, value):
+        if isinstance(value, datetime.datetime):
+            return serializers.DateField().to_representation(value.date())
+        return serializers.DateField().to_representation(value)
+
+
+class NullableListField(serializers.ListField):
+    """A custom ListField that returns None when serialized if the list is
+    empty. For API V3 compatibility.
+    """
+
+    def to_representation(self, data):
+        """
+        Return "None" if the list is empty, otherwise return the list.
+        """
+        if not data:
+            return None
+        return super().to_representation(data)
+
+
+class HighlightedField(serializers.Field):
+    """Handles highlighted text fields."""
+
+    def to_representation(self, value):
+        return render_string_or_list(value)
+
+
+class NoneToListField(serializers.ListField):
+    """A custom ListField that returns an empty list when the original value is
+    None; otherwise, it returns the original value.
+    This can be removed from some fields once a People re-index is done and
+    https://github.com/elastic/elasticsearch-dsl-py/issues/1819 solved.
+    """
+
+    def get_attribute(self, instance):
+        value = super().get_attribute(instance)
+        # Convert None to empty list explicitly here.
+        if value is None:
+            return []
+        return value
 
 
 class DocumentSerializer(serializers.Serializer):
@@ -99,7 +181,6 @@ class DocumentSerializer(serializers.Serializer):
         document = getattr(self.Meta, "document")
         model = document.Django.model
         document_fields = document._fields
-
         declared_fields = copy.deepcopy(self._declared_fields)
         field_mapping = OrderedDict()
 

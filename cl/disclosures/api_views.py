@@ -41,6 +41,14 @@ class AgreementViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = AgreementSerializer
     ordering_fields = ("id", "date_created", "date_modified")
     filterset_class = AgreementFilter
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
 
 class DebtViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -48,6 +56,14 @@ class DebtViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = DebtSerializer
     ordering_fields = ("id", "date_created", "date_modified")
     filterset_class = DebtFilter
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
 
 class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -69,6 +85,14 @@ class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = FinancialDisclosureSerializer
     filterset_class = FinancialDisclosureFilter
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
 
 class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -76,6 +100,14 @@ class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = GiftSerializer
     filterset_class = GiftFilter
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
 
 class InvestmentViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -83,6 +115,14 @@ class InvestmentViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = InvestmentSerializer
     filterset_class = InvestmentFilter
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
 
 class NonInvestmentIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -90,6 +130,14 @@ class NonInvestmentIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = NonInvestmentIncomeSerializer
     filterset_class = NonInvestmentIncomeFilter
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
 
 class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -97,6 +145,14 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
 
 class ReimbursementViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -104,6 +160,14 @@ class ReimbursementViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = ReimbursementSerializer
     filterset_class = ReimbursementFilter
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]
 
 
 class SpouseIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
@@ -111,3 +175,11 @@ class SpouseIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = SpouseIncomeSerializer
     filterset_class = SpouseIncomeFilter
     ordering_fields = ("id", "date_created", "date_modified")
+    # Default cursor ordering key
+    ordering = "-id"
+    # Additional cursor ordering fields
+    cursor_ordering_fields = [
+        "id",
+        "date_created",
+        "date_modified",
+    ]

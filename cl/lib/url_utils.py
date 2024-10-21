@@ -1,36 +1,71 @@
+from ada_url import URL
 from django.conf import settings
 from django.http import Http404, HttpRequest
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
+BASE_URL = (
+    "https://www.courtlistener.com"
+    if not settings.DEVELOPMENT
+    else "http://localhost:8000"
+)
 
-def get_redirect_or_login_url(request: HttpRequest, field_name: str) -> str:
-    """Get the redirect if it's safe, or send the user to the login page
 
-    :param request: The HTTP request
-    :param field_name: The field where the redirect is located
-    :return: Either the value requested or the default LOGIN_REDIRECT_URL, if
-    a sanity or security check failed.
+def parse_url_with_ada(url: str) -> str:
+    """Parses a URL using the `URL` class from the `Ada`.
+
+    Handles relative paths by adding the `BASE_URL` to the class constructor.
+    If the URL is already absolute, this step has no effect. Extracts the
+    parsed URL from the `href` attribute and attempts to remove the `BASE_URL`
+    if it was added previously.
+
+    Returns an empty string If the input URL is invalid or cannot be parsed.
+
+    :param url: The URL to parse.
+    :return: The parsed URL or an empty string if the input URL is invalid or
+    cannot be parsed.
     """
-    url = request.GET.get(field_name, "")
-    is_safe = is_safe_url(url, request)
-    if not is_safe:
+    if not url:
+        return ""
+
+    try:
+        ada_url = URL(url, base=BASE_URL)
+        return ada_url.href.replace(BASE_URL, "")
+    except ValueError:
+        return ""
+
+
+def get_redirect_or_abort(
+    request: HttpRequest, redirect_field_name: str, throw_404: bool = False
+) -> str:
+    """
+    Retrieves a safe redirect URL from the request or returns the login URL.
+
+    This function checks for a redirect URL in both the POST and GET data of
+    the provided request object. It then parses the retrieved URL using the
+    `parse_url_with_ada` helper and performs safety checks using the
+    `is_safe_url` function.
+
+    :param request: The HTTP request object containing potential redirect data.
+    :param redirect_field_name: The name of the field containing the redirect
+    URL.
+    :param throw_404: Whether to raise an Http404 exception for unsafe URLs.
+    Defaults to False, in which case it returns the login redirect URL.
+    :raises Http404: If `throw_404` is True and the redirect URL is unsafe.
+    :return: The safe, parsed redirect URL if found, otherwise the configured
+    login URL.
+    """
+    redirect_url = request.POST.get(
+        redirect_field_name,
+        request.GET.get(redirect_field_name, ""),
+    )
+    cleaned_url = parse_url_with_ada(redirect_url)
+    safe = is_safe_url(cleaned_url, request)
+    if not safe:
+        if throw_404:
+            raise Http404("Missing or unsafe redirect URL.")
         return settings.LOGIN_REDIRECT_URL
-    return url
-
-
-def get_redirect_or_404(request: HttpRequest, field_name: str) -> str:
-    """Get the redirect if safe, or throw a 404
-
-    :param request: The HTTP request
-    :param field_name: The field where the redirect is located
-    :return: The URL if it was safe
-    """
-    url = request.GET.get(field_name, "")
-    is_safe = is_safe_url(url, request)
-    if not is_safe:
-        raise Http404(f"Unsafe redirect URL: {url}")
-    return url
+    return cleaned_url
 
 
 def is_safe_url(url: str, request: HttpRequest) -> bool:
@@ -59,15 +94,10 @@ def is_safe_url(url: str, request: HttpRequest) -> bool:
     """
     sign_in_url = reverse("sign-in") in url
     register_in_url = reverse("register") in url
-    # Fixes security vulnerability reported upstream to Python, where
-    # whitespace can be provided in the scheme like "java\nscript:alert(bad)"
-    garbage_url = any(c in url for c in ["\n", "\r", " "])
     no_url = not url
     not_safe_url = not url_has_allowed_host_and_scheme(
         url,
         allowed_hosts={request.get_host()},
         require_https=request.is_secure(),
     )
-    return not any(
-        [sign_in_url, register_in_url, garbage_url, no_url, not_safe_url]
-    )
+    return not any([sign_in_url, register_in_url, no_url, not_safe_url])

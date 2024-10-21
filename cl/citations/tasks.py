@@ -6,6 +6,7 @@ from django.db.models import F
 from django.db.models.query import QuerySet
 from eyecite import get_citations
 from eyecite.models import CitationBase
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.celery_init import app
 from cl.citations.annotate_citations import (
@@ -37,6 +38,7 @@ from cl.search.tasks import add_items_to_solr, index_related_cites_fields
 # they are considered parallel reporters. For example,
 # "22 U.S. 44, 46 (13 Atl. 33)" would have a distance of 6.
 PARALLEL_DISTANCE = 6
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 @app.task
@@ -87,9 +89,9 @@ def find_citations_and_parantheticals_for_recap_documents(
 
     :return: None
     """
-    documents: QuerySet[RECAPDocument] = RECAPDocument.objects.filter(
-        pk__in=doc_ids
-    ).filter(
+    documents: QuerySet[
+        RECAPDocument, RECAPDocument
+    ] = RECAPDocument.objects.filter(pk__in=doc_ids).filter(
         ocr_status__in=[
             RECAPDocument.OCR_UNNECESSARY,
             RECAPDocument.OCR_COMPLETE,
@@ -116,7 +118,9 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     :param index: Whether to add the items to Solr
     :return: None
     """
-    opinions: QuerySet[Opinion] = Opinion.objects.filter(pk__in=opinion_pks)
+    opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
+        pk__in=opinion_pks
+    )
     for opinion in opinions:
         try:
             store_opinion_citations_and_update_parentheticals(opinion, index)
@@ -145,7 +149,9 @@ def store_opinion_citations_and_update_parentheticals(
     get_and_clean_opinion_text(opinion)
 
     # Extract the citations from the opinion's text
-    citations: List[CitationBase] = get_citations(opinion.cleaned_text)
+    citations: List[CitationBase] = get_citations(
+        opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER
+    )
 
     # If no citations are found, then there is nothing else to do for now.
     if not citations:

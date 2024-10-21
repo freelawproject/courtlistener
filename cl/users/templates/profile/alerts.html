@@ -42,67 +42,10 @@
     <div class="col-xs-12">
       <div class="table-responsive">
         <table class="table settings-table">
-          <thead>
-          <tr>
-            <th>Alert&nbsp;Type</th>
-            <th>Alert&nbsp;Name<br>and Query</th>
-            <th>Frequency</th>
-            <th colspan="2">Last&nbsp;Hit</th>
-          </tr>
-          </thead>
+          {% include "includes/search_alerts/table_header.html" with is_profile_dashboard=True%}
           <tbody>
           {% for alert in search_alerts %}
-            <tr>
-              <td>
-                <p class="bottom">
-                  {% if alert.type == SEARCH_TYPES.OPINION %}
-                    Case Law
-                  {% elif alert.type == SEARCH_TYPES.ORAL_ARGUMENT %}
-                    Oral Argument
-                  {% elif alert.type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
-                    RECAP
-                  {% endif %}
-                </p>
-              </td>
-              <td>
-                <p class="bottom">
-                  <a href="/?{{ alert.query }}" rel="nofollow">{{ alert.name }}</a>
-                </p>
-              </td>
-              <td>{{ alert.get_rate_display }}</td>
-              <td>{{ alert.date_last_hit|date:"M j, Y"|default:"Never" }}</td>
-              <td class="right">
-                {% if alert.type == SEARCH_TYPES.OPINION or alert.type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
-                  <a href="{% url "search_feed" "search" %}?{{ alert.query }}"
-                     title="Atom feed for this alert"
-                     class="btn btn-primary btn-xs">
-                    <i class="fa fa-rss"></i>&nbsp;Subscribe
-                  </a>
-                {% elif alert.type == SEARCH_TYPES.ORAL_ARGUMENT %}
-                  <a
-                    href="{% url "search_podcast" "search" %}?{{ alert.query }}"
-                    title="Podcast for this alert"
-                    class="btn btn-primary btn-xs">
-                    <i class="fa fa-podcast"></i>&nbsp;Podcast
-                  </a>
-                {% endif %}
-                {% if not user.profile.is_member and alert.rate == 'rt' %}
-                  <p class="bottom inline"
-                     title="Please become a member to enable Real Time alerts.">
-                    <a class="btn btn-primary btn-xs disabled">
-                      <i class="fa fa-pencil"></i>&nbsp;Edit</a>
-                  </p>
-                {% else %}
-                  <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
-                     rel="nofollow"
-                     class="btn btn-primary btn-xs">
-                    <i class="fa fa-pencil"></i>&nbsp;Edit</a>
-                {% endif %}
-                <a href="{% url "delete_alert_confirm" alert.pk %}"
-                   class="btn btn-danger btn-xs">
-                  <i class="fa fa-trash-o"></i>&nbsp;Delete</a>
-              </td>
-            </tr>
+            {% include "includes/search_alerts/table_row.html" with alert=alert is_profile_dashboard=True%}
           {% endfor %}
           </tbody>
         </table>

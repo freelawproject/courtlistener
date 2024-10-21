@@ -1,31 +1,30 @@
 # mypy: disable-error-code=attr-defined
 import datetime
 import os
+import re
 import shutil
 from datetime import date
+from http import HTTPStatus
 from unittest import mock
-from unittest.mock import MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.hashers import make_password
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import override_settings
+from django.db import connection
+from django.test import AsyncRequestFactory, RequestFactory, override_settings
 from django.test.client import AsyncClient
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.text import slugify
-from rest_framework.status import (
-    HTTP_200_OK,
-    HTTP_300_MULTIPLE_CHOICES,
-    HTTP_302_FOUND,
-    HTTP_400_BAD_REQUEST,
-    HTTP_404_NOT_FOUND,
-)
+from factory import RelatedFactory
 from waffle.testutils import override_flag
 
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -34,17 +33,33 @@ from cl.lib.test_helpers import (
     SimpleUserDataMixin,
     SitemapTest,
 )
-from cl.opinion_page.forms import CourtUploadForm
+from cl.opinion_page.forms import (
+    MeCourtUploadForm,
+    MissCourtUploadForm,
+    MoCourtUploadForm,
+    TennWorkCompAppUploadForm,
+    TennWorkCompClUploadForm,
+)
 from cl.opinion_page.utils import (
-    es_get_citing_clusters_with_cache,
+    es_get_citing_and_related_clusters_with_cache,
+    generate_docket_entries_csv_data,
     make_docket_title,
 )
-from cl.opinion_page.views import get_prev_next_volumes
-from cl.people_db.factories import PersonFactory, PositionFactory
+from cl.opinion_page.views import (
+    download_docket_entries_csv,
+    fetch_docket_entries,
+    get_prev_next_volumes,
+)
+from cl.people_db.factories import (
+    PersonFactory,
+    PersonWithChildrenFactory,
+    PositionFactory,
+)
 from cl.people_db.models import Person
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
+    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
 )
@@ -52,17 +67,20 @@ from cl.recap.mergers import add_docket_entries, merge_attachment_page_data
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
+    DocketEntryFactory,
     DocketFactory,
     OpinionClusterFactoryWithChildrenAndParents,
     OpinionClusterWithParentsFactory,
     OpinionFactory,
     OpinionsCitedWithParentsFactory,
+    RECAPDocumentFactory,
 )
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Citation,
     Docket,
+    DocketEntry,
     Opinion,
     OpinionCluster,
     RECAPDocument,
@@ -93,7 +111,7 @@ class SimpleLoadTest(TestCase):
             kwargs={"docket_id": 1, "doc_num": "1", "slug": "asdf"},
         )
         response = await self.async_client.get(path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
 
 
 class OpinionPageLoadTest(
@@ -172,17 +190,21 @@ class OpinionPageLoadTest(
             "view_case", kwargs={"pk": self.opinion_cluster_1.pk, "_": "asdf"}
         )
         response = await self.async_client.get(path)
-        self.assertEqual(response.status_code, HTTP_200_OK)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertIn("33 state 1", response.content.decode())
 
     async def test_es_get_citing_clusters_with_cache(self) -> None:
-        """Does es_get_citing_clusters_with_cache return the correct clusters
-        citing and the total cites count?
+        """Does es_get_citing_and_related_clusters_with_cache return the
+        correct clusters citing and the total cites count?
         """
 
-        clusters, count = await es_get_citing_clusters_with_cache(
-            self.o_cluster_3
+        request = AsyncRequestFactory().get("/")
+        result = await es_get_citing_and_related_clusters_with_cache(
+            self.o_cluster_3, request
         )
+        clusters = result.citing_clusters
+        count = result.citing_cluster_count
+
         c_list_names = [c["caseName"] for c in clusters]
         expected_clusters = [
             self.o_cluster_1.case_name,
@@ -248,8 +270,8 @@ class DocumentPageRedirection(TestCase):
             },
         )
         r = await self.async_client.get(path, follow=True)
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
 
 class CitationRedirectorTest(TestCase):
@@ -267,7 +289,7 @@ class CitationRedirectorTest(TestCase):
 
     async def test_citation_homepage(self) -> None:
         r = await self.async_client.get(reverse("citation_homepage"))
-        self.assertStatus(r, HTTP_200_OK)
+        self.assertStatus(r, HTTPStatus.OK)
 
     @override_flag("o-es-active", False)
     def test_with_a_citation(self) -> None:
@@ -276,12 +298,7 @@ class CitationRedirectorTest(TestCase):
         r = self.client.get(
             reverse("citation_redirector", kwargs=self.citation), follow=True
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
-
-        r = self.client.post(
-            reverse("citation_redirector"), self.citation, follow=True
-        )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
     async def test_multiple_results(self) -> None:
         """Do we return a 300 status code when there are multiple results?"""
@@ -290,12 +307,44 @@ class CitationRedirectorTest(TestCase):
         f2_cite.pk = None
         f2_cite.cluster_id = 3
         await f2_cite.asave()
+
         self.citation["reporter"] = slugify(self.citation["reporter"])
         r = await self.async_client.get(
             reverse("citation_redirector", kwargs=self.citation)
         )
-        self.assertStatus(r, HTTP_300_MULTIPLE_CHOICES)
+        self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+        # The page is displaying the expected message
+        self.assertIn("Found More than One Result", r.content.decode())
+        # the list of citations is showing the court names
+        self.assertIn("Testing Supreme Court |", r.content.decode())
+
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "56 F.2d 9 (1st Cir. 2015)"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+        # The page is displaying the expected message
+        self.assertIn("Found More than One Result", r.content.decode())
+        # the list of citations is showing the court names
+        self.assertIn("Testing Supreme Court |", r.content.decode())
+
         await f2_cite.adelete()
+
+    async def test_handle_ambiguous_reporter_variations(self) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "bailey",
+                },
+            ),
+        )
+        self.assertStatus(r, HTTPStatus.MULTIPLE_CHOICES)
+        self.assertIn(
+            "Found More Than One Possible Reporter", r.content.decode()
+        )
 
     async def test_unknown_citation(self) -> None:
         """Do we get a 404 message if we don't know the citation?"""
@@ -309,7 +358,58 @@ class CitationRedirectorTest(TestCase):
                 },
             ),
         )
-        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
+
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "1 bad-reporter 1"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "Maryland Code, Criminal Law § 11-208",
+                },
+            ),
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
+        self.assertIn("Unable to Find Reporter", r.content.decode())
+
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "Maryland Code, Criminal Law § 11-208"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={
+                    "reporter": "§ 97-29-63",
+                },
+            ),
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
+        self.assertIn("Unable to Find Reporter", r.content.decode())
+
+        # Test the search bar input
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "§ 97-29-63"},
+            follow=True,
+        )
+        self.assertStatus(r, HTTPStatus.BAD_REQUEST)
+        self.assertIn("No Citations Detected", r.content.decode())
 
     async def test_invalid_page_number_1918(self) -> None:
         """Do we fail gracefully with invalid page numbers?"""
@@ -323,7 +423,7 @@ class CitationRedirectorTest(TestCase):
                 },
             ),
         )
-        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
     async def test_long_numbers(self) -> None:
         """Do really long WL citations work?"""
@@ -333,13 +433,13 @@ class CitationRedirectorTest(TestCase):
                 kwargs={"reporter": "wl", "volume": "2012", "page": "2995064"},
             ),
         )
-        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
 
     async def test_volume_page(self) -> None:
         r = await self.async_client.get(
             reverse("citation_redirector", kwargs={"reporter": "f2d"})
         )
-        self.assertStatus(r, HTTP_200_OK)
+        self.assertStatus(r, HTTPStatus.OK)
 
     async def test_case_page(self) -> None:
         r = await self.async_client.get(
@@ -348,7 +448,28 @@ class CitationRedirectorTest(TestCase):
                 kwargs={"reporter": "f2d", "volume": "56"},
             )
         )
-        self.assertStatus(r, HTTP_200_OK)
+        self.assertStatus(r, HTTPStatus.OK)
+
+    async def test_handle_volume_pagination_properly(self) -> None:
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56"},
+            ),
+            {"page": 0},
+        )
+        self.assertStatus(r, HTTPStatus.OK)
+        self.assertEqual(r.context["cases"].number, 1)
+
+        r = await self.async_client.get(
+            reverse(
+                "citation_redirector",
+                kwargs={"reporter": "f2d", "volume": "56"},
+            ),
+            {"page": "a"},
+        )
+        self.assertStatus(r, HTTPStatus.OK)
+        self.assertEqual(r.context["cases"].number, 1)
 
     async def test_link_to_page_in_citation(self) -> None:
         """Test link to page with star pagination"""
@@ -392,7 +513,7 @@ class CitationRedirectorTest(TestCase):
                 },
             )
         )
-        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
         self.assertEqual(r.url, "/c/f2d/")
 
     async def test_reporter_variation_just_reporter_and_volume(self) -> None:
@@ -407,7 +528,7 @@ class CitationRedirectorTest(TestCase):
                 },
             )
         )
-        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
         self.assertEqual(r.url, "/c/f2d/56/")
 
     async def test_reporter_variation_full_citation(self) -> None:
@@ -423,7 +544,7 @@ class CitationRedirectorTest(TestCase):
                 },
             )
         )
-        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
         self.assertEqual(r.url, "/c/f2d/56/9/")
 
     async def test_volume_pagination(self) -> None:
@@ -534,20 +655,18 @@ class CitationRedirectorTest(TestCase):
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full
         citation?"""
-
-        r = self.client.get(
-            reverse(
-                "citation_redirector",
-                kwargs={
-                    "reporter": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)",
-                },
-            ),
+        r = self.client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "Reference to Lissner v. Saad, 56 F.2d 9 11 (1st Cir. 2015)",
+            },
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "opinion.html")
         self.assertEqual(
-            r.redirect_chain[0][0], "/opinion/2/case-name-cluster/"
+            r.context["cluster"].get_absolute_url(),
+            "/opinion/2/case-name-cluster/",
         )
 
     async def test_avoid_exception_possible_matches_page_with_letter(
@@ -585,7 +704,54 @@ class CitationRedirectorTest(TestCase):
                 },
             ),
         )
-        self.assertStatus(r, HTTP_404_NOT_FOUND)
+        self.assertStatus(r, HTTPStatus.NOT_FOUND)
+
+    async def test_can_handle_text_with_slashes(self):
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "ARB/11/20/"},
+            follow=True,
+        )
+        self.assertTemplateUsed(r, "volumes_for_reporter.html")
+        self.assertIn("No Citations Detected", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "https://dockets.justia.com/docket/circuit-courts/ca5/20-10820"
+            },
+            follow=True,
+        )
+        self.assertTemplateUsed(r, "volumes_for_reporter.html")
+        self.assertIn("No Citations Detected", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
+
+    async def test_can_filter_out_non_case_law_citation(self):
+        chests_of_tea = await sync_to_async(CitationWithParentsFactory.create)(
+            volume=22, reporter="U.S.", page="444", type=1
+        )
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {
+                "reporter": "§102 USC 222 is the statute that was discussed in 22 U.S. 444"
+            },
+            follow=True,
+        )
+
+        self.assertEqual(r.status_code, HTTPStatus.OK)
+        self.assertTemplateUsed(r, "opinion.html")
+        self.assertIn(str(chests_of_tea), r.content.decode())
+
+    async def test_show_error_for_non_opinion_citations(self):
+        r = await self.async_client.post(
+            reverse("citation_homepage"),
+            {"reporter": "44 Vand. L. Rev. 1041"},
+            follow=True,
+        )
+
+        self.assertIn("No Citations Detected", r.content.decode())
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
 
 class ViewRecapDocketTest(TestCase):
@@ -607,7 +773,7 @@ class ViewRecapDocketTest(TestCase):
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
 
     async def test_recap_docket_url(self) -> None:
         """Can we redirect to a regular docket URL from a recap/uscourts.*
@@ -623,7 +789,7 @@ class ViewRecapDocketTest(TestCase):
             ),
             follow=True,
         )
-        self.assertEqual(r.redirect_chain[0][1], HTTP_302_FOUND)
+        self.assertEqual(r.redirect_chain[0][1], HTTPStatus.FOUND)
 
     async def test_docket_view_counts_increment_by_one(self) -> None:
         """Test the view count for a Docket increments on page view"""
@@ -632,7 +798,7 @@ class ViewRecapDocketTest(TestCase):
         r = await self.async_client.get(
             reverse("view_docket", args=[self.docket.pk, self.docket.slug])
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         await self.docket.arefresh_from_db(fields=["view_count"])
         self.assertEqual(old_view_count + 1, self.docket.view_count)
 
@@ -654,7 +820,7 @@ class ViewRecapDocketTest(TestCase):
                 args=[self.docket_appellate.pk, self.docket_appellate.slug],
             )
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         await self.docket_appellate.arefresh_from_db(fields=["view_count"])
         self.assertEqual(old_view_count + 1, self.docket_appellate.view_count)
 
@@ -688,12 +854,12 @@ class OgRedirectLookupViewTest(TestCase):
     async def test_do_we_404_no_param(self) -> None:
         """Does the view return 404 when no parameters given?"""
         r = await self.async_client.get(self.url)
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
 
     async def test_unknown_doc(self) -> None:
         """Do we redirect to S3 when unknown file path?"""
         r = await self.async_client.get(self.url, {"file_path": "xxx"})
-        self.assertEqual(r.status_code, HTTP_302_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.FOUND)
 
     @mock.patch("cl.opinion_page.views.make_png_thumbnail_for_instance")
     async def test_success_goes_to_view(self, mock: MagicMock) -> None:
@@ -703,7 +869,7 @@ class OgRedirectLookupViewTest(TestCase):
         r = await self.async_client.get(
             self.url, {"file_path": path}, USER_AGENT="facebookexternalhit"
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         mock.assert_called_once()
 
     @mock.patch("cl.lib.thumbnails.microservice")
@@ -724,7 +890,7 @@ class OgRedirectLookupViewTest(TestCase):
         r = await self.async_client.get(
             self.url, {"file_path": path}, USER_AGENT="facebookexternalhit"
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         microservice_mock.assert_called_once()
 
         recap_doc = await RECAPDocument.objects.aget(pk=1)
@@ -751,7 +917,7 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
     async def test_bad_parameters(self) -> None:
         """If we omit the pacer_case_id and court_id params, do things fail?"""
         r = await self.async_client.get(reverse("new_docket_alert"))
-        self.assertEqual(r.status_code, HTTP_400_BAD_REQUEST)
+        self.assertEqual(r.status_code, HTTPStatus.BAD_REQUEST)
 
     async def test_unknown_docket(self) -> None:
         """What happens if no docket?"""
@@ -759,7 +925,7 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
             reverse("new_docket_alert"),
             data={"pacer_case_id": "blah", "court_id": "blah"},
         )
-        self.assertEqual(r.status_code, HTTP_404_NOT_FOUND)
+        self.assertEqual(r.status_code, HTTPStatus.NOT_FOUND)
         self.assertIn("Refresh this Page", r.content.decode())
 
     async def test_all_systems_go(self) -> None:
@@ -768,7 +934,7 @@ class NewDocketAlertTest(SimpleUserDataMixin, TestCase):
             reverse("new_docket_alert"),
             data={"pacer_case_id": "666666", "court_id": "test"},
         )
-        self.assertEqual(r.status_code, HTTP_200_OK)
+        self.assertEqual(r.status_code, HTTPStatus.OK)
         self.assertInHTML("Get Docket Alerts", r.content.decode())
 
 
@@ -882,12 +1048,32 @@ class UploadPublication(TestCase):
         # Create courts
         court_cl = CourtFactory.create(id="tennworkcompcl")
         court_app = CourtFactory.create(id="tennworkcompapp")
+        court_mo = CourtFactory.create(id="mo")
+        court_miss = CourtFactory.create(id="miss")
+        court_me = CourtFactory.create(id="me")
 
         # Create judges
         people = PersonFactory.create_batch(4)
         for person in people[:3]:
             PositionFactory.create(court=court_app, person=person)
         PositionFactory.create(court=court_cl, person=people[3])
+        people_me = PersonFactory.create_batch(3)
+        for person in people_me:
+            PositionFactory.create(
+                court=court_me, person=person, position_type="c-jus"
+            )
+        PersonWithChildrenFactory(
+            positions=RelatedFactory(
+                PositionFactory, factory_related_name="person", court=court_mo
+            )
+        )
+        PersonWithChildrenFactory(
+            positions=RelatedFactory(
+                PositionFactory,
+                factory_related_name="person",
+                court=court_miss,
+            )
+        )
 
         # Create users
         cls.tenn_user = UserFactory.create(
@@ -948,6 +1134,52 @@ class UploadPublication(TestCase):
             "publication_date": datetime.date(2019, 4, 13),
         }
 
+        self.me_data = {
+            "case_title": "A Sample Case",
+            "docket_number": "Pen-23-123",
+            "court_str": "me",
+            "pk": "me",
+            "date_argued": datetime.date(2024, 5, 12),
+            "date_reargued": datetime.date(2024, 6, 12),
+            "author_str": "Sample",
+            "publication_date": datetime.date(2024, 4, 12),
+            "cite_volume": "2024",
+            "cite_reporter": "ME",
+            "cite_page": "1",
+            "panel": Person.objects.filter(
+                positions__court_id="me"
+            ).values_list("pk", flat=True),
+        }
+
+        # mo and moctapp have the same fields
+        self.mo_data = {
+            "lead_author": Person.objects.filter(positions__court_id="mo")[
+                0
+            ].id,
+            "case_title": "A Sample Case",
+            "docket_number": "SC123456",
+            "court_str": "mo",
+            "pk": "mo",
+            "disposition": "Lorem ipsum dolor sit amet",
+            "author_str": "Sample",
+            "publication_date": datetime.date(2024, 6, 12),
+        }
+
+        # miss and missctapp have the same fields
+        self.miss_data = {
+            "lead_author": Person.objects.filter(positions__court_id="miss")[
+                0
+            ].id,
+            "case_title": "A Sample Case",
+            "docket_number": "2021-CT-123456-SCT",
+            "court_str": "miss",
+            "pk": "miss",
+            "disposition": "Lorem ipsum dolor sit amet",
+            "summary": "Lorem ipsum dolor sit amet",
+            "author_str": "Sample",
+            "publication_date": datetime.date(2024, 6, 12),
+        }
+
     def tearDown(self) -> None:
         if os.path.exists(os.path.join(settings.MEDIA_ROOT, "pdf/2019/")):
             shutil.rmtree(os.path.join(settings.MEDIA_ROOT, "pdf/2019/"))
@@ -973,7 +1205,7 @@ class UploadPublication(TestCase):
 
     def test_pdf_upload(self, mock) -> None:
         """Can we upload a PDF and form?"""
-        form = CourtUploadForm(
+        form = TennWorkCompClUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
@@ -994,9 +1226,10 @@ class UploadPublication(TestCase):
             msg=f"The citation count should be zero not {cite_count}",
         )
 
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
         if form.is_valid():
             form.save()
-        self.assertEqual(form.is_valid(), True, form.errors)
 
         # Validate that citations were created on upload.
         count = OpinionCluster.objects.all().count()
@@ -1012,7 +1245,7 @@ class UploadPublication(TestCase):
 
     def test_pdf_validation_failure(self, mock) -> None:
         """Can we fail upload documents that are not PDFs?"""
-        form = CourtUploadForm(
+        form = TennWorkCompClUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.png},
@@ -1031,7 +1264,7 @@ class UploadPublication(TestCase):
 
     def test_tn_wc_app_upload(self, mock) -> None:
         """Can we test appellate uploading?"""
-        form = CourtUploadForm(
+        form = TennWorkCompAppUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -1052,10 +1285,10 @@ class UploadPublication(TestCase):
             cite_count,
             msg=f"The citation count should be zero not {cite_count}",
         )
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
 
         if form.is_valid():
             form.save()
-        self.assertEqual(form.is_valid(), True, form.errors)
 
         # Check that citations were created on upload.
         count = OpinionCluster.objects.all().count()
@@ -1073,7 +1306,7 @@ class UploadPublication(TestCase):
         """Can we validate required testing field case title?"""
         self.work_comp_app_data.pop("case_title")
 
-        form = CourtUploadForm(
+        form = TennWorkCompAppUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -1092,7 +1325,7 @@ class UploadPublication(TestCase):
 
         pre_count = Opinion.objects.all().count()
 
-        form = CourtUploadForm(
+        form = TennWorkCompAppUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -1102,10 +1335,76 @@ class UploadPublication(TestCase):
         form.fields["second_judge"].queryset = qs
         form.fields["third_judge"].queryset = qs
 
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
         if form.is_valid():
             form.save()
 
         self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+
+    def test_me_form_save(self, mock) -> None:
+        """Can we save maine form successfully to db?"""
+
+        pre_count = Opinion.objects.all().count()
+
+        form = MeCourtUploadForm(
+            self.me_data,
+            pk="me",
+            files={"pdf_upload": self.pdf},
+        )
+
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
+        if form.is_valid():
+            form.save()
+
+        self.assertEqual(pre_count + 1, Opinion.objects.all().count())
+
+    def test_mo_form_save(self, mock) -> None:
+        """Can we save missouri form successfully to db?"""
+
+        pre_count = Opinion.objects.filter(
+            cluster__docket__court__id="mo"
+        ).count()
+
+        form = MoCourtUploadForm(
+            self.mo_data,
+            pk="mo",
+            files={"pdf_upload": self.pdf},
+        )
+
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
+        if form.is_valid():
+            form.save()
+
+        post_save_count = Opinion.objects.filter(
+            cluster__docket__court__id="mo"
+        ).count()
+        self.assertEqual(pre_count + 1, post_save_count)
+
+    def test_miss_form_save(self, mock) -> None:
+        """Can we save mississippi form successfully to db?"""
+
+        pre_count = Opinion.objects.filter(
+            cluster__docket__court__id="miss"
+        ).count()
+
+        form = MissCourtUploadForm(
+            self.miss_data,
+            pk="miss",
+            files={"pdf_upload": self.pdf},
+        )
+
+        self.assertEqual(form.is_valid(), True, msg=form.errors)
+
+        if form.is_valid():
+            form.save()
+
+        post_save_count = Opinion.objects.filter(
+            cluster__docket__court__id="miss"
+        ).count()
+        self.assertEqual(pre_count + 1, post_save_count)
 
     def test_form_two_judges_2042(self, mock) -> None:
         """Can we still save if there's only one or two judges on the panel?"""
@@ -1114,7 +1413,7 @@ class UploadPublication(TestCase):
         # Remove a judge from the data
         self.work_comp_app_data["third_judge"] = None
 
-        form = CourtUploadForm(
+        form = TennWorkCompAppUploadForm(
             self.work_comp_app_data,
             pk="tennworkcompapp",
             files={"pdf_upload": self.pdf},
@@ -1149,7 +1448,7 @@ class UploadPublication(TestCase):
             sha1="ffe0ec472b16e4e573aa1bbaf2ae358460b5d72c",
         )
 
-        form2 = CourtUploadForm(
+        form2 = TennWorkCompClUploadForm(
             self.work_comp_data,
             pk="tennworkcompcl",
             files={"pdf_upload": self.pdf},
@@ -1241,3 +1540,241 @@ class TestBlockSearchItemAjax(TestCase):
 
         await self.cluster.arefresh_from_db()
         self.assertTrue(self.cluster.blocked)
+
+
+class DocketEntryFileDownload(TestCase):
+    """Test Docket entries File Download and required functions."""
+
+    def setUp(self):
+        court = CourtFactory(id="ca5", jurisdiction="F")
+        # Main docket to test
+        docket = DocketFactory(
+            court=court,
+            case_name="Foo v. Bar",
+            docket_number="12-11111",
+            pacer_case_id="12345",
+        )
+
+        de1 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506581111,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1,
+            pacer_doc_id="00506581111",
+            document_number="00506581111",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        de1_2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de1_2,
+            pacer_doc_id="00506581111",
+            document_number="1",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        de2 = DocketEntryFactory(
+            docket=docket,
+            entry_number=2,
+            description="Lorem ipsum dolor sit amet",
+        )
+        RECAPDocumentFactory(
+            docket_entry=de2,
+            pacer_doc_id="",
+            document_number="2",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+
+        de3 = DocketEntryFactory(
+            docket=docket,
+            entry_number=506582222,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de3,
+            pacer_doc_id="00506582222",
+            document_number="3",
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de3,
+            description="Document attachment",
+            document_type=RECAPDocument.ATTACHMENT,
+            document_number="3",
+            attachment_number=2,
+        )
+        # Create extra docket and docket entries to make sure it only fetch
+        # required docket_entries
+        docket1 = DocketFactory(
+            court=court,
+            case_name="Test v. Test1",
+            docket_number="12-222222",
+            pacer_case_id="12345",
+        )
+        de4 = DocketEntryFactory(
+            docket=docket1,
+            entry_number=506582222,
+        )
+        RECAPDocumentFactory(
+            docket_entry=de4,
+            pacer_doc_id="00506582222",
+            document_number="005506582222",
+            document_type=RECAPDocument.PACER_DOCUMENT,
+        )
+        self.mocked_docket = docket
+        self.mocked_extra_docket = docket1
+        self.mocked_docket_entries = [de1, de1_2, de2, de3]
+        self.mocked_extra_docket_entries = [de4]
+
+        request_factory = RequestFactory()
+        self.request = request_factory.get("/mock-url/")
+        self.user = UserFactory.create(
+            username="learned",
+            email="learnedhand@scotus.gov",
+        )
+        self.request.auser = AsyncMock(return_value=self.user)
+
+    def tearDown(self):
+        # Clear all test data
+        Docket.objects.all().delete()
+        DocketEntry.objects.all().delete()
+        RECAPDocument.objects.all().delete()
+        User.objects.all().delete()
+
+    async def test_fetch_docket_entries(self) -> None:
+        """Verify that fetch entries function returns right docket_entries"""
+        res = await fetch_docket_entries(self.mocked_docket)
+        self.assertEqual(await res.acount(), len(self.mocked_docket_entries))
+        self.assertTrue(await res.acontains(self.mocked_docket_entries[0]))
+        self.assertFalse(
+            await res.acontains(self.mocked_extra_docket_entries[0])
+        )
+
+    def test_generate_docket_entries_csv_data(self) -> None:
+        """Verify str with csv data is created. Check column and data entry"""
+        res = generate_docket_entries_csv_data(self.mocked_docket_entries)
+        res_lines = res.split("\r\n")
+        res_line_data = res_lines[1].split(",")
+        self.assertEqual(res[:16], '"docketentry_id"')
+        self.assertEqual(res_line_data[1], '"506581111"')
+
+        # Checks if the number of values in each CSV row matches the expected
+        # number of columns.
+
+        # Compute the expected number of columns by combining the columns from
+        # the docket entry and recap documents
+        docket_entry = self.mocked_docket_entries[0]
+        de_columns = docket_entry.get_csv_columns(get_column_name=True)
+        rd_columns = docket_entry.recap_documents.first().get_csv_columns(
+            get_column_name=True
+        )
+        column_count = len(de_columns + rd_columns)
+
+        # Iterate over each line in the generated CSV data and count the number
+        # of values.
+        rows = [
+            len(re.findall('"([^"]*)"', line)) == column_count
+            for line in res_lines
+            if line
+        ]
+        # Assert that all rows have the expected number of values.
+        self.assertTrue(
+            all(rows),
+            "One or more rows of the CSV file has more values than expected",
+        )
+
+    @mock.patch("cl.opinion_page.utils.user_has_alert")
+    @mock.patch("cl.opinion_page.utils.core_docket_data")
+    @mock.patch("cl.opinion_page.utils.generate_docket_entries_csv_data")
+    def test_view_download_docket_entries_csv(
+        self,
+        mock_download_function,
+        mock_core_docket_data,
+        mock_user_has_alert,
+    ) -> None:
+        """Test download_docket_entries_csv returns csv content"""
+
+        mock_download_function.return_value = (
+            '"col1","col2","col3"\r\n"value1","value2","value3"'
+        )
+        mock_user_has_alert.return_value = False
+        mock_core_docket_data.return_value = (
+            self.mocked_docket,
+            {
+                "docket": self.mocked_docket,
+                "title": "title",
+                "note_form": "note_form",
+                "has_alert": mock_user_has_alert.return_value,
+                "timezone": "EST",
+                "private": True,
+            },
+        )
+        response = download_docket_entries_csv(
+            self.request, self.mocked_docket.id
+        )
+        self.assertEqual(response["Content-Type"], "text/csv")
+
+
+class CachePageIgnoreParamsTest(TestCase):
+    """Test the cache_page_ignore_params decorator."""
+
+    @classmethod
+    def setUpTestData(cls):
+        court = CourtFactory(id="ca5", jurisdiction="F")
+        cls.docket = DocketFactory(
+            court=court,
+            case_name="Foo v. Bar",
+            docket_number="12-11111",
+            pacer_case_id="12345",
+        )
+
+    def setUp(self):
+        r = get_redis_interface("CACHE")
+        keys_to_delete = r.keys(":1:custom.views.decorator.cache*")
+        if keys_to_delete:
+            r.delete(*keys_to_delete)
+
+    def test_cache_view_docket_feed(self) -> None:
+        """Confirm that cache_page_ignore_params can cache a view while ignoring
+        the GET params from the URL.
+        """
+
+        base_url = reverse(
+            "docket_feed",
+            kwargs={"docket_id": self.docket.id},
+        )
+
+        # Request docket/<int:docket_id>/feed/
+        # Response returned from DB.
+        with CaptureQueriesContext(connection) as queries:
+            response = async_to_sync(self.async_client.get)(base_url)
+            self.assertGreater(
+                len(queries), 0, "Expected more than 0 queries."
+            )
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get 200 OK status code for podcasts.",
+        )
+
+        # Request docket/<int:docket_id>/feed/?ts=12345
+        # Response returned from cache.
+        with CaptureQueriesContext(connection) as queries:
+            response = async_to_sync(self.async_client.get)(
+                base_url, {"ts": 12345}
+            )
+            self.assertEqual(
+                len(queries), 0, "Expected 0 queries for cached response."
+            )
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get 200 OK status code for podcasts.",
+        )
+        self.assertIn("Cache-Control", response.headers)
+        self.assertEqual(response.headers["Cache-Control"], "max-age=300")
+        self.assertIn("Expires", response.headers)
+        self.assertIn(self.docket.case_name, response.content.decode())

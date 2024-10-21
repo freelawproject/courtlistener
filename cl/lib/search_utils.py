@@ -10,6 +10,7 @@ from django.core.paginator import Page
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from eyecite.tokenizers import HyperscanTokenizer
 from requests import Session
 from scorched.response import SolrResponse
 
@@ -22,6 +23,7 @@ from cl.lib.utils import (
     cleanup_main_query,
     get_array_of_selected_fields,
     get_child_court_ids_for_parents,
+    map_to_docket_entry_sorting,
 )
 from cl.search.constants import (
     BOOSTS,
@@ -37,7 +39,10 @@ from cl.search.models import (
     Court,
     OpinionCluster,
     RECAPDocument,
+    SearchQuery,
 )
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def get_solr_interface(
@@ -96,7 +101,7 @@ def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
     """
     if not cd.get("q"):
         return None
-    citations = get_citations(cd["q"])
+    citations = get_citations(cd["q"], tokenizer=HYPERSCAN_TOKENIZER)
 
     citations = [c for c in citations if isinstance(c, FullCaseCitation)]
 
@@ -226,11 +231,13 @@ def merge_form_with_courts(
         "district": [],
         "state": [],
         "special": [],
+        "military": [],
+        "tribal": [],
     }
     bap_bundle = []
     b_bundle = []
-    state_bundle: List = []
-    state_bundles = []
+    states = []
+    territories = []
     for court in courts:
         if court.jurisdiction == Court.FEDERAL_APPELLATE:
             court_tabs["federal"].append(court)
@@ -243,36 +250,25 @@ def merge_form_with_courts(
             else:
                 b_bundle.append(court)
         elif court.jurisdiction in Court.STATE_JURISDICTIONS:
-            # State courts get bundled by supreme courts
-            if court.jurisdiction == Court.STATE_SUPREME:
-                # Whenever we hit a state supreme court, we append the
-                # previous bundle and start a new one.
-                if state_bundle:
-                    state_bundles.append(state_bundle)
-                state_bundle = [court]
-            else:
-                state_bundle.append(court)
+            states.append(court)
+        elif court.jurisdiction in Court.TERRITORY_JURISDICTIONS:
+            territories.append(court)
         elif court.jurisdiction in [
             Court.FEDERAL_SPECIAL,
             Court.COMMITTEE,
             Court.INTERNATIONAL,
-            Court.MILITARY_APPELLATE,
-            Court.MILITARY_TRIAL,
         ]:
             court_tabs["special"].append(court)
-
-    # append the final state bundle after the loop ends. Hack?
-    state_bundles.append(state_bundle)
+        elif court.jurisdiction in Court.MILITARY_JURISDICTIONS:
+            court_tabs["military"].append(court)
+        elif court.jurisdiction in Court.TRIBAL_JURISDICTIONS:
+            court_tabs["tribal"].append(court)
 
     # Put the bankruptcy bundles in the courts dict
     if bap_bundle:
         court_tabs["bankruptcy_panel"] = [bap_bundle]
     court_tabs["bankruptcy"] = [b_bundle]
-
-    # Divide the state bundles into the correct partitions
-    court_tabs["state"].append(state_bundles[:17])
-    court_tabs["state"].append(state_bundles[17:34])
-    court_tabs["state"].append(state_bundles[34:])
+    court_tabs["state"] = [states, territories]
 
     return court_tabs, court_count_human, court_count
 
@@ -352,7 +348,7 @@ def make_fq_proximity_query(cd: CleanData, field: str, key: str) -> str:
     and 44 F.2d 92. I.e., this ensures that queries don't span citations. This
     works because internally Solr uses proximity to create multiValue fields.
 
-    See: http://stackoverflow.com/a/33858649/64911 and
+    See: https://stackoverflow.com/a/33858649/64911 and
          https://github.com/freelawproject/courtlistener/issues/381
     """
     # Remove all valid Solr tokens, replacing with a space.
@@ -721,16 +717,6 @@ def add_filter_queries(main_params: SearchParam, cd) -> None:
             main_params["fq"].extend(main_fq)
         else:
             main_params["fq"] = main_fq
-
-
-def map_to_docket_entry_sorting(sort_string: str) -> str:
-    """Convert a RECAP sorting param to a docket entry sorting parameter."""
-    if sort_string == "dateFiled asc":
-        return "entry_date_filed asc"
-    elif sort_string == "dateFiled desc":
-        return "entry_date_filed desc"
-    else:
-        return sort_string
 
 
 def add_grouping(main_params: SearchParam, cd: CleanData, group: bool) -> None:
@@ -1214,3 +1200,65 @@ async def clean_up_recap_document_file(item: RECAPDocument) -> None:
         item.page_count = None
         item.is_available = False
         await item.asave()
+
+
+def store_search_query(request: HttpRequest, search_results: dict) -> None:
+    """Saves an user's search query in a SearchQuery model
+
+    :param request: the request object
+    :param search_results: the dict returned by `do_search` or
+        `do_es_search` functions
+    :return None
+    """
+    is_error = search_results.get("error")
+    is_es_search = search_results.get("results_details") is not None
+
+    search_query = SearchQuery(
+        user=None if request.user.is_anonymous else request.user,
+        get_params=request.GET.urlencode(),
+        failed=is_error,
+        query_time_ms=None,
+        hit_cache=False,
+        source=SearchQuery.WEBSITE,
+        engine=SearchQuery.ELASTICSEARCH if is_es_search else SearchQuery.SOLR,
+    )
+    if is_error:
+        # Leave `query_time_ms` as None if there is an error
+        search_query.save()
+        return
+
+    if is_es_search:
+        search_query.query_time_ms = search_results["results_details"][0]
+        # do_es_search returns 1 as query time if the micro cache was hit
+        search_query.hit_cache = search_query.query_time_ms == 1
+    else:
+        # Solr searches are not cached unless a cache_key is passed
+        # No cache_key is passed for the endpoints we are storing
+        search_query.query_time_ms = search_results[
+            "results"
+        ].object_list.QTime
+
+    search_query.save()
+
+
+def store_search_api_query(
+    request: HttpRequest, failed: bool, query_time: int | None, engine: int
+) -> None:
+    """Store the search query from the Search API.
+
+    :param request: The HTTP request object.
+    :param failed: Boolean indicating if the query execution failed.
+    :param query_time: The time taken to execute the query in milliseconds or
+    None if not applicable.
+    :param engine: The search engine used to execute the query.
+    :return: None
+    """
+    SearchQuery.objects.create(
+        user=None if request.user.is_anonymous else request.user,
+        get_params=request.GET.urlencode(),
+        failed=failed,
+        query_time_ms=query_time,
+        hit_cache=False,
+        source=SearchQuery.API,
+        engine=engine,
+    )

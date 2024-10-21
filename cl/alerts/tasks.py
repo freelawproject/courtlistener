@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from importlib import import_module
 from typing import Dict, List, Tuple, Union, cast
+from urllib.parse import urlencode
 
 from asgiref.sync import async_to_sync
 from celery import Task
@@ -11,6 +12,7 @@ from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives, get_connection, send_mail
 from django.db import transaction
 from django.template import loader
+from django.urls import reverse
 from django.utils.timezone import now
 from elasticsearch.exceptions import ConnectionError
 
@@ -23,22 +25,19 @@ from cl.alerts.utils import (
 from cl.api.models import WebhookEventType
 from cl.api.tasks import (
     send_docket_alert_webhook_events,
-    send_es_search_alert_webhook,
+    send_search_alert_webhook_es,
 )
 from cl.celery_init import app
 from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.favorites.models import Note, UserTag
 from cl.lib.command_utils import logger
-from cl.lib.elasticsearch_utils import (
-    fetch_all_search_results,
-    merge_highlights_into_result,
-)
+from cl.lib.elasticsearch_utils import fetch_all_search_results
 from cl.lib.redis_utils import create_redis_semaphore, delete_redis_semaphore
 from cl.lib.string_utils import trunc
 from cl.recap.constants import COURT_TIMEZONES
-from cl.search.constants import ALERTS_HL_TAG
 from cl.search.models import Docket, DocketEntry
 from cl.search.types import (
+    ESDocumentNameType,
     PercolatorResponseType,
     SaveDocumentResponseType,
     SearchAlertHitType,
@@ -222,6 +221,9 @@ def make_alert_messages(
         notes, tags = get_docket_notes_and_tags_by_user(
             d.pk, recipient.user_pk
         )
+        unsubscribe_url = reverse(
+            "one_click_docket_alert_unsubscribe", args=[recipient.secret_key]
+        )
         email_context["notes"] = notes
         email_context["tags"] = tags
         email_context["username"] = recipient.username
@@ -237,7 +239,11 @@ def make_alert_messages(
             body=txt_template.render(email_context),
             from_email=settings.DEFAULT_ALERTS_EMAIL,
             to=[recipient.email_address],
-            headers={"X-Entity-Ref-ID": f"docket.alert:{d.pk}"},
+            headers={
+                "X-Entity-Ref-ID": f"docket.alert:{d.pk}",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                "List-Unsubscribe": f"<https://www.courtlistener.com{unsubscribe_url}>",
+            },
         )
         html = html_template.render(email_context)
         msg.attach_alternative(html, "text/html")
@@ -452,22 +458,25 @@ def send_webhook_alert_hits(
             event_type=WebhookEventType.SEARCH_ALERT, enabled=True
         )
         for user_webhook in user_webhooks:
-            send_es_search_alert_webhook.delay(
+            send_search_alert_webhook_es.delay(
                 documents,
                 user_webhook.pk,
-                alert,
+                alert.pk,
             )
 
 
 @app.task(ignore_result=True)
 def send_search_alert_emails(
-    email_alerts_to_send: list[tuple[int, list[SearchAlertHitType]]]
+    email_alerts_to_send: list[tuple[int, list[SearchAlertHitType]]],
+    scheduled_alert: bool = False,
 ) -> None:
     """Send search alert emails for multiple users.
 
     :param email_alerts_to_send: A list of two tuples containing the user to
     whom the alerts should be sent. A list of tuples containing the Search
     Alert, (Alert, search type, documents, and number of documents)
+    :param scheduled_alert: A boolean indicating weather this alert has been
+    scheduled
     :return: None
     """
 
@@ -485,11 +494,32 @@ def send_search_alert_emails(
         context = {
             "hits": hits,
             "hits_limit": settings.SCHEDULED_ALERT_HITS_LIMIT,
+            "scheduled_alert": scheduled_alert,
         }
+        headers = {}
+        query_string = ""
+        if len(hits) == 1:
+            alert = hits[0][0]
+            unsubscribe_path = reverse(
+                "one_click_disable_alert", args=[alert.secret_key]
+            )
+            headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+        else:
+            params = {"keys": [hit[0].secret_key for hit in hits]}
+            query_string = urlencode(params, doseq=True)
+            unsubscribe_path = reverse("disable_alert_list")
+        headers["List-Unsubscribe"] = (
+            f"<https://www.courtlistener.com{unsubscribe_path}{'?' if query_string else ''}{query_string}>"
+        )
+
         txt = txt_template.render(context)
         html = html_template.render(context)
         msg = EmailMultiAlternatives(
-            subject, txt, settings.DEFAULT_ALERTS_EMAIL, [alert_user.email]
+            subject,
+            txt,
+            settings.DEFAULT_ALERTS_EMAIL,
+            [alert_user.email],
+            headers=headers,
         )
         msg.attach_alternative(html, "text/html")
         messages.append(msg)
@@ -529,11 +559,10 @@ def process_percolator_response(response: PercolatorResponseType) -> None:
         alert_user: UserProfile.user = alert_triggered.user
         # Set highlight if available in response.
         if hasattr(hit.meta, "highlight"):
-            merge_highlights_into_result(
-                hit.meta.highlight.to_dict(),
-                document_content_copy,
-                ALERTS_HL_TAG,
-            )
+            document_content_copy["meta"] = {}
+            document_content_copy["meta"][
+                "highlight"
+            ] = hit.meta.highlight.to_dict()
 
         # Override order_by to show the latest items when clicking the
         # "View Full Results" button.
@@ -662,7 +691,7 @@ def send_or_schedule_alerts(
 def es_save_alert_document(
     self: Task,
     alert_id: int,
-    es_document_name: str,
+    es_document_name: ESDocumentNameType,
 ) -> None:
     """Helper method to prepare and index an Alert object into Elasticsearch.
 

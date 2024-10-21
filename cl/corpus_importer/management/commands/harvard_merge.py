@@ -275,23 +275,9 @@ def update_docket_source(cluster: OpinionCluster) -> None:
     :return: None
     """
     docket = cluster.docket
-    new_docket_source = Docket.HARVARD + docket.source
-    if new_docket_source in [
-        Docket.HARVARD,
-        Docket.HARVARD_AND_RECAP,
-        Docket.SCRAPER_AND_HARVARD,
-        Docket.RECAP_AND_SCRAPER_AND_HARVARD,
-        Docket.HARVARD_AND_COLUMBIA,
-        Docket.DIRECT_INPUT_AND_HARVARD,
-        Docket.IDB_AND_HARVARD,
-        Docket.RECAP_AND_IDB_AND_HARVARD,
-        Docket.SCRAPER_AND_IDB_AND_HARVARD,
-        Docket.RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-        Docket.ANON_2020_AND_HARVARD,
-        Docket.ANON_2020_AND_SCRAPER_AND_HARVARD,
-    ]:
-        # Source is limited to those options because those are the only
-        # valid options when we sum the source with harvard source
+    if docket.source in Docket.NON_HARVARD_SOURCES():
+        # Add the Harvard source only if it has not been added before.
+        new_docket_source = Docket.HARVARD + docket.source
         docket.source = new_docket_source
         docket.save()
     else:

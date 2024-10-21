@@ -186,8 +186,13 @@ class AudioBlockedFromSearchEnginesTest(Base412Test):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
 
-        # She selects Oral Arguments to toggle the results to audio
+        # She selects the oral arguments dropdown
         self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
+
+        # And selects the search oral arguments link
+        self.browser.find_element(
+            By.LINK_TEXT, "Search Oral Arguments"
+        ).click()
 
         # She lands on the advanced search screen for OA, and does a wildcard
         # search.
@@ -211,8 +216,13 @@ class AudioBlockedFromSearchEnginesTest(Base412Test):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("pandora", "password")
 
-        # She selects Oral Arguments to toggle the results to audio
+        # She selects the oral arguments dropdown
         self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
+
+        # And selects the search oral arguments link
+        self.browser.find_element(
+            By.LINK_TEXT, "Search Oral Arguments"
+        ).click()
 
         # She lands on the advanced search screen for OA, and does a wildcard
         # search.
@@ -233,8 +243,13 @@ class AudioBlockedFromSearchEnginesTest(Base412Test):
         self.browser.get(self.live_server_url)
         self.attempt_sign_in("admin", "password")
 
-        # She selects Oral Arguments to toggle the results to audio
+        # She selects the oral arguments dropdown
         self.browser.find_element(By.CSS_SELECTOR, "#navbar-oa a").click()
+
+        # And selects the search oral arguments link
+        self.browser.find_element(
+            By.LINK_TEXT, "Search Oral Arguments"
+        ).click()
 
         # She lands on the advanced search screen for OA, and does a wildcard
         # search.

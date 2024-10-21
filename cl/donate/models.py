@@ -8,7 +8,6 @@ from django.utils import timezone
 
 from cl.lib.model_helpers import invert_choices_group_lookup
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 
 class PAYMENT_TYPES:
@@ -46,7 +45,7 @@ class PROVIDERS:
     )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Donation(AbstractDateTimeModel):
     # These statuses are shown on the profile page. Be warned.
     AWAITING_PAYMENT = 0
@@ -127,7 +126,7 @@ class Donation(AbstractDateTimeModel):
         ordering = ["-date_created"]
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class MonthlyDonation(AbstractDateTimeModel):
     """The metadata needed to associate a monthly donation with a user."""
 
@@ -198,7 +197,7 @@ class NeonWebhookEvent(AbstractDateTimeModel):
     )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class NeonMembership(AbstractDateTimeModel):
     BASIC = 1
     LEGACY = 2
@@ -208,6 +207,12 @@ class NeonMembership(AbstractDateTimeModel):
     TIER_4 = 6
     TIER_5 = 7
     PLATINUM = 8
+    EDU = 9
+    GROUP_SMALLEST = 10
+    GROUP_SMALL = 11
+    GROUP_MEDIUM = 12
+    GROUP_LARGE = 13
+    GROUP_UNLIMITED = 14
     TYPES = (
         (BASIC, "CL Membership - Basic"),
         (LEGACY, "CL Legacy Membership"),
@@ -217,6 +222,12 @@ class NeonMembership(AbstractDateTimeModel):
         (TIER_4, "CL Membership - Tier 4"),
         (TIER_5, "CL Membership - Tier 5"),
         (PLATINUM, "CL Platinum Membership"),
+        (EDU, "EDU Membership"),
+        (GROUP_SMALLEST, "Group Membership - Smallest"),
+        (GROUP_SMALL, "Group Membership - Small"),
+        (GROUP_MEDIUM, "Group Membership - Medium"),
+        (GROUP_LARGE, "Group Membership - Large"),
+        (GROUP_UNLIMITED, "Group Membership - Unlimited"),
     )
     TYPES_INVERTED = invert_choices_group_lookup(TYPES)
     user = models.OneToOneField(

@@ -27,12 +27,12 @@ $(document).ready(function(){
 </script>
 <script type="application/ld+json">
 {
-  "@context": "http://schema.org",
+  "@context": "https://schema.org",
   "@type": "Person",
   "honorificPrefix": "Judge",
   "familyName": "{{ person.name_last }}",
   "givenName": "{{ person.name_first }}",
-  "gender": "{% if person.gender == 'm' %}http://schema.org/Male{% else %}http://schema.org/Female{% endif %}",
+  "gender": "{% if person.gender == 'm' %}https://schema.org/Male{% else %}https://schema.org/Female{% endif %}",
   "nationality": {
     "@type": "Country",
     "name": "United States of America"
@@ -124,15 +124,15 @@ $(document).ready(function(){
             {% filter lower %}
             {% if person.name_middle %}
               {% if person.name_suffix %}
-                <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_middle }}-{{ person.name_suffix|cut:"." }}">{{ person.fjc_id }}</a>
+                <a href="https://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_middle }}-{{ person.name_suffix|cut:"." }}">{{ person.fjc_id }}</a>
               {% else %}
-                <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_middle }}">{{ person.fjc_id }}</a>
+                <a href="https://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_middle }}">{{ person.fjc_id }}</a>
               {% endif %}
             {% else %}
               {% if person.name_suffix %}
-                <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_suffix|cut:"." }}">{{ person.fjc_id }}</a>
+                <a href="https://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}-{{ person.name_suffix|cut:"." }}">{{ person.fjc_id }}</a>
               {% else %}
-                <a href="http://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}">{{ person.fjc_id }}</a>
+                <a href="https://www.fjc.gov/history/judges/{{ person.name_last }}-{{ person.name_first }}">{{ person.fjc_id }}</a>
               {% endif %}
             {% endif %}
             {% endfilter %}

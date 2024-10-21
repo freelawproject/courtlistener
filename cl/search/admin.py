@@ -24,6 +24,7 @@ from cl.search.models import (
     Parenthetical,
     ParentheticalGroup,
     RECAPDocument,
+    SearchQuery,
 )
 from cl.search.tasks import add_items_to_solr
 
@@ -285,6 +286,7 @@ class DocketAdmin(CursorPaginatorAdmin):
         "referred_to",
         "originating_court_information",
         "idb_data",
+        "parent_docket",
     )
 
     def save_model(
@@ -350,3 +352,11 @@ class ParentheticalGroupAdmin(CursorPaginatorAdmin):
         "opinion",
         "representative",
     )
+
+
+@admin.register(SearchQuery)
+class SearchQueryAdmin(CursorPaginatorAdmin):
+    raw_id_fields = ("user",)
+    list_display = ("__str__", "engine", "source")
+    list_filter = ("engine", "source")
+    search_fields = ("user__username",)

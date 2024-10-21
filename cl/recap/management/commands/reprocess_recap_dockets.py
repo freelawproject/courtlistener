@@ -100,7 +100,7 @@ class Command(VerboseCommand):
                 # The latter is defined by ones that *don't* have blank
                 # filepath_local fields.
                 Q(html_documents__isnull=False) | ~Q(filepath_local=""),
-                source__in=Docket.RECAP_SOURCES,
+                source__in=Docket.RECAP_SOURCES(),
             )
             .distinct()
             .only("pk", "case_name")

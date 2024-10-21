@@ -13,8 +13,8 @@ ALLOWED_HOSTS: list[str] = env(
     "ALLOWED_HOSTS", default=["www.courtlistener.com"]
 )
 
-EGRESS_PROXY_HOST = env(
-    "EGRESS_PROXY_HOST", default="http://cl-webhook-sentry:9090"
+EGRESS_PROXY_HOSTS: list[str] = env.list(
+    "EGRESS_PROXY_HOSTS", default=["http://cl-webhook-sentry:9090"]
 )
 
 SECURE_HSTS_SECONDS = 63_072_000
@@ -87,14 +87,12 @@ PERMISSIONS_POLICY: dict[str, list[str]] = {
 # Components:
 # - hCaptcha: https://docs.hcaptcha.com/#content-security-policy-settings
 # - Plausible: https://github.com/plausible/docs/issues/20
-# - Stripe: https://stripe.com/docs/security/guide#content-security-policy
 CSP_CONNECT_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
     "https://hcaptcha.com/",
     "https://*.hcaptcha.com/",
     "https://plausible.io/",
-    "https://api.stripe.com/",
 )
 CSP_FONT_SRC = (
     "'self'",
@@ -106,15 +104,13 @@ CSP_FRAME_SRC = (
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",  # for embedded PDFs
     "https://hcaptcha.com/",
     "https://*.hcaptcha.com/",
-    "https://js.stripe.com/",
-    "https://hooks.stripe.com/",
 )
 CSP_IMG_SRC = (
     "'self'",
     f"https://{AWS_S3_CUSTOM_DOMAIN}/",
     "https://portraits.free.law/",
+    "https://seals.free.law/",
     "data:",  # @tailwindcss/forms uses data URIs for images.
-    "https://*.stripe.com/",
 )
 CSP_MEDIA_SRC = (
     "'self'",
@@ -132,7 +128,6 @@ CSP_SCRIPT_SRC = (
     "https://hcaptcha.com/",
     "https://*.hcaptcha.com/",
     "https://plausible.io/",
-    "https://js.stripe.com/",
 )
 CSP_STYLE_SRC = (
     "'self'",

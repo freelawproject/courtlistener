@@ -39,6 +39,12 @@ case "$1" in
 'retry-webhooks')
     exec /opt/courtlistener/manage.py cl_retry_webhooks
     ;;
+'sweep-indexer')
+    exec /opt/courtlistener/manage.py sweep_indexer
+    ;;
+'probe-iquery-pages-daemon')
+    exec /opt/courtlistener/manage.py probe_iquery_pages_daemon
+    ;;
 *)
     echo "Unknown command"
     ;;

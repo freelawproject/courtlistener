@@ -1,5 +1,6 @@
 import logging
-from datetime import date, timedelta
+from datetime import date
+from http import HTTPStatus
 from typing import Optional
 
 import waffle
@@ -9,11 +10,10 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import aget_object_or_404  # type: ignore[attr-defined]
 from django.template.response import TemplateResponse
 from django.views.decorators.cache import cache_page
+from django.views.generic import TemplateView
 from requests import Session
-from rest_framework import status
-from rest_framework.status import HTTP_400_BAD_REQUEST
 
-from cl.lib.elasticsearch_utils import build_es_base_query
+from cl.lib.elasticsearch_utils import do_es_alert_estimation_query
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import (
     build_alert_estimation_query,
@@ -21,9 +21,13 @@ from cl.lib.search_utils import (
     build_coverage_query,
     get_solr_interface,
 )
-from cl.search.documents import AudioDocument
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    OpinionClusterDocument,
+)
 from cl.search.forms import SearchForm
-from cl.search.models import SEARCH_TYPES, Court, OpinionCluster
+from cl.search.models import SEARCH_TYPES, Citation, Court, OpinionCluster
 from cl.simple_pages.coverage_utils import build_chart_data
 from cl.simple_pages.views import get_coverage_data_fds
 
@@ -79,9 +83,8 @@ async def court_index(request: HttpRequest) -> HttpResponse:
 
 async def rest_docs(request, version=None):
     """Show the correct version of the rest docs"""
-    courts = await make_court_variable()
-    court_count = len(courts)
-    context = {"court_count": court_count, "courts": courts, "private": False}
+    court_count = await Court.objects.acount()
+    context = {"court_count": court_count, "private": False}
     return TemplateResponse(
         request,
         [f"rest-docs-{version}.html", "rest-docs-vlatest.html"],
@@ -98,10 +101,6 @@ async def api_index(request: HttpRequest) -> HttpResponse:
     )
 
 
-async def replication_docs(request: HttpRequest) -> HttpResponse:
-    return TemplateResponse(request, "replication.html", {"private": False})
-
-
 async def bulk_data_index(request: HttpRequest) -> HttpResponse:
     """Shows an index page for the dumps."""
     disclosure_coverage = await get_coverage_data_fds()
@@ -109,6 +108,58 @@ async def bulk_data_index(request: HttpRequest) -> HttpResponse:
         request,
         "bulk-data.html",
         disclosure_coverage,
+    )
+
+
+def parse_throttle_rate_for_template(rate: str) -> tuple[int, str] | None:
+    """
+    Parses a throttle rate string and returns a tuple containing the number of
+    citations allowed and the throttling duration in a format suitable for
+    templates.
+
+    Args:
+        rate (str): A string representing the throttle rate
+
+    Returns:
+        A tuple containing a two elements:
+            - The number of citations allowed (int).
+            - The throttling duration (str).
+    """
+    if not rate:
+        return None
+    duration_as_str = {"s": "second", "m": "minute", "h": "hour", "d": "day"}
+    num, period = rate.split("/")
+    return int(num), duration_as_str[period[0]]
+
+
+async def citation_lookup_api(
+    request: HttpRequest, version=None
+) -> HttpResponse:
+
+    cite_count = await Citation.objects.acount()
+    rate = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["citations"]  # type: ignore
+    default_throttle_rate = parse_throttle_rate_for_template(rate)
+    custom_throttle_rate = None
+    if request.user and request.user.is_authenticated:
+        rate = settings.REST_FRAMEWORK[  # type: ignore
+            "CITATION_LOOKUP_OVERRIDE_THROTTLE_RATES"
+        ].get(request.user.username, None)
+        custom_throttle_rate = parse_throttle_rate_for_template(rate)
+
+    return TemplateResponse(
+        request,
+        [
+            f"citation-lookup-api-{version}.html",
+            "citation-lookup-api-vlatest.html",
+        ],
+        {
+            "cite_count": cite_count,
+            "default_throttle_rate": default_throttle_rate,
+            "custom_throttle_rate": custom_throttle_rate,
+            "max_citation_per_request": settings.MAX_CITATIONS_PER_REQUEST,  # type: ignore
+            "private": False,
+            "version": version if version else "v4",
+        },
     )
 
 
@@ -225,48 +276,67 @@ async def get_result_count(request, version, day_count):
     period.
     """
 
-    search_form = await sync_to_async(SearchForm)(request.GET.copy())
+    es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
+        request, "oa-es-active"
+    )
+    es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
+        request, "o-es-active"
+    )
+    es_flag_for_r = await sync_to_async(waffle.flag_is_active)(
+        request, "recap-alerts-active"
+    )
+    is_es_form = es_flag_for_oa or es_flag_for_o or es_flag_for_r
+    search_form = await sync_to_async(SearchForm)(
+        request.GET.copy(), is_es_form=is_es_form
+    )
     if not search_form.is_valid():
         return JsonResponse(
             {"error": "Invalid SearchForm"},
             safe=True,
-            status=HTTP_400_BAD_REQUEST,
+            status=HTTPStatus.BAD_REQUEST,
         )
     cd = search_form.cleaned_data
     search_type = cd["type"]
-    es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
-        request, "oa-es-active"
-    )
-    if (
-        search_type == SEARCH_TYPES.ORAL_ARGUMENT and es_flag_for_oa
-    ):  # Elasticsearch version for OA
-        document_type = AudioDocument
-        cd["argued_after"] = date.today() - timedelta(days=int(day_count))
-        cd["argued_before"] = None
-        search_query = document_type.search()
-        s, _ = await sync_to_async(build_es_base_query)(search_query, cd)
-        total_query_results = s.count()
-    else:
+    match search_type:
+        case SEARCH_TYPES.ORAL_ARGUMENT if es_flag_for_oa:
+            # Elasticsearch version for OA
+            search_query = AudioDocument.search()
+            total_query_results = await sync_to_async(
+                do_es_alert_estimation_query
+            )(search_query, cd, day_count)
+        case SEARCH_TYPES.OPINION if es_flag_for_o:
+            # Elasticsearch version for O
+            search_query = OpinionClusterDocument.search()
+            total_query_results = await sync_to_async(
+                do_es_alert_estimation_query
+            )(search_query, cd, day_count)
+        case SEARCH_TYPES.RECAP if es_flag_for_r:
+            # Elasticsearch version for RECAP
+            search_query = DocketDocument.search()
+            total_query_results = await sync_to_async(
+                do_es_alert_estimation_query
+            )(search_query, cd, day_count)
+        case _:
 
-        @sync_to_async
-        def get_total_query_results(cleaned_data, dc):
-            with Session() as session:
-                try:
-                    si = get_solr_interface(
-                        cleaned_data, http_connection=session
-                    )
-                except NotImplementedError:
-                    logger.error(
-                        "Tried getting solr connection for %s, but it's not "
-                        "implemented yet",
-                        cleaned_data["type"],
-                    )
-                    raise
-                extra = build_alert_estimation_query(cleaned_data, int(dc))
-                response = si.query().add_extra(**extra).execute()
-                return response.result.numFound
+            @sync_to_async
+            def get_total_query_results(cleaned_data, dc):
+                with Session() as session:
+                    try:
+                        si = get_solr_interface(
+                            cleaned_data, http_connection=session
+                        )
+                    except NotImplementedError:
+                        logger.error(
+                            "Tried getting solr connection for %s, but it's not "
+                            "implemented yet",
+                            cleaned_data["type"],
+                        )
+                        raise
+                    extra = build_alert_estimation_query(cleaned_data, int(dc))
+                    response = si.query().add_extra(**extra).execute()
+                    return response.result.numFound
 
-        total_query_results = await get_total_query_results(cd, day_count)
+            total_query_results = await get_total_query_results(cd, day_count)
     return JsonResponse({"count": total_query_results}, safe=True)
 
 
@@ -280,18 +350,8 @@ async def deprecated_api(request, v):
             "objects": [],
         },
         safe=False,
-        status=status.HTTP_410_GONE,
+        status=HTTPStatus.GONE,
     )
-
-
-async def rest_change_log(request):
-    context = {"private": False}
-    return TemplateResponse(request, "rest-change-log.html", context)
-
-
-async def webhooks_getting_started(request):
-    context = {"private": False}
-    return TemplateResponse(request, "webhooks-getting-started.html", context)
 
 
 async def webhooks_docs(request, version=None):
@@ -303,3 +363,19 @@ async def webhooks_docs(request, version=None):
         [f"webhooks-docs-{version}.html", "webhooks-docs-vlatest.html"],
         context,
     )
+
+
+class VersionedTemplateView(TemplateView):
+    """Custom template view to handle the right template based on the path
+    version requested.
+    """
+
+    def get_template_names(self):
+        version = self.kwargs.get("version", "vlatest")
+        base_template = self.template_name.replace("-vlatest", f"-{version}")
+        return [base_template, self.template_name]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["version"] = self.kwargs.get("version", "v4")
+        return context

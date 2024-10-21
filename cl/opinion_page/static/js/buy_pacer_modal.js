@@ -23,6 +23,6 @@ $(document).ready(function () {
     document.cookie = 'buy_on_pacer_modal=true' + expires + '; samesite=lax; path=/';
 
     ///Close Modal
-    $('#modal-buy-pacer ').modal('toggle');
+    $('#modal-buy-pacer').modal('toggle');
   });
 });

@@ -3,7 +3,7 @@
 import environ
 from django.http import UnreadablePostError
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 
 env = environ.FileAwareEnv()
 DEVELOPMENT = env.bool("DEVELOPMENT", default=True)
@@ -14,7 +14,7 @@ def skip_unreadable_post(record):
         exc_value = record.exc_info[1]
         if isinstance(exc_value, UnreadablePostError):
             cache_key = "settings.unreadable_post_error"
-            r = make_redis_interface("CACHE")
+            r = get_redis_interface("CACHE")
             if r.get(cache_key) is not None:
                 # We've seen this recently; let it through; hitting it a lot
                 # might mean something.
@@ -78,6 +78,15 @@ LOGGING = {
         },
         # This is the one that's used practically everywhere in the code.
         "cl": {"handlers": ["console"], "level": "INFO", "propagate": True},
+        # CRITICAL is the highest log level, which will make the logger
+        # reject most logger calls from juriscraper: debug, info and warning
+        # This level may be modified on a VerboseCommand call with the
+        # proper verbosity value
+        "juriscraper": {
+            "handlers": ["console"],
+            "propagate": True,
+            "level": "CRITICAL",
+        },
     },
 }
 

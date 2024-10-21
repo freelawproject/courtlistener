@@ -230,13 +230,17 @@ def get_email_body(
     html_body = ""
     for part in message.walk():
         if part.get_content_type() == "text/plain":
-            plaintext_body = part.get_payload()
-            break
+            payload = part.get_payload()
+            if isinstance(payload, str):
+                plaintext_body = payload
+                break
 
     for part in message.walk():
         if part.get_content_type() == "text/html":
-            html_body = part.get_payload()
-            break
+            payload = part.get_payload()
+            if isinstance(payload, str):
+                html_body = payload
+                break
 
     return plaintext_body, html_body
 

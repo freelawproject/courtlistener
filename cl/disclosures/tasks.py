@@ -30,7 +30,7 @@ from cl.lib.command_utils import logger
 from cl.lib.crypto import sha1
 from cl.lib.microservice_utils import microservice
 from cl.lib.models import THUMBNAIL_STATUSES
-from cl.lib.redis_utils import create_redis_semaphore, make_redis_interface
+from cl.lib.redis_utils import create_redis_semaphore, get_redis_interface
 
 
 def make_disclosure_key(data_id: str) -> str:
@@ -378,7 +378,7 @@ def import_disclosure(self, data: dict[str, Union[str, int, list]]) -> None:
     :param data: The disclosure information to process
     :return: None
     """
-    redis_db = make_redis_interface("CACHE")
+    redis_db = get_redis_interface("CACHE")
     disclosure_key = make_disclosure_key(data["id"])
     newly_enqueued = create_redis_semaphore(
         redis_db,

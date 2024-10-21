@@ -11,8 +11,6 @@ class ESPaginator(Paginator):
         super().__init__(*args, **kwargs)
         if total_query_results:
             self._count = total_query_results
-        elif hasattr(self.object_list, "hits"):
-            self._count = self.object_list.hits.total.value
         else:
             self._count = len(self.object_list)
         self._aggregations = (

@@ -4,7 +4,9 @@ from django_elasticsearch_dsl.search import Search
 from elasticsearch_dsl import Q
 from elasticsearch_dsl.query import Query
 from elasticsearch_dsl.response import Hit, Response
+from eyecite import get_citations
 from eyecite.models import FullCaseCitation
+from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.citations.types import SupportedCitationType
 from cl.citations.utils import (
@@ -12,8 +14,11 @@ from cl.citations.utils import (
     get_years_from_reporter,
     make_name_param,
 )
+from cl.lib.types import CleanData
 from cl.search.documents import OpinionDocument
 from cl.search.models import Opinion
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 def fetch_citations(search_query: Search) -> list[Hit]:
@@ -27,7 +32,9 @@ def fetch_citations(search_query: Search) -> list[Hit]:
     citation_hits = []
     search_query = search_query.sort("id")
     # Only retrieve fields required for the lookup.
-    search_query = search_query.source(includes=["id", "caseName"])
+    search_query = search_query.source(
+        includes=["id", "caseName", "absolute_url", "dateFiled"]
+    )
     # Citation resolution aims for a single match. Setting up a size of 2 is
     # enough to determine if there is more than one match.
     search_query = search_query.extra(size=2)
@@ -124,13 +131,15 @@ def es_case_name_query(
 
 
 def es_search_db_for_full_citation(
-    full_citation: FullCaseCitation,
-) -> list[Hit]:
+    full_citation: FullCaseCitation, query_citation: bool = False
+) -> tuple[list[Hit], bool]:
     """For a citation object, try to match it to an item in the database using
     a variety of heuristics.
     :param full_citation: A FullCaseCitation instance.
-    return: A ElasticSearch Result object with the results, or an empty list if
-     no hits
+    :param query_citation: Whether this is related to es_get_query_citation
+    resolution
+    return: A two tuple, the ElasticSearch Result object with the results, or an empty list if
+     no hits and a boolean indicating whether the citation was found.
     """
 
     if not hasattr(full_citation, "citing_opinion"):
@@ -140,12 +149,20 @@ def es_search_db_for_full_citation(
         Q(
             "term", **{"status.raw": "Published"}
         ),  # Non-precedential documents aren't cited
-        Q("match", cluster_child="opinion"),
     ]
+
+    if query_citation:
+        # If this is related to query citation resolution, look for
+        # opinion_cluster to determine if a citation matched a single cluster.
+        filters.append(Q("match", cluster_child="opinion_cluster"))
+    else:
+        filters.append(Q("match", cluster_child="opinion"))
+
     must_not = []
     if full_citation.citing_opinion is not None:
         # Eliminate self-cites.
         must_not.append(Q("match", id=full_citation.citing_opinion.pk))
+
     # Set up filter parameters
     if full_citation.year:
         start_year = end_year = full_citation.year
@@ -184,8 +201,9 @@ def es_search_db_for_full_citation(
     query = Q("bool", must_not=must_not, filter=filters)
     citations_query = search_query.query(query)
     results = fetch_citations(citations_query)
+    citation_found = True if len(results) > 0 else False
     if len(results) == 1:
-        return results
+        return results, citation_found
     if len(results) > 1:
         if (
             full_citation.citing_opinion is not None
@@ -196,7 +214,36 @@ def es_search_db_for_full_citation(
                 full_citation,
                 full_citation.citing_opinion,
             )
-            return results
-
+            return results, citation_found
     # Give up.
-    return []
+    return [], citation_found
+
+
+def es_get_query_citation(
+    cd: CleanData,
+) -> tuple[Hit | None, list[FullCaseCitation]]:
+    """Extract citations from the query. If it's a single citation, search for
+     it into ES, and if found, return it.
+
+    :param cd: A CleanData instance.
+    :param return: A two tuple the ES Hit object or None and the list of
+    missing citations from the query.
+    """
+    missing_citations: list[FullCaseCitation] = []
+    if not cd.get("q"):
+        return None, missing_citations
+    citations = get_citations(cd["q"], tokenizer=HYPERSCAN_TOKENIZER)
+    citations = [c for c in citations if isinstance(c, FullCaseCitation)]
+
+    matches = None
+    for citation in citations:
+        matches, citation_found = es_search_db_for_full_citation(
+            citation, query_citation=True
+        )
+        if not citation_found:
+            missing_citations.append(citation)
+
+    if len(citations) == 1 and matches and len(matches) == 1:
+        # If more than one match, don't show the tip
+        return matches[0], missing_citations
+    return matches, missing_citations

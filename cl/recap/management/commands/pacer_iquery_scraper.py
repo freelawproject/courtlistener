@@ -22,7 +22,7 @@ def get_docket_ids_missing_info(num_to_get: int) -> Set[int]:
     return set(
         Docket.objects.filter(
             date_filed__isnull=True,
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             court__jurisdiction__in=[
                 Court.FEDERAL_DISTRICT,
                 Court.FEDERAL_BANKRUPTCY,
@@ -130,7 +130,7 @@ def get_docket_ids() -> Set[int]:
             Q(date_created__gt=one_week_ago)
             | Q(date_modified__gt=one_week_ago),
             case_name="",
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             court__jurisdiction__in=[
                 Court.FEDERAL_DISTRICT,
                 Court.FEDERAL_BANKRUPTCY,

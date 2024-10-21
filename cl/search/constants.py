@@ -16,13 +16,14 @@ SOLR_OPINION_HL_FIELDS = [
     "text",
 ]
 SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
-SOLR_PEOPLE_ES_HL_FIELDS = [
-    "name",
-    "name.exact",
-    "dob_city",
+PEOPLE_ES_HL_FIELDS = {
+    "name": 0,
+    "dob_city": 0,
+    "political_affiliation": 0,
+    "school": 0,
+}
+PEOPLE_ES_HL_KEYWORD_FIELDS = [
     "dob_state_id",
-    "text",
-    "text.exact",
 ]
 
 # ES fields that are used in the search queries
@@ -37,6 +38,14 @@ SEARCH_ORAL_ARGUMENT_QUERY_FIELDS = [
     "sha1",
 ]
 SEARCH_PEOPLE_CHILD_QUERY_FIELDS = [
+    "gender",
+    "alias",
+    "dob_city",
+    "political_affiliation",
+    "religion",
+    "fjc_id",
+    "aba_rating",
+    "school",
     "position_type",
     "nomination_process",
     "judicial_committee_action",
@@ -93,13 +102,18 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "citation",
     "judge",
     "caseNameFull",
-    "caseName",
     "status",
     "suitNature",
     "attorney",
     "procedural_history",
     "posture",
     "syllabus",
+]
+SEARCH_MLT_OPINION_QUERY_FIELDS = [
+    "procedural_history",
+    "posture",
+    "syllabus",
+    "text",
 ]
 
 # ES fields that are used for highlighting
@@ -112,25 +126,18 @@ SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
     "docketNumber",
     "court_citation_string",
 ]
-SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = [
-    "caseName",
-    "caseName.exact",
-    "judge",
-    "judge.exact",
-    "docketNumber",
-    "docketNumber.exact",
-    "court_citation_string",
-    "text",
-    "text.exact",
-]
-SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = [
-    "text",
-    "text.exact",
-    "docketNumber",
-    "docketNumber.exact",
-    "judge",
-    "judge.exact",
-]
+SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = {
+    "caseName": 0,
+    "judge": 0,
+    "docketNumber": 0,
+    "court_citation_string": 0,
+    "text": 100,
+}
+SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = {
+    "text": 100,
+    "docketNumber": 0,
+    "judge": 0,
+}
 SOLR_RECAP_HL_FIELDS = [
     "assignedTo",
     "caseName",
@@ -143,24 +150,29 @@ SOLR_RECAP_HL_FIELDS = [
     "suitNature",
     "text",
 ]
-SEARCH_RECAP_HL_FIELDS = [
-    "assignedTo",
-    "caseName",
-    "cause",
-    "court_citation_string",
-    "docketNumber",
-    "juryDemand",
-    "referredTo",
-    "suitNature",
-]
+SEARCH_RECAP_HL_FIELDS = {
+    "assignedTo": 0,
+    "caseName": 0,
+    "cause": 0,
+    "court_citation_string": 0,
+    "docketNumber": 0,
+    "juryDemand": 0,
+    "referredTo": 0,
+    "suitNature": 0,
+}
+SEARCH_OPINION_HL_FIELDS = {
+    "caseName": 0,
+    "citation": 0,
+    "court_citation_string": 0,
+    "docketNumber": 0,
+    "suitNature": 0,
+}
 
-SEARCH_OPINION_HL_FIELDS = [
-    "caseName",
-    "citation",
-    "court_citation_string",
-    "docketNumber",
-    "suitNature",
-]
+SEARCH_ALERTS_OPINION_HL_FIELDS = {
+    "caseName": 0,
+    "docketNumber": 0,
+    "text": 500,
+}
 
 
 # In RECAP Search, it is necessary to display 'plain_text' as a truncated snippet,
@@ -176,8 +188,24 @@ SEARCH_RECAP_CHILD_HL_FIELDS = {
 SEARCH_OPINION_CHILD_HL_FIELDS = {
     "text": 100,
 }
+SEARCH_RECAP_CHILD_EXCLUDE_FIELDS = {
+    "plain_text": 100,
+}
+SEARCH_OPINION_CHILD_EXCLUDE_FIELDS = {
+    "text": 100,
+}
 
-MULTI_VALUE_HL_FIELDS = ["citation"]
+api_child_highlight_map = {
+    (True, SEARCH_TYPES.OPINION): SEARCH_OPINION_CHILD_HL_FIELDS,
+    (True, SEARCH_TYPES.RECAP): SEARCH_RECAP_CHILD_HL_FIELDS,
+    (True, SEARCH_TYPES.RECAP_DOCUMENT): SEARCH_RECAP_CHILD_HL_FIELDS,
+    (True, SEARCH_TYPES.DOCKETS): SEARCH_RECAP_CHILD_HL_FIELDS,
+    (False, SEARCH_TYPES.OPINION): SEARCH_OPINION_CHILD_EXCLUDE_FIELDS,
+    (False, SEARCH_TYPES.RECAP): SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
+    (False, SEARCH_TYPES.RECAP_DOCUMENT): SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
+    (False, SEARCH_TYPES.DOCKETS): SEARCH_RECAP_CHILD_EXCLUDE_FIELDS,
+}
+
 # Search query for related items
 RELATED_PATTERN = re.compile(
     r"""
@@ -202,12 +230,19 @@ recap_boosts_qf = {
 }
 recap_boosts_es = {
     # Docket fields
-    "caseName": 4.0,
+    "caseName.exact": 4.0,
     "docketNumber": 3.0,
     # RECAPDocument fields:
     "description": 2.0,
 }
 recap_boosts_pf = {"text": 3.0, "caseName": 3.0, "description": 3.0}
+opinion_boosts_es = {
+    "text": 1.0,
+    "type": 1.0,
+    # Cluster fields
+    "caseName.exact": 4.0,
+    "docketNumber": 2.0,
+}
 BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "qf": {
         SEARCH_TYPES.OPINION: {
@@ -219,9 +254,10 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         },
         SEARCH_TYPES.RECAP: recap_boosts_qf,
         SEARCH_TYPES.DOCKETS: recap_boosts_qf,
+        SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_qf,
         SEARCH_TYPES.ORAL_ARGUMENT: {
             "text": 1.0,
-            "caseName": 4.0,
+            "caseName.exact": 4.0,
             "docketNumber": 2.0,
         },
         SEARCH_TYPES.PEOPLE: {
@@ -238,6 +274,8 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
     "es": {
         SEARCH_TYPES.RECAP: recap_boosts_es,
         SEARCH_TYPES.DOCKETS: recap_boosts_es,
+        SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_es,
+        SEARCH_TYPES.OPINION: opinion_boosts_es,
     },
     # Phrase-based boosts.
     "pf": {
@@ -265,4 +303,16 @@ o_type_index_map = {
     Opinion.REHEARING: "rehearing",
     Opinion.ON_THE_MERITS: "on-the-merits",
     Opinion.ON_MOTION_TO_STRIKE: "on-motion-to-strike",
+    Opinion.TRIAL_COURT: "trial-court-document",
+}
+
+
+cardinality_query_unique_ids = {
+    SEARCH_TYPES.RECAP: "docket_id",
+    SEARCH_TYPES.DOCKETS: "docket_id",
+    SEARCH_TYPES.RECAP_DOCUMENT: "id",
+    SEARCH_TYPES.OPINION: "cluster_id",
+    SEARCH_TYPES.PEOPLE: "id",
+    SEARCH_TYPES.ORAL_ARGUMENT: "id",
+    SEARCH_TYPES.PARENTHETICAL: "id",
 }

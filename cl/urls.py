@@ -57,7 +57,6 @@ urlpatterns = [
     path("", include("cl.search.urls")),
     path("", include("cl.alerts.urls")),
     path("", include("cl.api.urls")),
-    path("", include("cl.donate.urls")),
     path("", include("cl.visualizations.urls")),
     path("", include("cl.stats.urls")),
     # Sitemaps

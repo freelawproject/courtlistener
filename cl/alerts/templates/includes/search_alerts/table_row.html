@@ -1,0 +1,76 @@
+<tr id='alert-row-{{ alert.id }}' {% if hx_swap %} hx-swap-oob="true" {% endif %}>
+  <td>
+    <p class="bottom">
+      {% if alert.alert_type == SEARCH_TYPES.OPINION %}
+        Case Law
+      {% elif alert.alert_type == SEARCH_TYPES.ORAL_ARGUMENT %}
+        Oral Argument
+      {% elif alert.alert_type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
+        RECAP
+      {% endif %}
+    </p>
+  </td>
+  <td>
+    <p class="bottom">
+      <a href="/?{{ alert.query }}" rel="nofollow">{{ alert.name }}</a>
+    </p>
+  </td>
+  {% if is_profile_dashboard %}
+  <td>{{ alert.date_last_hit|date:"M j, Y"|default:"Never" }}</td>
+  {% endif %}
+  <td>{{ alert.get_rate_display }}</td>
+  <td class="right">
+    <div class="flex justify-content-end">
+      {% if is_profile_dashboard %}
+        {% if alert.type == SEARCH_TYPES.OPINION or alert.type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
+          <a href="{% url "search_feed" "search" %}?{{ alert.query }}"
+              title="Atom feed for this alert"
+              class="btn btn-primary btn-xs">
+            <i class="fa fa-rss"></i>&nbsp;Subscribe
+          </a>
+        {% elif alert.type == SEARCH_TYPES.ORAL_ARGUMENT %}
+          <a
+            href="{% url "search_podcast" "search" %}?{{ alert.query }}"
+            title="Podcast for this alert"
+            class="btn btn-primary btn-xs">
+            <i class="fa fa-podcast"></i>&nbsp;Podcast
+          </a>
+        {% endif %}
+      {% endif %}
+      <div>
+      {% if request.user.is_authenticated %}
+        {% if not user.profile.is_member and alert.rate == 'rt' %}
+          <p class="bottom inline ml-1"
+            title="Please become a member to enable Real Time alerts.">
+            <a class="btn btn-primary btn-xs disabled">
+              <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+          </p>
+        {% else %}
+          <a href="/?{{ alert.query }}&edit_alert={{ alert.pk }}"
+            rel="nofollow"
+            class="btn btn-primary btn-xs ml-1">
+            <i class="fa fa-pencil"></i>&nbsp;Edit</a>
+        {% endif %}
+      {% endif %}
+      </div>
+      {% if is_profile_dashboard %}
+        <a href="{% url "delete_alert_confirm" alert.pk %}"
+          class="xbtn btn-danger btn-xs ml-1">
+          <i class="fa fa-trash-o"></i>&nbsp;Delete
+        </a>
+      {% else %}
+        <div class='ml-1' data-loading-states>
+          <button
+            id='btn-remove-{{ alert.id }}'
+            class="btn {% if alert.rate == "off" %} btn-secondary {% else %} btn-danger {% endif %} btn-xs"
+            hx-post="{% url "htmx_disable_alert" alert.secret_key %}"
+            data-loading-disable
+            {% if alert.rate == "off" %} disabled {% endif %}>
+            &nbsp;Disable
+            <i data-loading class="fa fa-spinner fa-spin"></i>
+          </button>
+        </div>
+      {% endif %}
+    </div>
+  </td>
+</tr>

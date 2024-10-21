@@ -31,7 +31,7 @@
               {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
                 data-toggle="modal" data-target="#modal-buy-pacer"
                 class="open_buy_pacer_modal"
-             {% endif %}
+              {% endif %}
               target="_blank"
               rel="nofollow">Buy on PACER</a>
         </li>
@@ -47,11 +47,12 @@
           {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
             data-toggle="modal" data-target="#modal-buy-pacer"
             class="open_buy_pacer_modal btn btn-primary"
-          {% else%}
+          {% else %}
             class="btn btn-primary"
           {% endif %}
           target="_blank"
-          rel="nofollow"><i class="fa fa-external-link"></i> Buy on PACER</a>
+          rel="nofollow">
+          <i class="fa fa-external-link"></i>Buy on PACER</a>
       {% endif %}
     {% endif %}
   {% endif %}

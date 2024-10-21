@@ -8,7 +8,7 @@
   {% with doc0=result.doclist.docs.0 type=search_form.type.value %}
   <h3 class="bottom serif">
     {% if type == SEARCH_TYPES.PEOPLE or type_override == SEARCH_TYPES.PEOPLE %}
-      <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
+      <a href="{{ result.absolute_url }}{% querystring %}"
          class="visitable">
       {{ result.solr_highlights.name_reverse.0|safe }}
       {% if result.court %}
@@ -24,7 +24,7 @@
       </a>
 
     {% elif type == SEARCH_TYPES.ORAL_ARGUMENT or type_override == SEARCH_TYPES.ORAL_ARGUMENT or type == SEARCH_TYPES.OPINION or type_override == SEARCH_TYPES.OPINION %}
-      <a href="{{ result.absolute_url }}?{{ request.META.QUERY_STRING }}"
+      <a href="{{ result.absolute_url }}{% querystring %}"
          class="visitable">
       {{ result.solr_highlights.caseName.0|safe }}
       {% url "court_homepage" pk="me" as maine_url %}

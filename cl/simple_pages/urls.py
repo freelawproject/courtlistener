@@ -9,9 +9,11 @@ from cl.simple_pages.views import (
     contact,
     contact_thanks,
     contribute,
+    coverage,
     coverage_fds,
-    coverage_graph,
+    coverage_oa,
     coverage_opinions,
+    coverage_recap,
     delete_help,
     faq,
     feeds,
@@ -35,14 +37,20 @@ urlpatterns = [
     path("contact/thanks/", contact_thanks, name="contact_thanks"),  # type: ignore[arg-type]
     # Help pages
     path("help/", help_home, name="help_home"),  # type: ignore[arg-type]
-    path("help/coverage/", coverage_graph, name="coverage"),  # type: ignore[arg-type]
-    path(
-        "help/coverage/opinions/", coverage_opinions, name="coverage_opinions"  # type: ignore[arg-type]
-    ),
+    path("help/coverage/", coverage, name="coverage"),  # type: ignore[arg-type]
     path(
         "help/coverage/financial-disclosures/",
         coverage_fds,  # type: ignore[arg-type]
         name="coverage_fds",
+    ),
+    path("help/coverage/oral-arguments/", coverage_oa, name="coverage_oa"),  # type: ignore[arg-type]
+    path(
+        "help/coverage/opinions/", coverage_opinions, name="coverage_opinions"  # type: ignore[arg-type]
+    ),
+    path(
+        "help/coverage/recap/",
+        coverage_recap,  # type: ignore[arg-type]
+        name="coverage_recap",
     ),
     path("help/markdown/", markdown_help, name="markdown_help"),  # type: ignore[arg-type]
     path("help/alerts/", alert_help, name="alert_help"),  # type: ignore[arg-type]

@@ -40,7 +40,7 @@ def filter_invalid_XML_chars(input: str) -> str:
 
     This strips out everything else.
 
-    See: http://stackoverflow.com/a/25920392/64911
+    See: https://stackoverflow.com/a/25920392/64911
     """
     if isinstance(input, str):
         # Only do str, unicode, etc.
@@ -110,7 +110,7 @@ def normalize_dashes(text: str) -> str:
     :return: the better text
     """
     # Simple variables b/c in monospace code, you can't see the difference
-    # othewise.
+    # otherwise.
     normal_dash = "-"
     en_dash = "–"
     em_dash = "—"

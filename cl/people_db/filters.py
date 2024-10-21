@@ -41,7 +41,7 @@ class ABARatingFilter(NoEmptyFilterSet):
     class Meta:
         model = ABARating
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "year_rated": INTEGER_LOOKUPS,
@@ -54,7 +54,7 @@ class PoliticalAffiliationFilter(NoEmptyFilterSet):
     class Meta:
         model = PoliticalAffiliation
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_start": DATE_LOOKUPS,
@@ -74,7 +74,7 @@ class SchoolFilter(NoEmptyFilterSet):
     class Meta:
         model = School
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "name": ALL_TEXT_LOOKUPS,
@@ -91,7 +91,7 @@ class EducationFilter(NoEmptyFilterSet):
     class Meta:
         model = Education
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "degree_year": ["exact"],
@@ -105,7 +105,7 @@ class RetentionEventFilter(NoEmptyFilterSet):
     class Meta:
         model = RetentionEvent
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "position": ["exact"],
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
@@ -127,7 +127,7 @@ class PositionFilter(NoEmptyFilterSet):
     class Meta:
         model = Position
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "position_type": ["exact"],
             "person": ["exact"],
             "appointer": ["exact"],
@@ -229,7 +229,7 @@ class PersonFilter(NoEmptyFilterSet):
     class Meta:
         model = Person
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "date_dob": DATE_LOOKUPS,
@@ -264,7 +264,7 @@ class PartyFilter(NoEmptyFilterSet):
     class Meta:
         model = Party
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "name": ALL_TEXT_LOOKUPS,
@@ -276,15 +276,19 @@ class AttorneyFilter(NoEmptyFilterSet):
         "cl.search.filters.DocketFilter",
         field_name="roles__docket",
         queryset=Docket.objects.all(),
+        distinct=True,
     )
     parties_represented = filters.RelatedFilter(
-        PartyFilter, field_name="roles__party", queryset=Party.objects.all()
+        PartyFilter,
+        field_name="roles__party",
+        queryset=Party.objects.all(),
+        distinct=True,
     )
 
     class Meta:
         model = Attorney
         fields = {
-            "id": ["exact"],
+            "id": INTEGER_LOOKUPS,
             "date_created": DATETIME_LOOKUPS,
             "date_modified": DATETIME_LOOKUPS,
             "name": ALL_TEXT_LOOKUPS,

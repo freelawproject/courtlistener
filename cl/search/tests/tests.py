@@ -4,8 +4,10 @@ import os
 from datetime import date
 from pathlib import Path
 from unittest import mock
+from urllib.parse import parse_qs
 
 import pytz
+import time_machine
 from asgiref.sync import async_to_sync
 from dateutil.tz import tzoffset, tzutc
 from django.conf import settings
@@ -14,21 +16,29 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.db import IntegrityError, transaction
+from django.test import Client, override_settings
 from django.urls import reverse
+from django.utils.timezone import now
+from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import html
-from rest_framework.status import HTTP_200_OK
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
+from cl.audio.factories import AudioFactory
+from cl.lib.elasticsearch_utils import simplify_estimated_count
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     AudioTestCase,
+    CourtTestCase,
     EmptySolrTestCase,
     IndexedSolrTestCase,
+    PeopleTestCase,
     SolrTestCase,
 )
 from cl.lib.utils import (
@@ -42,21 +52,35 @@ from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
 from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.documents import (
+    ES_CHILD_ID,
+    AudioDocument,
     DocketDocument,
     ESRECAPDocument,
+    OpinionClusterDocument,
     OpinionDocument,
+    PersonDocument,
     PositionDocument,
 )
 from cl.search.factories import (
     CourtFactory,
     DocketEntryWithParentsFactory,
     DocketFactory,
+    OpinionClusterFactory,
     OpinionClusterFactoryWithChildrenAndParents,
+    OpinionFactory,
     OpinionWithChildrenFactory,
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
 from cl.search.management.commands.cl_calculate_pagerank import Command
+from cl.search.management.commands.cl_index_parent_and_child_docs import (
+    get_unique_oldest_history_rows,
+    log_last_document_indexed,
+)
+from cl.search.management.commands.cl_remove_content_from_es import (
+    compose_redis_key_remove_content,
+)
+from cl.search.management.commands.sweep_indexer import log_indexer_last_status
 from cl.search.models import (
     PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
@@ -64,15 +88,19 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
+    DocketEvent,
     Opinion,
     OpinionCluster,
     RECAPDocument,
+    SearchQuery,
     sort_cites,
 )
 from cl.search.tasks import (
     add_docket_to_solr_by_rds,
     get_es_doc_id_and_parent_id,
+    index_dockets_in_bulk,
 )
+from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
@@ -274,6 +302,92 @@ class ModelTest(TestCase):
             .count()
         )
         self.assertEqual(cluster_count, expected_count)
+
+    def test_opinions_order(self) -> None:
+        """Test opinions order"""
+
+        # Create court
+        court = CourtFactory(id="nyappdiv")
+
+        # Create cluster
+        cluster = OpinionClusterFactory(
+            case_name="Foo v. Bar",
+            case_name_short="Foo v. Bar",
+            docket=DocketFactory(
+                court=court,
+            ),
+            date_filed=date(1978, 3, 10),
+            source="U",
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+        )
+
+        # Create three opinions
+        op_1 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.LEAD,
+            ordering_key=1,
+        )
+        op_2 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.CONCURRENCE,
+            ordering_key=2,
+        )
+        op_3 = OpinionFactory(
+            cluster=cluster,
+            type=Opinion.DISSENT,
+            ordering_key=3,
+        )
+
+        # Test that the value of the order field matches the order in which
+        # they were created
+        self.assertEqual(op_1.ordering_key, 1)
+        self.assertEqual(op_2.ordering_key, 2)
+        self.assertEqual(op_3.ordering_key, 3)
+
+        # Can we swap orders?
+        op_1.ordering_key = None
+        op_1.save()
+
+        op_2.ordering_key = 1
+        op_2.save()
+
+        op_1.ordering_key = 2
+        op_1.save()
+
+        # Can we update an opinion using an existing position?
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                op_3.ordering_key = 2
+                op_3.save()
+
+        # Validate unique cluster/order
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                op = OpinionFactory(
+                    cluster=cluster,
+                    type=Opinion.ADDENDUM,
+                )
+                op.ordering_key = 3
+                op.save()
+
+        # Can we use avoid negative positions?
+        with transaction.atomic():
+            with self.assertRaises(ValidationError):
+                op = OpinionFactory(cluster=cluster, type=Opinion.LEAD)
+                op.ordering_key = -1
+                op.save()
+
+        # Can we order the opinions from a cluster using the field?
+        qs = (
+            cluster.sub_opinions.all()
+            .order_by("ordering_key")
+            .values_list("ordering_key", flat=True)
+        )
+        self.assertEqual(list(qs), [1, 2, 3, None])
+
+        # Order default value is null
+        op_5 = OpinionFactory(cluster=cluster, type="Lead Opinion")
+        self.assertEqual(op_5.ordering_key, None)
 
 
 class DocketValidationTest(TestCase):
@@ -886,6 +1000,96 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertNotIn("Did you mean", r.content.decode())
 
+    def test_round_estimated_search_counts(self) -> None:
+        """Confirm search counts above the threshold are properly rounded"""
+
+        tests = [
+            (13, 13),  # Below ELASTICSEARCH_CARDINALITY_PRECISION threshold
+            (109, 109),
+            (809, 809),
+            (1_074, 1_074),
+            (1_768, 1_768),
+            (1_881, 1_800),  # Above ELASTICSEARCH_CARDINALITY_PRECISION * 0.94
+            # threshold
+            (
+                11_740,
+                11_000,
+            ),
+            (367_740, 360_000),
+            (7_867_740, 7_800_000),
+            (95_367_740, 95_000_000),
+            (436_307_740, 430_000_000),
+        ]
+        for test in tests:
+            with self.subTest(test=test, msg="Test estimated search counts."):
+                self.assertEqual(simplify_estimated_count(test[0]), test[1])
+
+
+class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
+    """Common tests for the Search API V4 endpoints."""
+
+    async def test_es_general_bad_request_error_(self) -> None:
+        """Can we properly raise the ElasticBadRequestError exception?"""
+
+        # Bad syntax due to the / char in the query.
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "This query contains long/short proximity token",
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            r.data["detail"],
+            "Elasticsearch Bad request error. Please review your query.",
+        )
+
+    async def test_es_bad_syntax_proximity_tokens(self) -> None:
+        """Can we properly raise the BadProximityQuery exception?"""
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "This query contains /s proximity token",
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            r.data["detail"],
+            "The query contains an unrecognized proximity token.",
+        )
+
+    async def test_es_unbalanced_quotes(self) -> None:
+        """Can we properly raise the UnbalancedQuotesQuery exception?"""
+
+        params = {"type": SEARCH_TYPES.RECAP, "q": 'Test query with "quotes'}
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            r.data["detail"], "The query contains unbalanced quotes."
+        )
+
+    async def test_handle_unbalanced_parentheses(self) -> None:
+        """Can we properly raise the UnbalancedParenthesesQuery
+        exception?
+        """
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": "(Loretta OR (SEC) AND Jose",
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v4"}), params
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(
+            r.data["detail"], "The query contains unbalanced parentheses."
+        )
+
 
 class PagerankTest(TestCase):
     fixtures = ["test_objects_search.json", "judge_judy.json"]
@@ -933,18 +1137,11 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     ]
 
     def setUp(self) -> None:
-        UserProfileWithParentsFactory.create(
+        self.pandora_profile = UserProfileWithParentsFactory.create(
             user__username="pandora",
             user__password=make_password("password"),
         )
-        self.rebuild_index("search.OpinionCluster")
         super().setUp()
-        call_command(
-            "cl_index_parent_and_child_docs",
-            search_type=SEARCH_TYPES.OPINION,
-            queue="celery",
-            pk_offset=0,
-        )
 
     def _perform_wildcard_search(self):
         searchbox = self.browser.find_element(By.ID, "id_q")
@@ -1328,6 +1525,262 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
 
         bootstrap_btns = self.browser.find_elements(By.CSS_SELECTOR, "a.btn")
         self.assertIn("Sign Back In", [btn.text for btn in bootstrap_btns])
+
+        # We are taking advantage of the queries done with authenticated and
+        # anonymous user to see if SearchQuery collection is working
+        lookup = {
+            "get_params": "q=lissner",
+            "user": None,
+            "query_time_ms__gte": 0,
+        }
+        self.assertTrue(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "a SearchQuery with get_params 'q=lissner' and anonymous user should have been created",
+        )
+        SearchQuery.objects.filter(user=None).delete()
+
+        lookup["user"] = self.pandora_profile.user
+        self.assertTrue(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "a SearchQuery with get_params 'q=lissner' and 'pandora' user should have been created",
+        )
+
+        # Test if the SearchQuery get's deleted when the user is deleted
+        self.pandora_profile.user.delete()
+        lookup.pop("user")
+        self.assertFalse(
+            SearchQuery.objects.filter(**lookup).exists(),
+            "SearchQuery should have been deleted when the user was deleted",
+        )
+
+
+class SaveSearchQueryTest(TestCase):
+    def setUp(self) -> None:
+        self.client = Client()
+        # Using plain text, fielded queries and manual filters
+
+        self.base_searches = [
+            # Recap
+            r"type=r&q=trump&type=r&order_by=score%20desc&description=Notice",
+            # Audio
+            r"type=oa&q=company%20court_id:illappct&type=oa&order_by=score desc",
+            # Opinions
+            r"type=o&q=thomas&type=o&order_by=score%20desc&case_name=lorem",
+            # People
+            r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
+        ]
+
+        self.searches = self.base_searches + [
+            # Repeat the same query, for testing cache
+            r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
+        ]
+
+        super().setUp()
+        self.source_error_message = (
+            f"Saved wrong `engine` value, expected {SearchQuery.WEBSITE}"
+        )
+
+    @staticmethod
+    def normalize_query(query, replace_space=False):
+        """Normalize a query dictionary by sorting lists of values.
+        Sometimes the search process alters the order of the query parameters,
+        or duplicates them.
+        """
+
+        if replace_space:
+            query = query.replace("%20", "+")
+        parsed_query = parse_qs(query)
+        return {k: sorted(v) for k, v in parsed_query.items()}
+
+    @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
+    def test_search_query_saving(self) -> None:
+        """Do we save queries on all public endpoints"""
+        for query in self.searches:
+            url = f"{reverse('show_results')}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.WEBSITE,
+                self.source_error_message,
+            )
+
+        self.assertTrue(
+            SearchQuery.objects.last().hit_cache,
+            "Repeated query not marked as having hit cache",
+        )
+
+    # Force Solr use
+    @override_flag("oa-es-active", False)
+    @override_flag("r-es-active", False)
+    @override_flag("p-es-active", False)
+    @override_flag("o-es-active", False)
+    def test_search_query_saving_solr(self) -> None:
+        """Are queries saved when using solr search (do_search)"""
+        for query in self.searches:
+            url = f"{reverse('show_results')}?{query}"
+            self.client.get(url)
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.SOLR,
+                f"Saved wrong `engine` value, expected {SearchQuery.SOLR}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.WEBSITE,
+                self.source_error_message,
+            )
+
+    def test_failed_es_search_queries(self) -> None:
+        """Do we flag failed ElasticSearch queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse('show_results')}?{query}"
+        self.client.get(url)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
+
+    def test_search_api_v4_query_saving(self) -> None:
+        """Do we save queries on all V4 Search endpoints"""
+        for query in self.base_searches:
+            url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.API,
+                self.source_error_message,
+            )
+
+    def test_failed_es_search_v4_api_queries(self) -> None:
+        """Do we flag failed v4 API queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 400)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
+
+    def test_search_es_api_v3_query_saving(self) -> None:
+        """Do we save queries on all V3 Search endpoints"""
+        for query in self.base_searches:
+            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.API,
+                self.source_error_message,
+            )
+
+    def test_failed_es_search_v3_api_queries(self) -> None:
+        """Do we flag failed ES v3 API queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 500)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
+
+    @override_flag("oa-es-active", False)
+    @override_flag("oa-es-activate", False)
+    @override_flag("r-es-search-api-active", False)
+    @override_flag("p-es-active", False)
+    @override_flag("o-es-search-api-active", False)
+    def test_search_solr_api_v3_query_saving(self) -> None:
+        """Do we save queries on all V3 Search Solr endpoints"""
+        for query in self.base_searches:
+            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.SOLR,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.API,
+                self.source_error_message,
+            )
 
 
 class CaptionTest(TestCase):
@@ -1805,7 +2258,12 @@ class ESIndexingTasksUtils(TestCase):
             nomination_process="fed_senate",
         )
         cls.de = DocketEntryWithParentsFactory(
-            docket=DocketFactory(court=cls.court),
+            docket=DocketFactory(
+                court=cls.court,
+                docket_number="12-09876",
+                case_name="People v. Lorem",
+                source=Docket.RECAP,
+            ),
             entry_number=1,
         )
         cls.rd = RECAPDocumentFactory(
@@ -1813,6 +2271,19 @@ class ESIndexingTasksUtils(TestCase):
             document_number="1",
             is_available=True,
         )
+
+    @staticmethod
+    def mock_pgh_created_at(mock_date) -> int:
+        """Since it is not possible to use time_machine to mock the
+        pgh_created_at field on instances created by triggers, this method
+        assigns the mock_date to the most recently created event.
+        """
+        docket_events = DocketEvent.objects.all().order_by("pgh_created_at")
+        latest_d_event = docket_events.last()
+        latest_d_event.pgh_created_at = mock_date
+        latest_d_event.save()
+
+        return latest_d_event.pk
 
     def test_get_es_doc_id_and_parent_id(self) -> None:
         """Confirm that get_es_doc_id_and_parent_id returns the correct doc_id
@@ -1852,3 +2323,699 @@ class ESIndexingTasksUtils(TestCase):
             )
             self.assertEqual(doc_id, test["expected_doc_id"])
             self.assertEqual(parent_id, test["expected_parent_id"])
+
+    def test_get_unique_oldest_date_range_rows(self) -> None:
+        """Can we retrieve the unique oldest rows from history tables within a
+        specified date range?
+        """
+
+        docket_2 = DocketFactory(
+            court=self.court,
+            docket_number="21-55555",
+            case_name="Enterprises, Inc v. Lorem",
+            source=Docket.RECAP,
+        )
+        docket_1 = self.de.docket
+        expected_event_ids = set()
+        # Events created outside (before) the date_range.
+        mock_date = now().replace(year=2024, month=1, day=15, hour=1)
+        # docket_1 updates.
+        docket_1.docket_number = "12-00000-v1"
+        docket_1.case_name = "The People v. Lorem v1"
+        docket_1.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # docket_2 updates.
+        docket_2.docket_number = "21-00000-v1"
+        docket_2.case_name = "Enterprises, Inc v. The People v1"
+        docket_2.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # Events created within the date_range.
+        mock_date = now().replace(year=2024, month=1, day=16, hour=1)
+        # docket_1 updates.
+        docket_1.docket_number = "12-00000-v2"
+        docket_1.case_name = "The People v. Lorem v2"
+        docket_1.save()
+        # Oldest event within the data_range is expected.
+        expected_id = self.mock_pgh_created_at(mock_date)
+        expected_event_ids.add(expected_id)
+
+        mock_date = now().replace(year=2024, month=1, day=16, hour=2)
+        docket_1.docket_number = "12-00000-v3"
+        docket_1.save()
+        self.mock_pgh_created_at(mock_date)
+
+        mock_date = now().replace(year=2024, month=1, day=18, hour=1)
+        # docket_2 updates.
+        docket_2.docket_number = "21-00000-v2"
+        docket_2.save()
+        # Oldest event within the data_range is expected.
+        expected_id = self.mock_pgh_created_at(mock_date)
+        expected_event_ids.add(expected_id)
+
+        mock_date = now().replace(year=2024, month=1, day=19, hour=1)
+        docket_2.case_name = "Enterprises, Inc v. The People v3"
+        docket_2.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # Events created outside (after) the date_range
+        mock_date = now().replace(year=2024, month=1, day=20, hour=0)
+        # docket_1 updates.
+        docket_1.docket_number = "12-00000-v-latest"
+        docket_1.case_name = "The People v. Lorem v-latest"
+        docket_1.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # docket_1 updates.
+        docket_2.docket_number = "21-00000-v-lates"
+        docket_2.case_name = "Enterprises, Inc v. The People v-latest"
+        docket_2.save()
+        self.mock_pgh_created_at(mock_date)
+
+        # date_range dates.
+        date_start = now().replace(year=2024, month=1, day=16, hour=0)
+        date_end = now().replace(year=2024, month=1, day=19, hour=1)
+        unique_events = get_unique_oldest_history_rows(
+            date_start, date_end, 0, EventTable.DOCKET
+        )
+        # Confirm the expected events are returned.
+        unique_event_ids = set(unique_events.values_list("pgh_id", flat=True))
+        self.assertEqual(unique_event_ids, expected_event_ids)
+
+
+@mock.patch(
+    "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
+    return_value="es_sweep_indexer:log_test",
+)
+class SweepIndexerCommandTest(
+    CourtTestCase, PeopleTestCase, ESIndexTestCase, TestCase
+):
+    """sweep_indexer command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+        cls.de = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2015, 8, 16),
+                docket_number="1:21-bk-1234",
+                nature_of_suit="440",
+                source=Docket.RECAP,
+            ),
+            entry_number=1,
+            date_filed=datetime.date(2015, 8, 19),
+        )
+        cls.rd = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+        )
+        cls.rd_att = RECAPDocumentFactory(
+            docket_entry=cls.de,
+            document_number="1",
+            attachment_number=2,
+        )
+        cls.de_1 = DocketEntryWithParentsFactory(
+            docket=DocketFactory(
+                court=cls.court,
+                date_filed=datetime.date(2016, 8, 16),
+                date_argued=datetime.date(2012, 6, 23),
+                source=Docket.RECAP_AND_IDB,
+            ),
+            entry_number=None,
+            date_filed=datetime.date(2014, 7, 19),
+        )
+        cls.rd_2 = RECAPDocumentFactory(
+            docket_entry=cls.de_1,
+            document_number="",
+        )
+
+        # Audio Factories
+        cls.audio_1 = AudioFactory(
+            docket_id=cls.de.docket_id,
+            duration=420,
+            local_path_original_file="test/audio/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="C",
+            blocked=False,
+            sha1="a49ada00977449",
+            processing_complete=True,
+        )
+        cls.audio_2 = AudioFactory(
+            docket_id=cls.de_1.docket_id,
+            duration=837,
+            local_path_original_file="mp3/2014/06/09/ander_v._leo.mp3",
+            local_path_mp3="test/audio/2.mp3",
+            source="C",
+            sha1="a49ada0097744956",
+            processing_complete=True,
+        )
+        # This audio shouldn't be indexed since is not processed.
+        cls.audio_3 = AudioFactory(
+            docket_id=cls.de_1.docket_id,
+            processing_complete=False,
+        )
+
+        # Opinion Factories
+        cls.opinion_cluster_1 = OpinionClusterFactory.create(
+            source="C",
+            precedential_status="Errata",
+            docket=cls.de.docket,
+        )
+        cls.opinion_1 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=cls.person_2,
+            cluster=cls.opinion_cluster_1,
+            type="020lead",
+        )
+        cls.opinion_2 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=cls.person_2,
+            cluster=cls.opinion_cluster_1,
+            type="010combined",
+        )
+
+        cls.opinion_cluster_2 = OpinionClusterFactory.create(
+            source="C",
+            precedential_status="Published",
+            docket=cls.de_1.docket,
+        )
+        cls.opinion_3 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            author=cls.person_3,
+            cluster=cls.opinion_cluster_2,
+            type="010combined",
+        )
+
+        # No RECAP Docket.
+        DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2019, 8, 16),
+            docket_number="21-bk-2341",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
+
+    def tearDown(self) -> None:
+        self.delete_index(
+            [
+                "search.OpinionCluster",
+                "search.Docket",
+                "audio.Audio",
+                "people_db.Person",
+            ]
+        )
+        self.create_index(
+            [
+                "search.OpinionCluster",
+                "search.Docket",
+                "audio.Audio",
+                "people_db.Person",
+            ]
+        )
+
+    def test_sweep_indexer_all(self, mock_logging_prefix):
+        """Confirm the sweep_indexer command works properly indexing 'all' the
+        documents serially.
+        """
+
+        s = DocketDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        s = PersonDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+
+        # Call sweep_indexer command.
+        with mock.patch(
+            "cl.search.management.commands.sweep_indexer.logger"
+        ) as mock_logger:
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
+            )
+            expected_dict = {
+                "audio.Audio": 2,
+                "people_db.Person": 2,
+                "search.OpinionCluster": 2,
+                "search.Opinion": 3,
+                "search.Docket": 2,
+                "search.RECAPDocument": 3,
+            }
+            # All the instances of each type should be indexed.
+            mock_logger.info.assert_called_with(
+                f"\rDocuments Indexed: {expected_dict}"
+            )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+
+        # Confirm RECAPDocuments are indexed.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de.docket.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of RECAPDocuments returned."
+        )
+        # Confirm routing_ids are properly set.
+        response = s.execute()
+        self.assertEqual(int(response[0].meta.routing), self.de.docket.pk)
+        self.assertEqual(int(response[1].meta.routing), self.de.docket.pk)
+
+        # Confirm RECAPDocuments are indexed.
+        s = DocketDocument.search()
+        s = s.query("parent_id", type="recap_document", id=self.de_1.docket.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of RECAPDocuments returned."
+        )
+        # Confirm routing_ids are properly set.
+        response = s.execute()
+        self.assertEqual(int(response[0].meta.routing), self.de_1.docket.pk)
+
+        # Confirm Audios are indexed.
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 2)
+
+        # Confirm Persons are indexed
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
+
+        # Confirm Positions are indexed.
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_2.pk)
+        self.assertEqual(s.count(), 2)
+
+        s = PersonDocument.search()
+        s = s.query("parent_id", type="position", id=self.person_3.pk)
+        self.assertEqual(s.count(), 1)
+
+        # Confirm OpinionCluster are indexed
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+
+        # Confirm Opinions are indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_1.pk)
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Opinions returned."
+        )
+        # Confirm routing_ids are properly set.
+        response = s.execute()
+        self.assertEqual(
+            int(response[0].meta.routing), self.opinion_cluster_1.pk
+        )
+        self.assertEqual(
+            int(response[1].meta.routing), self.opinion_cluster_1.pk
+        )
+
+        s = OpinionClusterDocument.search()
+        s = s.query("parent_id", type="opinion", id=self.opinion_cluster_2.pk)
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+        # Confirm routing_ids are properly set.
+        response = s.execute()
+        self.assertEqual(
+            int(response[0].meta.routing), self.opinion_cluster_2.pk
+        )
+
+    @override_settings(ELASTICSEARCH_SWEEP_INDEXER_ACTION="missing")
+    def test_sweep_indexer_missing(self, mock_logging_prefix):
+        """Confirm the sweep_indexer command works properly indexing 'missing'
+        the documents serially.
+        """
+
+        # Call sweep_indexer command to indexing everything.
+        call_command(
+            "sweep_indexer",
+            testing_mode=True,
+        )
+
+        # Remove one instance of each type from their index.
+        DocketDocument.get(id=self.de_1.docket.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        DocketDocument.get(id=ES_CHILD_ID(self.rd.pk).RECAP).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        AudioDocument.get(id=self.audio_1.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        PersonDocument.get(id=self.person_2.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        PersonDocument.get(id=ES_CHILD_ID(self.position_2.pk).POSITION).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        OpinionClusterDocument.get(id=self.opinion_cluster_1.pk).delete(
+            refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH
+        )
+        OpinionClusterDocument.get(
+            id=ES_CHILD_ID(self.opinion_3.pk).OPINION
+        ).delete(refresh=settings.ELASTICSEARCH_DSL_AUTO_REFRESH)
+
+        with mock.patch(
+            "cl.search.management.commands.sweep_indexer.logger"
+        ) as mock_logger:
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
+            )
+            expected_dict = {
+                "audio.Audio": 1,
+                "people_db.Person": 1,
+                "search.OpinionCluster": 1,
+                "search.Opinion": 1,
+                "search.Docket": 1,
+                "search.RECAPDocument": 1,
+            }
+            # Only missing instances of each type should be indexed.
+            mock_logger.info.assert_called_with(
+                f"\rDocuments Indexed: {expected_dict}"
+            )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        # Confirm RECAPDocuments are indexed.
+        s = ESRECAPDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+        # Confirm Audios are indexed.
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 2)
+        # Confirm Persons are indexed
+        s = PersonDocument.search()
+        s = s.query(Q("match", person_child="person"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of judges returned.")
+        # Confirm Positions are indexed.
+        s = PositionDocument.search()
+        s = s.query(Q("match", person_child="position"))
+        self.assertEqual(s.count(), 3)
+        # Confirm OpinionCluster are indexed
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of Opinions returned."
+        )
+
+    def test_restart_from_last_document_logged(self, mock_logging_prefix):
+        """Confirm the sweep_indexer command can resume from where it left
+        off after a failure or interruption.
+        """
+
+        # Log last status to simulate a resume from "search.Docket"
+        log_indexer_last_status(
+            "search.Docket",
+            self.de.docket.pk,
+            0,
+        )
+
+        with mock.patch(
+            "cl.search.management.commands.sweep_indexer.logger"
+        ) as mock_logger:
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
+            )
+            expected_dict = {
+                "audio.Audio": 0,
+                "people_db.Person": 0,
+                "search.OpinionCluster": 0,
+                "search.Opinion": 0,
+                "search.Docket": 2,
+                "search.RECAPDocument": 3,
+            }
+            # Only Docket and RECAPDocument should be indexed.
+            mock_logger.info.assert_called_with(
+                f"\rDocuments Indexed: {expected_dict}"
+            )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        # Confirm RECAPDocuments are indexed.
+        s = ESRECAPDocument.search()
+        s = s.query(Q("match", docket_child="recap_document"))
+        self.assertEqual(
+            s.count(), 3, msg="Wrong number of RECAPDocuments returned."
+        )
+
+        # Confirm no Audios were indexed.
+        s = AudioDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0)
+        # Confirm that neither Person nor Positions were indexed.
+        s = PersonDocument.search().query("match_all")
+        self.assertEqual(s.count(), 0, msg="Wrong number of judges returned.")
+        # Confirm that neither OpinionCluster nor Opinions were indexed.
+        s = OpinionClusterDocument.search().query("match_all")
+        self.assertEqual(
+            s.count(), 0, msg="Wrong number of Clusters returned."
+        )
+
+
+@mock.patch(
+    "cl.search.management.commands.sweep_indexer.compose_indexer_redis_key",
+    return_value="es_sweep_indexer:log_remove",
+)
+class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
+    """cl_remove_content_from_es command tests for Elasticsearch"""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.court = CourtFactory(id="canb", jurisdiction="FB")
+
+        cls.recap_docket = DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2015, 8, 16),
+            docket_number="1:21-bk-1234",
+            nature_of_suit="440",
+            source=Docket.RECAP,
+        )
+        cls.non_recap_docket = DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2019, 8, 16),
+            docket_number="21-bk-2341",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
+        cls.non_recap_docket_2 = DocketFactory(
+            court=cls.court,
+            date_filed=datetime.date(2010, 8, 16),
+            docket_number="21-bk-2632",
+            nature_of_suit="440",
+            source=Docket.HARVARD,
+        )
+        r = get_redis_interface("CACHE")
+        keys_remove = r.keys(compose_redis_key_remove_content())
+        if keys_remove:
+            r.delete(*keys_remove)
+
+    def tearDown(self) -> None:
+        self.delete_index(["search.Docket", "search.OpinionCluster"])
+        self.create_index(["search.Docket", "search.OpinionCluster"])
+
+    def test_remove_non_recap_dockets(self, mock_logging_prefix):
+        """Confirm the cl_remove_content_from_es command works
+        properly removing non-recap dockets from ES.
+        """
+
+        # Index all the dockets regardless of their source.
+        index_dockets_in_bulk.delay(
+            [
+                self.recap_docket.pk,
+                self.non_recap_docket.pk,
+                self.non_recap_docket_2.pk,
+            ],
+            testing_mode=True,
+        )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 3, msg="Wrong number of Dockets returned.")
+
+        # Call sweep_indexer command.
+        with mock.patch(
+            "cl.search.management.commands.cl_remove_content_from_es.logger"
+        ) as mock_logger:
+            call_command(
+                "cl_remove_content_from_es",
+                action="non-recap-dockets",
+            )
+            mock_logger.info.assert_called_with(
+                "Successfully removed 2 non-recap dockets."
+            )
+
+        # Confirm non-recap Dockets are removed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 1, msg="Wrong number of Dockets returned.")
+        self.assertTrue(DocketDocument.exists(self.recap_docket.pk))
+
+    def test_restart_from_last_document_logged(self, mock_logging_prefix):
+        """Confirm the cl_remove_content_from_es is able to resume
+        from the last logged docket.
+        """
+
+        # Index all the dockets regardless of their source.
+        index_dockets_in_bulk.delay(
+            [
+                self.recap_docket.pk,
+                self.non_recap_docket.pk,
+                self.non_recap_docket_2.pk,
+            ],
+            testing_mode=True,
+        )
+
+        # Confirm Dockets are indexed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 3, msg="Wrong number of Dockets returned.")
+
+        log_last_document_indexed(
+            self.non_recap_docket_2.pk, compose_redis_key_remove_content()
+        )
+        # Call sweep_indexer command.
+        with mock.patch(
+            "cl.search.management.commands.cl_remove_content_from_es.logger"
+        ) as mock_logger:
+            call_command(
+                "cl_remove_content_from_es",
+                action="non-recap-dockets",
+                auto_resume=True,
+            )
+            mock_logger.info.assert_called_with(
+                "Successfully removed 1 non-recap dockets."
+            )
+
+        # Confirm the last non-recap Docket is removed.
+        s = DocketDocument.search()
+        s = s.query(Q("match", docket_child="docket"))
+        self.assertEqual(s.count(), 2, msg="Wrong number of Dockets returned.")
+        self.assertFalse(DocketDocument.exists(self.non_recap_docket_2.pk))
+
+    def test_remove_opinions_by_timestamp(self, mock_logging_prefix):
+        """Confirm the cl_remove_content_from_es command works
+        properly removing opinions by a timestamp range query.
+        """
+
+        # Opinion Factories
+        opinion_cluster_1 = OpinionClusterFactory.create(
+            source="C",
+            precedential_status="Errata",
+            docket=self.recap_docket,
+        )
+        opinion_1 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            cluster=opinion_cluster_1,
+            type="020lead",
+        )
+
+        opinion_cluster_2 = OpinionClusterFactory.create(
+            source="C",
+            precedential_status="Published",
+            docket=self.non_recap_docket,
+        )
+        opinion_2 = OpinionFactory.create(
+            extracted_by_ocr=False,
+            cluster=opinion_cluster_2,
+            type="010combined",
+        )
+
+        five_days_ago = now() - datetime.timedelta(days=5)
+        with time_machine.travel(five_days_ago, tick=False):
+            # Index all the opinion documents with a timestamp from 5 days ago.
+            call_command(
+                "cl_index_parent_and_child_docs",
+                search_type=SEARCH_TYPES.OPINION,
+                pk_offset=0,
+                testing_mode=True,
+            )
+
+        # Confirm OpinionClusters are indexed
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm Opinions are indexed.
+        s = OpinionDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Opinions returned."
+        )
+
+        three_days_ago = now() - datetime.timedelta(days=3)
+        with time_machine.travel(three_days_ago, tick=False):
+            # Run the sweep indexer to update the timestamp in opinion_2
+            log_indexer_last_status(
+                "search.Opinion",
+                opinion_2.pk,
+                0,
+            )
+            call_command(
+                "sweep_indexer",
+                testing_mode=True,
+            )
+
+        # The timestamp in opinion_2 is updated to 2 days ago.
+        opinion_2_doc = OpinionClusterDocument.get(
+            ES_CHILD_ID(opinion_2.pk).OPINION
+        )
+        self.assertEqual(opinion_2_doc.timestamp.date(), three_days_ago.date())
+
+        # Call cl_remove_content_from_es command.
+        with mock.patch(
+            "cl.search.management.commands.cl_remove_content_from_es.logger"
+        ) as mock_logger:
+            call_command(
+                "cl_remove_content_from_es",
+                action="opinions-removal",
+                start_date=three_days_ago.date(),
+                end_date=now().date(),
+                testing_mode=True,
+            )
+            self.assertIn(
+                "Removal task successfully scheduled. Task ID:",
+                mock_logger.info.call_args[0][0],
+            )
+
+        # Confirm OpinionCluster remains indexed.
+        s = OpinionClusterDocument.search()
+        s = s.query(Q("match", cluster_child="opinion_cluster"))
+        self.assertEqual(
+            s.count(), 2, msg="Wrong number of Clusters returned."
+        )
+        # Confirm only opinion_2 was removed.
+        s = OpinionDocument.search()
+        s = s.query(Q("match", cluster_child="opinion"))
+        self.assertEqual(
+            s.count(), 1, msg="Wrong number of Opinions returned."
+        )
+        self.assertFalse(
+            OpinionClusterDocument.exists(ES_CHILD_ID(opinion_2.pk).OPINION)
+        )

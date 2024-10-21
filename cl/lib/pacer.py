@@ -23,7 +23,7 @@ from juriscraper.pacer import (
 )
 from localflavor.us.us_states import STATES_NORMALIZED, USPS_CHOICES
 
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.people_db.models import AttorneyOrganization, Role
 from cl.people_db.types import RoleType
 from cl.recap.models import UPLOAD_TYPE
@@ -102,12 +102,12 @@ def lookup_and_save(new, debug=False):
                 d = ds[0]
 
     # Add RECAP as a source if it's not already.
-    if d.source in [Docket.DEFAULT, Docket.SCRAPER]:
-        d.source = Docket.RECAP_AND_SCRAPER
-    elif d.source == Docket.COLUMBIA:
-        d.source = Docket.COLUMBIA_AND_RECAP
-    elif d.source == Docket.COLUMBIA_AND_SCRAPER:
-        d.source = Docket.COLUMBIA_AND_RECAP_AND_SCRAPER
+    d.add_recap_source()
+
+    if d.nature_of_suit and hasattr(new, "nature_of_suit"):
+        # Avoid updating the nature_of_suit if the docket already has a
+        # nature_of_suit set, since this value doesn't change. See issue #3878.
+        delattr(new, "nature_of_suit")
 
     for attr, v in new.__dict__.items():
         setattr(d, attr, v)
@@ -115,8 +115,7 @@ def lookup_and_save(new, debug=False):
     if not debug:
         d.save()
         logger.info(
-            "Saved as Docket %s: https://www.courtlistener.com%s"
-            % (d.pk, d.get_absolute_url())
+            f"Saved as Docket {d.pk}: https://www.courtlistener.com{d.get_absolute_url()}"
         )
     return d
 
@@ -584,7 +583,7 @@ def get_or_cache_pacer_court_status(court_id: str, server_ip: str) -> bool:
     """
 
     court_status_key = f"status:pacer:court.{court_id}:ip.{server_ip}"
-    r = make_redis_interface("CACHE", decode_responses=False)
+    r = get_redis_interface("CACHE", decode_responses=False)
     pickle_status = r.get(court_status_key)
     if pickle_status:
         court_status = pickle.loads(pickle_status)
@@ -619,7 +618,7 @@ def log_pacer_court_connection(
     :param server_ip: The server IP address.
     :return: None
     """
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
     d = connection_info["date_time"].date().isoformat()
     t = connection_info["date_time"].time().isoformat()

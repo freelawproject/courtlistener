@@ -24,7 +24,7 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.model_helpers import make_docket_number_core
 from cl.lib.pacer import map_pacer_to_cl_id
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import S3PrivateUUIDStorage
 from cl.lib.string_utils import trunc
 from cl.lib.timezone_helpers import localize_date_and_time
@@ -246,8 +246,8 @@ async def merge_rss_data(
     court = await Court.objects.aget(pk=court_id)
     dockets_created = 0
     all_rds_created: list[int] = []
-    district_court_ids = (
-        Court.federal_courts.district_pacer_courts().values_list(
+    court_ids = (
+        Court.federal_courts.district_or_bankruptcy_pacer_courts().values_list(
             "pk", flat=True
         )
     )
@@ -256,7 +256,7 @@ async def merge_rss_data(
         build_date
         and build_date
         > make_aware(datetime(year=2018, month=4, day=20), timezone.utc)
-        and await district_court_ids.filter(id=court_id).aexists()
+        and await court_ids.filter(id=court_id).aexists()
         and court_id not in courts_exceptions_no_rss
     ):
         # Avoid parsing/adding feeds after we start scraping RSS Feeds for
@@ -280,6 +280,9 @@ async def merge_rss_data(
             court_id,
             docket["pacer_case_id"],
             docket["docket_number"],
+            docket.get("federal_defendant_number"),
+            docket.get("federal_dn_judge_initials_assigned"),
+            docket.get("federal_dn_judge_initials_referred"),
         )
         docket_entry = docket["docket_entries"][0]
         document_number = docket["docket_entries"][0]["document_number"]
@@ -440,7 +443,7 @@ def log_added_items_to_redis(
     :return: The data logged to redis.
     """
 
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     pipe = r.pipeline()
     log_key = "troller_bk:log"
     pipe.hgetall(log_key)
@@ -669,7 +672,7 @@ class Command(VerboseCommand):
                 "The 'file' argument is required for that action."
             )
 
-        threads: list[threading.Thread] = []
+        threads = []
         try:
             iterate_and_import_files(options, threads)
         except KeyboardInterrupt:

@@ -430,8 +430,8 @@ state_pairs = (
         (re.compile(r'Connecticut Superior Court', re.I), 'connsuperct'),
         (re.compile(r'Review Division Of The Superior Court', re.I), 'connsuperct'),
         # Merged with Superior Court on July 1, 1978
-        (re.compile(r'Court of Common Pleas,? +((%s))' % conn_counties, re.I), 'connsuperct'),
-        (re.compile(r'Superior Court,? +((%s))' % conn_counties, re.I), 'connsuperct'),
+        (re.compile(fr'Court of Common Pleas,? +(({conn_counties}))', re.I), 'connsuperct'),
+        (re.compile(fr'Superior Court,? +(({conn_counties}))', re.I), 'connsuperct'),
 
     (re.compile(r'Supreme Court of (the State of )?Delaware', re.I), 'del'),
         (re.compile(r'Delaware Supreme Court', re.I), 'del'),
@@ -570,7 +570,7 @@ state_pairs = (
         (re.compile(r'New York Court of Appeals', re.I), 'ny'),
     (re.compile(r'Appellate Division of the Supreme Court of (the State of )?New York', re.I), 'nyappdiv'),
         (re.compile(r'New York Supreme Court, Appellate Term', re.I), 'nyappdiv'),
-    (re.compile(r'Supreme Court.*((%s))' % ny_counties, re.I), 'nyappdiv'),
+    (re.compile(fr'Supreme Court.*(({ny_counties}))', re.I), 'nyappdiv'),
     (re.compile(r'Supreme Court of the State of New York', re.I), 'nysupct'),
     (re.compile(r'Family Court.*New York', re.I), 'nyfamct'),
     (re.compile(r'Surrogate\'s Court', re.I), 'nysurct'),

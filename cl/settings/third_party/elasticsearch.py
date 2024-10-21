@@ -8,7 +8,6 @@ if TESTING:
     ELASTICSEARCH_DISABLED = True
     ELASTICSEARCH_RECAP_DOCS_SIGNALS_DISABLED = False
     ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = False
-    ELASTICSEARCH_RECAP_CITES_ENABLED = True
     ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = True
     ELASTICSEARCH_OPINIONS_SIGNALS_ENABLED = True
     ES_HIGHLIGHTER = "fvh"
@@ -23,10 +22,6 @@ else:
     )
     ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED = env(
         "ELASTICSEARCH_DOCKETS_SIGNALS_DISABLED",
-        default=False,
-    )
-    ELASTICSEARCH_RECAP_CITES_ENABLED = env(
-        "ELASTICSEARCH_RECAP_CITES_ENABLED",
         default=False,
     )
     ELASTICSEARCH_CLUSTERS_SIGNALS_ENABLED = env(
@@ -62,8 +57,10 @@ ELASTICSEARCH_CA_CERT = env(
     "ELASTICSEARCH_CA_CERT",
     default="/opt/courtlistener/docker/elastic/ca.crt",
 )
-ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=200)
-
+ELASTICSEARCH_TIMEOUT = env("ELASTICSEARCH_TIMEOUT", default=3500)
+ELASTICSEARCH_FAST_QUERIES_TIMEOUT = env(
+    "ELASTICSEARCH_FAST_QUERIES_TIMEOUT", default=2
+)
 base_connection_params = {
     "hosts": ELASTICSEARCH_DSL_HOST,
     "http_auth": (ELASTICSEARCH_USER, ELASTICSEARCH_PASSWORD),
@@ -109,7 +106,6 @@ ELASTICSEARCH_DSL = {
                 "tokenizer": "whitespace",
                 "filter": [
                     "lowercase",
-                    "synonym_filter",
                     "custom_word_delimiter_filter",
                     "remove_leading_zeros",
                     "english_stop",
@@ -222,7 +218,7 @@ ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 ###################################################
 # The maximum number of scheduled hits per alert. #
 ###################################################
-SCHEDULED_ALERT_HITS_LIMIT = 30
+SCHEDULED_ALERT_HITS_LIMIT = 20
 
 ################################
 # ES bulk indexing batch size #
@@ -236,4 +232,40 @@ ELASTICSEARCH_BULK_BATCH_SIZE = env(
 ######################################################
 ELASTICSEARCH_PARALLEL_BULK_THREADS = env(
     "ELASTICSEARCH_PARALLEL_BULK_THREADS", default=5
+)
+
+
+##########################
+# Sweep indexer settings #
+##########################
+ELASTICSEARCH_SWEEP_INDEXER_ACTION = env(
+    "ELASTICSEARCH_SWEEP_INDEXER_ACTION", default="all"
+)
+ELASTICSEARCH_SWEEP_INDEXER_QUEUE = env(
+    "ELASTICSEARCH_SWEEP_INDEXER_QUEUE", default="es_sweep"
+)
+ELASTICSEARCH_SWEEP_INDEXER_CHUNK_SIZE = env(
+    "ELASTICSEARCH_SWEEP_INDEXER_CHUNK_SIZE", default=10
+)
+ELASTICSEARCH_SWEEP_INDEXER_HEADS_RATE = env(
+    "ELASTICSEARCH_SWEEP_INDEXER_HEADS_RATE", default=60
+)
+ELASTICSEARCH_SWEEP_INDEXER_MODELS = env(
+    "ELASTICSEARCH_SWEEP_INDEXER_MODELS",
+    default=[
+        "audio.Audio",
+        "people_db.Person",
+        "search.OpinionCluster",
+        "search.Opinion",
+        "search.Docket",
+        "search.RECAPDocument",
+    ],
+)
+
+
+ELASTICSEARCH_MAX_RESULT_COUNT = 10_000
+ELASTICSEARCH_CARDINALITY_PRECISION = 2000
+
+ELASTICSEARCH_MICRO_CACHE_ENABLED = env(
+    "ELASTICSEARCH_MICRO_CACHE_ENABLED", default=False
 )

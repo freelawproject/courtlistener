@@ -19,7 +19,7 @@
         <div class="sidebar-section">
             <h4 class="bottom">
                 <i class="fa fa-arrow-circle-o-left gray"></i>
-                <a href="{{ cluster.get_absolute_url }}?{{ request.META.QUERY_STRING }}">Back
+                <a href="{{ cluster.get_absolute_url }}{% querystring %}">Back
                     to Opinion</a>
             </h4>
         </div>

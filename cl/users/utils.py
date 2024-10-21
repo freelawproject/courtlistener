@@ -22,10 +22,10 @@ def create_stub_account(
     This can be helpful when receiving anonymous donations, payments from
     external applications like XERO, etc.
 
-    :param user_data: Generally cleaned data from a cl.donate.forms.UserForm
+    :param user_data: Generally cleaned data from a cl.users.forms.UserForm
     :type user_data: dict
     :param profile_data: Generally cleaned data from a
-    cl.donate.forms.ProfileForm
+    cl.users.forms.ProfileForm
     :type profile_data: dict
     :return: A tuple of a User and UserProfile objects
     """
@@ -51,7 +51,6 @@ def create_stub_account(
             city=profile_data["city"],
             state=profile_data["state"],
             zip_code=profile_data["zip_code"],
-            wants_newsletter=profile_data["wants_newsletter"],
         )
     return new_user, profile
 
@@ -77,7 +76,6 @@ def convert_to_stub_account(user: User) -> User:
     profile.state = None
     profile.stub_account = True
     profile.email_confirmed = False
-    profile.wants_newsletter = False
     profile.zip_code = None
     profile.save()
 
@@ -173,8 +171,8 @@ emails: Dict[str, EmailType] = {
         "    https://www.courtlistener.com/email/confirm/%s/\n\n"
         "We're always adding features and listening to your requests. "
         "To join the conversation:\n\n"
-        " - Sign up for the Free Law Project newsletter: https://free.law/newsletter/\n"
-        " - Follow Free Law project or CourtListener on Twitter: https://twitter.com/freelawproject\n"
+        " - Sign up for the Free Law Project newsletter: https://donate.free.law/np/clients/freelawproject/subscribe.jsp?subscription=9\n"
+        " - Follow Free Law project on BlueSky: https://bsky.app/profile/free.law\n"
         " - Check our blog for the latest news and updates: https://free.law/blog/\n\n"
         "Thanks for using CourtListener and joining our community,\n\n"
         "The Free Law Project Team\n\n"

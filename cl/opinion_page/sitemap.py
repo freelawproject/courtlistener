@@ -70,7 +70,7 @@ class DocketSitemap(sitemaps.Sitemap):
         return (
             Docket.objects.filter(
                 new_or_popular,
-                source__in=Docket.RECAP_SOURCES,
+                source__in=Docket.RECAP_SOURCES(),
                 blocked=False,
             )
             .order_by("pk")
@@ -104,7 +104,7 @@ class BlockedDocketSitemap(sitemaps.Sitemap):
     def items(self) -> QuerySet:
         return (
             Docket.objects.filter(
-                source__in=Docket.RECAP_SOURCES,
+                source__in=Docket.RECAP_SOURCES(),
                 blocked=True,
                 date_blocked__gt=datetime.today() - timedelta(days=30),
             )

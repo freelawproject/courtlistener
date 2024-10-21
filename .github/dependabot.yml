@@ -25,4 +25,4 @@ updates:
   groups:
     core:
       patterns:
-        - 'actions/*' # The core actions offered by Github
+        - 'actions/*' # The core actions offered by GitHub

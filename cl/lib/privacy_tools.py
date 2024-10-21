@@ -124,7 +124,7 @@ def anonymize(s: str) -> Tuple[str, bool]:
 
     SSNs can be much more complicated than the implementation here. For
     details, see:
-      http://rion.io/2013/09/10/validating-social-security-numbers-through-regular-expressions-2/
+      https://rion.io/2013/09/10/validating-social-security-numbers-through-regular-expressions-2/
     """
     ssn_re = re.compile(r"\b(\d{3}-\d{2}-\d{4})\b", flags=re.VERBOSE)
     ein_re = re.compile(r"\b(\d{2}-\d{7})\b")

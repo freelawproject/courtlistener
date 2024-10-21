@@ -67,6 +67,7 @@ if "test" in sys.argv:
     ratelimiter_all_2_per_m = lambda func: func
     ratelimiter_unsafe_3_per_m = lambda func: func
     ratelimiter_unsafe_10_per_m = lambda func: func
+    ratelimiter_all_10_per_h = lambda func: func
     ratelimiter_unsafe_2000_per_h = lambda func: func
 else:
     ratelimiter_all_2_per_m = ratelimit(
@@ -82,6 +83,10 @@ else:
         key=get_ip_for_ratelimiter,
         rate="10/m",
         method=UNSAFE,
+    )
+    ratelimiter_all_10_per_h = ratelimit(
+        key=get_path_to_make_key,
+        rate="10/h",
     )
     ratelimiter_unsafe_2000_per_h = ratelimit(
         key=get_path_to_make_key,

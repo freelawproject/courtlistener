@@ -1,24 +1,22 @@
 import datetime
+import pickle
 from typing import Tuple, TypedDict, cast
+from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
-from django.contrib.auth.hashers import make_password
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.test import override_settings
-from django.urls import reverse
-from rest_framework.status import HTTP_200_OK, HTTP_503_SERVICE_UNAVAILABLE
+from requests.cookies import RequestsCookieJar
 
 from cl.lib.date_time import midnight_pt
-from cl.lib.elasticsearch_utils import (
-    append_query_conjunctions,
-    replace_highlight,
-    select_unique_hl,
-)
+from cl.lib.elasticsearch_utils import append_query_conjunctions
 from cl.lib.filesizes import convert_size_to_bytes
 from cl.lib.mime_types import lookup_mime_type
 from cl.lib.model_helpers import (
     clean_docket_number,
     is_docket_number,
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_upload_path,
 )
@@ -29,8 +27,19 @@ from cl.lib.pacer import (
     normalize_attorney_role,
     normalize_us_state,
 )
+from cl.lib.pacer_session import (
+    ProxyPacerSession,
+    SessionData,
+    get_or_cache_pacer_cookies,
+    session_key,
+)
 from cl.lib.privacy_tools import anonymize
 from cl.lib.ratelimiter import parse_rate
+from cl.lib.redis_utils import (
+    acquire_redis_lock,
+    get_redis_interface,
+    release_redis_lock,
+)
 from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
@@ -49,7 +58,6 @@ from cl.search.factories import (
 )
 from cl.search.models import Court, Docket, Opinion, OpinionCluster
 from cl.tests.cases import SimpleTestCase, TestCase
-from cl.users.factories import UserProfileWithParentsFactory
 
 
 class TestPacerUtils(TestCase):
@@ -82,6 +90,87 @@ class TestPacerUtils(TestCase):
             msg="Bankruptcy dockets that start blocked "
             "should stay blocked.",
         )
+
+
+@override_settings(
+    EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"]
+)
+class TestPacerSessionUtils(TestCase):
+
+    def setUp(self) -> None:
+        r = get_redis_interface("CACHE", decode_responses=False)
+        # Clear cached session keys to prevent data inconsistencies.
+        key = r.keys(session_key % "test_user_new_cookie")
+        if key:
+            r.delete(*key)
+        self.test_cookies = RequestsCookieJar()
+        self.test_cookies.set("PacerSession", "this-is-a-test")
+        r.set(
+            session_key % "test_user_new_format",
+            pickle.dumps(
+                SessionData(self.test_cookies, "http://proxy_1:9090")
+            ),
+            ex=60 * 60,
+        )
+        r.set(
+            session_key % "test_new_format_almost_expired",
+            pickle.dumps(
+                SessionData(self.test_cookies, "http://proxy_1:9090")
+            ),
+            ex=60,
+        )
+
+    def test_pick_random_proxy_when_list_is_available(self):
+        """Does ProxyPacerSession choose a random proxy from the available list?"""
+        session = ProxyPacerSession(username="test", password="password")
+        self.assertIn(
+            session.proxy_address,
+            ["http://proxy_1:9090", "http://proxy_2:9090"],
+        )
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_compute_new_cookies_with_new_format(self, mock_log_into_pacer):
+        """Are we using the dataclass for new cookies?"""
+        mock_log_into_pacer.return_value = SessionData(
+            self.test_cookies,
+            "http://proxy_1:9090",
+        )
+        session_data = get_or_cache_pacer_cookies(
+            "test_user_new_cookie", username="test", password="password"
+        )
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_parse_cookie_proxy_pair_properly(self, mock_log_into_pacer):
+        """Can we parse the dataclass from cache properly?"""
+        session_data = get_or_cache_pacer_cookies(
+            "test_user_new_format", username="test", password="password"
+        )
+        self.assertEqual(mock_log_into_pacer.call_count, 0)
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(session_data.proxy_address, "http://proxy_1:9090")
+
+    @patch("cl.lib.pacer_session.log_into_pacer")
+    def test_compute_cookies_for_almost_expired_data(
+        self, mock_log_into_pacer
+    ):
+        """Are we using the dataclass when re-computing session?"""
+        mock_log_into_pacer.return_value = SessionData(
+            self.test_cookies, "http://proxy_2:9090"
+        )
+
+        # Attempts to get almost expired cookies with the new format from cache
+        # Expects refresh.
+        session_data = get_or_cache_pacer_cookies(
+            "test_new_format_almost_expired",
+            username="test",
+            password="password",
+        )
+        self.assertIsInstance(session_data, SessionData)
+        self.assertEqual(mock_log_into_pacer.call_count, 1)
+        self.assertEqual(session_data.proxy_address, "http://proxy_2:9090")
 
 
 class TestStringUtils(SimpleTestCase):
@@ -984,123 +1073,6 @@ class TestElasticsearchUtils(SimpleTestCase):
             ouput_str = append_query_conjunctions(test["input"])
             self.assertEqual(ouput_str, test["output"])
 
-    def test_replace_highlight(self) -> None:
-        """Confirm that the replace_highlight helper properly replaces
-        highlighted terms, ensuring it can handle Unicode characters, such as
-        emojis.
-        """
-
-        tests = [
-            {
-                "cleaned_str": "MOTION for Leave to File Amicus Curiae Lorem",
-                "unique_hl_strings": ["Lorem", "Amicus", "Curiae"],
-                "output": "MOTION for Leave to File <mark>Amicus</mark> <mark>Curiae</mark> <mark>Lorem</mark>",
-            },
-            {
-                "cleaned_str": "Strickland v. Washington.",
-                "unique_hl_strings": ["Washington", "v.", "Curiae"],
-                "output": "Strickland <mark>v.</mark> <mark>Washington</mark>.",
-            },
-            {
-                "cleaned_str": "Strickland v. Washington Washington.",
-                "unique_hl_strings": ["Washington", "v."],
-                "output": "Strickland <mark>v.</mark> <mark>Washington</mark> <mark>Washington</mark>.",
-            },
-            {
-                "cleaned_str": "Code, § 1-815",
-                "unique_hl_strings": ["§", "1-815"],
-                "output": "Code, <mark>§</mark> <mark>1-815</mark>",
-            },
-            {
-                "cleaned_str": "Dr. Israel also demonstrated a misunderstanding",
-                "unique_hl_strings": ["Dr.", "a"],
-                "output": "<mark>Dr.</mark> Israel also demonstrated <mark>a</mark> misunderstanding",
-            },
-            {
-                "cleaned_str": "Friedland ⚖️ Deposit",
-                "unique_hl_strings": ["⚖️", "Deposit"],
-                "output": "Friedland <mark>⚖️</mark> <mark>Deposit</mark>",
-            },
-        ]
-
-        for test in tests:
-            output_str = replace_highlight(
-                test["cleaned_str"], test["unique_hl_strings"], "mark"  # type: ignore
-            )
-            self.assertEqual(output_str, test["output"])
-
-    def test_select_unique_hl(self) -> None:
-        """Confirm that select_unique_hl correctly identifies and returns the
-        longest string for highlighting purposes.
-        """
-        tests = [
-            {
-                "current_list": [
-                    "MOTION for Leave to File Amicus Curiae Lorem"
-                ],
-                "input_str": "MOTION for Leave to File",
-                "output": ["MOTION for Leave to File Amicus Curiae Lorem"],
-                "field": "description",
-            },
-            {
-                "current_list": [
-                    "MOTION for Leave to File Amicus Curiae Lorem"
-                ],
-                "input_str": "for Leave to File Amicus",
-                "output": ["MOTION for Leave to File Amicus Curiae Lorem"],
-                "field": "description",
-            },
-            {
-                "current_list": ["Leave to File Amicus"],
-                "input_str": "Leave to File Amicus Curiae Lorem",
-                "output": ["Leave to File Amicus Curiae Lorem"],
-                "field": "description",
-            },
-            {
-                "current_list": ["to File Amicus Curiae"],
-                "input_str": "Leave to File Amicus Curiae Lorem",
-                "output": ["Leave to File Amicus Curiae Lorem"],
-                "field": "description",
-            },
-            {
-                "current_list": [
-                    "to File Amicus Curiae Lorem pellentesque eu, elementum"
-                ],
-                "input_str": "Leave to File Amicus Curiae Lorem",
-                "output": [
-                    "to File Amicus Curiae Lorem pellentesque eu, elementum"
-                ],
-                "field": "description",
-            },
-            {
-                "current_list": ["22 AL 339"],
-                "input_str": "22 AL 1",
-                "output": ["22 AL 339", "22 AL 1"],
-                "field": "citation",
-            },
-            {
-                "current_list": ["22 AL 1"],
-                "input_str": "22 AL 339",
-                "output": ["22 AL 1", "22 AL 339"],
-                "field": "citation",
-            },
-            {
-                "current_list": ["22 AL 1", "22 AL 2"],
-                "input_str": "22 AL 2",
-                "output": ["22 AL 1", "22 AL 2"],
-                "field": "citation",
-            },
-        ]
-
-        for test in tests:
-            output_str = select_unique_hl(
-                test["current_list"],  # type: ignore
-                test["input_str"],  # type: ignore
-                test["field"],  # type: ignore
-            )
-            print("Output STR: ", output_str)
-            self.assertEqual(output_str, test["output"])
-
     def test_check_and_sanitize_queries_bad_syntax(self) -> None:
         """Tests for methods that check and sanitize queries with a bad search
         syntax.
@@ -1130,6 +1102,22 @@ class TestElasticsearchUtils(SimpleTestCase):
             },
             {
                 "input_str": "This is not a range query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity /short query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity /parent query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity long/short query",
+                "output": False,
+            },
+            {
+                "input_str": "This is no proximity long/parent query",
                 "output": False,
             },
         ]
@@ -1221,3 +1209,104 @@ class TestElasticsearchUtils(SimpleTestCase):
                 test["input_str"]  # type: ignore
             )
             self.assertEqual(output, test["sanitized"])
+
+
+class TestRedisUtils(SimpleTestCase):
+    """Test Redis utils functions."""
+
+    def test_redis_lock(self) -> None:
+        """Test acquiring and releasing a Redis lock."""
+
+        lock_key = "test_lock"
+        r = get_redis_interface("CACHE")
+        identifier = acquire_redis_lock(r, lock_key, 2000)
+        self.assertTrue(identifier)
+
+        result = release_redis_lock(r, lock_key, identifier)
+        self.assertEqual(result, 1)
+
+
+class TestLinkifyOrigDocketNumber(SimpleTestCase):
+    def test_linkify_orig_docket_number(self):
+        test_pairs = [
+            (
+                "National Labor Relations Board",
+                "19-CA-289275",
+                "https://www.nlrb.gov/case/19-CA-289275",
+            ),
+            (
+                "National Labor Relations Board",
+                "NLRB-09CA110508",
+                "https://www.nlrb.gov/case/09-CA-110508",
+            ),
+            (
+                "EPA",
+                "85 FR 20688",
+                "https://www.federalregister.gov/citation/85-FR-20688",
+            ),
+            (
+                "Other Agency",
+                "85 Fed. Reg. 12345",
+                "https://www.federalregister.gov/citation/85-FR-12345",
+            ),
+            (
+                "National Labor Relations Board",
+                "85 Fed. Reg. 12345",
+                "https://www.federalregister.gov/citation/85-FR-12345",
+            ),
+            (
+                "Bureau of Land Management",
+                "88FR20688",
+                "https://www.federalregister.gov/citation/88-FR-20688",
+            ),
+            (
+                "Bureau of Land Management",
+                "88 Fed Reg 34523",
+                "https://www.federalregister.gov/citation/88-FR-34523",
+            ),
+            (
+                "Department of Transportation",
+                "89 Fed. Reg. 34,620",
+                "https://www.federalregister.gov/citation/89-FR-34,620",
+            ),
+            (
+                "Environmental Protection Agency",
+                "EPA-HQ-OW-2020-0005",
+                "https://www.regulations.gov/docket/EPA-HQ-OW-2020-0005",
+            ),
+            (
+                "United States Tax Court",
+                "USTC-2451-13",
+                "https://dawson.ustaxcourt.gov/case-detail/02451-13",
+            ),
+            (
+                "United States Tax Court",
+                "6837-20",
+                "https://dawson.ustaxcourt.gov/case-detail/06837-20",
+            ),
+            (
+                "United States Tax Court",
+                "USTC-5903-19W",
+                "https://dawson.ustaxcourt.gov/case-detail/05903-19W",
+            ),
+            ("Federal Communications Commission", "19-CA-289275", ""),
+            (
+                "National Labor Relations Board",
+                "This is not an NLRB case",
+                "",
+            ),
+            ("Other Agency", "This is not a Federal Register citation", ""),
+        ]
+
+        for i, (agency, docket_number, expected_output) in enumerate(
+            test_pairs
+        ):
+            with self.subTest(
+                f"Testing description text cleaning for {agency, docket_number}...",
+                i=i,
+            ):
+                self.assertEqual(
+                    linkify_orig_docket_number(agency, docket_number),
+                    expected_output,
+                    f"Got incorrect result from clean_parenthetical_text for text: {agency, docket_number}",
+                )

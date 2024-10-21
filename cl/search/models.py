@@ -6,16 +6,20 @@ import pghistory
 import pytz
 from asgiref.sync import sync_to_async
 from celery.canvas import chain
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.postgres.indexes import HashIndex
 from django.core.exceptions import ValidationError
-from django.db import models
-from django.db.models import Prefetch, Q, QuerySet
-from django.dispatch import Signal
+from django.db import IntegrityError, models, transaction
+from django.db.models import Q, QuerySet
+from django.db.models.functions import MD5
 from django.template import loader
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.text import slugify
 from eyecite import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from localflavor.us.models import USPostalCodeField, USZipCodeField
 from localflavor.us.us_states import OBSOLETE_STATES, USPS_CHOICES
 from model_utils import FieldTracker
@@ -25,12 +29,13 @@ from cl.custom_filters.templatetags.text_filters import best_case_name
 from cl.lib import fields
 from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
+    CSVExportMixin,
+    linkify_orig_docket_number,
     make_docket_number_core,
     make_recap_path,
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.lib.search_index_utils import (
     InvalidDocumentError,
     normalize_search_dicts,
@@ -39,9 +44,10 @@ from cl.lib.search_index_utils import (
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
 from cl.lib.utils import deepgetattr
+from cl.search.docket_sources import DocketSources
+from cl.users.models import User
 
-# Custom signal for use with bulk_create.
-bulk_create_signal = Signal()
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
 class PRECEDENTIAL_STATUS:
@@ -66,6 +72,11 @@ class PRECEDENTIAL_STATUS:
     @classmethod
     def get_status_value(cls, name):
         reverse_names = {value: key for key, value in cls.NAMES}
+        return reverse_names.get(name)
+
+    @classmethod
+    def get_status_value_reverse(cls, name):
+        reverse_names = {key: value for key, value in cls.NAMES}
         return reverse_names.get(name)
 
 
@@ -115,6 +126,7 @@ class SOURCES:
     COLUMBIA_M_MANUAL_INPUT_M_HARVARD = "ZMU"
     COLUMBIA_M_PUBLIC_RESOURCE_M_HARVARD = "ZRU"
     COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD = "ZLCU"
+    RECAP = "G"
     NAMES = (
         (COURT_WEBSITE, "court website"),
         (PUBLIC_RESOURCE, "public.resource.org"),
@@ -215,10 +227,14 @@ class SOURCES:
             COLUMBIA_M_LAWBOX_M_COURT_M_HARVARD,
             "columbia archive merged with lawbox, court website and Harvard",
         ),
+        (
+            RECAP,
+            "recap",
+        ),
     )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class OriginatingCourtInformation(AbstractDateTimeModel):
     """Lower court metadata to associate with appellate cases.
 
@@ -314,6 +330,12 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         null=True,
     )
 
+    @property
+    def administrative_link(self):
+        return linkify_orig_docket_number(
+            self.docket.appeal_from_str, self.docket_number
+        )
+
     def get_absolute_url(self) -> str:
         return self.docket.get_absolute_url()
 
@@ -321,140 +343,21 @@ class OriginatingCourtInformation(AbstractDateTimeModel):
         verbose_name_plural = "Originating Court Information"
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), exclude=["view_count"])
-class Docket(AbstractDateTimeModel):
+@pghistory.track(
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+    exclude=["view_count"],
+)
+class Docket(AbstractDateTimeModel, DocketSources):
     """A class to sit above OpinionClusters, Audio files, and Docket Entries,
     and link them together.
     """
 
-    # The source values are additive. That is, if you get content from a new
-    # source, you can add it to the previous one, and have a combined value.
-    # For example, if you start with a RECAP docket (1), then add scraped
-    # content (2), you can arrive at a combined docket (3) because 1 + 2 = 3.
-    # Put another way, this is a bitmask. We should eventually re-do it as a
-    # bitfield using, e.g. https://github.com/disqus/django-bitfield
-    DEFAULT = 0
-    RECAP = 1
-    SCRAPER = 2
-    RECAP_AND_SCRAPER = 3
-    COLUMBIA = 4
-    COLUMBIA_AND_RECAP = 5
-    COLUMBIA_AND_SCRAPER = 6
-    COLUMBIA_AND_RECAP_AND_SCRAPER = 7
-    IDB = 8
-    RECAP_AND_IDB = 9
-    SCRAPER_AND_IDB = 10
-    RECAP_AND_SCRAPER_AND_IDB = 11
-    COLUMBIA_AND_IDB = 12
-    COLUMBIA_AND_RECAP_AND_IDB = 13
-    COLUMBIA_AND_SCRAPER_AND_IDB = 14
-    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB = 15
-    HARVARD = 16
-    HARVARD_AND_RECAP = 17
-    SCRAPER_AND_HARVARD = 18
-    RECAP_AND_SCRAPER_AND_HARVARD = 19
-    HARVARD_AND_COLUMBIA = 20
-    COLUMBIA_AND_RECAP_AND_HARVARD = 21
-    COLUMBIA_AND_SCRAPER_AND_HARVARD = 22
-    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD = 23
-    IDB_AND_HARVARD = 24
-    RECAP_AND_IDB_AND_HARVARD = 25
-    SCRAPER_AND_IDB_AND_HARVARD = 26
-    RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 27
-    COLUMBIA_AND_IDB_AND_HARVARD = 28
-    COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD = 29
-    COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD = 30
-    COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD = 31
-    DIRECT_INPUT = 32
-    DIRECT_INPUT_AND_HARVARD = 48
-    ANON_2020 = 64
-    ANON_2020_AND_SCRAPER = 66
-    ANON_2020_AND_HARVARD = 80
-    ANON_2020_AND_SCRAPER_AND_HARVARD = 82
-    SOURCE_CHOICES = (
-        (DEFAULT, "Default"),
-        (RECAP, "RECAP"),
-        (SCRAPER, "Scraper"),
-        (RECAP_AND_SCRAPER, "RECAP and Scraper"),
-        (COLUMBIA, "Columbia"),
-        (COLUMBIA_AND_SCRAPER, "Columbia and Scraper"),
-        (COLUMBIA_AND_RECAP, "Columbia and RECAP"),
-        (COLUMBIA_AND_RECAP_AND_SCRAPER, "Columbia, RECAP, and Scraper"),
-        (IDB, "Integrated Database"),
-        (RECAP_AND_IDB, "RECAP and IDB"),
-        (SCRAPER_AND_IDB, "Scraper and IDB"),
-        (RECAP_AND_SCRAPER_AND_IDB, "RECAP, Scraper, and IDB"),
-        (COLUMBIA_AND_IDB, "Columbia and IDB"),
-        (COLUMBIA_AND_RECAP_AND_IDB, "Columbia, RECAP, and IDB"),
-        (COLUMBIA_AND_SCRAPER_AND_IDB, "Columbia, Scraper, and IDB"),
-        (
-            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-            "Columbia, RECAP, Scraper, and IDB",
-        ),
-        (HARVARD, "Harvard"),
-        (HARVARD_AND_RECAP, "Harvard and RECAP"),
-        (SCRAPER_AND_HARVARD, "Scraper and Harvard"),
-        (RECAP_AND_SCRAPER_AND_HARVARD, "RECAP, Scraper and Harvard"),
-        (HARVARD_AND_COLUMBIA, "Harvard and Columbia"),
-        (COLUMBIA_AND_RECAP_AND_HARVARD, "Columbia, RECAP, and Harvard"),
-        (COLUMBIA_AND_SCRAPER_AND_HARVARD, "Columbia, Scraper, and Harvard"),
-        (
-            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_HARVARD,
-            "Columbia, RECAP, Scraper, and Harvard",
-        ),
-        (IDB_AND_HARVARD, "IDB and Harvard"),
-        (RECAP_AND_IDB_AND_HARVARD, "RECAP, IDB and Harvard"),
-        (SCRAPER_AND_IDB_AND_HARVARD, "Scraper, IDB and Harvard"),
-        (
-            RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            "RECAP, Scraper, IDB and Harvard",
-        ),
-        (COLUMBIA_AND_IDB_AND_HARVARD, "Columbia, IDB, and Harvard"),
-        (
-            COLUMBIA_AND_RECAP_AND_IDB_AND_HARVARD,
-            "Columbia, Recap, IDB, and Harvard",
-        ),
-        (
-            COLUMBIA_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            "Columbia, Scraper, IDB, and Harvard",
-        ),
-        (
-            COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB_AND_HARVARD,
-            "Columbia, Recap, Scraper, IDB, and Harvard",
-        ),
-        (DIRECT_INPUT, "Direct court input"),
-        (DIRECT_INPUT_AND_HARVARD, "Direct court input and Harvard"),
-        (ANON_2020, "2020 anonymous database"),
-        (ANON_2020_AND_SCRAPER, "2020 anonymous database and Scraper"),
-        (ANON_2020_AND_HARVARD, "2020 anonymous database and Harvard"),
-        (
-            ANON_2020_AND_SCRAPER_AND_HARVARD,
-            "2020 anonymous database, Scraper, and Harvard",
-        ),
-    )
-    RECAP_SOURCES = [
-        RECAP,
-        RECAP_AND_SCRAPER,
-        COLUMBIA_AND_RECAP,
-        COLUMBIA_AND_RECAP_AND_SCRAPER,
-        RECAP_AND_IDB,
-        RECAP_AND_SCRAPER_AND_IDB,
-        COLUMBIA_AND_RECAP_AND_IDB,
-        COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-    ]
-    IDB_SOURCES = [
-        IDB,
-        RECAP_AND_IDB,
-        SCRAPER_AND_IDB,
-        RECAP_AND_SCRAPER_AND_IDB,
-        COLUMBIA_AND_IDB,
-        COLUMBIA_AND_RECAP_AND_IDB,
-        COLUMBIA_AND_SCRAPER_AND_IDB,
-        COLUMBIA_AND_RECAP_AND_SCRAPER_AND_IDB,
-    ]
-
     source = models.SmallIntegerField(
-        help_text="contains the source of the Docket.", choices=SOURCE_CHOICES
+        help_text="contains the source of the Docket.",
+        choices=DocketSources.SOURCE_CHOICES,
     )
     court = models.ForeignKey(
         "Court",
@@ -476,6 +379,17 @@ class Docket(AbstractDateTimeModel):
         on_delete=models.RESTRICT,
         blank=True,
         null=True,
+    )
+    parent_docket = models.ForeignKey(
+        "self",
+        help_text="In criminal cases (and some magistrate) PACER creates "
+        "a parent docket and one or more child dockets. Child dockets "
+        "contain docket information for each individual defendant "
+        "while parent dockets are a superset of all docket entries.",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="child_dockets",
     )
     appeal_from_str = models.TextField(
         help_text=(
@@ -639,7 +553,6 @@ class Docket(AbstractDateTimeModel):
         "the correction field on the Opinion Cluster.",
         blank=True,
         null=True,
-        db_index=True,
     )
     docket_number_core = models.CharField(
         help_text=(
@@ -658,9 +571,47 @@ class Docket(AbstractDateTimeModel):
         blank=True,
         db_index=True,
     )
+    federal_dn_office_code = models.CharField(
+        help_text="A one digit statistical code (either alphabetic or numeric) "
+        "of the office within the federal district. In this "
+        "example, 2:07-cv-34911-MJL, the 2 preceding "
+        "the : is the office code.",
+        max_length=3,
+        blank=True,
+    )
+    federal_dn_case_type = models.CharField(
+        help_text="Case type, e.g., civil (cv), magistrate (mj), criminal (cr), "
+        "petty offense (po), and miscellaneous (mc). These codes "
+        "can be upper case or lower case, and may vary in number of "
+        "characters.",
+        max_length=6,
+        blank=True,
+    )
+    federal_dn_judge_initials_assigned = models.CharField(
+        help_text="A typically three-letter upper cased abbreviation "
+        "of the judge's initials. In the example 2:07-cv-34911-MJL, "
+        "MJL is the judge's initials. Judge initials change if a "
+        "new judge takes over a case.",
+        max_length=5,
+        blank=True,
+    )
+    federal_dn_judge_initials_referred = models.CharField(
+        help_text="A typically three-letter upper cased abbreviation "
+        "of the judge's initials. In the example 2:07-cv-34911-MJL-GOG, "
+        "GOG is the magistrate judge initials.",
+        max_length=5,
+        blank=True,
+    )
+    federal_defendant_number = models.SmallIntegerField(
+        help_text="A unique number assigned to each defendant in a case, "
+        "typically found in pacer criminal cases as a -1, -2 after "
+        "the judge initials. Example: 1:14-cr-10363-RGS-1.",
+        null=True,
+        blank=True,
+    )
     # Nullable for unique constraint requirements.
     pacer_case_id = fields.CharNullField(
-        help_text="The cased ID provided by PACER.",
+        help_text="The case ID provided by PACER.",
         max_length=100,
         blank=True,
         null=True,
@@ -800,6 +751,8 @@ class Docket(AbstractDateTimeModel):
             "referred_to_id",
             "referred_to_str",
             "slug",
+            "pacer_case_id",
+            "source",
         ]
     )
     es_o_field_tracker = FieldTracker(
@@ -813,13 +766,21 @@ class Docket(AbstractDateTimeModel):
     )
 
     class Meta:
-        unique_together = ("docket_number", "pacer_case_id", "court")
+        constraints = [
+            models.UniqueConstraint(
+                MD5("docket_number"),
+                "pacer_case_id",
+                "court_id",
+                name="unique_docket_per_court",
+            ),
+        ]
         indexes = [
             models.Index(fields=["court_id", "id"]),
             models.Index(
                 fields=["court_id", "docket_number_core", "pacer_case_id"],
                 name="district_court_docket_lookup_idx",
             ),
+            HashIndex("docket_number", name="hash_docket_number_lookup_idx"),
         ]
 
     def __str__(self) -> str:
@@ -835,7 +796,7 @@ class Docket(AbstractDateTimeModel):
                 self.docket_number
             )
 
-        if self.source in self.RECAP_SOURCES:
+        if self.source in self.RECAP_SOURCES():
             for field in ["pacer_case_id", "docket_number"]:
                 if (
                     field == "pacer_case_id"
@@ -851,7 +812,15 @@ class Docket(AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"slug", "docket_number_core"}.union(update_fields)
 
-        super(Docket, self).save(update_fields=update_fields, *args, **kwargs)
+        try:
+            # Without a transaction wrapper, a failure will invalidate outer transactions
+            with transaction.atomic():
+                super().save(update_fields=update_fields, *args, **kwargs)
+        except IntegrityError:
+            # Temporary patch while we solve #3359
+            # If the error is not related to `date_modified` it will raise again
+            self.date_modified = timezone.now()
+            super().save(update_fields=update_fields, *args, **kwargs)
 
     def get_absolute_url(self) -> str:
         return reverse("view_docket", args=[self.pk, self.slug])
@@ -859,18 +828,24 @@ class Docket(AbstractDateTimeModel):
     def add_recap_source(self):
         if self.source == self.DEFAULT:
             self.source = self.RECAP_AND_SCRAPER
-        elif self.source in [
-            self.SCRAPER,
-            self.COLUMBIA,
-            self.COLUMBIA_AND_SCRAPER,
-            self.IDB,
-            self.SCRAPER_AND_IDB,
-            self.COLUMBIA_AND_IDB,
-            self.COLUMBIA_AND_SCRAPER_AND_IDB,
-            self.HARVARD,
-        ]:
+        elif self.source in self.NON_RECAP_SOURCES():
             # Simply add the RECAP value to the other value.
             self.source = self.source + self.RECAP
+
+    def add_opinions_source(self, scraper_source: int):
+        match scraper_source:
+            case self.COLUMBIA:
+                non_source_list = self.NON_COLUMBIA_SOURCES()
+            case self.SCRAPER:
+                non_source_list = self.NON_SCRAPER_SOURCES()
+            case self.HARVARD:
+                non_source_list = self.NON_HARVARD_SOURCES()
+            case _:
+                return
+
+        if self.source in non_source_list:
+            # Simply add the new source value to the other value.
+            self.source = self.source + scraper_source
 
     @property
     def authorities(self):
@@ -898,26 +873,11 @@ class Docket(AbstractDateTimeModel):
         return build_authorities_query(self.authorities)
 
     def add_idb_source(self):
-        if self.source == self.DEFAULT:
-            self.source = self.IDB
-        elif self.source in [
-            self.RECAP,
-            self.SCRAPER,
-            self.RECAP_AND_SCRAPER,
-            self.COLUMBIA,
-            self.COLUMBIA_AND_RECAP,
-            self.COLUMBIA_AND_SCRAPER,
-            self.COLUMBIA_AND_RECAP_AND_SCRAPER,
-        ]:
+        if self.source in self.NON_IDB_SOURCES():
             self.source = self.source + self.IDB
 
     def add_anon_2020_source(self) -> None:
-        if self.source not in [
-            self.ANON_2020,
-            self.ANON_2020_AND_HARVARD,
-            self.ANON_2020_AND_SCRAPER,
-            self.ANON_2020_AND_SCRAPER_AND_HARVARD,
-        ]:
+        if self.source in self.NON_ANON_2020_SOURCES():
             self.source = self.source + self.ANON_2020
 
     @property
@@ -936,11 +896,7 @@ class Docket(AbstractDateTimeModel):
             self.court.jurisdiction == Court.FEDERAL_APPELLATE
         ):
             return None
-        return "https://ecf.%s.uscourts.gov/cgi-bin/%s?%s" % (
-            self.pacer_court_id,
-            path,
-            self.pacer_case_id,
-        )
+        return f"https://ecf.{self.pacer_court_id}.uscourts.gov/cgi-bin/{path}?{self.pacer_case_id}"
 
     def pacer_appellate_url_with_caseId(self, path):
         return (
@@ -962,6 +918,12 @@ class Docket(AbstractDateTimeModel):
             "incDktEntries=Y"
         )
 
+    def pacer_acms_url(self):
+        return (
+            f"https://{self.pacer_court_id}-showdoc.azurewebsites.us/"
+            f"{self.docket_number}"
+        )
+
     @property
     def pacer_docket_url(self):
         if self.court.jurisdiction == Court.FEDERAL_APPELLATE:
@@ -972,6 +934,8 @@ class Docket(AbstractDateTimeModel):
 
             if not self.pacer_case_id:
                 return self.pacer_appellate_url_with_caseNum(path)
+            elif self.pacer_case_id.count("-") > 1:
+                return self.pacer_acms_url()
             else:
                 return self.pacer_appellate_url_with_caseId(path)
         else:
@@ -1024,35 +988,6 @@ class Docket(AbstractDateTimeModel):
     @property
     def pacer_view_doc_url(self):
         return self.pacer_district_url("qryDocument.pl")
-
-    @property
-    def prefetched_parties(self):
-        """Prefetch the attorneys and firms associated with a docket and put
-        those values into the `attys_in_docket` and `firms_in_docket`
-        attributes.
-
-        :return: A parties queryset with the correct values prefetched.
-        """
-        from cl.people_db.models import Attorney, AttorneyOrganization
-
-        return self.parties.prefetch_related(
-            Prefetch(
-                "attorneys",
-                queryset=Attorney.objects.filter(roles__docket=self)
-                .distinct()
-                .only("pk", "name"),
-                to_attr="attys_in_docket",
-            ),
-            Prefetch(
-                "attys_in_docket__organizations",
-                queryset=AttorneyOrganization.objects.filter(
-                    attorney_organization_associations__docket=self
-                )
-                .distinct()
-                .only("pk", "name"),
-                to_attr="firms_in_docket",
-            ),
-        )
 
     def as_search_list(self):
         """Create list of search dicts from a single docket. This should be
@@ -1174,7 +1109,7 @@ class Docket(AbstractDateTimeModel):
         :param do_original_xml: Whether to do the original XML file as received
         from Internet Archive.
         """
-        if self.source not in self.RECAP_SOURCES:
+        if self.source not in self.RECAP_SOURCES():
             return
 
         from cl.lib.pacer import process_docket_data
@@ -1192,7 +1127,9 @@ class Docket(AbstractDateTimeModel):
             )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class DocketTags(Docket.tags.through):
     """A model class to track docket tags m2m relation"""
 
@@ -1200,7 +1137,9 @@ class DocketTags(Docket.tags.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class DocketPanel(Docket.panel.through):
     """A model class to track docket panel m2m relation"""
 
@@ -1208,8 +1147,8 @@ class DocketPanel(Docket.panel.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
-class DocketEntry(AbstractDateTimeModel):
+@pghistory.track()
+class DocketEntry(AbstractDateTimeModel, CSVExportMixin):
     docket = models.ForeignKey(
         Docket,
         help_text=(
@@ -1304,7 +1243,15 @@ class DocketEntry(AbstractDateTimeModel):
     class Meta:
         verbose_name_plural = "Docket Entries"
         indexes = [
-            models.Index(fields=["recap_sequence_number", "entry_number"])
+            models.Index(
+                fields=["docket_id", "entry_number"],
+                name="entry_number_idx",
+                condition=Q(entry_number=1),
+            ),
+            models.Index(
+                fields=["recap_sequence_number", "entry_number"],
+                name="search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx",
+            ),
         ]
         ordering = ("recap_sequence_number", "entry_number")
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1325,8 +1272,31 @@ class DocketEntry(AbstractDateTimeModel):
             )
         return None
 
+    def get_csv_columns(self, get_column_name=False):
+        columns = [
+            "id",
+            "entry_number",
+            "date_filed",
+            "time_filed",
+            "pacer_sequence_number",
+            "recap_sequence_number",
+            "description",
+        ]
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
+        return columns
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+    def get_column_function(self):
+        """Get dict of attrs: fucntion to apply on field value if it needs
+        to be pre-processed before being add to csv
+
+        returns: dict -- > {attr1: function}"""
+        return {}
+
+
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class DocketEntryTags(DocketEntry.tags.through):
     """A model class to track docket entry tags m2m relation"""
 
@@ -1361,11 +1331,8 @@ class AbstractPacerDocument(models.Model):
         null=True,
     )
     pacer_doc_id = models.CharField(
-        help_text=(
-            "The ID of the document in PACER. This information is "
-            "provided by RECAP."
-        ),
-        max_length=32,  # Same as in RECAP
+        help_text="The ID of the document in PACER.",
+        max_length=64,  # Increased to support storing docketEntryId from ACMS.
         blank=True,
     )
     is_available = models.BooleanField(
@@ -1388,8 +1355,10 @@ class AbstractPacerDocument(models.Model):
         abstract = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
-class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
+@pghistory.track()
+class RECAPDocument(
+    AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel, CSVExportMixin
+):
     """The model for Docket Documents and Attachments."""
 
     PACER_DOCUMENT = 1
@@ -1425,6 +1394,11 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         ),
         blank=True,
     )
+    acms_document_guid = models.CharField(
+        help_text="The GUID of the document in ACMS.",
+        max_length=64,
+        blank=True,
+    )
 
     es_rd_field_tracker = FieldTracker(
         fields=[
@@ -1454,11 +1428,17 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
                     "document_type",
                     "document_number",
                     "attachment_number",
-                ]
+                ],
+                name="search_recapdocument_document_type_303cccac79571217_idx",
             ),
             models.Index(
                 fields=["filepath_local"],
                 name="search_recapdocument_filepath_local_7dc6b0e53ccf753_uniq",
+            ),
+            models.Index(
+                fields=["pacer_doc_id"],
+                name="pacer_doc_id_idx",
+                condition=~Q(pacer_doc_id=""),
             ),
         ]
         permissions = (("has_recap_api_access", "Can work with RECAP API"),)
@@ -1524,7 +1504,13 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         court = self.docket_entry.docket.court
         court_id = map_cl_to_pacer_id(court.pk)
         if self.pacer_doc_id:
-            if court.jurisdiction == Court.FEDERAL_APPELLATE:
+            if self.pacer_doc_id.count("-") > 1:
+                return (
+                    f"https://{court_id}-showdoc.azurewebsites.us/docs/"
+                    f"{self.docket_entry.docket.pacer_case_id}/"
+                    f"{self.pacer_doc_id}"
+                )
+            elif court.jurisdiction == Court.FEDERAL_APPELLATE:
                 template = "https://ecf.%s.uscourts.gov/docs1/%s?caseId=%s"
             else:
                 template = "https://ecf.%s.uscourts.gov/doc1/%s?caseid=%s"
@@ -1642,9 +1628,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"pacer_doc_id"}.union(update_fields)
 
-        super(RECAPDocument, self).save(
-            update_fields=update_fields, *args, **kwargs
-        )
+        super().save(update_fields=update_fields, *args, **kwargs)
         tasks = []
         if do_extraction and self.needs_extraction:
             # Context extraction not done and is requested.
@@ -1682,7 +1666,7 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
         is deleted, but that should be OK.
         """
         id_cache = self.pk
-        super(RECAPDocument, self).delete(*args, **kwargs)
+        super().delete(*args, **kwargs)
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "search.RECAPDocument")
@@ -1793,8 +1777,57 @@ class RECAPDocument(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
 
         return normalize_search_dicts(out)
 
+    def get_csv_columns(self, get_column_name=False):
+        columns = [
+            "id",
+            "document_type",
+            "description",
+            "acms_document_guid",
+            "date_upload",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "is_free_on_pacer",
+            "is_available",
+            "is_sealed",
+            "sha1",
+            "page_count",
+            "file_size",
+            "filepath_local",
+            "filepath_ia",
+            "ocr_status",
+        ]
+        if get_column_name:
+            columns = [self.add_class_name(col) for col in columns]
+        return columns
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+    def _get_readable_document_type(self, *args, **kwargs):
+        return self.get_document_type_display()
+
+    def _get_readable_ocr_status(self, *args, **kwargs):
+        return self.get_ocr_status_display()
+
+    def _get_full_filepath_local(self, *args, **kwargs):
+        if self.filepath_local:
+            return f"https://storage.courtlistener.com/{self.filepath_local}"
+        return ""
+
+    def get_column_function(self):
+        """Get dict of attrs: function to apply on field value if it needs
+        to be pre-processed before being add to csv
+        If not functions returns empty dict
+
+        returns: dict -- > {attr1: function}"""
+        return {
+            "document_type": self._get_readable_document_type,
+            "ocr_status": self._get_readable_ocr_status,
+            "filepath_local": self._get_full_filepath_local,
+        }
+
+
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class RECAPDocumentTags(RECAPDocument.tags.through):
     """A model class to track recap document tags m2m relation"""
 
@@ -1802,7 +1835,7 @@ class RECAPDocumentTags(RECAPDocument.tags.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class BankruptcyInformation(AbstractDateTimeModel):
     docket = models.OneToOneField(
         Docket,
@@ -1851,7 +1884,7 @@ class BankruptcyInformation(AbstractDateTimeModel):
         return f"Bankruptcy Info for docket {self.docket_id}"
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Claim(AbstractDateTimeModel):
     docket = models.ForeignKey(
         Docket,
@@ -1966,7 +1999,9 @@ class Claim(AbstractDateTimeModel):
         )
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class ClaimTags(Claim.tags.through):
     """A model class to track claim tags m2m relation"""
 
@@ -1974,7 +2009,7 @@ class ClaimTags(Claim.tags.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     DOCKET_ENTRY = 1
     CLAIM_ENTRY = 2
@@ -2023,7 +2058,7 @@ class ClaimHistory(AbstractPacerDocument, AbstractPDF, AbstractDateTimeModel):
     )
     pacer_case_id = models.CharField(
         help_text=(
-            "The cased ID provided by PACER. Noted in this case on a "
+            "The case ID provided by PACER. Noted in this case on a "
             "per-document-level, since we've learned that some "
             "documents from other cases can appear in curious places."
         ),
@@ -2052,7 +2087,7 @@ class FederalCourtsQuerySet(models.QuerySet):
             end_date__isnull=True,
         ).exclude(pk="scotus")
 
-    def district_pacer_courts(self) -> models.QuerySet:
+    def district_or_bankruptcy_pacer_courts(self) -> models.QuerySet:
         return self.filter(
             Q(
                 jurisdiction__in=[
@@ -2096,7 +2131,7 @@ class FederalCourtsQuerySet(models.QuerySet):
         return self.filter(jurisdictions__in=Court.MILITARY_JURISDICTIONS)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Court(models.Model):
     """A class to represent some information about each court, can be extended
     as needed."""
@@ -2304,7 +2339,7 @@ class Court(models.Model):
     )
     jurisdiction = models.CharField(
         help_text="the jurisdiction of the court, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in JURISDICTIONS]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in JURISDICTIONS),
         max_length=3,
         choices=JURISDICTIONS,
     )
@@ -2330,7 +2365,9 @@ class Court(models.Model):
         ordering = ["position"]
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class CourtAppealsTo(Court.appeals_to.through):
     """A model class to track court appeals_to m2m relation"""
 
@@ -2338,7 +2375,7 @@ class CourtAppealsTo(Court.appeals_to.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Courthouse(models.Model):
     """A class to represent the physical location of a court."""
 
@@ -2423,6 +2460,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
                 c = get_citations(
                     citation_str,
                     remove_ambiguous=False,
+                    tokenizer=HYPERSCAN_TOKENIZER,
                 )[0]
             except IndexError:
                 raise ValueError(f"Unable to parse citation '{citation_str}'")
@@ -2440,7 +2478,7 @@ class ClusterCitationQuerySet(models.query.QuerySet):
         return clone
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class OpinionCluster(AbstractDateTimeModel):
     """A class representing a cluster of court opinions."""
 
@@ -2541,7 +2579,7 @@ class OpinionCluster(AbstractDateTimeModel):
     )
     source = models.CharField(
         help_text="the source of the cluster, one of: %s"
-        % ", ".join(["%s (%s)" % (t[0], t[1]) for t in SOURCES.NAMES]),
+        % ", ".join(f"{t[0]} ({t[1]})" for t in SOURCES.NAMES),
         max_length=10,
         choices=SOURCES.NAMES,
         blank=True,
@@ -2686,6 +2724,12 @@ class OpinionCluster(AbstractDateTimeModel):
         max_length=1000,
         blank=True,
         db_index=True,
+    )
+    filepath_pdf_harvard = models.FileField(
+        help_text="The case PDF from the Caselaw Access Project for this cluster",
+        upload_to=make_upload_path,
+        storage=IncrementingAWSMediaStorage(),
+        blank=True,
     )
     arguments = models.TextField(
         help_text="The attorney(s) and legal arguments presented as HTML text. "
@@ -2977,9 +3021,7 @@ class OpinionCluster(AbstractDateTimeModel):
         self.slug = slugify(trunc(best_case_name(self), 75))
         if update_fields is not None:
             update_fields = {"slug"}.union(update_fields)
-        super(OpinionCluster, self).save(
-            update_fields=update_fields, *args, **kwargs
-        )
+        super().save(update_fields=update_fields, *args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -3009,7 +3051,7 @@ class OpinionCluster(AbstractDateTimeModel):
         is deleted, but that should be OK.
         """
         id_cache = self.pk
-        super(OpinionCluster, self).delete(*args, **kwargs)
+        super().delete(*args, **kwargs)
         from cl.search.tasks import delete_items
 
         delete_items.delay([id_cache], "search.Opinion")
@@ -3121,7 +3163,9 @@ class OpinionCluster(AbstractDateTimeModel):
         return search_list
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class OpinionClusterPanel(OpinionCluster.panel.through):
     """A model class to track opinion cluster panel m2m relation"""
 
@@ -3129,7 +3173,9 @@ class OpinionClusterPanel(OpinionCluster.panel.through):
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class OpinionClusterNonParticipatingJudges(
     OpinionCluster.non_participating_judges.through
 ):
@@ -3140,7 +3186,7 @@ class OpinionClusterNonParticipatingJudges(
         proxy = True
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Citation(models.Model):
     """A simple class to hold citations."""
 
@@ -3210,9 +3256,15 @@ class Citation(models.Model):
     class Meta:
         indexes = [
             # To look up individual citations
-            models.Index(fields=["volume", "reporter", "page"]),
+            models.Index(
+                fields=["volume", "reporter", "page"],
+                name="search_citation_volume_ae340b5b02e8912_idx",
+            ),
             # To generate reporter volume lists
-            models.Index(fields=["volume", "reporter"]),
+            models.Index(
+                fields=["volume", "reporter"],
+                name="search_citation_volume_251bc1d270a8abee_idx",
+            ),
         ]
         unique_together = (("cluster", "volume", "reporter", "page"),)
 
@@ -3261,7 +3313,7 @@ def sort_cites(c):
         return 8
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Opinion(AbstractDateTimeModel):
     COMBINED = "010combined"
     UNANIMOUS = "015unamimous"
@@ -3275,6 +3327,7 @@ class Opinion(AbstractDateTimeModel):
     REHEARING = "070rehearing"
     ON_THE_MERITS = "080onthemerits"
     ON_MOTION_TO_STRIKE = "090onmotiontostrike"
+    TRIAL_COURT = "100trialcourt"
     OPINION_TYPES = (
         (COMBINED, "Combined Opinion"),
         (UNANIMOUS, "Unanimous Opinion"),
@@ -3288,6 +3341,7 @@ class Opinion(AbstractDateTimeModel):
         (REHEARING, "Rehearing"),
         (ON_THE_MERITS, "On the Merits"),
         (ON_MOTION_TO_STRIKE, "On Motion to Strike Cost Bill"),
+        (TRIAL_COURT, "Trial Court Document"),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
@@ -3432,6 +3486,15 @@ class Opinion(AbstractDateTimeModel):
             "sha1",
         ]
     )
+    ordering_key = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cluster_id", "ordering_key"],
+                name="unique_opinion_ordering_key",
+            )
+        ]
 
     @property
     def siblings(self) -> QuerySet:
@@ -3450,6 +3513,10 @@ class Opinion(AbstractDateTimeModel):
     def clean(self) -> None:
         if self.type == "":
             raise ValidationError("'type' is a required field.")
+        if isinstance(self.ordering_key, int) and self.ordering_key < 1:
+            raise ValidationError(
+                {"ordering_key": "Ordering key cannot be zero or negative"}
+            )
 
     def save(
         self,
@@ -3458,7 +3525,8 @@ class Opinion(AbstractDateTimeModel):
         *args: List,
         **kwargs: Dict,
     ) -> None:
-        super(Opinion, self).save(*args, **kwargs)
+        self.clean()
+        super().save(*args, **kwargs)
         if index:
             from cl.search.tasks import add_items_to_solr
 
@@ -3566,21 +3634,14 @@ class Opinion(AbstractDateTimeModel):
         return normalize_search_dicts(out)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot(), obj_field=None)
+@pghistory.track(
+    pghistory.InsertEvent(), pghistory.DeleteEvent(), obj_field=None
+)
 class OpinionJoinedBy(Opinion.joined_by.through):
     """A model class to track opinion joined_by m2m relation"""
 
     class Meta:
         proxy = True
-
-
-class BulkCreateManager(models.Manager):
-    """Custom manager that will trigger a signal on bulk_create."""
-
-    def bulk_create_with_signal(self, objs, *args, **kwargs):
-        created_objs = super().bulk_create(objs, *args, **kwargs)
-        bulk_create_signal.send(sender=self.model, instances=created_objs)
-        return created_objs
 
 
 class OpinionsCited(models.Model):
@@ -3625,8 +3686,6 @@ class OpinionsCitedByRECAPDocument(models.Model):
         "in the citing document",
         default=1,
     )
-
-    objects = BulkCreateManager()
 
     def __str__(self) -> str:
         return f"{self.citing_document.id} ⤜--cites⟶  {self.cited_opinion.id}"
@@ -3757,7 +3816,7 @@ class ParentheticalGroup(models.Model):
 TaggableType = TypeVar("TaggableType", Docket, DocketEntry, RECAPDocument)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class Tag(AbstractDateTimeModel):
     name = models.CharField(
         help_text="The name of the tag.",
@@ -3850,6 +3909,7 @@ class SEARCH_TYPES:
     OPINION = "o"
     RECAP = "r"
     DOCKETS = "d"
+    RECAP_DOCUMENT = "rd"
     ORAL_ARGUMENT = "oa"
     PEOPLE = "p"
     PARENTHETICAL = "pa"
@@ -3857,8 +3917,61 @@ class SEARCH_TYPES:
         (OPINION, "Opinions"),
         (RECAP, "RECAP"),
         (DOCKETS, "RECAP Dockets"),
+        (RECAP_DOCUMENT, "RECAP Documents"),
         (ORAL_ARGUMENT, "Oral Arguments"),
         (PEOPLE, "People"),
         (PARENTHETICAL, "Parenthetical"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
+
+
+class SearchQuery(models.Model):
+    WEBSITE = 1
+    API = 2
+    SOURCES = (
+        (WEBSITE, "Website"),
+        (API, "API request"),
+    )
+    ELASTICSEARCH = 1
+    SOLR = 2
+    ENGINES = (
+        (ELASTICSEARCH, "Elasticsearch"),
+        (SOLR, "Solr"),
+    )
+    user = models.ForeignKey(
+        User,
+        help_text="The user who performed this search query.",
+        related_name="search_queries",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    source = models.SmallIntegerField(
+        help_text="The interface used to perform the query.", choices=SOURCES
+    )
+    get_params = models.TextField(
+        help_text="The GET parameters of the search query."
+    )
+    query_time_ms = models.IntegerField(
+        help_text="The milliseconds to execute the query, as returned in "
+        "the ElasticSearch or Solr response.",
+        null=True,
+    )
+    hit_cache = models.BooleanField(
+        help_text="Whether the query hit the cache or not."
+    )
+    failed = models.BooleanField(
+        help_text="True if there was an error executing the query."
+    )
+    engine = models.SmallIntegerField(
+        help_text="The engine that executed the search", choices=ENGINES
+    )
+    date_created = models.DateTimeField(
+        help_text="Datetime when the record was created.",
+        auto_now_add=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["date_created"]),
+        ]

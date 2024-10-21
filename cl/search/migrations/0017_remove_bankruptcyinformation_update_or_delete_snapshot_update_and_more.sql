@@ -44,21 +44,21 @@ DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_8a108 ON "sear
 --
 DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_c9dd9 ON "search_tag";
 --
--- Rename unnamed index for ('volume', 'reporter') on citation to search_cita_volume_464334_idx
+-- Rename unnamed index for ('volume', 'reporter') on citation to search_citation_volume_251bc1d270a8abee_idx
 --
-ALTER INDEX "search_citation_volume_251bc1d270a8abee_idx" RENAME TO "search_cita_volume_464334_idx";
+-- (no-op)
 --
--- Rename unnamed index for ('volume', 'reporter', 'page') on citation to search_cita_volume_92c344_idx
+-- Rename unnamed index for ('volume', 'reporter', 'page') on citation to search_citation_volume_ae340b5b02e8912_idx
 --
-ALTER INDEX "search_citation_volume_ae340b5b02e8912_idx" RENAME TO "search_cita_volume_92c344_idx";
+-- (no-op)
 --
--- Rename unnamed index for ('recap_sequence_number', 'entry_number') on docketentry to search_dock_recap_s_306ab9_idx
+-- Rename unnamed index for ('recap_sequence_number', 'entry_number') on docketentry to search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx
 --
-ALTER INDEX "search_docketentry_recap_sequence_number_1c82e51988e2d89f_idx" RENAME TO "search_dock_recap_s_306ab9_idx";
+-- (no-op)
 --
--- Rename unnamed index for ('document_type', 'document_number', 'attachment_number') on recapdocument to search_reca_documen_cc5acd_idx
+-- Rename unnamed index for ('document_type', 'document_number', 'attachment_number') on recapdocument to search_recapdocument_document_type_303cccac79571217_idx
 --
-ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO "recapdocument to search_reca_documen_cc5acd_idx";
+-- (no-op)
 --
 -- Create trigger update_or_delete_snapshot_update on model bankruptcyinformation
 --
@@ -88,7 +88,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_17e86()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -104,13 +104,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_17e86 ON "search_bankruptcyinformation";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_17e86
                 AFTER UPDATE ON "search_bankruptcyinformation"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."docket_id" IS DISTINCT FROM (NEW."docket_id") OR OLD."date_converted" IS DISTINCT FROM (NEW."date_converted") OR OLD."date_last_to_file_claims" IS DISTINCT FROM (NEW."date_last_to_file_claims") OR OLD."date_last_to_file_govt" IS DISTINCT FROM (NEW."date_last_to_file_govt") OR OLD."date_debtor_dismissed" IS DISTINCT FROM (NEW."date_debtor_dismissed") OR OLD."chapter" IS DISTINCT FROM (NEW."chapter") OR OLD."trustee_str" IS DISTINCT FROM (NEW."trustee_str"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_17e86();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_17e86 ON "search_bankruptcyinformation" IS '85d1a7878d466326c90c68b401f107b1158c2796';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model claim
 --
@@ -140,7 +140,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_bb32f()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -156,13 +156,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_bb32f ON "search_claim";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_bb32f
                 AFTER UPDATE ON "search_claim"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."docket_id" IS DISTINCT FROM (NEW."docket_id") OR OLD."date_claim_modified" IS DISTINCT FROM (NEW."date_claim_modified") OR OLD."date_original_entered" IS DISTINCT FROM (NEW."date_original_entered") OR OLD."date_original_filed" IS DISTINCT FROM (NEW."date_original_filed") OR OLD."date_last_amendment_entered" IS DISTINCT FROM (NEW."date_last_amendment_entered") OR OLD."date_last_amendment_filed" IS DISTINCT FROM (NEW."date_last_amendment_filed") OR OLD."claim_number" IS DISTINCT FROM (NEW."claim_number") OR OLD."creditor_details" IS DISTINCT FROM (NEW."creditor_details") OR OLD."creditor_id" IS DISTINCT FROM (NEW."creditor_id") OR OLD."status" IS DISTINCT FROM (NEW."status") OR OLD."entered_by" IS DISTINCT FROM (NEW."entered_by") OR OLD."filed_by" IS DISTINCT FROM (NEW."filed_by") OR OLD."amount_claimed" IS DISTINCT FROM (NEW."amount_claimed") OR OLD."unsecured_claimed" IS DISTINCT FROM (NEW."unsecured_claimed") OR OLD."secured_claimed" IS DISTINCT FROM (NEW."secured_claimed") OR OLD."priority_claimed" IS DISTINCT FROM (NEW."priority_claimed") OR OLD."description" IS DISTINCT FROM (NEW."description") OR OLD."remarks" IS DISTINCT FROM (NEW."remarks"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_bb32f();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_bb32f ON "search_claim" IS '5a3fde0d49f7f04afe30f9151a8b3535710ec1a0';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model claimhistory
 --
@@ -192,7 +192,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_137a5()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -208,13 +208,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_137a5 ON "search_claimhistory";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_137a5
                 AFTER UPDATE ON "search_claimhistory"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."sha1" IS DISTINCT FROM (NEW."sha1") OR OLD."page_count" IS DISTINCT FROM (NEW."page_count") OR OLD."file_size" IS DISTINCT FROM (NEW."file_size") OR OLD."filepath_local" IS DISTINCT FROM (NEW."filepath_local") OR OLD."filepath_ia" IS DISTINCT FROM (NEW."filepath_ia") OR OLD."ia_upload_failure_count" IS DISTINCT FROM (NEW."ia_upload_failure_count") OR OLD."thumbnail" IS DISTINCT FROM (NEW."thumbnail") OR OLD."thumbnail_status" IS DISTINCT FROM (NEW."thumbnail_status") OR OLD."plain_text" IS DISTINCT FROM (NEW."plain_text") OR OLD."ocr_status" IS DISTINCT FROM (NEW."ocr_status") OR OLD."date_upload" IS DISTINCT FROM (NEW."date_upload") OR OLD."document_number" IS DISTINCT FROM (NEW."document_number") OR OLD."attachment_number" IS DISTINCT FROM (NEW."attachment_number") OR OLD."pacer_doc_id" IS DISTINCT FROM (NEW."pacer_doc_id") OR OLD."is_available" IS DISTINCT FROM (NEW."is_available") OR OLD."is_free_on_pacer" IS DISTINCT FROM (NEW."is_free_on_pacer") OR OLD."is_sealed" IS DISTINCT FROM (NEW."is_sealed") OR OLD."claim_id" IS DISTINCT FROM (NEW."claim_id") OR OLD."date_filed" IS DISTINCT FROM (NEW."date_filed") OR OLD."claim_document_type" IS DISTINCT FROM (NEW."claim_document_type") OR OLD."description" IS DISTINCT FROM (NEW."description") OR OLD."claim_doc_id" IS DISTINCT FROM (NEW."claim_doc_id") OR OLD."pacer_dm_id" IS DISTINCT FROM (NEW."pacer_dm_id") OR OLD."pacer_case_id" IS DISTINCT FROM (NEW."pacer_case_id"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_137a5();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_137a5 ON "search_claimhistory" IS 'c4f2a33aa09534f0db6c38a62b0c4e2d656d1db0';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model court
 --
@@ -244,7 +244,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_c94ab()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -260,13 +260,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_c94ab ON "search_court";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_c94ab
                 AFTER UPDATE ON "search_court"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."pacer_court_id" IS DISTINCT FROM (NEW."pacer_court_id") OR OLD."pacer_has_rss_feed" IS DISTINCT FROM (NEW."pacer_has_rss_feed") OR OLD."pacer_rss_entry_types" IS DISTINCT FROM (NEW."pacer_rss_entry_types") OR OLD."date_last_pacer_contact" IS DISTINCT FROM (NEW."date_last_pacer_contact") OR OLD."fjc_court_id" IS DISTINCT FROM (NEW."fjc_court_id") OR OLD."in_use" IS DISTINCT FROM (NEW."in_use") OR OLD."has_opinion_scraper" IS DISTINCT FROM (NEW."has_opinion_scraper") OR OLD."has_oral_argument_scraper" IS DISTINCT FROM (NEW."has_oral_argument_scraper") OR OLD."position" IS DISTINCT FROM (NEW."position") OR OLD."citation_string" IS DISTINCT FROM (NEW."citation_string") OR OLD."short_name" IS DISTINCT FROM (NEW."short_name") OR OLD."full_name" IS DISTINCT FROM (NEW."full_name") OR OLD."url" IS DISTINCT FROM (NEW."url") OR OLD."start_date" IS DISTINCT FROM (NEW."start_date") OR OLD."end_date" IS DISTINCT FROM (NEW."end_date") OR OLD."jurisdiction" IS DISTINCT FROM (NEW."jurisdiction") OR OLD."notes" IS DISTINCT FROM (NEW."notes"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_c94ab();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_c94ab ON "search_court" IS '3d7ee4371f809a112d0ca08ebac797bfe18e404d';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model docket
 --
@@ -296,7 +296,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_7e039()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -312,13 +312,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_7e039 ON "search_docket";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_7e039
                 AFTER UPDATE ON "search_docket"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."source" IS DISTINCT FROM (NEW."source") OR OLD."court_id" IS DISTINCT FROM (NEW."court_id") OR OLD."appeal_from_id" IS DISTINCT FROM (NEW."appeal_from_id") OR OLD."appeal_from_str" IS DISTINCT FROM (NEW."appeal_from_str") OR OLD."originating_court_information_id" IS DISTINCT FROM (NEW."originating_court_information_id") OR OLD."idb_data_id" IS DISTINCT FROM (NEW."idb_data_id") OR OLD."assigned_to_id" IS DISTINCT FROM (NEW."assigned_to_id") OR OLD."assigned_to_str" IS DISTINCT FROM (NEW."assigned_to_str") OR OLD."referred_to_id" IS DISTINCT FROM (NEW."referred_to_id") OR OLD."referred_to_str" IS DISTINCT FROM (NEW."referred_to_str") OR OLD."panel_str" IS DISTINCT FROM (NEW."panel_str") OR OLD."date_last_index" IS DISTINCT FROM (NEW."date_last_index") OR OLD."date_cert_granted" IS DISTINCT FROM (NEW."date_cert_granted") OR OLD."date_cert_denied" IS DISTINCT FROM (NEW."date_cert_denied") OR OLD."date_argued" IS DISTINCT FROM (NEW."date_argued") OR OLD."date_reargued" IS DISTINCT FROM (NEW."date_reargued") OR OLD."date_reargument_denied" IS DISTINCT FROM (NEW."date_reargument_denied") OR OLD."date_filed" IS DISTINCT FROM (NEW."date_filed") OR OLD."date_terminated" IS DISTINCT FROM (NEW."date_terminated") OR OLD."date_last_filing" IS DISTINCT FROM (NEW."date_last_filing") OR OLD."case_name_short" IS DISTINCT FROM (NEW."case_name_short") OR OLD."case_name" IS DISTINCT FROM (NEW."case_name") OR OLD."case_name_full" IS DISTINCT FROM (NEW."case_name_full") OR OLD."slug" IS DISTINCT FROM (NEW."slug") OR OLD."docket_number" IS DISTINCT FROM (NEW."docket_number") OR OLD."docket_number_core" IS DISTINCT FROM (NEW."docket_number_core") OR OLD."pacer_case_id" IS DISTINCT FROM (NEW."pacer_case_id") OR OLD."cause" IS DISTINCT FROM (NEW."cause") OR OLD."nature_of_suit" IS DISTINCT FROM (NEW."nature_of_suit") OR OLD."jury_demand" IS DISTINCT FROM (NEW."jury_demand") OR OLD."jurisdiction_type" IS DISTINCT FROM (NEW."jurisdiction_type") OR OLD."appellate_fee_status" IS DISTINCT FROM (NEW."appellate_fee_status") OR OLD."appellate_case_type_information" IS DISTINCT FROM (NEW."appellate_case_type_information") OR OLD."mdl_status" IS DISTINCT FROM (NEW."mdl_status") OR OLD."filepath_local" IS DISTINCT FROM (NEW."filepath_local") OR OLD."filepath_ia" IS DISTINCT FROM (NEW."filepath_ia") OR OLD."filepath_ia_json" IS DISTINCT FROM (NEW."filepath_ia_json") OR OLD."ia_upload_failure_count" IS DISTINCT FROM (NEW."ia_upload_failure_count") OR OLD."ia_needs_upload" IS DISTINCT FROM (NEW."ia_needs_upload") OR OLD."ia_date_first_change" IS DISTINCT FROM (NEW."ia_date_first_change") OR OLD."date_blocked" IS DISTINCT FROM (NEW."date_blocked") OR OLD."blocked" IS DISTINCT FROM (NEW."blocked"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_7e039();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_7e039 ON "search_docket" IS 'cab7d35a7309b21c85f837b8a6c4759febe46fd8';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model docketentry
 --
@@ -348,7 +348,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_46e1e()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -364,13 +364,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_46e1e ON "search_docketentry";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_46e1e
                 AFTER UPDATE ON "search_docketentry"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."docket_id" IS DISTINCT FROM (NEW."docket_id") OR OLD."date_filed" IS DISTINCT FROM (NEW."date_filed") OR OLD."time_filed" IS DISTINCT FROM (NEW."time_filed") OR OLD."entry_number" IS DISTINCT FROM (NEW."entry_number") OR OLD."recap_sequence_number" IS DISTINCT FROM (NEW."recap_sequence_number") OR OLD."pacer_sequence_number" IS DISTINCT FROM (NEW."pacer_sequence_number") OR OLD."description" IS DISTINCT FROM (NEW."description"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_46e1e();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_46e1e ON "search_docketentry" IS '2330fe784864bcc2d76ebe1d4a07e7819fa8de38';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model opinion
 --
@@ -400,7 +400,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_67ecd()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -416,13 +416,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_67ecd ON "search_opinion";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_67ecd
                 AFTER UPDATE ON "search_opinion"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."cluster_id" IS DISTINCT FROM (NEW."cluster_id") OR OLD."author_id" IS DISTINCT FROM (NEW."author_id") OR OLD."author_str" IS DISTINCT FROM (NEW."author_str") OR OLD."per_curiam" IS DISTINCT FROM (NEW."per_curiam") OR OLD."joined_by_str" IS DISTINCT FROM (NEW."joined_by_str") OR OLD."type" IS DISTINCT FROM (NEW."type") OR OLD."sha1" IS DISTINCT FROM (NEW."sha1") OR OLD."page_count" IS DISTINCT FROM (NEW."page_count") OR OLD."download_url" IS DISTINCT FROM (NEW."download_url") OR OLD."local_path" IS DISTINCT FROM (NEW."local_path") OR OLD."plain_text" IS DISTINCT FROM (NEW."plain_text") OR OLD."html" IS DISTINCT FROM (NEW."html") OR OLD."html_lawbox" IS DISTINCT FROM (NEW."html_lawbox") OR OLD."html_columbia" IS DISTINCT FROM (NEW."html_columbia") OR OLD."html_anon_2020" IS DISTINCT FROM (NEW."html_anon_2020") OR OLD."xml_harvard" IS DISTINCT FROM (NEW."xml_harvard") OR OLD."html_with_citations" IS DISTINCT FROM (NEW."html_with_citations") OR OLD."extracted_by_ocr" IS DISTINCT FROM (NEW."extracted_by_ocr"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_67ecd();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_67ecd ON "search_opinion" IS '4a3d82790ac0cbd840d6a7f6c136d4cc65419e5e';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model opinioncluster
 --
@@ -452,7 +452,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_6a181()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -468,13 +468,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_6a181 ON "search_opinioncluster";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_6a181
                 AFTER UPDATE ON "search_opinioncluster"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."docket_id" IS DISTINCT FROM (NEW."docket_id") OR OLD."judges" IS DISTINCT FROM (NEW."judges") OR OLD."date_filed" IS DISTINCT FROM (NEW."date_filed") OR OLD."date_filed_is_approximate" IS DISTINCT FROM (NEW."date_filed_is_approximate") OR OLD."slug" IS DISTINCT FROM (NEW."slug") OR OLD."case_name_short" IS DISTINCT FROM (NEW."case_name_short") OR OLD."case_name" IS DISTINCT FROM (NEW."case_name") OR OLD."case_name_full" IS DISTINCT FROM (NEW."case_name_full") OR OLD."scdb_id" IS DISTINCT FROM (NEW."scdb_id") OR OLD."scdb_decision_direction" IS DISTINCT FROM (NEW."scdb_decision_direction") OR OLD."scdb_votes_majority" IS DISTINCT FROM (NEW."scdb_votes_majority") OR OLD."scdb_votes_minority" IS DISTINCT FROM (NEW."scdb_votes_minority") OR OLD."source" IS DISTINCT FROM (NEW."source") OR OLD."procedural_history" IS DISTINCT FROM (NEW."procedural_history") OR OLD."attorneys" IS DISTINCT FROM (NEW."attorneys") OR OLD."nature_of_suit" IS DISTINCT FROM (NEW."nature_of_suit") OR OLD."posture" IS DISTINCT FROM (NEW."posture") OR OLD."syllabus" IS DISTINCT FROM (NEW."syllabus") OR OLD."headnotes" IS DISTINCT FROM (NEW."headnotes") OR OLD."summary" IS DISTINCT FROM (NEW."summary") OR OLD."disposition" IS DISTINCT FROM (NEW."disposition") OR OLD."history" IS DISTINCT FROM (NEW."history") OR OLD."other_dates" IS DISTINCT FROM (NEW."other_dates") OR OLD."cross_reference" IS DISTINCT FROM (NEW."cross_reference") OR OLD."correction" IS DISTINCT FROM (NEW."correction") OR OLD."citation_count" IS DISTINCT FROM (NEW."citation_count") OR OLD."precedential_status" IS DISTINCT FROM (NEW."precedential_status") OR OLD."date_blocked" IS DISTINCT FROM (NEW."date_blocked") OR OLD."blocked" IS DISTINCT FROM (NEW."blocked") OR OLD."filepath_json_harvard" IS DISTINCT FROM (NEW."filepath_json_harvard"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_6a181();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_6a181 ON "search_opinioncluster" IS '907cc0f72768dba7763ab81e6e1c65f362301716';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model originatingcourtinformation
 --
@@ -504,7 +504,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_49538()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -520,13 +520,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_49538 ON "search_originatingcourtinformation";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_49538
                 AFTER UPDATE ON "search_originatingcourtinformation"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."docket_number" IS DISTINCT FROM (NEW."docket_number") OR OLD."assigned_to_id" IS DISTINCT FROM (NEW."assigned_to_id") OR OLD."assigned_to_str" IS DISTINCT FROM (NEW."assigned_to_str") OR OLD."ordering_judge_id" IS DISTINCT FROM (NEW."ordering_judge_id") OR OLD."ordering_judge_str" IS DISTINCT FROM (NEW."ordering_judge_str") OR OLD."court_reporter" IS DISTINCT FROM (NEW."court_reporter") OR OLD."date_disposed" IS DISTINCT FROM (NEW."date_disposed") OR OLD."date_filed" IS DISTINCT FROM (NEW."date_filed") OR OLD."date_judgment" IS DISTINCT FROM (NEW."date_judgment") OR OLD."date_judgment_eod" IS DISTINCT FROM (NEW."date_judgment_eod") OR OLD."date_filed_noa" IS DISTINCT FROM (NEW."date_filed_noa") OR OLD."date_received_coa" IS DISTINCT FROM (NEW."date_received_coa"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_49538();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_49538 ON "search_originatingcourtinformation" IS '5d249a18e8be51afa8c54132770efcdde2b47a61';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model recapdocument
 --
@@ -556,7 +556,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_8a108()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -572,13 +572,13 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_8a108 ON "search_recapdocument";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_8a108
                 AFTER UPDATE ON "search_recapdocument"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."sha1" IS DISTINCT FROM (NEW."sha1") OR OLD."page_count" IS DISTINCT FROM (NEW."page_count") OR OLD."file_size" IS DISTINCT FROM (NEW."file_size") OR OLD."filepath_local" IS DISTINCT FROM (NEW."filepath_local") OR OLD."filepath_ia" IS DISTINCT FROM (NEW."filepath_ia") OR OLD."ia_upload_failure_count" IS DISTINCT FROM (NEW."ia_upload_failure_count") OR OLD."thumbnail" IS DISTINCT FROM (NEW."thumbnail") OR OLD."thumbnail_status" IS DISTINCT FROM (NEW."thumbnail_status") OR OLD."plain_text" IS DISTINCT FROM (NEW."plain_text") OR OLD."ocr_status" IS DISTINCT FROM (NEW."ocr_status") OR OLD."date_upload" IS DISTINCT FROM (NEW."date_upload") OR OLD."document_number" IS DISTINCT FROM (NEW."document_number") OR OLD."attachment_number" IS DISTINCT FROM (NEW."attachment_number") OR OLD."pacer_doc_id" IS DISTINCT FROM (NEW."pacer_doc_id") OR OLD."is_available" IS DISTINCT FROM (NEW."is_available") OR OLD."is_free_on_pacer" IS DISTINCT FROM (NEW."is_free_on_pacer") OR OLD."is_sealed" IS DISTINCT FROM (NEW."is_sealed") OR OLD."docket_entry_id" IS DISTINCT FROM (NEW."docket_entry_id") OR OLD."document_type" IS DISTINCT FROM (NEW."document_type") OR OLD."description" IS DISTINCT FROM (NEW."description"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_8a108();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_8a108 ON "search_recapdocument" IS 'a3e0c759d8c03f380dd3eddfcff551091fcee1d1';
-        
+
 --
 -- Create trigger update_or_delete_snapshot_update on model tag
 --
@@ -608,7 +608,7 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
 
             CREATE OR REPLACE FUNCTION pgtrigger_update_or_delete_snapshot_update_c9dd9()
             RETURNS TRIGGER AS $$
-                
+
                 BEGIN
                     IF ("public"._pgtrigger_should_ignore(TG_NAME) IS TRUE) THEN
                         IF (TG_OP = 'DELETE') THEN
@@ -624,11 +624,11 @@ ALTER INDEX "search_recapdocument_document_type_303cccac79571217_idx" RENAME TO 
             DROP TRIGGER IF EXISTS pgtrigger_update_or_delete_snapshot_update_c9dd9 ON "search_tag";
             CREATE  TRIGGER pgtrigger_update_or_delete_snapshot_update_c9dd9
                 AFTER UPDATE ON "search_tag"
-                
-                
+
+
                 FOR EACH ROW WHEN (OLD."id" IS DISTINCT FROM (NEW."id") OR OLD."date_created" IS DISTINCT FROM (NEW."date_created") OR OLD."name" IS DISTINCT FROM (NEW."name"))
                 EXECUTE PROCEDURE pgtrigger_update_or_delete_snapshot_update_c9dd9();
 
             COMMENT ON TRIGGER pgtrigger_update_or_delete_snapshot_update_c9dd9 ON "search_tag" IS '4071657dcfe71811e9e7a5c24dd77c22f81d7377';
-        
+
 COMMIT;

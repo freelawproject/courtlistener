@@ -1,0 +1,27 @@
+{% if request.user.is_authenticated %}
+  <form id="pray_{{document_id}}" hx-post="{% if prayer_exists %}{% url 'delete_prayer' document_id %}{% else %}{% url 'create_prayer' document_id %}{% endif %}"
+    hx-swap="none" class="flex" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-swap-oob="true">
+    <button type="submit"
+            class="btn btn-xs {% if prayer_exists %}btn-primary{% else %}btn-default{% endif %}"
+            data-document-id="{{ document_id }}"
+            title="{% if prayer_exists %}Click to remove your request.{% else %}Click to request this document.{% endif %}"
+            >
+    <span id="counter_{{ document_id }}">{{count}}</span> 🙏
+    </button>
+    {% if daily_limit_reached %}
+    &nbsp;
+    <span id='daily_limit_tooltip' data-toggle="tooltip" data-placement="left" title="You have reached your daily request limit.">
+      <i class="fa fa-lg fa-exclamation-circle red" aria-hidden="true"></i>
+    </span>
+    {% endif %}
+  </form>
+{% else %}
+  <button
+    class="btn btn-default btn-xs"
+    data-toggle="modal"
+    data-target="#modal-logged-out"
+    title="Sign in to request document."
+    >
+    {{count}} 🙏
+  </button>
+{% endif %}

@@ -1,10 +1,16 @@
+import logging
+from functools import wraps
+from typing import Callable
+
 import waffle
 from django.conf import settings
 from django.contrib.syndication.views import Feed
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.feedgenerator import Atom1Feed
 from django.utils.html import strip_tags
 from django.utils.timezone import is_naive
+from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl.response import Response
 from requests import Session
 
@@ -16,8 +22,15 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_index_utils import null_map
 from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import ESRECAPDocument, OpinionClusterDocument
+from cl.search.exception import (
+    BadProximityQuery,
+    UnbalancedParenthesesQuery,
+    UnbalancedQuotesQuery,
+)
 from cl.search.forms import SearchForm
 from cl.search.models import SEARCH_TYPES, Court
+
+logger = logging.getLogger(__name__)
 
 
 def get_item(item):
@@ -299,3 +312,37 @@ class AllJurisdictionsFeed(JurisdictionFeed):
                 items = solr.query().add_extra(**params).execute()
 
         return items
+
+
+def search_feed_error_handler(view_func: Callable) -> Callable:
+    """Wraps a Feed view function to handle search feed errors gracefully.
+
+    :param view_func: The Feed view to be wrapped.
+    :return: The wrapped view function that handles search feed errors.
+    """
+
+    @wraps(view_func)
+    def wrapped_view(request, *args, **kwargs):
+        try:
+            response = view_func(request, *args, **kwargs)
+            return response
+        except (
+            UnbalancedParenthesesQuery,
+            UnbalancedQuotesQuery,
+            BadProximityQuery,
+            ApiError,
+        ) as e:
+            logger.warning("Couldn't load the feed page. Error was: %s", e)
+            return HttpResponse(
+                "Invalid search syntax. Please check your request and try again.",
+                status=400,
+            )
+
+        except (TransportError, ConnectionError, RequestError) as e:
+            logger.warning("Couldn't load the feed page. Error was: %s", e)
+            return HttpResponse(
+                "Unable to process your request. Please try again later.",
+                status=500,
+            )
+
+    return wrapped_view

@@ -1,4 +1,5 @@
 import logging
+import pickle
 import traceback
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
@@ -21,6 +22,7 @@ from django.urls import reverse
 from django.utils.timezone import make_aware
 from django.views.decorators.cache import never_cache
 from django_elasticsearch_dsl.search import Search
+from eyecite.models import FullCaseCitation
 from requests import RequestException, Session
 from scorched.exc import SolrError
 from waffle.decorators import waffle_flag
@@ -28,12 +30,14 @@ from waffle.decorators import waffle_flag
 from cl.alerts.forms import CreateAlertForm
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
+from cl.citations.match_citations_queries import es_get_query_citation
 from cl.custom_filters.templatetags.text_filters import naturalduration
 from cl.lib.bot_detector import is_bot
+from cl.lib.crypto import sha256
 from cl.lib.elasticsearch_utils import (
     build_es_main_query,
+    compute_lowest_possible_estimate,
     convert_str_date_fields_to_date_objects,
-    es_index_exists,
     fetch_es_results,
     get_facet_dict_for_search_query,
     get_only_status_facets,
@@ -41,9 +45,10 @@ from cl.lib.elasticsearch_utils import (
     merge_courts_from_db,
     merge_unavailable_fields_on_parent_document,
     set_results_highlights,
+    simplify_estimated_count,
 )
 from cl.lib.paginators import ESPaginator
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.search_utils import (
     add_depth_counts,
     build_main_query,
@@ -54,7 +59,9 @@ from cl.lib.search_utils import (
     make_stats_variable,
     merge_form_with_courts,
     regroup_snippets,
+    store_search_query,
 )
+from cl.lib.types import CleanData
 from cl.lib.utils import (
     sanitize_unbalanced_parenthesis,
     sanitize_unbalanced_quotes,
@@ -251,17 +258,17 @@ def do_search(
     )
     return {
         "results": paged_results,
-        "facet_fields": make_stats_variable(search_form, paged_results),
         "search_form": search_form,
         "search_summary_str": search_summary_str,
         "search_summary_dict": search_summary_dict,
+        "error": error,
         "courts": courts,
         "court_count_human": court_count_human,
         "court_count": court_count,
         "query_citation": query_citation,
-        "error": error,
         "cited_cluster": cited_cluster,
         "related_cluster": related_cluster,
+        "facet_fields": make_stats_variable(search_form, paged_results),
     }
 
 
@@ -270,7 +277,7 @@ def get_homepage_stats():
     """Get any stats that are displayed on the homepage and return them as a
     dict
     """
-    r = make_redis_interface("STATS")
+    r = get_redis_interface("STATS")
     ten_days_ago = make_aware(
         datetime.today() - timedelta(days=10), timezone.utc
     )
@@ -393,168 +400,168 @@ def show_results(request: HttpRequest) -> HttpResponse:
             render_dict.update({"alert_form": alert_form})
             return TemplateResponse(request, "search.html", render_dict)
 
-    else:
-        # Either a search or the homepage
-        if len(request.GET) == 0:
-            # No parameters --> Homepage.
-            if not is_bot(request):
-                async_to_sync(tally_stat)("search.homepage_loaded")
+    # This is a GET request: Either a search or the homepage
+    if len(request.GET) == 0:
+        # No parameters --> Homepage.
+        if not is_bot(request):
+            async_to_sync(tally_stat)("search.homepage_loaded")
 
-            # Ensure we get nothing from the future.
-            mutable_GET = request.GET.copy()  # Makes it mutable
-            mutable_GET["filed_before"] = date.today()
+        # Ensure we get nothing from the future.
+        mutable_GET = request.GET.copy()  # Makes it mutable
+        mutable_GET["filed_before"] = date.today()
 
-            # Load the render_dict with good results that can be shown in the
-            # "Latest Cases" section
-            if not waffle.flag_is_active(request, "o-es-active"):
-                render_dict.update(
-                    {
-                        "results_o": do_search(
-                            mutable_GET,
-                            rows=5,
-                            override_params={"order_by": "dateFiled desc"},
-                            facet=False,
-                            cache_key="homepage-data-o",
-                        )["results"]
-                    }
-                )
-            else:
-                mutable_GET.update(
-                    {
-                        "order_by": "dateArgued desc",
-                        "type": SEARCH_TYPES.OPINION,
-                    }
-                )
-                render_dict.update(
-                    {
-                        "results_o": do_es_search(
-                            mutable_GET,
-                            rows=5,
-                            facet=False,
-                            cache_key="homepage-data-o-es",
-                        )["results"]
-                    }
-                )
-
-            # Get the results from the oral arguments as well
-            # Check if waffle flag is active.
-            if not waffle.flag_is_active(request, "oa-es-active"):
-                render_dict.update(
-                    {
-                        "results_oa": do_search(
-                            mutable_GET,
-                            rows=5,
-                            override_params={
-                                "order_by": "dateArgued desc",
-                                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                            },
-                            facet=False,
-                            cache_key="homepage-data-oa",
-                        )["results"]
-                    }
-                )
-            else:
-                # Add additional or overridden GET parameters
-                mutable_GET.update(
-                    {
-                        "order_by": "dateArgued desc",
-                        "type": SEARCH_TYPES.ORAL_ARGUMENT,
-                    }
-                )
-                render_dict.update(
-                    {
-                        "results_oa": do_es_search(
-                            mutable_GET,
-                            rows=5,
-                            facet=False,
-                            cache_key="homepage-data-oa-es",
-                        )["results"]
-                    }
-                )
-
-            # But give it a fresh form for the advanced search section
-            render_dict.update(
-                {"search_form": SearchForm(request.GET, request=request)}
+        # Load the render_dict with good results that can be shown in the
+        # "Latest Cases" section
+        if not waffle.flag_is_active(request, "o-es-active"):
+            search = do_search(
+                mutable_GET,
+                rows=5,
+                override_params={"order_by": "dateFiled desc"},
+                facet=False,
+                cache_key="homepage-data-o",
+            )
+        else:
+            mutable_GET.update(
+                {
+                    "order_by": "dateArgued desc",
+                    "type": SEARCH_TYPES.OPINION,
+                }
+            )
+            search = do_es_search(
+                mutable_GET,
+                rows=5,
+                facet=False,
+                cache_key="homepage-data-o-es",
             )
 
-            # Get a bunch of stats.
-            stats = get_homepage_stats()
-            render_dict.update(stats)
+        render_dict.update(**search)
+        # Rename dictionary key "results" to "results_o" for consistency.
+        render_dict["results_o"] = render_dict.pop("results")
 
-            return TemplateResponse(request, "homepage.html", render_dict)
+        # Get the results from the oral arguments as well
+        # Check if waffle flag is active.
+        if not waffle.flag_is_active(request, "oa-es-active"):
+            render_dict.update(
+                {
+                    "results_oa": do_search(
+                        mutable_GET,
+                        rows=5,
+                        override_params={
+                            "order_by": "dateArgued desc",
+                            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                        },
+                        facet=False,
+                        cache_key="homepage-data-oa",
+                    )["results"]
+                }
+            )
         else:
-            # User placed a search or is trying to edit an alert
-            if request.GET.get("edit_alert"):
-                # They're editing an alert
-                if request.user.is_anonymous:
-                    return HttpResponseRedirect(
-                        "{path}?next={next}{encoded_params}".format(
-                            path=reverse("sign-in"),
-                            next=request.path,
-                            encoded_params=quote(
-                                f"?{request.GET.urlencode()}"
-                            ),
-                        )
-                    )
-                else:
-                    alert = get_object_or_404(
-                        Alert,
-                        pk=request.GET.get("edit_alert"),
-                        user=request.user,
-                    )
-                    alert_form = CreateAlertForm(
-                        instance=alert,
-                        initial={"query": get_string_sans_alert},
-                        user=request.user,
-                    )
-            else:
-                # Just a regular search
-                if not is_bot(request):
-                    async_to_sync(tally_stat)("search.results")
+            # Add additional or overridden GET parameters
+            mutable_GET.update(
+                {
+                    "order_by": "dateArgued desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                }
+            )
+            render_dict.update(
+                {
+                    "results_oa": do_es_search(
+                        mutable_GET,
+                        rows=5,
+                        facet=False,
+                        cache_key="homepage-data-oa-es",
+                    )["results"]
+                }
+            )
 
-                # Create bare-bones alert form.
-                alert_form = CreateAlertForm(
-                    initial={"query": get_string, "rate": "dly"},
-                    user=request.user,
+        # But give it a fresh form for the advanced search section
+        render_dict.update(
+            {"search_form": SearchForm(request.GET, request=request)}
+        )
+
+        # Get a bunch of stats.
+        stats = get_homepage_stats()
+        render_dict.update(stats)
+
+        return TemplateResponse(request, "homepage.html", render_dict)
+
+    # This is a GET with parameters
+    # User placed a search or is trying to edit an alert
+    if request.GET.get("edit_alert"):
+        # They're editing an alert
+        if request.user.is_anonymous:
+            return HttpResponseRedirect(
+                "{path}?next={next}{encoded_params}".format(
+                    path=reverse("sign-in"),
+                    next=request.path,
+                    encoded_params=quote(f"?{request.GET.urlencode()}"),
                 )
-            search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
-            match search_type:
-                case SEARCH_TYPES.PARENTHETICAL:
-                    render_dict.update(do_es_search(request.GET.copy()))
-                case SEARCH_TYPES.ORAL_ARGUMENT:
-                    # Check if waffle flag is active.
-                    if waffle.flag_is_active(request, "oa-es-active"):
-                        render_dict.update(do_es_search(request.GET.copy()))
-                    else:
-                        render_dict.update(do_search(request.GET.copy()))
-                case SEARCH_TYPES.PEOPLE:
-                    if waffle.flag_is_active(request, "p-es-active"):
-                        render_dict.update(do_es_search(request.GET.copy()))
-                    else:
-                        render_dict.update(do_search(request.GET.copy()))
-                case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-                    if waffle.flag_is_active(request, "r-es-active"):
-                        search_results = do_es_search(request.GET.copy())
-                    else:
-                        search_results = do_search(request.GET.copy())
-                    render_dict.update(search_results)
-                case SEARCH_TYPES.OPINION:
-                    if waffle.flag_is_active(request, "o-es-active"):
-                        render_dict.update(do_es_search(request.GET.copy()))
-                    else:
-                        render_dict.update(do_search(request.GET.copy()))
-                case _:
-                    render_dict.update(do_search(request.GET.copy()))
+            )
 
-            # Set the value to the query as a convenience
-            alert_form.fields["name"].widget.attrs["value"] = render_dict[
-                "search_summary_str"
-            ]
-            render_dict.update({"alert_form": alert_form})
+        alert = get_object_or_404(
+            Alert,
+            pk=request.GET.get("edit_alert"),
+            user=request.user,
+        )
+        alert_form = CreateAlertForm(
+            instance=alert,
+            initial={"query": get_string_sans_alert},
+            user=request.user,
+        )
+    else:
+        # Just a regular search
+        if not is_bot(request):
+            async_to_sync(tally_stat)("search.results")
 
-            return TemplateResponse(request, "search.html", render_dict)
+        # Create bare-bones alert form.
+        alert_form = CreateAlertForm(
+            initial={"query": get_string, "rate": "dly"},
+            user=request.user,
+        )
+
+    search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
+    match search_type:
+        case SEARCH_TYPES.PARENTHETICAL:
+            search_results = do_es_search(request.GET.copy())
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            # Check if waffle flag is active.
+            if waffle.flag_is_active(request, "oa-es-active"):
+                search_results = do_es_search(request.GET.copy())
+            else:
+                search_results = do_search(request.GET.copy())
+        case SEARCH_TYPES.PEOPLE:
+            if waffle.flag_is_active(request, "p-es-active"):
+                search_results = do_es_search(request.GET.copy())
+            else:
+                search_results = do_search(request.GET.copy())
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            if waffle.flag_is_active(request, "r-es-active"):
+                search_results = do_es_search(request.GET.copy())
+            else:
+                search_results = do_search(request.GET.copy())
+        case SEARCH_TYPES.OPINION:
+            if waffle.flag_is_active(request, "o-es-active"):
+                search_results = do_es_search(request.GET.copy())
+            else:
+                search_results = do_search(request.GET.copy())
+        case SEARCH_TYPES.RECAP_DOCUMENT:
+            search_results = do_es_search(request.GET.copy())
+        case _:
+            search_results = do_search(request.GET.copy())
+
+    render_dict.update(search_results)
+    store_search_query(request, search_results)
+
+    # Set the value to the query as a convenience
+    alert_form.fields["name"].widget.attrs["value"] = render_dict[
+        "search_summary_str"
+    ]
+    render_dict.update({"alert_form": alert_form})
+
+    return TemplateResponse(request, "search.html", render_dict)
 
 
+@never_cache
 def advanced(request: HttpRequest) -> HttpResponse:
     render_dict = {"private": False}
 
@@ -667,6 +674,30 @@ def es_search(request: HttpRequest) -> HttpResponse:
     return render(request, template, render_dict)
 
 
+def remove_missing_citations(
+    missing_citations: list[FullCaseCitation], cd: CleanData
+) -> tuple[list[str], str]:
+    """Removes missing citations from the query and returns the missing
+    citations as strings and the modified query.
+
+    :param missing_citations: A list of FullCaseCitation objects representing
+    the citations that are missing from the query.
+    :param cd: A CleanData object containing the query string.
+    :return: A two-tuple containing a list of missing citation strings and the
+    suggested query string with missing citations removed.
+    """
+    missing_citations_str = [
+        citation.corrected_citation() for citation in missing_citations
+    ]
+    query_string = cd["q"]
+    for citation in missing_citations_str:
+        query_string = query_string.replace(citation, "")
+    suggested_query = (
+        " ".join(query_string.split()) if missing_citations_str else ""
+    )
+    return missing_citations_str, suggested_query
+
+
 def do_es_search(
     get_params: QueryDict,
     rows: int = settings.SEARCH_PAGE_SIZE,
@@ -686,7 +717,6 @@ def do_es_search(
     other location.
     """
     paged_results = None
-    # One court?
     courts = Court.objects.filter(in_use=True)
     query_time = total_query_results = 0
     top_hits_limit = 5
@@ -698,6 +728,7 @@ def do_es_search(
     cited_cluster = None
     query_citation = None
     facet_fields = []
+    missing_citations_str = []
 
     search_form = SearchForm(get_params, is_es_form=True, courts=courts)
     match get_params.get("type", SEARCH_TYPES.OPINION):
@@ -709,16 +740,31 @@ def do_es_search(
             document_type = PersonDocument
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             document_type = DocketDocument
+            # Set a different number of results per page for RECAP SEARCH
+            rows = settings.RECAP_SEARCH_PAGE_SIZE
         case SEARCH_TYPES.OPINION:
             document_type = OpinionClusterDocument
 
-    if search_form.is_valid() and es_index_exists(
-        index_name=document_type._index._name
-    ):
-        cd = search_form.cleaned_data
+    if search_form.is_valid() and document_type:
+        # Copy cleaned_data to preserve the original data when displaying the form
+        cd = search_form.cleaned_data.copy()
         try:
             # Create necessary filters to execute ES query
             search_query = document_type.search()
+
+            if cd["type"] in [
+                SEARCH_TYPES.OPINION,
+                SEARCH_TYPES.RECAP,
+                SEARCH_TYPES.DOCKETS,
+            ]:
+                query_citation, missing_citations = es_get_query_citation(cd)
+                if cd["type"] in [
+                    SEARCH_TYPES.OPINION,
+                ]:
+                    missing_citations_str, suggested_query = (
+                        remove_missing_citations(missing_citations, cd)
+                    )
+                    cd["q"] = suggested_query if suggested_query else cd["q"]
             (
                 s,
                 child_docs_count_query,
@@ -737,32 +783,17 @@ def do_es_search(
                 rows_per_page=rows,
                 cache_key=cache_key,
             )
-            search_form = _clean_form(
-                get_params, search_form.cleaned_data, courts, is_es_form=True
-            )
             cited_cluster = async_to_sync(add_depth_counts)(
                 # Also returns cited cluster if found
                 search_data=cd,
                 search_results=paged_results,
             )
-
-            if cd["type"] in [
-                SEARCH_TYPES.OPINION,
-                SEARCH_TYPES.RECAP,
-                SEARCH_TYPES.DOCKETS,
-            ]:
-                query_citation = get_query_citation(cd)
-
-            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
-                facet_fields = get_facet_dict_for_search_query(
-                    search_query, cd, search_form
-                )
             related_prefix = RELATED_PATTERN.search(cd["q"])
             if related_prefix:
                 related_pks = related_prefix.group("pks").split(",")
-                related_cluster = OpinionCluster.objects.get(
+                related_cluster = OpinionCluster.objects.filter(
                     sub_opinions__pk__in=related_pks
-                )
+                ).distinct("pk")
         except UnbalancedParenthesesQuery as e:
             error = True
             error_message = "unbalanced_parentheses"
@@ -781,6 +812,21 @@ def do_es_search(
             suggested_query = "proximity_filter"
             if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
                 suggested_query = "proximity_query"
+        finally:
+            # Make sure to always call the _clean_form method
+            search_form = _clean_form(
+                get_params, search_form.cleaned_data, courts, is_es_form=True
+            )
+            if cd["type"] in [SEARCH_TYPES.OPINION] and facet:
+                # If the search query is valid, pass the cleaned data to filter and
+                # retrieve the correct number of opinions per status. Otherwise (if
+                # the query has errors), just provide a dictionary containing the
+                # search type to get the total number of opinions per status
+                facet_fields = get_facet_dict_for_search_query(
+                    search_query,
+                    cd if not error else {"type": cd["type"]},
+                    search_form,
+                )
     else:
         error = True
 
@@ -806,13 +852,47 @@ def do_es_search(
         "courts": courts,
         "court_count_human": court_count_human,
         "court_count": court_count,
+        "query_citation": query_citation,
+        "cited_cluster": cited_cluster,
+        "related_cluster": related_cluster,
+        "facet_fields": facet_fields,
         "error_message": error_message,
         "suggested_query": suggested_query,
-        "related_cluster": related_cluster,
-        "cited_cluster": cited_cluster,
-        "query_citation": query_citation,
-        "facet_fields": facet_fields,
+        "estimated_count_threshold": simplify_estimated_count(
+            compute_lowest_possible_estimate(
+                settings.ELASTICSEARCH_CARDINALITY_PRECISION
+            )
+        ),
+        "missing_citations": missing_citations_str,
     }
+
+
+def retrieve_cached_search_results(
+    get_params: QueryDict,
+) -> tuple[dict[str, Page | int] | None, str]:
+    """
+    Retrieve cached search results based on the GET parameters.
+
+    :param get_params: The GET parameters provided by the user.
+    :return: A two-tuple containing either the cached search results and the
+    cache key based ona prefix and the get parameters, or None and the cache key
+    if no cached results were found.
+    """
+
+    params = get_params.copy()
+    # If no page is present in the parameters, set it to 1 to generate the same
+    # hash for page 1, regardless of whether the page parameter is included.
+    # Apply the same to the q parameter when it is not present in params.
+    params.setdefault("page", "1")
+    params.setdefault("q", "")
+    sorted_params = dict(sorted(params.items()))
+    key_prefix = "search_results_cache:"
+    params_hash = sha256(pickle.dumps(sorted_params))
+    cache_key = f"{key_prefix}{params_hash}"
+    cached_results = cache.get(cache_key)
+    if cached_results:
+        return pickle.loads(cached_results), cache_key
+    return None, cache_key
 
 
 def fetch_and_paginate_results(
@@ -837,9 +917,22 @@ def fetch_and_paginate_results(
 
     # Run the query and set up pagination
     if cache_key is not None:
+        # Check cache for displaying insights on the Home Page.
         results = cache.get(cache_key)
         if results is not None:
             return results, 0, False, None, None
+
+    # Check micro-cache for all other search requests.
+    results_dict, micro_cache_key = retrieve_cached_search_results(get_params)
+    if results_dict:
+        # Return results and counts. Set query time to 1ms.
+        return (
+            results_dict["results"],
+            1,
+            False,
+            results_dict["main_total"],
+            results_dict["child_total"],
+        )
 
     try:
         page = int(get_params.get("page", 1))
@@ -873,5 +966,20 @@ def fetch_and_paginate_results(
     merge_unavailable_fields_on_parent_document(results, search_type)
 
     if cache_key is not None:
+        # Cache only Page results for displaying insights on the Home Page.
         cache.set(cache_key, results, settings.QUERY_RESULTS_CACHE)
+    elif settings.ELASTICSEARCH_MICRO_CACHE_ENABLED:
+        # Cache Page results and counts for all other search requests.
+        results_dict = {
+            "results": results,
+            "main_total": main_total,
+            "child_total": child_total,
+        }
+        serialized_data = pickle.dumps(results_dict)
+        cache.set(
+            micro_cache_key,
+            serialized_data,
+            settings.SEARCH_RESULTS_MICRO_CACHE,
+        )
+
     return results, query_time, error, main_total, child_total

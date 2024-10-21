@@ -10,8 +10,8 @@ from lxml import html
 
 from cl.lib.elasticsearch_utils import (
     build_daterange_query,
-    build_es_filters,
     build_es_main_query,
+    build_es_plain_filters,
     build_fulltext_query,
     build_sort_results,
     build_term_query,
@@ -323,7 +323,7 @@ class ParentheticalESTest(ESIndexTestCase, TestCase):
             "type": SEARCH_TYPES.PARENTHETICAL,
         }
 
-        filters = build_es_filters(cd)
+        filters = build_es_plain_filters(cd)
 
         if not filters:
             # Return all results

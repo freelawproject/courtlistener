@@ -8,11 +8,14 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.views import PasswordResetView
+from django.core.exceptions import SuspiciousOperation, ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.core.validators import validate_email
 from django.db.models import Count, F
 from django.http import (
     HttpRequest,
@@ -45,7 +48,7 @@ from cl.lib.ratelimiter import (
     ratelimiter_unsafe_2000_per_h,
 )
 from cl.lib.types import AuthenticatedHttpRequest, EmailType
-from cl.lib.url_utils import get_redirect_or_login_url
+from cl.lib.url_utils import get_redirect_or_abort
 from cl.search.models import SEARCH_TYPES
 from cl.stats.utils import tally_stat
 from cl.users.forms import (
@@ -59,7 +62,7 @@ from cl.users.forms import (
     UserForm,
 )
 from cl.users.models import UserProfile
-from cl.users.tasks import update_moosend_subscription
+from cl.users.tasks import create_neon_account, update_neon_account
 from cl.users.utils import (
     convert_to_stub_account,
     delete_user_assets,
@@ -310,7 +313,6 @@ def view_api_usage(request: AuthenticatedHttpRequest) -> HttpResponse:
 @never_cache
 def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
     old_email = request.user.email  # this line has to be at the top to work.
-    old_wants_newsletter = request.user.profile.wants_newsletter
     user = request.user
     up = user.profile
     user_form = UserForm(request.POST or None, instance=user)
@@ -325,10 +327,6 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             up.activation_key = sha1_activation_key(user.username)
             up.key_expires = now() + timedelta(5)
             up.email_confirmed = False
-
-            # Unsubscribe the old address in moosend (we'll
-            # resubscribe it when they confirm it later).
-            update_moosend_subscription.delay(old_email, "unsubscribe")
 
             # Send an email to the new and old addresses. New for verification;
             # old for notification of the change.
@@ -354,19 +352,15 @@ def view_settings(request: AuthenticatedHttpRequest) -> HttpResponse:
             msg = message_dict["settings_changed_successfully"]
             messages.add_message(request, msg["level"], msg["message"])
 
-        new_wants_newsletter = profile_cd["wants_newsletter"]
-        if old_wants_newsletter != new_wants_newsletter:
-            if new_wants_newsletter is True and not changed_email:
-                # They just subscribed. If they didn't *also* update their
-                # email address, subscribe them.
-                update_moosend_subscription.delay(new_email, "subscribe")
-            elif new_wants_newsletter is False:
-                # They just unsubscribed
-                update_moosend_subscription.delay(new_email, "unsubscribe")
-
         # New email address and changes above are saved here.
         profile_form.save()
         user_form.save()
+
+        if not settings.DEVELOPMENT:
+            if up.neon_account_id:
+                update_neon_account.delay(user.pk)
+            else:
+                create_neon_account.delay(user.pk)
 
         return HttpResponseRedirect(reverse("view_settings"))
 
@@ -402,9 +396,6 @@ def delete_account(request: AuthenticatedHttpRequest) -> HttpResponse:
             )
             delete_user_assets(request.user)
             user = convert_to_stub_account(request.user)
-            update_moosend_subscription.delay(
-                request.user.email, "unsubscribe"
-            )
             update_session_auth_hash(request, user)
             logout(request)
             return HttpResponseRedirect(reverse("delete_profile_done"))
@@ -468,7 +459,7 @@ async def take_out_done(request: HttpRequest) -> HttpResponse:
 @never_cache
 def register(request: HttpRequest) -> HttpResponse:
     """allow only an anonymous user to register"""
-    redirect_to = get_redirect_or_login_url(request, "next")
+    redirect_to = get_redirect_or_abort(request, "next")
     if request.user.is_anonymous:
         if request.method == "POST":
             try:
@@ -534,10 +525,7 @@ def register(request: HttpRequest) -> HttpResponse:
                     email["to"],
                 )
                 async_to_sync(tally_stat)("user.created")
-                get_str = "?next=%s&email=%s" % (
-                    urlencode(redirect_to),
-                    urlencode(user.email),
-                )
+                get_str = f"?next={urlencode(redirect_to)}&email={urlencode(user.email)}"
                 return HttpResponseRedirect(
                     reverse("register_success") + get_str
                 )
@@ -559,8 +547,14 @@ def register(request: HttpRequest) -> HttpResponse:
 def register_success(request: HttpRequest) -> HttpResponse:
     """Tell the user they have been registered and allow them to continue where
     they left off."""
-    redirect_to = get_redirect_or_login_url(request, "next")
+    redirect_to = get_redirect_or_abort(request, "next")
     email = request.GET.get("email", "")
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            raise SuspiciousOperation("Invalid Email address")
+
     default_from = parseaddr(settings.DEFAULT_FROM_EMAIL)[1]
     return TemplateResponse(
         request,
@@ -580,8 +574,7 @@ def confirm_email(request, activation_key):
     """Confirms email addresses for a user and sends an email to the admins.
 
     Checks if a hash in a confirmation link is valid, and if so sets the user's
-    email address as valid. If they are subscribed to the newsletter, ensures
-    that moosend is updated.
+    email address as valid.
     """
     ups = UserProfile.objects.filter(activation_key=activation_key)
     if not len(ups):
@@ -616,10 +609,13 @@ def confirm_email(request, activation_key):
 
     # Tests pass; Save the profile
     for up in ups:
-        if up.wants_newsletter:
-            update_moosend_subscription.delay(up.user.email, "subscribe")
         up.email_confirmed = True
         up.save()
+        if not settings.DEVELOPMENT:
+            if up.neon_account_id:
+                update_neon_account.delay(up.user.pk)
+            else:
+                create_neon_account.delay(up.user.pk)
 
     return TemplateResponse(
         request, "register/confirm.html", {"success": True, "private": True}
@@ -716,40 +712,6 @@ def password_change(request: AuthenticatedHttpRequest) -> HttpResponse:
         "profile/password_form.html",
         {"form": form, "page": "profile_password", "private": False},
     )
-
-
-@csrf_exempt  # nosemgrep
-def moosend_webhook(request: HttpRequest) -> HttpResponse:
-    logger.info("Got moosend webhook with %s method.", request.method)
-
-    if request.method == "POST":
-        # The body is returned as a byte string
-        body = request.body.decode("utf-8")
-        json_body = json.loads(body)
-        webhook_event = json_body.get("Event")
-        if webhook_event:
-            webhook_event_name = webhook_event.get("EventName")
-            webhook_contact_context = webhook_event.get("ContactContext")
-            wants_newsletter = None
-            email = None
-            if webhook_contact_context:
-                email = webhook_contact_context.get("EmailAddress")
-            if webhook_event_name == "SUBSCRIBED":
-                wants_newsletter = True
-            elif webhook_event_name == "UNSUBSCRIBED":
-                wants_newsletter = False
-            if wants_newsletter is not None and email is not None:
-                profiles = UserProfile.objects.filter(user__email=email)
-                logger.info(
-                    "Updating %s profiles for email %s",
-                    profiles.count(),
-                    email,
-                )
-                profiles.update(wants_newsletter=wants_newsletter)
-
-    # Moosend does a GET when you create/edit the automation workflow,
-    # so we need to return a 200 even for GETs.
-    return HttpResponse("<h1>200: OK</h1>")
 
 
 @login_required
@@ -875,3 +837,24 @@ class RateLimitedPasswordResetView(PasswordResetView):
     template_name = "register/password_reset_form.html"
     email_template_name = "register/password_reset_email.html"
     form_class = CustomPasswordResetForm
+
+
+class SafeRedirectLoginView(auth_views.LoginView):
+    """
+    Custom LoginView that validates and sanitizes the redirect URL after a
+    successful login.
+
+    This view inherits from Django's built-in LoginView but adds an extra layer
+    of security by ensuring the redirect URL submitted by the login form is safe
+    It prevents potential open redirect vulnerabilities.
+    """
+
+    def get_redirect_url(self):
+        """
+        Return the user-originating redirect URL if it's safe. otherwise falls
+        back to the default.
+
+        This method ensures users cannot be redirected to malicious URLs after
+        logging in, even if they attempt to provide one.
+        """
+        return get_redirect_or_abort(self.request, self.redirect_field_name)

@@ -26,7 +26,7 @@ urlpatterns = [
     path(
         "sign-in/",
         ratelimiter_unsafe_10_per_m(
-            auth_views.LoginView.as_view(
+            views.SafeRedirectLoginView.as_view(
                 **{
                     "template_name": "register/login.html",
                     "authentication_form": ConfirmedEmailAuthenticationForm,
@@ -173,10 +173,6 @@ urlpatterns = [
         name="email_confirm_success",
     ),
     # Webhooks
-    path(
-        "webhook/moosend/",
-        views.moosend_webhook,
-    ),
     path(
         "webhook/ses/",
         SESEventWebhookView.as_view(),

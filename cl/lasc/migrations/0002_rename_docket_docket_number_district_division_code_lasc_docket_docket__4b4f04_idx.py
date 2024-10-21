@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.RenameIndex(
             model_name="docket",
-            new_name="lasc_docket_docket__4b4f04_idx",
+            new_name="lasc_docket_docket_number_district_division_code_07584433_idx",
             old_fields=("docket_number", "district", "division_code"),
         ),
     ]

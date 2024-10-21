@@ -238,7 +238,10 @@ class Docket(AbstractDateTimeModel):
 
     class Meta:
         indexes = [
-            models.Index(fields=["docket_number", "district", "division_code"])
+            models.Index(
+                fields=["docket_number", "district", "division_code"],
+                name="lasc_docket_docket_number_district_division_code_07584433_idx",
+            )
         ]
 
     @property

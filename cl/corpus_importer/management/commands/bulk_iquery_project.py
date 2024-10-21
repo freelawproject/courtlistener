@@ -1,6 +1,5 @@
 import itertools
 import time
-from collections import defaultdict
 from typing import List, TypedDict
 
 from django.conf import settings
@@ -10,9 +9,10 @@ from django.db.models.functions import RowNumber
 from redis.exceptions import ConnectionError
 
 from cl.corpus_importer.tasks import make_docket_by_iquery
+from cl.corpus_importer.utils import CycleChecker
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
-from cl.lib.redis_utils import make_redis_interface
+from cl.lib.redis_utils import get_redis_interface
 from cl.scrapers.tasks import update_docket_info_iquery
 from cl.search.models import Court, Docket
 
@@ -31,15 +31,17 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
     :return None
     """
     q = options["queue"]
-    r = make_redis_interface("CACHE")
+    r = get_redis_interface("CACHE")
     # This is a simple dictionary that's populated with the maximum
     # pacer_case_id in the CL DB as of 2021-01-18. The idea is to use this to
     # prevent the scraper from going forever. You can reset it by querying the
     # latest item in the DB by date_filed, and then using r.hmset to save it.
     max_ids = r.hgetall("iquery_max_ids")
 
-    courts = Court.federal_courts.district_pacer_courts().exclude(
-        pk__in=["uscfc", "arb", "cit"]
+    courts = (
+        Court.federal_courts.district_or_bankruptcy_pacer_courts().exclude(
+            pk__in=["uscfc", "arb", "cit"]
+        )
     )
     if options["courts"] != ["all"]:
         courts = courts.filter(pk__in=options["courts"])
@@ -77,7 +79,7 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
                     "a new connection."
                 )
                 time.sleep(10)
-                r = make_redis_interface("CACHE")
+                r = get_redis_interface("CACHE")
                 # Continuing here will skip this court for this iteration; not
                 # a huge deal.
                 continue
@@ -92,69 +94,20 @@ def add_all_cases_to_cl(options: OptionsType) -> None:
             time.sleep(options["iteration_delay"])
 
 
-class CycleChecker:
-    """Keep track of a cycling list to determine each time it starts over.
-
-    We plan to iterate over dockets that are ordered by a cycling court ID, so
-    imagine if we had two courts, ca1 and ca2, we'd have rows like:
-
-        docket: 1, court: ca1
-        docket: 14, court: ca2
-        docket: 15, court: ca1
-        docket: xx, court: ca2
-
-    In other words, they'd just go back and forth. In reality, we have about
-    200 courts, but the idea is the same. This code lets us detect each time
-    the cycle has started over, even if courts stop being part of the cycle,
-    as will happen towards the end of the queryset.. For example, maybe ca1
-    finishes, and now we just have:
-
-        docket: x, court: ca2
-        docket: y, court: ca2
-        docket: z, court: ca2
-
-    That's considered cycling each time we get to a new row.
-
-    The way to use this is to just create an instance and then send it a
-    cycling list of court_id's.
-
-    Other fun requirements this hits:
-     - No need to know the length of the cycle
-     - No need to externally track the iteration count
-    """
-
-    def __init__(self) -> None:
-        self.court_counts: defaultdict = defaultdict(int)
-        self.current_iteration: int = 1
-
-    def check_if_cycled(self, court_id: str) -> bool:
-        """Check if the cycle repeated
-
-        :param court_id: The ID of the court
-        :return True if the cycle started over, else False
-        """
-        self.court_counts[court_id] += 1
-        if self.court_counts[court_id] == self.current_iteration:
-            return False
-        else:
-            # Finished cycle and court has been seen more times than the
-            # iteration count. Bump the iteration count and return True.
-            self.current_iteration += 1
-            return True
-
-
 def update_open_cases(options) -> None:
     """Update any cases that are in our system and not terminated."""
     # This is a very fancy query that fetches the results while cycling over
     # the court_id field. This way, we can do one hit per court per some
     # schedule. It should help us avoid getting banned. Hopefully!
     q = options["queue"]
-    courts = Court.federal_courts.district_pacer_courts().exclude(
-        pk__in=["uscfc", "arb", "cit", "jpml"]
+    courts = (
+        Court.federal_courts.district_or_bankruptcy_pacer_courts().exclude(
+            pk__in=["uscfc", "arb", "cit", "jpml"]
+        )
     )
     ds = (
         Docket.objects.filter(
-            source__in=Docket.RECAP_SOURCES,
+            source__in=Docket.RECAP_SOURCES(),
             date_terminated=None,
             court__in=courts,
             pacer_case_id__isnull=False,

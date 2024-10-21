@@ -7,6 +7,7 @@ from datetime import date
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from eyecite.find import get_citations
+from eyecite.tokenizers import HyperscanTokenizer
 from eyecite.utils import clean_text
 
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -18,6 +19,8 @@ from ...people_db.lookup_utils import (
     lookup_judges_by_last_name_list,
 )
 from .convert_columbia_html import convert_columbia_html
+
+HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 # only make a solr connection once
 SOLR_CONN = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
@@ -336,7 +339,10 @@ def make_and_save(
     # get citation objects in a list for addition to the cluster
     found_citations = []
     for c in item["citations"]:
-        found = get_citations(clean_text(c, ["html", "inline_whitespace"]))
+        found = get_citations(
+            clean_text(c, ["html", "inline_whitespace"]),
+            tokenizer=HYPERSCAN_TOKENIZER,
+        )
         if not found:
             # if the docket number --is-- citation string, we're likely dealing
             # with a somewhat common triplet of (docket number, date,
