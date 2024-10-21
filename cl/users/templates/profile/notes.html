@@ -14,6 +14,8 @@
             src="{% static "js/jquery.tablesorter.min.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/jquery.tablesorter.widgets.min.js" %}"></script>
+    <script defer type="text/javascript"
+            src="{% static "js/responsive-table.js" %}"></script>
 
     <script type="text/javascript" nonce="{{ request.csp_nonce }}">
       $(document).ready(function(){
@@ -62,15 +64,17 @@
         {% for type, typed_note_forms in note_forms.items %}
           <div class="tab-pane {% if forloop.first %}active{% endif %}" id="{{ type|slugify }}">
             {% if typed_note_forms %}
-              <div class="table-responsive">
-                <table class="table settings-table tablesorter-bootstrap">
+              <div class="table-responsive responsive-table-wrapper">
+                <table id="{{ type|slugify }}-table" class="table settings-table tablesorter-bootstrap">
                   <thead>
                   <tr>
-                    <th>Name</th>
+                    <th data-label="Name">Name</th>
                     {% if type == "Dockets" %}
-                      <th>Last&nbsp;Filing</th>
+                      <th data-label="Last Filing">Last Filing</th>
+                      <th data-label="Docket Number" class="sorter-false">Docket Number</th>
+                      <th data-label="Court" class="sorter-false">Court</th>
                     {% endif %}
-                    <th class="sorter-false">Notes</th>
+                    <th data-label="Notes" class="sorter-false">Notes</th>
                     <th class="sorter-false">
                       {% if type == "Dockets" %}
                         <a class="btn btn-default" href="{{ docket_search_url }}" role="button">
