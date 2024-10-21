@@ -186,7 +186,7 @@ async def view_tags(request, username):
     )
 
 
-# @cache_page_ignore_params(30)  # Cache for 30 seconds
+@cache_page_ignore_params(30)  # Cache for 30 seconds
 async def open_prayers(request: HttpRequest) -> HttpResponse:
     """Show the user top open prayer requests."""
 
