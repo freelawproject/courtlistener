@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import timedelta
 
 from asgiref.sync import sync_to_async
@@ -260,9 +261,6 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
         total_cost += float(price(prayer.recap_document))
 
     return count, total_cost
-
-
-from dataclasses import dataclass
 
 
 @dataclass
