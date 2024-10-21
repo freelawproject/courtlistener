@@ -262,21 +262,28 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
     return count, total_cost
 
 
+from dataclasses import dataclass
+
+@dataclass
+class PrayerStats:
+    prayer_count: int
+    distinct_count: int
+    total_cost: float
+
+
 async def get_lifetime_prayer_stats(
     status: int,
-) -> tuple[
-    int, int, float
-]:  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
+) -> PrayerStats:  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
 
     cache_key = f"prayer-stats-{status}"
 
     data = await cache.aget(cache_key)
 
     if data is not None:
-        return (
-            data["count"],
-            data["num_distinct_purchases"],
-            data["total_cost"],
+        return PrayerStats(
+            prayer_count=data["count"],
+            distinct_count=data["num_distinct_purchases"],
+            total_cost=data["total_cost"],
         )
 
     prayer_by_status = Prayer.objects.filter(status=status)
@@ -314,4 +321,4 @@ async def get_lifetime_prayer_stats(
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
 
-    return prayer_count, distinct_prayers, total_cost
+    return PrayerStats(prayer_count=prayer_count, distinct_count=distinct_prayers, total_cost=total_cost)
