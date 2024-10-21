@@ -10,7 +10,7 @@ from django.core.cache import caches
 from django.core.paginator import EmptyPage, PageNotAnInteger
 from django.http import Http404, HttpRequest, HttpResponse
 from django.template.response import TemplateResponse
-from django.utils.encoding import force_bytes, iri_to_uri
+from django.utils.encoding import force_bytes, escape_uri_path
 from django.utils.http import http_date
 
 from cl.lib.ratelimiter import ratelimiter_all_2_per_m
@@ -24,13 +24,21 @@ def make_cache_key(request: HttpRequest, section: str) -> str:
     received, but it adds a section parameter to make the key slightly more
     readable.
 
-    Note that the full URL will include the various GET parameters.
+    Note that only 'p' GET parameter is included in the key.
 
     :param request: The HttpRequest from the client
     :param section: The section of the sitemap that is loaded
     :return a key that can be used to cache the request
     """
-    url = hashlib.md5(force_bytes(iri_to_uri(request.build_absolute_uri())))
+    # url without query string
+    base_url: str = request.build_absolute_uri(escape_uri_path(request.path))
+    
+    # include only 'p' parameter to the cache key, make it more deterministic
+    if page := request.GET.get("p", None):
+        base_url = f"{base_url}?p={page}"
+
+    url = hashlib.md5(force_bytes(base_url))
+    
     return f"sitemap.{section}.{url.hexdigest()}"
 
 

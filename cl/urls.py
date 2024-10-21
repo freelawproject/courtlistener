@@ -26,7 +26,6 @@ register_converter(BlankSlugConverter, "blank-slug")
 sitemaps = {
     SEARCH_TYPES.ORAL_ARGUMENT: AudioSitemap,
     SEARCH_TYPES.OPINION: OpinionSitemap,
-    SEARCH_TYPES.RECAP: DocketSitemap,
     SEARCH_TYPES.PEOPLE: PersonSitemap,
     "disclosures": DisclosureSitemap,
     "visualizations": VizSitemap,
@@ -34,6 +33,10 @@ sitemaps = {
     "blocked-audio": BlockedAudioSitemap,
     "blocked-dockets": BlockedDocketSitemap,
     "blocked-opinions": BlockedOpinionSitemap,
+}
+
+pregenerated_sitemaps = {
+    SEARCH_TYPES.RECAP: DocketSitemap,
 }
 
 urlpatterns = [
@@ -70,6 +73,18 @@ urlpatterns = [
         cached_sitemap,
         {"sitemaps": sitemaps},
         name="sitemaps",
+    ),
+    # Pregenerated sitemaps, shorter cache time for sitemap index
+    path(
+        "large-sitemap.xml",
+        cache_page(60 * 60 * 24, cache="db_cache")(sitemaps_views.index),
+        {"sitemaps": pregenerated_sitemaps, "sitemap_url_name": "sitemaps-pregenerated"},
+    ),
+    path(
+        "large-sitemap-<str:section>.xml",
+        cached_sitemap,
+        {"sitemaps": pregenerated_sitemaps},
+        name="sitemaps-pregenerated",
     ),
     # Redirects
     path(

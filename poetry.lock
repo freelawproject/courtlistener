@@ -1024,6 +1024,17 @@ jinja2 = ["jinja2 (>=2.9.6)"]
 tests = ["jinja2 (>=2.9.6)", "pytest", "pytest-cov", "pytest-django", "pytest-ruff"]
 
 [[package]]
+name = "django-cursor-pagination"
+version = "0.3.0"
+description = "Cursor based pagination for Django"
+optional = false
+python-versions = "*"
+files = [
+    {file = "django_cursor_pagination-0.3.0-py3-none-any.whl", hash = "sha256:ce88147adc1e41c58427217cf54d7cbb4d04d5cf0a3a2c794d81602ad347658e"},
+    {file = "django_cursor_pagination-0.3.0.tar.gz", hash = "sha256:b09293ea9aa93cd0f3a9f4197e1f11f09283678e6c991cf4d4517a0fe90244c1"},
+]
+
+[[package]]
 name = "django-debug-toolbar"
 version = "4.4.6"
 description = "A configurable set of panels that display various debug information about the current request/response."
