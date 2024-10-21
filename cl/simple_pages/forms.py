@@ -63,4 +63,4 @@ class ContactForm(forms.Form):
 
     def get_issue_type_display(self) -> str:
         value = self.cleaned_data.get("issue_type")
-        return dict(self.fields["issue_type"].choices).get(value, "Unidentified Type")
+        return dict(self.ISSUE_TYPE_CHOICES).get(value, "Unidentified Type")
