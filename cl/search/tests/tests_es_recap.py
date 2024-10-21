@@ -6435,7 +6435,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             non_recap_docket = DocketFactory(
@@ -6452,9 +6452,9 @@ class RECAPIndexingTest(
 
         # Update a non-recap docket to a different non-recap source
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             non_recap_docket.source = Docket.HARVARD
@@ -6465,9 +6465,9 @@ class RECAPIndexingTest(
 
         # Update a non-recap docket to a recap source
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             non_recap_docket.source = Docket.RECAP_AND_IDB_AND_HARVARD
@@ -6481,7 +6481,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             docket = DocketFactory(
@@ -6498,9 +6498,9 @@ class RECAPIndexingTest(
 
         # Restart task counter.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket_2 = DocketFactory(
@@ -6516,9 +6516,9 @@ class RECAPIndexingTest(
 
         # Update a Docket without changes.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket.save()
@@ -6529,7 +6529,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             docket.save()
@@ -6539,9 +6539,9 @@ class RECAPIndexingTest(
 
         # Update a Docket untracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket.blocked = True
@@ -6552,9 +6552,9 @@ class RECAPIndexingTest(
 
         # Update a Docket tracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket.docket_number = "21-43434"
@@ -6572,9 +6572,9 @@ class RECAPIndexingTest(
         self.create_index("search.Docket")
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             docket.docket_number = "21-43435"
@@ -6593,6 +6593,7 @@ class RECAPIndexingTest(
         """Confirm a RECAPDocument is properly indexed in ES with the right
         number of indexing tasks.
         """
+
         docket = DocketFactory(
             court=self.court,
             pacer_case_id="asdf",
@@ -6605,7 +6606,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             de_1 = DocketEntryWithParentsFactory(
@@ -6624,12 +6625,13 @@ class RECAPIndexingTest(
         # Only 1 es_save_document task should be called on creation.
         self.reset_and_assert_task_count(expected=1)
         r_doc = DocketDocument.get(id=ES_CHILD_ID(rd_1.pk).RECAP)
+
         self.assertEqual(r_doc.docket_child["parent"], docket.pk)
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             de_2 = DocketEntryWithParentsFactory(
@@ -6644,9 +6646,9 @@ class RECAPIndexingTest(
 
         # Update a RECAPDocument without changes.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.save()
@@ -6655,9 +6657,9 @@ class RECAPIndexingTest(
 
         # Update a RECAPDocument untracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.is_sealed = True
@@ -6668,9 +6670,9 @@ class RECAPIndexingTest(
 
         # Update a RECAPDocument tracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.description = "Lorem Ipsum"
@@ -6686,7 +6688,7 @@ class RECAPIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             rd_1.page_count = 6
@@ -6707,9 +6709,9 @@ class RECAPIndexingTest(
         )
         # Update the RECAPDocument docket_entry.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.docket_entry = de_2
@@ -6735,9 +6737,9 @@ class RECAPIndexingTest(
         self.assertFalse(DocketDocument.exists(id=ES_CHILD_ID(rd_1.pk).RECAP))
         # RECAP Document creation on update.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             rd_1.pacer_doc_id = "99999999"
@@ -6752,9 +6754,9 @@ class RECAPIndexingTest(
         # Add cites to RECAPDocument.
         opinion = OpinionWithParentsFactory()
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             OpinionsCitedByRECAPDocument.objects.bulk_create(
@@ -6779,9 +6781,9 @@ class RECAPIndexingTest(
 
         # Confirm OpinionsCitedByRECAPDocument delete doesn't trigger a update.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             OpinionsCitedByRECAPDocument.objects.filter(
@@ -6796,9 +6798,9 @@ class RECAPIndexingTest(
         opinion_2 = OpinionWithParentsFactory()
         # Update cites to RECAPDocument.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             o_cited = OpinionsCitedByRECAPDocument(
