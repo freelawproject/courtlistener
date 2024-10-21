@@ -14,6 +14,7 @@ from django.db.models import (
     Q,
     Subquery,
 )
+from django.db.models import Case, When, Value, F, Sum
 from django.db.models.functions import Cast, Extract, Now, Sqrt
 from django.template import loader
 from django.utils import timezone
@@ -275,29 +276,38 @@ async def get_lifetime_prayer_stats(
             data["total_cost"],
         )
 
-    filtered_list = Prayer.objects.filter(status=status)
 
-    count = await filtered_list.acount()
+    prayer_by_status = Prayer.objects.filter(status=status)
 
-    total_cost = 0
-    distinct_documents = set()
+    prayer_count = await prayer_by_status.acount()
 
-    async for prayer in filtered_list:
-        recap_document = await sync_to_async(lambda: prayer.recap_document)()
+    distinct_prayers = await prayer_by_status.values("recap_document").distinct().acount()
 
-        distinct_documents.add(recap_document)
-
-        document_price = price(recap_document)
-        total_cost += float(document_price) if document_price else 0.0
-
-    num_distinct = len(distinct_documents)
+    total_cost = await (
+        prayer_by_status.select_related("recap_document")
+        .values("recap_document")
+        .distinct()
+        .annotate(
+            price=Case(
+                When(recap_document__is_free_on_pacer=True, then=Value(0.0)),
+                When(recap_document__page_count__gt=30, then=Value(3.0)),
+                When(
+                    recap_document__page_count__gt=0,
+                    recap_document__page_count__lte=30,
+                    then=F("recap_document__page_count") * 0.10,
+                ),
+                default=Value(0.0),
+            )
+        )
+        .aaggregate(Sum("price", default=0.0))
+    )
 
     data = {
-        "count": count,
-        "num_distinct_purchases": num_distinct,
+        "count": prayer_count,
+        "num_distinct_purchases": distinct_prayers,
         "total_cost": total_cost,
     }
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
 
-    return count, num_distinct, total_cost
+    return prayer_count, distinct_prayers, total_cost
