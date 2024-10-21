@@ -269,7 +269,7 @@ from dataclasses import dataclass
 class PrayerStats:
     prayer_count: int
     distinct_count: int
-    total_cost: float
+    total_cost: str
 
 
 async def get_lifetime_prayer_stats(
@@ -319,7 +319,7 @@ async def get_lifetime_prayer_stats(
     data = {
         "count": prayer_count,
         "num_distinct_purchases": distinct_prayers,
-        "total_cost": total_cost,
+        "total_cost": f"{total_cost:,.2f}",
     }
     one_day = 60 * 60 * 24
     await cache.aset(cache_key, data, one_day)
@@ -327,5 +327,5 @@ async def get_lifetime_prayer_stats(
     return PrayerStats(
         prayer_count=prayer_count,
         distinct_count=distinct_prayers,
-        total_cost=total_cost,
+        total_cost=f"{total_cost:,.2f}",
     )

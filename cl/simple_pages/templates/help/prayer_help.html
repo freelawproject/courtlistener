@@ -57,7 +57,7 @@
   </p>
   <p>PACER waives the first $30.00 of purchases by anyone in each quarter. Leveraging this will allow users to have more access to court documents.
   </p>
-  <p>Since the project's creation, users have fulfilled <span class="bold">{{ count|intcomma }}</span> prayers for <span class="bold">{{ num_distinct_purchases|intcomma }}</span> distinct documents, for a total cost of <span class="bold">${{ total_cost|floatformat:2 }}</span>.
+  <p>Since the project's creation, users have fulfilled <span class="bold">{{ granted_stats.prayer_count|intcomma }}</span> prayers for <span class="bold">{{ granted_stats.distinct_count|intcomma }}</span> distinct documents, for a total cost of <span class="bold">${{ granted_stats.total_cost }}</span>.
   </p>
 
   <h3 id="limitations">Limitations</h3>

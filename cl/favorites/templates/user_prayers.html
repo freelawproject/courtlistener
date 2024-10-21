@@ -18,7 +18,7 @@
   <div class="col-xs-12">
     <div class="well well-sm">
       {% if is_page_owner %}
-        <p>You have had <b>{{ count }}</b> requests fulfilled for documents that cost <b>${{ total_cost|floatformat:2 }}</b>.<p>
+        <p>You have had <b>{{ count|intcomma }}</b> requests fulfilled for documents that cost <b>${{ total_cost|floatformat:2 }}</b>.<p>
         <p>{% if is_eligible %}You are eligible to make document requests.{% else %}You have reached your daily limit; wait 24 hours to make new requests.{% endif %}</p>
       {% endif %}
     </div>

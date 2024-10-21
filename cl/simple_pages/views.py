@@ -135,18 +135,14 @@ async def markdown_help(request: HttpRequest) -> HttpResponse:
 
 
 async def prayer_help(request: HttpRequest) -> HttpResponse:
-    count, num_distinct, total_cost = await get_lifetime_prayer_stats(
+    stats = await get_lifetime_prayer_stats(
         Prayer.GRANTED
     )
 
     context = {
         "daily_quota": settings.ALLOWED_PRAYER_COUNT,
         "private": False,
-        "granted_stats": {
-            "count": count,
-            "num_distinct": num_distinct,
-            "total_cost": total_cost,
-        },
+        "granted_stats": stats,
     }
 
     return TemplateResponse(request, "help/prayer_help.html", context)

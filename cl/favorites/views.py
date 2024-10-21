@@ -198,16 +198,8 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
     context = {
         "top_prayers": top_prayers,
         "private": False,
-        "granted_stats": {
-            "count": granted_stats[0],
-            "num_distinct": granted_stats[1],
-            "total_cost": granted_stats[2],
-        },
-        "waiting_stats": {
-            "count": waiting_stats[0],
-            "num_distinct": waiting_stats[1],
-            "total_cost": waiting_stats[2],
-        },
+        "granted_stats": granted_stats,
+        "waiting_stats": waiting_stats,
     }
 
     return TemplateResponse(request, "top_prayers.html", context)
