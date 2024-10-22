@@ -402,13 +402,8 @@ async def contact(
     else:
         # the form is loading for the first time
         issue_type = request.GET.get("issue_type")
-        if issue_type:
-            issue_type_lower = issue_type.lower()
-            valid_issue_types = [
-                choice[0] for choice in ContactForm.ISSUE_TYPE_CHOICES
-            ]
-            if issue_type_lower in valid_issue_types:
-                initial["issue_type"] = issue_type_lower
+        if issue_type and issue_type.lower() in ContactForm.VALID_ISSUE_TYPES:
+            initial["issue_type"] = issue_type.lower()
         user = await request.auser()  # type: ignore[attr-defined]
         if isinstance(user, User):
             initial["email"] = user.email

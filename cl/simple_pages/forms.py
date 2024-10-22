@@ -6,11 +6,17 @@ from hcaptcha.fields import hCaptchaField
 
 
 class ContactForm(forms.Form):
+    REMOVAL_REQUEST = "removal"
+    RECAP_BUG = "recap"
+    SUPPORT_REQUEST = "support"
+
     ISSUE_TYPE_CHOICES = [
-        ("removal", "Case Removal Request"),
-        ("bug", "RECAP Extension Bug"),
-        ("support", "Support"),
+        (REMOVAL_REQUEST, "Case Removal Request"),
+        (RECAP_BUG, "RECAP Extension Bug"),
+        (SUPPORT_REQUEST, "Support"),
     ]
+
+    VALID_ISSUE_TYPES = [REMOVAL_REQUEST, RECAP_BUG, SUPPORT_REQUEST]
 
     name = forms.CharField(
         widget=forms.TextInput(attrs={"class": "form-control"})
