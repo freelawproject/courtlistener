@@ -1123,14 +1123,6 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     return await view_opinion_old(request, pk, "str")
 
 
-async def view_opinion_details(
-    request: HttpRequest, pk: int, _: str
-) -> HttpResponse:
-    """View for displaying opinion case details."""
-
-    return await render_opinion_view(request, pk, "details")
-
-
 async def view_opinion_pdf(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:

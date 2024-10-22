@@ -17,7 +17,6 @@ from cl.opinion_page.views import (
     view_opinion,
     view_opinion_authorities,
     view_opinion_cited_by,
-    view_opinion_details,
     view_opinion_pdf,
     view_opinion_related_cases,
     view_opinion_summaries,
@@ -46,11 +45,6 @@ urlpatterns = [
         name="docket_feed",
     ),
     path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),  # type: ignore[arg-type]
-    path(
-        "opinion/<int:pk>/<blank-slug:_>/details/",
-        view_opinion_details,
-        name="view_case_details",
-    ),  # with the tab
     path(
         "opinion/<int:pk>/<blank-slug:_>/authorities/",
         view_opinion_authorities,
