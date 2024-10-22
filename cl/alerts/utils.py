@@ -4,7 +4,8 @@ from datetime import date
 from django.conf import settings
 from django.http import QueryDict
 from elasticsearch_dsl import Q, Search
-from elasticsearch_dsl.response import Response
+from elasticsearch_dsl.response import Hit, Response
+from redis import Redis
 
 from cl.alerts.models import (
     SCHEDULED_ALERT_HIT_STATUS,
@@ -16,13 +17,20 @@ from cl.lib.command_utils import logger
 from cl.lib.elasticsearch_utils import add_es_highlighting
 from cl.search.documents import AudioPercolator
 from cl.search.models import SEARCH_TYPES, Docket
-from cl.users.models import UserProfile
 
 
 @dataclass
 class DocketAlertReportObject:
     da_alert: DocketAlert
     docket: Docket
+
+
+@dataclass
+class TaskCompletionStatus:
+    completed: bool = False
+    created: int = 0
+    total: int = 0
+    start_time_millis: int | None = None
 
 
 class OldAlertReport:
@@ -138,3 +146,44 @@ def alert_hits_limit_reached(alert_pk: int, user_pk: int) -> bool:
         )
         return True
     return False
+
+
+def make_alert_set_key(alert_id: int, document_type: str) -> str:
+    """Generate a Redis key for storing alert hits.
+
+    :param alert_id: The ID of the alert.
+    :param document_type: The type of document associated with the alert.
+    :return: A Redis key string in the format "alert_hits:{alert_id}.{document_type}".
+    """
+    return f"alert_hits:{alert_id}.{document_type}"
+
+
+def add_document_hit_to_alert_set(
+    r: Redis, alert_id: int, document_type: str, document_id: int
+) -> None:
+    """Add a document ID to the Redis SET associated with an alert ID.
+
+    :param r: Redis client instance.
+    :param alert_id: The alert identifier.
+    :param document_type: The type of document associated with the alert.
+    :param document_id: The docket identifier to add.
+    :return: None
+    """
+    alert_key = make_alert_set_key(alert_id, document_type)
+    r.sadd(alert_key, document_id)
+
+
+def has_document_alert_hit_been_triggered(
+    r: Redis, alert_id: int, document_type: str, document_id: int
+) -> bool:
+    """Check if a document ID is a member of the Redis SET associated with an
+     alert ID.
+
+    :param r: Redis client instance.
+    :param alert_id: The alert identifier.
+    :param document_type: The type of document associated with the alert.
+    :param document_id: The docket identifier to check.
+    :return: True if the docket ID is a member of the set, False otherwise.
+    """
+    alert_key = make_alert_set_key(alert_id, document_type)
+    return r.sismember(alert_key, document_id)
