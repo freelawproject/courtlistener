@@ -1,6 +1,7 @@
 import json
 import os
 import boto3
+from botocore.exceptions import ClientError
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from cl.search.models import Opinion, OpinionCluster
@@ -10,7 +11,7 @@ from lxml import etree
 import re
 from django.utils.safestring import mark_safe
 import html
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
 from tqdm import tqdm
@@ -26,6 +27,8 @@ class Command(BaseCommand):
         super().__init__(*args, **kwargs)
         self.verbose = False
         self.logger = logging.getLogger(__name__)
+        self.s3_client = None
+        self.bucket_name = None
 
     def add_arguments(self, parser):
         """
@@ -64,17 +67,26 @@ class Command(BaseCommand):
                 level=logging.CRITICAL
             )  # Only log critical errors
 
-        reporter = options.get("reporter")
-        self.process_crosswalks(reporter)
+        self.setup_s3_client()
 
-    def setup_s3_client(self):
-        """Set up the S3 client for accessing CAP data."""
-        self.s3_client = boto3.client(
-            "s3",
-            endpoint_url=settings.CAP_R2_ENDPOINT_URL,
-            aws_access_key_id=settings.CAP_R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.CAP_R2_SECRET_ACCESS_KEY,
-        )
+        reporter = options.get("reporter")
+        self.process_crosswalk(reporter)
+
+    def setup_s3_client(self, mock_client: Optional[Any] = None) -> None:
+        """Set up S3 client for accessing CAP data in R2.
+
+        :param mock_client: Optional mock client for testing.
+        :return: None
+        """
+        if mock_client:
+            self.s3_client = mock_client
+        else:
+            self.s3_client = boto3.client(
+                "s3",
+                endpoint_url=settings.CAP_R2_ENDPOINT_URL,
+                aws_access_key_id=settings.CAP_R2_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.CAP_R2_SECRET_ACCESS_KEY,
+            )
         self.bucket_name = settings.CAP_R2_BUCKET_NAME
 
     def process_all_crosswalks(self):
@@ -138,19 +150,19 @@ class Command(BaseCommand):
             cl_cluster_id = entry["cl_cluster_id"]
 
             self.log(f"Processing entry: {entry['cap_path']}", logging.DEBUG)
-
             self.log(
                 f"Processing cluster {cl_cluster_id} with CAP path: {cap_path}",
                 logging.WARNING,
             )
 
             cap_html = self.fetch_cap_html(cap_path)
-            cl_xml_list = self.fetch_cl_xml(cl_cluster_id)
+            result = self.fetch_cl_xml(cl_cluster_id)
 
-            if cap_html and cl_xml_list:
+            if cap_html and result:
+                cl_cluster, cl_xml_list = result
                 self.log(
                     f"Successfully fetched CAP HTML and CL XML for cluster {cl_cluster_id}",
-                    logging.SUCCESS,
+                    logging.INFO,
                 )
                 self.log("\nOriginal CAP HTML Content:\n\n", logging.DEBUG)
                 self.log(cap_html, logging.DEBUG)
@@ -159,6 +171,10 @@ class Command(BaseCommand):
                 processed_opinions, changes = self.update_cap_html_with_cl_xml(
                     cap_html, cl_xml_list
                 )
+                if "casebody" in cap_html and "data" in cap_html["casebody"]:
+                    self.update_cluster_headmatter(
+                        cl_cluster, cap_html["casebody"]["data"]
+                    )
 
                 if processed_opinions:
                     self.save_updated_xml(processed_opinions)
@@ -204,8 +220,6 @@ class Command(BaseCommand):
                         f"No changes needed for {entry['cap_path']}",
                         logging.DEBUG,
                     )
-
-                # TODO: update cl xml in db
             else:
                 self.log(
                     f"Failed to fetch either CAP HTML or CL XML for cluster {cl_cluster_id}",
@@ -254,7 +268,6 @@ class Command(BaseCommand):
             html_path = cap_path.replace("cases", "html").replace(
                 ".json", ".html"
             )
-            # Print the full S3 path for debugging
             full_s3_path = f"s3://{self.bucket_name}/{html_path}"
             self.log(f"Attempting to fetch: {full_s3_path}", logging.WARNING)
 
@@ -268,18 +281,20 @@ class Command(BaseCommand):
             self.log(f"Error fetching CAP HTML: {str(e)}", logging.ERROR)
         return None
 
-    def fetch_cl_xml(self, cluster_id: int) -> Optional[List[Dict[str, str]]]:
+    def fetch_cl_xml(
+        self, cluster_id: int
+    ) -> Optional[Tuple[OpinionCluster, List[Dict[str, Any]]]]:
         """
         Fetch CL XML content for a given cluster ID.
 
         :param cluster_id: The ID of the opinion cluster
         :type cluster_id: int
-        :return: A list of dictionaries containing opinion data, or None if an error occurred
-        :rtype: Optional[List[Dict[str, str]]]
+        :return: A tuple containing the OpinionCluster and a list of dictionaries containing opinion data, or None if an error occurred
+        :rtype: Optional[Tuple[OpinionCluster, List[Dict[str, str]]]]
         """
         try:
-            cluster = OpinionCluster.objects.get(id=cluster_id)
-            opinions = Opinion.objects.filter(cluster=cluster)
+            cl_cluster = OpinionCluster.objects.get(id=cluster_id)
+            opinions = Opinion.objects.filter(cluster=cl_cluster)
 
             xml_data = []
             for opinion in opinions:
@@ -293,9 +308,9 @@ class Command(BaseCommand):
 
             self.log(
                 f"Successfully fetched XML for cluster {cluster_id} ({len(xml_data)} opinions)",
-                logging.SUCCESS,
+                logging.INFO,
             )
-            return xml_data
+            return cl_cluster, xml_data
         except OpinionCluster.DoesNotExist:
             self.log(
                 f"OpinionCluster with id {cluster_id} does not exist",
@@ -407,7 +422,6 @@ class Command(BaseCommand):
                 }
             )
 
-        # Log changes
         if changes_made:
             self.log("\nChanges made:", logging.INFO)
             for change in changes_made:
@@ -418,62 +432,28 @@ class Command(BaseCommand):
         return processed_opinions, changes_made
 
     def convert_html_to_xml(self, html_content: str) -> str:
-        """
-        Convert HTML content to XML.
-
-        :param html_content: The HTML content to convert
-        :type html_content: str
-        :return: The converted XML content
-        :rtype: str
-        """
-        print("Input to convert_html_to_xml:", html_content)
-
         soup = BeautifulSoup(html_content, "html.parser")
-        root = soup.opinion
 
-        xml_root = etree.Element(root.name)
+        for element in soup.find_all():
+            classes = element.get("class", [])
 
-        for name, value in root.attrs.items():
-            if isinstance(value, list):
-                xml_root.set(name, " ".join(value))
-            else:
-                xml_root.set(name, str(value))
+            if len(classes) == 1:
+                new_tag = classes[0]
+                element.name = new_tag
+                del element["class"]
+            elif len(classes) > 1:
+                element["type"] = " ".join(classes)
+                del element["class"]
 
-        def convert_element(html_elem, xml_parent):
-            xml_elem = etree.SubElement(xml_parent, html_elem.name)
+            for attr, value in element.attrs.items():
+                if attr not in ["class", "type"]:
+                    element[attr] = value
 
-            for name, value in html_elem.attrs.items():
-                if isinstance(value, list):
-                    xml_elem.set(name, " ".join(value))
-                else:
-                    xml_elem.set(name, str(value))
+        for element in soup.find_all():
+            if element.string:
+                element.string = element.string.strip()
 
-            if html_elem.string:
-                xml_elem.text = html_elem.string.strip()
-
-            # Recursively convert child elements
-            for child in html_elem.children:
-                if child.name:
-                    convert_element(child, xml_elem)
-
-        # Convert the HTML structure to XML
-        for child in root.children:
-            if child.name:  # Only process tag elements, not strings
-                convert_element(child, xml_root)
-
-        # Convert the XML tree to a string
-        xml_string = etree.tostring(
-            xml_root, encoding="unicode", pretty_print=True
-        )
-
-        # Clean up the XML
-        xml_string = re.sub(r"\n\s*\n", "\n", xml_string)  # Remove empty lines
-        xml_string = re.sub(
-            r">\s+<", "><", xml_string
-        )  # Remove whitespace between tags
-
-        print("Output from convert_html_to_xml:", xml_string)
-        return xml_string
+        return str(soup)
 
     def save_updated_xml(self, processed_opinions: List[Dict[str, str]]):
         """
@@ -509,3 +489,48 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(message)
         self.logger.log(level, message)
+
+    def update_cluster_headmatter(self, cluster_id: int, cap_data: dict):
+        try:
+            cluster = OpinionCluster.objects.get(id=cluster_id)
+            if "casebody" in cap_data and "data" in cap_data["casebody"]:
+                casebody_html = cap_data["casebody"]["data"]
+                soup = BeautifulSoup(casebody_html, "html.parser")
+                head_matter = soup.find("section", class_="head-matter")
+
+                if head_matter:
+                    # Convert the head-matter to XML
+                    new_headmatter = self.convert_html_to_xml(str(head_matter))
+
+                    if cluster.headmatter != new_headmatter:
+                        cluster.headmatter = new_headmatter
+                        cluster.save()
+                        self.log(
+                            f"Updated headmatter for cluster {cluster_id}",
+                            logging.INFO,
+                        )
+                    else:
+                        self.log(
+                            f"No change in headmatter for cluster {cluster_id}",
+                            logging.DEBUG,
+                        )
+                else:
+                    self.log(
+                        f"No head-matter section found in CAP data for cluster {cluster_id}",
+                        logging.WARNING,
+                    )
+            else:
+                self.log(
+                    f"No casebody data found in CAP data for cluster {cluster_id}",
+                    logging.WARNING,
+                )
+        except OpinionCluster.DoesNotExist:
+            self.log(
+                f"OpinionCluster with id {cluster_id} does not exist",
+                logging.ERROR,
+            )
+        except Exception as e:
+            self.log(
+                f"Error updating headmatter for cluster {cluster_id}: {str(e)}",
+                logging.ERROR,
+            )

@@ -45,61 +45,121 @@ class UpdateCapCasesTest(TestCase):
             cap_html, cl_xml_list
         )
 
+        print(f"Processed opinions: {processed_opinions}")
+
         self.assertEqual(len(processed_opinions), 1)
 
         # Parse the processed XML to check structure
         soup = BeautifulSoup(processed_opinions[0]["xml"], "xml")
+        print(f"Parsed XML: {soup.prettify()}")
 
         # Check the overall structure
         opinion_tag = soup.find("opinion")
-        self.assertIsNotNone(opinion_tag)
-        self.assertEqual(opinion_tag.get("type"), "majority")
+        print(f"Opinion tag: {opinion_tag}")
+        self.assertIsNotNone(opinion_tag, "Opinion tag should exist")
+        self.assertEqual(
+            opinion_tag.get("type"),
+            "majority",
+            "Opinion type should be majority",
+        )
+        self.assertEqual(
+            opinion_tag.get("data-type"),
+            "majority",
+            "Opinion data-type should be majority",
+        )
 
         # Check that various tags are present
         author_tag = opinion_tag.find("author")
-        self.assertIsNotNone(author_tag)
-        self.assertEqual(author_tag.get("id"), "b1")
-        self.assertEqual(author_tag.text.strip(), "AUTHOR NAME")
+        print(f"Author tag: {author_tag}")
+        self.assertIsNotNone(author_tag, "Author tag should exist")
+        self.assertEqual(
+            author_tag.get("id"), "b1", "Author tag should have id 'b1'"
+        )
+        self.assertEqual(
+            author_tag.text.strip(),
+            "AUTHOR NAME",
+            "Author name should be correct",
+        )
 
-        p_tag = opinion_tag.find("p")
-        self.assertIsNotNone(p_tag)
-        self.assertEqual(p_tag.get("id"), "b2")
-        self.assertEqual(p_tag.text.strip(), "Some opinion text")
+        p_tag = opinion_tag.find("p", id="b2")
+        print(f"P tag: {p_tag}")
+        self.assertIsNotNone(p_tag, "P tag with id 'b2' should exist")
+        self.assertEqual(
+            p_tag.text.strip(),
+            "Some opinion text",
+            "P tag text should be correct",
+        )
 
         summary_tag = opinion_tag.find("summary")
-        self.assertIsNotNone(summary_tag)
-        self.assertEqual(summary_tag.get("id"), "b3")
-        self.assertEqual(summary_tag.text.strip(), "Case summary")
+        print(f"Summary tag: {summary_tag}")
+        self.assertIsNotNone(summary_tag, "Summary tag should exist")
+        self.assertEqual(
+            summary_tag.get("id"), "b3", "Summary tag should have id 'b3'"
+        )
+        self.assertEqual(
+            summary_tag.text.strip(),
+            "Case summary",
+            "Summary text should be correct",
+        )
 
-        aside_tag = opinion_tag.find("aside")
-        self.assertIsNotNone(aside_tag)
-        self.assertEqual(aside_tag.get("id"), "b4")
-        self.assertEqual(aside_tag.text.strip(), "More text")
+        aside_tag = opinion_tag.find("aside", id="b4")
+        print(f"Aside tag: {aside_tag}")
+        self.assertIsNotNone(aside_tag, "Aside tag with id 'b4' should exist")
+        self.assertEqual(
+            aside_tag.text.strip(),
+            "More text",
+            "Aside tag text should be correct",
+        )
 
-        self.assertIsNone(soup.find("p", class_="author"))
-        self.assertIsNone(soup.find("p", class_="summary"))
+        # Check that there are no class attributes left
+        self.assertIsNone(
+            soup.find(attrs={"class": True}),
+            "There should be no elements with class attributes",
+        )
 
         # Check that there are only four direct children of the opinion tag
-        self.assertEqual(len(opinion_tag.find_all(recursive=False)), 4)
+        self.assertEqual(
+            len(opinion_tag.find_all(recursive=False)),
+            4,
+            "Opinion tag should have exactly 4 direct children",
+        )
 
         # Verify the order of elements
-        children = list(opinion_tag.children)
+        children = [
+            child
+            for child in opinion_tag.children
+            if isinstance(child, bs4.element.Tag)
+        ]
+        print("Filtered children of opinion tag:")
+        for i, child in enumerate(children):
+            print(f"{i}: <{child.name}>")
+
         self.assertTrue(
-            isinstance(children[0], bs4.element.Tag)
-            and children[0].name == "author"
+            len(children) >= 4,
+            f"Opinion tag should have at least 4 child tags, but has {len(children)}",
         )
-        self.assertTrue(
-            isinstance(children[1], bs4.element.Tag)
-            and children[1].name == "p"
+        self.assertEqual(
+            children[0].name,
+            "author",
+            f"First child tag should be an author tag, but is <{children[0].name}>",
         )
-        self.assertTrue(
-            isinstance(children[2], bs4.element.Tag)
-            and children[2].name == "summary"
+        self.assertEqual(
+            children[1].name,
+            "p",
+            f"Second child tag should be a p tag, but is <{children[1].name}>",
         )
-        self.assertTrue(
-            isinstance(children[3], bs4.element.Tag)
-            and children[3].name == "aside"
+        self.assertEqual(
+            children[2].name,
+            "summary",
+            f"Third child tag should be a summary tag, but is <{children[2].name}>",
         )
+        self.assertEqual(
+            children[3].name,
+            "aside",
+            f"Fourth child tag should be an aside tag, but is <{children[3].name}>",
+        )
+
+        print("All assertions passed successfully!")
 
     def test_update_cap_html_with_no_opinion_content(self):
         # Case: CL XML includes an opinion not present in CAP HTML
