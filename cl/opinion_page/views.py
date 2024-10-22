@@ -934,7 +934,7 @@ async def setup_opinion_context(
                 break
             elif sub_opinion.download_url:
                 has_downloads = True
-                pdf_path = sub_opinion.local_path.url
+                pdf_path = None
 
     get_string = make_get_string(request)
 
@@ -1118,8 +1118,6 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
         )
         if ui_flag_for_o or user_flag_active:
             return await render_opinion_view(request, pk, "opinions")
-    # else:
-    # print("~~~~1:", ui_flag_for_o, "~~~2:", user_flag_active, request.user)
     return await view_opinion_old(request, pk, "str")
 
 
@@ -1230,7 +1228,13 @@ async def view_opinion_summaries(
 async def view_opinion_related_cases(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """"""
+    """View Related Cases Tab
+
+    :param request: HTTP request
+    :param pk: The cluster PK
+    :param _: url slug
+    :return: Return related cases tab
+    """
     cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
     related_cluster_object = await es_get_related_clusters_with_cache(
         cluster, request
@@ -1241,7 +1245,6 @@ async def view_opinion_related_cases(
         "sub_opinion_ids": related_cluster_object.sub_opinion_pks,
         "related_search_params": f"&{urlencode(related_cluster_object.url_search_params)}",
         "queries_timeout": related_cluster_object.timeout,
-        "has_related_cases": related_cluster_object.has_related_cases,
     }
     return await render_opinion_view(
         request, pk, "related-cases", additional_context

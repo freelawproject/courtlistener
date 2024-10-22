@@ -240,7 +240,6 @@ class RelatedClusterResults:
     sub_opinion_pks: list[int] = field(default_factory=list)
     url_search_params: dict[str, str] = field(default_factory=dict)
     timeout: bool = False
-    has_related_cases: bool = False
 
 
 async def es_get_related_clusters_with_cache(
@@ -294,12 +293,12 @@ async def es_get_related_clusters_with_cache(
     if cached_related_clusters is not None:
         related_cluster_result.related_clusters = cached_related_clusters
         related_cluster_result.timeout = timeout_related
-        related_cluster_result.has_related_cases = (
-            True if len(cached_related_clusters) > 0 else False
+        related_cluster_result.sub_opinion_pks = list(
+            map(int, sub_opinion_pks)
         )
+        related_cluster_result.url_search_params = url_search_params
         return related_cluster_result
 
-    # if cached_related_clusters is None:
     related_query = await build_related_clusters_query(
         cluster_search, sub_opinion_pks, search_params
     )
@@ -331,22 +330,12 @@ async def es_get_related_clusters_with_cache(
     )
     related_cluster_result.timeout = False
     related_cluster_result.sub_opinion_pks = list(map(int, sub_opinion_pks))
-    related_cluster_result.has_related_cases = True if response else False
+    # related_cluster_result.has_related_cases = True if response else False
 
     if timeout_related == False:
         await cache.aset(
             mlt_cache_key,
             (related_cluster_result.related_clusters, timeout_related),
-            settings.RELATED_CACHE_TIMEOUT,
-        )
-
-        await cache.aset(
-            mlt_cache_key,
-            (
-                related_cluster_result.related_clusters,
-                timeout_related,
-                related_cluster_result.has_related_cases,
-            ),
             settings.RELATED_CACHE_TIMEOUT,
         )
     return related_cluster_result
@@ -468,6 +457,7 @@ async def es_get_citing_and_related_clusters_with_cache(
         cached_citing_cluster_count,
         timeout_cited,
     ) = await cache.aget(cache_citing_key) or (None, 0, False)
+
     cached_related_clusters, timeout_related = (
         await cache.aget(mlt_cache_key) or (None, False)
         if settings.RELATED_USE_CACHE
