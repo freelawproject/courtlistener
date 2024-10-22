@@ -58,7 +58,11 @@ class ContactForm(forms.Form):
             r"remov(e|al)|take down",
             re.I,
         )
-        if re.search(regex, subject) and "http" not in message.lower():
+        is_removal_request = (
+            re.search(regex, subject)
+            or cleaned_data.get("issue_type", "") == self.REMOVAL_REQUEST
+        )
+        if is_removal_request and "http" not in message.lower():
             msg = (
                 "This appears to be a removal request, but you did not "
                 "include a link. You must include a link for a request to be "
