@@ -486,7 +486,12 @@ class OpinionV3APISearchTest(
                 created_opinions.append(opinion)
 
         page_size = 20
-        total_opinions = Opinion.objects.all().distinct("cluster_id").count()
+        total_opinions = (
+            Opinion.objects.all()
+            .order_by("cluster_id", "ordering_key")
+            .distinct("cluster_id")
+            .count()
+        )
         total_pages = int(total_opinions / page_size) + 1
         ids_in_results = set()
         cd = {
@@ -2256,7 +2261,6 @@ class OpinionsESSearchTest(
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
-
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
