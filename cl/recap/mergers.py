@@ -1787,7 +1787,6 @@ async def merge_attachment_page_data(
             attachment.get("attachment_number") is not None,
             # Missing on sealed items.
             attachment.get("pacer_doc_id", False),
-            attachment["description"],
         ]
         if not all(sanity_checks):
             continue
