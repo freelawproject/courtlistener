@@ -117,7 +117,7 @@
 {% elif tab == "cited-by" %}
     {# Cited By #}
     <div class="tab-pane fade in active" id="cited-by">
-        <h2 class="opinion-section-title jump-link" id="related-cases">
+        <h2 class="opinion-section-title jump-link">
             <span>
                 Cited By ({{ citing_cluster_count|intcomma }})
                 <a href="/feed/search/?type=o&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})" rel="nofollow">
@@ -174,7 +174,7 @@
 {% elif tab == "related-cases" %}
     {# Related Cases #}
     <div class="tab-pane fade in active" id="related">
-        <h2 class="opinion-section-title jump-link" id="">Related Cases</h2>
+        <h2 class="opinion-section-title jump-link">Related Cases</h2>
         <hr class="hr-opinion">
             {% url 'show_results' as show_results_url %}
                 {% with sub_opinion_ids_list=sub_opinion_ids|join:',' pk_str=cluster.pk|stringformat:"s" %}
@@ -312,7 +312,12 @@
                         {% elif sub_opinion.html_with_citations %}
                           {% if cluster.source == "C" %}
                         {# It's a PDF with no HTML enrichment#}
-                            <div class="plaintext">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
+                              {% if sub_opinion.html %}
+                                  {# for scrpaed HTML eg. Colo, Okla we do not want to insert line breaks #}
+                                  <div class="serif-text scraped-html">{{ sub_opinion.html_with_citations|safe }}</div>
+                              {% else %}
+                                  <div class="plaintext">{{ sub_opinion.html_with_citations|safe|linebreaksbr }}</div>
+                              {% endif %}
                           {% else %}
                             <div class="serif-text">{{ sub_opinion.html_with_citations|safe }}</div>
                           {% endif %}

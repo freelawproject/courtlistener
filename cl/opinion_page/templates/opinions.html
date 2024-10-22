@@ -312,9 +312,9 @@
                 {% if related_cases_count > 0  %}
                     <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
                         {% if tab == "related-cases" %}
-                            <a href="#" data-toggle="tab">Related<span class="hidden-xs hidden-sm hidden-md">&nbsp;Cases&nbsp;({{ related_cases_count }})</span></a>
+                            <a href="#" data-toggle="tab">Related<span class="hidden-xs hidden-sm hidden-md">&nbsp;Cases</span></a>
                         {% else %}
-                            <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;<span class="hidden-xs hidden-sm hidden-md">Cases&nbsp;({{ related_cases_count }})</span></a>
+                            <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;<span class="hidden-xs hidden-sm hidden-md">Cases</span></a>
                         {% endif %}
                     </li>
                 {% endif %}
