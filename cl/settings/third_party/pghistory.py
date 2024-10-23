@@ -1,4 +1,3 @@
-# Default pghistory trackers for @pghistory.track()
 import pghistory
 from pghistory.admin.core import (
     BackFilter,
@@ -7,6 +6,7 @@ from pghistory.admin.core import (
     MethodFilter,
     ObjFilter,
 )
+from pghistory.config import admin_model
 
 
 class EventsAdminNoFilters(pghistory.admin.EventsAdmin):
@@ -31,7 +31,23 @@ class EventsAdminNoFilters(pghistory.admin.EventsAdmin):
 
         return filters
 
+    def get_queryset(self, request):
+        # Run query only when we have a model name and object id in url. e.g.
+        # obj=search.RECAPDocument:372557163
+        if "obj" in request.GET:
+            obj = request.GET.get("obj")
+            if ":" in obj:
+                obj_id = obj.split(":")[1]
+                pgh_model = obj.split(":")[0]
+                return admin_model().objects.filter(
+                    pgh_obj_model=pgh_model, pgh_obj_id=obj_id
+                )
 
+        # By default it wont perform any query
+        return admin_model().objects.none()
+
+
+# Default pghistory trackers for @pghistory.track()
 PGHISTORY_DEFAULT_TRACKERS = (
     pghistory.UpdateEvent(
         condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
