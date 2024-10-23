@@ -21,6 +21,7 @@ class AudioFactory(DjangoModelFactory):
         """Creates an instance of the model class without indexing."""
         obj = model_class(*args, **kwargs)
         # explicitly sets `index=False` to prevent it from being indexed in SOLR.
+        # Once Solr is removed, we can just remove this method completely.
         obj.save(index=False)
         return obj
 
