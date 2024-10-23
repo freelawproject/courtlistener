@@ -1035,13 +1035,6 @@ closely the content in the book*/
   font-size: 1em;
 }
 
-#headmatter {
-  border: 1px rgba(210, 210, 210, 0.55) solid;
-  padding: 10px;
-  background: rgba(232, 232, 232, 0.37);
-  margin: 10px;
-}
-
 #headmatter > attorneys, docketnumbers, judges, footnotes, court, decisiondate {
   line-height: 2em;
   font-size: 14px;

@@ -5,7 +5,7 @@
 
 .opinion-body {
 
-  #headmatter {
+  .harvard > * {
     font-family: Merriweather, "Times New Roman", Times, serif;
     font-size: 15px;
     letter-spacing: 0.2px;
@@ -14,8 +14,9 @@
     margin: 0px;
     background-color: white;
     border: none;
-
+    line-height: 2.3em;
   }
+
   #headmatter > parties {
     text-align: center;
     font-style: initial;
@@ -601,6 +602,12 @@ div.footnote:first-of-type {
 
   opinion > a.page-label::after {
     right: -2.5em;
+    text-indent: 0;
+  }
+
+  .harvard a.page-label::after {
+      right: -2.5em;
+      text-indent: 0;
   }
 
    /* Adjust to move the entire blockquote to the right */

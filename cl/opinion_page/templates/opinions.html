@@ -65,11 +65,31 @@
                     <h3> <span>Jump To</span> </h3>
                     <li class="jump-links active"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#" >Top</a></li>
                     <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
-                    {% if cluster.headnotes %}
-                        <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#headnotes" >Headnotes</a></li>
-                    {% endif %}
                     {% if cluster.headmatter %}
-                      <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o" >Opinion</a></li>
+                      <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o">Headmatter</a></li>
+                    {% else %}
+
+                        {% if cluster.correction %}
+                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#correction">Correction</a></li>
+                        {% endif %}
+                        {% if cluster.attorneys %}
+                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#attorneys">Attorneys</a></li>
+                        {% endif %}
+                        {% if cluster.headnotes %}
+                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#headnotes">Headnotes</a></li>
+                        {% endif %}
+                        {% if cluster.syllabus %}
+                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#syllabus">Syllabus</a></li>
+                        {% endif %}
+                        {% if cluster.summary %}
+                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#summary">Summary</a></li>
+                        {% endif %}
+                        {% if cluster.history %}
+                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#history">History</a></li>
+                        {% endif %}
+                        {% if cluster.disposition %}
+                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#disposition">Disposition</a></li>
+                        {% endif %}
                     {% endif %}
                     {% for sub_opinion in cluster.ordered_opinions %}
                       {% if cluster.sub_opinions.all.count > 1 %}

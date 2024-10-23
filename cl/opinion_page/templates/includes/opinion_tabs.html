@@ -267,18 +267,66 @@
     <div class="tab-pane fade in active" id="opinion">
         <article>
             {% with opinion_count=cluster.sub_opinions.all.count %}
-                {% if cluster.headnotes %}
-                    <h2 class="opinion-section-title jump-link" id="headnotes">Headnotes</h2>
-                    <hr class="hr-opinion">
-                    <p class="bottom">{{ cluster.headnotes | safe}}</p>
-                {% endif %}
 
                 {% if cluster.headmatter %}
-                    <h2 class="opinion-section-title jump-link" id="o">Opinion</h2>
+                    <h2 class="opinion-section-title jump-link" id="o">Headmatter</h2>
                     <hr class="hr-opinion">
-                    <div id="headmatter" class="serif-text">
+                    <div class="serif-text harvard" id="headmatter">
                     {{ cluster.headmatter|safe }}
                     </div>
+                {% else %}
+                    {% if cluster.correction %}
+                        <h2 class="opinion-section-title jump-link" id="correction">Correction</h2>
+                        <hr class="hr-opinion">
+                        <div id="" class="serif-text harvard">
+                        {{ cluster.correction|safe }}
+                        </div>
+                    {% endif %}
+
+                    {% if cluster.attorneys %}
+                        <h2 class="opinion-section-title jump-link" id="attorneys">Attorneys</h2>
+                        <hr class="hr-opinion">
+                        <div  class="serif-text harvard">
+                        <p>{{ cluster.attorneys|safe|linebreaksbr }}</p>
+                        </div>
+                    {% endif %}
+
+                    {% if cluster.headnotes %}
+                        <h2 class="opinion-section-title jump-link" id="headnotes">Headnotes</h2>
+                        <hr class="hr-opinion">
+                        <p class="bottom">{{ cluster.headnotes | safe}}</p>
+                    {% endif %}
+
+                    {% if cluster.syllabus %}
+                        <h2 class="opinion-section-title jump-link" id="syllabus">Syllabus</h2>
+                        <hr class="hr-opinion">
+                        <div id="" class="serif-text harvard">
+                        {{ cluster.syllabus|safe }}
+                        </div>
+                    {% endif %}
+
+                    {% if cluster.summary %}
+                        <h2 class="opinion-section-title jump-link" id="summary">Summary</h2>
+                        <hr class="hr-opinion">
+                        <div id="" class="serif-text harvard">
+                        {{ cluster.summary|safe }}
+                        </div>
+                    {% endif %}
+                    {% if cluster.history %}
+                        <h2 class="opinion-section-title jump-link" id="history">History</h2>
+                        <hr class="hr-opinion">
+                        <div id="" class="serif-text harvard">
+                        {{ cluster.history|safe }}
+                        </div>
+                    {% endif %}
+
+                    {% if cluster.disposition %}
+                        <h2 class="opinion-section-title jump-link" id="disposition">Disposition</h2>
+                        <hr class="hr-opinion">
+                        <div class="serif-text harvard">
+                        {{ cluster.disposition|safe }}
+                        </div>
+                    {% endif %}
                 {% endif %}
 
                 {% for sub_opinion in cluster.ordered_opinions %}
