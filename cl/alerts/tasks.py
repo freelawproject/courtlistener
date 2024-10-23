@@ -889,12 +889,13 @@ def send_or_schedule_search_alerts(
     until all results are retrieved or no more results are available.
 
     :param self: The celery task
-    :param response: A two tuple, the document ID to be percolated in
-    ES index and the document data that triggered the alert.
+    :param response: An optional `SaveESDocumentReturn` object containing the
+    ID of the document saved in the ES index, the content of the document and
+    the app label associated with the document.
     :return: A SendAlertsResponse dataclass containing the main alerts
     triggered, the recap documents alerts triggered, the docket alerts
     triggered, the document content that triggered the alert, and the related
-    app label model.
+    app label model or None.
     """
 
     if not response:
