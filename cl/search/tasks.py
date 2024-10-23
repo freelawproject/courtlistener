@@ -528,7 +528,9 @@ def update_es_document(
     update doesn't involve a related instance.
     :param fields_map: A dict containing fields that can be updated or None if
     mapping is not required for the update.
-    :return: None
+    :return: `SaveESDocumentReturn` object containing the ID of the document
+    saved in the ES index, the content of the document and the app label
+    associated with the document or None
     """
 
     es_document = getattr(es_document_module, es_document_name)
