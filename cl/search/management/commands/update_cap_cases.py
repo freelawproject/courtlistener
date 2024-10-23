@@ -158,67 +158,30 @@ class Command(BaseCommand):
             cap_html = self.fetch_cap_html(cap_path)
             result = self.fetch_cl_xml(cl_cluster_id)
 
-            if cap_html and result:
+            if cap_html is not None and result is not None:
                 cl_cluster, cl_xml_list = result
-                self.log(
-                    f"Successfully fetched CAP HTML and CL XML for cluster {cl_cluster_id}",
-                    logging.INFO,
-                )
-                self.log("\nOriginal CAP HTML Content:\n\n", logging.DEBUG)
-                self.log(cap_html, logging.DEBUG)
 
-                # Update CAP HTML with CL XML information
-                processed_opinions, changes = self.update_cap_html_with_cl_xml(
-                    cap_html, cl_xml_list
-                )
-                if "casebody" in cap_html and "data" in cap_html["casebody"]:
-                    self.update_cluster_headmatter(
-                        cl_cluster, cap_html["casebody"]["data"]
+                # Process the HTML content directly
+                soup = BeautifulSoup(cap_html, "html.parser")
+                casebody = soup.find("section", class_="casebody")
+
+                if casebody:
+                    # Process the casebody
+                    processed_opinions, changes_made = (
+                        self.update_cap_html_with_cl_xml(
+                            str(casebody), cl_xml_list
+                        )
                     )
 
-                if processed_opinions:
+                    # Save the updated XML
                     self.save_updated_xml(processed_opinions)
 
-                self.log("\n\nUpdated CAP HTML Content:\n\n", logging.DEBUG)
-                for opinion in processed_opinions:
-                    if opinion["xml"]:
-                        try:
-                            opinion_soup = BeautifulSoup(
-                                html.unescape(opinion["xml"]), "html.parser"
-                            )
-                            pretty_opinion = opinion_soup.prettify()
-                            self.log(mark_safe(pretty_opinion), logging.DEBUG)
-                            self.log("\n\n", logging.DEBUG)
-                        except Exception as e:
-                            self.log(
-                                f"Error processing opinion XML: {str(e)}",
-                                logging.ERROR,
-                            )
-                    else:
-                        self.log(
-                            f"Empty XML for opinion type {opinion['type']}",
-                            logging.WARNING,
-                        )
-
-                self.log("\n\nCL XML Content:\n\n", logging.DEBUG)
-                for opinion in cl_xml_list:
-                    self.log(
-                        f"Opinion ID: {opinion['id']}, Type: {opinion['type']}\n",
-                        logging.DEBUG,
-                    )
-                    self.log(opinion["xml"], logging.DEBUG)
-                    self.log("\n\n", logging.DEBUG)
-
-                if changes:
-                    self.log(
-                        f"Changes made to {entry['cap_path']}:", logging.INFO
-                    )
-                    for change in changes:
-                        self.log(f"  - {change}", logging.INFO)
+                    # Update cluster headmatter
+                    self.update_cluster_headmatter(cl_cluster_id, soup)
                 else:
                     self.log(
-                        f"No changes needed for {entry['cap_path']}",
-                        logging.DEBUG,
+                        f"No casebody found in CAP HTML for cluster {cl_cluster_id}",
+                        logging.WARNING,
                     )
             else:
                 self.log(
@@ -490,38 +453,30 @@ class Command(BaseCommand):
                 self.stdout.write(message)
         self.logger.log(level, message)
 
-    def update_cluster_headmatter(self, cluster_id: int, cap_data: dict):
+    def update_cluster_headmatter(self, cluster_id: int, soup: BeautifulSoup):
         try:
             cluster = OpinionCluster.objects.get(id=cluster_id)
-            if "casebody" in cap_data and "data" in cap_data["casebody"]:
-                casebody_html = cap_data["casebody"]["data"]
-                soup = BeautifulSoup(casebody_html, "html.parser")
-                head_matter = soup.find("section", class_="head-matter")
+            head_matter = soup.find("section", class_="head-matter")
 
-                if head_matter:
-                    # Convert the head-matter to XML
-                    new_headmatter = self.convert_html_to_xml(str(head_matter))
+            if head_matter:
+                # Convert the head-matter to XML
+                new_headmatter = self.convert_html_to_xml(str(head_matter))
 
-                    if cluster.headmatter != new_headmatter:
-                        cluster.headmatter = new_headmatter
-                        cluster.save()
-                        self.log(
-                            f"Updated headmatter for cluster {cluster_id}",
-                            logging.INFO,
-                        )
-                    else:
-                        self.log(
-                            f"No change in headmatter for cluster {cluster_id}",
-                            logging.DEBUG,
-                        )
+                if cluster.headmatter != new_headmatter:
+                    cluster.headmatter = new_headmatter
+                    cluster.save()
+                    self.log(
+                        f"Updated headmatter for cluster {cluster_id}",
+                        logging.INFO,
+                    )
                 else:
                     self.log(
-                        f"No head-matter section found in CAP data for cluster {cluster_id}",
-                        logging.WARNING,
+                        f"No change in headmatter for cluster {cluster_id}",
+                        logging.DEBUG,
                     )
             else:
                 self.log(
-                    f"No casebody data found in CAP data for cluster {cluster_id}",
+                    f"No head-matter section found in CAP data for cluster {cluster_id}",
                     logging.WARNING,
                 )
         except OpinionCluster.DoesNotExist:
