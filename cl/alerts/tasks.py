@@ -647,8 +647,9 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     """Process the response from the percolator and handle alerts triggered by
      the percolator query.
 
-    :param response: A two tuple, a list of Alerts triggered and the document
-    data that triggered the alert.
+    :param response: A `SendAlertsResponse` object containing A list of hits
+    for main, docket only and recap-only alerts, the document data that
+    triggered the alerts and The related app label model.
     :return: None
     """
     if not response:
