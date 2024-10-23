@@ -313,7 +313,9 @@ def es_save_document(
     :param app_label: The app label and model that belongs to the document
     being added.
     :param es_document_name: A Elasticsearch DSL document name.
-    :return: SaveESDocumentReturn or None
+    :return: `SaveESDocumentReturn` object containing the ID of the document
+    saved in the ES index, the content of the document and the app label
+    associated with the document or None.
     """
 
     es_args = {}
