@@ -19,6 +19,8 @@ from elasticsearch.exceptions import ConnectionTimeout
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
@@ -492,6 +494,7 @@ class OpinionV3APISearchTest(
             "order_by": "dateFiled desc",
             "highlight": False,
         }
+        request = Request(APIRequestFactory().get("/"))
         for page in range(1, total_pages + 1):
             search_query = OpinionClusterDocument.search()
             offset = max(0, (page - 1) * page_size)
@@ -499,6 +502,7 @@ class OpinionV3APISearchTest(
                 search_query, cd, {"text": 500}, SEARCH_HL_TAG, "v3"
             )
             hits = ESList(
+                request=request,
                 main_query=main_query,
                 offset=offset,
                 page_size=page_size,
@@ -628,8 +632,9 @@ class OpinionV4APISearchTest(
         prioritizing the different text fields available in the content when
         highlighting is disabled."""
 
-        with self.captureOnCommitCallbacks(execute=True):
-
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             c_2_opinion_1 = OpinionFactory.create(
                 extracted_by_ocr=True,
                 author=self.person_2,
@@ -637,7 +642,6 @@ class OpinionV4APISearchTest(
                 html_lawbox="<b>html_lawbox</b> &amp; text from DB",
                 cluster=self.opinion_cluster_2,
             )
-
             c_2_opinion_2 = OpinionFactory.create(
                 extracted_by_ocr=True,
                 author=self.person_2,
@@ -712,7 +716,9 @@ class OpinionV4APISearchTest(
                     )
                     self.assertEqual(expected_text, result_opinion["snippet"])
 
-        with self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             c_2_opinion_1.delete()
             c_2_opinion_2.delete()
             c_2_opinion_3.delete()
@@ -2211,7 +2217,7 @@ class OpinionsESSearchTest(
         r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
-        self.assertIn("<mark>Howell</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas Howell</mark>", r.content.decode())
 
         # case_name filter: Howells
         search_params = {
@@ -2221,7 +2227,7 @@ class OpinionsESSearchTest(
         r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
-        self.assertIn("<mark>Howells</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas Howells</mark>", r.content.decode())
 
         # text query: Howell
         search_params = {

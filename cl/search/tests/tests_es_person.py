@@ -1342,7 +1342,8 @@ class PeopleSearchTestElasticSearch(
             "type": SEARCH_TYPES.PEOPLE,
         }
         s = PersonDocument.search()
-        main_query, _ = build_es_base_query(s, cd)
+        es_queries = build_es_base_query(s, cd)
+        main_query = es_queries.search_query
         self.assertEqual(main_query.count(), 2)
 
         # Query by parent field dob_state and child field selection_method.
@@ -1352,7 +1353,8 @@ class PeopleSearchTestElasticSearch(
             "type": SEARCH_TYPES.PEOPLE,
         }
         s = PersonDocument.search()
-        main_query, _ = build_es_base_query(s, cd)
+        es_queries = build_es_base_query(s, cd)
+        main_query = es_queries.search_query
         self.assertEqual(main_query.count(), 1)
 
         position_5.delete()

@@ -96,6 +96,9 @@ router.register(
     r"docket-tags", favorite_views.DocketTagViewSet, basename="DocketTag"
 )
 
+# Prayers
+router.register(r"prayers", favorite_views.PrayerViewSet, basename="prayer")
+
 # Visualizations
 router.register(
     r"visualizations/json", viz_views.JSONViewSet, basename="jsonversion"
@@ -319,7 +322,7 @@ urlpatterns = [
         name="coverage_data_opinions",
     ),
     re_path(
-        r"^api/rest/v(?P<version>[123])/alert-frequency/(?P<day_count>\d+)/$",
+        r"^api/rest/v(?P<version>[1234])/alert-frequency/(?P<day_count>\d+)/$",
         views.get_result_count,
         name="alert_frequency",
     ),

@@ -57,7 +57,7 @@ jobs:
         with:
           driver-opts: network=host
       - name: Prebuild docker images
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./courtlistener
           file: ./courtlistener/docker/django/Dockerfile
@@ -97,14 +97,14 @@ jobs:
           docker exec -e SELENIUM_DEBUG=1 -e SELENIUM_TIMEOUT=30 cl-django
           python /opt/courtlistener/manage.py test
           cl --verbosity=2 ${{ matrix.tag_flags }} --parallel
-      - name: cp selenium results from docker to host
+      - name: Export selenium results from docker to host
         if: failure()
         run: |
           # This is annoying b/c docker cp doesn't support globs. See:
           # https://stackoverflow.com/q/35806102/
           # https://github.com/moby/moby/issues/7710
           mkdir selenium-screenshots
-          docker exec cl-django bash -c "mkdir /extract && mv /tmp/*-selenium.png /extract"
+          docker exec cl-django bash -c "mkdir /extract && mv /tmp/*-selenium.png /extract ||:"
           docker cp 'cl-django:/extract' selenium-screenshots/
       - name: Save selenium screenshot as Github artifacts
         uses: actions/upload-artifact@master
@@ -112,6 +112,7 @@ jobs:
         with:
           name: selenium-screenshots
           path: selenium-screenshots/extract
+          if-no-files-found: ignore
 
 # Cancel the current workflow (tests) for pull requests (head_ref) only. See:
 # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-using-a-fallback-value

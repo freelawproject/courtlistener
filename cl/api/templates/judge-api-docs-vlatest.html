@@ -49,6 +49,9 @@
 
 
 <div class="col-xs-12 col-md-8 col-lg-6">
+  {% if version == "v3" %}
+    {% include "includes/v3-deprecated-warning.html" %}
+  {% endif %}
   <h1 id="about">Judge and Justice&nbsp;API</h1>
   <p class="lead">Use these APIs to query and analyze thousands of federal and state court judges.
   </p>

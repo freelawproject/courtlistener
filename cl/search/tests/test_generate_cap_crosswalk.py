@@ -60,7 +60,10 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
         mock_find_matching_case.return_value = mock_opinion_cluster
 
         # Call the command
-        call_command("generate_cap_crosswalk")
+        call_command(
+            "generate_cap_crosswalk",
+            output_dir="/opt/courtlistener/cl/search/crosswalks",
+        )
 
         # Check if crosswalk file was created
         expected_file_path = (
