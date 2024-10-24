@@ -19,7 +19,6 @@ from elasticsearch.exceptions import ConnectionTimeout
 from elasticsearch_dsl import Q
 from factory import RelatedFactory
 from lxml import etree, html
-from waffle.models import Flag
 from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.text_filters import html_decode
