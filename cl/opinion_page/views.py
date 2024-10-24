@@ -906,10 +906,10 @@ async def setup_opinion_context(
 ) -> dict[str, Any]:
     """Generate the basic page information we need to load the page
 
-    :param cluster: The opinon cluster
+    :param cluster: The opinion cluster
     :param request: The HTTP request from the user
     :param tab: The tab to load
-    :return:
+    :return: The opinion page context used to generate the page
     """
     title = ", ".join(
         [
@@ -1099,40 +1099,46 @@ async def view_authorities(
     )
 
 
-async def check_flag_exists(flag_name: str) -> bool:
-    return await sync_to_async(
-        waffle.get_waffle_flag_model().objects.filter(name=flag_name).exists
-    )()
-
-
 @never_cache
 async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
-    """View for displaying opinions."""
+    """View Opinions
 
-    flag_exists = await check_flag_exists("ui_flag_for_o")
-    if flag_exists:
-        ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-            request, "ui_flag_for_o"
-        )
-        user_flag_active = await sync_to_async(waffle.flag_is_active)(
-            request.user, "ui_flag_for_o"
-        )
-        if ui_flag_for_o or user_flag_active:
-            return await render_opinion_view(request, pk, "opinions")
+    :param request: HTTP request
+    :param pk: The cluster PK
+    :param _: url slug
+    :return: The old or new opinion HTML
+    """
+    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
+        request, "ui_flag_for_o"
+    )
+    if ui_flag_for_o:
+        return await render_opinion_view(request, pk, "opinions")
     return await view_opinion_old(request, pk, "str")
 
 
 async def view_opinion_pdf(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """View for displaying opinion case details."""
+    """View Opinion PDF Tab
+
+    :param request: HTTP request
+    :param pk: The cluster PK
+    :param _: url slug
+    :return: Opinion PDF tab
+    """
     return await render_opinion_view(request, pk, "pdf")
 
 
 async def view_opinion_authorities(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """View for displaying opinion authorities."""
+    """View Opinion Table of Authorities
+
+    :param request: HTTP request
+    :param pk: The cluster PK
+    :param _: url slug
+    :return: Table of Authorities tab
+    """
     cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
 
     authorities_context: AuthoritiesContext = AuthoritiesContext(
@@ -1148,38 +1154,34 @@ async def view_opinion_authorities(
         "authorities_context": authorities_context,
         "authorities_with_data": await cluster.aauthorities_with_data(),
     }
+
     ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o"
     )
-    user_flag_active = await sync_to_async(waffle.flag_is_active)(
-        request.user, "ui_flag_for_o"
-    )
-
-    if ui_flag_for_o or user_flag_active:
+    if ui_flag_for_o:
         return await render_opinion_view(
             request, pk, "authorities", additional_context
         )
-    else:
-        # Old page to load for people outside the flag
-        return await view_authorities(
-            request=request, pk=pk, slug="authorities"
-        )
+
+    # Old page to load for people outside the flag
+    return await view_authorities(request=request, pk=pk, slug="authorities")
 
 
 async def view_opinion_cited_by(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """"""
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    """View Cited By Tab
 
-    (
-        citing_clusters,
-        citing_cluster_count,
-        _,
-    ) = await es_get_cited_clusters_with_cache(cluster, request)
+    :param request: HTTP request
+    :param pk: The cluster PK
+    :param _: url slug
+    :return: Cited By tab
+    """
+    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cited_query = await es_get_cited_clusters_with_cache(cluster, request)
     additional_context = {
-        "citing_clusters": citing_clusters,
-        "citing_cluster_count": citing_cluster_count,
+        "citing_clusters": cited_query.citing_clusters,
+        "citing_cluster_count": cited_query.citing_cluster_count,
     }
     return await render_opinion_view(
         request, pk, "cited-by", additional_context
@@ -1189,7 +1191,13 @@ async def view_opinion_cited_by(
 async def view_opinion_summaries(
     request: HttpRequest, pk: int, _: str
 ) -> HttpResponse:
-    """"""
+    """View Opinion Summaries tab
+
+    :param request: HTTP request
+    :param pk: The cluster PK
+    :param _: url slug
+    :return: Summaries tab
+    """
     cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
     parenthetical_groups = [
@@ -1208,22 +1216,16 @@ async def view_opinion_summaries(
     ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o"
     )
-    user_flag_active = await sync_to_async(waffle.flag_is_active)(
-        request.user, "ui_flag_for_o"
-    )
-
-    if ui_flag_for_o or user_flag_active:
-        additional_context = {
-            "parenthetical_groups": parenthetical_groups,
-            "ui_flag_for_o": ui_flag_for_o,
-            "user_flag_active": user_flag_active,
-        }
-        return await render_opinion_view(
-            request, pk, "summaries", additional_context
-        )
-    else:
+    if not ui_flag_for_o:
         # Old page to load for people outside the flag
         return await view_summaries(request=request, pk=pk, slug="summaries")
+    additional_context = {
+        "parenthetical_groups": parenthetical_groups,
+        "ui_flag_for_o": ui_flag_for_o,
+    }
+    return await render_opinion_view(
+        request, pk, "summaries", additional_context
+    )
 
 
 async def view_opinion_related_cases(
@@ -1234,7 +1236,7 @@ async def view_opinion_related_cases(
     :param request: HTTP request
     :param pk: The cluster PK
     :param _: url slug
-    :return: Return related cases tab
+    :return: Related Cases tab
     """
     cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
     related_cluster_object = await es_get_related_clusters_with_cache(

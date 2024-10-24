@@ -344,7 +344,7 @@ async def es_get_related_clusters_with_cache(
 async def es_get_cited_clusters_with_cache(
     cluster: OpinionCluster,
     request: HttpRequest,
-):
+) -> RelatedCitingResults:
     """Elastic cited by cluster search or cache
 
     :param cluster:The cluster to check
@@ -360,6 +360,7 @@ async def es_get_cited_clusters_with_cache(
     ]
     if is_bot(request) or not sub_opinion_pks:
         return (None, False, False)
+    cluster_results = RelatedCitingResults()
 
     cached_citing_results, cahced_citing_clusters_count, timeout_cited = (
         await cache.aget(cache_citing_key) or (None, False, False)
@@ -368,11 +369,10 @@ async def es_get_cited_clusters_with_cache(
     )
 
     if cached_citing_results is not None:
-        return (
-            cached_citing_results,
-            cahced_citing_clusters_count,
-            timeout_cited,
-        )
+        cluster_results.citing_clusters = cached_citing_results
+        cluster_results.citing_cluster_count = cahced_citing_clusters_count
+        cluster_results.timeout = timeout_cited
+        return cluster_result
 
     cluster_search = OpinionClusterDocument.search()
     cited_query = await build_cites_clusters_query(
@@ -393,23 +393,24 @@ async def es_get_cited_clusters_with_cache(
         )
         response = None
         timeout_cited = True
-    citing_clusters = list(response)
-    citing_clusters_count = (
+
+    citing_clusters = list(response) if not timeout_cited else []
+    cluster_results.citing_clusters = citing_clusters
+    cluster_results.citing_cluster_count = (
         response.hits.total.value if response is not None else 0
     )
-    timeout_cited = False if citing_clusters else timeout_cited
-
-    if not timeout_cited:
+    cluster_results.timeout = False if citing_clusters else timeout_cited
+    if not cluster_results.timeout:
         await cache.aset(
             cache_citing_key,
             (
-                citing_clusters,
-                citing_clusters_count,
-                timeout_cited,
+                cluster_result.citing_clusters,
+                cluster_result.citing_cluster_count,
+                cluster_result.timeout,
             ),
             settings.RELATED_CACHE_TIMEOUT,
         )
-    return citing_clusters, citing_clusters_count, timeout_cited
+    return cluster_result
 
 
 async def es_get_citing_and_related_clusters_with_cache(
