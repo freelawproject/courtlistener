@@ -2859,17 +2859,17 @@ class OpinionCluster(AbstractDateTimeModel):
         citation = ""
         if not citations:
             return ""
+        if citations[0].type == Citation.NEUTRAL:
+            return citations[0]
+        elif (
+            len(citations) >= 2
+            and citations[0].type == Citation.WEST
+            and citations[1].type == Citation.LEXIS
+        ):
+            citation += f"{citations[0]}, {citations[1]}"
         else:
-            if citations[0].type == Citation.NEUTRAL:
-                return citations[0]
-            elif (
-                len(citations) >= 2
-                and citations[0].type == Citation.WEST
-                and citations[1].type == Citation.LEXIS
-            ):
-                citation += f"{citations[0]}, {citations[1]}"
-            else:
-                citation += f"{citations[0]}"
+            citation += f"{citations[0]}"
+            
         return citation
 
     @property
