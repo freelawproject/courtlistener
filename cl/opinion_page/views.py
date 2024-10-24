@@ -903,7 +903,7 @@ async def view_opinion_old(
 
 async def setup_opinion_context(
     cluster: OpinionCluster, request: HttpRequest, tab: str
-):
+)-> dict[str, Any]:
     """Generate the basic page information we need to load the page
 
     :param cluster: The opinon cluster
