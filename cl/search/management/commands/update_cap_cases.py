@@ -1,32 +1,27 @@
 import json
 import os
 import boto3
-from botocore.exceptions import ClientError
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.conf import settings
 from cl.search.models import Opinion, OpinionCluster
 import logging
 from bs4 import BeautifulSoup
-from lxml import etree
-import re
-from django.utils.safestring import mark_safe
-import html
 from typing import List, Dict, Tuple, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
 from tqdm import tqdm
-import sys
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Update CL cases with the latest CAP data using crosswalk files"
+    help = "Update CL cases with the latest CAP data.  Requires crosswalk files to be generated first."
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.verbose = False
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.WARNING)  # Change this to WARNING
         self.s3_client = None
         self.bucket_name = None
 
@@ -46,7 +41,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--verbose",
             action="store_true",
-            help="Increase output verbosity for tracking changes and debugging",
+            help="Enable verbose output",
         )
 
     def handle(self, *args, **options):
@@ -70,7 +65,11 @@ class Command(BaseCommand):
         self.setup_s3_client()
 
         reporter = options.get("reporter")
-        self.process_crosswalk(reporter)
+
+        if reporter:
+            self.process_crosswalk(reporter)
+        else:
+            self.process_all_crosswalks()
 
     def setup_s3_client(self, mock_client: Optional[Any] = None) -> None:
         """Set up S3 client for accessing CAP data in R2.
@@ -90,7 +89,22 @@ class Command(BaseCommand):
         self.bucket_name = settings.CAP_R2_BUCKET_NAME
 
     def process_all_crosswalks(self):
-        """Process all crosswalk files in the specified directory."""
+        """
+        Process all crosswalk files in the specified directory concurrently.
+
+        This function scans the 'crosswalk_dir' for all JSON files and processes
+        each file using a thread pool to improve performance. It uses a
+        ThreadPoolExecutor to handle multiple files concurrently, with the number
+        of worker threads set to twice the number of available CPU cores.
+
+        A progress bar is displayed using 'tqdm' to provide real-time feedback on
+        the processing status of the crosswalk files. Errors encountered during
+        processing are logged for debugging purposes.
+
+        Raises:
+            Exception: If an error occurs during the processing of a crosswalk file,
+            it is caught and logged, but not re-raised.
+        """
         crosswalk_dir = "cl/search/crosswalks"
         crosswalk_files = [
             f for f in os.listdir(crosswalk_dir) if f.endswith(".json")
@@ -124,8 +138,17 @@ class Command(BaseCommand):
         """
         Process a single crosswalk file for the given reporter.
 
+        This function reads the crosswalk JSON file for the specified reporter,
+        fetches the corresponding CAP HTML and CL XML data, and updates the CL
+        XML with changes from the CAP HTML. It also updates the cluster's
+        headmatter if changes are detected.
+
         :param reporter: The reporter to process
         :type reporter: str
+
+        Logs errors encountered during file access or JSON parsing, and warns if
+        CAP HTML or CL XML data cannot be fetched. Updates are logged at various
+        levels of verbosity.
         """
         crosswalk_path = f"cl/search/crosswalks/{reporter}.json"
 
@@ -166,17 +189,14 @@ class Command(BaseCommand):
                 casebody = soup.find("section", class_="casebody")
 
                 if casebody:
-                    # Process the casebody
                     processed_opinions, changes_made = (
                         self.update_cap_html_with_cl_xml(
                             str(casebody), cl_xml_list
                         )
                     )
 
-                    # Save the updated XML
                     self.save_updated_xml(processed_opinions)
 
-                    # Update cluster headmatter
                     self.update_cluster_headmatter(cl_cluster_id, soup)
                 else:
                     self.log(
@@ -188,33 +208,6 @@ class Command(BaseCommand):
                     f"Failed to fetch either CAP HTML or CL XML for cluster {cl_cluster_id}",
                     logging.WARNING,
                 )
-
-    def convert_xml_to_html(self, xml_content: str) -> str:
-        """
-        Convert XML content to HTML.
-
-        :param xml_content: The XML content to convert
-        :type xml_content: str
-        :return: The converted HTML content
-        :rtype: str
-        """
-        soup = BeautifulSoup(xml_content, "xml")
-
-        # Convert opinion tags
-        for opinion in soup.find_all("opinion"):
-            opinion.name = "div"
-            opinion["class"] = opinion.get("type", "")
-
-        # Convert author tags
-        for author in soup.find_all("author"):
-            author.name = "p"
-            author["class"] = "author"
-
-        # Convert paragraphs
-        for p in soup.find_all("p"):
-            p.name = "p"
-
-        return str(soup)
 
     def fetch_cap_html(self, cap_path: str) -> Optional[str]:
         """
@@ -315,7 +308,6 @@ class Command(BaseCommand):
             if opinion_type is None:
                 continue
 
-            # Find corresponding section in CAP HTML
             matching_opinion = cap_soup.find(
                 "article", class_="opinion", attrs={"data-type": opinion_type}
             )
@@ -352,17 +344,9 @@ class Command(BaseCommand):
                                 changes_made.append(
                                     f"Updated attribute '{attr}' for element {cl_elem.get('id')}"
                                 )
-                print(
-                    "Before replacement - matching_opinion:", matching_opinion
-                )
-                print("Before replacement - new_opinion:", new_opinion)
                 matching_opinion.replace_with(new_opinion)
-                print("After replacement - new_opinion:", new_opinion)
-
-                print("Before conversion to XML:", str(new_opinion))
                 # Convert updated CAP HTML back to XML
                 updated_xml = self.convert_html_to_xml(str(new_opinion))
-                print("After conversion to XML:", updated_xml)
 
                 self.log(
                     f"\nUpdated XML for opinion type {opinion_type}:",
@@ -395,6 +379,17 @@ class Command(BaseCommand):
         return processed_opinions, changes_made
 
     def convert_html_to_xml(self, html_content: str) -> str:
+        """
+        Convert HTML content to XML format.
+
+        This function parses the given HTML content and modifies the tag names
+        and attributes based on the class names.
+
+        :param html_content: The HTML content to convert
+        :type html_content: str
+        :return: The converted XML content as a string
+        :rtype: str
+        """
         soup = BeautifulSoup(html_content, "html.parser")
 
         for element in soup.find_all():
@@ -445,15 +440,27 @@ class Command(BaseCommand):
                     logging.ERROR,
                 )
 
-    def log(self, message, level=logging.INFO):
-        if getattr(self, "verbose", False):
-            if level >= logging.WARNING:
-                self.stderr.write(self.style.WARNING(message))
-            else:
-                self.stdout.write(message)
-        self.logger.log(level, message)
+    def log(self, message: str, level: int = logging.INFO):
+        """
+        Log
+
+        :param message: The message to log
+        :type message: str
+        :param level: The logging level (e.g., logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL)
+        :type level: int
+        """
+        if level >= logging.WARNING or self.verbose:
+            self.logger.log(level, message)
 
     def update_cluster_headmatter(self, cluster_id: int, soup: BeautifulSoup):
+        """
+        Update the headmatter of an OpinionCluster with new data from CAP.
+
+        :param cluster_id: The ID of the opinion cluster to update
+        :type cluster_id: int
+        :param soup: A BeautifulSoup object containing the parsed CAP HTML
+        :type soup: BeautifulSoup
+        """
         try:
             cluster = OpinionCluster.objects.get(id=cluster_id)
             head_matter = soup.find("section", class_="head-matter")
