@@ -739,7 +739,7 @@ class CitationRedirectorTest(TestCase):
         )
 
         self.assertEqual(r.status_code, HTTPStatus.OK)
-        self.assertTemplateUsed(r, "opinion.html")
+        self.assertTemplateUsed(r, "opinions.html")
         self.assertIn(str(chests_of_tea), r.content.decode())
 
     async def test_show_error_for_non_opinion_citations(self):
