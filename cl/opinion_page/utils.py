@@ -404,13 +404,13 @@ async def es_get_cited_clusters_with_cache(
         await cache.aset(
             cache_citing_key,
             (
-                cluster_result.citing_clusters,
-                cluster_result.citing_cluster_count,
-                cluster_result.timeout,
+                cluster_results.citing_clusters,
+                cluster_results.citing_cluster_count,
+                cluster_results.timeout,
             ),
             settings.RELATED_CACHE_TIMEOUT,
         )
-    return cluster_result
+    return cluster_results
 
 
 async def es_get_citing_and_related_clusters_with_cache(
