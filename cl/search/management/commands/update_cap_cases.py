@@ -1,15 +1,17 @@
 import json
-import os
-import boto3
-from django.core.management.base import BaseCommand
-from django.conf import settings
-from cl.search.models import Opinion, OpinionCluster
 import logging
-from bs4 import BeautifulSoup
-from typing import List, Dict, Tuple, Optional, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional, Tuple
+
+import boto3
+from bs4 import BeautifulSoup
+from django.conf import settings
+from django.core.management.base import BaseCommand
 from tqdm import tqdm
+
+from cl.search.models import Opinion, OpinionCluster
 
 logger = logging.getLogger(__name__)
 

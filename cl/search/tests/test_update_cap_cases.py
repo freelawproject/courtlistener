@@ -1,9 +1,11 @@
 import logging
-from bs4 import BeautifulSoup
+from unittest.mock import MagicMock, patch
+
 import bs4
-from cl.tests.cases import TestCase
+from bs4 import BeautifulSoup
+
 from cl.search.management.commands.update_cap_cases import Command
-from unittest.mock import patch, MagicMock
+from cl.tests.cases import TestCase
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
