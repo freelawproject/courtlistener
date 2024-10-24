@@ -2854,22 +2854,26 @@ class OpinionCluster(AbstractDateTimeModel):
 
     @property
     def display_citation(self):
+        """Find favorite citation to display
+
+        Identify the proper or favorite citation(s) to display on the front end
+        but don't wrap it together with a title
+        :return: The citation if applicable
+        """
         citation_list = [citation for citation in self.citations.all()]
         citations = sorted(citation_list, key=sort_cites)
-        citation = ""
         if not citations:
-            return ""
-        if citations[0].type == Citation.NEUTRAL:
-            return citations[0]
+            citation = ""
+        elif citations[0].type == Citation.NEUTRAL:
+            citation = citations[0]
         elif (
             len(citations) >= 2
             and citations[0].type == Citation.WEST
             and citations[1].type == Citation.LEXIS
         ):
-            citation += f"{citations[0]}, {citations[1]}"
+            citation = f"{citations[0]}, {citations[1]}"
         else:
-            citation += f"{citations[0]}"
-            
+            citation = citations[0]
         return citation
 
     @property
