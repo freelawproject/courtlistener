@@ -10,7 +10,6 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_flag
 
 from cl.search.models import Court
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest

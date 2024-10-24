@@ -19,7 +19,6 @@ from django.test.client import AsyncClient
 from django.urls import reverse
 from django.utils.text import slugify
 from factory import RelatedFactory
-from waffle.models import Flag
 from waffle.testutils import override_flag
 
 from cl.lib.models import THUMBNAIL_STATUSES

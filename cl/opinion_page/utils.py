@@ -3,7 +3,7 @@ import logging
 import traceback
 from dataclasses import dataclass, field
 from io import StringIO
-from typing import Dict, List, Tuple, Union
+from typing import Dict, Tuple, Union
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -546,12 +546,14 @@ async def es_get_citing_and_related_clusters_with_cache(
     return results
 
 
-async def es_cited_case_count(cluster_id: int, sub_opinion_pks: List[str]):
+async def es_cited_case_count(
+    cluster_id: int, sub_opinion_pks: list[str]
+) -> int:
     """Elastic quick cited by count query
 
     :param cluster_id: The cluster id to search with
     :param sub_opinion_pks: The subopinion ids of the cluster
-    :return:
+    :return: Opinion Cited Count
     """
     cache = caches["db_cache"]
     cache_cited_by_key = f"cited-by-count-es:{cluster_id}"
@@ -579,7 +581,7 @@ async def es_cited_case_count(cluster_id: int, sub_opinion_pks: List[str]):
     return cited_by_count
 
 
-async def es_related_case_count(cluster_id, sub_opinion_pks: List[str]):
+async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
     """Elastic quick related cases count
 
     :param cluster_id: The cluster id of the object
