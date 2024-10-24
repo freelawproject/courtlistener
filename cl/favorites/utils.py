@@ -156,7 +156,7 @@ async def get_top_prayers() -> list[RECAPDocument]:
         .order_by("-geometric_mean")[:50]
     )
 
-    return documents
+    return [doc async for doc in documents.aiterator()]
 
 
 async def get_user_prayers(user: User) -> list[Prayer]:
@@ -196,7 +196,7 @@ async def get_user_prayers(user: User) -> list[Prayer]:
         .order_by("prayers__date_created")
     )
 
-    return documents.all()
+    return [document async for document in documents.aiterator()]
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
