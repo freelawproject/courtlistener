@@ -21,7 +21,7 @@ class Command(BaseCommand):
         super().__init__(*args, **kwargs)
         self.verbose = False
         self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.WARNING)  # Change this to WARNING
+        self.logger.setLevel(logging.WARNING)
         self.s3_client = None
         self.bucket_name = None
 
