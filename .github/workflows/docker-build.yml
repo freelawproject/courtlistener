@@ -11,16 +11,39 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build_push.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set up docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Collect docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            freelawproject/courtlistener
+          flavor: |
+            latest=false
+          tags: |
+            type=sha,prefix=,suffix=-prod,format=short
       - name: Build and Push
-        run: |
-          make push-image --file docker/django/Makefile -e VERSION=$(git rev-parse --short HEAD)
+        id: build_push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/django/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
 
   deploy:
     needs: build
@@ -50,12 +73,12 @@ jobs:
       - name: Launch Temporary Pod
         id: tempPod
         run: |
-          kubectl run temp-pod-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod --restart Never --pod-running-timeout=120s --overrides='
+          kubectl run temp-pod-${{ steps.vars.outputs.sha_short }} -n ${{ env.EKS_NAMESPACE }} --image=freelawproject/courtlistener@${{ needs.build.outputs.digest }} --restart Never --pod-running-timeout=120s --overrides='
           {
               "spec": {
               "containers": [{
                   "name": "temp-pod",
-                  "image": "freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod",
+                  "image": "freelawproject/courtlistener@${{ needs.build.outputs.digest }}",
                   "command": ["/bin/sh", "-c", "trap : TERM INT; sleep 259200 & wait"],
                   "envFrom": [{
                   "secretRef": {
@@ -92,42 +115,42 @@ jobs:
 
       # Rollout new versions one by one (watch "deployments" in k9s)
       - name: Rollout cl-python
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-python web=freelawproject/courtlistener@${{ needs.build.outputs.digest }}
       - name: Watch cl-python rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-python
 
       - name: Rollout cl-celery-prefork
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork cl-celery-prefork=freelawproject/courtlistener@${{ needs.build.outputs.digest }}
       - name: Watch cl-celery-prefork rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork
 
       - name: Rollout cl-celery-prefork-bulk
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk cl-celery-prefork-bulk=freelawproject/courtlistener@${{ needs.build.outputs.digest }}
       - name: Watch cl-celery-prefork-bulk rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-bulk
 
       - name: Rollout cl-celery-prefork-es-sweep
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep cl-celery-prefork-es-sweep=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep cl-celery-prefork-es-sweep=freelawproject/courtlistener@${{ needs.build.outputs.digest }}
       - name: Watch cl-celery-prefork-es-sweep rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-celery-prefork-es-sweep
 
       - name: Rollout cl-scrape-rss
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss scrape-rss=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss scrape-rss=freelawproject/courtlistener@${{ needs.build.outputs.digest }}
       - name: Watch cl-scrape-rss rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-scrape-rss
 
       - name: Rollout cl-retry-webhooks
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks retry-webhooks=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks retry-webhooks=freelawproject/courtlistener@${{ needs.build.outputs.digest }}
       - name: Watch cl-retry-webhooks rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks
 
       - name: Rollout cl-send-rt-percolator-alerts
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts cl-send-rt-percolator-alerts=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts cl-send-rt-percolator-alerts=freelawproject/courtlistener@${{ needs.build.outputs.digest }}
       - name: Watch cl-send-rt-percolator-alerts rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts
 
       - name: Rollout cl-es-sweep-indexer
-        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer sweep-indexer=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer sweep-indexer=freelawproject/courtlistener@${{ needs.build.outputs.digest }}
       - name: Watch cl-es-sweep-indexer rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer
 
@@ -137,5 +160,5 @@ jobs:
         run: |
           CRONJOB_NAMES=$(kubectl get cronjobs -n court-listener -o jsonpath='{.items.*.metadata.name}' -l image_type=web-prod);
           for name in $CRONJOB_NAMES; do
-             kubectl set image -n ${{ env.EKS_NAMESPACE }} CronJob/$name job=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod;
+             kubectl set image -n ${{ env.EKS_NAMESPACE }} CronJob/$name job=freelawproject/courtlistener@${{ needs.build.outputs.digest }};
           done;
