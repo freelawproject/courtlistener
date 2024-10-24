@@ -358,9 +358,9 @@ async def es_get_cited_clusters_with_cache(
         str(pk)
         async for pk in cluster.sub_opinions.values_list("pk", flat=True)
     ]
-    if is_bot(request) or not sub_opinion_pks:
-        return (None, False, False)
     cluster_results = RelatedCitingResults()
+    if is_bot(request) or not sub_opinion_pks:
+        return cluster_results
 
     cached_citing_results, cahced_citing_clusters_count, timeout_cited = (
         await cache.aget(cache_citing_key) or (None, False, False)
@@ -372,7 +372,7 @@ async def es_get_cited_clusters_with_cache(
         cluster_results.citing_clusters = cached_citing_results
         cluster_results.citing_cluster_count = cahced_citing_clusters_count
         cluster_results.timeout = timeout_cited
-        return cluster_result
+        return cluster_results
 
     cluster_search = OpinionClusterDocument.search()
     cited_query = await build_cites_clusters_query(
@@ -386,7 +386,7 @@ async def es_get_cited_clusters_with_cache(
         logger.warning("Error getting cited and related clusters: %s", e)
         if settings.DEBUG is True:
             traceback.print_exc()
-        return (None, False, False)
+        return cluster_results
     except ConnectionTimeout as e:
         logger.warning(
             "ConnectionTimeout getting cited and related clusters: %s", e
