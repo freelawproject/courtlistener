@@ -1006,7 +1006,8 @@ async def render_opinion_view(
     :param additional_context: Any additional context to be passed to the view
     :return: HttpResponse
     """
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    queryset = OpinionCluster.objects.prefetch_related("sub_opinions")
+    cluster: OpinionCluster = await aget_object_or_404(queryset, pk=pk)
 
     ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o"
