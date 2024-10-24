@@ -41,7 +41,7 @@ from cl.alerts.tasks import (
     get_docket_notes_and_tags_by_user,
     send_alert_and_webhook,
 )
-from cl.alerts.utils import InvalidDateError, percolate_document
+from cl.alerts.utils import InvalidDateError, percolate_es_document
 from cl.api.factories import WebhookFactory
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -563,6 +563,7 @@ class AlertAPITests(APITestCase):
 
 
 @override_switch("o-es-alerts-active", active=True)
+@mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
     """Test Search Alerts Webhooks"""
 
@@ -660,15 +661,19 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             gender="m",
         )
         cls.mock_date = now().replace(day=15, hour=0)
-        with mock.patch(
-            "cl.api.webhooks.requests.post",
-            side_effect=lambda *args, **kwargs: MockResponse(
-                200, mock_raw=True
+        with (
+            mock.patch(
+                "cl.search.tasks.percolator_alerts_models_supported",
+                new=[Audio],
             ),
-        ), time_machine.travel(
-            cls.mock_date, tick=False
-        ), cls.captureOnCommitCallbacks(
-            execute=True
+            mock.patch(
+                "cl.api.webhooks.requests.post",
+                side_effect=lambda *args, **kwargs: MockResponse(
+                    200, mock_raw=True
+                ),
+            ),
+            time_machine.travel(cls.mock_date, tick=False),
+            cls.captureOnCommitCallbacks(execute=True),
         ):
             cls.dly_opinion = OpinionWithParentsFactory.create(
                 cluster__case_name="California vs Lorem",
@@ -1822,6 +1827,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
 
 
 @override_switch("oa-es-alerts-active", active=True)
+@mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 @mock.patch(
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
@@ -2721,11 +2727,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
 
         # Percolate the document. First batch.
         document_index = AudioDocument._index._name
-        percolator_response = percolate_document(
-            str(rt_oral_argument.pk), document_index
+        percolator_responses = percolate_es_document(
+            str(rt_oral_argument.pk),
+            AudioPercolator._index._name,
+            document_index,
         )
-
-        ids_in_results = [result.id for result in percolator_response.hits]
+        ids_in_results = [
+            result.id for result in percolator_responses.main_response.hits
+        ]
 
         # Update the first in the previous batch.
         alert_to_modify = alerts_created[0]
@@ -2733,14 +2742,17 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         alert_to_modify.save()
 
         # Percolate the next page.
-        search_after = percolator_response.hits[-1].meta.sort
-        percolator_response = percolate_document(
-            str(rt_oral_argument.pk), document_index, search_after=search_after
+        search_after = percolator_responses.main_response.hits[-1].meta.sort
+        percolator_responses = percolate_es_document(
+            str(rt_oral_argument.pk),
+            AudioPercolator._index._name,
+            document_index,
+            main_search_after=search_after,
         )
 
         # The document updated shouldn't be retrieved again.
         # Since documents are ordered by asc date_created instead of timestamp.
-        for result in percolator_response.hits:
+        for result in percolator_responses.main_response.hits:
             self.assertNotIn(result.id, ids_in_results)
             ids_in_results.append(result.id)
 
@@ -3064,14 +3076,14 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
         cls.search_alert_7 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
-            name="Test Alert R",
-            query="q=Test+O&type=r",
+            name="Test Alert D",
+            query="q=Test+O&type=d",
         )
         cls.search_alert_8 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.DAILY,
-            name="Test Alert R",
-            query="q=Test+O&type=r",
+            name="Test Alert D",
+            query="q=Test+O&type=d",
         )
 
     def tearDown(self) -> None:
