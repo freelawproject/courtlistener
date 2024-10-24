@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import bs4
 from cl.tests.cases import TestCase
 from cl.search.management.commands.update_cap_cases import Command
+from unittest.mock import patch, MagicMock
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -49,7 +50,6 @@ class UpdateCapCasesTest(TestCase):
 
         self.assertEqual(len(processed_opinions), 1)
 
-        # Parse the processed XML to check structure
         soup = BeautifulSoup(processed_opinions[0]["xml"], "xml")
         print(f"Parsed XML: {soup.prettify()}")
 
@@ -68,7 +68,6 @@ class UpdateCapCasesTest(TestCase):
             "Opinion data-type should be majority",
         )
 
-        # Check that various tags are present
         author_tag = opinion_tag.find("author")
         print(f"Author tag: {author_tag}")
         self.assertIsNotNone(author_tag, "Author tag should exist")
@@ -207,7 +206,6 @@ class UpdateCapCasesTest(TestCase):
         self.assertEqual(majority_opinion["type"], "majority")
         self.assertEqual(len(majority_opinion.find_all(recursive=False)), 2)
 
-        # Check the concurrence opinion (should be unchanged from CL XML)
         concurrence_soup = BeautifulSoup(processed_opinions[1]["xml"], "xml")
         concurrence_opinion = concurrence_soup.find("opinion")
         self.assertEqual(concurrence_opinion["type"], "concurrence")
@@ -251,7 +249,6 @@ class UpdateCapCasesTest(TestCase):
             cap_html, cl_xml_list
         )
 
-        # Check the number of processed opinions
         self.assertEqual(
             len(processed_opinions),
             1,
@@ -316,7 +313,6 @@ class UpdateCapCasesTest(TestCase):
 
         majority_soup = BeautifulSoup(majority_opinion["xml"], "xml")
 
-        # Check that CAP content is preserved
         self.assertEqual(
             majority_soup.author.text,
             "AUTHOR NAME",
@@ -336,3 +332,117 @@ class UpdateCapCasesTest(TestCase):
             "Extra CAP content",
             "Extra CAP content should be unchanged",
         )
+
+    def test_convert_html_to_xml_simple(self):
+        html_content = """
+        <div class="opinion">
+            <p class="author">AUTHOR NAME</p>
+            <p class="paragraph">Some opinion text</p>
+            <div class="footnote">A footnote</div>
+        </div>
+        """
+
+        expected_xml = """
+        <opinion>
+            <author>AUTHOR NAME</author>
+            <paragraph>Some opinion text</paragraph>
+            <footnote>A footnote</footnote>
+        </opinion>
+        """
+
+        result = self.command.convert_html_to_xml(html_content)
+
+        # Normalize whitespace for comparison
+        result = " ".join(result.split())
+        expected_xml = " ".join(expected_xml.split())
+
+        self.assertEqual(
+            result,
+            expected_xml,
+            "The converted XML does not match the expected output",
+        )
+
+        self.assertNotIn(
+            'class="', result, "Class attributes should be removed"
+        )
+        self.assertIn(
+            "<opinion>",
+            result,
+            "The root element should be renamed to 'opinion'",
+        )
+        self.assertIn(
+            "<author>",
+            result,
+            "The 'author' class should be converted to a tag",
+        )
+        self.assertIn(
+            "<paragraph>",
+            result,
+            "The 'paragraph' class should be converted to a tag",
+        )
+        self.assertIn(
+            "<footnote>",
+            result,
+            "The 'footnote' class should be converted to a tag",
+        )
+
+    @patch(
+        "cl.search.management.commands.update_cap_cases.Command.fetch_cap_html"
+    )
+    @patch(
+        "cl.search.management.commands.update_cap_cases.Command.fetch_cl_xml"
+    )
+    @patch(
+        "cl.search.management.commands.update_cap_cases.Command.update_cap_html_with_cl_xml"
+    )
+    @patch(
+        "cl.search.management.commands.update_cap_cases.Command.save_updated_xml"
+    )
+    @patch(
+        "cl.search.management.commands.update_cap_cases.Command.update_cluster_headmatter"
+    )
+    def test_process_crosswalk_simple(
+        self,
+        mock_update_headmatter,
+        mock_save_xml,
+        mock_update_html,
+        mock_fetch_cl,
+        mock_fetch_cap,
+    ):
+        mock_fetch_cap.return_value = """
+        <html>
+            <body>
+                <section class="casebody">
+                    <article class="opinion" data-type="majority">
+                        <p>Some case content</p>
+                    </article>
+                </section>
+            </body>
+        </html>
+        """
+        mock_fetch_cl.return_value = (
+            MagicMock(),
+            [{"id": 1, "type": "opinion", "xml": "<opinion>CL XML</opinion>"}],
+        )
+        mock_update_html.return_value = (
+            [{"id": 1, "type": "opinion", "xml": "<updated>XML</updated>"}],
+            ["change"],
+        )
+
+        crosswalk_content = [
+            {
+                "cap_path": "path/to/cap",
+                "cl_cluster_id": 123,
+                "cap_case_id": 8118054,
+            }
+        ]
+
+        with patch("builtins.open", MagicMock()):
+            with patch("json.load", return_value=crosswalk_content):
+                self.command.process_crosswalk("test_reporter")
+
+        mock_fetch_cap.assert_called_once_with("path/to/cap")
+        mock_fetch_cl.assert_called_once_with(123)
+        mock_update_html.assert_called_once()
+        mock_save_xml.assert_called_once()
+        mock_update_headmatter.assert_called_once()
