@@ -183,4 +183,4 @@ class TestImportHarvardPDFs(TestCase):
 
         # Verify that the cluster's harvard_id field was updated
         self.cluster.refresh_from_db()
-        self.assertEqual(self.cluster.harvard_id, "1")
+        self.assertEqual(self.cluster.harvard_id, 1)

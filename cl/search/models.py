@@ -2731,10 +2731,9 @@ class OpinionCluster(AbstractDateTimeModel):
         storage=IncrementingAWSMediaStorage(),
         blank=True,
     )
-    harvard_id = models.CharField(
+    harvard_id = models.IntegerField(
         help_text="The ID of the item in the Caselaw Access Project (Harvard)",
-        default=0,
-        db_index=True,
+        null=True,
     )
     arguments = models.TextField(
         help_text="The attorney(s) and legal arguments presented as HTML text. "
@@ -2783,6 +2782,11 @@ class OpinionCluster(AbstractDateTimeModel):
             "source",
         ]
     )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["harvard_id"]),
+        ]
 
     async def acaption(self):
         """Make a proper caption
