@@ -54,7 +54,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--job",
             type=str,
-            choices=["import_pdf"],
+            choices=["import_pdf", "assign_cap_id"],
             default="import_pdf",
             help="",
         )
@@ -242,6 +242,17 @@ class Command(BaseCommand):
 
                 except OpinionCluster.DoesNotExist:
                     logger.info(f"Cluster not found for id: {cl_cluster_id}")
+
+            case "assign_cap_id":
+                try:
+                    cluster = OpinionCluster.objects.get(id=cl_cluster_id)
+                    cluster.harvard_id = cap_case_id
+                    if not self.dry_run:
+                        cluster.save()
+
+                except OpinionCluster.DoesNotExist:
+                    logger.info(f"Cluster not found for id: {cl_cluster_id}")
+
             case _:
                 raise Exception(f"Unknown job {self.job}")
 

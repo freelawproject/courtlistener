@@ -119,3 +119,68 @@ class TestImportHarvardPDFs(TestCase):
         self.assertEqual(
             self.cluster.filepath_pdf_harvard, "mocked_saved_path.pdf"
         )
+
+    @patch("cl.search.management.commands.import_harvard_pdfs.tqdm")
+    @patch(
+        "cl.search.management.commands.import_harvard_pdfs.OpinionCluster.objects.get"
+    )
+    @patch(
+        "cl.search.management.commands.import_harvard_pdfs.HarvardPDFStorage"
+    )
+    @patch("cl.search.management.commands.import_harvard_pdfs.boto3.client")
+    @patch("cl.search.management.commands.import_harvard_pdfs.os.listdir")
+    @patch("cl.search.management.commands.import_harvard_pdfs.os.path.exists")
+    def test_assign_harvard_id(
+        self,
+        mock_exists,
+        mock_listdir,
+        mock_boto3_client,
+        mock_harvard_storage,
+        mock_opinion_cluster_get,
+        mock_tqdm,
+    ):
+        # Setup mocks
+        mock_listdir.return_value = ["test_crosswalk.json"]
+        mock_exists.side_effect = lambda path: path in [
+            "/mocked_path/crosswalk_dir"
+        ]
+
+        mock_s3 = MagicMock()
+        mock_boto3_client.return_value = mock_s3
+        mock_storage = MagicMock()
+        mock_harvard_storage.return_value = mock_storage
+        mock_opinion_cluster_get.return_value = self.cluster
+        mock_tqdm.side_effect = (
+            lambda x, *args, **kwargs: x
+        )  # Make tqdm a pass-through function
+
+        crosswalk_data = [
+            {
+                "cap_case_id": 1,
+                "cl_cluster_id": self.cluster.id,
+                "cap_path": "/test/path.json",
+            }
+        ]
+
+        # Mock file operations
+        m = mock_open(read_data=json.dumps(crosswalk_data))
+
+        # Mock crosswalk_dir
+        crosswalk_dir = "/mocked_path/crosswalk_dir"
+
+        # Verify crosswalk_dir exists
+        self.assertTrue(
+            os.path.exists(crosswalk_dir),
+            f"Crosswalk directory does not exist: {crosswalk_dir}",
+        )
+
+        with patch("builtins.open", m):
+            call_command(
+                "import_harvard_pdfs",
+                crosswalk_dir=crosswalk_dir,
+                job="assign_cap_id",
+            )
+
+        # Verify that the cluster's harvard_id field was updated
+        self.cluster.refresh_from_db()
+        self.assertEqual(self.cluster.harvard_id, "1")
