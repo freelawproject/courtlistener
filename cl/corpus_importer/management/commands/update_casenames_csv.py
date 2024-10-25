@@ -1,10 +1,10 @@
 """
 Update case names from a csv file
 
-The csv must have this two columns: cluster_id and new_casename
+The csv must have this two columns: cluster_id and new_case_name
 
 For example:
-"cluster_id","new_casename"
+"cluster_id","new_case_name"
 "774888","1000 Friends of Maryland v. Carol Browner"
 "542985","101 Ranch v. United States"
 "298695","1507 Corporation v. Henderson"
@@ -84,18 +84,18 @@ def process_csv_data(data: DataFrame | TextFileReader, delay_s: float) -> None:
 
     for index, row in data.iterrows():
         cluster_id = row.get("cluster_id")
-        new_casename = row.get("new_casename")
+        new_case_name = row.get("new_case_name")
 
         if not OpinionCluster.objects.filter(id=cluster_id).exists():
             logger.info(f"Opinion cluster doesn't exist: {cluster_id}")
             continue
 
-        if cluster_id and new_casename:
+        if cluster_id and new_case_name:
             # We add a delay on each save because it will trigger ES indexing for
             # cluster and docket
             logger.info(f"Updating case name for cluster id: {cluster_id}")
             cluster = OpinionCluster.objects.get(id=cluster_id)
-            cluster.case_name = titlecase(harmonize(new_casename))
+            cluster.case_name = titlecase(harmonize(new_case_name))
             cluster.save()
             time.sleep(delay_s)
 
@@ -103,7 +103,7 @@ def process_csv_data(data: DataFrame | TextFileReader, delay_s: float) -> None:
                 logger.info(
                     f"Updating case name for docket id: {cluster.docket_id}"
                 )
-                cluster.docket.case_name = titlecase(harmonize(new_casename))
+                cluster.docket.case_name = titlecase(harmonize(new_case_name))
                 cluster.docket.save()
                 time.sleep(delay_s)
 
