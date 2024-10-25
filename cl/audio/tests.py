@@ -303,6 +303,8 @@ class TranscriptionTest(TestCase):
             docket=DocketFactory(
                 court=cls.court_1, date_argued=datetime.date(2014, 8, 14)
             ),
+            local_path_mp3__data=b"\x10" * 10,
+            local_path_original_file__data=b"\x10" * 10,
             duration=2000,
             stt_status=Audio.STT_NEEDED,
         )
@@ -310,6 +312,8 @@ class TranscriptionTest(TestCase):
             docket=DocketFactory(
                 court=cls.court_1, date_argued=datetime.date(2014, 8, 13)
             ),
+            local_path_mp3__data=b"\x10" * 10,
+            local_path_original_file__data=b"\x10" * 10,
             duration=1000,
             stt_status=Audio.STT_FAILED,
         )
