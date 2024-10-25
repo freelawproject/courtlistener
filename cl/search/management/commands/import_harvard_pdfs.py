@@ -6,9 +6,9 @@ from typing import Any, Dict, Optional, Tuple
 
 import boto3
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 from tqdm import tqdm
-from django.core.files.base import ContentFile
 
 from cl.lib.storage import HarvardPDFStorage
 from cl.search.models import OpinionCluster
