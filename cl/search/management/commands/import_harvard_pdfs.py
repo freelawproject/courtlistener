@@ -8,6 +8,7 @@ import boto3
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from tqdm import tqdm
+from django.core.files.base import ContentFile
 
 from cl.lib.storage import HarvardPDFStorage
 from cl.search.models import OpinionCluster
@@ -159,7 +160,12 @@ class Command(BaseCommand):
             try:
                 cap_case_id = entry["cap_case_id"]
                 cl_cluster_id = entry["cl_cluster_id"]
-                pdf_path = entry["cap_path"].replace(".json", ".pdf")
+                json_path = entry["cap_path"]
+
+                # Construct the PDF path based on the JSON path
+                pdf_path = json_path.replace("cases", "case-pdfs").replace(
+                    ".json", ".pdf"
+                )
 
                 if pdf_path in self.processed_pdfs:
                     logger.info(f"Skipping already processed PDF: {pdf_path}")
@@ -240,6 +246,8 @@ class Command(BaseCommand):
         logger.info(f"Fetching PDF from CAP: {pdf_path}")
         logger.debug(f"Bucket name: {self.cap_bucket_name}")
 
+        pdf_path = pdf_path.lstrip("/")
+
         if self.dry_run:
             logger.info(f"Dry run: Would fetch PDF from {pdf_path}")
             return b"Mock PDF content"
@@ -280,13 +288,23 @@ class Command(BaseCommand):
         storage = HarvardPDFStorage()
         file_path = f"harvard_pdf/{cluster.pk}.pdf"
         logger.debug(f"Saving file to: {file_path}")
-        storage.save(file_path, pdf_content)
-        logger.debug(f"File saved. Updating cluster {cluster.pk}")
-        cluster.filepath_pdf_harvard = file_path
-        cluster.save()
-        logger.info(
-            f"Cluster updated. filepath_pdf_harvard: {cluster.filepath_pdf_harvard}"
-        )
+
+        try:
+            content_file = ContentFile(pdf_content)
+
+            saved_path = storage.save(file_path, content_file)
+            logger.info(f"File saved successfully at: {saved_path}")
+
+            cluster.filepath_pdf_harvard = saved_path
+            cluster.save()
+            logger.info(
+                f"Cluster updated. filepath_pdf_harvard: {cluster.filepath_pdf_harvard}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Error saving PDF for cluster {cluster.id}: {str(e)}",
+                exc_info=True,
+            )
 
 
 if __name__ == "__main__":
