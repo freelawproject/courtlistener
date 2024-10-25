@@ -3,6 +3,7 @@
 {% load extras %}
 {% load admin_urls %}
 {% load static %}
+{% load waffle_tags %}
 
 
 {% block title %}{{ title|safe|striptags }} – CourtListener.com{% endblock %}
@@ -29,6 +30,15 @@
             src="{% static "js/save-notes.js" %}"></script>
     <script defer type="text/javascript"
             src="{% static "js/buy_pacer_modal.js" %}"></script>
+      {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
+  {% flag "pray-and-pay" %}
+  <script src="{% static "js/pray_and_pay.js" %}"></script>
+  {% endflag %}
 {% endblock %}
 
 {% block sidebar %}
@@ -188,6 +198,11 @@
                     <a href="https://free.law/recap/"
                        class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
                   {% endif %}
+                  {% flag "pray-and-pay" %}
+                  <div class="prayer-button" data-gap-size="2px">
+                    {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
+                  </div>
+                  {% endflag %}
                 </span>
               </p>
             </div>
