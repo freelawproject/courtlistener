@@ -1787,9 +1787,17 @@ async def merge_attachment_page_data(
             attachment.get("attachment_number") is not None,
             # Missing on sealed items.
             attachment.get("pacer_doc_id", False),
-            attachment["description"],
         ]
         if not all(sanity_checks):
+            continue
+
+        # Missing on some restricted docs (see Juriscraper)
+        # Attachment 0 may not have page count since it is the main rd.
+        if (
+            "page_count" in attachment
+            and attachment["page_count"] is None
+            and attachment["attachment_number"] != 0
+        ):
             continue
 
         # Appellate entries with attachments don't have a main RD, transform it
