@@ -64,6 +64,7 @@ class TestImportHarvardPDFs(TestCase):
         mock_s3 = MagicMock()
         mock_boto3_client.return_value = mock_s3
         mock_storage = MagicMock()
+        mock_storage.save.return_value = "mocked_saved_path.pdf"
         mock_harvard_storage.return_value = mock_storage
         mock_opinion_cluster_get.return_value = self.cluster
         mock_tqdm.side_effect = (
@@ -115,4 +116,6 @@ class TestImportHarvardPDFs(TestCase):
 
         # Verify that the cluster's filepath_pdf_harvard field was updated
         self.cluster.refresh_from_db()
-        self.assertIsNotNone(self.cluster.filepath_pdf_harvard)
+        self.assertEqual(
+            self.cluster.filepath_pdf_harvard, "mocked_saved_path.pdf"
+        )
