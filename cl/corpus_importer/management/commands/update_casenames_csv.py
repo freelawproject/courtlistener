@@ -58,7 +58,7 @@ def load_csv_file(options: dict) -> DataFrame | TextFileReader:
     if options["start_row"]:
         # Keep header columns because if skiprows is used, it will ignore the header.
         column_names = pd.read_csv(options["csv"], nrows=1).columns
-        header = None
+        header = 0
 
     data = pd.read_csv(
         options["csv"],
@@ -84,7 +84,7 @@ def process_csv_data(data: DataFrame | TextFileReader, delay_s: float) -> None:
 
     for index, row in data.iterrows():
         cluster_id = row.get("cluster_id")
-        new_case_name = row.get("new_case_name")
+        new_case_name = row.get("new_casename")
 
         if not OpinionCluster.objects.filter(id=cluster_id).exists():
             logger.info(f"Opinion cluster doesn't exist: {cluster_id}")
