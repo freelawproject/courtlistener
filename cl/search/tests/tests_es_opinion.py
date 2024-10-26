@@ -632,8 +632,9 @@ class OpinionV4APISearchTest(
         prioritizing the different text fields available in the content when
         highlighting is disabled."""
 
-        with self.captureOnCommitCallbacks(execute=True):
-
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             c_2_opinion_1 = OpinionFactory.create(
                 extracted_by_ocr=True,
                 author=self.person_2,
@@ -641,7 +642,6 @@ class OpinionV4APISearchTest(
                 html_lawbox="<b>html_lawbox</b> &amp; text from DB",
                 cluster=self.opinion_cluster_2,
             )
-
             c_2_opinion_2 = OpinionFactory.create(
                 extracted_by_ocr=True,
                 author=self.person_2,
@@ -716,7 +716,9 @@ class OpinionV4APISearchTest(
                     )
                     self.assertEqual(expected_text, result_opinion["snippet"])
 
-        with self.captureOnCommitCallbacks(execute=True):
+        with time_machine.travel(
+            self.mock_date, tick=False
+        ), self.captureOnCommitCallbacks(execute=True):
             c_2_opinion_1.delete()
             c_2_opinion_2.delete()
             c_2_opinion_3.delete()
@@ -3070,7 +3072,7 @@ class EsOpinionsIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             opinion_cluster = OpinionClusterFactory.create(
@@ -3102,9 +3104,9 @@ class EsOpinionsIndexingTest(
         self.reset_and_assert_task_count(expected=2)
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             # Update the author field in the opinion record.
@@ -3115,9 +3117,9 @@ class EsOpinionsIndexingTest(
 
         # Update an opinion untracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             opinion.joined_by_str = "Joined Lorem"
@@ -3190,9 +3192,9 @@ class EsOpinionsIndexingTest(
         )
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             # Add OpinionsCited using save() as in add_manual_citations command
@@ -3207,9 +3209,9 @@ class EsOpinionsIndexingTest(
         self.assertEqual(es_doc.cites, [opinion_2.pk])
 
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             # Add OpinionsCited using bulk_create as in store_opinion_citations_and_update_parentheticals
@@ -3295,7 +3297,7 @@ class EsOpinionsIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, False, *args, **kwargs
             ),
         ):
             # Update the court field in the docket record.
@@ -3311,7 +3313,7 @@ class EsOpinionsIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, False, *args, **kwargs
             ),
         ):
             opinion_cluster.other_dates = "January 12"
@@ -3386,7 +3388,7 @@ class EsOpinionsIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_es_document.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, False, *args, **kwargs
             ),
         ):
             # update docket number in parent document
@@ -3409,7 +3411,7 @@ class EsOpinionsIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.update_children_docs_by_query.delay",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_children_docs_by_query, *args, **kwargs
+                update_children_docs_by_query, False, *args, **kwargs
             ),
         ):
             # update docket number in parent document

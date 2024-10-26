@@ -1,8 +1,10 @@
 from datetime import datetime
 
+from django.conf import settings
 from django.http import QueryDict
 from django.utils.html import escape, strip_tags
 from django_elasticsearch_dsl import Document, fields
+from elasticsearch_dsl import Document as DSLDocument
 
 from cl.alerts.models import Alert
 from cl.audio.models import Audio
@@ -363,8 +365,8 @@ class AudioPercolator(AudioDocumentBase):
 
         cd = search_form.cleaned_data
         search_query = AudioDocument.search()
-        query, _ = build_es_base_query(search_query, cd)
-        return query.to_dict()["query"]
+        es_queries = build_es_base_query(search_query, cd)
+        return es_queries.search_query.to_dict()["query"]
 
 
 class ES_CHILD_ID:
@@ -784,7 +786,7 @@ class PersonDocument(PersonBaseDocument):
 
 
 # RECAP
-class DocketBaseDocument(Document):
+class RECAPBaseDocument(Document):
     docket_child = JoinField(relations={"docket": ["recap_document"]})
     timestamp = fields.DateField()
 
@@ -960,8 +962,7 @@ class DocketBaseDocument(Document):
         return datetime.utcnow()
 
 
-@recap_index.document
-class ESRECAPDocument(DocketBaseDocument):
+class ESRECAPBaseDocument(DSLDocument):
     id = fields.IntegerField(attr="pk")
     docket_entry_id = fields.IntegerField(attr="docket_entry.pk")
     description = fields.TextField(
@@ -1028,6 +1029,10 @@ class ESRECAPDocument(DocketBaseDocument):
     cites = fields.ListField(
         fields.IntegerField(multi=True),
     )
+
+
+@recap_index.document
+class ESRECAPDocument(RECAPBaseDocument, ESRECAPBaseDocument):
 
     class Django:
         model = RECAPDocument
@@ -1136,8 +1141,7 @@ class ESRECAPDocument(DocketBaseDocument):
         return instance.docket_entry.docket.pacer_case_id
 
 
-@recap_index.document
-class DocketDocument(DocketBaseDocument):
+class DocketBaseDocument(DSLDocument):
     docket_slug = fields.KeywordField(attr="slug", index=False)
     docket_absolute_url = fields.KeywordField(index=False)
     court_exact = fields.KeywordField(attr="court.pk", index=False)
@@ -1185,6 +1189,10 @@ class DocketDocument(DocketBaseDocument):
             multi=True,
         )
     )
+
+
+@recap_index.document
+class DocketDocument(DocketBaseDocument, RECAPBaseDocument):
 
     def prepare_caseName(self, instance):
         return best_case_name(instance)
@@ -1834,3 +1842,160 @@ class OpinionClusterDocument(OpinionBaseDocument):
 
     def prepare_cluster_child(self, instance):
         return "opinion_cluster"
+
+
+class RECAPSweepDocument(DocketDocument, ESRECAPDocument):
+    class Index:
+        name = "recap_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+
+class ESRECAPSweepDocument(ESRECAPBaseDocument):
+
+    class Index:
+        name = "recap_document_sweep"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+
+class ESRECAPDocumentPlain(ESRECAPDocument):
+    docket_absolute_url = fields.KeywordField(index=False)
+
+    # Parties
+    party_id = fields.ListField(fields.IntegerField(multi=True))
+    party = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    attorney_id = fields.ListField(fields.IntegerField(multi=True))
+    attorney = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+    firm_id = fields.ListField(fields.IntegerField(multi=True))
+    firm = fields.ListField(
+        fields.TextField(
+            analyzer="text_en_splitting_cl",
+            fields={
+                "exact": fields.TextField(
+                    analyzer="english_exact",
+                    search_analyzer="search_analyzer_exact",
+                ),
+            },
+            search_analyzer="search_analyzer",
+            multi=True,
+        )
+    )
+
+    def prepare_parties(self, instance):
+        out = {
+            "party_id": set(),
+            "party": set(),
+            "attorney_id": set(),
+            "attorney": set(),
+            "firm_id": set(),
+            "firm": set(),
+        }
+
+        # Extract only required parties values.
+        party_values = instance.docket_entry.docket.parties.values_list(
+            "pk", "name"
+        )
+        for pk, name in party_values.iterator():
+            out["party_id"].add(pk)
+            out["party"].add(name)
+
+        # Extract only required attorney values.
+        atty_values = (
+            Attorney.objects.filter(roles__docket=instance.docket_entry.docket)
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in atty_values.iterator():
+            out["attorney_id"].add(pk)
+            out["attorney"].add(name)
+
+        # Extract only required firm values.
+        firms_values = (
+            AttorneyOrganization.objects.filter(
+                attorney_organization_associations__docket=instance.docket_entry.docket
+            )
+            .distinct()
+            .values_list("pk", "name")
+        )
+        for pk, name in firms_values.iterator():
+            out["firm_id"].add(pk)
+            out["firm"].add(name)
+
+        return out
+
+    def prepare_docket_absolute_url(self, instance):
+        return instance.docket_entry.docket.get_absolute_url()
+
+    def prepare(self, instance):
+        data = super().prepare(instance)
+        parties_prepared = self.prepare_parties(instance)
+        data["party_id"] = list(parties_prepared["party_id"])
+        data["party"] = list(parties_prepared["party"])
+        data["attorney_id"] = list(parties_prepared["attorney_id"])
+        data["attorney"] = list(parties_prepared["attorney"])
+        data["firm_id"] = list(parties_prepared["firm_id"])
+        data["firm"] = list(parties_prepared["firm"])
+        return data
+
+
+class RECAPPercolator(DocketDocument, ESRECAPDocument):
+    rate = fields.KeywordField(attr="rate")
+    percolator_query = PercolatorField()
+
+    class Index:
+        name = "recap_percolator"
+        settings = {
+            "number_of_shards": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_SHARDS,
+            "number_of_replicas": settings.ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_REPLICAS,
+            "analysis": settings.ELASTICSEARCH_DSL["analysis"],
+        }
+
+    def prepare_timestamp(self, instance):
+        return datetime.utcnow()
+
+    def prepare_percolator_query(self, instance):
+        from cl.alerts.utils import build_plain_percolator_query
+
+        qd = QueryDict(instance.query.encode(), mutable=True)
+        search_form = SearchForm(qd)
+        if not search_form.is_valid():
+            logger.warning(
+                f"The query {qd} associated with Alert ID {instance.pk} is "
+                "invalid and was not indexed."
+            )
+            return None
+
+        cd = search_form.cleaned_data
+        query = build_plain_percolator_query(cd)
+        return query.to_dict()

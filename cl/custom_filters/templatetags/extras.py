@@ -1,10 +1,13 @@
 import random
 import re
+import urllib.parse
 from datetime import datetime
 
+import waffle
 from django import template
 from django.core.exceptions import ValidationError
 from django.template import Context
+from django.template.context import RequestContext
 from django.template.defaultfilters import date as date_filter
 from django.utils.formats import date_format
 from django.utils.html import format_html
@@ -12,7 +15,8 @@ from django.utils.http import urlencode
 from django.utils.safestring import SafeString, mark_safe
 from elasticsearch_dsl import AttrDict, AttrList
 
-from cl.search.models import Court, Docket, DocketEntry
+from cl.search.constants import ALERTS_HL_TAG, SEARCH_HL_TAG
+from cl.search.models import SEARCH_TYPES, Court, Docket, DocketEntry
 
 register = template.Library()
 
@@ -130,11 +134,25 @@ def random_int(a: int, b: int) -> int:
 
 
 @register.filter
-def get_attrdict(mapping, key):
-    """Emulates the dictionary get for AttrDict objects. Useful when keys
-    have spaces or other punctuation."""
+def get_es_doc_content(
+    mapping: AttrDict | dict, scheduled_alert: bool = False
+) -> AttrDict | dict | str:
+    """
+    Returns the ES document content placed in the "_source" field if the
+    document is an AttrDict, or just returns the content if it's not necessary
+    to extract from "_source" such as in scheduled alerts where the content is
+     a dict.
+
+    :param mapping: The AttrDict or dict instance to extract the content from.
+    :param scheduled_alert: A boolean indicating if the content belongs to a
+    scheduled alert where the content is already in place.
+    :return: The ES document content.
+    """
+
+    if scheduled_alert:
+        return mapping
     try:
-        return mapping[key]
+        return mapping["_source"]
     except KeyError:
         return ""
 
@@ -200,13 +218,15 @@ def citation(obj) -> SafeString:
 
 
 @register.simple_tag
-def contains_highlights(content: str) -> bool:
+def contains_highlights(content: str, alert: bool = False) -> bool:
     """Check if a given string contains the mark tag used in highlights.
 
     :param content: The input string to check.
+    :param alert: Whether this tag is being used in the alert template.
     :return: True if the mark highlight tag is found, otherwise False.
     """
-    pattern = r"<mark>.*?</mark>"
+    hl_tag = ALERTS_HL_TAG if alert else SEARCH_HL_TAG
+    pattern = rf"<{hl_tag}>.*?</{hl_tag}>"
     matches = re.findall(pattern, content)
     return bool(matches)
 
@@ -245,6 +265,35 @@ def get_highlight(result: AttrDict | dict[str, any], field: str) -> any:
         original_value = result.get(field, "")
 
     return render_string_or_list(hl_value) if hl_value else original_value
+
+
+@register.simple_tag
+def extract_q_value(query: str) -> str:
+    """Extract the value of the "q" parameter from a URL-encoded query string.
+
+    :param query: The URL-encoded query string.
+    :return: The value of the "q" parameter or an empty string if "q" is not found.
+    """
+
+    parsed_query = urllib.parse.parse_qs(query)
+    return parsed_query.get("q", [""])[0]
+
+
+@register.simple_tag(takes_context=True)
+def alerts_supported(context: RequestContext, search_type: str) -> str:
+    """Determine if search alerts are supported based on the search type and flag
+    status.
+
+    :param context: The template context, which includes the request, required
+    for the waffle flag.
+    :param search_type: The type of search being performed.
+    :return: True if alerts are supported, False otherwise.
+    """
+
+    request = context["request"]
+    if search_type == SEARCH_TYPES.RECAP:
+        return waffle.flag_is_active(request, "recap-alerts-active")
+    return search_type in (SEARCH_TYPES.OPINION, SEARCH_TYPES.ORAL_ARGUMENT)
 
 
 @register.filter
