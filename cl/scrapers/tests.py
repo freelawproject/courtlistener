@@ -41,6 +41,7 @@ from cl.scrapers.utils import (
     get_binary_content,
     get_existing_docket,
     get_extension,
+    scraped_citation_object_is_valid,
     update_or_create_docket,
 )
 from cl.search.factories import (
@@ -874,7 +875,7 @@ class ScraperDocketMatchingTest(TestCase):
         )
 
 
-class UpdateFromTestCommandTest(TestCase):
+class UpdateFromTextCommandTest(TestCase):
     """Test the input processing and DB querying for the command"""
 
     def setUp(self):
@@ -932,10 +933,18 @@ class UpdateFromTestCommandTest(TestCase):
             "cl.scrapers.tasks.get_scraper_object_by_name",
             return_value=test_opinion_scraper.Site(),
         ):
-            cmd.handle(juriscraper_module="somepath.sc", opinion_ids=[101])
+            cmd.handle(court_id="somepath.sc", opinion_ids=[101])
 
         self.assertFalse(
-            any(cmd.stats.values()), "No object should be modified"
+            any(
+                [
+                    cmd.stats["Docket"],
+                    cmd.stats["OpinionCluster"],
+                    cmd.stats["Citation"],
+                    cmd.stats["Opinion"],
+                ]
+            ),
+            "No object should be modified",
         )
 
         # will target 1 opinion, there are 2 in the time period
@@ -945,7 +954,7 @@ class UpdateFromTestCommandTest(TestCase):
             return_value=test_opinion_scraper.Site(),
         ):
             update_from_text.Command().handle(
-                juriscraper_module="somepath.vt",
+                court_id="somepath.vt",
                 opinion_ids=[],
                 date_filed_gte="2020/06/01",
                 date_filed_lte="2021/06/01",
@@ -978,4 +987,24 @@ class UpdateFromTestCommandTest(TestCase):
             self.opinion_2020_unpub.cluster.docket.docket_number,
             "13",
             "Unpublished docket should not be modified",
+        )
+
+    def test_scraped_citation_object_is_valid(self):
+        """Can we validate Citation dicts got from `Site.extract_from_text`"""
+        bad_type = {"reporter": "WI", "type": Citation.FEDERAL}
+        self.assertFalse(
+            scraped_citation_object_is_valid(bad_type),
+            "Citation should be marked as invalid. Type does not match reporter",
+        )
+
+        bad_reporter = {"reporter": "Some text"}
+        self.assertFalse(
+            scraped_citation_object_is_valid(bad_reporter),
+            "Citation should be marked as invalid. Reporter does not exist",
+        )
+
+        valid_citation = {"reporter": "WI", "type": Citation.NEUTRAL}
+        self.assertTrue(
+            scraped_citation_object_is_valid(valid_citation),
+            "Citation object should be marked as valid",
         )

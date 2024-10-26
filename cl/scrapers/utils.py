@@ -1,5 +1,4 @@
 import os
-import sys
 from datetime import date
 from typing import Optional, Tuple
 from urllib.parse import urljoin
@@ -9,15 +8,16 @@ import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
-from django.db.models import Q, QuerySet
+from django.db.models import Q
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.test_utils import MockRequest
 from lxml import html
+from reporters_db import REPORTERS
 from requests import Response, Session
 
+from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.utils import winnow_case_name
-from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
 from cl.recap.mergers import find_docket_object
@@ -26,8 +26,7 @@ from cl.scrapers.exceptions import (
     NoDownloadUrlError,
     UnexpectedContentTypeError,
 )
-from cl.scrapers.tasks import extract_recap_pdf
-from cl.search.models import Court, Docket, RECAPDocument
+from cl.search.models import Court, Docket
 
 
 def get_child_court(child_court_name: str, court_id: str) -> Optional[Court]:
@@ -242,53 +241,6 @@ def signal_handler(signal, frame):
     die_now = True
 
 
-def extract_recap_documents(
-    docs: QuerySet,
-    ocr_available: bool = True,
-    order_by: Optional[str] = None,
-    queue: Optional[str] = None,
-) -> None:
-    """Loop over RECAPDocuments and extract their contents. Use OCR if requested.
-
-    :param docs: A queryset containing the RECAPDocuments to be processed.
-    :type docs: Django Queryset
-    :param ocr_available: Whether OCR should be completed (True) or whether items
-    should simply be updated to have status OCR_NEEDED.
-    :type ocr_available: Bool
-    :param order_by: An optimization parameter. You may opt to order the
-    processing by 'small-first' or 'big-first'.
-    :type order_by: str
-    :param queue: The celery queue to send the content to.
-    :type queue: str
-    """
-    docs = docs.exclude(filepath_local="")
-    if ocr_available:
-        # We're doing OCR. Only work with those items that require it.
-        docs = docs.filter(ocr_status=RECAPDocument.OCR_NEEDED)
-    else:
-        # Focus on the items that we don't know if they need OCR.
-        docs = docs.filter(ocr_status=None)
-
-    if order_by is not None:
-        if order_by == "small-first":
-            docs = docs.order_by("page_count")
-        elif order_by == "big-first":
-            docs = docs.order_by("-page_count")
-
-    count = docs.count()
-    throttle = CeleryThrottle(queue_name=queue)
-    for i, pk in enumerate(docs.values_list("pk", flat=True)):
-        throttle.maybe_wait()
-        extract_recap_pdf.apply_async(
-            (pk, ocr_available), priority=5, queue=queue
-        )
-        if i % 1000 == 0:
-            msg = f"Sent {i + 1}/{count} tasks to celery so far."
-            logger.info(msg)
-            sys.stdout.write(f"\r{msg}")
-            sys.stdout.flush()
-
-
 def get_existing_docket(
     court_id: str, docket_number: str, appeal_from_str: str = ""
 ) -> Docket | None:
@@ -466,3 +418,30 @@ def update_or_create_docket(
             setattr(docket, field, value)
 
     return docket
+
+
+def scraped_citation_object_is_valid(citation_object: dict) -> bool:
+    """Validate Citation objects from `Site.extract_from_text`
+
+    Check that the parsed `Citation.reporter` exists in reporters-db
+    and that the `Citation.type` matches the reporters-db type
+
+    :param citation_object: dict got from `Site.extract_from_text`
+    :return: True if the parsed reporter and type match with reporters-db
+        False otherwise
+    """
+    parsed_reporter = citation_object["reporter"]
+    try:
+        reporter = REPORTERS[parsed_reporter]
+        mapped_type = map_reporter_db_cite_type(reporter[0].get("cite_type"))
+        if mapped_type == citation_object["type"]:
+            return True
+        logger.error(
+            "Citation.type '%s' from `extract_from_text` does not match reporters-db type '%s'",
+            citation_object["type"],
+            parsed_reporter,
+        )
+    except KeyError:
+        logger.error("Parsed reporter '%s' does not exist", parsed_reporter)
+
+    return False

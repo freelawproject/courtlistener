@@ -30,6 +30,7 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
+from cl.scrapers.utils import scraped_citation_object_is_valid
 from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -71,8 +72,9 @@ def update_document_from_text(
             opinion.cluster.__dict__.update(data)
         elif model_name == "Citation":
             data["cluster_id"] = opinion.cluster_id
-            _, citation_created = ModelClass.objects.get_or_create(**data)
-            metadata_dict["Citation"]["created"] = citation_created
+            if scraped_citation_object_is_valid(data):
+                _, citation_created = ModelClass.objects.get_or_create(**data)
+                metadata_dict["Citation"]["created"] = citation_created
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
         else:

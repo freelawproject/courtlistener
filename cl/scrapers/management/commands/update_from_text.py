@@ -1,8 +1,9 @@
+import traceback
 from datetime import datetime
 
 from django.db import transaction
 
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import ScraperCommand, logger
 from cl.scrapers.tasks import update_document_from_text
 from cl.search.models import PRECEDENTIAL_STATUS, Opinion, OpinionCluster
 
@@ -23,15 +24,37 @@ def rerun_extract_from_text(
 
     :return None
     """
+    if not opinion.plain_text and not opinion.html:
+        # May be an opinion entirely from a merged corpus
+        # or an error during text extraction
+        logger.info(
+            "Opinion %s has no `plain_text` or `html` to extract from",
+            opinion.id,
+        )
+        stats["No text to extract from"] += 1
+        return
+
     with transaction.atomic():
-        changes = update_document_from_text(opinion, juriscraper_module)
+        try:
+            changes = update_document_from_text(opinion, juriscraper_module)
+        except:
+            # Probably a bad implementation of `extract_from_text`
+            logger.debug(
+                "`update_document_from_text` failed for opinion %s. Traceback: %s",
+                opinion.id,
+                traceback.format_exc(),
+            )
+            stats["Error"] += 1
+            return
+
         if not changes:
             logger.info("Did not get any metadata for opinion %s", opinion.id)
+            stats["No metadata extracted"] += 1
             return
 
         logger.info("Processing opinion %s", opinion.id)
 
-        # Check if changes exist before saving, to prevent unecessary DB queries
+        # Check if changes exist before saving, to prevent unnecessary DB queries
         if changes.get("Docket"):
             opinion.cluster.docket.save()
             logger.debug(
@@ -67,7 +90,7 @@ def rerun_extract_from_text(
                 )
 
 
-class Command(VerboseCommand):
+class Command(ScraperCommand):
     help = """Updates objects by running Site.extract_from_text
     over extracted content found on Opinion.plain_text or Opinion.html.
 
@@ -79,18 +102,20 @@ class Command(VerboseCommand):
     and check if updates over Docket, OpinionCluster, Opinion and
     Citation are as expected
     """
-    stats = {}  # assigned at the end of a command run, for testing
+    # For aggregate reporting at the end of the command
+    stats = {
+        "Docket": 0,
+        "OpinionCluster": 0,
+        "Opinion": 0,
+        "Citation": 0,
+        "No text to extract from": 0,
+        "No metadata extracted": 0,
+        "Error": 0,
+    }
+    juriscraper_module_type = "opinions"
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--juriscraper-module",
-            help="""The Juriscraper file which contains the
-            `extract_from_text` method to be used. The `court_id`
-            will be deduced from this. Example:
-            juriscraper.opinions.united_states.federal_appellate.ca1
-            """,
-            required=True,
-        )
+        super().add_arguments(parser)
         parser.add_argument(
             "--opinion-ids",
             nargs="+",
@@ -100,15 +125,17 @@ class Command(VerboseCommand):
             other filters will be ignored""",
         )
         parser.add_argument(
-            "date-filed-gte",
+            "--date-filed-gte",
             default="",
-            help=r"""A filter value in %Y/%m/%d format.
+            type=self.parse_input_date,
+            help=r"""A filter value in %Y-%m-%d or %Y/%m/%d format.
             OpinionCluster.date_filed will have to be greater or equal""",
         )
         parser.add_argument(
-            "date-filed-lte",
+            "--date-filed-lte",
             default="",
-            help=r"""A filter value in %Y/%m/%d format.
+            type=self.parse_input_date,
+            help=r"""A filter value in %Y-%m-%d or %Y/%m/%d format.
             OpinionCluster.date_filed will have to be less or equal""",
         )
         parser.add_argument(
@@ -122,16 +149,14 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        juriscraper_module = options["juriscraper_module"]
-        # For aggregate reporting
-        stats = {"Docket": 0, "OpinionCluster": 0, "Opinion": 0, "Citation": 0}
+        juriscraper_module = options["court_id"]
 
         if options["opinion_ids"]:
             opinions = Opinion.objects.filter(id__in=options["opinion_ids"])
             for op in opinions:
-                rerun_extract_from_text(op, juriscraper_module, stats)
+                rerun_extract_from_text(op, juriscraper_module, self.stats)
 
-            logger.info("Modified objects counts: %s", stats)
+            logger.info("Modified objects counts: %s", self.stats)
             return
 
         if not (options["date_filed_gte"] and options["date_filed_lte"]):
@@ -140,12 +165,10 @@ class Command(VerboseCommand):
             )
 
         court_id = juriscraper_module.split(".")[-1].split("_")[0]
-        gte_date = datetime.strptime(options["date_filed_gte"], "%Y/%m/%d")
-        lte_date = datetime.strptime(options["date_filed_lte"], "%Y/%m/%d")
         query = {
             "docket__court_id": court_id,
-            "date_filed__gte": gte_date,
-            "date_filed__lte": lte_date,
+            "date_filed__gte": options["date_filed_lte"],
+            "date_filed__lte": options["date_filed_gte"],
         }
 
         if options["cluster_status"]:
@@ -157,7 +180,19 @@ class Command(VerboseCommand):
         for cluster in qs:
             opinions = cluster.sub_opinions.all()
             for op in opinions:
-                rerun_extract_from_text(op, juriscraper_module, stats)
+                rerun_extract_from_text(op, juriscraper_module, self.stats)
 
-        logger.info("Modified objects counts: %s", stats)
-        self.stats = stats
+        logger.info("Modified objects counts: %s", self.stats)
+
+    def parse_input_date(self, date_string: str) -> datetime | str:
+        """Parses a date string in accepted formats
+
+        :param date_string: the date string in "%Y/%m/%d" or "%Y-%m-%d"
+        :return: an empty string if the input was empty; or the date object
+        """
+        parsed_date = ""
+        if "/" in date_string:
+            parsed_date = datetime.strptime(date_string, "%Y/%m/%d")
+        elif "-" in date_string:
+            parsed_date = datetime.strptime(date_string, "%Y-%m-%d")
+        return parsed_date
