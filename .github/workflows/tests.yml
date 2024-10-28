@@ -11,6 +11,39 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    steps:
+      - name: Check out CourtListener
+        uses: actions/checkout@v4
+        with:
+          path: courtlistener
+
+      # Build docker image
+      - name: Set up docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./courtlistener
+          file: ./courtlistener/docker/django/Dockerfile
+          push: false # This image is for testing only
+          tags: courtlistener:latest
+          outputs: type=docker,dest=/tmp/courtlistener.tar
+          build-args: |
+            BUILD_ENV=dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: courtlistener
+          path: /tmp/courtlistener.tar
+          compression-level: 0
+          retention-days: 1
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -50,30 +83,25 @@ jobs:
       - name: Echo github actor name for debugging
         run: echo ${{ github.actor }}
 
-      # Build and cache docker images so tests are always run on the latest
-      # dependencies
       - name: Set up docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
-      - name: Prebuild docker images
-        uses: docker/build-push-action@v6
-        with:
-          context: ./courtlistener
-          file: ./courtlistener/docker/django/Dockerfile
-          load: true
-          build-args: |
-            BUILD_ENV=dev
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       # Prepare Docker images
       - name: Pull docker images
         working-directory: courtlistener/docker/courtlistener
         run: docker compose pull --quiet --ignore-buildable
-      - name: Build docker images
+      - name: Download courtlistener image
+        uses: actions/download-artifact@v4
+        with:
+          name: courtlistener
+          path: /tmp
+      - name: Load courtlistener image
+        run: docker load --input /tmp/courtlistener.tar
+      - name: Build cl-postgresql images # TODO: replace with an off-the-shelf image. Until then, build now for later steps.
         working-directory: courtlistener/docker/courtlistener
-        run: docker compose build
+        run: docker compose build cl-postgresql
       - name: List docker images
         run: docker image ls -a --no-trunc
 
@@ -82,7 +110,8 @@ jobs:
         run: docker network create -d bridge --attachable cl_net_overlay
       - name: Start docker containers
         working-directory: courtlistener/docker/courtlistener
-        run: docker compose -f docker-compose.yml -f docker-compose.tmpfs.yml up -d --no-build --pull=never
+        run: > # don't build, rather use loaded image from build step, specified by merging overriding config
+          docker compose -f docker-compose.yml -f docker-compose.tmpfs.yml -f <(echo 'services: { cl-django: { image: "courtlistener" }, cl-celery: { image: "courtlistener" } }') up -d --no-build --pull=never
       - name: List docker containers
         run: docker ps -a --no-trunc
       - name: Show the docker startup logs
