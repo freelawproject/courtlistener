@@ -166,6 +166,7 @@ class OpinionClusterFilter(NoEmptyFilterSet):
             "citation_count": INTEGER_LOOKUPS,
             "precedential_status": ["exact"],
             "date_blocked": DATE_LOOKUPS,
+            "harvard_id": ["exact"],
             "blocked": ["exact"],
         }
 
