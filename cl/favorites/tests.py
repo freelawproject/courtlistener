@@ -980,7 +980,7 @@ class RECAPPrayAndPay(TestCase):
             email_text_content,
         )
         self.assertIn(
-            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'M j, Y')}",
+            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'F j, Y')}",
             email_text_content,
         )
         self.assertIn(
@@ -1001,7 +1001,7 @@ class RECAPPrayAndPay(TestCase):
             html_content,
         )
         self.assertIn(
-            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'M j, Y')}",
+            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'F j, Y')}",
             html_content,
         )
         self.assertIn(

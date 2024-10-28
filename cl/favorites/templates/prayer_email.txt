@@ -18,8 +18,8 @@ Date Filed: {% if docket_entry.datetime_filed %}{{ docket_entry.datetime_filed|t
 Description: {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else %}{{ docket_entry.description|default:"Unknown docket entry description"|safe|wordwrap:80 }}{% endif %}
 View Document: https://www.courtlistener.com{{document_url}}
 ~~~
-You requested it on {{ date_created|date:"M j, Y" }}
-{{num_waiting}} people were also waiting for it.
+You requested it on {{ date_created|date:"F j, Y" }}.
+{{num_waiting}} people were waiting for it.
 Somebody paid ${{ price }} to make it available to all of us.
 
 ************************
