@@ -84,7 +84,7 @@ def process_csv_data(data: DataFrame | TextFileReader, delay_s: float) -> None:
 
     for index, row in data.iterrows():
         cluster_id = row.get("cluster_id")
-        new_case_name = row.get("new_casename")
+        new_case_name = row.get("new_case_name")
 
         if not OpinionCluster.objects.filter(id=cluster_id).exists():
             logger.info(f"Opinion cluster doesn't exist: {cluster_id}")
