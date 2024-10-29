@@ -19,7 +19,7 @@ Description: {% if rd.description %}{{ rd.description|safe|wordwrap:80 }}{% else
 View Document: https://www.courtlistener.com{{document_url}}
 ~~~
 You requested it on {{ date_created|date:"F j, Y" }}.
-{{num_waiting}} people were waiting for it.
+{{num_waiting}} {{ num_waiting|pluralize:"person was,people were" }} waiting for it.
 Somebody paid ${{ price }} to make it available to all of us.
 
 ************************
