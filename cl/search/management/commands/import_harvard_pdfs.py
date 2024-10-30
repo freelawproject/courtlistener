@@ -121,7 +121,7 @@ class Command(BaseCommand):
         :return: None
         """
         logger.info(
-            f"Processing crosswalks. Reporter: {specific_reporter}, Resume: {self.resume}, Workers: {self.max_workers}"
+            f"Processing crosswalks. Specific reporter: {specific_reporter}, Resume: {self.resume}, Workers: {self.max_workers}"
         )
         # Find all json files
         reporters_files = sorted(os.listdir(self.crosswalk_dir))
@@ -168,7 +168,9 @@ class Command(BaseCommand):
                     None,
                 )
                 if reporter_item_index:
+                    # Update reporters and reporters files list
                     reporters = reporters[reporter_item_index:]
+                    reporters_files = reporters_files[reporter_item_index:]
                     self.start_from_reporter = None
 
         for filename in reporters_files:
@@ -228,33 +230,43 @@ class Command(BaseCommand):
 
             if pdf_path in self.processed_pdfs:
                 logger.info(f"Skipping already processed PDF: {pdf_path}")
+                # Early abort
                 return 0
 
             logger.info(f"Processing PDF: {pdf_path}")
 
             if not self.dry_run:
-                pdf_content = self.fetch_pdf_from_cap(pdf_path)
-                if pdf_content:
-                    cluster = OpinionCluster.objects.get(id=cl_cluster_id)
-                    self.store_pdf_in_cl(cluster, pdf_content)
-                    self.processed_pdfs.add(pdf_path)
-                    return 1  # Successfully downloaded and stored
+                cluster = OpinionCluster.objects.get(id=cl_cluster_id)
+                if not cluster.filepath_pdf_harvard:
+                    # We don't have the pdf file yet
+                    pdf_content = self.fetch_pdf_from_cap(pdf_path)
+                    if pdf_content:
+                        self.store_pdf_in_cl(cluster, pdf_content)
+                        self.processed_pdfs.add(pdf_path)
+                        # Successfully downloaded and stored
+                        return 1
+                else:
+                    logger.info(
+                        f"Cluster: {cl_cluster_id} already has a PDF file assigned: {pdf_path}"
+                    )
             else:
                 logger.info(f"Dry run: Would fetch PDF from {pdf_path}")
-                return 0
 
+        except OpinionCluster.DoesNotExist:
+            logger.error(
+                f"Cluster id: {entry.get('cl_cluster_id', 'Unknown')} doesn't exist."
+            )
         except KeyError as e:
             logger.error(
                 f"Missing key in entry: {e}. Entry: {json.dumps(entry, indent=2)}"
             )
-            return 0
         except Exception as e:
             logger.error(
                 f"Error processing CAP ID {entry.get('cap_case_id', 'Unknown')}: {str(e)}",
                 exc_info=True,
             )
-            return 0
-        # Return 0 at the end if all else fails
+
+        # No files downloaded
         return 0
 
     def process_crosswalk_file(self, crosswalk_file: str) -> None:
