@@ -36,7 +36,6 @@ class TestImportHarvardPDFs(TestCase):
         cls.docket = DocketFactory(court=cls.court)
         cls.cluster = OpinionClusterFactory(docket=cls.docket)
 
-    @patch("cl.search.management.commands.import_harvard_pdfs.tqdm")
     @patch(
         "cl.search.management.commands.import_harvard_pdfs.OpinionCluster.objects.get"
     )
@@ -53,7 +52,6 @@ class TestImportHarvardPDFs(TestCase):
         mock_boto3_client,
         mock_harvard_storage,
         mock_opinion_cluster_get,
-        mock_tqdm,
     ):
         # Setup mocks
         mock_listdir.return_value = ["test_crosswalk.json"]
@@ -67,9 +65,6 @@ class TestImportHarvardPDFs(TestCase):
         mock_storage.save.return_value = "mocked_saved_path.pdf"
         mock_harvard_storage.return_value = mock_storage
         mock_opinion_cluster_get.return_value = self.cluster
-        mock_tqdm.side_effect = (
-            lambda x, *args, **kwargs: x
-        )  # Make tqdm a pass-through function
 
         crosswalk_data = [
             {

@@ -2,13 +2,14 @@ import json
 import logging
 import os
 import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, Optional, Tuple
 
 import boto3
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
-from tqdm import tqdm
 
 from cl.lib.storage import HarvardPDFStorage
 from cl.search.models import OpinionCluster
@@ -33,6 +34,11 @@ class Command(BaseCommand):
             help="Specific reporter to process (e.g., 'A.2d')",
         )
         parser.add_argument(
+            "--start-from-reporter",
+            type=str,
+            help="Process starting from this reporter (e.g., 'A.2d')",
+        )
+        parser.add_argument(
             "--resume",
             action="store_true",
             help="Resume processing from the last completed reporter",
@@ -51,6 +57,12 @@ class Command(BaseCommand):
             help="Directory for reading crosswalk files",
             required=True,
         )
+        parser.add_argument(
+            "--max-workers",
+            type=int,
+            default=2,
+            help="The maximum number of concurrent processes to use.",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         """Handle the command execution.
@@ -64,7 +76,11 @@ class Command(BaseCommand):
             logger.setLevel(logging.DEBUG)
 
         self.dry_run = options["dry_run"]
+        self.resume = options["resume"]
+        self.reporter = options["reporter"]
         self.crosswalk_dir = options["crosswalk_dir"]
+        self.max_workers = options["max_workers"]
+        self.start_from_reporter = options["start_from_reporter"]
 
         if not os.path.exists(self.crosswalk_dir):
             logger.warning(
@@ -72,8 +88,14 @@ class Command(BaseCommand):
             )
             return
 
+        if self.resume and self.start_from_reporter:
+            logger.warning(
+                f"You can't combine --resume and --start-from-reporter arguments."
+            )
+            return
+
         self.setup_s3_clients()
-        self.process_crosswalks(options["reporter"], options["resume"])
+        self.process_crosswalks(self.reporter, self.resume)
 
     def setup_s3_clients(self) -> None:
         """Initialize S3 client for accessing Harvard CAP R2.
@@ -99,8 +121,18 @@ class Command(BaseCommand):
         :return: None
         """
         logger.info(
-            f"Processing crosswalks. Reporter: {specific_reporter}, Resume: {resume}"
+            f"Processing crosswalks. Reporter: {specific_reporter}, Resume: {self.resume}, Workers: {self.max_workers}"
         )
+        # Find all json files
+        reporters_files = sorted(os.listdir(self.crosswalk_dir))
+        reporters_files = [r for r in reporters_files if ".json" in r]
+
+        # Generate a list of reporters available
+        reporters = [
+            r.replace(".json", "").replace("_", ".").replace("..", ". ")
+            for r in reporters_files
+        ]
+
         last_reporter_file = os.path.join(
             self.crosswalk_dir, "last_completed_reporter.txt"
         )
@@ -120,12 +152,41 @@ class Command(BaseCommand):
         else:
             last_completed_reporter = None
 
-        for filename in sorted(os.listdir(self.crosswalk_dir)):
+        if self.start_from_reporter:
+            if self.start_from_reporter not in reporters:
+                logger.error(
+                    f"Invalid reporter to start from: {self.start_from_reporter}. Valid options: {reporters}"
+                )
+                return
+            else:
+                reporter_item_index = next(
+                    (
+                        index
+                        for index, item in enumerate(reporters)
+                        if item == self.start_from_reporter
+                    ),
+                    None,
+                )
+                if reporter_item_index:
+                    reporters = reporters[reporter_item_index:]
+                    self.start_from_reporter = None
+
+        for filename in reporters_files:
             if filename.endswith(".json"):
-                reporter = filename.replace("_", ".").rstrip(".json")
+                reporter = (
+                    filename.replace(".json", "")
+                    .replace("_", ".")
+                    .replace("..", ". ")
+                )
 
                 # Skip reporters until we reach the resume point
                 if resume and last_completed_reporter:
+                    if last_completed_reporter not in reporters:
+                        logger.error(
+                            f"Invalid last completed reporter: {last_completed_reporter}. Valid options: {reporters}"
+                        )
+                        return
+
                     if reporter <= last_completed_reporter:
                         logger.info(
                             f"Skipping already processed reporter: {reporter}"
@@ -145,6 +206,57 @@ class Command(BaseCommand):
                 with open(last_reporter_file, "w") as f:
                     f.write(reporter)
 
+    def process_entry(self, entry: Dict[str, Any]) -> int:
+        """Processes a single entry by attempting to download and store its associated
+        PDF file
+        :param entry: A dictionary containing details about the case entry.
+        :return: An integer indicating the result of the process:
+                 - 1 if the PDF was successfully downloaded and stored.
+                 - 0 if the PDF was not downloaded (e.g., already processed, dry run
+                 mode, or an error occurred).
+        """
+        logger.debug(f"Processing entry: {entry}")
+        try:
+            cap_case_id = entry["cap_case_id"]
+            cl_cluster_id = entry["cl_cluster_id"]
+            json_path = entry["cap_path"]
+
+            # Construct the PDF path based on the JSON path
+            pdf_path = json_path.replace("cases", "case-pdfs").replace(
+                ".json", ".pdf"
+            )
+
+            if pdf_path in self.processed_pdfs:
+                logger.info(f"Skipping already processed PDF: {pdf_path}")
+                return 0
+
+            logger.info(f"Processing PDF: {pdf_path}")
+
+            if not self.dry_run:
+                pdf_content = self.fetch_pdf_from_cap(pdf_path)
+                if pdf_content:
+                    cluster = OpinionCluster.objects.get(id=cl_cluster_id)
+                    self.store_pdf_in_cl(cluster, pdf_content)
+                    self.processed_pdfs.add(pdf_path)
+                    return 1  # Successfully downloaded and stored
+            else:
+                logger.info(f"Dry run: Would fetch PDF from {pdf_path}")
+                return 0
+
+        except KeyError as e:
+            logger.error(
+                f"Missing key in entry: {e}. Entry: {json.dumps(entry, indent=2)}"
+            )
+            return 0
+        except Exception as e:
+            logger.error(
+                f"Error processing CAP ID {entry.get('cap_case_id', 'Unknown')}: {str(e)}",
+                exc_info=True,
+            )
+            return 0
+        # Return 0 at the end if all else fails
+        return 0
+
     def process_crosswalk_file(self, crosswalk_file: str) -> None:
         """Process a single crosswalk file.
 
@@ -152,46 +264,34 @@ class Command(BaseCommand):
         :return: None
         """
         logger.info(f"Processing crosswalk file: {crosswalk_file}")
+
+        start_time = time.time()
+
         with open(crosswalk_file, "r") as f:
             crosswalk_data = json.load(f)
+            logger.info(f"Documents to download: {len(crosswalk_data)}")
 
-        for entry in tqdm(crosswalk_data, desc="Processing entries"):
-            logger.debug(f"Processing entry: {entry}")
-            try:
-                cap_case_id = entry["cap_case_id"]
-                cl_cluster_id = entry["cl_cluster_id"]
-                json_path = entry["cap_path"]
+        total_downloaded = 0
 
-                # Construct the PDF path based on the JSON path
-                pdf_path = json_path.replace("cases", "case-pdfs").replace(
-                    ".json", ".pdf"
-                )
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_entry = {
+                executor.submit(self.process_entry, entry): entry
+                for entry in crosswalk_data
+            }
 
-                if pdf_path in self.processed_pdfs:
-                    logger.info(f"Skipping already processed PDF: {pdf_path}")
-                    continue
+            for future in as_completed(future_to_entry):
+                entry = future_to_entry[future]
+                try:
+                    result = future.result()
+                    if result is not None:
+                        total_downloaded += result
+                except Exception as e:
+                    logger.error(f"Error processing entry {entry}: {str(e)}")
 
-                logger.info(f"Processing PDF: {pdf_path}")
-
-                if not self.dry_run:
-                    pdf_content = self.fetch_pdf_from_cap(pdf_path)
-                    if pdf_content:
-                        cluster = OpinionCluster.objects.get(id=cl_cluster_id)
-                        self.store_pdf_in_cl(cluster, pdf_content)
-                else:
-                    logger.info(f"Dry run: Would fetch PDF from {pdf_path}")
-
-                self.processed_pdfs.add(pdf_path)
-
-            except KeyError as e:
-                logger.error(
-                    f"Missing key in entry: {e}. Entry: {json.dumps(entry, indent=2)}"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error processing CAP ID {entry.get('cap_case_id', 'Unknown')}: {str(e)}",
-                    exc_info=True,
-                )
+        total_time = time.time() - start_time
+        logger.info(
+            f"Finished processing all entries in the crosswalk file: {crosswalk_file} - Total time: {total_time:.2f} seconds. Total files downloaded: {total_downloaded}."
+        )
 
     def parse_cap_path(self, cap_path: str) -> Tuple[str, str, str]:
         """Extract data from CAP path.
@@ -205,37 +305,6 @@ class Command(BaseCommand):
         volume_folder = parts[1]
         case_name = parts[-1].replace(".json", "")
         return reporter_slug, volume_folder, case_name
-
-    def process_entry(self, entry: Dict[str, Any]) -> None:
-        """Process a single crosswalk entry.
-
-        :param entry: Dictionary containing crosswalk entry data.
-        :return: None
-        """
-        cap_case_id = entry["cap_case_id"]
-        cl_cluster_id = entry["cl_cluster_id"]
-        cap_path = entry["cap_path"]
-        logger.info(
-            f"Processing entry: cap_case_id={cap_case_id}, cl_cluster_id={cl_cluster_id}, cap_path={cap_path}"
-        )
-        try:
-            cluster = OpinionCluster.objects.get(id=cl_cluster_id)
-            logger.info(f"Found cluster: {cluster}")
-            pdf_content = self.fetch_pdf_from_cap(cap_path)
-            logger.info(
-                f"Fetched PDF content, length: {len(pdf_content) if pdf_content else 0}"
-            )
-            if pdf_content:
-                logger.info(
-                    "PDF content is not empty, calling store_pdf_in_cl"
-                )
-                self.store_pdf_in_cl(cluster, pdf_content)
-            else:
-                logger.info("PDF content is empty, skipping storage")
-        except OpinionCluster.DoesNotExist:
-            logger.info(f"Cluster not found for id: {cl_cluster_id}")
-        except Exception as e:
-            logger.error(f"Error processing entry: {str(e)}", exc_info=True)
 
     def fetch_pdf_from_cap(self, pdf_path: str) -> Optional[bytes]:
         """Fetch PDF content from CAP.
