@@ -51,6 +51,12 @@ class Command(BaseCommand):
             help="Directory for reading crosswalk files",
             required=True,
         )
+        parser.add_argument(
+            "--max-workers",
+            type=int,
+            help="Maximum number of worker threads (default: 4, max: 16)",
+            default=4,
+        )
 
     def handle(self, *args, **options):
         """
@@ -62,6 +68,7 @@ class Command(BaseCommand):
         """
         self.verbose = options.get("verbose", False)
         self.crosswalk_dir = options["crosswalk_dir"]
+        self.max_workers = min(options["max_workers"], 16)
 
         # Set up logging
         if self.verbose:
@@ -103,8 +110,8 @@ class Command(BaseCommand):
 
         This function scans the 'crosswalk_dir' for all JSON files and processes
         each file using a thread pool to improve performance. It uses a
-        ThreadPoolExecutor to handle multiple files concurrently, with the number
-        of worker threads set to twice the number of available CPU cores.
+        ThreadPoolExecutor to handle multiple files concurrently, with the default
+        number of worker threads set to 4, and a maximum of 16.
 
         A progress bar is displayed using 'tqdm' to provide real-time feedback on
         the processing status of the crosswalk files. Errors encountered during
@@ -122,9 +129,7 @@ class Command(BaseCommand):
             total=len(crosswalk_files),
             desc="Processing crosswalks",
         ) as pbar:
-            with ThreadPoolExecutor(
-                max_workers=multiprocessing.cpu_count() * 2
-            ) as executor:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = []
                 for filename in crosswalk_files:
                     reporter = filename[:-5]
