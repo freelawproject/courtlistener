@@ -45,6 +45,12 @@ class Command(BaseCommand):
             action="store_true",
             help="Enable verbose output",
         )
+        parser.add_argument(
+            "--crosswalk-dir",
+            type=str,
+            help="Directory for reading crosswalk files",
+            required=True,
+        )
 
     def handle(self, *args, **options):
         """
@@ -55,6 +61,7 @@ class Command(BaseCommand):
         :type options: Dict[str, Any]
         """
         self.verbose = options.get("verbose", False)
+        self.crosswalk_dir = options["crosswalk_dir"]
 
         # Set up logging
         if self.verbose:
@@ -107,9 +114,8 @@ class Command(BaseCommand):
             Exception: If an error occurs during the processing of a crosswalk file,
             it is caught and logged, but not re-raised.
         """
-        crosswalk_dir = "cl/search/crosswalks"
         crosswalk_files = [
-            f for f in os.listdir(crosswalk_dir) if f.endswith(".json")
+            f for f in os.listdir(self.crosswalk_dir) if f.endswith(".json")
         ]
 
         with tqdm(
