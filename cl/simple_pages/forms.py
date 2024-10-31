@@ -6,12 +6,29 @@ from hcaptcha.fields import hCaptchaField
 
 
 class ContactForm(forms.Form):
+    REMOVAL_REQUEST = "removal"
+    RECAP_BUG = "recap"
+    SUPPORT_REQUEST = "support"
+
+    ISSUE_TYPE_CHOICES = [
+        (REMOVAL_REQUEST, "Case Removal Request"),
+        (RECAP_BUG, "RECAP Extension Bug"),
+        (SUPPORT_REQUEST, "Support"),
+    ]
+
+    VALID_ISSUE_TYPES = [REMOVAL_REQUEST, RECAP_BUG, SUPPORT_REQUEST]
+
     name = forms.CharField(
         widget=forms.TextInput(attrs={"class": "form-control"})
     )
 
     email = forms.EmailField(
         widget=forms.TextInput(attrs={"class": "form-control"})
+    )
+
+    issue_type = forms.ChoiceField(
+        choices=ISSUE_TYPE_CHOICES,
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
 
     # This is actually the "Subject" field, but we call it the phone_number
@@ -41,7 +58,11 @@ class ContactForm(forms.Form):
             r"remov(e|al)|take down",
             re.I,
         )
-        if re.search(regex, subject) and "http" not in message.lower():
+        is_removal_request = (
+            re.search(regex, subject)
+            or cleaned_data.get("issue_type", "") == self.REMOVAL_REQUEST
+        )
+        if is_removal_request and "http" not in message.lower():
             msg = (
                 "This appears to be a removal request, but you did not "
                 "include a link. You must include a link for a request to be "
@@ -49,3 +70,7 @@ class ContactForm(forms.Form):
             )
             self.add_error("message", msg)
         return cleaned_data
+
+    def get_issue_type_display(self) -> str:
+        value = self.cleaned_data.get("issue_type", "")
+        return dict(self.ISSUE_TYPE_CHOICES).get(value, "Unidentified Type")

@@ -43,7 +43,7 @@
       {{ note_form.instance.docket_id.docket_number }}
     </td>
     <td id="court-{{ note_form.instance.id }}">
-      {{ note_form.instance.docket_id.court.short_name }}
+      {{ note_form.instance.docket_id.court.citation_string }}
     </td>
   {% endif %}
   <td id="notes-{{ note_form.instance.id }}">

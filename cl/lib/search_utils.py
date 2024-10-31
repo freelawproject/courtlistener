@@ -1,6 +1,5 @@
 import re
 from datetime import date, datetime, timedelta
-from math import ceil
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
@@ -105,7 +104,6 @@ def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
     citations = get_citations(cd["q"], tokenizer=HYPERSCAN_TOKENIZER)
 
     citations = [c for c in citations if isinstance(c, FullCaseCitation)]
-
     matches = None
     if len(citations) == 1:
         # If it's not exactly one match, user doesn't get special help.
@@ -1229,14 +1227,37 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         return
 
     if is_es_search:
-        search_query.query_time_ms = ceil(search_results["results_details"][0])
+        search_query.query_time_ms = search_results["results_details"][0]
         # do_es_search returns 1 as query time if the micro cache was hit
         search_query.hit_cache = search_query.query_time_ms == 1
     else:
         # Solr searches are not cached unless a cache_key is passed
         # No cache_key is passed for the endpoints we are storing
-        search_query.query_time_ms = ceil(
-            search_results["results"].object_list.QTime
-        )
+        search_query.query_time_ms = search_results[
+            "results"
+        ].object_list.QTime
 
     search_query.save()
+
+
+def store_search_api_query(
+    request: HttpRequest, failed: bool, query_time: int | None, engine: int
+) -> None:
+    """Store the search query from the Search API.
+
+    :param request: The HTTP request object.
+    :param failed: Boolean indicating if the query execution failed.
+    :param query_time: The time taken to execute the query in milliseconds or
+    None if not applicable.
+    :param engine: The search engine used to execute the query.
+    :return: None
+    """
+    SearchQuery.objects.create(
+        user=None if request.user.is_anonymous else request.user,
+        get_params=request.GET.urlencode(),
+        failed=failed,
+        query_time_ms=query_time,
+        hit_cache=False,
+        source=SearchQuery.API,
+        engine=engine,
+    )
