@@ -159,14 +159,7 @@ class Command(BaseCommand):
                 )
                 return
             else:
-                reporter_item_index = next(
-                    (
-                        index
-                        for index, item in enumerate(reporters)
-                        if item == self.start_from_reporter
-                    ),
-                    None,
-                )
+                reporter_item_index = reporters.index(self.start_from_reporter)
                 if reporter_item_index:
                     # Update reporters and reporters files list
                     reporters = reporters[reporter_item_index:]
