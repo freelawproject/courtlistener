@@ -23,6 +23,7 @@ from cl.corpus_importer.tasks import (
     get_and_save_free_document_report,
     mark_court_done_on_date,
     process_free_opinion_result,
+    recap_document_into_opinions,
 )
 from cl.corpus_importer.utils import CycleChecker
 from cl.lib.argparse_types import valid_date
@@ -339,7 +340,6 @@ def get_pdfs(
                 f"before starting the next cycle."
             )
             time.sleep(2)
-
         logger.info(f"Processing row id: {row.id} from {row.court_id}")
         c = chain(
             process_free_opinion_result.si(
@@ -348,8 +348,14 @@ def get_pdfs(
                 cnt,
             ).set(queue=q),
             get_and_process_free_pdf.s(row.pk, row.court_id).set(queue=q),
+            # `recap_document_into_opinions` uses a different doctor extraction
+            # endpoint, so it doesn't depend on the document's content
+            # being extracted on `get_and_process_free_pdf`, where it's
+            # only extracted if it doesn't require OCR
+            recap_document_into_opinions.s().set(queue=q),
             delete_pacer_row.s(row.pk).set(queue=q),
         )
+
         if index:
             c = c | add_items_to_solr.s("search.RECAPDocument").set(queue=q)
         c.apply_async()
