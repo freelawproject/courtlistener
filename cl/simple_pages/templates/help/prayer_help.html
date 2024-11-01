@@ -76,23 +76,23 @@
   <p>To create a Prayer, find a document you are interested in on a particular docket, and press the 🙏 button on the right. The number on the button is how many others have requested the document. If you have reached your daily limit, you will be informed by a message.
   </p>
   <p>
-    <img src="{% static "png/docket-alert-button.png" %}"
+    {% comment %} <img src="{% static "png/docket-alert-button.png" %}"
          alt="screenshot of the prayer button"
          class="img-responsive img-rounded shadow center-block"
          height="31"
-         width="94">
+         width="94"> {% endcomment %}
   </p>
   <p>That's all there is to it. You'll receive an email as soon as someone purchases the document and it is uploaded to RECAP.
   </p>
   <p>Here's an example of what an email might look like:</p>
   <p class="v-offset-above-2">
-    <a href="{% static "png/alert-example.png" %}">
+    {% comment %} <a href="{% static "png/alert-example.png" %}">
       <img src="{% static "png/alert-example.png" %}"
            width="749"
            height="529"
            class="img-responsive img-rounded center-block shadow"
       >
-    </a>
+    </a> {% endcomment %}
   </p>
   <p class="v-offset-below-2 gray alt small">
     (Click for full size version.)
@@ -102,11 +102,11 @@
   <p>To delete a Prayer, navigate to a docket you have previously requested a document from, and press the 🙏 button on the right again. Alternatively, you can navigate to the {% if user.is_authenticated %}<a href="{% url 'user_prayers' user.username %}">list of prayers in your profile</a>{% else %}list of prayers in your profile{% endif %} and mass delete from there. It is not possible to delete a prayer once it is fulfilled.
   </p>
   <p>
-    <img src="{% static "png/docket-alert-disable-button.png" %}"
+    {% comment %} <img src="{% static "png/docket-alert-disable-button.png" %}"
          alt="screenshot of the delete button"
          class="img-responsive img-rounded shadow center-block"
          height="31"
-         width="119">
+         width="119"> {% endcomment %}
   </p>
 
   <h2>Coming Soon</h2>
