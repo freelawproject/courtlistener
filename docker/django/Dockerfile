@@ -44,19 +44,22 @@ ARG BUILD_ENV=prod
 FROM build-base AS python-base
 
 WORKDIR $PYSETUP_PATH
-
 COPY poetry.lock pyproject.toml ./
 RUN poetry install --no-root $(test "$BUILD_ENV" != "dev" && echo "--without dev")
-
-COPY . /opt/courtlistener
-
 
 # Collect compiled assets from webpack-build stage.
 # Note: Always produce production code and never produce source-maps
 # (run the devMiddleware for legible output)
+# Copy a subset of the `cl` directory so that this compilation
+# can be cached in a layer that precedes the full directory copy.
 WORKDIR /opt/courtlistener/cl
+COPY ./cl/package.json ./cl/package-lock.json ./
+COPY ./cl/*.config.js ./cl/tsconfig.json ./
+COPY ./cl/assets ./assets
 RUN npm install
 RUN npx webpack --mode=production --no-devtool
+
+COPY . /opt/courtlistener
 
 WORKDIR /opt
 
