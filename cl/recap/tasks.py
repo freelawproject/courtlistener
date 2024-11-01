@@ -393,7 +393,10 @@ async def process_recap_pdf(pk):
                 item=rd,
             )
             if response.is_success:
-                rd.page_count = response.text
+                rd.page_count = int(response.text)
+                assert isinstance(
+                    rd.page_count, (int, type(None))
+                ), "page_count must be an int or None."
             rd.file_size = rd.filepath_local.size
 
         rd.ocr_status = None
