@@ -1011,10 +1011,7 @@ async def render_opinion_view(
     ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o"
     )
-    user_flag_active = await sync_to_async(waffle.flag_is_active)(
-        request.user, "ui_flag_for_o"
-    )
-    if not any([ui_flag_for_o, user_flag_active]):
+    if not ui_flag_for_o:
         return await view_opinion_old(request, pk, "str")
 
     context = await setup_opinion_context(cluster, request, tab=tab)
