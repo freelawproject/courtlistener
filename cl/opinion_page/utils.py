@@ -362,7 +362,7 @@ async def es_get_cited_clusters_with_cache(
     if is_bot(request) or not sub_opinion_pks:
         return cluster_results
 
-    cached_citing_results, cahced_citing_clusters_count, timeout_cited = (
+    cached_citing_results, cached_citing_clusters_count, timeout_cited = (
         await cache.aget(cache_citing_key) or (None, False, False)
         if settings.RELATED_USE_CACHE
         else (None, False, False)
