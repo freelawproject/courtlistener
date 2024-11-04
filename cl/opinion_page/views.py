@@ -939,8 +939,7 @@ async def setup_opinion_context(
     get_string = make_get_string(request)
 
     sub_opinion_pks = [
-        str(pk)
-        async for pk in cluster.sub_opinions.values_list("pk", flat=True)
+       str(opinion.pk) async for opinion in cluster.sub_opinions.all()
     ]
 
     es_has_cited_opinions = await es_cited_case_count(
