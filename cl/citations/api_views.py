@@ -13,6 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from cl.api.api_permissions import V3APIPermission
 from cl.api.utils import CitationCountRateThrottle, LoggingMixin
 from cl.citations.api_serializers import (
     CitationAPIRequestSerializer,
@@ -27,7 +28,7 @@ from cl.search.selectors import get_clusters_from_citation_str
 class CitationLookupViewSet(LoggingMixin, CreateModelMixin, GenericViewSet):
     queryset = OpinionCluster.objects.all()
     serializer_class = CitationAPIRequestSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, V3APIPermission]
     throttle_classes = [CitationCountRateThrottle]
     citation_list: list[FullCaseCitation | ShortCaseCitation] = []
 
