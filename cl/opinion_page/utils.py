@@ -370,7 +370,7 @@ async def es_get_cited_clusters_with_cache(
 
     if cached_citing_results is not None:
         cluster_results.citing_clusters = cached_citing_results
-        cluster_results.citing_cluster_count = cahced_citing_clusters_count
+        cluster_results.citing_cluster_count = cached_citing_clusters_count
         cluster_results.timeout = timeout_cited
         return cluster_results
 
