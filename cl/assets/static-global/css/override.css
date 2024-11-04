@@ -1545,6 +1545,10 @@ emphasis {
   margin-right: 0.25em;
 }
 
+.mr-2 {
+  margin-right: 0.5em;
+}
+
 [data-loading] {
   display: none;
 }
