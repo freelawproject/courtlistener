@@ -2,12 +2,10 @@ import argparse
 import datetime
 import inspect
 import math
-import os
 import time
 from typing import Callable, Dict, List, Optional, cast
 
 from celery.canvas import chain
-from django.conf import settings
 from django.db.models import F, Q, Window
 from django.db.models.functions import RowNumber
 from django.utils.timezone import now
@@ -35,9 +33,6 @@ from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
 from cl.search.tasks import add_docket_to_solr_by_rds, add_items_to_solr
-
-PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
-PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
 def get_last_complete_date(
