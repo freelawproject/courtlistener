@@ -1,6 +1,8 @@
 import logging
 import re
-from datetime import datetime
+import time
+from datetime import date, datetime
+from typing import Set
 
 import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
@@ -9,10 +11,9 @@ from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.corpus_importer.utils import winnow_case_name
-from cl.search.models import Citation, OpinionCluster
+from cl.search.models import Citation
 
-logger = logging.getLogger("django.db.backends")
-logger.setLevel(logging.WARNING)
+logger = logging.getLogger(__name__)
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
 
@@ -27,42 +28,56 @@ class Command(BaseCommand):
             help="Path to the CSV file to process.",
         )
         parser.add_argument(
-            "--strict",
-            action="store_true",
-            help="Enable strict matching for docket and date.",
-        )
-        parser.add_argument(
             "--delay",
             type=float,
             default=0.1,
             help="How long to wait to update each opinion and docket (in seconds, allows floating numbers).",
         )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Simulate the update process without making changes",
+        )
+        parser.add_argument(
+            "--chunk-size",
+            type=int,
+            default=100000,
+            help="The number of rows to read at a time",
+        )
 
     def handle(self, *args, **options):
         filepath = options["filepath"]
-        strict = options["strict"]
+        delay = options["delay"]
+        dry_run = options["dry_run"]
+        chunk_size = options["chunk_size"]
 
         if not filepath:
             raise CommandError(
                 "Filepath is required. Use --filepath to specify the CSV file location."
             )
 
-        # self.stdout.write(self.style.NOTICE(
-        #     f"Processing CSV at {filepath} with strict mode set to {strict}"))
-        process_csv(filepath, strict)
+        process_csv(filepath, delay, dry_run, chunk_size)
 
 
-def process_csv(filepath: str, strict: bool):
-    chunksize = 10**5  # Adjust for memory management
+def process_csv(
+    filepath: str, delay: float, dry_run: bool, chunk_size: int
+) -> None:
+    """Process rows from csv file
+
+    :param filepath: path to csv file
+    :param delay: delay between saves in seconds
+    :param dry_run: flag to simulate update process
+    :param chunk_size: number of rows to read at a time
+    """
     match_count = 0
     total = 0
     rcount = 0
     row_count = pd.read_csv(filepath).shape[0]
-    print(f"Total rows in CSV: {row_count}")
+    logger.info(f"Total rows in CSV: {row_count}")
     start_time = datetime.now()
-    print(f"Start time: {start_time}")
+    logger.info(f"Start time: {start_time}")
 
-    for chunk in pd.read_csv(filepath, chunksize=chunksize):
+    for chunk in pd.read_csv(filepath, chunksize=chunk_size):
         for _, row in chunk.iterrows():
             rcount += 1
             match_found = False
@@ -123,11 +138,6 @@ def process_csv(filepath: str, strict: bool):
 
                 formatted_date = parse_date(filed_date)
 
-                # TODO validate for any of the reporters
-                if not formatted_date or "F.3d" not in citation:
-                    print("skip?")
-                    continue
-
                 # Query citations in the database
                 citations = Citation.objects.filter(
                     volume=main_citation.groups["volume"],
@@ -144,38 +154,75 @@ def process_csv(filepath: str, strict: bool):
                     ):
                         match_found = True
                         match_count += 1
+
                         display_match_info(
                             citation_obj,
                             case_title,
                             parallel_cite_str,
-                            match_count,
-                            total,
-                            rcount,
                         )
+
+                        if not dry_run:
+                            cluster_casename = (
+                                citation_obj.cluster.case_name
+                                if citation_obj.cluster.case_name
+                                else citation_obj.cluster.case_name_full
+                            )
+                            docket_casename = (
+                                citation_obj.cluster.docket.case_name
+                                if citation_obj.cluster.docket.case_name
+                                else citation_obj.cluster.docket.case_name_full
+                            )
+                            if len(case_title) < len(cluster_casename):
+                                # Save new case name in cluster
+                                logger.info(
+                                    f"Case name updated for cluster id: {citation_obj.cluster_id}"
+                                )
+                                citation_obj.cluster.case_name = case_title
+                                citation_obj.cluster.save()
+                            else:
+                                logger.info(
+                                    f"Cluster: {citation_obj.cluster_id} already have the best name."
+                                )
+
+                            if len(case_title) < len(docket_casename):
+                                # Save new case name in docket
+                                logger.info(
+                                    f"Case name updated for docket id: {citation_obj.cluster.docket_id}"
+                                )
+                                citation_obj.cluster.docket.case_name = (
+                                    case_title
+                                )
+                                citation_obj.cluster.docket.save()
+
+                            else:
+                                logger.info(
+                                    f"Docket: {citation_obj.cluster.docket_id} already have the best name."
+                                )
+
+                            # Wait between updates to avoid issues with redis memory
+                            time.sleep(delay)
+
                         break
 
                 if not match_found:
-                    print(
-                        "\n-----------\nFailed",
-                        citation_str,
-                        docket_num,
-                        case_title,
-                        parallel_cite_str,
-                        filed_date,
+                    logger.info(
+                        f"Failed: {citation_str} - {docket_num} - {case_title} - {parallel_cite_str} - {filed_date}"
                     )
 
             except Exception as e:
                 logger.error(f"Unexpected error processing row {row}: {e}")
 
-    # self.stdout.write(
-    #     self.style.SUCCESS(f"Total matches found: {match_count}"))
-    print(f"Total matches found: {match_count}")
+    logger.info(f"Total matches found: {match_count}")
     end_time = datetime.now()
-    print(f"End time: {end_time-start_time}")
+    logger.info(f"End time: {end_time - start_time}")
 
 
-def parse_date(date_str: str):
-    """Attempts to parse the filed date into a datetime object."""
+def parse_date(date_str: str) -> date | None:
+    """Attempts to parse the filed date into a datetime object.
+
+    :param date_str: date string
+    :return: date object or none
+    """
     for fmt in ("%B %d, %Y", "%d-%b-%y"):
         try:
             return datetime.strptime(date_str, fmt).date()
@@ -185,9 +232,15 @@ def parse_date(date_str: str):
     return None
 
 
-def is_match(citation, docket_num, formatted_date, case_title):
-    """
-    Checks if the database citation matches docket number, filing date, and case title.
+def is_match(citation, docket_num, formatted_date, case_title) -> bool:
+    """Checks if the database citation matches docket number, filing date, and case
+    title.
+
+    :param citation: Citation object that matched csv citation
+    :param docket_num: Docket number from csv
+    :param formatted_date: Formated date from csv
+    :param case_title: Case name from csv
+    :return: True if match found else False
     """
     # Check docket number and date
     failed = 0
@@ -204,8 +257,10 @@ def is_match(citation, docket_num, formatted_date, case_title):
             failed += 10
         return False
 
-    # Compare case name overlaps if strict matching on
-    if citation.cluster.case_name_full == "":
+    if (
+        not citation.cluster.case_name_full
+        or citation.cluster.case_name_full == ""
+    ):
         cn = citation.cluster.case_name
     else:
         cn = citation.cluster.case_name_full
@@ -223,14 +278,17 @@ def is_match(citation, docket_num, formatted_date, case_title):
         order1 = get_term_indices(overlap, cf)
         order2 = get_term_indices(overlap, case_title)
 
-        return list(order1.keys()) == list(order2.keys())
+        return list(order1.keys()) == list(order2.keys()) and len(overlap) > 1
 
     return False
 
 
-def get_term_indices(terms, text: str):
-    """
-    Returns a dictionary of each term's index in the text, sorted by appearance order.
+def get_term_indices(terms: Set, text: str) -> dict:
+    """Returns a dictionary of each term's index in the text, sorted by appearance order.
+
+    :param terms: set of terms to search for
+    :param text: text to search for terms
+    :return: dict of each term's index in the text
     """
     term_indices = {
         term: match.start()
@@ -240,19 +298,16 @@ def get_term_indices(terms, text: str):
     return dict(sorted(term_indices.items(), key=lambda item: item[1]))
 
 
-def display_match_info(
-    citation, case_title, parallel_cite, match_count, total, rcount
-):
+def display_match_info(citation, case_title, parallel_cite):
+    """Displays information about a match in a structured format.
+
+    :param citation: Citation object
+    :param case_title: case name from csv
+    :param parallel_cite: cite from csv
     """
-    Displays information about a match in a structured format.
-    """
-    print(
-        f"\n============================= {match_count} {total} {100 * (rcount / 285417)}"
-    )
-    print(
+    logger.info(
         f"Matched Case in DB: {citation.cluster.id} - {citation.cluster.case_name_full if citation.cluster.case_name_full else citation.cluster.case_name}"
     )
-    print(f"CSV Case Title: {case_title}")
-    print(f"Matching Citation: {citation}")
-    print(f"Parallel Cite: {parallel_cite}")
-    # TODO save in DB
+    logger.info(f"CSV Case Title: {case_title}")
+    logger.info(f"Matching Citation: {citation}")
+    logger.info(f"Parallel Cite: {parallel_cite}")
