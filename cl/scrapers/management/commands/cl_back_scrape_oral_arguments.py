@@ -1,3 +1,5 @@
+import time
+
 from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
 
@@ -26,3 +28,10 @@ class Command(cl_scrape_oral_arguments.Command):
         ):
             site.parse()
             self.scrape_court(site, full_crawl=True, backscrape=True)
+
+            if wait := options["backscrape_wait"]:
+                logger.info(
+                    "Sleeping for %s seconds before continuing backscrape",
+                    wait,
+                )
+                time.sleep(wait)

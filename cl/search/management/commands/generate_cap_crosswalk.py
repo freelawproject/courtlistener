@@ -7,8 +7,6 @@ import boto3
 from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from eyecite.find import get_citations
-from eyecite.models import FullCaseCitation
 from tqdm import tqdm
 
 from cl.lib.command_utils import CommandUtils
@@ -61,6 +59,11 @@ class Command(CommandUtils, BaseCommand):
             help="Directory to save crosswalk files",
             required=True,
         )
+        parser.add_argument(
+            "--start-from-reporter",
+            type=str,
+            help="Process starting from this reporter slug",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         if options["verbose"]:
@@ -70,6 +73,7 @@ class Command(CommandUtils, BaseCommand):
         self.single_reporter = options["reporter"]
         self.single_volume = options["volume"]
         self.output_dir = options["output_dir"]
+        self.start_from_reporter = options["start_from_reporter"]
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -110,6 +114,27 @@ class Command(CommandUtils, BaseCommand):
             reporters = [
                 r for r in reporters if r["short_name"] == self.single_reporter
             ]
+
+        if self.start_from_reporter:
+            reporter_item_index = next(
+                (
+                    index
+                    for index, item in enumerate(reporters)
+                    if item["slug"] == self.start_from_reporter
+                ),
+                None,
+            )
+            if reporter_item_index:
+                logger.info(
+                    f"Starting from reporter: {self.start_from_reporter}"
+                )
+                reporters = reporters[reporter_item_index:]
+                self.start_from_reporter = None
+            else:
+                # Invalid reporter slug
+                raise ValueError(
+                    f"Invalid reporter slug to start from: {self.start_from_reporter}"
+                )
 
         for i, reporter in enumerate(
             tqdm(reporters, desc="Processing reporters")
@@ -164,10 +189,6 @@ class Command(CommandUtils, BaseCommand):
                         logger.info(
                             f"Match found: CAP ID {case_meta['id']} -> CL ID {cl_case.id}"
                         )
-                    else:
-                        logger.info(
-                            f"No match found for CAP ID {case_meta['id']}"
-                        )
                 else:
                     logger.warning(
                         f"Invalid case metadata for CAP ID {case_meta['id']}"
@@ -181,7 +202,7 @@ class Command(CommandUtils, BaseCommand):
                 )
 
             logger.info(
-                f"Processed {self.total_cases_processed} cases for {reporter_name}, found {self.total_matches_found} matches"
+                f"Processed {self.total_cases_processed} cases for {reporter_name}({reporter_slug}), found {self.total_matches_found} matches"
             )
 
     def fetch_volumes_for_reporter(self, reporter_slug: str) -> List[str]:
@@ -235,17 +256,17 @@ class Command(CommandUtils, BaseCommand):
             cap_case_id = str(case_meta["id"])
             page = str(case_meta["first_page"])
 
-            query = f"{reporter_slug}.{volume}/{page}.{cap_case_id}"
+            query = f"law.free.cap.{reporter_slug}.{volume}/{page}.{cap_case_id}.json"
             logger.debug(f"Searching for: {query}")
 
+            # Exact match of the file path in this format, e.g.:
+            # law.free.cap.wis-2d.369/658.6776082.json
             matching_cluster = OpinionCluster.objects.filter(
-                filepath_json_harvard__icontains=query
+                filepath_json_harvard=query
             ).first()
 
             if matching_cluster:
-                logger.info(
-                    f"Match found: CAP ID {cap_case_id} -> CL ID {matching_cluster.id}"
-                )
+                # Match found, return object
                 return matching_cluster
             else:
                 logger.info(

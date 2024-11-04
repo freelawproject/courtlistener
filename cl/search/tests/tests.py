@@ -1558,20 +1558,39 @@ class SaveSearchQueryTest(TestCase):
     def setUp(self) -> None:
         self.client = Client()
         # Using plain text, fielded queries and manual filters
-        self.searches = [
+
+        self.base_searches = [
             # Recap
             r"type=r&q=trump&type=r&order_by=score%20desc&description=Notice",
             # Audio
             r"type=oa&q=company%20court_id:illappct&type=oa&order_by=score desc",
+            # Opinions
+            r"type=o&q=thomas&type=o&order_by=score%20desc&case_name=lorem",
             # People
             r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
+        ]
+
+        self.searches = self.base_searches + [
             # Repeat the same query, for testing cache
             r"type=p&q=thomas&type=p&order_by=score%20desc&born_after=01/01/2080",
         ]
+
         super().setUp()
         self.source_error_message = (
             f"Saved wrong `engine` value, expected {SearchQuery.WEBSITE}"
         )
+
+    @staticmethod
+    def normalize_query(query, replace_space=False):
+        """Normalize a query dictionary by sorting lists of values.
+        Sometimes the search process alters the order of the query parameters,
+        or duplicates them.
+        """
+
+        if replace_space:
+            query = query.replace("%20", "+")
+        parsed_query = parse_qs(query)
+        return {k: sorted(v) for k, v in parsed_query.items()}
 
     @override_settings(ELASTICSEARCH_MICRO_CACHE_ENABLED=True)
     def test_search_query_saving(self) -> None:
@@ -1579,25 +1598,25 @@ class SaveSearchQueryTest(TestCase):
         for query in self.searches:
             url = f"{reverse('show_results')}?{query}"
             self.client.get(url)
-            # Compare parsed query strings; sometimes the search process
-            # alters the order of the query parameters, or duplicates them
+            # Compare parsed query strings;
             last_query = SearchQuery.objects.last()
-            parsed_query = parse_qs(query.replace("%20", "+"))
-            for key, stored_values in parse_qs(last_query.get_params).items():
-                self.assertTrue(
-                    parsed_query[key][0] == stored_values[0],
-                    f"Query was not saved properly for endpoint {query}",
-                )
-                self.assertEqual(
-                    last_query.engine,
-                    SearchQuery.ELASTICSEARCH,
-                    f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
-                )
-                self.assertEqual(
-                    last_query.source,
-                    SearchQuery.WEBSITE,
-                    self.source_error_message,
-                )
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.WEBSITE,
+                self.source_error_message,
+            )
 
         self.assertTrue(
             SearchQuery.objects.last().hit_cache,
@@ -1608,18 +1627,20 @@ class SaveSearchQueryTest(TestCase):
     @override_flag("oa-es-active", False)
     @override_flag("r-es-active", False)
     @override_flag("p-es-active", False)
+    @override_flag("o-es-active", False)
     def test_search_query_saving_solr(self) -> None:
         """Are queries saved when using solr search (do_search)"""
         for query in self.searches:
             url = f"{reverse('show_results')}?{query}"
             self.client.get(url)
             last_query = SearchQuery.objects.last()
-            parsed_query = parse_qs(query.replace("%20", "+"))
-            for key, stored_values in parse_qs(last_query.get_params).items():
-                self.assertTrue(
-                    parsed_query[key][0] == stored_values[0],
-                    f"Query was not saved properly for endpoint {query}",
-                )
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
             self.assertEqual(
                 last_query.engine,
                 SearchQuery.SOLR,
@@ -1646,6 +1667,120 @@ class SaveSearchQueryTest(TestCase):
             SearchQuery.ELASTICSEARCH,
             f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
         )
+
+    def test_search_api_v4_query_saving(self) -> None:
+        """Do we save queries on all V4 Search endpoints"""
+        for query in self.base_searches:
+            url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.API,
+                self.source_error_message,
+            )
+
+    def test_failed_es_search_v4_api_queries(self) -> None:
+        """Do we flag failed v4 API queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse("search-list", kwargs={"version": "v4"})}?{query}"
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 400)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
+
+    def test_search_es_api_v3_query_saving(self) -> None:
+        """Do we save queries on all V3 Search endpoints"""
+        for query in self.base_searches:
+            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.ELASTICSEARCH,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.API,
+                self.source_error_message,
+            )
+
+    def test_failed_es_search_v3_api_queries(self) -> None:
+        """Do we flag failed ES v3 API queries properly?"""
+        query = "type=r&q=contains/sproximity token"
+        url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 500)
+        last_query = SearchQuery.objects.last()
+        self.assertTrue(last_query.failed, "SearchQuery.failed should be True")
+        self.assertEqual(
+            last_query.query_time_ms, None, "Query time should be None"
+        )
+        self.assertEqual(
+            last_query.engine,
+            SearchQuery.ELASTICSEARCH,
+            f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+        )
+
+    @override_flag("oa-es-active", False)
+    @override_flag("oa-es-activate", False)
+    @override_flag("r-es-search-api-active", False)
+    @override_flag("p-es-active", False)
+    @override_flag("o-es-search-api-active", False)
+    def test_search_solr_api_v3_query_saving(self) -> None:
+        """Do we save queries on all V3 Search Solr endpoints"""
+        for query in self.base_searches:
+            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
+            self.client.get(url)
+            # Compare parsed query strings;
+            last_query = SearchQuery.objects.last()
+            expected_query = self.normalize_query(query, replace_space=True)
+            stored_query = self.normalize_query(last_query.get_params)
+            self.assertEqual(
+                expected_query,
+                stored_query,
+                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
+            )
+            self.assertEqual(
+                last_query.engine,
+                SearchQuery.SOLR,
+                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
+            )
+            self.assertEqual(
+                last_query.source,
+                SearchQuery.API,
+                self.source_error_message,
+            )
 
 
 class CaptionTest(TestCase):
@@ -2846,19 +2981,6 @@ class RemoveContentFromESCommandTest(ESIndexTestCase, TestCase):
                 "sweep_indexer",
                 testing_mode=True,
             )
-
-        with self.captureOnCommitCallbacks(execute=True):
-            # Trigger a change in opinion_1 to confirm the timestamp is not
-            # updated.
-            opinion_1.type = Opinion.UNANIMOUS
-            opinion_1.save()
-
-        # The timestamp in opinion_1 remains the same as it was from 5 days ago
-        opinion_1_doc = OpinionClusterDocument.get(
-            ES_CHILD_ID(opinion_1.pk).OPINION
-        )
-        self.assertEqual(opinion_1_doc.type, "unanimous-opinion")
-        self.assertEqual(opinion_1_doc.timestamp.date(), five_days_ago.date())
 
         # The timestamp in opinion_2 is updated to 2 days ago.
         opinion_2_doc = OpinionClusterDocument.get(

@@ -370,11 +370,7 @@ class SearchV4ViewSet(LoggingMixin, viewsets.ViewSet):
                 request.version,
             )
             es_list_instance = api_utils.CursorESList(
-                main_query,
-                child_docs_query,
-                None,
-                None,
-                cd,
+                main_query, child_docs_query, None, None, cd, request
             )
             results_page = paginator.paginate_queryset(
                 es_list_instance, request

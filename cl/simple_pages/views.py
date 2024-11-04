@@ -378,24 +378,32 @@ async def contact(
                 logger.info("Detected spam message. Not sending email.")
                 return HttpResponseRedirect(reverse("contact_thanks"))
 
+            issue_type_label = form.get_issue_type_display()
+
             default_from = settings.DEFAULT_FROM_EMAIL
             message = EmailMessage(
                 subject="[CourtListener] Contact: "
                 "{phone_number}".format(**cd),
                 body="Subject: {phone_number}\n"
-                "From: {name} ({email})\n\n\n"
+                "From: {name}\n"
+                "User Email: <{email}>\n"
+                "Issue Type: {issue_type_label}\n\n"
                 "{message}\n\n"
                 "Browser: {browser}".format(
                     browser=request.META.get("HTTP_USER_AGENT", "Unknown"),
+                    issue_type_label=issue_type_label,
                     **cd,
                 ),
-                to=["info@free.law"],
+                to=["support@freelawproject.atlassian.net"],
                 reply_to=[cd.get("email", default_from) or default_from],
             )
             await sync_to_async(message.send)()
             return HttpResponseRedirect(reverse("contact_thanks"))
     else:
         # the form is loading for the first time
+        issue_type = request.GET.get("issue_type")
+        if issue_type and issue_type.lower() in ContactForm.VALID_ISSUE_TYPES:
+            initial["issue_type"] = issue_type.lower()
         user = await request.auser()  # type: ignore[attr-defined]
         if isinstance(user, User):
             initial["email"] = user.email
