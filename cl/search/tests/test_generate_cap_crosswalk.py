@@ -1,10 +1,10 @@
 import json
 import os
+from datetime import datetime, timezone
 from io import StringIO
 from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone
-import pytz
 
+import pytz
 from django.core.management import call_command
 from django.test import override_settings
 
