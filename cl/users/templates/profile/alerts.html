@@ -13,6 +13,8 @@
   {% endif %}
   <script defer type="text/javascript"
           src="{% static "js/toggle_settings.js" %}"></script>
+  <script defer type="text/javascript"
+          src="{% static "js/responsive-table.js" %}"></script>
 {% endblock %}
 
 
@@ -40,7 +42,7 @@
       <h2>Search Alerts for Case Law and Oral Arguments</h2>
     </div>
     <div class="col-xs-12">
-      <div class="table-responsive">
+      <div class="table-responsive responsive-table-wrapper">
         <table class="table settings-table">
           {% include "includes/search_alerts/table_header.html" with is_profile_dashboard=True%}
           <tbody>
@@ -64,15 +66,15 @@
         <h3 class="gray caps">🎉 Being a member provides you unlimited docket alerts</h3>
       {% endif %}
 
-      <div class="table-responsive">
-        <table class="table settings-table">
+      <div class="table-responsive responsive-table-wrapper">
+        <table id="dockets-table" class="table settings-table">
           <thead>
           <tr>
-              <th><a class="no-underline black-link" href="?{% url_replace request 'name' %}">Case Name{% sort_caret request 'name' %}</a></th>
-              <th><a class="no-underline black-link" href="?{% url_replace request 'court' %}">Court{% sort_caret request 'court' %}</a></th>
-              <th><a class="no-underline black-link" href="?{% url_replace request 'docket_number' %}">Docket Number{% sort_caret request 'docket_number' %}</a></th>
-              <th><a class="no-underline black-link" href="?{% url_replace request 'date_filed' %}">Date Filed{% sort_caret request 'date_filed' %}</a></th>
-              <th colspan="2"><a class="no-underline black-link" href="?{% url_replace request 'hit' %}"> Last&nbsp;Hit{% sort_caret request 'hit' %}</a></th>
+              <th data-label="Case Name"><a class="no-underline black-link" href="?{% url_replace request 'name' %}">Case Name{% sort_caret request 'name' %}</a></th>
+              <th data-label="Court"><a class="no-underline black-link" href="?{% url_replace request 'court' %}">Court{% sort_caret request 'court' %}</a></th>
+              <th data-label="Docket Number"><a class="no-underline black-link" href="?{% url_replace request 'docket_number' %}">Docket Number{% sort_caret request 'docket_number' %}</a></th>
+              <th data-label="Date Filed"><a class="no-underline black-link" href="?{% url_replace request 'date_filed' %}">Date Filed{% sort_caret request 'date_filed' %}</a></th>
+              <th data-label="Last&nbsp;Hit" colspan="2"><a class="no-underline black-link" href="?{% url_replace request 'hit' %}"> Last&nbsp;Hit{% sort_caret request 'hit' %}</a></th>
           </tr>
           </thead>
           <tbody>
