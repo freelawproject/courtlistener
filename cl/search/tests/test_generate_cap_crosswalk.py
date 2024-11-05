@@ -230,7 +230,6 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
                 "citations": [{"cite": "1 U.S. 1"}],
                 "file_name": "old_case",
                 "last_updated": "2024-03-18T00:00:00+00:00",
-                "first_page": "1",
             },
             {
                 "id": 2,
@@ -239,7 +238,6 @@ class TestGenerateCapCrosswalk(SimpleTestCase):
                 "citations": [{"cite": "1 U.S. 2"}],
                 "file_name": "new_case",
                 "last_updated": "2024-03-20T00:00:00+00:00",
-                "first_page": "2",
             },
         ]
 
