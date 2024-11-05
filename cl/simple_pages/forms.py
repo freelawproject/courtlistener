@@ -6,19 +6,19 @@ from hcaptcha.fields import hCaptchaField
 
 
 class ContactForm(forms.Form):
-    REMOVAL_REQUEST = "removal"
-    RECAP_BUG = "recap"
     SUPPORT_REQUEST = "support"
     API_HELP = "api"
     DATA_QUALITY = "data_quality"
+    RECAP_BUG = "recap"
+    REMOVAL_REQUEST = "removal"
     MEMBERSHIPS = "memberships"
 
     ISSUE_TYPE_CHOICES = [
-        (REMOVAL_REQUEST, "Case Removal Request"),
-        (RECAP_BUG, "RECAP Extension Bug"),
         (SUPPORT_REQUEST, "General Support"),
         (API_HELP, "Data or API Help"),
         (DATA_QUALITY, "Report Data Quality Problem"),
+        (RECAP_BUG, "RECAP Extension Bug"),
+        (REMOVAL_REQUEST, "Case Removal Request"),
         (MEMBERSHIPS, "Memberships or Donations"),
     ]
 
