@@ -245,18 +245,29 @@ def is_match(citation, docket_num, formatted_date, case_title) -> bool:
     """
 
     # Prepare docket numbers
-    cluster_docket_number = clean_docket_number(
+    cleaned_cluster_docket_number = clean_docket_number(
         citation.cluster.docket.docket_number
     )
-    docket_num = clean_docket_number(docket_num)
+    cleaned_docket_num = clean_docket_number(docket_num)
+
+    # In some cases clean_docket_number returns an empty string, try with original
+    # docket numbers
+    if not cleaned_cluster_docket_number:
+        cleaned_cluster_docket_number = citation.cluster.docket.docket_number
+
+    if not cleaned_docket_num:
+        cleaned_docket_num = docket_num
 
     # Check docket number and date
     failed = 0
     if (
-        cluster_docket_number.lower() not in docket_num.lower()
+        cleaned_cluster_docket_number.lower() not in cleaned_docket_num.lower()
         or citation.cluster.date_filed != formatted_date
     ):
-        if cluster_docket_number.lower() not in docket_num.lower():
+        if (
+            cleaned_cluster_docket_number.lower()
+            not in cleaned_docket_num.lower()
+        ):
             failed += 1
         if citation.cluster.date_filed != formatted_date:
             failed += 10
