@@ -11,6 +11,7 @@ from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 
 from cl.corpus_importer.utils import winnow_case_name
+from cl.lib.model_helpers import clean_docket_number
 from cl.search.models import Citation
 
 logger = logging.getLogger(__name__)
@@ -242,16 +243,20 @@ def is_match(citation, docket_num, formatted_date, case_title) -> bool:
     :param case_title: Case name from csv
     :return: True if match found else False
     """
+
+    # Prepare docket numbers
+    cluster_docket_number = clean_docket_number(
+        citation.cluster.docket.docket_number
+    )
+    docket_num = clean_docket_number(docket_num)
+
     # Check docket number and date
     failed = 0
     if (
-        citation.cluster.docket.docket_number.lower() not in docket_num.lower()
+        cluster_docket_number.lower() not in docket_num.lower()
         or citation.cluster.date_filed != formatted_date
     ):
-        if (
-            citation.cluster.docket.docket_number.lower()
-            not in docket_num.lower()
-        ):
+        if cluster_docket_number.lower() not in docket_num.lower():
             failed += 1
         if citation.cluster.date_filed != formatted_date:
             failed += 10
