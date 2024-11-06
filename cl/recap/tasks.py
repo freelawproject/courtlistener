@@ -2,7 +2,6 @@ import asyncio
 import concurrent.futures
 import hashlib
 import logging
-import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from http import HTTPStatus
@@ -764,7 +763,9 @@ async def process_recap_claims_register(pk):
     except Exception as e:
         logging.exception(e)
         await mark_pq_status(
-            pq, traceback.format_exc(), PROCESSING_STATUS.FAILED
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
         )
         return None
     logger.info(f"Parsing completed for item {pq}")
@@ -868,7 +869,9 @@ async def process_recap_docket_history_report(pk):
     except Exception as e:
         logging.exception(e)
         await mark_pq_status(
-            pq, traceback.format_exc(), PROCESSING_STATUS.FAILED
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
         )
         return None
     logger.info(f"Parsing completed for item {pq}")
@@ -984,7 +987,9 @@ async def process_case_query_page(pk):
     except Exception as e:
         logging.exception(e)
         await mark_pq_status(
-            pq, traceback.format_exc(), PROCESSING_STATUS.FAILED
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
         )
         return None
     logger.info(f"Parsing completed for item {pq}")
@@ -1123,7 +1128,9 @@ async def process_recap_appellate_docket(pk):
     except Exception as e:
         logging.exception(e)
         await mark_pq_status(
-            pq, traceback.format_exc(), PROCESSING_STATUS.FAILED
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
         )
         return None
     logger.info(f"Parsing completed of item {pq}")
@@ -1234,7 +1241,9 @@ async def process_recap_acms_docket(pk):
     except Exception as e:
         logging.exception(e)
         await mark_pq_status(
-            pq, traceback.format_exc(), PROCESSING_STATUS.FAILED
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
         )
         return None
     logger.info(f"Parsing completed of item {pq}")
@@ -1334,7 +1343,9 @@ async def process_recap_acms_appellate_attachment(
     except Exception as e:
         logging.exception(e)
         await mark_pq_status(
-            pq, traceback.format_exc(), PROCESSING_STATUS.FAILED
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
         )
         return None
     logger.info(f"Parsing completed of item {pq}")
