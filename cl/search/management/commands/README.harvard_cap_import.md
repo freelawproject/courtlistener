@@ -32,13 +32,13 @@ manage.py generate_cap_crosswalk --output-dir cl/search/crosswalks [options]
 - `--dry-run`: Run without saving crosswalk files
 - `--verbose`: Increase output verbosity
 
-### 2. update_cap_crosswalk
+### 2. update_cap_cases
 
 Updates CourtListener cases with the latest CAP HTML content using the generated
 crosswalk files.
 
 ```
-manage.py update_cap_crosswalk --crosswalk-dir cl/search/crosswalks [options]
+manage.py update_cap_cases --crosswalk-dir cl/search/crosswalks [options]
 ```
 
 #### Options:
@@ -78,13 +78,13 @@ manage.py generate_cap_crosswalk --output-dir cl/search/crosswalks --reporter U.
 Update all reporters:
 
 ```
-manage.py update_cap_crosswalk --crosswalk-dir cl/search/crosswalks
+manage.py update_cap_cases --crosswalk-dir cl/search/crosswalks
 ```
 
 Or update specific reporter:
 
 ```
-manage.py update_cap_crosswalk --crosswalk-dir cl/search/crosswalks --reporter U_S
+manage.py update_cap_cases --crosswalk-dir cl/search/crosswalks --reporter U_S
 ```
 
 ## Data Flow
@@ -96,7 +96,7 @@ manage.py update_cap_crosswalk --crosswalk-dir cl/search/crosswalks --reporter U
      - Matches CAP cases with CourtListener cases
      - Generates crosswalk JSON files
 
-2. `update_cap_crosswalk`:
+2. `update_cap_cases`:
    - Reads crosswalk files
    - For each mapping:
      - Fetches CAP HTML content
