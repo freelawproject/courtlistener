@@ -1658,9 +1658,21 @@ async def merge_attachment_page_data(
                 .afirst()
             )
         else:
-            main_rd = await RECAPDocument.objects.select_related(
-                "docket_entry", "docket_entry__docket"
-            ).aget(**params)
+            try:
+                main_rd = await RECAPDocument.objects.select_related(
+                    "docket_entry", "docket_entry__docket"
+                ).aget(**params)
+            except RECAPDocument.DoesNotExist as exc:
+                # In cases where we have "doppelgänger" dockets drop pacer
+                # case id and check if the docket exists once more.
+                if params.get("pacer_case_id"):
+                    retry_params = params.copy()
+                    retry_params.pop(
+                        "docket_entry__docket__pacer_case_id", None
+                    )
+                    main_rd = await RECAPDocument.objects.select_related(
+                        "docket_entry", "docket_entry__docket"
+                    ).aget(**retry_params)
     except RECAPDocument.MultipleObjectsReturned as exc:
         if pacer_case_id:
             duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
