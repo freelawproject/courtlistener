@@ -221,10 +221,18 @@ def process_csv(
 def parse_date(date_str: str) -> date | None:
     """Attempts to parse the filed date into a datetime object.
 
+    # January 10, 1999
+    # 24-Jul-97
+    # 21-Jan-94
+    # 1/17/1961
+    # 12/1/1960
+    # 26-Sep-00
+    # Feb. 28, 2001
+
     :param date_str: date string
     :return: date object or none
     """
-    for fmt in ("%B %d, %Y", "%d-%b-%y"):
+    for fmt in ("%B %d, %Y", "%d-%b-%y", "%m/%d/%Y", "%m/%d/%y", "%b. %d, %Y"):
         try:
             return datetime.strptime(date_str, fmt).date()
         except (ValueError, TypeError):
@@ -243,6 +251,10 @@ def is_match(citation, docket_num, formatted_date, case_title) -> bool:
     :param case_title: Case name from csv
     :return: True if match found else False
     """
+
+    if not citation.cluster.docket.docket_number:
+        # There is no docket number, abort
+        return False
 
     # Prepare docket numbers
     cleaned_cluster_docket_number = clean_docket_number(
