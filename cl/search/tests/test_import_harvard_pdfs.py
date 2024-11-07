@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from concurrent.futures import Future
 from unittest.mock import MagicMock, mock_open, patch
 
 from django.core.management import call_command
@@ -36,7 +37,29 @@ class TestImportHarvardPDFs(TestCase):
         cls.docket = DocketFactory(court=cls.court)
         cls.cluster = OpinionClusterFactory(docket=cls.docket)
 
-    @patch("cl.search.management.commands.import_harvard_pdfs.tqdm")
+    class MockFuture(Future):
+        def __init__(self):
+            super().__init__()
+            self._result = None
+            self._done = False
+            self._condition = MagicMock()  # Create a mock for _condition
+
+        def set_result(self, result):
+            self._result = result
+            self._done = True
+
+        def result(self, timeout=None):
+            if not self._done:
+                raise Exception("Future is not done")
+            return self._result
+
+        def done(self):
+            return self._done
+
+    @patch("cl.search.management.commands.import_harvard_pdfs.as_completed")
+    @patch(
+        "cl.search.management.commands.import_harvard_pdfs.ThreadPoolExecutor"
+    )
     @patch(
         "cl.search.management.commands.import_harvard_pdfs.OpinionCluster.objects.get"
     )
@@ -53,7 +76,8 @@ class TestImportHarvardPDFs(TestCase):
         mock_boto3_client,
         mock_harvard_storage,
         mock_opinion_cluster_get,
-        mock_tqdm,
+        mock_executor,
+        mock_as_completed,
     ):
         # Setup mocks
         mock_listdir.return_value = ["test_crosswalk.json"]
@@ -61,15 +85,17 @@ class TestImportHarvardPDFs(TestCase):
             "/mocked_path/crosswalk_dir"
         ]
 
+        # Mock S3 client
         mock_s3 = MagicMock()
         mock_boto3_client.return_value = mock_s3
+
+        # Mock storage and its save method
         mock_storage = MagicMock()
         mock_storage.save.return_value = "mocked_saved_path.pdf"
         mock_harvard_storage.return_value = mock_storage
+
+        # Mock OpinionCluster.objects.get to return test cluster
         mock_opinion_cluster_get.return_value = self.cluster
-        mock_tqdm.side_effect = (
-            lambda x, *args, **kwargs: x
-        )  # Make tqdm a pass-through function
 
         crosswalk_data = [
             {
@@ -90,6 +116,31 @@ class TestImportHarvardPDFs(TestCase):
             os.path.exists(crosswalk_dir),
             f"Crosswalk directory does not exist: {crosswalk_dir}",
         )
+
+        # Mock the ThreadPoolExecutor to call process_entry directly
+        mock_executor_instance = mock_executor.return_value
+        mock_executor_instance.__enter__.return_value = mock_executor_instance
+
+        # Create a mock Future object
+        mock_future = self.MockFuture()
+        mock_future.set_result(1)  # Simulating that 1 file has been downloaded
+
+        # Directly override the behavior of executor.submit to return the mock Future
+        future_to_entry = {}
+
+        def submit_side_effect(func, entry):
+            # Call the process_entry function directly with the entry
+            result = func(entry)  # Call the function passed to submit
+            future_to_entry[mock_future] = entry  # Map the future to the entry
+            mock_future.set_result(result)  # Set the result on the mock future
+            return mock_future  # Return the mock Future object
+
+        mock_executor_instance.submit.side_effect = submit_side_effect
+
+        # Mock as_completed to return an iterable of mock futures
+        mock_as_completed.return_value = [
+            mock_future
+        ]  # Simulate that it's completed
 
         with patch("builtins.open", m):
             call_command("import_harvard_pdfs", crosswalk_dir=crosswalk_dir)

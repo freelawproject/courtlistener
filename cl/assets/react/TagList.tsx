@@ -9,7 +9,7 @@ const TagList: React.FC<UserState> = ({ userId, userName, isPageOwner }) => {
 
   const getTags = React.useCallback(
     async (key: string, page = 1) =>
-      await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}&page_size=10&order_by=name`),
+      await appFetch(`/api/rest/v4/tags/?user=${userId}&page=${page}&page_size=10&order_by=name`),
     []
   );
   const {

@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from cl.api.api_permissions import IsOwner
+from cl.api.api_permissions import IsOwner, V3APIPermission
 from cl.api.utils import LoggingMixin
 from cl.visualizations.api_permissions import IsParentVisualizationOwner
 from cl.visualizations.api_serializers import (
@@ -19,7 +19,11 @@ from cl.visualizations.utils import build_visualization
 
 
 class JSONViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated, IsParentVisualizationOwner]
+    permission_classes = [
+        IsAuthenticated,
+        IsParentVisualizationOwner,
+        V3APIPermission,
+    ]
     serializer_class = JSONVersionSerializer
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
@@ -38,7 +42,7 @@ class JSONViewSet(LoggingMixin, ModelViewSet):
 
 
 class VisualizationViewSet(LoggingMixin, ModelViewSet):
-    permission_classes = [IsAuthenticated, IsOwner]
+    permission_classes = [IsAuthenticated, IsOwner, V3APIPermission]
     serializer_class = VisualizationSerializer
     ordering_fields = ("id", "date_created", "date_modified", "user")
     # Default cursor ordering key
