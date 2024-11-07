@@ -5,21 +5,21 @@
   <td id="name-{{ note_form.instance.id }}">
     {% if note_form.instance.cluster_id %}
       {% with instance=note_form.instance.cluster_id %}
-        <i class="fa-book fa gray" title="{{ type }}"></i>
+        <i class="fa-book fa gray mr-2" title="{{ type }}"></i>
         <a href="{% url 'view_case' instance.pk instance.slug %}">
           {{note_form.instance.name }}
         </a>
       {% endwith %}
     {% elif note_form.instance.audio_id %}
       {% with instance=note_form.instance.audio_id %}
-        <i class="fa-volume-up fa grey" title="{{ type }}"></i>
+        <i class="fa-volume-up fa grey mr-2" title="{{ type }}"></i>
         <a href="{% url 'view_audio_file' instance.pk instance.docket.slug %}">
           {{ note_form.instance.name }}
         </a>
       {% endwith %}
     {% elif note_form.instance.docket_id %}
       {% with instance=note_form.instance.docket_id %}
-        <i class="fa-list fa grey"
+        <i class="fa-list fa grey mr-2"
            title="{{ type }}"></i>
         <a href="{% url 'view_docket' instance.pk instance.slug %}?order_by=desc">
           {{ note_form.instance.name }}
@@ -27,7 +27,7 @@
       {% endwith %}
     {% elif note_form.instance.recap_doc_id %}
       {% with instance=note_form.instance.recap_doc_id %}
-        <i class="fa-file-text-o fa grey"
+        <i class="fa-file-text-o fa grey mr-2"
            title="{{ type }}"></i>
         <a href="{% url 'view_recap_document' instance.docket_entry.docket.pk instance.document_number instance.docket_entry.docket.slug %}">
           {{ note_form.instance.name }}
