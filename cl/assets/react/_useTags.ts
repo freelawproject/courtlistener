@@ -13,7 +13,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
   const [textVal, setTextVal] = React.useState<string>('');
 
   const getTags = React.useCallback(
-    async (key: string, page = 1) => await appFetch(`/api/rest/v3/tags/?user=${userId}&page=${page}`),
+    async (key: string, page = 1) => await appFetch(`/api/rest/v4/tags/?user=${userId}&page=${page}`),
     []
   );
 
@@ -22,7 +22,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
     let morePagesAvailable = true;
     /* fetches all the tags associated to the given docket at once */
     while (morePagesAvailable) {
-      const response = await appFetch(`/api/rest/v3/docket-tags/?docket=${docket}&tag__user=${userId}&page=${page}`);
+      const response = await appFetch(`/api/rest/v4/docket-tags/?docket=${docket}&tag__user=${userId}&page=${page}`);
       (response as ApiResult<Association>).results.forEach((e) => associations.unshift(e));
       const nextPage = (response as ApiResult<Association>).next;
       if (!nextPage) morePagesAvailable = false;
@@ -36,7 +36,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
 
   const postTag = React.useCallback(
     async ({ name }: { name: string }) =>
-      await appFetch('/api/rest/v3/tags/', {
+      await appFetch('/api/rest/v4/tags/', {
         method: 'POST',
         body: { name },
       }),
@@ -45,7 +45,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
 
   const postAssoc = React.useCallback(
     async ({ tag }: { tag: number }) =>
-      await appFetch('/api/rest/v3/docket-tags/', {
+      await appFetch('/api/rest/v4/docket-tags/', {
         method: 'POST',
         body: { tag, docket },
       }),
@@ -54,7 +54,7 @@ export const useTags = ({ docket, enabled, userId }: UseTagsProps) => {
 
   const deleteAssoc = React.useCallback(
     async ({ assocId }: { assocId: number }) =>
-      await appFetch(`/api/rest/v3/docket-tags/${assocId}/`, {
+      await appFetch(`/api/rest/v4/docket-tags/${assocId}/`, {
         method: 'DELETE',
       }),
     []
@@ -183,7 +183,7 @@ export const updateTags = () => {
   //  Update our tag fields
   const updateTag = React.useCallback(
     async (tag: Tag) =>
-      await appFetch(`/api/rest/v3/tags/${tag.id}/`, {
+      await appFetch(`/api/rest/v4/tags/${tag.id}/`, {
         method: 'PUT',
         body: { ...tag },
       }),
@@ -192,7 +192,7 @@ export const updateTags = () => {
 
   const deleteTag = React.useCallback(
     async (id: number) =>
-      await appFetch(`/api/rest/v3/tags/${id}/`, {
+      await appFetch(`/api/rest/v4/tags/${id}/`, {
         method: 'DELETE',
       }),
     []
