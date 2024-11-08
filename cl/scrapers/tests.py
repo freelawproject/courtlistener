@@ -956,8 +956,8 @@ class UpdateFromTextCommandTest(TestCase):
             update_from_text.Command().handle(
                 court_id="somepath.vt",
                 opinion_ids=[],
-                date_filed_gte="2020/06/01",
-                date_filed_lte="2021/06/01",
+                date_filed_gte=datetime(2020, 5, 1),
+                date_filed_lte=datetime(2021, 6, 1),
                 cluster_status="Published",
             )
 

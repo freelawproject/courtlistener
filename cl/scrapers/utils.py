@@ -437,8 +437,9 @@ def scraped_citation_object_is_valid(citation_object: dict) -> bool:
         if mapped_type == citation_object["type"]:
             return True
         logger.error(
-            "Citation.type '%s' from `extract_from_text` does not match reporters-db type '%s'",
+            "Citation.type '%s' from `extract_from_text` does not match reporters-db type '%s' for reporter '%s'",
             citation_object["type"],
+            mapped_type,
             parsed_reporter,
         )
     except KeyError:

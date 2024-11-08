@@ -167,8 +167,8 @@ class Command(ScraperCommand):
         court_id = juriscraper_module.split(".")[-1].split("_")[0]
         query = {
             "docket__court_id": court_id,
-            "date_filed__gte": options["date_filed_lte"],
-            "date_filed__lte": options["date_filed_gte"],
+            "date_filed__gte": options["date_filed_gte"],
+            "date_filed__lte": options["date_filed_lte"],
         }
 
         if options["cluster_status"]:
@@ -177,6 +177,8 @@ class Command(ScraperCommand):
         qs = OpinionCluster.objects.filter(**query).prefetch_related(
             "sub_opinions"
         )
+        logger.debug("Found %s objects matching query %s", qs.count(), query)
+
         for cluster in qs:
             opinions = cluster.sub_opinions.all()
             for op in opinions:
