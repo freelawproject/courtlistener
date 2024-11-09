@@ -1,9 +1,11 @@
 import json
 import logging
 import os
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import boto3
+import pytz
 from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -64,6 +66,11 @@ class Command(CommandUtils, BaseCommand):
             type=str,
             help="Process starting from this reporter slug",
         )
+        parser.add_argument(
+            "--updated-after",
+            type=str,
+            help="Only process cases updated after this date (format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS+00:00)",
+        )
 
     def handle(self, *args: Any, **options: Any) -> None:
         if options["verbose"]:
@@ -74,6 +81,25 @@ class Command(CommandUtils, BaseCommand):
         self.single_volume = options["volume"]
         self.output_dir = options["output_dir"]
         self.start_from_reporter = options["start_from_reporter"]
+        self.updated_after = None
+        if options["updated_after"]:
+            try:
+                self.updated_after = datetime.fromisoformat(
+                    options["updated_after"]
+                )
+            except ValueError:
+                try:
+                    self.updated_after = datetime.strptime(
+                        options["updated_after"], "%Y-%m-%d"
+                    )
+                    # Set time to start of day in UTC
+                    self.updated_after = self.updated_after.replace(
+                        tzinfo=pytz.UTC
+                    )
+                except ValueError:
+                    raise ValueError(
+                        "Invalid date format. Use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS+00:00"
+                    )
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -169,11 +195,12 @@ class Command(CommandUtils, BaseCommand):
             )
 
             for case_meta in cases_metadata:
-                self.total_cases_processed += 1
                 logger.debug(
                     f"Processing case: {case_meta['id']} - {case_meta['name_abbreviation']}"
                 )
                 if self.is_valid_case_metadata(case_meta):
+                    # Only increment the counter for valid cases that meet our date criteria
+                    self.total_cases_processed += 1
                     cl_case = self.find_matching_case(
                         case_meta, reporter_slug, volume
                     )
@@ -295,7 +322,22 @@ class Command(CommandUtils, BaseCommand):
             response = self.s3_client.get_object(
                 Bucket=self.bucket_name, Key=key
             )
-            return json.loads(response["Body"].read().decode("utf-8"))
+            cases = json.loads(response["Body"].read().decode("utf-8"))
+
+            # Filter cases by last_updated if specified
+            if self.updated_after:
+                cases = [
+                    case
+                    for case in cases
+                    if "last_updated" in case
+                    and datetime.fromisoformat(case["last_updated"])
+                    > self.updated_after
+                ]
+                logger.debug(
+                    f"Filtered to {len(cases)} cases after {self.updated_after}"
+                )
+
+            return cases
         except Exception as e:
             logger.error(
                 f"Error fetching CasesMetadata.json for {reporter_slug} volume {volume}: {str(e)}"
