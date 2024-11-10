@@ -98,7 +98,7 @@ def compute_estimated_remaining_time(
         initial_wait,
     )
 
-    return estimated_time_remaining
+    return min(estimated_time_remaining, 7200)
 
 
 def retrieve_task_info(task_info: dict[str, Any]) -> TaskCompletionStatus:
