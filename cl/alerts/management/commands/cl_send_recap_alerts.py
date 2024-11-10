@@ -142,7 +142,9 @@ def index_daily_recap_documents(
     :return: The total number of documents re-indexed.
     """
 
-    if r.exists("alert_sweep:main_re_index_completed"):
+    if target_index is RECAPSweepDocument and r.exists(
+        "alert_sweep:main_re_index_completed"
+    ):
         logger.info(
             "The main re-index task has been completed and will be omitted."
         )
@@ -150,7 +152,9 @@ def index_daily_recap_documents(
         # proceed with RECAPDocument re-index.
         return 0
 
-    if r.exists("alert_sweep:rd_re_index_completed"):
+    if target_index is ESRECAPSweepDocument and r.exists(
+        "alert_sweep:rd_re_index_completed"
+    ):
         logger.info(
             "The RECAPDocument only re-index task has been completed and will "
             "be omitted."
