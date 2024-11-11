@@ -2720,7 +2720,7 @@ def query_and_save_list_of_creditors(
     backoff=2,
     logger=logger,
 )
-def extract_recap_document(rd: RECAPDocument) -> Response:
+def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
@@ -2736,17 +2736,26 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def ingest_recap_document(
+def recap_document_into_opinions(
     self,
-    recap_document_id: int,
-    add_to_solr: bool,
-) -> None:
+    task_data: Optional[TaskData] = None,
+    recap_document_id: Optional[int] = None,
+    add_to_solr: bool = False,
+) -> Optional[TaskData]:
     """Ingest recap document into Opinions
 
+    :param task_data: dictionary that will contain the recap_document_id,
+        if called inside a chain() on the scraper_pacer_free_opinions
+        command. This task should be chained after the PDF has
+        been downloaded from PACER
     :param recap_document_id: The document id to inspect and import
     :param add_to_solr: Whether to add to solr
-    :return:None
+
+    :return: The same `task_data` that came as input
     """
+    if not recap_document_id and task_data:
+        recap_document_id = task_data["rd_pk"]
+
     logger.info(f"Importing recap document {recap_document_id}")
     recap_document = (
         RECAPDocument.objects.select_related("docket_entry__docket")
@@ -2763,17 +2772,27 @@ def ingest_recap_document(
         .get(id=recap_document_id)
     )
     docket = recap_document.docket_entry.docket
-    if recap_document.docket_entry.docket.court.jurisdiction == "FD":
+
+    jurisdiction = recap_document.docket_entry.docket.court.jurisdiction
+    court_id = recap_document.docket_entry.docket.court.id
+    # `dcd` has a regular juriscraper scraper. Avoid duplicates
+    if court_id in ["dcd", "orld"] or jurisdiction not in [
+        Court.FEDERAL_DISTRICT,
+        Court.FEDERAL_BANKRUPTCY,
+    ]:
+        return task_data
+
+    if jurisdiction == Court.FEDERAL_DISTRICT:
         if "cv" not in docket.docket_number.lower():
             logger.info("Skipping non-civil opinion in district court")
-            return
+            return task_data
 
     ops = Opinion.objects.filter(sha1=recap_document.sha1)
     if ops.count() > 0:
         logger.info(f"Skipping previously imported opinion: {ops[0].id}")
-        return
+        return task_data
 
-    response = extract_recap_document(rd=recap_document)
+    response = extract_recap_document_for_opinions(rd=recap_document)
     r = response.json()
 
     try:
@@ -2792,7 +2811,7 @@ def ingest_recap_document(
     case_law_citations = filter_out_non_case_law_citations(citations)
     if len(case_law_citations) == 0:
         logger.info(f"No citation found for rd: {recap_document.id}")
-        return
+        return task_data
 
     with transaction.atomic():
         cluster = OpinionCluster.objects.create(
@@ -2823,3 +2842,5 @@ def ingest_recap_document(
                 cluster.id
             )
         )
+    # Return input task data to preserve the chain in scrape_pacer_free_opinion
+    return task_data
