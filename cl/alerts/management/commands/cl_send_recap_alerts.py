@@ -98,7 +98,7 @@ def compute_estimated_remaining_time(
         initial_wait,
     )
 
-    return min(estimated_time_remaining, 7200)
+    return estimated_time_remaining
 
 
 def retrieve_task_info(task_info: dict[str, Any]) -> TaskCompletionStatus:
@@ -357,7 +357,7 @@ def index_daily_recap_documents(
         )
         task_status = get_task_status(task_id, es)
         task_info = retrieve_task_info(task_status)
-        time.sleep(estimated_time_remaining)
+        time.sleep(min(estimated_time_remaining, 900))
         if task_info and not task_info.completed:
             estimated_time_remaining = compute_estimated_remaining_time(
                 initial_wait, task_info
