@@ -615,14 +615,15 @@ def merge_overlapping_data(
 
 def add_citations_to_cluster(
     cites: list[str], cluster_id: int, save_again_if_exists: bool = False
-) -> None:
+) -> int:
     """Add string citations to OpinionCluster if it has not yet been added
 
     :param cites: citation list
     :param cluster_id: cluster id related to citations
     :param save_again_if_exists: force save citation if it already exists
-    :return: None
+    :return: total of citations added
     """
+    total_added = 0
     for cite in cites:
         clean_cite = re.sub(r"\s+", " ", cite)
         citation = get_citations(clean_cite, tokenizer=HYPERSCAN_TOKENIZER)
@@ -676,10 +677,12 @@ def add_citations_to_cluster(
                 logger.info(
                     f"New citation: {cite} added to cluster id: {cluster_id}"
                 )
+                total_added += 1
             except IntegrityError:
                 logger.warning(
                     f"Reporter mismatch for cluster: {cluster_id} on cite: {cite}"
                 )
+    return total_added
 
 
 def update_cluster_panel(
