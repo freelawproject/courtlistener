@@ -124,13 +124,11 @@ if (footnoteMarks.length === footnotes.length) {
   // we can make this work
   footnoteMarks.each(function (index) {
     const footnoteMark = $(this);
-    console.log(index, footnoteMark);
     const $newElement = $('<a></a>');
     // Copy attributes from the old element
     $.each(footnoteMark.attributes, function () {
       if (footnoteMark.specified) {
         $newElement.attr(footnoteMark.name, footnoteMark.value);
-        console.log(footnoteMark.name, footnoteMark.value);
       }
     });
     $newElement.html(footnoteMark.html());
@@ -140,7 +138,6 @@ if (footnoteMarks.length === footnotes.length) {
     $newElement.attr('href', `#fn${index}`);
     $newElement.attr('id', `fnref${index}`);
     footnote.attr('id', `fn${index}`);
-    console.log(footnoteMark, footnote);
 
     const $jumpback = $('<a class="jumpback">↵</a>');
     $jumpback.attr('href', `#fnref${index}`);
@@ -153,8 +150,6 @@ if (footnoteMarks.length === footnotes.length) {
   //   and so label is no usable to identify the correct footnote.
 
   footnotes.each(function (index) {
-    console.log($(this));
-
     const $jumpback = $('<a class="jumpback">↵</a>');
     $jumpback.attr('label', $(this).attr('label'));
     $(this).append($jumpback);
@@ -181,7 +176,7 @@ if (footnoteMarks.length === footnotes.length) {
         500
       ); // Adjust the animation duration as needed
     } else {
-      console.warn('No matching footnote found below the current position for:', markText);
+      // console.warn('No matching footnote found below the current position for:', markText);
     }
   });
 
@@ -210,7 +205,7 @@ if (footnoteMarks.length === footnotes.length) {
         500
       ); // Adjust the animation duration as needed
     } else {
-      console.warn('No matching footnotemark found above the current position for label:', footnoteLabel);
+      // console.warn('No matching footnotemark found above the current position for label:', footnoteLabel);
     }
   });
 }
