@@ -267,6 +267,11 @@ div.footnote:first-of-type {
     margin-left: 5px;
   }
 
+  /*Jump backs are empty in resource.org documents for now*/
+  #resource-org-text .jumpback {
+    display: none;
+  }
+
 
   footnote > * {
     font-size: 12px;
@@ -589,25 +594,26 @@ div.footnote:first-of-type {
   }
 
   footnote > blockquote > a.page-label::after {
-    right: -2.5em;
+    right: -1.0em;
   }
 
   blockquote[id^="A"] > a.page-label::after {
-    right: -2.5em;
+    right: -1.0em;
   }
 
   blockquote[id^="b"] > a.page-label::after {
-    right: -4.0em;
+    right: -1.0em;
   }
 
   opinion > a.page-label::after {
-    right: -2.5em;
+    right: -1.0em;
     text-indent: 0;
   }
 
   .harvard a.page-label::after {
-      right: -2.5em;
-      text-indent: 0;
+    right: -1.0em;
+    text-indent: 0;
+    position: absolute;
   }
 
    /* Adjust to move the entire blockquote to the right */
@@ -626,7 +632,7 @@ div.footnote:first-of-type {
   }
 
   div.counsel > a.page-label::after {
-    right: -2.5em;
+    right: -1.0em;
   }
 
   footnote > p > a.page-label::after {

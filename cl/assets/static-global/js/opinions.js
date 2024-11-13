@@ -77,10 +77,27 @@ document.querySelectorAll('strong').forEach((el) => {
 ///////////////
 
 
+
+
 // We formatted the harvard footnotes oddly when they appeared inside the pre-opinion content.
 // this removes the excess a tags and allows us to standardize footnotes across our contents
 // footnote cleanup in harvard
 // Update and modify footnotes to enable linking
+
+  // This is needed for variations in resource.org footnotes
+  $(".footnotes > .footnote").each(function() {
+      var $this = $(this);
+      var newElement = $("<footnote />"); // Create a new <footnote> element
+
+      // Copy attributes and content from the original element
+      $.each(this.attributes, function(_, attr) {
+          newElement.attr(attr.name, attr.value);
+      });
+      newElement.html($this.html()); // Copy the inner content
+      $this.replaceWith(newElement); // Replace the original <div> with <footnote>
+  });
+
+
 $('div.footnote > a').remove();
 const headfootnotemarks = $('a.footnote');
 const divfootnotes = $('div.footnote');
