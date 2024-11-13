@@ -18,6 +18,8 @@ HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 # Compile regex pattern once for efficiency
 WORD_PATTERN = re.compile(r"\b\w+\b|\b\w+\.\b")
 
+NUMBER_PATTERN = re.compile(r"^[+-]?[0-9]+$")
+
 FALSE_POSITIVES = {
     "and",
     "personal",
@@ -208,6 +210,21 @@ def update_matched_case_name(
     return cluster_case_name_updated, docket_case_name_updated
 
 
+def get_citation_filter(citation: FullCaseCitation) -> dict:
+    """Get citation as a dict to use it as a filter
+
+    2012-635 (La.App. 3 Cir. 12/5/12) also includes date_filed when it is parsed
+
+    :param citation:
+    :return: dict with volume, reporter and page
+    """
+    return {
+        key: citation.groups[key]
+        for key in ["volume", "reporter", "page"]
+        if key in citation.groups
+    }
+
+
 def process_csv(
     filepath: str, delay: float, dry_run: bool, chunk_size: int
 ) -> None:
@@ -241,24 +258,24 @@ def process_csv(
                 # Skipping row without two citations
                 continue
 
-            # 2012-635 (La.App. 3 Cir. 12/5/12) also includes date_filed when it is parsed
-            valid_citations[0].groups.pop("date_filed", None)
-            valid_citations[1].groups.pop("date_filed", None)
-
-            # Check if already have both citations from row
-            try:
-                c = Citation.objects.filter(
-                    **valid_citations[0].groups
-                ).values_list("cluster", flat=True)
-                d = Citation.objects.filter(
-                    **valid_citations[1].groups
-                ).values_list("cluster", flat=True)
-            except ValueError:
-                # Usually when the volume number is not an integer e.g. 2001-1 Trade Cases P 73,218
+            if not NUMBER_PATTERN.match(
+                valid_citations[0].groups.get("volume")
+            ) or not NUMBER_PATTERN.match(
+                valid_citations[1].groups.get("volume")
+            ):
+                # Volume number is not an integer e.g. 2001-1 Trade Cases P 73,218
                 logger.warning(
                     f"Row index: {index} - Citation parsing failed."
                 )
                 continue
+
+            # Check if already have both citations from row
+            c = Citation.objects.filter(
+                **get_citation_filter(valid_citations[0])
+            ).values_list("cluster", flat=True)
+            d = Citation.objects.filter(
+                **get_citation_filter(valid_citations[1])
+            ).values_list("cluster", flat=True)
 
             overlapping_clusters = c.intersection(d)
             if overlapping_clusters:
