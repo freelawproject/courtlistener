@@ -12,8 +12,7 @@ $('.star-pagination').each(function (index, element) {
     var number = $(this).attr('number')
     if (number.indexOf("P") > -1) {
       $(this).attr('label', "");
-    }
-    else {
+    } else {
       $(this).attr('label', number);
     }
   } else {
