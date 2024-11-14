@@ -194,6 +194,10 @@ def update_matched_case_name(
         logger.info(f"Case name updated for cluster id: {matched_cluster.id}")
         return True
 
+    logger.info(
+        f"Cluster id: {matched_cluster.id} already has the smallest case name."
+    )
+
     return False
 
 
@@ -264,10 +268,10 @@ def process_csv(
 
             overlapping_clusters = c.intersection(d)
             if overlapping_clusters:
+                # Only log a message, continue with the process to try to improve the case names instead of continuing to the next row
                 logger.info(
                     f"Row index: {index} - Both citations exist for this cluster: {list(overlapping_clusters)}"
                 )
-                continue
 
             if not valid_citations:
                 logger.info(f"Row index: {index} - No valid citations found.")
