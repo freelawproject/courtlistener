@@ -93,13 +93,13 @@ def check_case_names_match(csv_case_name: str, cl_case_name: str) -> bool:
 def parse_date(date_str: str) -> date | None:
     """Attempts to parse the filed date into a datetime object.
 
-    # January 10, 1999
-    # 24-Jul-97
-    # 21-Jan-94
-    # 1/17/1961
-    # 12/1/1960
-    # 26-Sep-00
-    # Feb. 28, 2001
+    January 10, 1999
+    24-Jul-97
+    21-Jan-94
+    1/17/1961
+    12/1/1960
+    26-Sep-00
+    Feb. 28, 2001
 
     :param date_str: date string
     :return: date object or none
@@ -189,28 +189,33 @@ def find_matches(
 
 def update_matched_case_name(
     matched_cluster: OpinionCluster, csv_case_name: str
-) -> bool:
-    """Update case name of matched cluster and related docket
+) -> tuple[bool, bool]:
+    """Update case name of matched cluster and related docket if empty any of them
 
     :param matched_cluster: OpinionCluster object
     :param csv_case_name: case name from csv row
     :return: tuple with boolean values if cluster and related docket case name updated
     """
+    cluster_case_name_updated = False
+    docket_case_name_updated = False
 
-    if not matched_cluster.case_name or len(csv_case_name) < len(
-        matched_cluster.case_name
-    ):
-        # Save case name in cluster when we don't have it or when the case name in csv is smaller than the current case name
+    if not matched_cluster.case_name:
+        # Save case name in cluster when we don't have it
         matched_cluster.case_name = csv_case_name
         matched_cluster.save()
         logger.info(f"Case name updated for cluster id: {matched_cluster.id}")
-        return True
+        cluster_case_name_updated = True
 
-    logger.info(
-        f"Cluster id: {matched_cluster.id} already has the smallest case name."
-    )
+    if not matched_cluster.docket.case_name:
+        # Save case name in docket when we don't have it
+        matched_cluster.docket.case_name = csv_case_name
+        matched_cluster.docket.save()
+        logger.info(
+            f"Case name updated for docket id: {matched_cluster.docket.id}"
+        )
+        docket_case_name_updated = True
 
-    return False
+    return cluster_case_name_updated, docket_case_name_updated
 
 
 def make_citation(citation: FullCaseCitation) -> dict:
@@ -241,6 +246,8 @@ def process_csv(
     """
 
     total_clusters_updated = 0
+    total_dockets_updated = 0
+
     logger.info(f"Processing {filepath}")
     for chunk in pd.read_csv(filepath, chunksize=chunk_size):
         for row in chunk.dropna().itertuples():
@@ -288,12 +295,15 @@ def process_csv(
             # We matched the row with a cluster
             if not dry_run:
                 # Update case names
-                cluster_updated = update_matched_case_name(
+                cluster_updated, docket_updated = update_matched_case_name(
                     matches[0], csv_case_name
                 )
 
                 if cluster_updated:
                     total_clusters_updated = +1
+
+                if docket_updated:
+                    total_dockets_updated = +1
 
                 # Add any of the citations if possible
                 add_citations_to_cluster(
@@ -311,6 +321,7 @@ def process_csv(
 
     if not dry_run:
         logger.info(f"Clusters updated: {total_clusters_updated}")
+        logger.info(f"Dockets updated: {total_dockets_updated}")
 
 
 class Command(BaseCommand):
