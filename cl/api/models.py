@@ -64,7 +64,7 @@ class Webhook(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return f"<Webhook: {self.pk} for event type '{self.get_event_type_display()}'>"
+        return f"<Webhook:{self.pk} V{self.version} for event type '{self.get_event_type_display()}'>"
 
 
 class WEBHOOK_EVENT_STATUS:

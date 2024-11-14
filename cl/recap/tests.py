@@ -3499,12 +3499,14 @@ class RecapEmailDocketAlerts(TestCase):
             event_type=WebhookEventType.DOCKET_ALERT,
             url="https://example.com/",
             enabled=True,
+            version=1,
         )
         cls.webhook_2 = WebhookFactory(
             user=cls.user_profile_2.user,
             event_type=WebhookEventType.DOCKET_ALERT,
             url="https://example.com/",
             enabled=True,
+            version=2,
         )
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
@@ -3779,6 +3781,19 @@ class RecapEmailDocketAlerts(TestCase):
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
+        with mock.patch("cl.users.signals.notify_new_or_updated_webhook"):
+            webhook_2_1 = await sync_to_async(WebhookFactory)(
+                user=self.user_profile.user,
+                event_type=WebhookEventType.DOCKET_ALERT,
+                url="https://example.com/",
+                enabled=True,
+                version=2,
+            )
+        self.assertEqual(
+            await Webhook.objects.all().acount(),
+            3,
+            msg="Wrong number of webhook endpoints",
+        )
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option enabled
         await self.async_client.post(self.path, self.data, format="json")
@@ -3804,10 +3819,14 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
         self.assertEqual(len(mail.outbox), 3)
 
-        # Two more webhooks should be triggered, one for testing_2@recap.email
-        # and one for testing_1@recap.email
+        # 3 more webhooks should be triggered, one for testing_2@recap.email
+        # and 2 for testing_1@recap.email
         webhooks_triggered = WebhookEvent.objects.filter()
-        self.assertEqual(await webhooks_triggered.acount(), 3)
+        self.assertEqual(
+            await webhooks_triggered.acount(),
+            4,
+            msg="Wrong number of webhooks.",
+        )
 
         async for webhook_sent in webhooks_triggered:
             self.assertEqual(
@@ -3817,6 +3836,21 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(await webhook_user_2.acount(), 2)
         webhook_user_1 = WebhookEvent.objects.filter(webhook=self.webhook)
         self.assertEqual(await webhook_user_1.acount(), 1)
+        webhook_2_user_1 = WebhookEvent.objects.filter(webhook=webhook_2_1)
+        self.assertEqual(await webhook_2_user_1.acount(), 1)
+
+        # Confirm webhook versions.
+        version_1_webhook = await webhook_user_1.afirst()
+        webhook_version = version_1_webhook.content["webhook"]["version"]
+        self.assertEqual(webhook_version, 1)
+
+        version_2_webhook = await webhook_2_user_1.afirst()
+        webhook_version = version_2_webhook.content["webhook"]["version"]
+        self.assertEqual(webhook_version, 2)
+
+        version_2_webhook = await webhook_user_2.afirst()
+        webhook_version = version_2_webhook.content["webhook"]["version"]
+        self.assertEqual(webhook_version, 2)
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -7500,11 +7534,19 @@ class RecapFetchWebhooksTest(TestCase):
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.user_profile = UserProfileWithParentsFactory()
-        cls.webhook_enabled = WebhookFactory(
+        cls.webhook_v1_enabled = WebhookFactory(
             user=cls.user_profile.user,
             event_type=WebhookEventType.RECAP_FETCH,
             url="https://example.com/",
             enabled=True,
+            version=1,
+        )
+        cls.webhook_v2_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.RECAP_FETCH,
+            url="https://example.com/",
+            enabled=True,
+            version=2,
         )
 
         cls.user_profile_2 = UserProfileWithParentsFactory()
@@ -7558,12 +7600,16 @@ class RecapFetchWebhooksTest(TestCase):
 
         self.assertEqual(dockets.count(), 2)
 
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
         self.assertEqual(
             webhook_events[0].webhook.user,
+            self.user_profile.user,
+        )
+        self.assertEqual(
+            webhook_events[1].webhook.user,
             self.user_profile.user,
         )
         content = webhook_events[0].content
@@ -7577,6 +7623,12 @@ class RecapFetchWebhooksTest(TestCase):
             content["payload"]["status"], PROCESSING_STATUS.SUCCESSFUL
         )
         self.assertNotEqual(content["payload"]["date_completed"], None)
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = {
+            webhook.content["webhook"]["version"] for webhook in webhook_events
+        }
+        self.assertEqual(webhook_versions, {1, 2})
 
     @mock.patch(
         "cl.recap.mergers.AttachmentPage",
@@ -7616,10 +7668,10 @@ class RecapFetchWebhooksTest(TestCase):
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
 
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
 
         self.assertEqual(
             webhook_events[0].webhook.user,
@@ -7677,10 +7729,10 @@ class RecapFetchWebhooksTest(TestCase):
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
 
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
 
         self.assertEqual(
             webhook_events[0].webhook.user,

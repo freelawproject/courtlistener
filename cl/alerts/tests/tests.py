@@ -1544,6 +1544,14 @@ class OldDocketAlertsWebhooksTest(TestCase):
             event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
             url="https://example.com/",
             enabled=True,
+            version=1,
+        )
+        cls.webhook_v2_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+            url="https://example.com/",
+            enabled=True,
+            version=2,
         )
         cls.disabled_docket_alert = DocketAlertWithParentsFactory(
             docket__source=Docket.RECAP,
@@ -1605,9 +1613,16 @@ class OldDocketAlertsWebhooksTest(TestCase):
         self.assertEqual(active_docket_alerts.count(), 2)
 
         webhook_events = WebhookEvent.objects.all()
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = {
+            webhook.content["webhook"]["version"] for webhook in webhook_events
+        }
+        self.assertEqual(webhook_versions, {1, 2})
+
         self.assertEqual(
             webhook_events[0].event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
@@ -1701,10 +1716,16 @@ class OldDocketAlertsWebhooksTest(TestCase):
         # user_profile_2
         self.assertEqual(len(mail.outbox), 2)
 
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = {
+            webhook.content["webhook"]["version"] for webhook in webhook_events
+        }
+        self.assertEqual(webhook_versions, {1, 2})
 
         self.assertEqual(
             webhook_events[0].webhook.user,
