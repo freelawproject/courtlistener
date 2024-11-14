@@ -142,13 +142,13 @@ def find_matches(
     :param csv_case_name: case name from csv row
     :return: list of tuples of matched OpinionCluster and used citation
     """
-    matches = []
+    matches: list[tuple[OpinionCluster, str]] = []
 
     # Try to match row using both citations
     for citation in valid_citations:
 
         possible_matches = Citation.objects.filter(
-            **citation.groups,
+            **get_citation_filter(citation),
             cluster__docket__docket_number__contains=csv_docket_num,
             cluster__date_filed=csv_date_filed,
         )
@@ -162,8 +162,7 @@ def find_matches(
                 if match.cluster.case_name_full
                 else match.cluster.case_name
             )
-            match_on_caption = check_case_names_match(csv_case_name, case_name)
-            if match_on_caption:
+            if check_case_names_match(csv_case_name, case_name):
                 if not any(
                     cluster.id == match.cluster.id
                     for cluster, citation in matches
@@ -178,15 +177,14 @@ def find_matches(
 
 def update_matched_case_name(
     matched_cluster: OpinionCluster, csv_case_name: str
-) -> tuple[bool, bool]:
+) -> bool:
     """Update case name of matched cluster and related docket
 
     :param matched_cluster: OpinionCluster object
     :param csv_case_name: case name from csv row
     :return: tuple with boolean values if cluster and related docket case name updated
     """
-    cluster_case_name_updated = False
-    docket_case_name_updated = False
+
     if not matched_cluster.case_name or len(csv_case_name) < len(
         matched_cluster.case_name
     ):
@@ -194,20 +192,9 @@ def update_matched_case_name(
         matched_cluster.case_name = csv_case_name
         matched_cluster.save()
         logger.info(f"Case name updated for cluster id: {matched_cluster.id}")
-        cluster_case_name_updated = True
+        return True
 
-    if not matched_cluster.docket.case_name or len(csv_case_name) < len(
-        matched_cluster.docket.case_name
-    ):
-        # Save case name in docket when we don't have it or when the case name in csv is smaller than the current case name
-        matched_cluster.docket.case_name = csv_case_name
-        matched_cluster.docket.save()
-        logger.info(
-            f"Case name updated for docket id: {matched_cluster.docket.id}"
-        )
-        docket_case_name_updated = True
-
-    return cluster_case_name_updated, docket_case_name_updated
+    return False
 
 
 def get_citation_filter(citation: FullCaseCitation) -> dict:
@@ -219,9 +206,9 @@ def get_citation_filter(citation: FullCaseCitation) -> dict:
     :return: dict with volume, reporter and page
     """
     return {
-        key: citation.groups[key]
-        for key in ["volume", "reporter", "page"]
-        if key in citation.groups
+        "volume": citation.groups["volume"],
+        "reporter": citation.corrected_reporter(),
+        "page": citation.groups["page"],
     }
 
 
@@ -237,8 +224,6 @@ def process_csv(
     """
 
     total_clusters_updated = 0
-    total_dockets_updated = 0
-    total_citations_added = 0
     logger.info(f"Processing {filepath}")
     for chunk in pd.read_csv(filepath, chunksize=chunk_size):
         for row in chunk.dropna().itertuples():
@@ -300,6 +285,9 @@ def process_csv(
                 valid_citations, clean_docket_num, date_filed, csv_case_name
             )
 
+            if not matches:
+                logger.info(f"Row index: {index} - No matches found.")
+
             if len(matches) == 1:
                 # Only one match, we can update case name and add citation
                 matched_cluster, used_citation = matches[0]
@@ -313,21 +301,17 @@ def process_csv(
                 # We already have matched the case using one of the citations
                 if not dry_run:
                     # Update case names
-                    cluster_updated, docket_updated = update_matched_case_name(
+                    cluster_updated = update_matched_case_name(
                         matched_cluster, csv_case_name
                     )
 
                     if cluster_updated:
                         total_clusters_updated = +1
 
-                    if docket_updated:
-                        total_dockets_updated = +1
-
                     if citation_to_add:
-                        citations_added = add_citations_to_cluster(
+                        add_citations_to_cluster(
                             citation_to_add, matched_cluster.id
                         )
-                        total_citations_added += citations_added
 
                     # Wait between each processed row to avoid sending to many indexing tasks
                     time.sleep(delay)
@@ -342,14 +326,9 @@ def process_csv(
                 logger.warning(
                     f"Row index: {index} - Failed: too many matches: {len(matches)} - Matches: {[(cluster.id, citation) for cluster, citation in matches]}"
                 )
-            else:
-                # No matches
-                logger.info(f"Row index: {index} - No matches found.")
 
     if not dry_run:
         logger.info(f"Clusters updated: {total_clusters_updated}")
-        logger.info(f"Dockets updated: {total_dockets_updated}")
-        logger.info(f"Citations added: {total_citations_added}")
 
 
 class Command(BaseCommand):
@@ -366,7 +345,7 @@ class Command(BaseCommand):
             "--delay",
             type=float,
             default=0.1,
-            help="How long to wait to update each opinion and docket (in seconds, allows floating numbers).",
+            help="How long to wait to update each opinion cluster (in seconds, allows floating numbers).",
         )
         parser.add_argument(
             "--dry-run",
