@@ -765,16 +765,15 @@ def winnow_case_name(case_name: str) -> Set:
     # Fix case name to be cleaner
     case_name = harmonize(case_name)
 
-    # Join abbreviations/acronyms and ignore single char abbreviations
+    # Join abbreviations/acronyms
     # e.g.
     # "D.L.M. v. T.J.S." -> "DLM v. TJS"
     # "In the Matter of E. B." -> "In the Matter of EB"
     # "R. L. C. R. v. L. Z. S." -> "RLCR v. LZS"
     # "J. B. v. C. E." -> "JB v. CE"
     # "County v. A. D. B. County" -> "County v. ADB County"
-    # "In re Gregory C. KAPORDELIS" -> "In re Gregory C. KAPORDELIS" remains the same
     case_name = re.sub(
-        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.",
+        r"\b[A-Z][A-Z\.\s]*[A-Z]\b\.?",
         lambda m: m.group().replace(".", "").replace(" ", ""),
         case_name,
     )
