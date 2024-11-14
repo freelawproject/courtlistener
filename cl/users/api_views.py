@@ -10,7 +10,12 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import IsOwner
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookVersions,
+)
 from cl.api.tasks import send_test_webhook_event
 from cl.users.filters import WebhookEventViewFilter
 from cl.users.forms import WebhookForm
@@ -191,6 +196,39 @@ class WebhooksViewSet(ModelViewSet):
         send_test_webhook_event.delay(webhook.pk, event_dummy_content)
         return Response(
             status=HTTPStatus.OK,
+        )
+
+    @action(detail=False, methods=["get"])
+    def get_available_versions(self, request, *args, **kwargs):
+        """Render the webhook version field containing available versions for
+        the select event type.
+        """
+
+        event_type = request.GET.get("event_type")
+        htmx_template = "includes/webhooks_htmx/webhook-version-select.html"
+        context = {"version_choices": []}
+        if not event_type:
+            return render(request, htmx_template, context)
+
+        # Get user webhooks for this event type
+        existing_webhooks = Webhook.objects.filter(
+            user=request.user, event_type=event_type
+        )
+        used_versions = set(
+            existing_webhooks.values_list("version", flat=True)
+        )
+        # Get available webhook versions
+        version_labels = dict(WebhookVersions.choices)
+        version_choices = [
+            (v, version_labels[v])
+            for v in version_labels
+            if v not in used_versions
+        ]
+        context["version_choices"] = version_choices
+        return render(
+            request,
+            htmx_template,
+            context,
         )
 
 

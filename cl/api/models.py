@@ -16,6 +16,11 @@ class WebhookEventType(models.IntegerChoices):
     OLD_DOCKET_ALERTS_REPORT = 4, "Old Docket Alerts Report"
 
 
+class WebhookVersions(models.IntegerChoices):
+    V1 = 1, "V1"
+    V2 = 2, "V2"
+
+
 HttpStatusCodes = models.IntegerChoices(  # type: ignore
     "HttpStatusCodes", [(s.name, s.value) for s in HTTPStatus]  # type: ignore[arg-type]
 )
@@ -48,7 +53,9 @@ class Webhook(AbstractDateTimeModel):
         help_text="An on/off switch for the webhook.", default=False
     )
     version: models.IntegerField = models.IntegerField(
-        help_text="The specific version of the webhook provisioned.", default=1
+        help_text="The specific version of the webhook provisioned.",
+        choices=WebhookVersions.choices,
+        default=WebhookVersions.V1,
     )
     failure_count: models.IntegerField = models.IntegerField(
         help_text="The number of failures (400+ status) responses the webhook "
