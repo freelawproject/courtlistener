@@ -1576,11 +1576,7 @@ class RECAPDocument(
         *args,
         **kwargs,
     ):
-        if self.document_type == self.ATTACHMENT:
-            if self.attachment_number is None:
-                raise ValidationError(
-                    "attachment_number cannot be null for an attachment."
-                )
+        self.clean()
 
         if self.pacer_doc_id is None:
             # Juriscraper returns these as null values. Instead we want blanks.
@@ -1659,6 +1655,24 @@ class RECAPDocument(
             *args,
             **kwargs,
         )
+
+    def clean(self):
+        """
+        Validate that:
+        - Attachments must have an attachment_number.
+        - Main PACER documents must not have an attachment_number.
+        """
+        super().clean()
+        is_attachment = self.document_type == self.ATTACHMENT
+        has_attachment_number = self.attachment_number is not None
+        if is_attachment and not has_attachment_number:
+            raise ValidationError(
+                "attachment_number cannot be null for an attachment."
+            )
+        if not is_attachment and has_attachment_number:
+            raise ValidationError(
+                "attachment_number must be null for a main PACER document."
+            )
 
     def delete(self, *args, **kwargs):
         """
