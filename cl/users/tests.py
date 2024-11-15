@@ -3195,7 +3195,7 @@ class WebhooksHTMXTests(APITestCase):
         url="https://example.com",
         event_type=WebhookEventType.DOCKET_ALERT,
         enabled=True,
-        version=WebhookVersions.V1,
+        version=WebhookVersions.v1,
     ):
         data = {
             "url": url,
@@ -3450,7 +3450,7 @@ class WebhooksHTMXTests(APITestCase):
             user=self.user_2,
             event_type=WebhookEventType.DOCKET_ALERT,
             url="https://example.com/",
-            version=WebhookVersions.V1,
+            version=WebhookVersions.v1,
             enabled=True,
         )
 
@@ -3482,7 +3482,7 @@ class WebhooksHTMXTests(APITestCase):
             user=self.user_1,
             event_type=WebhookEventType.DOCKET_ALERT,
             url="https://example.com/",
-            version=WebhookVersions.V1,
+            version=WebhookVersions.v1,
             enabled=True,
         )
         self.assertEqual(await webhooks.acount(), 2)
