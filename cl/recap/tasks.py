@@ -353,6 +353,7 @@ async def process_recap_pdf(pk):
     # be converted to a string.
     rd.document_number = str(pq.document_number)
     rd.attachment_number = pq.attachment_number
+    rd.document_type = document_type
 
     # Do the file, finally.
     try:
