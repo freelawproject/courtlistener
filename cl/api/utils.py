@@ -910,13 +910,15 @@ def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
     creation date in ISO format, and deprecation date according webhook version.
     """
 
+    deprecation_date: str | None = None
     match webhook.version:
         case WebhookVersions.v1:
             deprecation_date = get_webhook_deprecation_date(
-                settings.WEBHOOK_V1_DEPRECATION_DATE
+                settings.WEBHOOK_V1_DEPRECATION_DATE  # type: ignore
             )
         case WebhookVersions.v2:
             deprecation_date = None
+
     return {
         "event_type": webhook.event_type,
         "version": webhook.version,
