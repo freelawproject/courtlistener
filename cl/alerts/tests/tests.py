@@ -49,6 +49,7 @@ from cl.api.models import (
     WebhookEvent,
     WebhookEventType,
 )
+from cl.api.utils import get_webhook_deprecation_date
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
@@ -1666,6 +1667,21 @@ class OldDocketAlertsWebhooksTest(TestCase):
         self.assertEqual(
             content["payload"]["old_alerts"][0]["docket"],
             self.very_old_docket_alert.docket.pk,
+        )
+
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_enabled
+        ).first()
+        v2_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_v2_enabled
+        ).first()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
         )
 
         # Run command again

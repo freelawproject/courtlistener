@@ -28,7 +28,12 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 
-from cl.api.models import WEBHOOK_EVENT_STATUS, Webhook, WebhookEvent
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    Webhook,
+    WebhookEvent,
+    WebhookVersions,
+)
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Event
@@ -878,12 +883,45 @@ class WebhookKeyType(TypedDict):
     deprecation_date: str | None
 
 
+def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
+    """Convert a webhook deprecation date string to ISO-8601 format with
+     UTC timezone.
+
+    :param webhook_deprecation_date: The deprecation date as a string in
+    "YYYY-MM-DD" format.
+    :return: The ISO-8601 formatted date string with UTC timezone.
+    """
+
+    deprecation_date = (
+        datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
+        .replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+        )
+        .isoformat()
+    )
+    return deprecation_date
+
+
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
+    """Generate a dictionary representing the content for the webhook key.
+
+    :param webhook: The Webhook instance.
+    :return: A dictionary containing webhook details, event type, version,
+    creation date in ISO format, and deprecation date according webhook version.
+    """
+
+    match webhook.version:
+        case WebhookVersions.v1:
+            deprecation_date = get_webhook_deprecation_date(
+                settings.WEBHOOK_V1_DEPRECATION_DATE
+            )
+        case WebhookVersions.v2:
+            deprecation_date = None
     return {
         "event_type": webhook.event_type,
         "version": webhook.version,
         "date_created": webhook.date_created.isoformat(),
-        "deprecation_date": None,
+        "deprecation_date": deprecation_date,
     }
 
 

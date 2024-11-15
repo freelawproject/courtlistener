@@ -37,7 +37,10 @@ from cl.api.management.commands.cl_retry_webhooks import (
     retry_webhook_events,
 )
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
-from cl.api.utils import get_next_webhook_retry_date
+from cl.api.utils import (
+    get_next_webhook_retry_date,
+    get_webhook_deprecation_date,
+)
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
@@ -3852,6 +3855,21 @@ class RecapEmailDocketAlerts(TestCase):
         webhook_version = version_2_webhook.content["webhook"]["version"]
         self.assertEqual(webhook_version, 2)
 
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = await WebhookEvent.objects.filter(
+            webhook=self.webhook
+        ).afirst()
+        v2_webhook_event = await WebhookEvent.objects.filter(
+            webhook=webhook_2_1
+        ).afirst()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
+        )
+
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
         side_effect=lambda z, x, c, v, b, d, e: (None, ""),
@@ -7629,6 +7647,21 @@ class RecapFetchWebhooksTest(TestCase):
             webhook.content["webhook"]["version"] for webhook in webhook_events
         }
         self.assertEqual(webhook_versions, {1, 2})
+
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_v1_enabled
+        ).first()
+        v2_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_v2_enabled
+        ).first()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
+        )
 
     @mock.patch(
         "cl.recap.mergers.AttachmentPage",

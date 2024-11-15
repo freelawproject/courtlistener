@@ -2,6 +2,7 @@ import datetime
 from unittest import mock
 
 import time_machine
+from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
@@ -26,6 +27,7 @@ from cl.alerts.utils import (
 )
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
+from cl.api.utils import get_webhook_deprecation_date
 from cl.donate.models import NeonMembership
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
@@ -1666,6 +1668,21 @@ class RECAPAlertsSweepIndexTest(
             webhook_versions.count(1),
             3,
             msg="Wrong number of V1 webhook events.",
+        )
+
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_enabled
+        ).first()
+        v2_webhook_event = WebhookEvent.objects.filter(
+            webhook=webhook_2_1
+        ).first()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
