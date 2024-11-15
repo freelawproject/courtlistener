@@ -8,7 +8,9 @@ from urllib.parse import parse_qs, urlparse
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.contrib.sites.models import Site
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.test import override_settings
@@ -219,6 +221,15 @@ class ApiQueryCountTests(TransactionTestCase):
         "attorney_party.json",
     ]
 
+    def clear_query_caches(self):
+        """
+        Resets all caches that may prevent query execution.
+        Needed to ensure deterministic behavior of ``assertNumQueries`` (or
+        after external changes to some Django database records).
+        """
+        self.addCleanup(Site.objects.clear_cache)
+        self.addCleanup(ContentType.objects.clear_cache)
+
     def setUp(self) -> None:
         # Add the permissions to the user.
         up = UserProfileWithParentsFactory.create(
@@ -237,6 +248,7 @@ class ApiQueryCountTests(TransactionTestCase):
         r = get_redis_interface("STATS")
         api_prefix = "api:test_counts.count"
         r.set(api_prefix, 101)
+        self.clear_query_caches()
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
@@ -282,11 +294,12 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("opinion-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_party_api_query_counts(self, mock_logging_prefix) -> None:
+    def test_party_endpoint_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(9):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
 
+    def test_attorney_endpoint_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(6):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
