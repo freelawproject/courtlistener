@@ -257,6 +257,10 @@ async def process_recap_pdf(pk):
 
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq} ")
     try:
+        # Attempt to get RECAPDocument instance.
+        # It is possible for this instance to not have a document yet,
+        # so the document_type field will have a default value,
+        # which is why we do not use it to retrieve the RECAPDocument.
         if pq.pacer_case_id:
             rd = await RECAPDocument.objects.aget(
                 docket_entry__docket__pacer_case_id=pq.pacer_case_id,
@@ -267,6 +271,8 @@ async def process_recap_pdf(pk):
             # work anyway.
             rd = await RECAPDocument.objects.aget(pacer_doc_id=pq.pacer_doc_id)
     except (RECAPDocument.DoesNotExist, RECAPDocument.MultipleObjectsReturned):
+        # Try again but this time using Docket and Docket Entry to get
+        # the RECAPDocument instance. If not found, we create a new one.
         retries = 5
         while True:
             try:
@@ -301,7 +307,7 @@ async def process_recap_pdf(pk):
                 break
 
         # Got the Docket, attempt to get/create the DocketEntry, and then
-        # create the RECAPDocument
+        # get/create the RECAPDocument
         retries = 5
         while True:
             try:
@@ -352,6 +358,8 @@ async def process_recap_pdf(pk):
     # processor fields tracker from detecting it as a value change, it should
     # be converted to a string.
     rd.document_number = str(pq.document_number)
+    # We update attachment_number and document_type in case the
+    # RECAPDocument didn't have the actual document yet.
     rd.attachment_number = pq.attachment_number
     rd.document_type = document_type
 
