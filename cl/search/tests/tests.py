@@ -2436,6 +2436,7 @@ class SweepIndexerCommandTest(
             docket_entry=cls.de,
             document_number="1",
             attachment_number=2,
+            document_type=RECAPDocument.ATTACHMENT,
         )
         cls.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
