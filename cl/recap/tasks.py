@@ -341,11 +341,23 @@ async def process_recap_pdf(pk):
                         attachment_number=pq.attachment_number,
                         document_type=document_type,
                     )
-                except (
-                    RECAPDocument.DoesNotExist,
-                    RECAPDocument.MultipleObjectsReturned,
-                ):
+                except RECAPDocument.DoesNotExist:
                     # Unable to find it. Make a new item.
+                    rd = RECAPDocument(
+                        docket_entry=de,
+                        pacer_doc_id=pq.pacer_doc_id,
+                        document_type=document_type,
+                    )
+                except RECAPDocument.MultipleObjectsReturned:
+                    # Multiple RECAPDocuments exist for this docket entry,
+                    # which is unexpected. Ideally, we should not create a new
+                    # RECAPDocument when multiples exist. However, since this
+                    # behavior has been in place for years, we're retaining it
+                    # for now. We've added Sentry logging to capture these
+                    # cases for future debugging.
+                    logger.error(
+                        "Multiple RECAPDocuments returned when processing pdf upload"
+                    )
                     rd = RECAPDocument(
                         docket_entry=de,
                         pacer_doc_id=pq.pacer_doc_id,
