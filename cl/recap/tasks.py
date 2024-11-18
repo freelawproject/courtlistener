@@ -2114,6 +2114,12 @@ def fetch_docket(self, fq_pk):
         newly_enqueued = enqueue_docket_alert(d_pk)
         if newly_enqueued:
             send_alert_and_webhook(d_pk, start_time)
+
+    # Link docket to fq if not previously linked
+    if not fq.docket_id:
+        fq.docket_id = d_pk
+        fq.save()
+
     return result
 
 
