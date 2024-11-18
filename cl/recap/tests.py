@@ -820,6 +820,7 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
 
         fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.docket)
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
         rds = RECAPDocument.objects.all()
         self.assertEqual(rds.count(), 1)
@@ -836,6 +837,7 @@ class RecapDocketFetchApiTest(TestCase):
         result = do_pacer_fetch(fq)
         result.get()
         fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.docket)
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
         rds = RECAPDocument.objects.all()
         self.assertEqual(rds.count(), 1)
@@ -872,6 +874,8 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(fakes.CASE_NAME, mail.outbox[0].subject)
+        fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.docket)
 
 
 @mock.patch("cl.recap.api_serializers.get_or_cache_pacer_cookies")
