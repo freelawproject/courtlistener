@@ -429,7 +429,7 @@ async def process_recap_pdf(pk):
         try:
             await rd.asave()
         except (IntegrityError, ValidationError):
-            msg = "Duplicate key on unique_together constraint"
+            msg = "Failed to save RECAPDocument (unique_together constraint or doc type issue)"
             await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             rd.filepath_local.delete(save=False)
             return None
