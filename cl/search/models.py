@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime
 from typing import Any, Dict, List, Tuple, TypeVar
@@ -48,6 +49,8 @@ from cl.search.docket_sources import DocketSources
 from cl.users.models import User
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
+
+logger = logging.getLogger(__name__)
 
 
 class PRECEDENTIAL_STATUS:
@@ -1665,14 +1668,16 @@ class RECAPDocument(
         super().clean()
         is_attachment = self.document_type == self.ATTACHMENT
         has_attachment_number = self.attachment_number is not None
-        if is_attachment and not has_attachment_number:
-            raise ValidationError(
+        missing_attachment_number = is_attachment and not has_attachment_number
+        wrongly_added_att_num = not is_attachment and has_attachment_number
+        if missing_attachment_number or wrongly_added_att_num:
+            msg = (
                 "attachment_number cannot be null for an attachment."
+                if missing_attachment_number
+                else "attachment_number must be null for a main PACER document."
             )
-        if not is_attachment and has_attachment_number:
-            raise ValidationError(
-                "attachment_number must be null for a main PACER document."
-            )
+            logger.error(msg)
+            raise ValidationError({"attachment_number": msg})
 
     def delete(self, *args, **kwargs):
         """
