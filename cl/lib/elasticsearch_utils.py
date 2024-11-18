@@ -3216,19 +3216,13 @@ def do_es_sweep_alert_query(
     multi_search = multi_search.add(main_query)
     if parent_query:
         parent_search = search_query.query(parent_query)
-        parent_search = parent_search.extra(
-            from_=0, size=settings.SCHEDULED_ALERT_HITS_LIMIT
-        )
+        parent_search = parent_search.extra(from_=0)
         parent_search = parent_search.source(includes=["docket_id"])
         multi_search = multi_search.add(parent_search)
 
     if child_query:
         child_search = child_search_query.query(child_query)
-        child_search = child_search.extra(
-            from_=0,
-            size=settings.SCHEDULED_ALERT_HITS_LIMIT
-            * settings.RECAP_CHILD_HITS_PER_RESULT,
-        )
+        child_search = child_search.extra(from_=0)
         child_search = child_search.source(includes=["id"])
         multi_search = multi_search.add(child_search)
 
