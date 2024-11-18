@@ -449,6 +449,60 @@ class DocketValidationTest(TestCase):
                 )
 
 
+class RECAPDocumentValidationTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.docket_entry = DocketEntryWithParentsFactory()
+
+    def test_attachment_with_attachment_number(self):
+        """Attachments with attachment_number should not raise ValidationError."""
+        document = RECAPDocument.objects.create(
+            docket_entry=self.docket_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        self.assertIsNotNone(document.id)
+
+    def test_attachment_without_attachment_number(self):
+        """Attachments without attachment_number should raise ValidationError."""
+        with self.assertRaises(ValidationError) as cm:
+            RECAPDocument.objects.create(
+                docket_entry=self.docket_entry,
+                document_type=RECAPDocument.ATTACHMENT,
+                attachment_number=None,
+            )
+        # Assert that the error message is as expected
+        self.assertIn("attachment_number", cm.exception.message_dict)
+        self.assertEqual(
+            cm.exception.message_dict["attachment_number"],
+            ["attachment_number cannot be null for an attachment."],
+        )
+
+    def test_main_document_with_attachment_number(self):
+        """Main PACER documents with attachment_number should raise ValidationError."""
+        with self.assertRaises(ValidationError) as cm:
+            RECAPDocument.objects.create(
+                docket_entry=self.docket_entry,
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                attachment_number=1,
+            )
+        # Assert that the error message is as expected
+        self.assertIn("attachment_number", cm.exception.message_dict)
+        self.assertEqual(
+            cm.exception.message_dict["attachment_number"],
+            ["attachment_number must be null for a main PACER document."],
+        )
+
+    def test_main_document_without_attachment_number(self):
+        """Main PACER documents without attachment_number should not raise ValidationError."""
+        document = RECAPDocument.objects.create(
+            docket_entry=self.docket_entry,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            attachment_number=None,
+        )
+        self.assertIsNotNone(document.id)
+
+
 class IndexingTest(EmptySolrTestCase):
     """Are things indexed properly?"""
 
