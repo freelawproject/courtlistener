@@ -35,26 +35,31 @@ FALSE_POSITIVES = {
     "st",
     "ex",
     "rel",
-    "v",
     "vs",
     "for",
-    "a",
 }
 
 DATE_FORMATS = ("%B %d, %Y", "%d-%b-%y", "%m/%d/%Y", "%m/%d/%y", "%b. %d, %Y")
 
 
-def tokenize_case_name(case_name: str) -> list[str]:
+def tokenize_case_name(case_name: str) -> set[str]:
     """Tokenizes case name and removes single-character words except for letters with periods.
+
+    Also removes false positive words
 
     :param case_name: case name to tokenize
     :return: list of words
     """
-    return [
-        word.lower()
-        for word in WORD_PATTERN.findall(case_name)
-        if len(word) > 1
-    ]
+    return (
+        set(
+            [
+                word.lower()
+                for word in WORD_PATTERN.findall(case_name)
+                if len(word) > 1
+            ]
+        )
+        - FALSE_POSITIVES
+    )
 
 
 def check_case_names_match(csv_case_name: str, cl_case_name: str) -> bool:
@@ -66,11 +71,11 @@ def check_case_names_match(csv_case_name: str, cl_case_name: str) -> bool:
     """
     # Tokenize each string, capturing both words and abbreviations with periods and
     # convert all words to lowercase for case-insensitive matching
-    csv_case_name_tokens = set(tokenize_case_name(csv_case_name))
-    cluster_case_name_tokens = set(tokenize_case_name(cl_case_name))
+    csv_case_name_tokens = tokenize_case_name(csv_case_name)
+    cluster_case_name_tokens = tokenize_case_name(cl_case_name)
 
-    # Check if there is an overlap between case names and remove false positive words
-    overlap = csv_case_name_tokens & cluster_case_name_tokens - FALSE_POSITIVES
+    # Check if there is an overlap between case names
+    overlap = csv_case_name_tokens & cluster_case_name_tokens
 
     if not overlap:
         # if no hits no match on name - move along
@@ -204,114 +209,109 @@ def update_matched_case_name(
     return cluster_case_name_updated, docket_case_name_updated
 
 
-def process_csv(
-    filepath: str, delay: float, dry_run: bool, chunk_size: int
-) -> None:
+def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
     """Process rows from csv file
 
     :param filepath: path to csv file
     :param delay: delay between saves in seconds
     :param dry_run: flag to simulate update process
-    :param chunk_size: number of rows to read at a time
     """
 
     total_clusters_updated = 0
     total_dockets_updated = 0
 
     logger.info(f"Processing {filepath}")
-    for chunk in pd.read_csv(filepath, chunksize=chunk_size):
-        for row in chunk.dropna().itertuples():
-            (
-                index,
-                west_case_name,
-                court,
-                date_str,
-                cite1,
-                cite2,
-                docket,
-                volume,
-            ) = row
+    df = pd.read_csv(filepath).dropna()
+    for row in df.itertuples():
+        (
+            index,
+            west_case_name,
+            court,
+            date_str,
+            cite1,
+            cite2,
+            docket,
+            volume,
+        ) = row
 
-            clean_docket_num = docket.strip('="').strip('"')
-            if not clean_docket_num:
-                logger.info(f"Row index: {index} - No docket number found.")
-                continue
+        clean_docket_num = docket.strip('="').strip('"')
+        if not clean_docket_num:
+            logger.info(f"Row index: {index} - No docket number found.")
+            continue
 
-            date_filed = parse_date(date_str)
-            if not date_filed:
-                logger.info(f"Row index: {index} - No valid date found.")
-                continue
-
-            valid_citations = parse_citations([cite1, cite2])
-
-            if not valid_citations:
-                logger.info(f"Row index: {index} - Missing two citations.")
-                continue
-
-            # Query for possible matches using data from row
-            possible_matches = query_possible_matches(
-                valid_citations=valid_citations,
-                docket_number=clean_docket_num,
-                date_filed=date_filed,
-            )
-
-            if not possible_matches:
-                logger.info(f"Row index: {index} - No matches found.")
-                continue
-
-            matches = []
-            for match in possible_matches:
-                cl_case_name = (
-                    match.cluster.case_name_full
-                    if match.cluster.case_name_full
-                    else match.cluster.case_name
-                )
-                case_name_match = check_case_names_match(
-                    west_case_name, cl_case_name
-                )
-                if case_name_match:
-                    matches.append(match)
-
-            if not possible_matches:
-                logger.info(f"Row index: {index} - No matches found.")
-                continue
-
-            if len(matches) != 1:
-                logger.warning(
-                    f"Row index: {index} - Failed, Matches found: {len(matches)} - Matches: {[cluster.id for cluster in matches]}"
-                )
-                continue
-
+        date_filed = parse_date(date_str)
+        if not date_filed:
             logger.info(
-                f"Row index: {index} - Match found: {matches[0].cluster_id} - Csv case name: {west_case_name}"
+                f"Row index: {index} - No valid date found: {date_str}"
             )
+            continue
 
-            if dry_run:
-                # Dry run, don't save anything
-                continue
+        valid_citations = parse_citations([cite1, cite2])
 
-            # Update case names
-            cluster_updated, docket_updated = update_matched_case_name(
-                matches[0].cluster, west_case_name
+        if not valid_citations:
+            logger.info(f"Row index: {index} - Missing two valid citations.")
+            continue
+
+        # Query for possible matches using data from row
+        possible_matches = query_possible_matches(
+            valid_citations=valid_citations,
+            docket_number=clean_docket_num,
+            date_filed=date_filed,
+        )
+
+        if not possible_matches:
+            logger.info(f"Row index: {index} - No matches found.")
+            continue
+
+        matches = []
+        for match in possible_matches:
+            cl_case_name = (
+                match.cluster.case_name_full
+                if match.cluster.case_name_full
+                else match.cluster.case_name
             )
-
-            if cluster_updated:
-                total_clusters_updated = +1
-
-            if docket_updated:
-                total_dockets_updated = +1
-
-            # Add any of the citations if possible
-            add_citations_to_cluster(
-                [
-                    f"{cite.get('volume')} {cite.get('reporter')} {cite.get('page')}"
-                    for cite in valid_citations
-                ],
-                matches[0].cluster_id,
+            case_name_match = check_case_names_match(
+                west_case_name, cl_case_name
             )
+            if case_name_match:
+                matches.append(match)
 
-            # Wait between each processed row to avoid sending to many indexing tasks
-            time.sleep(delay)
+        if len(matches) != 1:
+            logger.warning(
+                f"Row index: {index} - Failed, Matches found: {len(matches)} - Matches: {[cluster.id for cluster in matches]}"
+            )
+            continue
+
+        logger.info(
+            f"Row index: {index} - Match found: {matches[0].cluster_id} - Csv case name: {west_case_name}"
+        )
+
+        if dry_run:
+            # Dry run, don't save anything
+            continue
+
+        # Update case names
+        cluster_updated, docket_updated = update_matched_case_name(
+            matches[0].cluster, west_case_name
+        )
+
+        if cluster_updated:
+            total_clusters_updated = +1
+
+        if docket_updated:
+            total_dockets_updated = +1
+
+        # Add any of the citations if possible
+        add_citations_to_cluster(
+            [
+                f"{cite.get('volume')} {cite.get('reporter')} {cite.get('page')}"
+                for cite in valid_citations
+            ],
+            matches[0].cluster_id,
+        )
+
+        # Wait between each processed row to avoid sending to many indexing tasks
+        time.sleep(delay)
 
     if not dry_run:
         logger.info(f"Clusters updated: {total_clusters_updated}")
@@ -339,22 +339,15 @@ class Command(BaseCommand):
             action="store_true",
             help="Simulate the update process without making changes",
         )
-        parser.add_argument(
-            "--chunk-size",
-            type=int,
-            default=100000,
-            help="The number of rows to read at a time",
-        )
 
     def handle(self, *args, **options):
         filepath = options["filepath"]
         delay = options["delay"]
         dry_run = options["dry_run"]
-        chunk_size = options["chunk_size"]
 
         if not filepath:
             raise CommandError(
                 "Filepath is required. Use --filepath to specify the CSV file location."
             )
 
-        process_csv(filepath, delay, dry_run, chunk_size)
+        process_csv(filepath, delay, dry_run)
