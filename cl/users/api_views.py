@@ -226,11 +226,10 @@ class WebhooksViewSet(ModelViewSet):
         used_versions = set(
             existing_webhooks.values_list("version", flat=True)
         )
-        # Get available webhook versions
-        version_labels = dict(WebhookVersions.choices)
+        # Get available webhook versions, excluding used ones
         version_choices = [
-            (v, version_labels[v])
-            for v in version_labels
+            (v, label)
+            for v, label in WebhookVersions.choices
             if v not in used_versions
         ]
         context["version_choices"] = version_choices
