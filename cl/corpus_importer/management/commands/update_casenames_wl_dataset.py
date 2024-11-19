@@ -70,12 +70,11 @@ def check_case_names_match(csv_case_name: str, cl_case_name: str) -> bool:
     :return: True if they match else False
     """
     # Tokenize each string, capturing both words and abbreviations with periods and
-    # convert all words to lowercase for case-insensitive matching
-    csv_case_name_tokens = tokenize_case_name(csv_case_name)
-    cluster_case_name_tokens = tokenize_case_name(cl_case_name)
-
-    # Check if there is an overlap between case names
-    overlap = csv_case_name_tokens & cluster_case_name_tokens
+    # convert all words to lowercase for case-insensitive matching and check if there
+    # is an overlap between case names
+    overlap = tokenize_case_name(csv_case_name) & tokenize_case_name(
+        cl_case_name
+    )
 
     if not overlap:
         # if no hits no match on name - move along
