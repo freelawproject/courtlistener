@@ -1993,6 +1993,7 @@ files = [
     {file = "hyperscan-0.7.8-pp310-pypy310_pp73-manylinux_2_28_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:c1cf3cc905240d85781b2d7f86ee1cfda0748dcb940c5d44b45472905be2045c"},
     {file = "hyperscan-0.7.8-pp39-pypy39_pp73-manylinux_2_28_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:e558cef9caaa73e802de35d2d4491034c4fb4b5697bd98ce1cb5adeb9300ad4b"},
     {file = "hyperscan-0.7.8-pp39-pypy39_pp73-manylinux_2_28_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:fd8f3b0882870de27dc33b92732360521d2b627c19cddf4b9832d7b478c215e6"},
+    {file = "hyperscan-0.7.8.tar.gz", hash = "sha256:1ed6c87eaf32f77c89fec8c102f20bc677e44c4ce80bde903620f274ea4b8ed7"},
 ]
 
 [[package]]
@@ -2379,13 +2380,13 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.6.38"
+version = "2.6.39"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.6.38-py27-none-any.whl", hash = "sha256:769559ce2f261b9dbd595df84581ebf6152e44bb1d0e593df0df9946ca567b49"},
-    {file = "juriscraper-2.6.38.tar.gz", hash = "sha256:7fa646bcc0401c735e43813bb541a11e96516f35e48b3bedf0f39105713e538f"},
+    {file = "juriscraper-2.6.39-py27-none-any.whl", hash = "sha256:e120663fbbef69d8127c20792cc9f9533c98bfc779f7829724b776dbeb11ac93"},
+    {file = "juriscraper-2.6.39.tar.gz", hash = "sha256:b11f7aeaea0c0a11d3a1a1d3d93e0276f203093288baa1120b0eb8e5d856561e"},
 ]
 
 [package.dependencies]
@@ -4319,13 +4320,13 @@ files = [
 
 [[package]]
 name = "reporters-db"
-version = "3.2.44"
+version = "3.2.45"
 description = "Database of Court Reporters"
 optional = false
 python-versions = "*"
 files = [
-    {file = "reporters_db-3.2.44-py2.py3-none-any.whl", hash = "sha256:598d6f67cbc2ca11d7ec64e99a9e26a62ef3a64e4220a7eec8cbadbcd9e99e09"},
-    {file = "reporters_db-3.2.44.tar.gz", hash = "sha256:612890bb282e5047a31daa32222b26c635c28edf9a8b140f005e6157540f29d1"},
+    {file = "reporters_db-3.2.45-py2.py3-none-any.whl", hash = "sha256:941395a7e2ebcd433ebc6ae6c2e6c4a2e70e98e197de40d9cc64f806855e0ada"},
+    {file = "reporters_db-3.2.45.tar.gz", hash = "sha256:ed334abc6f8f29ac68bb96001b50d1262be0cd7e02383527922303bfab5cd49e"},
 ]
 
 [package.dependencies]
