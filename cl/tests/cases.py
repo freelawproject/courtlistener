@@ -399,7 +399,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
         return next_page, previous_page, current_page
 
 
-class RECAPAlertsAssertions:
+class SearchAlertsAssertions:
 
     @staticmethod
     def get_html_content_from_email(email_content):
@@ -493,7 +493,9 @@ class RECAPAlertsAssertions:
                 case_text_cleaned = self.clean_case_title(case_text)
                 if case_title == case_text_cleaned:
                     child_hit_count = len(
-                        case.xpath("following-sibling::ul[1]/li/a")
+                        case.xpath(
+                            "following-sibling::ul[1]/li/a | following-sibling::ul[1]/li/strong"
+                        )
                     )
                     self.assertEqual(
                         child_hit_count,
@@ -522,8 +524,8 @@ class RECAPAlertsAssertions:
             child_documents = case_item.xpath("./following-sibling::ul[1]/li")
             results = []
             for li in child_documents:
-                a_tag = li.xpath(".//a")[0]
-                full_text = a_tag.text_content()
+                child_tag = li.xpath(".//a | .//strong")[0]
+                full_text = child_tag.text_content()
                 first_part = full_text.split("\u2014")[0].strip()
                 results.append(first_part)
 
@@ -550,6 +552,7 @@ class RECAPAlertsAssertions:
         expected_hits,
         case_title,
         expected_child_hits,
+        nested_field="recap_documents",
     ):
         """Confirm the following assertions for the search alert webhook:
         - An specific alert webhook was triggered.
@@ -557,6 +560,8 @@ class RECAPAlertsAssertions:
         - The specified case contains the expected number of child hits.
         """
 
+        matched_alert_name = None
+        matched_case_title = None
         for webhook in webhooks:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 webhook_cases = webhook["payload"]["results"]
@@ -566,14 +571,21 @@ class RECAPAlertsAssertions:
                     msg=f"Did not get the right number of hits for the alert %s. "
                     % alert_title,
                 )
+                matched_alert_name = True
                 for case in webhook["payload"]["results"]:
                     if case_title == strip_tags(case["caseName"]):
+                        matched_case_title = True
+                        if nested_field is None:
+                            self.assertTrue(nested_field not in case)
+                            continue
                         self.assertEqual(
-                            len(case["recap_documents"]),
+                            len(case[nested_field]),
                             expected_child_hits,
                             msg=f"Did not get the right number of child documents for the case %s. "
                             % case_title,
                         )
+        self.assertTrue(matched_alert_name, msg="Alert name didn't match")
+        self.assertTrue(matched_case_title, msg="Case title didn't match")
 
     def _count_percolator_webhook_hits_and_child_hits(
         self,

@@ -13,17 +13,25 @@ from django.http import QueryDict
 from django.template import loader
 from django.urls import reverse
 from django.utils.timezone import now
+from elasticsearch_dsl import MultiSearch
 from elasticsearch_dsl import Q as ES_Q
+from elasticsearch_dsl.response import Response
 
 from cl.alerts.models import Alert, RealTimeQueue
 from cl.alerts.utils import InvalidDateError
-from cl.api.models import WebhookEventType
+from cl.api.models import WebhookEventType, WebhookVersions
 from cl.api.webhooks import send_search_alert_webhook
 from cl.lib import search_utils
 from cl.lib.command_utils import VerboseCommand, logger
-from cl.lib.elasticsearch_utils import do_es_api_query
+from cl.lib.elasticsearch_utils import (
+    do_es_api_query,
+    limit_inner_hits,
+    set_results_child_docs,
+    set_results_highlights,
+)
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import regroup_snippets
+from cl.lib.types import CleanData
 from cl.search.constants import ALERTS_HL_TAG, SEARCH_ALERTS_OPINION_HL_FIELDS
 from cl.search.documents import OpinionDocument
 from cl.search.forms import SearchForm
@@ -106,6 +114,59 @@ def send_alert(user_profile, hits):
     msg.send(fail_silently=False)
 
 
+def query_alerts_es(
+    cd: CleanData, v1_webhook: bool = False
+) -> tuple[Response, Response | None]:
+    """Query ES for opinion alerts, optionally handling a V1 webhook query.
+
+    :param cd: A CleanData object containing the query parameters.
+    :param v1_webhook: A boolean indicating whether to include a V1 webhook query.
+    :return: A tuple containing the main search response and an optional V1
+    query response.
+    """
+
+    v1_results = None
+    search_query = OpinionDocument.search()
+    cd["highlight"] = True
+    main_query, _ = do_es_api_query(
+        search_query,
+        cd,
+        SEARCH_ALERTS_OPINION_HL_FIELDS,
+        ALERTS_HL_TAG,
+        "v4",
+    )
+    main_query = main_query.extra(
+        from_=0,
+        size=settings.SCHEDULED_ALERT_HITS_LIMIT,
+    )
+    multi_search = MultiSearch()
+    multi_search = multi_search.add(main_query)
+
+    if v1_webhook:
+        search_query = OpinionDocument.search()
+        v1_query, _ = do_es_api_query(
+            search_query,
+            cd,
+            SEARCH_ALERTS_OPINION_HL_FIELDS,
+            ALERTS_HL_TAG,
+            "v3",
+        )
+        v1_query = v1_query.extra(
+            from_=0,
+            size=settings.SCHEDULED_ALERT_HITS_LIMIT,
+        )
+        multi_search = multi_search.add(v1_query)
+
+    responses = multi_search.execute()
+    results = responses[0]
+    limit_inner_hits({}, results, cd["type"])
+    set_results_highlights(results, cd["type"])
+    set_results_child_docs(results)
+    if v1_webhook:
+        v1_results = responses[1]
+    return results, v1_results
+
+
 class Command(VerboseCommand):
     help = (
         "Sends the alert emails on a real time, daily, weekly or monthly "
@@ -152,10 +213,9 @@ class Command(VerboseCommand):
         if options["rate"] == Alert.REAL_TIME:
             self.clean_rt_queue()
 
-    def run_query(self, alert, rate):
+    def run_query(self, alert, rate, v1_webhook=False):
         results = []
-        cd = {}
-        main_params = {}
+        v1_results = None
         logger.info(f"Now running the query: {alert.query}\n")
 
         # Make a dict from the query string.
@@ -175,7 +235,7 @@ class Command(VerboseCommand):
             if waffle.switch_is_active("oa-es-alerts-active"):
                 # Return empty results for OA alerts. They are now handled
                 # by Elasticsearch.
-                return query_type, results
+                return query_type, results, v1_results
 
         logger.info(f"Data sent to SearchForm is: {qd}\n")
         search_form = SearchForm(qd, is_es_form=self.o_es_alerts)
@@ -187,7 +247,7 @@ class Command(VerboseCommand):
                 and len(self.valid_ids[query_type]) == 0
             ):
                 # Bail out. No results will be found if no valid_ids.
-                return query_type, results
+                return query_type, results, v1_results
 
             main_params = search_utils.build_main_query(
                 cd,
@@ -220,19 +280,7 @@ class Command(VerboseCommand):
                     )
 
             if self.o_es_alerts:
-                search_query = OpinionDocument.search()
-                s, _ = do_es_api_query(
-                    search_query,
-                    cd,
-                    SEARCH_ALERTS_OPINION_HL_FIELDS,
-                    ALERTS_HL_TAG,
-                    "v3",
-                )
-                s = s.extra(
-                    from_=0,
-                    size=settings.SCHEDULED_ALERT_HITS_LIMIT,
-                )
-                results = s.execute()
+                results, v1_results = query_alerts_es(cd, v1_webhook)
             else:
                 # Ignore warnings from this bit of code. Otherwise, it complains
                 # about the query URL being too long and having to POST it instead
@@ -248,7 +296,7 @@ class Command(VerboseCommand):
                 regroup_snippets(results)
 
         logger.info(f"There were {len(results)} results.")
-        return qd, results
+        return qd, results, v1_results
 
     def send_emails_and_webhooks(self, rate):
         """Send out an email and webhook events to every user whose alert has a
@@ -261,6 +309,13 @@ class Command(VerboseCommand):
             alerts = user.alerts.filter(rate=rate)
             logger.info(f"Running alerts for user '{user}': {alerts}")
 
+            # Query user's webhooks.
+            user_webhooks = user.webhooks.filter(
+                event_type=WebhookEventType.SEARCH_ALERT, enabled=True
+            )
+            v1_webhook = WebhookVersions.v1 in {
+                webhook.version for webhook in user_webhooks
+            }
             if rate == Alert.REAL_TIME:
                 if not user.profile.is_member:
                     continue
@@ -268,7 +323,9 @@ class Command(VerboseCommand):
             hits = []
             for alert in alerts:
                 try:
-                    qd, results = self.run_query(alert, rate)
+                    qd, results, v1_results = self.run_query(
+                        alert, rate, v1_webhook
+                    )
                 except:
                     traceback.print_exc()
                     logger.info(
@@ -293,10 +350,13 @@ class Command(VerboseCommand):
 
                     # Send webhook event if the user has a SEARCH_ALERT
                     # endpoint enabled.
-                    user_webhooks = user.webhooks.filter(
-                        event_type=WebhookEventType.SEARCH_ALERT, enabled=True
-                    )
                     for user_webhook in user_webhooks:
+                        results = (
+                            v1_results
+                            if alert.alert_type == SEARCH_TYPES.OPINION
+                            and user_webhook.version == WebhookVersions.v1
+                            else results
+                        )
                         send_search_alert_webhook(
                             self.sis[search_type], results, user_webhook, alert
                         )

@@ -1,5 +1,4 @@
 import json
-from collections import defaultdict
 from typing import Any
 
 from elasticsearch_dsl.response import Hit
@@ -12,13 +11,14 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
-from cl.lib.elasticsearch_utils import merge_highlights_into_result
+from cl.lib.elasticsearch_utils import set_results_child_docs
 from cl.search.api_serializers import (
     RECAPESResultSerializer,
     V3OAESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
 from cl.search.models import SEARCH_TYPES, DocketEntry
+from cl.search.types import ESDictDocument
 
 
 @app.task()
@@ -127,7 +127,7 @@ def send_es_search_alert_webhook(
 
 @app.task()
 def send_search_alert_webhook_es(
-    results: list[dict[str, Any]] | list[Hit],
+    results: list[ESDictDocument] | list[Hit],
     webhook_pk: int,
     alert_pk: int,
 ) -> None:
@@ -152,34 +152,7 @@ def send_search_alert_webhook_es(
                 es_results, many=True
             ).data
         case SEARCH_TYPES.RECAP:
-            for result in results:
-                child_result_objects = []
-                child_docs = None
-                if isinstance(result, dict):
-                    child_docs = result.get("child_docs")
-                elif hasattr(result, "child_docs"):
-                    child_docs = result.child_docs
-
-                if child_docs:
-                    for child_doc in child_docs:
-                        if isinstance(result, dict):
-                            child_result_objects.append(child_doc)
-                        else:
-                            child_result_objects.append(
-                                defaultdict(
-                                    lambda: None,
-                                    child_doc["_source"].to_dict(),
-                                )
-                            )
-
-                result["child_docs"] = child_result_objects
-                # Merge HL into the parent document from percolator response.
-                if isinstance(result, dict):
-                    meta_hl = result.get("meta", {}).get("highlight", {})
-                    merge_highlights_into_result(
-                        meta_hl,
-                        result,
-                    )
+            set_results_child_docs(results, merge_highlights=True)
             serialized_results = RECAPESResultSerializer(
                 results, many=True
             ).data
