@@ -1,3 +1,5 @@
+import re
+
 from disposable_email_domains import blocklist
 from django import forms
 from django.contrib.auth import authenticate
@@ -187,6 +189,14 @@ class UserCreationFormExtended(UserCreationForm):
                 code="bad_email_domain",
             )
         return email
+
+    def clean_first_name(self):
+        first_name = self.cleaned_data.get("first_name")
+        if re.search(r"""[!"#$%&()*+,./:;<=>?@[\]_{|}~]+""", first_name):
+            raise forms.ValidationError(
+                "First name must not contain any special characters."
+            )
+        return first_name
 
 
 class EmailConfirmationForm(forms.Form):
