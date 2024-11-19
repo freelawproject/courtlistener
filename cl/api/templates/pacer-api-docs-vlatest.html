@@ -95,6 +95,23 @@
   "{% get_full_host %}{% url "docketentry-list" version=version %}?docket=4214664"</pre>
   <p>Such a request will return up to 20 docket entries per page. Each docket entry returned can contain a number of nested documents in the <code>recap_document</code> key, including their full extracted text (see details in the next section below). As a result, this response can be quite large.
   </p>
+  <p>You can also order the results using specific fields. To order results, use the <code>order_by</code> query parameter. For example, to order docket entries by their filing date in ascending order:
+  </p>
+  <pre class="pre-scrollable">curl -v \
+  --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
+  "{% get_full_host %}{% url "docketentry-list" version=version %}?order_by=date_filed"</pre>
+  <p>To order in descending order, prepend a <code>-</code> to the field name. For example, <code>?order_by=-date_filed</code> will order by filing date in descending order.
+  </p>
+  <p>The following fields can be used for ordering:</p>
+  <ul>
+    <li><code>id</code></li>
+    <li><code>date_created</code></li>
+    <li><code>date_modified</code></li>
+    <li><code>date_filed</code></li>
+    <li><code>recap_sequence_number</code></li>
+    <li><code>entry_number</code></li>
+  </ul>
+  <p>To order using multiple fields simultaneously, separate the field names with commas. For example, <code>?order_by=recap_sequence_number,entry_number</code> will use the default website order for Docket Entries.</p>
   <p>A few field-level notes:</p>
   <table class="table">
     <thead>
