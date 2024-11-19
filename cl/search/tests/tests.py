@@ -50,7 +50,6 @@ from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
-from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
