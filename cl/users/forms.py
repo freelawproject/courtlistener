@@ -192,9 +192,7 @@ class UserCreationFormExtended(UserCreationForm):
 
     def clean_first_name(self):
         first_name = self.cleaned_data.get("first_name")
-        if not re.match(
-            r"""[^!"#$%&()*+,./:;<=>?@[\]_{|}~]+$""", first_name, re.IGNORECASE
-        ):
+        if re.search(r"""[!"#$%&()*+,./:;<=>?@[\]_{|}~]+""", first_name):
             raise forms.ValidationError(
                 "First name must not contain any special characters."
             )
