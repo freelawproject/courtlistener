@@ -2,6 +2,7 @@ import datetime
 from unittest import mock
 
 import time_machine
+from django.conf import settings
 from django.core import mail
 from django.core.management import call_command
 from django.test.utils import override_settings
@@ -26,6 +27,7 @@ from cl.alerts.utils import (
 )
 from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
+from cl.api.utils import get_webhook_deprecation_date
 from cl.donate.models import NeonMembership
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import RECAPSearchTestCase
@@ -1517,6 +1519,15 @@ class RECAPAlertsSweepIndexTest(
             query=f'q=pacer_doc_id:0190645981 AND "SUBPOENAS SERVED CASE UPDATED"&type=r',
         )
 
+        with mock.patch("cl.users.signals.notify_new_or_updated_webhook"):
+            webhook_2_1 = WebhookFactory(
+                user=self.user_profile.user,
+                event_type=WebhookEventType.SEARCH_ALERT,
+                url="https://example.com/",
+                enabled=True,
+                version=2,
+            )
+
         with mock.patch(
             "cl.api.webhooks.requests.post",
             side_effect=lambda *args, **kwargs: MockResponse(
@@ -1560,10 +1571,25 @@ class RECAPAlertsSweepIndexTest(
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True
         )
-        # 2 webhooks should be triggered one for each document ingested that
-        # matched each alert.
+        # One webhook should be triggered for each webhook version (V1, V2) and
+        # for each document ingested that matched each alert. 4 Webhook events total.
         self.assertEqual(
-            len(webhook_events), 2, msg="Webhook events didn't match."
+            len(webhook_events), 4, msg="Webhook events didn't match."
+        )
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = [
+            webhook["webhook"]["version"] for webhook in webhook_events
+        ]
+        self.assertEqual(
+            webhook_versions.count(2),
+            2,
+            msg="Wrong number of V2 webhook events.",
+        )
+        self.assertEqual(
+            webhook_versions.count(1),
+            2,
+            msg="Wrong number of V1 webhook events.",
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[0])
@@ -1623,10 +1649,40 @@ class RECAPAlertsSweepIndexTest(
         webhook_events = WebhookEvent.objects.all().values_list(
             "content", flat=True
         )
-        # 3 webhooks should be triggered one for each document ingested that
-        # matched each alert.
+        # One webhook should be triggered for each webhook version (V1, V2) and
+        # for each document ingested that matched each alert. 6 Webhook events total.
         self.assertEqual(
-            len(webhook_events), 3, msg="Webhook events didn't match."
+            len(webhook_events), 6, msg="Webhook events didn't match."
+        )
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = [
+            webhook["webhook"]["version"] for webhook in webhook_events
+        ]
+        self.assertEqual(
+            webhook_versions.count(2),
+            3,
+            msg="Wrong number of V2 webhook events.",
+        )
+        self.assertEqual(
+            webhook_versions.count(1),
+            3,
+            msg="Wrong number of V1 webhook events.",
+        )
+
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_enabled
+        ).first()
+        v2_webhook_event = WebhookEvent.objects.filter(
+            webhook=webhook_2_1
+        ).first()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
         )
 
         html_content = self.get_html_content_from_email(mail.outbox[1])
