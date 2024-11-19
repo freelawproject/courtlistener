@@ -208,6 +208,18 @@ def update_matched_case_name(
     return cluster_case_name_updated, docket_case_name_updated
 
 
+def combine_initials(case_name: str) -> str:
+    """Combine initials in case captions
+
+    :param case_name: the case caption
+    :return: the cleaned case caption
+    """
+
+    pattern = r"((?:[A-Z]\.?\s?){2,})(\s|$)"
+
+    return re.sub(pattern, lambda m: m.group(0).replace(".", ""), case_name)
+
+
 def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
     """Process rows from csv file
 
@@ -269,6 +281,10 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
                 if match.cluster.case_name_full
                 else match.cluster.case_name
             )
+
+            west_case_name = combine_initials(west_case_name)
+            cl_case_name = combine_initials(cl_case_name)
+
             case_name_match = check_case_names_match(
                 west_case_name, cl_case_name
             )
