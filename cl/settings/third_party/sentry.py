@@ -52,4 +52,5 @@ if SENTRY_DSN:
         ],
         ignore_errors=[KeyboardInterrupt],
         before_send=fingerprint_sentry_error,
+        attach_stacktrace=True,
     )
