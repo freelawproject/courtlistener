@@ -28,6 +28,13 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Unresponsive
+        "SAGW": "1/hour",
+        # Bounced
+        "testname2024": "1/hour",
+        "cadebe2258": "1/hour",
+        # Disposable email
+        "a29883f4-3958-484b-9f46-aa9796110dd0_IddU": "1/hour",
         # Didn't respond to emails, 2024-10-14
         "ashishjaddu": "10/hour",
         # Made 1M requests for commercial enterprise
