@@ -103,17 +103,3 @@ def get_term_frequency(
             return top_terms_dict
     else:
         raise ValueError("Unknown output type!")
-
-
-def get_data_dir(core: str, url: str = settings.SOLR_HOST):
-    """
-    Interrogate Solr to get the location of its data directory.
-
-    Useful when writing the external_pagerank file or when reading it.
-    """
-    status_doc = get_solr_core_status(url=url)
-    result = cast(
-        List[_ElementTree],
-        status_doc.xpath(f'//*[@name="{core}"]//*[@name="dataDir"]/text()'),
-    )
-    return str(result[0])
