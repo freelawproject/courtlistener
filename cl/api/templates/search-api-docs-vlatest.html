@@ -93,7 +93,10 @@
             "lexisCite": "",
             "meta": {
                 "timestamp": "2024-06-22T10:26:35.320787Z",
-                "date_created": "2022-06-26T23:24:18.926040Z"
+                "date_created": "2022-06-26T23:24:18.926040Z",
+                "score": {
+                    "bm25": 2.1369965
+                }
             },
             "neutralCite": "",
             "non_participating_judge_ids": [],
@@ -247,6 +250,10 @@
       <p>This field only responds to arguments provided to the <code>q</code> parameter.  If the <code>q</code> parameter is not used, the <code>snippet</code> field will show the first 500 characters of the <code>text</code> field.
       </p>
       <p>This field only displays Opinion text content.
+      </p>
+    </li>
+    <li>
+      <p>The <code>meta</code> field in main documents contains the <code>score</code> field, which is currently a hash that includes the <code>bm25</code> score used by Elasticsearch to rank results. Additional scores may be introduced in the future.
       </p>
     </li>
   </ol>
