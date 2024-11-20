@@ -435,7 +435,11 @@ class V3OpinionESResultSerializer(DocumentSerializer):
         )
 
 
-class MetaDataSerializer(serializers.Serializer):
+class ScoreDataSerializer(serializers.Serializer):
+    bm25 = serializers.FloatField(read_only=True, source="bm25_score")
+
+
+class BaseMetaDataSerializer(serializers.Serializer):
     """The metadata serializer V4 Search API."""
 
     timestamp = TimeStampField(read_only=True, default_timezone=timezone.utc)
@@ -444,7 +448,15 @@ class MetaDataSerializer(serializers.Serializer):
     )
 
 
-class RECAPMetaDataSerializer(MetaDataSerializer):
+class MainDocumentMetaDataSerializer(BaseMetaDataSerializer):
+    """The metadata serializer V4 Search API for main documents.
+    Includes the score field.
+    """
+
+    score = ScoreDataSerializer(source="*", read_only=True)
+
+
+class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):
     """The metadata serializer for the RECAP search type includes the
     additional more_docs field.
     """
@@ -454,10 +466,10 @@ class RECAPMetaDataSerializer(MetaDataSerializer):
     )
 
 
-class MetaMixin(serializers.Serializer):
-    """Mixin to add nested metadata serializer."""
+class MainMetaMixin(serializers.Serializer):
+    """Mixin to add nested metadata serializer for main documents."""
 
-    meta = MetaDataSerializer(source="*", read_only=True)
+    meta = MainDocumentMetaDataSerializer(source="*", read_only=True)
 
 
 class RECAPMetaMixin(serializers.Serializer):
@@ -466,7 +478,13 @@ class RECAPMetaMixin(serializers.Serializer):
     meta = RECAPMetaDataSerializer(source="*", read_only=True)
 
 
-class BaseRECAPDocumentESResultSerializer(MetaMixin, DocumentSerializer):
+class ChildMetaMixin(serializers.Serializer):
+    """Mixin to add nested metadata serializer for child documents."""
+
+    meta = BaseMetaDataSerializer(source="*", read_only=True)
+
+
+class BaseRECAPDocumentESResultSerializer(DocumentSerializer):
     """The base serializer class for RECAP_DOCUMENT search type results."""
 
     # Fields from the RECAPDocument
@@ -505,6 +523,12 @@ class BaseRECAPDocumentESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
+class NestedRECAPDocumentESResultSerializer(
+    BaseRECAPDocumentESResultSerializer, ChildMetaMixin
+):
+    """Mixin to add nested metadata serializer for nested Recap documents."""
+
+
 class BaseDocketESResultSerializer(DocumentSerializer):
     """The serializer class for DOCKETS Search type results."""
 
@@ -541,25 +565,27 @@ class BaseDocketESResultSerializer(DocumentSerializer):
         )
 
 
-class RECAPDocumentESResultSerializer(BaseRECAPDocumentESResultSerializer):
+class RECAPDocumentESResultSerializer(
+    BaseRECAPDocumentESResultSerializer, MainMetaMixin
+):
     """The serializer for RECAP_DOCUMENT search type results."""
 
     docket_id = serializers.IntegerField(read_only=True)
 
 
-class DocketESResultSerializer(MetaMixin, BaseDocketESResultSerializer):
+class DocketESResultSerializer(MainMetaMixin, BaseDocketESResultSerializer):
     """The serializer class for DOCKETS Search type results."""
 
 
 class RECAPESResultSerializer(RECAPMetaMixin, BaseDocketESResultSerializer):
     """The serializer class for RECAP search type results."""
 
-    recap_documents = BaseRECAPDocumentESResultSerializer(
+    recap_documents = NestedRECAPDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
 
 
-class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
+class OpinionDocumentESResultSerializer(ChildMetaMixin, DocumentSerializer):
     """The serializer for OpinionDocument results."""
 
     snippet = HighlightedField(read_only=True, source="text")
@@ -579,7 +605,7 @@ class OpinionDocumentESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
+class OpinionClusterESResultSerializer(MainMetaMixin, DocumentSerializer):
     """The serializer for OpinionCluster Search results."""
 
     opinions = OpinionDocumentESResultSerializer(
@@ -609,7 +635,7 @@ class OpinionClusterESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class PositionESResultSerializer(MetaMixin, DocumentSerializer):
+class PositionESResultSerializer(ChildMetaMixin, DocumentSerializer):
     """The serializer for Positions Search results."""
 
     class Meta:
@@ -644,7 +670,7 @@ class PositionESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class PersonESResultSerializer(MetaMixin, DocumentSerializer):
+class PersonESResultSerializer(MainMetaMixin, DocumentSerializer):
     """The serializer for Person Search results."""
 
     name = HighlightedField(read_only=True)
@@ -674,7 +700,7 @@ class PersonESResultSerializer(MetaMixin, DocumentSerializer):
         )
 
 
-class OAESResultSerializer(MetaMixin, DocumentSerializer):
+class OAESResultSerializer(MainMetaMixin, DocumentSerializer):
     """The serializer for V4 Oral argument results."""
 
     snippet = HighlightedField(read_only=True, source="text")

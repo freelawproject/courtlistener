@@ -262,11 +262,20 @@ class V4SearchAPIAssertions(SimpleTestCase):
         meta_expected_value = await sync_to_async(get_meta_expected_value)(
             content_to_compare
         )
-        self.assertEqual(
-            meta_value,
-            meta_expected_value,
-            f"The field '{meta_field}' does not match.",
-        )
+        if meta_field == "score":
+            # Special case for the score field. Only confirm the presence of
+            # keys and avoid comparing values, as they differ in each response.
+            self.assertEqual(
+                set(meta_value.keys()),
+                set(meta_expected_value.keys()),
+                f"The keys in field '{meta_field}' do not match.",
+            )
+        else:
+            self.assertEqual(
+                meta_value,
+                meta_expected_value,
+                f"The field '{meta_field}' does not match.",
+            )
 
     async def _test_api_fields_content(
         self,
@@ -296,6 +305,10 @@ class V4SearchAPIAssertions(SimpleTestCase):
                                     meta_value,
                                 ) in child_value.items():
                                     with self.subTest(meta_field=meta_field):
+                                        self.assertFalse(
+                                            meta_field == "score",
+                                            msg="score key should not be present in nested documents",
+                                        )
                                         await self._compare_field(
                                             meta_field,
                                             meta_value,
