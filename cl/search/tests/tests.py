@@ -50,7 +50,6 @@ from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
-from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -72,7 +71,6 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
-from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
     log_last_document_indexed,
@@ -447,6 +445,60 @@ class DocketValidationTest(TestCase):
                     pacer_case_id="asdf",
                     court_id=self.court.pk,
                 )
+
+
+class RECAPDocumentValidationTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.docket_entry = DocketEntryWithParentsFactory()
+
+    def test_attachment_with_attachment_number(self):
+        """Attachments with attachment_number should not raise ValidationError."""
+        document = RECAPDocument.objects.create(
+            docket_entry=self.docket_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        self.assertIsNotNone(document.id)
+
+    def test_attachment_without_attachment_number(self):
+        """Attachments without attachment_number should raise ValidationError."""
+        with self.assertRaises(ValidationError) as cm:
+            RECAPDocument.objects.create(
+                docket_entry=self.docket_entry,
+                document_type=RECAPDocument.ATTACHMENT,
+                attachment_number=None,
+            )
+        # Assert that the error message is as expected
+        self.assertIn("attachment_number", cm.exception.message_dict)
+        self.assertEqual(
+            cm.exception.message_dict["attachment_number"],
+            ["attachment_number cannot be null for an attachment."],
+        )
+
+    def test_main_document_with_attachment_number(self):
+        """Main PACER documents with attachment_number should raise ValidationError."""
+        with self.assertRaises(ValidationError) as cm:
+            RECAPDocument.objects.create(
+                docket_entry=self.docket_entry,
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                attachment_number=1,
+            )
+        # Assert that the error message is as expected
+        self.assertIn("attachment_number", cm.exception.message_dict)
+        self.assertEqual(
+            cm.exception.message_dict["attachment_number"],
+            ["attachment_number must be null for a main PACER document."],
+        )
+
+    def test_main_document_without_attachment_number(self):
+        """Main PACER documents without attachment_number should not raise ValidationError."""
+        document = RECAPDocument.objects.create(
+            docket_entry=self.docket_entry,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            attachment_number=None,
+        )
+        self.assertIsNotNone(document.id)
 
 
 class IndexingTest(EmptySolrTestCase):
@@ -1089,38 +1141,6 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         self.assertEqual(
             r.data["detail"], "The query contains unbalanced parentheses."
         )
-
-
-class PagerankTest(TestCase):
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        PACERFreeDocumentLogFactory.create()
-
-    def test_pagerank_calculation(self) -> None:
-        """Create a few items and fake citation relation among them, then
-        run the pagerank algorithm. Check whether this simple case can get the
-        correct result.
-        """
-        # calculate pagerank of these 3 document
-        comm = Command()
-        self.verbosity = 1
-        pr_results = comm.do_pagerank()
-
-        # Verify that whether the answer is correct, based on calculations in
-        # Gephi
-        answers = {
-            1: 0.369323534954,
-            2: 0.204581549974,
-            3: 0.378475867453,
-        }
-        for key, value in answers.items():
-            self.assertTrue(
-                abs(pr_results[key] - value) < 0.0001,
-                msg="The answer for item %s was %s when it should have been "
-                "%s" % (key, pr_results[key], answers[key]),
-            )
 
 
 class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
@@ -2436,6 +2456,7 @@ class SweepIndexerCommandTest(
             docket_entry=cls.de,
             document_number="1",
             attachment_number=2,
+            document_type=RECAPDocument.ATTACHMENT,
         )
         cls.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(
