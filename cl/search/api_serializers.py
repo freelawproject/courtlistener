@@ -462,7 +462,17 @@ class RECAPMetaDataSerializer(MainDocumentMetaDataSerializer):
     """
 
     more_docs = serializers.BooleanField(
-        read_only=True, source="child_remaining"
+        read_only=True, source="child_remaining", default=False
+    )
+
+
+class RECAPWebhookMetaDataSerializer(BaseMetaDataSerializer):
+    """The metadata serializer for the RECAP search Webhook that includes the
+    additional more_docs field without the score field.
+    """
+
+    more_docs = serializers.BooleanField(
+        read_only=True, source="child_remaining", default=False
     )
 
 
@@ -470,12 +480,6 @@ class MainMetaMixin(serializers.Serializer):
     """Mixin to add nested metadata serializer for main documents."""
 
     meta = MainDocumentMetaDataSerializer(source="*", read_only=True)
-
-
-class RECAPMetaMixin(serializers.Serializer):
-    """Mixin to add nested metadata serializer for the RECAP search type."""
-
-    meta = RECAPMetaDataSerializer(source="*", read_only=True)
 
 
 class ChildMetaMixin(serializers.Serializer):
@@ -577,12 +581,22 @@ class DocketESResultSerializer(MainMetaMixin, BaseDocketESResultSerializer):
     """The serializer class for DOCKETS Search type results."""
 
 
-class RECAPESResultSerializer(RECAPMetaMixin, BaseDocketESResultSerializer):
+class RECAPESResultSerializer(BaseDocketESResultSerializer):
     """The serializer class for RECAP search type results."""
 
     recap_documents = NestedRECAPDocumentESResultSerializer(
         many=True, read_only=True, source="child_docs"
     )
+    meta = RECAPMetaDataSerializer(source="*", read_only=True)
+
+
+class RECAPESWebhookResultSerializer(BaseDocketESResultSerializer):
+    """The serializer class for RECAP search Webhooks results."""
+
+    recap_documents = NestedRECAPDocumentESResultSerializer(
+        many=True, read_only=True, source="child_docs"
+    )
+    meta = RECAPWebhookMetaDataSerializer(source="*", read_only=True)
 
 
 class OpinionDocumentESResultSerializer(ChildMetaMixin, DocumentSerializer):

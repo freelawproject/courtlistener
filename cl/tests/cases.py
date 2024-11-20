@@ -657,6 +657,11 @@ class RECAPAlertsAssertions:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 hit = webhook["payload"]["results"][0]
                 if child_field:
+                    self.assertNotIn(
+                        "score",
+                        hit["recap_documents"][0]["meta"],
+                        msg="score shouldn't be present on webhook nested documents",
+                    )
                     child_field_content = hit["recap_documents"][0][field_name]
                     self.assertIn(
                         hl_expected,
@@ -665,6 +670,11 @@ class RECAPAlertsAssertions:
                         % field_name,
                     )
                 else:
+                    self.assertNotIn(
+                        "score",
+                        hit["meta"],
+                        msg="score shouldn't be present on webhook main document",
+                    )
                     parent_field_content = hit[field_name]
                     self.assertIn(
                         hl_expected,
