@@ -324,6 +324,30 @@
     <p>Ordering by fields with duplicate values is non-deterministic. If you wish to order by such a field, you should provide a second field as a tie-breaker to consistently order results. For example, ordering by <code>date_filed</code> will not return consistent ordering for items that have the same date, but this can be fixed by ordering by <code>date_filed,id</code>. In that case, if two items have the same <code>date_filed</code> value, the tie will be broken by the <code>id</code> field.
     </p>
 
+    <h3 id="counting">Counting</h3>
+    <p>To retrieve the total number of items matching your query without fetching all the data, you can use the <code>count=on</code> parameter. This is useful for verifying filters and understanding the scope of your query results without incurring the overhead of retrieving full datasets.
+    </p>
+    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cited_opinion=32239&count=on"
+
+{"count": 3302}</pre>
+    <p>When <code>count=on</code> is specified:</p>
+    <ul>
+      <li>The API returns only the <code>count</code> key with the total number of matching items.</li>
+      <li>Pagination parameters like <code>cursor</code> are ignored.</li>
+      <li>The response does not include any result data, which can improve performance for large datasets.</li>
+    </ul>
+    <p>In standard paginated responses, a <code>count</code> key is included with the URL to obtain the total count for your query:</p>
+    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cited_opinion=32239
+
+{
+  "count": "https://www.courtlistener.com/api/rest/v4/opinions/?cited_opinion=32239&count=on",
+  "next": "https://www.courtlistener.com/api/rest/v4/opinions/?cited_opinion=32239&cursor=2",
+  "previous": null,
+  "results": [
+    // paginated results
+  ]
+}</pre>
+    <p>You can follow this URL to get the total count of items matching your query.</p>
 
     <h3 id="field-selection">Field Selection</h3>
     <p>To save bandwidth and increase serialization performance, fields can be limited by using the <code>fields</code> parameter with a comma-separated list of fields.
