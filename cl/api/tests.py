@@ -2561,3 +2561,108 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(await webhook_events.acount(), 2)
         # Confirm no milestone event should be created.
         self.assertEqual(await milestone_events.acount(), 0)
+
+
+class CountParameterTests(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
+        permissions = Permission.objects.filter(
+            codename__in=["has_recap_api_access", "has_recap_upload_access"]
+        )
+        cls.user_1.user.user_permissions.add(*permissions)
+
+        cls.court_canb = CourtFactory(id="canb")
+        cls.court_cand = CourtFactory(id="cand")
+
+        cls.url = reverse("docket-list", kwargs={"version": "v4"})
+
+        for i in range(10):
+            DocketFactory(
+                court=cls.court_canb,
+                source=Docket.HARVARD,
+                pacer_case_id=str(i),
+            )
+        for i in range(7):
+            DocketFactory(
+                court=cls.court_canb,
+                source=Docket.RECAP,
+                pacer_case_id=str(100 + i),
+            )
+        for i in range(5):
+            DocketFactory(
+                court=cls.court_cand,
+                source=Docket.HARVARD,
+                pacer_case_id=str(200 + i),
+            )
+
+    def setUp(self):
+        self.client = make_client(self.user_1.user.pk)
+
+    async def test_count_on_returns_only_count(self):
+        """
+        Test that when 'count=on' is specified, the API returns only the count.
+        """
+        params = {"count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        # The response should only contain the 'count' key
+        self.assertEqual(list(response.data.keys()), ["count"])
+        self.assertIsInstance(response.data["count"], int)
+        # The count should match the total number of dockets
+        expected_count = await sync_to_async(Docket.objects.count)()
+        self.assertEqual(response.data["count"], expected_count)
+
+    async def test_standard_response_includes_count_url(self):
+        """
+        Test that the standard response includes a 'count' key with the count URL.
+        """
+        response = await self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("count", response.data)
+        count_url = response.data["count"]
+        self.assertIsInstance(count_url, str)
+        self.assertIn("count=on", count_url)
+
+    async def test_invalid_count_parameter(self):
+        """
+        Test that invalid 'count' parameter values are handled appropriately.
+        """
+        params = {"count": "invalid"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        # The response should be the standard paginated response
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
+
+    async def test_count_with_filters(self):
+        """
+        Test that the count returned matches the filters applied.
+        """
+        params = {"court": "canb", "source": Docket.RECAP, "count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        expected_count = await sync_to_async(
+            lambda: Docket.objects.filter(
+                court__id="canb",
+                source=Docket.RECAP,
+            ).count()
+        )()
+        self.assertEqual(response.data["count"], expected_count)
+
+    async def test_count_with_no_results(self):
+        """
+        Test that 'count=on' returns zero when no results match the filters.
+        """
+        params = {"court": "cand", "source": Docket.RECAP, "count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
