@@ -269,7 +269,7 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
 
     def list(self, request, *args, **kwargs):
 
-        match request.GET["type"]:
+        match request.GET.get("type", SEARCH_TYPES.OPINION):
             case SEARCH_TYPES.ORAL_ARGUMENT if waffle.flag_is_active(
                 request, "oa-es-active"
             ):
