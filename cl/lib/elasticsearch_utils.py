@@ -3216,13 +3216,15 @@ def do_es_sweep_alert_query(
     multi_search = multi_search.add(main_query)
     if parent_query:
         parent_search = search_query.query(parent_query)
-        parent_search = parent_search.extra(from_=0)
+        # Ensure accurate tracking of total hit count for up to 10,001 query results
+        parent_search = parent_search.extra(from_=0, track_total_hits=10_001)
         parent_search = parent_search.source(includes=["docket_id"])
         multi_search = multi_search.add(parent_search)
 
     if child_query:
         child_search = child_search_query.query(child_query)
-        child_search = child_search.extra(from_=0)
+        # Ensure accurate tracking of total hit count for up to 10,001 query results
+        child_search = child_search.extra(from_=0, track_total_hits=10_001)
         child_search = child_search.source(includes=["id"])
         multi_search = multi_search.add(child_search)
 
