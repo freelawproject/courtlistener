@@ -1,30 +1,26 @@
 import json
-import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import boto3
 from bs4 import BeautifulSoup
 from django.conf import settings
-from django.core.management.base import BaseCommand
-from tqdm import tqdm
 
+from cl.lib.command_utils import VerboseCommand, logger
 from cl.search.models import Opinion, OpinionCluster
 
-logger = logging.getLogger(__name__)
 
-
-class Command(BaseCommand):
+class Command(VerboseCommand):
     help = "Update CL cases with the latest CAP data.  Requires crosswalk files to be generated first."
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.verbose = False
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.WARNING)
         self.s3_client = None
         self.bucket_name = None
+        self.crosswalk_dir = None
+        self.max_workers = None
 
     def add_arguments(self, parser):
         """Add command line arguments to the parser.
@@ -37,11 +33,6 @@ class Command(BaseCommand):
             type=str,
             help="Specific reporter to update (e.g., 'A_2d'). If not provided, all reporters will be processed.",
             required=False,
-        )
-        parser.add_argument(
-            "--verbose",
-            action="store_true",
-            help="Enable verbose output",
         )
         parser.add_argument(
             "--crosswalk-dir",
@@ -63,23 +54,14 @@ class Command(BaseCommand):
         :param options: Command options
         :type options: Dict[str, Any]
         """
-        self.verbose = options.get("verbose", False)
-        self.crosswalk_dir = options["crosswalk_dir"]
-        self.max_workers = min(options["max_workers"], 16)
-
-        # Set up logging
-        if self.verbose:
-            logging.basicConfig(level=logging.DEBUG)
-        else:
-            logging.basicConfig(
-                level=logging.CRITICAL
-            )  # Only log critical errors
-
+        self.crosswalk_dir = options.get("crosswalk_dir")
+        self.max_workers = min(options.get("max_workers"), 16)
         self.setup_s3_client()
 
-        reporter = options.get("reporter")
+        reporter: str | None = options.get("reporter")
 
         if reporter:
+            reporter = reporter.replace(" ", "_").replace(".", "_")
             self.process_crosswalk(reporter)
         else:
             self.process_all_crosswalks()
@@ -109,39 +91,25 @@ class Command(BaseCommand):
         ThreadPoolExecutor to handle multiple files concurrently, with the default
         number of worker threads set to 4, and a maximum of 16.
 
-        A progress bar is displayed using 'tqdm' to provide real-time feedback on
-        the processing status of the crosswalk files. Errors encountered during
-        processing are logged for debugging purposes.
+        Errors encountered during processing are logged for debugging purposes.
 
         Raises:
             Exception: If an error occurs during the processing of a crosswalk file,
             it is caught and logged, but not re-raised.
         """
-        crosswalk_files = [
-            f for f in os.listdir(self.crosswalk_dir) if f.endswith(".json")
-        ]
+        crosswalk_files = list(Path(self.crosswalk_dir).glob("*.json"))
 
-        with tqdm(
-            total=len(crosswalk_files),
-            desc="Processing crosswalks",
-        ) as pbar:
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = []
-                for filename in crosswalk_files:
-                    reporter = filename[:-5]
-                    futures.append(
-                        executor.submit(self.process_crosswalk, reporter)
-                    )
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {
+                executor.submit(self.process_crosswalk, file.stem)
+                for file in crosswalk_files
+            }
 
-                for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        self.log(
-                            f"Error processing crosswalk: {str(e)}",
-                            logging.ERROR,
-                        )
-                    pbar.update(1)
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"Error processing crosswalk: {str(e)}")
 
     def process_crosswalk(self, reporter: str):
         """Process a single crosswalk file for the given reporter.
@@ -164,32 +132,26 @@ class Command(BaseCommand):
             with open(crosswalk_path, "r") as file:
                 crosswalk_data = json.load(file)
         except FileNotFoundError:
-            self.log(
-                f"Crosswalk file not found: {crosswalk_path}",
-                logging.ERROR,
-            )
+            logger.error(f"Crosswalk file not found: {crosswalk_path}")
             return
         except json.JSONDecodeError:
-            self.log(
-                f"Invalid JSON in crosswalk file: {crosswalk_path}",
-                logging.ERROR,
-            )
+            logger.error(f"Invalid JSON in crosswalk file: {crosswalk_path}")
             return
+
+        logger.info(f"Processing file: {crosswalk_path}")
 
         for entry in crosswalk_data:
             cap_path = entry["cap_path"]
             cl_cluster_id = entry["cl_cluster_id"]
 
-            self.log(f"Processing entry: {entry['cap_path']}", logging.DEBUG)
-            self.log(
-                f"Processing cluster {cl_cluster_id} with CAP path: {cap_path}",
-                logging.WARNING,
+            logger.info(
+                f"Processing cluster {cl_cluster_id} with CAP path: {cap_path}"
             )
 
             cap_html = self.fetch_cap_html(cap_path)
             result = self.fetch_cl_xml(cl_cluster_id)
 
-            if cap_html is not None and result is not None:
+            if cap_html and result:
                 cl_cluster, cl_xml_list = result
 
                 # Process the HTML content directly
@@ -207,14 +169,12 @@ class Command(BaseCommand):
 
                     self.update_cluster_headmatter(cl_cluster_id, soup)
                 else:
-                    self.log(
-                        f"No casebody found in CAP HTML for cluster {cl_cluster_id}",
-                        logging.WARNING,
+                    logger.warning(
+                        f"No casebody found in CAP HTML for cluster {cl_cluster_id}"
                     )
             else:
-                self.log(
-                    f"Failed to fetch either CAP HTML or CL XML for cluster {cl_cluster_id}",
-                    logging.WARNING,
+                logger.warning(
+                    f"Failed to fetch either CAP HTML or CL XML for cluster {cl_cluster_id}"
                 )
 
     def fetch_cap_html(self, cap_path: str) -> Optional[str]:
@@ -225,23 +185,25 @@ class Command(BaseCommand):
         :return: The fetched HTML content or None if an error occurred
         :rtype: Optional[str]
         """
+        full_s3_path = None
         try:
             # Remove leading slash if present and change extension to .html
-            cap_path = cap_path.lstrip("/")
-            html_path = cap_path.replace("cases", "html").replace(
-                ".json", ".html"
+            html_path = (
+                cap_path.lstrip("/")
+                .replace("cases", "html")
+                .replace(".json", ".html")
             )
             full_s3_path = f"s3://{self.bucket_name}/{html_path}"
-            self.log(f"Attempting to fetch: {full_s3_path}", logging.WARNING)
+            logger.debug(f"Attempting to fetch: {full_s3_path}")
 
             response = self.s3_client.get_object(
                 Bucket=self.bucket_name, Key=html_path
             )
             return response["Body"].read().decode("utf-8")
         except self.s3_client.exceptions.NoSuchKey:
-            self.log(f"File not found in S3: {full_s3_path}", logging.ERROR)
+            logger.error(f"File not found in S3: {full_s3_path}")
         except Exception as e:
-            self.log(f"Error fetching CAP HTML: {str(e)}", logging.ERROR)
+            logger.error(f"Error fetching CAP HTML: {str(e)}")
         return None
 
     def fetch_cl_xml(
@@ -266,22 +228,16 @@ class Command(BaseCommand):
                         "xml": opinion.xml_harvard,
                     }
                 )
-
-            self.log(
-                f"Successfully fetched XML for cluster {cluster_id} ({len(xml_data)} opinions)",
-                logging.INFO,
+            logger.info(
+                f"Successfully fetched XML for cluster {cluster_id} ({len(xml_data)} opinions)"
             )
             return cl_cluster, xml_data
         except OpinionCluster.DoesNotExist:
-            self.log(
-                f"OpinionCluster with id {cluster_id} does not exist",
-                logging.ERROR,
-            )
+            logger.error(f"OpinionCluster with id {cluster_id} does not exist")
             return None
         except Exception as e:
-            self.log(
-                f"Error fetching XML for cluster {cluster_id}: {str(e)}",
-                logging.ERROR,
+            logger.error(
+                f"Error fetching XML for cluster {cluster_id}: {str(e)}"
             )
             return None
 
@@ -433,12 +389,8 @@ class Command(BaseCommand):
                 matching_opinion.replace_with(new_opinion)
                 # Convert updated CAP HTML back to XML
                 updated_xml = self.convert_html_to_xml(str(new_opinion))
-
-                self.log(
-                    f"\nUpdated XML for opinion type {opinion_type}:",
-                    logging.DEBUG,
-                )
-                self.log(updated_xml, logging.DEBUG)
+                logger.debug(f"\nUpdated XML for opinion type {opinion_type}:")
+                logger.debug(updated_xml)
 
             else:
                 # No matching opinion in CAP HTML, use CL XML as-is
@@ -456,11 +408,11 @@ class Command(BaseCommand):
             )
 
         if changes_made:
-            self.log("\nChanges made:", logging.INFO)
+            logger.debug("\nChanges made:")
             for change in changes_made:
-                self.log(f"  - {change}", logging.INFO)
+                logger.debug(f"  - {change}")
         else:
-            self.log("\nNo changes were necessary.", logging.INFO)
+            logger.info("No changes were necessary.")
 
         return processed_opinions, changes_made
 
@@ -509,31 +461,17 @@ class Command(BaseCommand):
                 opinion = Opinion.objects.get(id=opinion_data["id"])
                 opinion.xml_harvard = opinion_data["xml"]
                 opinion.save()
-                self.log(
-                    f"Successfully updated XML for opinion {opinion.id} (type: {opinion_data['type']})",
-                    logging.INFO,
+                logger.info(
+                    f"Successfully updated XML for opinion {opinion.id} (type: {opinion_data['type']})"
                 )
             except Opinion.DoesNotExist:
-                self.log(
-                    f"Opinion with id {opinion_data['id']} does not exist",
-                    logging.ERROR,
+                logger.error(
+                    f"Opinion with id {opinion_data['id']} does not exist"
                 )
             except Exception as e:
-                self.log(
-                    f"Error updating XML for opinion {opinion_data['id']}: {str(e)}",
-                    logging.ERROR,
+                logger.error(
+                    f"Error updating XML for opinion {opinion_data['id']}: {str(e)}"
                 )
-
-    def log(self, message: str, level: int = logging.INFO):
-        """Log a message
-
-        :param message: The message to log
-        :type message: str
-        :param level: The logging level (e.g., logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL)
-        :type level: int
-        """
-        if level >= logging.WARNING or self.verbose:
-            self.logger.log(level, message)
 
     def update_cluster_headmatter(self, cluster_id: int, soup: BeautifulSoup):
         """Update the headmatter of an OpinionCluster with new data from CAP.
@@ -554,27 +492,18 @@ class Command(BaseCommand):
                 if cluster.headmatter != new_headmatter:
                     cluster.headmatter = new_headmatter
                     cluster.save()
-                    self.log(
-                        f"Updated headmatter for cluster {cluster_id}",
-                        logging.INFO,
-                    )
+                    logger.info(f"Updated headmatter for cluster {cluster_id}")
                 else:
-                    self.log(
-                        f"No change in headmatter for cluster {cluster_id}",
-                        logging.DEBUG,
+                    logger.debug(
+                        f"No change in headmatter for cluster {cluster_id}"
                     )
             else:
-                self.log(
-                    f"No head-matter section found in CAP data for cluster {cluster_id}",
-                    logging.WARNING,
+                logger.warning(
+                    f"No head-matter section found in CAP data for cluster {cluster_id}"
                 )
         except OpinionCluster.DoesNotExist:
-            self.log(
-                f"OpinionCluster with id {cluster_id} does not exist",
-                logging.ERROR,
-            )
+            logger.error(f"OpinionCluster with id {cluster_id} does not exist")
         except Exception as e:
-            self.log(
-                f"Error updating headmatter for cluster {cluster_id}: {str(e)}",
-                logging.ERROR,
+            logger.error(
+                f"Error updating headmatter for cluster {cluster_id}: {str(e)}"
             )

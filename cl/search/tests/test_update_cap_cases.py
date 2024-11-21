@@ -441,6 +441,9 @@ class UpdateCapCasesTest(TestCase):
 
         with patch("builtins.open", MagicMock()):
             with patch("json.load", return_value=crosswalk_content):
+                # Set self.crosswalk_dir to a test-specific value
+                self.command.crosswalk_dir = "/test/crosswalk"
+                # Call the method under test
                 self.command.process_crosswalk("test_reporter")
 
         mock_fetch_cap.assert_called_once_with("path/to/cap")
