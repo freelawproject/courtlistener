@@ -3015,6 +3015,7 @@ class OpinionCluster(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
 
+    @cached_property
     def ordered_opinions(self):
         # Fetch all sub-opinions ordered by ordering_key
         sub_opinions = self.sub_opinions.all().order_by("ordering_key")

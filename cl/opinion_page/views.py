@@ -939,7 +939,7 @@ async def setup_opinion_context(
     get_string = make_get_string(request)
 
     sub_opinion_pks = [
-       str(opinion.pk) async for opinion in cluster.sub_opinions.all()
+        str(opinion.pk) async for opinion in cluster.sub_opinions.all()
     ]
 
     es_has_cited_opinions = await es_cited_case_count(
@@ -1137,17 +1137,7 @@ async def view_opinion_authorities(
     """
     cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
 
-    authorities_context: AuthoritiesContext = AuthoritiesContext(
-        citation_record=cluster,
-        query_string=request.META["QUERY_STRING"],
-        total_authorities_count=await cluster.aauthority_count(),
-        view_all_url="view_authorities_url",
-        doc_type="opinion",
-    )
-    await authorities_context.post_init()
-
     additional_context = {
-        "authorities_context": authorities_context,
         "authorities_with_data": await cluster.aauthorities_with_data(),
     }
 
