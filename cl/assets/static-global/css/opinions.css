@@ -621,16 +621,6 @@ div.footnote:first-of-type {
     margin-left: 3em;
   }
 
-  a.page-label::after {
-    display: inline;
-    position: relative;
-    attr(label);
-    float: right;
-    font-size: 1em;
-    color: dimgray;
-    width: 0;
-  }
-
   div.counsel > a.page-label::after {
     right: -1.0em;
   }
