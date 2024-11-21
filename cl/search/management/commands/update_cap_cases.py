@@ -1,6 +1,5 @@
 import json
 import logging
-import multiprocessing
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple
@@ -28,8 +27,7 @@ class Command(BaseCommand):
         self.bucket_name = None
 
     def add_arguments(self, parser):
-        """
-        Add command line arguments to the parser.
+        """Add command line arguments to the parser.
 
         :param parser: The argument parser
         :type parser: argparse.ArgumentParser
@@ -59,8 +57,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        """
-        Handle the command execution.
+        """Handle the command execution.
 
         :param args: Additional arguments
         :param options: Command options
@@ -105,8 +102,7 @@ class Command(BaseCommand):
         self.bucket_name = settings.CAP_R2_BUCKET_NAME
 
     def process_all_crosswalks(self):
-        """
-        Process all crosswalk files in the specified directory concurrently.
+        """Process all crosswalk files in the specified directory concurrently.
 
         This function scans the 'crosswalk_dir' for all JSON files and processes
         each file using a thread pool to improve performance. It uses a
@@ -148,8 +144,7 @@ class Command(BaseCommand):
                     pbar.update(1)
 
     def process_crosswalk(self, reporter: str):
-        """
-        Process a single crosswalk file for the given reporter.
+        """Process a single crosswalk file for the given reporter.
 
         This function reads the crosswalk JSON file for the specified reporter,
         fetches the corresponding CAP HTML and CL XML data, and updates the CL
@@ -163,7 +158,7 @@ class Command(BaseCommand):
         CAP HTML or CL XML data cannot be fetched. Updates are logged at various
         levels of verbosity.
         """
-        crosswalk_path = f"cl/search/crosswalks/{reporter}.json"
+        crosswalk_path = os.path.join(self.crosswalk_dir, f"{reporter}.json")
 
         try:
             with open(crosswalk_path, "r") as file:
@@ -223,8 +218,7 @@ class Command(BaseCommand):
                 )
 
     def fetch_cap_html(self, cap_path: str) -> Optional[str]:
-        """
-        Fetch CAP HTML content from S3.
+        """Fetch CAP HTML content from S3.
 
         :param cap_path: The path to the CAP HTML file in S3
         :type cap_path: str
@@ -253,8 +247,7 @@ class Command(BaseCommand):
     def fetch_cl_xml(
         self, cluster_id: int
     ) -> Optional[Tuple[OpinionCluster, List[Dict[str, Any]]]]:
-        """
-        Fetch CL XML content for a given cluster ID.
+        """Fetch CL XML content for a given cluster ID.
 
         :param cluster_id: The ID of the opinion cluster
         :type cluster_id: int
@@ -263,10 +256,9 @@ class Command(BaseCommand):
         """
         try:
             cl_cluster = OpinionCluster.objects.get(id=cluster_id)
-            opinions = Opinion.objects.filter(cluster=cl_cluster)
 
             xml_data = []
-            for opinion in opinions:
+            for opinion in cl_cluster.sub_opinions.all():
                 xml_data.append(
                     {
                         "id": opinion.id,
@@ -293,11 +285,82 @@ class Command(BaseCommand):
             )
             return None
 
+    def rollback_pagination(self, soup: BeautifulSoup) -> BeautifulSoup:
+        """Rollback pagination changes to original xml structure
+
+        Convert <span> tags with class 'star-pagination' back to <page-number> tags
+        and remove the 'class' attribute. See fix_pagination() in harvard_merge.py
+
+        :param soup: The content to clean up
+        :return: soup
+        """
+        for span in soup.find_all("span", class_="star-pagination"):
+            span.name = "page-number"
+            # Remove the 'class' attribute
+            if "class" in span:
+                del span["class"]
+            # Restore the 'label' and 'citation-index' attributes (if present)
+            if "label" in span.attrs:
+                span["label"] = span["label"]
+            if "citation-index" in span.attrs:
+                span["citation-index"] = span["citation-index"]
+            # Restore the content without surrounding spaces or newlines
+            if span.string:
+                span.string = span.string.strip()
+        return soup
+
+    def rollback_footnotes(self, soup: BeautifulSoup) -> BeautifulSoup:
+        """Revert footnotes and footnotemarks to their original format
+
+        See fix_footnotes() in harvard_merge.py
+
+        :param soup: Bs4 object containing the modified footnotes
+        :return: Content reverted to original footnotes and footnotemarks
+        """
+        # Revert <a> elements with footnote class to <footnotemark>
+        for fn in soup.find_all("a", class_="footnote"):
+            fn.name = "footnotemark"
+            fn.string = fn.get(
+                "label", fn.get("id", "").lstrip("fn").rstrip("_ref")
+            )
+            for attr in ["href", "id", "class", "label"]:
+                if attr in fn.attrs:
+                    del fn[attr]
+
+        # Revert <div> elements with footnote class to <footnote>
+        for fnl in soup.find_all("div", class_="footnote"):
+            label = fnl["id"].lstrip("fn")
+            fnl.name = "footnote"
+            fnl["label"] = label
+            del fnl["id"], fnl["class"]
+
+            # Ensure only <p> tags remain as children
+            for child in fnl.contents:
+                if child.name == "a":  # Remove unnecessary <a> tags
+                    child.decompose()
+
+        # Remove the wrapping <div class="footnotes">
+        footnotes_div = soup.find("div", class_="footnotes")
+        if footnotes_div:
+            # Extract children (footnote divs) and append back to the correct parent
+            parent = soup.find("opinion") or soup.find("casebody")
+            if parent:
+                for child in footnotes_div.find_all("footnote"):
+                    parent.append(child.extract())
+            footnotes_div.decompose()
+
+        # Remove any empty <footnotemark> tags in footnotes
+        for footnote in soup.find_all("footnote"):
+            for empty_mark in footnote.find_all("footnotemark"):
+                if not empty_mark.get_text(strip=True):
+                    empty_mark.decompose()
+
+        return soup
+
     def update_cap_html_with_cl_xml(
         self, cap_html: str, cl_xml_list: List[Dict[str, str]]
     ) -> Tuple[List[Dict[str, str]], List[str]]:
-        """
-        Update CAP HTML content with CL XML information.
+        """Update CAP HTML content with CL XML information.
 
         :param cap_html: The CAP HTML content
         :type cap_html: str
@@ -312,6 +375,9 @@ class Command(BaseCommand):
 
         for cl_xml in cl_xml_list:
             cl_soup = BeautifulSoup(cl_xml["xml"], "xml")
+            # Revert xml to original
+            cl_soup = self.rollback_footnotes(cl_soup)
+            cl_soup = self.rollback_pagination(cl_soup)
             cl_opinion = cl_soup.find("opinion")
 
             if cl_opinion is None:
@@ -336,27 +402,34 @@ class Command(BaseCommand):
 
                 # Update all elements with matching IDs
                 for cl_elem in cl_opinion.find_all(True):  # Find all elements
-                    cap_elem = new_opinion.find(id=cl_elem.get("id"))
-                    if cap_elem:
-                        # Update tag name if different
-                        if cap_elem.name != cl_elem.name:
-                            changes_made.append(
-                                f"Updated element {cl_elem.get('id')} type from {cap_elem.name} to {cl_elem.name}"
-                            )
-                            new_elem = cap_soup.new_tag(
-                                cl_elem.name, id=cl_elem.get("id")
-                            )
-                            new_elem.attrs = cap_elem.attrs
-                            new_elem.extend(cap_elem.contents)
-                            cap_elem.replace_with(new_elem)
-
-                        # Update attributes
-                        for attr, value in cl_elem.attrs.items():
-                            if attr != "id" and cap_elem.get(attr) != value:
-                                cap_elem[attr] = value
+                    if cl_elem.get("id"):
+                        # We need to verify that the element has an id, when
+                        # find(id=None) it will return the first element that does not
+                        # have an id attribute at all
+                        cap_elem = new_opinion.find(id=cl_elem.get("id"))
+                        if cap_elem:
+                            # Update tag name if different
+                            if cap_elem.name != cl_elem.name:
                                 changes_made.append(
-                                    f"Updated attribute '{attr}' for element {cl_elem.get('id')}"
+                                    f"Updated element {cl_elem.get('id')} type from {cap_elem.name} to {cl_elem.name}"
                                 )
+                                new_elem = cap_soup.new_tag(
+                                    cl_elem.name, id=cl_elem.get("id")
+                                )
+                                new_elem.attrs = cap_elem.attrs
+                                new_elem.extend(cap_elem.contents)
+                                cap_elem.replace_with(new_elem)
+
+                            # Update attributes
+                            for attr, value in cl_elem.attrs.items():
+                                if (
+                                    attr != "id"
+                                    and cap_elem.get(attr) != value
+                                ):
+                                    cap_elem[attr] = value
+                                    changes_made.append(
+                                        f"Updated attribute '{attr}' for element {cl_elem.get('id')}"
+                                    )
                 matching_opinion.replace_with(new_opinion)
                 # Convert updated CAP HTML back to XML
                 updated_xml = self.convert_html_to_xml(str(new_opinion))
@@ -392,8 +465,7 @@ class Command(BaseCommand):
         return processed_opinions, changes_made
 
     def convert_html_to_xml(self, html_content: str) -> str:
-        """
-        Convert HTML content to XML format.
+        """Convert HTML content to XML format.
 
         This function parses the given HTML content and modifies the tag names
         and attributes based on the class names.
@@ -427,8 +499,7 @@ class Command(BaseCommand):
         return str(soup)
 
     def save_updated_xml(self, processed_opinions: List[Dict[str, str]]):
-        """
-        Save the updated XML for processed opinions.
+        """Save the updated XML for processed opinions.
 
         :param processed_opinions: A list of dictionaries containing processed opinion data
         :type processed_opinions: List[Dict[str, str]]
@@ -454,8 +525,7 @@ class Command(BaseCommand):
                 )
 
     def log(self, message: str, level: int = logging.INFO):
-        """
-        Log
+        """Log a message
 
         :param message: The message to log
         :type message: str
@@ -466,8 +536,7 @@ class Command(BaseCommand):
             self.logger.log(level, message)
 
     def update_cluster_headmatter(self, cluster_id: int, soup: BeautifulSoup):
-        """
-        Update the headmatter of an OpinionCluster with new data from CAP.
+        """Update the headmatter of an OpinionCluster with new data from CAP.
 
         :param cluster_id: The ID of the opinion cluster to update
         :type cluster_id: int
