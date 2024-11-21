@@ -40,7 +40,7 @@ from cl.search.types import ESCursor
 logger = logging.getLogger(__name__)
 
 
-def get_object_list(request, cd, paginator):
+def get_object_list(request, cd, paginator, es_flag_status):
     """Perform the Solr work"""
     # Set the offset value
     try:
@@ -56,21 +56,19 @@ def get_object_list(request, cd, paginator):
     if cd["type"] == SEARCH_TYPES.DOCKETS:
         group = True
 
-    is_oral_argument_active = cd[
-        "type"
-    ] == SEARCH_TYPES.ORAL_ARGUMENT and waffle.flag_is_active(
-        request, "oa-es-activate"
+    is_oral_argument_active = (
+        cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and es_flag_status
     )
-    is_people_active = cd[
-        "type"
-    ] == SEARCH_TYPES.PEOPLE and waffle.flag_is_active(request, "p-es-active")
-    is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION and (
-        waffle.flag_is_active(request, "o-es-search-api-active")
+    is_people_active = cd["type"] == SEARCH_TYPES.PEOPLE and es_flag_status
+    is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION and es_flag_status
+    is_recap_active = (
+        cd["type"]
+        in [
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+        ]
+        and es_flag_status
     )
-    is_recap_active = cd["type"] in [
-        SEARCH_TYPES.RECAP,
-        SEARCH_TYPES.DOCKETS,
-    ] and (waffle.flag_is_active(request, "r-es-search-api-active"))
 
     if is_oral_argument_active:
         search_query = AudioDocument.search()
