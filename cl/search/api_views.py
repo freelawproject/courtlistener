@@ -115,7 +115,14 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
-    ordering_fields = ("id", "date_created", "date_modified", "date_filed")
+    ordering_fields = (
+        "id",
+        "date_created",
+        "date_modified",
+        "date_filed",
+        "recap_sequence_number",
+        "entry_number",
+    )
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields

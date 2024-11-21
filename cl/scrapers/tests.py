@@ -17,8 +17,6 @@ from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
-from cl.donate.factories import DonationFactory
-from cl.donate.models import Donation
 from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
@@ -62,12 +60,6 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")
         cls.user_profile = UserProfileWithParentsFactory()
-        cls.donation = DonationFactory(
-            donor=cls.user_profile.user,
-            amount=20,
-            status=Donation.PROCESSED,
-            send_annual_reminder=True,
-        )
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
             event_type=WebhookEventType.SEARCH_ALERT,
