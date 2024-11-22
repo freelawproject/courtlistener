@@ -11,7 +11,7 @@ from cl.api.utils import generate_webhook_key_content
 from cl.api.webhooks import send_webhook_event
 from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
-from cl.lib.elasticsearch_utils import set_results_child_docs
+from cl.lib.elasticsearch_utils import set_child_docs_and_score
 from cl.search.api_serializers import (
     RECAPESWebhookResultSerializer,
     V3OAESResultSerializer,
@@ -152,7 +152,7 @@ def send_search_alert_webhook_es(
                 es_results, many=True
             ).data
         case SEARCH_TYPES.RECAP:
-            set_results_child_docs(results, merge_highlights=True)
+            set_child_docs_and_score(results, merge_highlights=True)
             serialized_results = RECAPESWebhookResultSerializer(
                 results, many=True
             ).data

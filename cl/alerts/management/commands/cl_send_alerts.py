@@ -26,7 +26,7 @@ from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.elasticsearch_utils import (
     do_es_api_query,
     limit_inner_hits,
-    set_results_child_docs,
+    set_child_docs_and_score,
     set_results_highlights,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -161,7 +161,7 @@ def query_alerts_es(
     results = responses[0]
     limit_inner_hits({}, results, cd["type"])
     set_results_highlights(results, cd["type"])
-    set_results_child_docs(results)
+    set_child_docs_and_score(results)
     if v1_webhook:
         v1_results = responses[1]
     return results, v1_results

@@ -663,6 +663,7 @@ class SearchAlertsAssertions:
         field_name,
         hl_expected,
         child_field,
+        nested_field="recap_documents",
     ):
         """Assert Hl in webhook fields."""
         for webhook in webhooks:
@@ -671,10 +672,10 @@ class SearchAlertsAssertions:
                 if child_field:
                     self.assertNotIn(
                         "score",
-                        hit["recap_documents"][0]["meta"],
+                        hit[nested_field][0]["meta"],
                         msg="score shouldn't be present on webhook nested documents",
                     )
-                    child_field_content = hit["recap_documents"][0][field_name]
+                    child_field_content = hit[nested_field][0][field_name]
                     self.assertIn(
                         hl_expected,
                         child_field_content,

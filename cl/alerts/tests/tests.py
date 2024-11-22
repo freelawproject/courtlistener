@@ -963,6 +963,24 @@ class SearchAlertsWebhooksTest(
             "opinions",
         )
 
+        # Assert HL content in V2 webhooks.
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            self.search_alert.name,
+            "caseName",
+            "<strong>California</strong> vs Lorem",
+            child_field=False,
+            nested_field="opinions",
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            self.search_alert.name,
+            "snippet",
+            "Lorem dolor <strong>california</strong> sit amet, consectetur adipiscing elit.",
+            child_field=True,
+            nested_field="opinions",
+        )
+
         # Assert V1 Opinion Search Alerts Webhook
         self._count_webhook_hits_and_child_hits(
             list(webhook_events),

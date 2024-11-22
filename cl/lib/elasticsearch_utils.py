@@ -3316,8 +3316,10 @@ def simplify_estimated_count(search_count: int) -> int:
     return search_count
 
 
-def set_results_child_docs(
-    results: list[Hit] | list[dict[str, Any]], merge_highlights: bool = False
+def set_child_docs_and_score(
+    results: list[Hit] | list[dict[str, Any]] | Response,
+    merge_highlights: bool = False,
+    merge_score: bool = False,
 ) -> None:
     """Process and attach child documents to the main search results.
 
@@ -3325,6 +3327,8 @@ def set_results_child_docs(
     or a list of dicts.
     :param merge_highlights: A boolean indicating whether to merge
     highlight data into the results.
+    :param merge_score: A boolean indicating whether to merge
+    the BM25 score into the results.
     :return: None. Results are modified in place.
     """
 
@@ -3349,3 +3353,7 @@ def set_results_child_docs(
         if merge_highlights and result_is_dict:
             meta_hl = result.get("meta", {}).get("highlight", {})
             merge_highlights_into_result(meta_hl, result)
+
+        # Optionally merges the BM25 score for display in the API.
+        if merge_score and isinstance(result, Response):
+            result["bm25_score"] = result.meta.score
