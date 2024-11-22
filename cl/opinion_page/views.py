@@ -10,7 +10,7 @@ from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib import messages
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import IntegerField, Prefetch
+from django.db.models import IntegerField, Prefetch, QuerySet
 from django.db.models.functions import Cast
 from django.http import HttpRequest, HttpResponseRedirect
 from django.http.response import (
@@ -994,8 +994,17 @@ async def setup_opinion_context(
     return context
 
 
+async def get_opinions_base_queryset() -> QuerySet:
+    return OpinionCluster.objects.prefetch_related(
+        "sub_opinions__opinions_cited", "citations"
+    ).select_related("docket__court")
+
+
 async def render_opinion_view(
-    request: HttpRequest, pk: int, tab: str, additional_context: dict = {}
+    request: HttpRequest,
+    cluster: OpinionCluster,
+    tab: str,
+    additional_context: dict = {},
 ) -> HttpResponse:
     """Helper function to render opinion views with common context.
 
@@ -1005,14 +1014,14 @@ async def render_opinion_view(
     :param additional_context: Any additional context to be passed to the view
     :return: HttpResponse
     """
-    queryset = OpinionCluster.objects.prefetch_related("sub_opinions")
-    cluster: OpinionCluster = await aget_object_or_404(queryset, pk=pk)
-
     ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o"
     )
     if not ui_flag_for_o:
         return await view_opinion_old(request, pk, "str")
+
+    if not any([ui_flag_for_o]):
+        return await view_opinion_old(request, cluster.pk, "str")
 
     context = await setup_opinion_context(cluster, request, tab=tab)
 
@@ -1107,9 +1116,13 @@ async def view_opinion(request: HttpRequest, pk: int, _: str) -> HttpResponse:
     ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o"
     )
-    if ui_flag_for_o:
-        return await render_opinion_view(request, pk, "opinions")
-    return await view_opinion_old(request, pk, "str")
+    if not ui_flag_for_o:
+        return await view_opinion_old(request, pk, "str")
+
+    cluster: OpinionCluster = await aget_object_or_404(
+        await get_opinions_base_queryset(), pk=pk
+    )
+    return await render_opinion_view(request, cluster, "opinions")
 
 
 async def view_opinion_pdf(
@@ -1122,7 +1135,10 @@ async def view_opinion_pdf(
     :param _: url slug
     :return: Opinion PDF tab
     """
-    return await render_opinion_view(request, pk, "pdf")
+    cluster: OpinionCluster = await aget_object_or_404(
+        await get_opinions_base_queryset(), pk=pk
+    )
+    return await render_opinion_view(request, cluster, "pdf")
 
 
 async def view_opinion_authorities(
@@ -1135,22 +1151,25 @@ async def view_opinion_authorities(
     :param _: url slug
     :return: Table of Authorities tab
     """
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
+        request, "ui_flag_for_o"
+    )
+    if not ui_flag_for_o:
+        # Old page to load for people outside the flag
+        return await view_authorities(
+            request=request, pk=pk, slug="authorities"
+        )
+
+    cluster: OpinionCluster = await aget_object_or_404(
+        await get_opinions_base_queryset(), pk=pk
+    )
 
     additional_context = {
         "authorities_with_data": await cluster.aauthorities_with_data(),
     }
-
-    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-        request, "ui_flag_for_o"
+    return await render_opinion_view(
+        request, cluster, "authorities", additional_context
     )
-    if ui_flag_for_o:
-        return await render_opinion_view(
-            request, pk, "authorities", additional_context
-        )
-
-    # Old page to load for people outside the flag
-    return await view_authorities(request=request, pk=pk, slug="authorities")
 
 
 async def view_opinion_cited_by(
@@ -1163,14 +1182,16 @@ async def view_opinion_cited_by(
     :param _: url slug
     :return: Cited By tab
     """
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cluster: OpinionCluster = await aget_object_or_404(
+        await get_opinions_base_queryset(), pk=pk
+    )
     cited_query = await es_get_cited_clusters_with_cache(cluster, request)
     additional_context = {
         "citing_clusters": cited_query.citing_clusters,
         "citing_cluster_count": cited_query.citing_cluster_count,
     }
     return await render_opinion_view(
-        request, pk, "cited-by", additional_context
+        request, cluster, "cited-by", additional_context
     )
 
 
@@ -1184,7 +1205,16 @@ async def view_opinion_summaries(
     :param _: url slug
     :return: Summaries tab
     """
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
+        request, "ui_flag_for_o"
+    )
+    if not ui_flag_for_o:
+        # Old page to load for people outside the flag
+        return await view_summaries(request=request, pk=pk, slug="summaries")
+
+    cluster: OpinionCluster = await aget_object_or_404(
+        await get_opinions_base_queryset(), pk=pk
+    )
     parenthetical_groups_qs = await get_or_create_parenthetical_groups(cluster)
     parenthetical_groups = [
         parenthetical_group
@@ -1210,7 +1240,7 @@ async def view_opinion_summaries(
         "ui_flag_for_o": ui_flag_for_o,
     }
     return await render_opinion_view(
-        request, pk, "summaries", additional_context
+        request, cluster, "summaries", additional_context
     )
 
 
@@ -1224,7 +1254,9 @@ async def view_opinion_related_cases(
     :param _: url slug
     :return: Related Cases tab
     """
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cluster: OpinionCluster = await aget_object_or_404(
+        await get_opinions_base_queryset(), pk=pk
+    )
     related_cluster_object = await es_get_related_clusters_with_cache(
         cluster, request
     )
@@ -1236,7 +1268,7 @@ async def view_opinion_related_cases(
         "queries_timeout": related_cluster_object.timeout,
     }
     return await render_opinion_view(
-        request, pk, "related-cases", additional_context
+        request, cluster, "related-cases", additional_context
     )
 
 
