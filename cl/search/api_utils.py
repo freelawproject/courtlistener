@@ -484,6 +484,8 @@ class CursorESList:
                         )
                     )
                 result["child_docs"] = child_result_objects
+            # Include the ES main document score as bm25_score.
+            result["bm25_score"] = result.meta.score
 
         if self.reverse:
             # If doing backward pagination, reverse the results of the current
