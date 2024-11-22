@@ -90,7 +90,9 @@ class VersionBasedPagination(PageNumberPagination):
 
         self.version = request.version
         self.request = request
-        self.is_count_request = request.query_params.get("count") == "on" and self.version == "v4"
+        self.is_count_request = (
+            request.query_params.get("count") == "on" and self.version == "v4"
+        )
 
         if self.is_count_request:
             self.count = queryset.count()
