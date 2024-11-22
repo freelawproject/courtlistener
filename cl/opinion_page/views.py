@@ -151,11 +151,11 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
 
         mutable_GET = request.GET.copy()
 
-        es_flag_for_oa = await sync_to_async(waffle.flag_is_active)(
-            request, "oa-es-active"
+        es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
+            request, "o-es-active"
         )
 
-        if not es_flag_for_oa:
+        if not es_flag_for_o:
             # Do solr search
             response = await sync_to_async(do_search)(
                 mutable_GET,
