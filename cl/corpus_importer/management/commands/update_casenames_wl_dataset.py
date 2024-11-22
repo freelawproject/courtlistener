@@ -5,11 +5,13 @@ from datetime import date, datetime
 
 import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django.db.models import Q, QuerySet
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
 
+from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.utils import add_citations_to_cluster
 from cl.search.models import Citation, OpinionCluster
 
@@ -127,25 +129,34 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
     for cite_str in citation_strings:
         # Get citations from the string
         found_cites = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
+        if not found_cites:
+            continue
+
+        citation = found_cites[0]
 
         # Ensure we have valid citations to process
-        for citation in found_cites:
-            if isinstance(citation, FullCaseCitation):
-                volume = citation.groups.get("volume")
+        if isinstance(citation, FullCaseCitation):
+            volume = citation.groups.get("volume")
 
-                # Validate the volume
-                if volume and volume.isdigit():
-                    # Append the validated citation as a dictionary
-                    validated_citations.append(
-                        {
-                            "volume": citation.groups["volume"],
-                            "reporter": citation.corrected_reporter(),
-                            "page": citation.groups["page"],
-                        }
-                    )
-                else:
-                    # If volume is invalid, skip this citation
-                    continue
+            # Validate the volume
+            if not volume or not volume.isdigit():
+                continue
+
+            if not citation.corrected_reporter():
+                reporter_type = Citation.STATE
+            else:
+                cite_type_str = citation.all_editions[0].reporter.cite_type
+                reporter_type = map_reporter_db_cite_type(cite_type_str)
+
+            # Append the validated citation as a dictionary
+            validated_citations.append(
+                {
+                    "volume": citation.groups["volume"],
+                    "reporter": citation.corrected_reporter(),
+                    "page": citation.groups["page"],
+                    "type": reporter_type,
+                }
+            )
 
     return validated_citations
 
@@ -305,28 +316,46 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
             # Dry run, don't save anything
             continue
 
-        # Update case names
-        cluster_updated, docket_updated = update_matched_case_name(
-            matches[0].cluster, west_case_name
-        )
+        with transaction.atomic():
+            matched_cluster = matches[0].cluster
 
-        if cluster_updated:
-            total_clusters_updated = +1
+            # Update case names
+            cluster_updated, docket_updated = update_matched_case_name(
+                matched_cluster, west_case_name
+            )
 
-        if docket_updated:
-            total_dockets_updated = +1
+            if cluster_updated:
+                total_clusters_updated = +1
 
-        # Add any of the citations if possible
-        add_citations_to_cluster(
-            [
-                f"{cite.get('volume')} {cite.get('reporter')} {cite.get('page')}"
-                for cite in valid_citations
-            ],
-            matches[0].cluster_id,
-        )
+            if docket_updated:
+                total_dockets_updated = +1
 
-        # Wait between each processed row to avoid sending to many indexing tasks
-        time.sleep(delay)
+            # Add any of the citations if possible
+            for citation in valid_citations:
+                if Citation.objects.filter(
+                    cluster_id=matched_cluster.id,
+                    reporter=citation.get("reporter"),
+                ).exists():
+                    # Avoid adding a citation if we already have a citation from the
+                    # citation's reporter.
+                    logger.info(
+                        f"Can't add: {citation.get('volume')} {citation.get('reporter')} {citation.get('page')} to cluster id: {matched_cluster.id}. There is already "
+                        f"a citation from that reporter."
+                    )
+                    continue
+                citation["cluster_id"] = matched_cluster.id
+                Citation.objects.get_or_create(**citation)
+
+            add_citations_to_cluster(
+                [
+                    f"{cite.get('volume')} {cite.get('reporter')} {cite.get('page')}"
+                    for cite in valid_citations
+                ],
+                matches[0].cluster_id,
+            )
+
+            # Wait between each processed row to avoid sending to many indexing tasks
+            time.sleep(delay)
 
     if not dry_run:
         logger.info(f"Clusters updated: {total_clusters_updated}")
