@@ -337,7 +337,7 @@
       <li>The response does not include any result data, which can improve performance for large datasets.</li>
     </ul>
     <p>In standard paginated responses, a <code>count</code> key is included with the URL to obtain the total count for your query:</p>
-    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cited_opinion=32239
+    <pre class="pre-scrollable">curl "{% get_full_host %}{% url "opinion-list" version="v4" %}?cited_opinion=32239"
 
 {
   "count": "https://www.courtlistener.com/api/rest/v4/opinions/?cited_opinion=32239&count=on",
