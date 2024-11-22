@@ -3216,18 +3216,20 @@ def do_es_sweep_alert_query(
     multi_search = multi_search.add(main_query)
     if parent_query:
         parent_search = search_query.query(parent_query)
+        # Ensure accurate tracking of total hit count for up to 10,001 query results
         parent_search = parent_search.extra(
-            from_=0, size=settings.SCHEDULED_ALERT_HITS_LIMIT
+            from_=0,
+            track_total_hits=settings.ELASTICSEARCH_MAX_RESULT_COUNT + 1,
         )
         parent_search = parent_search.source(includes=["docket_id"])
         multi_search = multi_search.add(parent_search)
 
     if child_query:
         child_search = child_search_query.query(child_query)
+        # Ensure accurate tracking of total hit count for up to 10,001 query results
         child_search = child_search.extra(
             from_=0,
-            size=settings.SCHEDULED_ALERT_HITS_LIMIT
-            * settings.RECAP_CHILD_HITS_PER_RESULT,
+            track_total_hits=settings.ELASTICSEARCH_MAX_RESULT_COUNT + 1,
         )
         child_search = child_search.source(includes=["id"])
         multi_search = multi_search.add(child_search)
@@ -3241,15 +3243,45 @@ def do_es_sweep_alert_query(
     if child_query:
         rd_results = responses[2]
 
+    # Re-run parent query to fetch potentially missed docket IDs due to large
+    # result sets.
+    should_repeat_parent_query = (
+        docket_results
+        and docket_results.hits.total.value
+        >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
+    )
+    if should_repeat_parent_query:
+        docket_ids = [int(d.docket_id) for d in main_results]
+        # Adds extra filter to refine results.
+        parent_query.filter.append(Q("terms", docket_id=docket_ids))
+        parent_search = search_query.query(parent_query)
+        parent_search = parent_search.source(includes=["docket_id"])
+        docket_results = parent_search.execute()
+
     limit_inner_hits({}, main_results, cd["type"])
     set_results_highlights(main_results, cd["type"])
 
-    for result in main_results:
-        child_result_objects = []
-        if hasattr(result, "child_docs"):
-            for child_doc in result.child_docs:
-                child_result_objects.append(child_doc.to_dict())
-            result["child_docs"] = child_result_objects
+    # This block addresses a potential issue where the initial child query
+    # might not return all expected results, especially when the result set is
+    # large. To ensure complete data retrieval, it extracts child document IDs
+    # from the main results and refines the child query filter with these IDs.
+    # Finally, it re-executes the child search.
+    should_repeat_child_query = (
+        rd_results
+        and rd_results.hits.total.value
+        >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
+    )
+    if should_repeat_child_query:
+        rd_ids = [
+            int(rd["_source"]["id"])
+            for docket in main_results
+            if hasattr(docket, "child_docs")
+            for rd in docket.child_docs
+        ]
+        child_query.filter.append(Q("terms", id=rd_ids))
+        child_search = child_search_query.query(child_query)
+        child_search = child_search.source(includes=["id"])
+        rd_results = child_search.execute()
 
     return main_results, docket_results, rd_results
 
