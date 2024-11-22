@@ -280,6 +280,50 @@ class UserDataTest(LiveServerTestCase):
         )
         self.assertRedirects(r, "/")
 
+    async def test_registration_rejects_malicious_first_name_input(
+        self,
+    ) -> None:
+        tests = (
+            # Invalid
+            ("evil.com", False),
+            ("http://test", False),
+            ("email@test.test", False),
+            ("/test/", False),
+            # Valid
+            ("My fullname", True),
+            ("Test Test", True),
+            ("Éric Terrien-Pascal", True),
+            ("Tel'c", True),
+        )
+        for first_name, is_valid in tests:
+            with self.subTest(
+                f"Trying to register using {first_name} as first name.",
+                first_name=first_name,
+                is_valid=is_valid,
+            ):
+                r = await self.async_client.post(
+                    reverse("register"),
+                    {
+                        "username": "aamon",
+                        "email": "user@free.law",
+                        "password1": "a",
+                        "password2": "a",
+                        "first_name": first_name,
+                        "last_name": "Marquis of Hell",
+                        "skip_me_if_alive": "",
+                    },
+                )
+                if not is_valid:
+                    self.assertIn(
+                        "First name must not contain any special characters.",
+                        r.content.decode(),
+                    )
+                else:
+                    self.assertNotIn(
+                        "First name must not contain any special characters.",
+                        r.content.decode(),
+                    )
+
     async def test_confirming_an_email_address(self) -> None:
         """Tests whether we can confirm the case where an email is associated
         with a single account.
