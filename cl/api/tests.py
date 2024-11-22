@@ -2614,7 +2614,7 @@ class CountParameterTests(TestCase):
         self.assertEqual(list(response.data.keys()), ["count"])
         self.assertIsInstance(response.data["count"], int)
         # The count should match the total number of dockets
-        expected_count = await sync_to_async(Docket.objects.count)()
+        expected_count = await Docket.objects.acount()
         self.assertEqual(response.data["count"], expected_count)
 
     async def test_standard_response_includes_count_url(self):
