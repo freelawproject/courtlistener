@@ -2631,12 +2631,6 @@ class CountParameterTests(TestCase):
 
         cls.url = reverse("docket-list", kwargs={"version": "v4"})
 
-        for i in range(10):
-            DocketFactory(
-                court=cls.court_canb,
-                source=Docket.HARVARD,
-                pacer_case_id=str(i),
-            )
         for i in range(7):
             DocketFactory(
                 court=cls.court_canb,
