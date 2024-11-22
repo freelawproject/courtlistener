@@ -3289,33 +3289,23 @@ def set_results_child_docs(
     """
 
     for result in results:
-        child_result_objects = []
-        child_docs = None
-
-        # Get child_docs based on result type
-        if isinstance(result, dict):
-            child_docs = result.get("child_docs")
-        elif hasattr(result, "child_docs"):
-            child_docs = result.child_docs
-
-        # Process child documents if they exist
-        if child_docs:
-            for child_doc in child_docs:
-                if isinstance(result, dict):
-                    child_result_objects.append(child_doc)
-                else:
-                    child_result_objects.append(
-                        defaultdict(
-                            lambda: None,
-                            child_doc["_source"].to_dict(),
-                        )
-                    )
-
-        # Set processed child docs back to result
-        result["child_docs"] = child_result_objects
+        result_is_dict = isinstance(result, dict)
+        if result_is_dict:
+            # If the result is a dictionary, do nothing, or assign [] to
+            # child_docs if it is not present.
+            child_docs = result.get("child_docs", [])
+            result["child_docs"] = child_docs
+        else:
+            # Process child hits if the result is an ES AttrDict instance,
+            # so they can be properly serialized.
+            child_docs = getattr(result, "child_docs", [])
+            result["child_docs"] = [
+                defaultdict(lambda: None, doc["_source"].to_dict())
+                for doc in child_docs
+            ]
 
         # Optionally merges highlights. Used for integrating percolator
         # highlights into the percolated document.
-        if merge_highlights and isinstance(result, dict):
+        if merge_highlights and result_is_dict:
             meta_hl = result.get("meta", {}).get("highlight", {})
             merge_highlights_into_result(meta_hl, result)
