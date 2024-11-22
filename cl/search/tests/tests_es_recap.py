@@ -5459,6 +5459,7 @@ class IndexDocketRECAPDocumentsCommandTest(
             docket_entry=self.de,
             document_number="1",
             attachment_number=2,
+            document_type=RECAPDocument.ATTACHMENT,
         )
         self.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(

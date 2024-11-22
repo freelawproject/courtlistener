@@ -262,11 +262,20 @@ class V4SearchAPIAssertions(SimpleTestCase):
         meta_expected_value = await sync_to_async(get_meta_expected_value)(
             content_to_compare
         )
-        self.assertEqual(
-            meta_value,
-            meta_expected_value,
-            f"The field '{meta_field}' does not match.",
-        )
+        if meta_field == "score":
+            # Special case for the score field. Only confirm the presence of
+            # keys and avoid comparing values, as they differ in each response.
+            self.assertEqual(
+                set(meta_value.keys()),
+                set(meta_expected_value.keys()),
+                f"The keys in field '{meta_field}' do not match.",
+            )
+        else:
+            self.assertEqual(
+                meta_value,
+                meta_expected_value,
+                f"The field '{meta_field}' does not match.",
+            )
 
     async def _test_api_fields_content(
         self,
@@ -296,6 +305,10 @@ class V4SearchAPIAssertions(SimpleTestCase):
                                     meta_value,
                                 ) in child_value.items():
                                     with self.subTest(meta_field=meta_field):
+                                        self.assertFalse(
+                                            meta_field == "score",
+                                            msg="score key should not be present in nested documents",
+                                        )
                                         await self._compare_field(
                                             meta_field,
                                             meta_value,
@@ -656,6 +669,11 @@ class SearchAlertsAssertions:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 hit = webhook["payload"]["results"][0]
                 if child_field:
+                    self.assertNotIn(
+                        "score",
+                        hit["recap_documents"][0]["meta"],
+                        msg="score shouldn't be present on webhook nested documents",
+                    )
                     child_field_content = hit["recap_documents"][0][field_name]
                     self.assertIn(
                         hl_expected,
@@ -664,6 +682,11 @@ class SearchAlertsAssertions:
                         % field_name,
                     )
                 else:
+                    self.assertNotIn(
+                        "score",
+                        hit["meta"],
+                        msg="score shouldn't be present on webhook main document",
+                    )
                     parent_field_content = hit[field_name]
                     self.assertIn(
                         hl_expected,
