@@ -55,7 +55,6 @@ info_tips = (
     % reverse("alert_help"),
     'There is an <a href="%s">RSS feed</a> for every query so you can easily stay up to date.'
     % reverse("feeds_info"),
-    'Search relevancy on CourtListener is <a href="https://free.law/2013/11/12/citegeist/">highly tuned and is powered by the citation network between cases</a>.',
     'You can make sophisticated queries using a number of <a href="%s">advanced search features</a>.'
     % reverse("advanced_search"),
     'You can get an alert whenever an opinion is cited by <a href="https://free.law/2020/02/20/citation-alerts/">using a Citation Search</a>.',
