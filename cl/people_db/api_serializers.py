@@ -275,7 +275,17 @@ class PartySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
 
 
 class AttorneySerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
-    parties_represented = PartyRoleSerializer(source="roles", many=True)
+    parties_represented = serializers.SerializerMethodField()
+
+    def get_parties_represented(self, obj: Attorney):
+        if hasattr(obj, "filtered_roles"):
+            data = obj.filtered_roles
+        else:
+            data = obj.roles
+
+        return PartyRoleSerializer(
+            data, many=True, context={"request": self.context["request"]}
+        ).data
 
     class Meta:
         model = Attorney
