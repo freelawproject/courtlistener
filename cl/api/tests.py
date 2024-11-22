@@ -320,6 +320,57 @@ class ApiQueryCountTests(TransactionTestCase):
         r = self.client.get(path, {"pacer_doc_id__in": "17711118263,asdf"})
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
+    def test_count_on_query_counts(self, mock_logging_prefix) -> None:
+        """
+        Check that a v4 API request with param `count=on` only performs
+        2 queries to the database: one to check the authenticated user,
+        and another to select the count.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            path = reverse("docket-list", kwargs={"version": "v4"})
+            params = {"count": "on"}
+            self.client.get(path, params)
+
+        self.assertEqual(
+            len(ctx.captured_queries),
+            2,
+            msg=f"{len(ctx.captured_queries)} queries executed, 2 expected",
+        )
+
+        executed_queries = [query["sql"] for query in ctx.captured_queries]
+        expected_queries = [
+            'FROM "auth_user" WHERE "auth_user"."id" =',
+            'SELECT COUNT(*) AS "__count"',
+        ]
+        for executed_query, expected_fragment in zip(
+            executed_queries, expected_queries
+        ):
+            self.assertIn(
+                expected_fragment,
+                executed_query,
+                msg=f"Expected query fragment not found: {expected_fragment}",
+            )
+
+    def test_standard_request_no_count_query(
+        self, mock_logging_prefix
+    ) -> None:
+        """
+        Check that a v4 API request without param `count=on` doesn't perform
+        a count query.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            path = reverse("docket-list", kwargs={"version": "v4"})
+            no_count_params = {}
+            self.client.get(path, no_count_params)
+
+        executed_queries = [query["sql"] for query in ctx.captured_queries]
+        for sql in executed_queries:
+            self.assertNotIn(
+                'SELECT COUNT(*) AS "__count"',
+                sql,
+                msg="Unexpected COUNT query found in standard request.",
+            )
+
 
 class ApiEventCreationTestCase(TestCase):
     """Check that events are created properly."""
