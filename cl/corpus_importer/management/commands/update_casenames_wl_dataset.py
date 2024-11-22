@@ -41,7 +41,14 @@ FALSE_POSITIVES = {
     "for",
 }
 
-DATE_FORMATS = ("%B %d, %Y", "%d-%b-%y", "%m/%d/%Y", "%m/%d/%y", "%b. %d, %Y")
+DATE_FORMATS = (
+    "%B %d, %Y",
+    "%d-%b-%y",
+    "%m/%d/%Y",
+    "%m/%d/%y",
+    "%b. %d, %Y",
+    "%Y-%m-%d",
+)
 
 
 def tokenize_case_name(case_name: str) -> set[str]:
@@ -105,6 +112,7 @@ def parse_date(date_str: str) -> date | None:
     12/1/1960
     26-Sep-00
     Feb. 28, 2001
+    2007-01-24
 
     :param date_str: date string
     :return: date object or none
