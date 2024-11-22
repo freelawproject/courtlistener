@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -21,6 +22,7 @@ class Command(VerboseCommand):
         self.bucket_name = None
         self.crosswalk_dir = None
         self.max_workers = None
+        self.delay = None
 
     def add_arguments(self, parser):
         """Add command line arguments to the parser.
@@ -46,6 +48,13 @@ class Command(VerboseCommand):
             help="Maximum number of worker threads (default: 4, max: 16)",
             default=4,
         )
+        parser.add_argument(
+            "--delay",
+            type=float,
+            default=1.0,
+            help="How long to wait between opinions update (in seconds, allows floating "
+            "numbers).",
+        )
 
     def handle(self, *args, **options):
         """Handle the command execution.
@@ -56,6 +65,8 @@ class Command(VerboseCommand):
         """
         self.crosswalk_dir = options.get("crosswalk_dir")
         self.max_workers = min(options.get("max_workers"), 16)
+        self.delay = options.get("delay")
+
         self.setup_s3_client()
 
         reporter: str | None = options.get("reporter")
@@ -464,6 +475,9 @@ class Command(VerboseCommand):
                 logger.info(
                     f"Successfully updated XML for opinion {opinion.id} (type: {opinion_data['type']})"
                 )
+                # xml_harvard is being indexed by ES, wait between each updated opinion
+                # to avoid sending to many indexing tasks
+                time.sleep(self.delay)
             except Opinion.DoesNotExist:
                 logger.error(
                     f"Opinion with id {opinion_data['id']} does not exist"
