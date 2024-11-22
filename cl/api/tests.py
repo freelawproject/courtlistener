@@ -64,7 +64,12 @@ from cl.people_db.api_views import (
     SchoolViewSet,
     SourceViewSet,
 )
-from cl.people_db.factories import PartyFactory, PartyTypeFactory
+from cl.people_db.factories import (
+    AttorneyFactory,
+    AttorneyOrganizationFactory,
+    PartyFactory,
+    PartyTypeFactory,
+)
 from cl.people_db.models import Attorney
 from cl.recap.factories import ProcessingQueueFactory
 from cl.recap.views import (
@@ -846,10 +851,7 @@ class DRFJudgeApiFilterTests(
 
 
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
-    fixtures = [
-        "recap_docs.json",
-        "attorney_party.json",
-    ]
+    fixtures = ["recap_docs.json"]
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -860,6 +862,40 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         )
         ps = Permission.objects.filter(codename="has_recap_api_access")
         up.user.user_permissions.add(*ps)
+
+        cls.docket = Docket.objects.get(pk=1)
+        cls.docket_2 = DocketFactory()
+        firm = AttorneyOrganizationFactory(
+            name="Lawyers LLP", lookup_key="6201in816"
+        )
+        cls.attorney = AttorneyFactory(
+            name="Juneau",
+            contact_raw="Juneau\r\nAlaska",
+            phone="555-555-5555",
+            fax="555-555-5555",
+            email="j@me.com",
+            date_created="2017-04-25T23:52:43.497Z",
+            date_modified="2017-04-25T23:52:43.497Z",
+            organizations=[firm],
+            docket=cls.docket,
+        )
+        cls.attorney_2 = AttorneyFactory(
+            organizations=[firm], docket=cls.docket_2
+        )
+        cls.party = PartyFactory(
+            name="Honker",
+            extra_info="",
+            docket=cls.docket,
+            attorneys=[cls.attorney],
+            date_created="2017-04-25T23:53:11.745Z",
+            date_modified="2017-04-25T23:53:11.745Z",
+        )
+        PartyTypeFactory.create(
+            party=cls.party,
+            name="Defendant",
+            extra_info="Klaxon",
+            docket=cls.docket,
+        )
 
     @async_to_sync
     async def setUp(self) -> None:
@@ -951,19 +987,19 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
     async def test_attorney_filters(self) -> None:
         self.path = reverse("attorney-list", kwargs={"version": "v3"})
 
-        self.q["id"] = 1
+        self.q["id"] = self.attorney.pk
         await self.assertCountInResults(1)
-        self.q["id"] = 2
+        self.q["id"] = self.attorney_2.pk
+        await self.assertCountInResults(1)
+
+        self.q = {"docket__id": self.docket.pk}
+        await self.assertCountInResults(1)
+        self.q = {"docket__id": self.docket_2.pk}
         await self.assertCountInResults(0)
 
-        self.q = {"docket__id": 1}
+        self.q = {"parties_represented__id": self.party.pk}
         await self.assertCountInResults(1)
-        self.q = {"docket__id": 2}
-        await self.assertCountInResults(0)
-
-        self.q = {"parties_represented__id": 1}
-        await self.assertCountInResults(1)
-        self.q = {"parties_represented__id": 2}
+        self.q = {"parties_represented__id": 9999}
         await self.assertCountInResults(0)
         self.q = {"parties_represented__name__contains": "Honker"}
         await self.assertCountInResults(1)
@@ -988,21 +1024,21 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
     async def test_party_filters(self) -> None:
         self.path = reverse("party-list", kwargs={"version": "v3"})
 
-        self.q["id"] = 1
+        self.q["id"] = self.party.pk
         await self.assertCountInResults(1)
-        self.q["id"] = 2
+        self.q["id"] = 999_999
         await self.assertCountInResults(0)
 
         # This represents dockets that the party was a part of.
-        self.q = {"docket__id": 1}
+        self.q = {"docket__id": self.docket.id}
         await self.assertCountInResults(1)
-        self.q = {"docket__id": 2}
+        self.q = {"docket__id": 999_999}
         await self.assertCountInResults(0)
 
         # Contrasted with this, which joins based on their attorney.
-        self.q = {"attorney__docket__id": 1}
+        self.q = {"attorney__docket__id": self.docket.pk}
         await self.assertCountInResults(1)
-        self.q = {"attorney__docket__id": 2}
+        self.q = {"attorney__docket__id": 999_999}
         await self.assertCountInResults(0)
 
         self.q = {"name": "Honker"}
