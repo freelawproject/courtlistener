@@ -2989,7 +2989,13 @@ class OpinionCluster(AbstractDateTimeModel):
         The returned list is sorted by that citation count field.
         """
         authorities_with_data = []
-        async for authority in await self.aauthorities():
+        authorities_base = await self.aauthorities()
+        authorities_qs = (
+            authorities_base.prefetch_related("citations")
+            .select_related("docket__court")
+            .order_by("-citation_count", "-date_filed")
+        )
+        async for authority in authorities_qs:
             authority.citation_depth = (
                 await get_citation_depth_between_clusters(
                     citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
