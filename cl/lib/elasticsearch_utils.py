@@ -3355,5 +3355,5 @@ def set_child_docs_and_score(
             merge_highlights_into_result(meta_hl, result)
 
         # Optionally merges the BM25 score for display in the API.
-        if merge_score and isinstance(result, Response):
+        if merge_score and isinstance(result, AttrDict):
             result["bm25_score"] = result.meta.score

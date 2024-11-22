@@ -270,6 +270,11 @@ class V4SearchAPIAssertions(SimpleTestCase):
                 set(meta_expected_value.keys()),
                 f"The keys in field '{meta_field}' do not match.",
             )
+            for score_value in meta_value.values():
+                self.assertIsNotNone(
+                    score_value, f"The score value can't be None."
+                )
+
         else:
             self.assertEqual(
                 meta_value,
