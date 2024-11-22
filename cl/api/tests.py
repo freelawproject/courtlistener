@@ -360,8 +360,7 @@ class ApiQueryCountTests(TransactionTestCase):
         """
         with CaptureQueriesContext(connection) as ctx:
             path = reverse("docket-list", kwargs={"version": "v4"})
-            no_count_params = {}
-            self.client.get(path, no_count_params)
+            self.client.get(path)
 
         executed_queries = [query["sql"] for query in ctx.captured_queries]
         for sql in executed_queries:
