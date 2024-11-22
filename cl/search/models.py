@@ -2799,9 +2799,8 @@ class OpinionCluster(AbstractDateTimeModel):
             else:
                 caption += f", {citations[0]}"
 
-        cluster = await OpinionCluster.objects.aget(pk=self.pk)
-        docket = await Docket.objects.aget(id=cluster.docket_id)
-        court = await Court.objects.aget(pk=docket.court_id)
+        docket = await sync_to_async(lambda: self.docket)()
+        court = await sync_to_async(lambda: docket.court)()
         if docket.court_id != "scotus":
             court = re.sub(" ", "&nbsp;", court.citation_string)
             # Strftime fails before 1900. Do it this way instead.
