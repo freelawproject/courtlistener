@@ -17,6 +17,7 @@ from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
+from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
@@ -48,7 +49,7 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import Citation, Court, Docket, Opinion
+from cl.search.models import SOURCES, Citation, Court, Docket, Opinion
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
@@ -881,6 +882,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="12"),
                 date_filed=date(2020, 6, 1),
                 precedential_status="Published",
+                source=SOURCES.COURT_M_HARVARD,
             ),
             plain_text="""Docket Number: 2020-12
             Disposition: Affirmed
@@ -891,6 +893,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="13"),
                 date_filed=date(2020, 7, 1),
                 precedential_status="Unpublished",
+                source=SOURCES.COURT_WEBSITE,
             ),
             plain_text="Docket Number: 2020-13\nDisposition: Affirmed",
         )
@@ -900,6 +903,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=self.docket_sc,
                 date_filed=date(2021, 6, 1),
                 precedential_status="Published",
+                source=SOURCES.COURT_WEBSITE,
             ),
             plain_text="Some text with no matches",
             id=101,
@@ -910,6 +914,7 @@ class UpdateFromTextCommandTest(TestCase):
                 docket=DocketFactory(court=self.vt, docket_number="13"),
                 date_filed=date(2022, 6, 1),
                 precedential_status="Unpublished",
+                source=SOURCES.COURT_WEBSITE,
             ),
             id=100,
             plain_text="Docket Number: 2022-13\n2022 VT 11",
@@ -999,4 +1004,30 @@ class UpdateFromTextCommandTest(TestCase):
         self.assertTrue(
             scraped_citation_object_is_valid(valid_citation),
             "Citation object should be marked as valid",
+        )
+
+
+class CommandInputTest(TestCase):
+    def test_get_module_by_court_id(self):
+        """Test if get_module_by_court_id helper is working properly"""
+        try:
+            get_module_by_court_id("lactapp", "opinions")
+            self.fail("Court id matches more than 1 Site object, should fail")
+        except ValueError:
+            pass
+
+        try:
+            get_module_by_court_id("ca1", "something")
+            self.fail("Invalid module type, should fail")
+        except ValueError:
+            pass
+
+        # same court, different type
+        self.assertEqual(
+            "juriscraper.opinions.united_states.federal_appellate.ca1",
+            get_module_by_court_id("ca1", "opinions"),
+        )
+        self.assertEqual(
+            "juriscraper.oral_args.united_states.federal_appellate.ca1",
+            get_module_by_court_id("ca1", "oral_args"),
         )

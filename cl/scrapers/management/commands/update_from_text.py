@@ -169,6 +169,7 @@ class Command(ScraperCommand):
             "docket__court_id": court_id,
             "date_filed__gte": options["date_filed_gte"],
             "date_filed__lte": options["date_filed_lte"],
+            "source__contains": "C",
         }
 
         if options["cluster_status"]:

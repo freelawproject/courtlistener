@@ -48,7 +48,7 @@ def get_scraper_object_by_name(court_id: str, juriscraper_module: str = ""):
                 continue
 
 
-def get_module_by_court_id(court_id: str, module_type: str):
+def get_module_by_court_id(court_id: str, module_type: str) -> str:
     """Given a `court_id` return a juriscraper module path
 
     Some court_ids match multiple scraper files. These will force the user
