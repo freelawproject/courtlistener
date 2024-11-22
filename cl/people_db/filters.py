@@ -288,12 +288,10 @@ class PartyFilter(NoEmptyFilterSet):
                 continue
 
             cleaned_key = filter_key
-            # Add "party" prefix for fields in Meta class without lookup separator
-            if (
-                LOOKUP_SEP not in filter_key
-                and filter_key in self._meta.fields
-            ):
-                cleaned_key = f"party{LOOKUP_SEP}{filter_key}"
+            # Add "party" prefix for fields in Meta class
+            for basic_field, _ in self._meta.fields.items():
+                if cleaned_key.startswith(basic_field):
+                    cleaned_key = f"party{LOOKUP_SEP}{filter_key}"
 
             # Adjust specific lookups for prefetch query compatibility
             #
@@ -331,6 +329,9 @@ class AttorneyFilter(NoEmptyFilterSet):
         queryset=Party.objects.all(),
         distinct=True,
     )
+    filter_nested_results = filters.BooleanFilter(
+        field_name="roles", method="filter_roles"
+    )
 
     class Meta:
         model = Attorney
@@ -340,3 +341,47 @@ class AttorneyFilter(NoEmptyFilterSet):
             "date_modified": DATETIME_LOOKUPS,
             "name": ALL_TEXT_LOOKUPS,
         }
+
+    def filter_roles(self, qs, name, value):
+        if not value:
+            return qs
+
+        role_filters = {}
+        for filter_key, value in self.data.items():
+            # Skip custom filtering options triggered by the user
+            if filter_key.startswith("filter_nested_results"):
+                continue
+
+            cleaned_key = filter_key
+            # Add "party" prefix for fields in Meta class without lookup separator
+            # Add "party" prefix for fields in Meta class
+            for basic_field, _ in self._meta.fields.items():
+                if cleaned_key.startswith(basic_field):
+                    cleaned_key = f"attorney{LOOKUP_SEP}{filter_key}"
+
+            # Adjust specific lookups for prefetch query compatibility
+            #
+            # The `PartyFilter` class is designed to work with the `roles`
+            # table. However, the `parties_represented`, `parties_represented__docket`
+            # and `parties_represented__attorney` lookups reference the `party`,
+            # `docket` and `attorney` fields, respectively.
+            #
+            # To ensure correct filtering, we need to modify these lookups to
+            # reference the appropriate table and field names.
+            cleaned_key = cleaned_key.replace(
+                "parties_represented__docket", "docket", 1
+            )
+            cleaned_key = cleaned_key.replace(
+                "parties_represented__attorney", "attorney", 1
+            )
+            cleaned_key = cleaned_key.replace(
+                "parties_represented", "party", 1
+            )
+            role_filters[cleaned_key] = value
+
+        prefetch = Prefetch(
+            name,
+            queryset=Role.objects.filter(**role_filters),
+            to_attr=f"filtered_{name}",
+        )
+        return qs.prefetch_related(prefetch)
