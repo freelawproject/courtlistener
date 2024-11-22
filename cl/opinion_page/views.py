@@ -1017,8 +1017,6 @@ async def render_opinion_view(
     ui_flag_for_o = await sync_to_async(waffle.flag_is_active)(
         request, "ui_flag_for_o"
     )
-    if not ui_flag_for_o:
-        return await view_opinion_old(request, pk, "str")
 
     if not any([ui_flag_for_o]):
         return await view_opinion_old(request, cluster.pk, "str")
