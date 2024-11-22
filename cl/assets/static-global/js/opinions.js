@@ -250,7 +250,6 @@ $(document).ready(function () {
 // Update sidebar to show where we are on the page
 document.addEventListener('scroll', function () {
   let sections = document.querySelectorAll('.jump-link');
-  let links = document.querySelectorAll('.jump-links > a');
   let currentSection = '';
 
   // Determine which section is currently in view
@@ -261,8 +260,9 @@ document.addEventListener('scroll', function () {
       currentSection = section.getAttribute('id');
     }
   });
-
-  // Remove the active class from all links and their parent elements
+  if (!currentSection) currentSection = 'top';
+  // Remove the active class from links and their parent elements
+  let links = document.querySelectorAll('.jump-links > a.active');
   links.forEach((link) => {
     link.classList.remove('active');
     if (link.parentElement) {
@@ -271,12 +271,11 @@ document.addEventListener('scroll', function () {
   });
 
   // Add the active class to the link and its parent that corresponds to the current section
-  links.forEach((link) => {
-    if (link.getAttribute('href') === `#${currentSection}`) {
-      link.classList.add('active');
-      if (link.parentElement) {
-        link.parentElement.classList.add('active');
-      }
-    }
-  });
+  let activeLink = document.getElementById(`nav_${currentSection}`);
+  if (!activeLink) return;
+
+  activeLink.classList.add('active');
+  if (activeLink.parentElement) {
+    activeLink.parentElement.classList.add('active');
+  }
 });

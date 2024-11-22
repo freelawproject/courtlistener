@@ -330,7 +330,6 @@ async def es_get_related_clusters_with_cache(
     )
     related_cluster_result.timeout = False
     related_cluster_result.sub_opinion_pks = list(map(int, sub_opinion_pks))
-    # related_cluster_result.has_related_cases = True if response else False
 
     if timeout_related == False:
         await cache.aset(

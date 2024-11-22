@@ -407,16 +407,15 @@ div.footnote:first-of-type {
   }
 
   /*Opinion Date File*/
-  .case-date-new {
-    border: 1px solid #B53C2C;
-    border-radius: 20px; /* Rounds the corners */
-    padding: 5px;
-    padding-left: 8px;
-    padding-right: 8px;
-    padding-top: 8px;
-    color: #B53C2C;
 
+ .case-date-new {
+    border: 1px solid #B53C2C;
+    padding: 0px 10px;
+    border-radius: 20px; /* Rounds the corners */
+    color: #B53C2C;
   }
+
+
 
   /*Buttons on Top of Page*/
   .add-a-note {
@@ -470,10 +469,8 @@ div.footnote:first-of-type {
     color: black;
     border-color: black;
     background-color: white;
-    vertical-align: top;
-    float:right;
-    display:block;
   }
+
 
   #btn-group-download-original {
     float:right;
@@ -481,13 +478,20 @@ div.footnote:first-of-type {
     margin-left:10px;
     padding-right: 10px;
   }
-
   #add-note-button {
     color: black;
     border-color: black;
     background-color: white;
-    vertical-align: top;
-    float: right;
+  }
+
+  .top-row {
+    height: 32px;
+    line-height:28px
+  }
+
+  .action-buttons{
+    display: flex;
+    column-gap: 5px;
   }
 
   #get-citation-btn-group {

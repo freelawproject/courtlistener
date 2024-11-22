@@ -16,6 +16,7 @@ from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
+from django.utils.functional import cached_property
 from django.utils.text import slugify
 from eyecite import get_citations
 from eyecite.tokenizers import HyperscanTokenizer

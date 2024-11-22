@@ -61,64 +61,58 @@
                     </div>
                 {% endif %}
 
-                <div id="opinion-toc" class="sidebar-section">
-                    <h3> <span>Jump To</span> </h3>
-                    <li class="jump-links active"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#" >Top</a></li>
-                    <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
-                    {% if cluster.headmatter %}
-                      <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o">Headmatter</a></li>
-                    {% else %}
+           <div id="opinion-toc" class="sidebar-section">
+                  <h3> <span>Jump To</span> </h3>
+                  <li class="jump-links active"><a id="nav_top" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#"  class="active">Top</a></li>
+                  <li class="jump-links"><a id="nav_caption" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
+                  {% if cluster.headmatter %}
+                    <li class="jump-links"><a id="nav_o" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o">Headmatter</a></li>
+                  {% else %}
 
-                        {% if cluster.correction %}
-                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#correction">Correction</a></li>
-                        {% endif %}
-                        {% if cluster.attorneys %}
-                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#attorneys">Attorneys</a></li>
-                        {% endif %}
-                        {% if cluster.headnotes %}
-                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#headnotes">Headnotes</a></li>
-                        {% endif %}
-                        {% if cluster.syllabus %}
-                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#syllabus">Syllabus</a></li>
-                        {% endif %}
-                        {% if cluster.summary %}
-                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#summary">Summary</a></li>
-                        {% endif %}
-                        {% if cluster.history %}
-                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#history">History</a></li>
-                        {% endif %}
-                        {% if cluster.disposition %}
-                            <li class="jump-links"><a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#disposition">Disposition</a></li>
-                        {% endif %}
-                    {% endif %}
-                    {% for sub_opinion in cluster.ordered_opinions %}
+                      {% if cluster.correction %}
+                          <li class="jump-links"><a  id="nav_correction" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#correction">Correction</a></li>
+                      {% endif %}
+                      {% if cluster.attorneys %}
+                          <li class="jump-links"><a id="nav_attorneys" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#attorneys">Attorneys</a></li>
+                      {% endif %}
+                      {% if cluster.headnotes %}
+                          <li class="jump-links"><a id="nav_headnotes" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#headnotes">Headnotes</a></li>
+                      {% endif %}
+                      {% if cluster.syllabus %}
+                          <li class="jump-links"><a id="nav_syllabus" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#syllabus">Syllabus</a></li>
+                      {% endif %}
+                      {% if cluster.summary %}
+                          <li class="jump-links"><a id="nav_summary" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#summary">Summary</a></li>
+                      {% endif %}
+                      {% if cluster.history %}
+                          <li class="jump-links"><a id="nav_history" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#history">History</a></li>
+                      {% endif %}
+                      {% if cluster.disposition %}
+                          <li class="jump-links"><a id="nav_disposition" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#disposition">Disposition</a></li>
+                      {% endif %}
+                  {% endif %}
+                  {% for sub_opinion in cluster.ordered_opinions %}
+                  <li class="jump-links sub-opinion">
+                    <a id="nav_o{{ forloop.counter }}" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o{{ forloop.counter }}" >
                       {% if cluster.sub_opinions.all.count > 1 %}
-                        {% if sub_opinion.ordering_key != None %}
-                          <li class="jump-links sub-opinion">
-                            <a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o{{ forloop.counter }}" >
-                            {% if sub_opinion.get_type_display == "Concurrence Opinion" %}
-                              Concurrence
-                            {% else %}
-                              {{ sub_opinion.get_type_display }}
-                            {% endif %}
-                                {% if sub_opinion.author_str %}
-                                by {{ sub_opinion.author_str }}
-                              {% endif %}
-                            </a>
-                          </li>
+                        {% if sub_opinion.get_type_display == "Concurrence Opinion" %}
+                          Concurrence
+                        {% else %}
+                          {{ sub_opinion.get_type_display }}
+                        {% endif %}
+                            {% if sub_opinion.author_str %}
+                            by {{ sub_opinion.author_str }}
                         {% endif %}
                       {% else %}
-                        <li class="jump-links sub-opinion">
-                          <a href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o{{ forloop.counter }}" >
-                            {{ sub_opinion.get_type_display }}
-                            {% if sub_opinion.author_str %}
-                              by {{ sub_opinion.author_str }}
-                            {% endif %}
-                          </a>
-                        </li>
+                        {{ sub_opinion.get_type_display }}
+                        {% if sub_opinion.author_str %}
+                          by {{ sub_opinion.author_str }}
                         {% endif %}
-                    {% endfor %}
-                </div>
+                      {% endif %}
+                    </a>
+                  </li>
+                  {% endfor %}
+              </div>
 
             {% if cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source and tab == "opinions" %}
                 <div class="col-sm-12 alert-warning alert v-offset-above-2">
@@ -196,30 +190,31 @@
         <div id="caption-square">
 
             <div id="opinion-caption">
+              <div class="flex justify-content-between top-row">
                 <span class="case-date-new">{{ cluster.date_filed }}</span>
+                <div class="action-buttons">
+                  <div id="get-citation-btn-group" class="btn-group hidden-print">
+                    <a id="get-citation-alerts" href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
+                      rel="nofollow"
+                      class="btn"
+                    ><i class="fa fa-bell-o"></i><span class="hidden-xs">Get Citation Alerts</span></a>
+                    <a class="btn dropdown-toggle"
+                      data-toggle="dropdown"
+                      aria-haspopup="true"
+                      aria-expanded="false">
+                      <span class="caret"></span>
+                      <span class="sr-only">Toggle Dropdown</span>
+                    </a>
+                    <ul class="dropdown-menu">
+                      <li><a href="{% url "alert_help" %}#citation-alerts">Learn More</a></li>
+                    </ul>
+                  </div>
+                  {% if pdf_path %}
+                      {% include "includes/add_download_button.html" %}
+                  {% endif %}
                   {% include "includes/add_note_button.html" with form_instance_id=note_form.instance.cluster_id %}
-
-                {% if pdf_path %}
-                    {% include "includes/add_download_button.html" %}
-                {% endif %}
-
-                <div id="get-citation-btn-group" class="btn-group hidden-print">
-                        <a id="get-citation-alerts" href="/?show_alert_modal=yes&q=cites%3A({{ cluster.sub_opinions.all|OR_join }})"
-                           rel="nofollow"
-                           class="btn"
-                        ><i class="fa fa-bell-o"></i><span class="hidden-xs">Get Citation Alerts</span></a>
-                        <a class="btn dropdown-toggle"
-                           data-toggle="dropdown"
-                           aria-haspopup="true"
-                           aria-expanded="false">
-                          <span class="caret"></span>
-                          <span class="sr-only">Toggle Dropdown</span>
-                        </a>
-                        <ul class="dropdown-menu">
-                          <li><a href="{% url "alert_help" %}#citation-alerts">Learn More</a></li>
-                        </ul>
-                      </div>
-
+                </div>
+            </div>
 
                 <div class="case-caption jump-link" id="caption">{{ cluster.docket.case_name }}</div>
                 <h4 class="case-court">{{ cluster.docket.court }}</h4>
