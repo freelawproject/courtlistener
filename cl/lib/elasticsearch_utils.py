@@ -3217,14 +3217,20 @@ def do_es_sweep_alert_query(
     if parent_query:
         parent_search = search_query.query(parent_query)
         # Ensure accurate tracking of total hit count for up to 10,001 query results
-        parent_search = parent_search.extra(from_=0, track_total_hits=10_001)
+        parent_search = parent_search.extra(
+            from_=0,
+            track_total_hits=settings.ELASTICSEARCH_MAX_RESULT_COUNT + 1,
+        )
         parent_search = parent_search.source(includes=["docket_id"])
         multi_search = multi_search.add(parent_search)
 
     if child_query:
         child_search = child_search_query.query(child_query)
         # Ensure accurate tracking of total hit count for up to 10,001 query results
-        child_search = child_search.extra(from_=0, track_total_hits=10_001)
+        child_search = child_search.extra(
+            from_=0,
+            track_total_hits=settings.ELASTICSEARCH_MAX_RESULT_COUNT + 1,
+        )
         child_search = child_search.source(includes=["id"])
         multi_search = multi_search.add(child_search)
 
@@ -3240,7 +3246,9 @@ def do_es_sweep_alert_query(
     # Re-run parent query to fetch potentially missed docket IDs due to large
     # result sets.
     should_repeat_parent_query = (
-        docket_results and docket_results.hits.total.value >= 10_000
+        docket_results
+        and docket_results.hits.total.value
+        >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
     if should_repeat_parent_query:
         docket_ids = [int(d.docket_id) for d in main_results]
@@ -3259,18 +3267,20 @@ def do_es_sweep_alert_query(
     # from the main results and refines the child query filter with these IDs.
     # Finally, it re-executes the child search.
     should_repeat_child_query = (
-        rd_results and rd_results.hits.total.value >= 10_000
+        rd_results
+        and rd_results.hits.total.value
+        >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
     )
     if should_repeat_child_query:
         rd_ids = [
-            int(rd.to_dict()["id"])
+            int(rd["_source"]["id"])
             for docket in main_results
             if hasattr(docket, "child_docs")
             for rd in docket.child_docs
         ]
         child_query.filter.append(Q("terms", id=rd_ids))
         child_search = child_search_query.query(child_query)
-        child_search = child_search.source(includes=["docket_id"])
+        child_search = child_search.source(includes=["id"])
         rd_results = child_search.execute()
 
     return main_results, docket_results, rd_results
