@@ -2694,12 +2694,10 @@ class CountParameterTests(TestCase):
         response = await self.client.get(self.url, params)
 
         self.assertEqual(response.status_code, 200)
-        expected_count = await sync_to_async(
-            lambda: Docket.objects.filter(
-                court__id="canb",
-                source=Docket.RECAP,
-            ).count()
-        )()
+        expected_count = await Docket.objects.filter(
+            court__id="canb",
+            source=Docket.RECAP,
+        ).acount()
         self.assertEqual(response.data["count"], expected_count)
 
     async def test_count_with_no_results(self):
