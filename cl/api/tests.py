@@ -69,6 +69,7 @@ from cl.people_db.factories import (
     AttorneyOrganizationFactory,
     PartyFactory,
     PartyTypeFactory,
+    RoleFactory,
 )
 from cl.people_db.models import Attorney
 from cl.recap.factories import ProcessingQueueFactory
@@ -1009,17 +1010,93 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         # Adds extra role to the existing attorney
         docket = await Docket.objects.afirst()
         attorney = await Attorney.objects.afirst()
+        party = await sync_to_async(PartyFactory)(
+            docket=self.docket_2,
+            attorneys=[attorney],
+        )
         await sync_to_async(PartyTypeFactory.create)(
-            party=await sync_to_async(PartyFactory)(
-                docket=docket,
-                attorneys=[attorney],
-            ),
-            docket=docket,
+            party=party,
+            docket=self.docket_2,
         )
         self.q = {"docket__date_created__range": "2017-04-14,2017-04-15"}
         await self.assertCountInResults(1)
         self.q = {"docket__date_created__range": "2017-04-15,2017-04-16"}
         await self.assertCountInResults(0)
+
+        # Initial request: Fetch all related records
+        self.q = {"docket__id": self.docket.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of parties
+        self.assertEqual(
+            len(results[0]["parties_represented"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['parties_represented'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Fetch attorney records for docket (repeat request with "filter_nested_results")
+        self.q = {"docket__id": self.docket.pk, "filter_nested_results": True}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify top-level record has single party (due to filter)
+        self.assertEqual(
+            len(results[0]["parties_represented"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['parties_represented'])}.\n\nr.data was: {r.data}",
+        )
+        # Verify expected party is present in the parties_represented list
+        self.assertIn(
+            str(self.party.pk), results[0]["parties_represented"][0]["party"]
+        )
+
+        # Request using parties_represented lookup: Fetch all related records
+        self.q = {"parties_represented__docket__id": self.docket_2.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of parties
+        self.assertEqual(
+            len(results[0]["parties_represented"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['parties_represented'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Fetch attorney records for parties associated with docket_2 (repeat with "filter_nested_results")
+        self.q = {
+            "parties_represented__docket__id": self.docket_2.pk,
+            "filter_nested_results": True,
+        }
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of parties
+        self.assertEqual(
+            len(results[0]["parties_represented"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['parties_represented'])}.\n\nr.data was: {r.data}",
+        )
+        # Verify expected party is present in the parties_represented list
+        self.assertIn(
+            str(party.pk), results[0]["parties_represented"][0]["party"]
+        )
 
     async def test_party_filters(self) -> None:
         self.path = reverse("party-list", kwargs={"version": "v3"})
@@ -1032,17 +1109,20 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         # This represents dockets that the party was a part of.
         self.q = {"docket__id": self.docket.id}
         await self.assertCountInResults(1)
-        self.q = {"docket__id": 999_999}
+        self.q = {"docket__id": self.docket_2.id}
         await self.assertCountInResults(0)
 
         # Contrasted with this, which joins based on their attorney.
         self.q = {"attorney__docket__id": self.docket.pk}
         await self.assertCountInResults(1)
-        self.q = {"attorney__docket__id": 999_999}
+        self.q = {"attorney__docket__id": self.docket_2.pk}
         await self.assertCountInResults(0)
 
         self.q = {"name": "Honker"}
         await self.assertCountInResults(1)
+        self.q = {"name__icontains": "Honk"}
+        await self.assertCountInResults(1)
+
         self.q = {"name": "Cardinal Bonds"}
         await self.assertCountInResults(0)
 
@@ -1050,6 +1130,85 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         await self.assertCountInResults(1)
         self.q = {"attorney__name__icontains": "Juno"}
         await self.assertCountInResults(0)
+
+        # Add another attorney to the party record but linked to another docket
+        await sync_to_async(RoleFactory.create)(
+            party=self.party, docket=self.docket_2, attorney=self.attorney_2
+        )
+
+        # Fetch all party records for docket
+        self.q = {"docket__id": self.docket.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of attorneys
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Fetch top-level record for docket (repeat with "filter_nested_results")
+        self.q = {"docket__id": self.docket.pk, "filter_nested_results": True}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify the record has only one attorney (due to filter)
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+        # Check if retrieved attorney matches expected record
+        self.assertEqual(
+            results[0]["attorneys"][0]["attorney_id"], self.attorney.pk
+        )
+
+        # Fetch party details based on attorney lookup
+        self.q = {"attorney__docket__id": self.docket_2.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of attorneys
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Apply additional filter to refine previous request
+        self.q = {
+            "attorney__docket__id": self.docket_2.pk,
+            "filter_nested_results": True,
+        }
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Ensure only attorney_2 is associated with the filtered party
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+        self.assertEqual(
+            results[0]["attorneys"][0]["attorney_id"], self.attorney_2.pk
+        )
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
