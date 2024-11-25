@@ -30,6 +30,7 @@ from cl.lib.recap_utils import needs_ocr
 from cl.lib.string_utils import trunc
 from cl.lib.utils import is_iter
 from cl.recap.mergers import save_iquery_to_docket
+from cl.scrapers.utils import scraped_citation_object_is_valid
 from cl.search.models import Docket, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ ExtractProcessResult = Tuple[str, Optional[str]]
 
 def update_document_from_text(
     opinion: Opinion, juriscraper_module: str = ""
-) -> None:
+) -> dict:
     """Extract additional metadata from document text
 
     We use this code with BIA decisions. Previously Tax.
@@ -54,12 +55,13 @@ def update_document_from_text(
 
     :param opinion: Opinion object
     :param juriscraper_module: full module to get Site object
-    :return: None
+    :return: the extracted data dictionary
     """
     court = opinion.cluster.docket.court.pk
     site = get_scraper_object_by_name(court, juriscraper_module)
     if site is None:
-        return
+        logger.debug("No site found %s", juriscraper_module)
+        return {}
 
     metadata_dict = site.extract_from_text(opinion.plain_text or opinion.html)
     for model_name, data in metadata_dict.items():
@@ -70,13 +72,17 @@ def update_document_from_text(
             opinion.cluster.__dict__.update(data)
         elif model_name == "Citation":
             data["cluster_id"] = opinion.cluster_id
-            ModelClass.objects.get_or_create(**data)
+            if scraped_citation_object_is_valid(data):
+                _, citation_created = ModelClass.objects.get_or_create(**data)
+                metadata_dict["Citation"]["created"] = citation_created
         elif model_name == "Opinion":
             opinion.__dict__.update(data)
         else:
             raise NotImplementedError(
                 f"Object type of {model_name} not yet supported."
             )
+
+    return metadata_dict
 
 
 @app.task(
