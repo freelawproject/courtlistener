@@ -5,7 +5,12 @@ from django.db import transaction
 
 from cl.lib.command_utils import ScraperCommand, logger
 from cl.scrapers.tasks import update_document_from_text
-from cl.search.models import PRECEDENTIAL_STATUS, Opinion, OpinionCluster
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SOURCES,
+    Opinion,
+    OpinionCluster,
+)
 
 
 def rerun_extract_from_text(
@@ -169,7 +174,7 @@ class Command(ScraperCommand):
             "docket__court_id": court_id,
             "date_filed__gte": options["date_filed_gte"],
             "date_filed__lte": options["date_filed_lte"],
-            "source__contains": "C",
+            "source__contains": SOURCES.COURT_WEBSITE,
         }
 
         if options["cluster_status"]:
