@@ -19,10 +19,7 @@ class IsOwner(permissions.BasePermission):
         return obj.user == request.user
 
 
-class V3APIPermission(
-    permissions.DjangoModelPermissionsOrAnonReadOnly,
-    permissions.BasePermission,
-):
+class V3APIPermission(permissions.BasePermission):
 
     r = get_redis_interface("STATS")
     v3_blocked_message = (
@@ -72,10 +69,6 @@ class V3APIPermission(
         :param view: The APIview being accessed.
         :return: True if the user has permission to access V3, False if not.
         """
-
-        # Prioritize DjangoModelPermissionsOrAnonReadOnly permissions
-        if not super().has_permission(request, view):
-            return False
 
         if (
             not self.is_v3_api_request(request)
