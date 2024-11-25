@@ -4,6 +4,7 @@ import operator
 import re
 import time
 import traceback
+from collections import defaultdict
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
@@ -1281,6 +1282,7 @@ def build_es_base_query(
                     mlt_query,
                     child_highlighting=child_highlighting,
                     api_version=api_version,
+                    alerts=alerts,
                 )
             )
 
@@ -2964,9 +2966,10 @@ def do_es_api_query(
     child documents.
     """
 
+    alerts = True if hl_tag == ALERTS_HL_TAG else False
     try:
         es_queries = build_es_base_query(
-            search_query, cd, cd["highlight"], api_version
+            search_query, cd, cd["highlight"], api_version, alerts=alerts
         )
         s = es_queries.search_query
         child_docs_query = es_queries.child_query
@@ -3047,7 +3050,7 @@ def do_es_api_query(
             # parameters as in the frontend. Only switch highlighting according
             # to the user request.
             main_query = add_es_highlighting(
-                s, cd, highlighting=cd["highlight"]
+                s, cd, alerts=alerts, highlighting=cd["highlight"]
             )
 
     return main_query, child_docs_query
@@ -3216,18 +3219,20 @@ def do_es_sweep_alert_query(
     multi_search = multi_search.add(main_query)
     if parent_query:
         parent_search = search_query.query(parent_query)
+        # Ensure accurate tracking of total hit count for up to 10,001 query results
         parent_search = parent_search.extra(
-            from_=0, size=settings.SCHEDULED_ALERT_HITS_LIMIT
+            from_=0,
+            track_total_hits=settings.ELASTICSEARCH_MAX_RESULT_COUNT + 1,
         )
         parent_search = parent_search.source(includes=["docket_id"])
         multi_search = multi_search.add(parent_search)
 
     if child_query:
         child_search = child_search_query.query(child_query)
+        # Ensure accurate tracking of total hit count for up to 10,001 query results
         child_search = child_search.extra(
             from_=0,
-            size=settings.SCHEDULED_ALERT_HITS_LIMIT
-            * settings.RECAP_CHILD_HITS_PER_RESULT,
+            track_total_hits=settings.ELASTICSEARCH_MAX_RESULT_COUNT + 1,
         )
         child_search = child_search.source(includes=["id"])
         multi_search = multi_search.add(child_search)
@@ -3241,15 +3246,45 @@ def do_es_sweep_alert_query(
     if child_query:
         rd_results = responses[2]
 
+    # Re-run parent query to fetch potentially missed docket IDs due to large
+    # result sets.
+    should_repeat_parent_query = (
+        docket_results
+        and docket_results.hits.total.value
+        >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
+    )
+    if should_repeat_parent_query:
+        docket_ids = [int(d.docket_id) for d in main_results]
+        # Adds extra filter to refine results.
+        parent_query.filter.append(Q("terms", docket_id=docket_ids))
+        parent_search = search_query.query(parent_query)
+        parent_search = parent_search.source(includes=["docket_id"])
+        docket_results = parent_search.execute()
+
     limit_inner_hits({}, main_results, cd["type"])
     set_results_highlights(main_results, cd["type"])
 
-    for result in main_results:
-        child_result_objects = []
-        if hasattr(result, "child_docs"):
-            for child_doc in result.child_docs:
-                child_result_objects.append(child_doc.to_dict())
-            result["child_docs"] = child_result_objects
+    # This block addresses a potential issue where the initial child query
+    # might not return all expected results, especially when the result set is
+    # large. To ensure complete data retrieval, it extracts child document IDs
+    # from the main results and refines the child query filter with these IDs.
+    # Finally, it re-executes the child search.
+    should_repeat_child_query = (
+        rd_results
+        and rd_results.hits.total.value
+        >= settings.ELASTICSEARCH_MAX_RESULT_COUNT
+    )
+    if should_repeat_child_query:
+        rd_ids = [
+            int(rd["_source"]["id"])
+            for docket in main_results
+            if hasattr(docket, "child_docs")
+            for rd in docket.child_docs
+        ]
+        child_query.filter.append(Q("terms", id=rd_ids))
+        child_search = child_search_query.query(child_query)
+        child_search = child_search.source(includes=["id"])
+        rd_results = child_search.execute()
 
     return main_results, docket_results, rd_results
 
@@ -3279,3 +3314,45 @@ def simplify_estimated_count(search_count: int) -> int:
         zeroes = (len(search_count_str) - 2) * "0"
         return int(first_two + zeroes)
     return search_count
+
+
+def set_child_docs_and_score(
+    results: list[Hit] | list[dict[str, Any]] | Response,
+    merge_highlights: bool = False,
+    merge_score: bool = False,
+) -> None:
+    """Process and attach child documents to the main search results.
+
+    :param results: A list of search results, which can be ES Hit objects
+    or a list of dicts.
+    :param merge_highlights: A boolean indicating whether to merge
+    highlight data into the results.
+    :param merge_score: A boolean indicating whether to merge
+    the BM25 score into the results.
+    :return: None. Results are modified in place.
+    """
+
+    for result in results:
+        result_is_dict = isinstance(result, dict)
+        if result_is_dict:
+            # If the result is a dictionary, do nothing, or assign [] to
+            # child_docs if it is not present.
+            result["child_docs"] = result.get("child_docs", [])
+        else:
+            # Process child hits if the result is an ES AttrDict instance,
+            # so they can be properly serialized.
+            child_docs = getattr(result, "child_docs", [])
+            result["child_docs"] = [
+                defaultdict(lambda: None, doc["_source"].to_dict())
+                for doc in child_docs
+            ]
+
+        # Optionally merges highlights. Used for integrating percolator
+        # highlights into the percolated document.
+        if merge_highlights and result_is_dict:
+            meta_hl = result.get("meta", {}).get("highlight", {})
+            merge_highlights_into_result(meta_hl, result)
+
+        # Optionally merges the BM25 score for display in the API.
+        if merge_score and isinstance(result, AttrDict):
+            result["bm25_score"] = result.meta.score
