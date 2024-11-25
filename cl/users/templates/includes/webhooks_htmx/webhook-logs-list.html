@@ -21,11 +21,11 @@
           {% endif %}
         </p>
       </td>
-      <td>{{ webhook.date_created }}</td>
+      <td>{{ webhook.date_created|date:"M. j, Y, h:m a T" }}</td>
       {% if not webhook.debug %}
         <td class="text-center">
           {% if webhook.next_retry_date %}
-            {{ webhook.next_retry_date }}
+            {{ webhook.next_retry_date|date:"M. j, Y, h:m a T" }}
           {% else %}
             -
           {% endif %}
