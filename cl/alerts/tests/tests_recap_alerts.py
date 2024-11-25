@@ -51,7 +51,7 @@ from cl.search.factories import (
 from cl.search.models import Docket
 from cl.search.tasks import index_docket_parties_in_es
 from cl.stats.models import Stat
-from cl.tests.cases import ESIndexTestCase, RECAPAlertsAssertions, TestCase
+from cl.tests.cases import ESIndexTestCase, SearchAlertsAssertions, TestCase
 from cl.tests.utils import MockResponse
 from cl.users.factories import UserProfileWithParentsFactory
 
@@ -61,7 +61,7 @@ from cl.users.factories import UserProfileWithParentsFactory
     return_value="alert_hits_sweep",
 )
 class RECAPAlertsSweepIndexTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, RECAPAlertsAssertions
+    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
     """
     RECAP Alerts Sweep Index Tests
@@ -627,6 +627,18 @@ class RECAPAlertsSweepIndexTest(
             alert_de.docket.case_name,
             [rd_2.description],
         )
+        webhook_events = WebhookEvent.objects.all().values_list(
+            "content", flat=True
+        )
+        # Assert webhook event child hits.
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            cross_object_alert.name,
+            1,
+            alert_de.docket.case_name,
+            1,
+        )
+
         # Assert email text version:
         txt_email = mail.outbox[4].body
         self.assertIn(cross_object_alert.name, txt_email)
@@ -1712,7 +1724,7 @@ class RECAPAlertsSweepIndexTest(
     return_value="alert_hits_percolator",
 )
 class RECAPAlertsPercolatorTest(
-    RECAPSearchTestCase, ESIndexTestCase, TestCase, RECAPAlertsAssertions
+    RECAPSearchTestCase, ESIndexTestCase, TestCase, SearchAlertsAssertions
 ):
     """
     RECAP Alerts Percolator Tests

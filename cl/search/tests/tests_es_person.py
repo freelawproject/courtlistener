@@ -616,6 +616,7 @@ class PeopleV4APISearchTest(
         search_params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": f"id:{self.person_2.pk} AND nomination_process:(U.S. Senate)",
+            "order_by": "score desc",
         }
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
@@ -662,6 +663,7 @@ class PeopleV4APISearchTest(
         search_params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": f"id:{person.pk}",
+            "order_by": "score desc",
         }
         # API
         r = async_to_sync(self._test_api_results_count)(
@@ -869,6 +871,7 @@ class PeopleV4APISearchTest(
             "q": f"id:{self.person_2.pk} name:Sheindlin dob_city:Brookyln nomination_process:(U.S. Senate) political_affiliation:Democratic",
             "school": "New York Law School",
             "dob_state": "NY",
+            "order_by": "score desc",
         }
 
         # Judged Search type HL disabled.
