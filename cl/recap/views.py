@@ -3,7 +3,10 @@ import asyncio
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.models import User
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import (
+    DjangoModelPermissionsOrAnonReadOnly,
+    IsAuthenticatedOrReadOnly,
+)
 from rest_framework.viewsets import ModelViewSet
 
 from cl.api.api_permissions import V3APIPermission
@@ -179,7 +182,10 @@ class FjcIntegratedDatabaseViewSet(LoggingMixin, ModelViewSet):
     queryset = FjcIntegratedDatabase.objects.all().order_by("-id")
     serializer_class = FjcIntegratedDatabaseSerializer
     filterset_class = FjcIntegratedDatabaseFilter
-    permission_classes = [V3APIPermission]
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_created",
