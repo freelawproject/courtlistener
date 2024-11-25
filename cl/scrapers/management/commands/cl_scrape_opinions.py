@@ -18,7 +18,7 @@ from sentry_sdk import capture_exception
 
 from cl.alerts.models import RealTimeQueue
 from cl.citations.utils import map_reporter_db_cite_type
-from cl.lib.command_utils import VerboseCommand, logger
+from cl.lib.command_utils import ScraperCommand, logger
 from cl.lib.crypto import sha1
 from cl.lib.string_utils import trunc
 from cl.people_db.lookup_utils import lookup_judges_by_messy_str
@@ -217,14 +217,16 @@ def save_everything(
         )
 
 
-class Command(VerboseCommand):
+class Command(ScraperCommand):
     help = "Runs the Juriscraper toolkit against one or many jurisdictions."
+    juriscraper_module_type = "opinions"
     scrape_target_descr = "opinions"  # for logging purposes
 
     def __init__(self, stdout=None, stderr=None, no_color=False):
         super().__init__(stdout=None, stderr=None, no_color=False)
 
     def add_arguments(self, parser):
+        super().add_arguments(parser)
         parser.add_argument(
             "--daemon",
             action="store_true",
@@ -244,20 +246,6 @@ class Command(VerboseCommand):
                 "all requested courts. Particularly useful if it is "
                 "desired to quickly scrape over all courts. Default "
                 "is 30 minutes."
-            ),
-        )
-        parser.add_argument(
-            "--courts",
-            type=str,
-            dest="court_id",
-            metavar="COURTID",
-            required=True,
-            help=(
-                "The court(s) to scrape and extract. This should be "
-                "in the form of a python module or package import "
-                "from the Juriscraper library, e.g. "
-                '"juriscraper.opinions.united_states.federal_appellate.ca1" '
-                'or simply "opinions" to do all opinions.'
             ),
         )
         parser.add_argument(
