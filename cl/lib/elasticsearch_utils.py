@@ -3337,8 +3337,7 @@ def set_child_docs_and_score(
         if result_is_dict:
             # If the result is a dictionary, do nothing, or assign [] to
             # child_docs if it is not present.
-            child_docs = result.get("child_docs", [])
-            result["child_docs"] = child_docs
+            result["child_docs"] = result.get("child_docs", [])
         else:
             # Process child hits if the result is an ES AttrDict instance,
             # so they can be properly serialized.
