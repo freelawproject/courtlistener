@@ -1,4 +1,5 @@
 {% extends "profile/webhooks_base.html" %}
+{% load extras %}
 {% load static %}
 {% load waffle_tags %}
 {% load humanize %}
@@ -13,11 +14,11 @@
       <label class="col-md-3">Endpoint status: </label><p class="col-md-9">{% if webhook_event.webhook.enabled %} Enabled {% else %} Disabled {% endif %}</p>
       <label class="col-md-3">Event type: </label><p class="col-md-9">{{ webhook_event.webhook.get_event_type_display }}</p>
       <label class="col-md-3">Idempotency-key: </label><p class="col-md-9">{{ webhook_event.event_id }}</p>
-      <label class="col-md-3">Event date: </label><p class="col-md-9">{{ webhook_event.date_created|date:"M. j, Y, h:i a T" }}</p>
+      <label class="col-md-3">Event date: </label><p class="col-md-9">{{ webhook_event.date_created|datetime_in_utc }}</p>
       <label class="col-md-3">Status code: </label><p class="col-md-9 bold"> {% if webhook_event.status_code %}{{ webhook_event.status_code }} {{ webhook_event.get_status_code_display }} {% else %}-{% endif %}</p>
       <label class="col-md-3">Event status: </label><p class="col-md-9 bold {{ webhook_event.event_status|webhook_status_class }}">{{ webhook_event.get_event_status_display }}</p>
       <label class="col-md-3">Failure count: </label><p class="col-md-9">{{ webhook_event.retry_counter }}</p>
-      <label class="col-md-3">Next retry date: </label><p class="col-md-9">{% if not webhook_event.debug %}{% if webhook_event.next_retry_date %}{{ webhook_event.next_retry_date|date:"M. j, Y, h:i a T" }}{% else %}-{% endif %}{% else %}Test events will not be retried{% endif %}</p>
+      <label class="col-md-3">Next retry date: </label><p class="col-md-9">{% if not webhook_event.debug %}{% if webhook_event.next_retry_date %}{{ webhook_event.next_retry_date|datetime_in_utc }}{% else %}-{% endif %}{% else %}Test events will not be retried{% endif %}</p>
     </div>
     <div class="row form-group">
       <div class="col-xs-12">
