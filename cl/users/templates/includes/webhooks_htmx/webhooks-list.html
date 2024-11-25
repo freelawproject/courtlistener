@@ -8,6 +8,11 @@
     </td>
     <td>
       <p class="bottom">
+        {{ webhook.get_version_display }}
+      </p>
+    </td>
+    <td>
+      <p class="bottom">
         {% if webhook.enabled is True %}
           <span class="text-success">Active</span>
         {% else %}

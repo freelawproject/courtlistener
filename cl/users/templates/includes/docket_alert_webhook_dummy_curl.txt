@@ -69,7 +69,7 @@ curl --request POST \
       ]
    },
    "webhook":{
-      "version":1,
+      "version":{{ webhook_version }},
       "event_type":1,
       "date_created":"2022-10-11T14:21:40.855097-07:00",
       "deprecation_date":null
