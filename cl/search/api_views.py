@@ -115,7 +115,14 @@ class DocketEntryViewSet(LoggingMixin, viewsets.ModelViewSet):
     permission_classes = (RECAPUsersReadOnly, V3APIPermission)
     serializer_class = DocketEntrySerializer
     filterset_class = DocketEntryFilter
-    ordering_fields = ("id", "date_created", "date_modified", "date_filed")
+    ordering_fields = (
+        "id",
+        "date_created",
+        "date_modified",
+        "date_filed",
+        "recap_sequence_number",
+        "entry_number",
+    )
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
@@ -262,36 +269,53 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
 
     def list(self, request, *args, **kwargs):
 
-        is_opinion_active = waffle.flag_is_active(
-            request, "o-es-search-api-active"
-        )
-        search_form = SearchForm(request.GET, is_es_form=is_opinion_active)
+        match request.GET.get("type", SEARCH_TYPES.OPINION):
+            case SEARCH_TYPES.ORAL_ARGUMENT if waffle.flag_is_active(
+                request, "oa-es-active"
+            ):
+                es_flag_is_active = True
+            case SEARCH_TYPES.PEOPLE if waffle.flag_is_active(
+                request, "p-es-active"
+            ):
+                es_flag_is_active = True
+            case SEARCH_TYPES.OPINION if waffle.flag_is_active(
+                request, "o-es-search-api-active"
+            ):
+                es_flag_is_active = True
+            case (
+                SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
+            ) if waffle.flag_is_active(request, "r-es-search-api-active"):
+                es_flag_is_active = True
+            case _:
+                es_flag_is_active = False
+
+        search_form = SearchForm(request.GET, is_es_form=es_flag_is_active)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-
             search_type = cd["type"]
             paginator = pagination.PageNumberPagination()
-            sl = api_utils.get_object_list(request, cd=cd, paginator=paginator)
+            sl = api_utils.get_object_list(
+                request,
+                cd=cd,
+                paginator=paginator,
+                es_flag_status=es_flag_is_active,
+            )
             result_page = paginator.paginate_queryset(sl, request)
 
             match search_type:
-                case SEARCH_TYPES.ORAL_ARGUMENT if waffle.flag_is_active(
-                    request, "oa-es-active"
-                ):
+                case SEARCH_TYPES.ORAL_ARGUMENT if es_flag_is_active:
                     serializer = V3OAESResultSerializer(result_page, many=True)
-                case SEARCH_TYPES.PEOPLE if waffle.flag_is_active(
-                    request, "p-es-active"
-                ):
+                case SEARCH_TYPES.PEOPLE if es_flag_is_active:
                     serializer = ExtendedPersonESSerializer(
                         result_page, many=True
                     )
-                case SEARCH_TYPES.OPINION if is_opinion_active:
+                case SEARCH_TYPES.OPINION if es_flag_is_active:
                     serializer = V3OpinionESResultSerializer(
                         result_page, many=True
                     )
                 case (
                     SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS
-                ) if waffle.flag_is_active(request, "r-es-search-api-active"):
+                ) if es_flag_is_active:
                     serializer = V3RECAPDocumentESResultSerializer(
                         result_page, many=True
                     )

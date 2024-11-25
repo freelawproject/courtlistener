@@ -5,7 +5,7 @@ $(document).ready(function () {
   var setAuthorityIDs = function (id, cb) {
     $.ajax({
       method: 'GET',
-      url: '/api/rest/v3/search/',
+      url: '/api/rest/v4/search/',
       data: {
         q: 'cluster_id:' + id,
         format: 'json',
@@ -24,7 +24,7 @@ $(document).ready(function () {
         // We have the authority IDs, but we don't know how many
         // are SCOTUS cases in the right date range.
         method: 'GET',
-        url: '/api/rest/v3/search/',
+        url: '/api/rest/v4/search/',
         data: {
           q: dateFiledQ + ' AND id:(' + cache[id].authority_ids.join(' OR ') + ')',
           court: 'scotus',
@@ -44,7 +44,7 @@ $(document).ready(function () {
     cache[id]['citing_count'] = 0; // Set the default
     $.ajax({
       method: 'GET',
-      url: '/api/rest/v3/search/',
+      url: '/api/rest/v4/search/',
       data: {
         q: dateFiledQ + ' AND cites:(' + id + ')',
         court: 'scotus',
@@ -119,7 +119,7 @@ $(document).ready(function () {
     var params = getParamsForQuery(q);
     return $.ajax({
       method: 'GET',
-      url: '/api/rest/v3/search/',
+      url: '/api/rest/v4/search/',
       data: params,
       success: function (data) {
         return async(data.results);

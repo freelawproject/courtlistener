@@ -14,7 +14,7 @@ from cl.celery_init import app
 from cl.corpus_importer.api_serializers import DocketEntrySerializer
 from cl.lib.elasticsearch_utils import merge_highlights_into_result
 from cl.search.api_serializers import (
-    RECAPESResultSerializer,
+    RECAPESWebhookResultSerializer,
     V3OAESResultSerializer,
 )
 from cl.search.api_utils import ResultObject
@@ -180,7 +180,7 @@ def send_search_alert_webhook_es(
                         meta_hl,
                         result,
                     )
-            serialized_results = RECAPESResultSerializer(
+            serialized_results = RECAPESWebhookResultSerializer(
                 results, many=True
             ).data
         case _:
