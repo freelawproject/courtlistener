@@ -24,6 +24,7 @@ from cl.search.models import Citation, Court, Opinion
 
 class Command(cl_back_scrape_opinions.Command):
     scrape_target_descr = "citations"
+    juriscraper_module_type = "opinions"
 
     def scrape_court(
         self,
