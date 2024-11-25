@@ -25,6 +25,7 @@ from eyecite.tokenizers import HyperscanTokenizer
 from httpx import (
     HTTPStatusError,
     NetworkError,
+    ReadError,
     RemoteProtocolError,
     TimeoutException,
 )
@@ -598,6 +599,7 @@ def process_free_opinion_result(
         ConnectionError,
         ReadTimeout,
         RedisConnectionError,
+        ReadError,
     ),
     max_retries=15,
     interval_start=5,

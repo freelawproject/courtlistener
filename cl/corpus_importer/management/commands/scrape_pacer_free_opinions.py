@@ -331,10 +331,10 @@ def get_pdfs(
                 throttle.update_min_items(min_items)
 
             logger.info(
-                f"Court cycle completed for: {row.court_id}. Current iteration: {cycle_checker.current_iteration}. Sleep 2 seconds "
+                f"Court cycle completed for: {row.court_id}. Current iteration: {cycle_checker.current_iteration}. Sleep 1 second "
                 f"before starting the next cycle."
             )
-            time.sleep(2)
+            time.sleep(1)
         logger.info(f"Processing row id: {row.id} from {row.court_id}")
         c = chain(
             process_free_opinion_result.si(
