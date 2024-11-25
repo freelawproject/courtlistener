@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.utils import LoggingMixin
