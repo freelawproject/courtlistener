@@ -75,17 +75,56 @@
                       </a>
                       <br>
                     {% endif %}
-                {% else %}
-                   <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
-                    <strong style="font-weight: bold;">
-                        View original:
-                    </strong>
-                    {% if result.download_url %}
-                      <a href="{{result.download_url}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
-                          From the court
-                      </a>
-                      &nbsp;&nbsp;|&nbsp;&nbsp;
-                    {% endif %}
+                  {% endif %}
+                  {% if type == 'o' %}
+                    <ul>
+                    {% for doc in result.child_docs %}
+                      {% with doc=doc|get_es_doc_content:True %}
+                        <li style="margin-bottom: 5px;">
+                          {% if result.child_docs|length > 1 or doc.type != 'combined-opinion' %}
+                            {% if doc.text %}
+                              <strong>{{ doc.type_text }}</strong>
+                            {% endif %}
+                          {% endif %}
+                          {% if doc.text %}
+                            {% contains_highlights doc.text.0 True as highlighted %}
+                            <span style="display: block;">{% if highlighted %}&hellip; {% endif %}{{ doc.text|render_string_or_list|safe|underscore_to_space }} &hellip;</span>
+                          {% endif %}
+                          {% if doc.download_url or doc.local_path %}
+                            <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+                              <strong style="font-weight: bold;">
+                                View original:
+                              </strong>
+                              {% if doc.download_url %}
+                                <a href="{{doc.download_url}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                                  From the court
+                                </a>
+                                &nbsp;&nbsp;|&nbsp;&nbsp;
+                              {% endif %}
+                              {% if doc.local_path %}
+                                {# Provide link to S3. #}
+                                <a href="https://storage.courtlistener.com/{{doc.local_path}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                                  Our backup
+                                </a>
+                              {% endif %}
+                            </p>
+                        {% endif %}
+                        </li>
+                      {% endwith %}
+                    {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if type == 'oa' %}
+                  <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0; padding: 0;">
+                  <strong style="font-weight: bold;">
+                      View original:
+                  </strong>
+                  {% if result.download_url %}
+                    <a href="{{result.download_url}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
+                        From the court
+                    </a>
+                    &nbsp;&nbsp;|&nbsp;&nbsp;
+                  {% endif %}
                   {% if result.local_path %}
                     {# Provide link to S3. #}
                     <a href="https://storage.courtlistener.com/{{result.local_path}}" style="font-size: 100%; font-weight: inherit; font-family: inherit; color: #009; border: 0; font-style: inherit; padding: 0; text-decoration: none; vertical-align: baseline; margin: 0;">
@@ -93,8 +132,6 @@
                     </a>
                   {% endif %}
                   </p>
-                {% endif %}
-                {% if type == 'oa' %}
                   <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 0; padding: 0;">
                     <strong style="font-weight: bold;">Date Argued: </strong>
                     {% if result.dateArgued %}
@@ -116,9 +153,7 @@
                       {{ result|get_highlight:"judge"|safe|underscore_to_space }}
                     {% endif %}
                   </p>
-                {% endif %}
-                {% if type == 'o' or type == 'oa' %}
-                    <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
+                   <p style="font-size: 100%; font-weight: inherit; font-family: inherit; border: 0; vertical-align: baseline; font-style: inherit; margin: 0 0 1.5em; padding: 0;">
                       {% if result|get_highlight:"text" %}
                         &hellip;{{ result|get_highlight:"text"|safe|underscore_to_space }}&hellip;
                       {% endif %}

@@ -22,7 +22,7 @@
       ]
    },
    "webhook":{
-      "version":1,
+      "version":{{ webhook_version }},
       "event_type":4,
       "date_created":"2022-12-28T14:21:40.855097-07:00",
       "deprecation_date":null

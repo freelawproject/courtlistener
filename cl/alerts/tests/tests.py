@@ -48,7 +48,9 @@ from cl.api.models import (
     Webhook,
     WebhookEvent,
     WebhookEventType,
+    WebhookVersions,
 )
+from cl.api.utils import get_webhook_deprecation_date
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
 from cl.donate.models import NeonMembership
@@ -73,10 +75,14 @@ from cl.search.models import (
     Opinion,
     RECAPDocument,
 )
-from cl.search.tasks import add_items_to_solr
 from cl.stats.models import Stat
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
-from cl.tests.cases import APITestCase, ESIndexTestCase, TestCase
+from cl.tests.cases import (
+    APITestCase,
+    ESIndexTestCase,
+    SearchAlertsAssertions,
+    TestCase,
+)
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import EmailSent
@@ -564,7 +570,9 @@ class AlertAPITests(APITestCase):
 
 @override_switch("o-es-alerts-active", active=True)
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
-class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
+class SearchAlertsWebhooksTest(
+    ESIndexTestCase, TestCase, SearchAlertsAssertions
+):
     """Test Search Alerts Webhooks"""
 
     @classmethod
@@ -581,6 +589,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             event_type=WebhookEventType.SEARCH_ALERT,
             url="https://example.com/",
             enabled=True,
+            version=2,
         )
         cls.webhook_enabled_1 = WebhookFactory(
             user=cls.user_profile_1.user,
@@ -647,6 +656,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             event_type=WebhookEventType.SEARCH_ALERT,
             url="https://example.com/",
             enabled=True,
+            version=1,
         )
         cls.search_alert_3 = AlertFactory(
             user=cls.user_profile_3.user,
@@ -781,7 +791,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             len(mail.outbox), 4, msg="Outgoing emails don't match."
         )
 
-        # Opinion email alert assertions
+        # First Opinion email alert assertions search_alert
         self.assertEqual(mail.outbox[0].to[0], self.user_profile.user.email)
         # Plain text assertions
         opinion_alert_content = mail.outbox[0].body
@@ -793,18 +803,36 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             opinion_alert_content,
         )
         self.assertIn("California vs Lorem", opinion_alert_content)
-        self.assertIn("california sit amet", opinion_alert_content)
+        self.assertIn(
+            "california sit amet",
+            opinion_alert_content,
+            msg="Alert content didn't match",
+        )
         self.assertIn(self.dly_opinion_2.download_url, opinion_alert_content)
         self.assertIn(
             str(self.dly_opinion_2.local_path), opinion_alert_content
         )
 
-        html_content = None
-        for content, content_type in mail.outbox[0].alternatives:
-            if content_type == "text/html":
-                html_content = content
-                break
+        html_content = self.get_html_content_from_email(mail.outbox[0])
         # HTML assertions
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            self.search_alert.name,
+            1,
+            self.dly_opinion.cluster.case_name,
+            2,
+        )
+
+        self._assert_child_hits_content(
+            html_content,
+            self.search_alert.name,
+            self.dly_opinion.cluster.case_name,
+            [
+                self.dly_opinion.get_type_display(),
+                self.dly_opinion_2.get_type_display(),
+            ],
+        )
+
         self.assertIn("had 1 hit", html_content)
         self.assertIn(
             self.dly_opinion_2.cluster.docket.court.citation_string.replace(
@@ -830,7 +858,27 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             mail.outbox[0].extra_headers["List-Unsubscribe"],
         )
 
-        # Second Opinion alert
+        # Second Opinion alert search_alert_2
+        html_content = self.get_html_content_from_email(mail.outbox[1])
+        # HTML assertions
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            self.search_alert.name,
+            1,
+            self.dly_opinion.cluster.case_name,
+            2,
+        )
+
+        self._assert_child_hits_content(
+            html_content,
+            self.search_alert.name,
+            self.dly_opinion.cluster.case_name,
+            [
+                self.dly_opinion.get_type_display(),
+                self.dly_opinion_2.get_type_display(),
+            ],
+        )
+
         self.assertEqual(mail.outbox[1].to[0], self.user_profile_2.user.email)
         self.assertIn("daily opinion alert", mail.outbox[1].body)
         self.assertEqual(
@@ -843,6 +891,24 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
         self.assertIn(
             unsubscribe_url,
             mail.outbox[1].extra_headers["List-Unsubscribe"],
+        )
+
+        # Third Opinion alert search_alert_3
+        html_content = self.get_html_content_from_email(mail.outbox[2])
+        # HTML assertions
+        self._count_alert_hits_and_child_hits(
+            html_content,
+            self.search_alert_3.name,
+            1,
+            self.dly_opinion.cluster.case_name,
+            1,
+        )
+
+        self._assert_child_hits_content(
+            html_content,
+            self.search_alert_3.name,
+            self.dly_opinion.cluster.case_name,
+            [self.dly_opinion.get_type_display()],
         )
 
         # Oral Argument Alert
@@ -860,8 +926,11 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             mail.outbox[3].extra_headers["List-Unsubscribe"],
         )
 
-        # Two webhook events should be sent, both of them to user_profile user
-        webhook_events = WebhookEvent.objects.all()
+        # 3 webhook events should be sent, 2 user_profile user and 1 user_profile_3
+        webhook_events = WebhookEvent.objects.filter().values_list(
+            "content", flat=True
+        )
+
         self.assertEqual(
             len(webhook_events), 3, msg="Webhook events don't match."
         )
@@ -884,7 +953,46 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
             },
         }
 
-        for webhook_sent in webhook_events:
+        # Assert V2 Opinion Search Alerts Webhook
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            self.search_alert.name,
+            1,
+            self.dly_opinion.cluster.case_name,
+            2,
+            "opinions",
+        )
+
+        # Assert HL content in V2 webhooks.
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            self.search_alert.name,
+            "caseName",
+            "<strong>California</strong> vs Lorem",
+            child_field=False,
+            nested_field="opinions",
+        )
+        self._assert_webhook_hit_hl(
+            webhook_events,
+            self.search_alert.name,
+            "snippet",
+            "Lorem dolor <strong>california</strong> sit amet, consectetur adipiscing elit.",
+            child_field=True,
+            nested_field="opinions",
+        )
+
+        # Assert V1 Opinion Search Alerts Webhook
+        self._count_webhook_hits_and_child_hits(
+            list(webhook_events),
+            self.search_alert_3.name,
+            1,
+            self.dly_opinion.cluster.case_name,
+            0,
+            None,
+        )
+
+        webhook_events_instances = WebhookEvent.objects.all()
+        for webhook_sent in webhook_events_instances:
             with self.subTest(webhook_sent=webhook_sent):
                 self.assertEqual(
                     webhook_sent.event_status,
@@ -892,6 +1000,7 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                     msg="The event status doesn't match.",
                 )
                 content = webhook_sent.content
+
                 alert_data_compare = alert_data[
                     content["payload"]["alert"]["id"]
                 ]
@@ -925,14 +1034,13 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                 if (
                     content["payload"]["alert"]["alert_type"]
                     == SEARCH_TYPES.OPINION
-                ):
+                ) and webhook_sent.webhook.version == WebhookVersions.v1:
                     # Assert the number of keys in the Opinions Search Webhook
                     # payload
                     keys_count = len(content["payload"]["results"][0])
                     self.assertEqual(
                         keys_count, len(opinion_v3_search_api_keys)
                     )
-
                     # Iterate through all the opinion fields and compare them.
                     for (
                         field,
@@ -950,7 +1058,10 @@ class SearchAlertsWebhooksTest(ESIndexTestCase, TestCase):
                                 expected_value,
                                 f"Field '{field}' does not match.",
                             )
-                else:
+                elif (
+                    content["payload"]["alert"]["alert_type"]
+                    == SEARCH_TYPES.ORAL_ARGUMENT
+                ):
                     # Assertions for OA webhook payload.
                     self.assertEqual(
                         content["payload"]["results"][0]["caseName"],
@@ -1544,6 +1655,14 @@ class OldDocketAlertsWebhooksTest(TestCase):
             event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
             url="https://example.com/",
             enabled=True,
+            version=1,
+        )
+        cls.webhook_v2_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.OLD_DOCKET_ALERTS_REPORT,
+            url="https://example.com/",
+            enabled=True,
+            version=2,
         )
         cls.disabled_docket_alert = DocketAlertWithParentsFactory(
             docket__source=Docket.RECAP,
@@ -1605,9 +1724,16 @@ class OldDocketAlertsWebhooksTest(TestCase):
         self.assertEqual(active_docket_alerts.count(), 2)
 
         webhook_events = WebhookEvent.objects.all()
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = {
+            webhook.content["webhook"]["version"] for webhook in webhook_events
+        }
+        self.assertEqual(webhook_versions, {1, 2})
+
         self.assertEqual(
             webhook_events[0].event_status,
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
@@ -1651,6 +1777,21 @@ class OldDocketAlertsWebhooksTest(TestCase):
         self.assertEqual(
             content["payload"]["old_alerts"][0]["docket"],
             self.very_old_docket_alert.docket.pk,
+        )
+
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_enabled
+        ).first()
+        v2_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_v2_enabled
+        ).first()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
         )
 
         # Run command again
@@ -1701,10 +1842,16 @@ class OldDocketAlertsWebhooksTest(TestCase):
         # user_profile_2
         self.assertEqual(len(mail.outbox), 2)
 
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = {
+            webhook.content["webhook"]["version"] for webhook in webhook_events
+        }
+        self.assertEqual(webhook_versions, {1, 2})
 
         self.assertEqual(
             webhook_events[0].webhook.user,
