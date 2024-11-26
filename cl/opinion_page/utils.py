@@ -271,7 +271,6 @@ async def es_get_citing_and_related_clusters_with_cache(
             size=settings.RELATED_COUNT,
             track_total_hits=False,
         )
-        print("Related query opinion: ", related_query.to_dict())
         multi_search = multi_search.add(related_query)
         related_index = response_index
         response_index += 1
