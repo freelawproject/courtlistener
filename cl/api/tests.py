@@ -86,7 +86,7 @@ from cl.search.api_views import (
     TagViewSet,
 )
 from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import SOURCES, Docket, Opinion
+from cl.search.models import SOURCES, Court, Docket, Opinion
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import MockResponse, make_client
@@ -671,6 +671,56 @@ class FilteringCountTestCase:
             expected_count,
             msg=f"Expected {expected_count}, but got {got}.\n\nr.data was: {r.data}",
         )
+
+
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        Court.objects.all().delete()
+
+        cls.parent_court = CourtFactory(id="parent1", full_name="Parent Court")
+
+        cls.child_court1 = CourtFactory(
+            id="child1",
+            parent_court=cls.parent_court,
+            full_name="Child Court 1",
+        )
+        cls.child_court2 = CourtFactory(
+            id="child2",
+            parent_court=cls.parent_court,
+            full_name="Child Court 2",
+        )
+
+        cls.orphan_court = CourtFactory(id="orphan", full_name="Orphan Court")
+
+    @async_to_sync
+    async def setUp(self):
+        self.path = reverse("court-list", kwargs={"version": "v4"})
+        self.q: Dict[str, Any] = {}
+
+    async def test_parent_court_filter(self):
+        """Can we filter courts by parent_court id?"""
+        self.q["parent_court"] = "parent1"
+        await self.assertCountInResults(2)  # Should return child1 and child2
+
+        # Verify the returned court IDs
+        response = await self.async_client.get(self.path, self.q)
+        court_ids = [court["id"] for court in response.data["results"]]
+        self.assertEqual(set(court_ids), {"child1", "child2"})
+
+        # Filter for courts with parent_court id='orphan' (none should match)
+        self.q["parent_court"] = "orphan"
+        await self.assertCountInResults(0)
+
+    async def test_no_parent_court_filter(self):
+        """Do we get all courts when using no filters?"""
+        self.q = {}
+        await self.assertCountInResults(4)  # Should return all four courts
+
+    async def test_invalid_parent_court_filter(self):
+        """Do we handle invalid parent_court values correctly?"""
+        self.q["parent_court"] = "nonexistent"
+        await self.assertCountInResults(0)
 
 
 class DRFJudgeApiFilterTests(
