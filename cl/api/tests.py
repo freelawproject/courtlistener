@@ -484,6 +484,8 @@ class BlockV3APITests(TestCase):
 
         cls.audio_path_v3 = reverse("audio-list", kwargs={"version": "v3"})
         cls.audio_path_v4 = reverse("audio-list", kwargs={"version": "v4"})
+        cls.debt_path_v4 = reverse("debt-list", kwargs={"version": "v4"})
+        cls.debt_path_v3 = reverse("debt-list", kwargs={"version": "v3"})
 
     def setUp(self) -> None:
         self.r = get_redis_interface("STATS")
@@ -594,6 +596,27 @@ class BlockV3APITests(TestCase):
         ):
             response = await self.async_client.get(self.audio_path_v4)
         self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    async def test_confirm_v4_post_requests_are_not_allowed(
+        self, mock_api_prefix
+    ) -> None:
+        """Confirm V4 users are not allowed to POST requests."""
+        response = await self.client_2.post(self.debt_path_v4, {})
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_confirm_v3_post_requests_are_not_allowed(
+        self, mock_api_prefix
+    ) -> None:
+        """Confirm V3 users are not allowed to POST requests."""
+        response = await self.client_2.post(self.debt_path_v3, {})
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_confirm_anonymous_post_requests_are_not_allowed(
+        self, mock_api_prefix
+    ) -> None:
+        """Confirm anonymous users are not allowed to POST requests."""
+        response = await self.async_client.post(self.debt_path_v4, {})
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
 class DRFOrderingTests(TestCase):

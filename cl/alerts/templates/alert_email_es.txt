@@ -16,8 +16,14 @@ View Full Results / Edit this Alert: https://www.courtlistener.com/?{{ alert.que
 Disable this Alert (one click): https://www.courtlistener.com{% url "disable_alert" alert.secret_key %}{% endif %}
 
 {{forloop.counter}}. {{ result.caseName|render_string_or_list|safe|striptags }} ({% if result.court_id != 'scotus' %}{{ result.court_citation_string|render_string_or_list|striptags }} {% endif %}{% if type == 'o' or type == 'r' %}{{ result.dateFiled|date:"Y" }}{% elif type == 'oa' %}{{ result.dateArgued|date:"Y" }}{% endif %})
-{% if type == 'oa' %}{% if result.dateArgued %}Date Argued: {{ result.dateArgued|date:"F jS, Y" }}{% else %}Date Argued: Unknown Date {% endif %}{% if result.docketNumber %} | Docket Number: {{ result.docketNumber|render_string_or_list|safe|striptags }}{% endif %} | Duration: {{ result.duration|naturalduration }}{% if result.judge %} | Judge: {{ result.judge|render_string_or_list|safe|striptags|underscore_to_space }}{% endif %}{% endif %}
-{% if type == 'o' or type == 'oa' %}{% if result|get_highlight:"text" %}...{{ result|get_highlight:"text"|safe|striptags|underscore_to_space|compress_whitespace }}...{% endif %}{% endif %}
+{% if type == 'oa' %}{% if result.dateArgued %}Date Argued: {{ result.dateArgued|date:"F jS, Y" }}{% else %}Date Argued: Unknown Date {% endif %}{% if result.docketNumber %} | Docket Number: {{ result.docketNumber|render_string_or_list|safe|striptags }}{% endif %} | Duration: {{ result.duration|naturalduration }}{% if result.judge %} | Judge: {{ result.judge|render_string_or_list|safe|striptags|underscore_to_space }}{% endif %}
+{% if result|get_highlight:"text" %}...{{ result|get_highlight:"text"|safe|striptags|underscore_to_space|compress_whitespace }}...{% endif %}
+{% endif %}
+{% if type == 'o' %}{% for doc in result.child_docs %}{% with doc=doc|get_es_doc_content:True %}{% if result.child_docs|length > 1 or doc.type != 'combined-opinion' %}{% if doc.text %}{{ doc.type_text }}{% endif %}{% endif %}
+   {% if doc.text %}...{{ doc.text|render_string_or_list|safe|striptags|underscore_to_space|compress_whitespace }}...{% endif %}
+   {% if doc.download_url %} - Download original from the court: {{doc.download_url}}{% endif %}
+   {% if doc.local_path %} - Download the original from our backup: https://storage.courtlistener.com/{{ doc.local_path }}{% endif %}
+{% endwith %}{% endfor %}{% endif %}
 {% if type == 'r' %}{% if result.dateFiled %}Date Filed: {{ result.dateFiled|date:"F jS, Y" }}{% else %}Date Filed: Unknown Date {% endif %}{% if result.docketNumber %} | Docket Number: {{ result.docketNumber|render_string_or_list|safe|striptags }}{% endif %}
 {% for doc in result.child_docs %}{% with doc=doc|get_es_doc_content:scheduled_alert %} - {% if doc.short_description %}{{ doc.short_description|render_string_or_list|safe|striptags }} - {% endif %}Document #{% if doc.document_number %}{{ doc.document_number }}{% endif %}{% if doc.attachment_number %}, Attachment #{{ doc.attachment_number }}{% endif %}
    {% if doc.description %}Description: {{ doc.description|render_string_or_list|safe|striptags }}{% endif %}
@@ -27,9 +33,8 @@ Disable this Alert (one click): https://www.courtlistener.com{% url "disable_ale
 {% if result.child_docs and result.child_remaining %}{% extract_q_value alert.query_run as q_value %}View Additional Results for this Case: https://www.courtlistener.com/?type={{ type|urlencode }}&q={% if q_value %}({{ q_value|urlencode }})%20AND%20{% endif %}docket_id%3A{{ result.docket_id|urlencode }}{% endif %}
 {% endif %}~~~~~
  - View this item on our site: https://www.courtlistener.com{% if type == 'r' %}{{result.docket_absolute_url}}{% else %}{{result.absolute_url}}{% endif %}
-{% if result.download_url %} - Download original from the court: {{result.download_url}}
-{% endif %}{% if result.local_path %} - Download the original from our backup: https://storage.courtlistener.com/{{ result.local_path }}{% endif %}{% endfor %}
-
+{% if type == 'oa' %}{% if result.download_url %} - Download original from the court: {{result.download_url}}
+{% endif %}{% if result.local_path %} - Download the original from our backup: https://storage.courtlistener.com/{{ result.local_path }}{% endif %}{% endif %}{% endfor %}
 {% endfor %}
 ************************
 This alert brought to you by the 501(c)(3) non-profit Free Law Project
