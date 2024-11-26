@@ -1,7 +1,7 @@
 import random
 import re
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone
 
 import waffle
 from django import template
@@ -335,6 +335,21 @@ def format_date(date_str: str) -> str:
         return date_filter(date_obj, "F jS, Y")
     except (ValueError, TypeError):
         return date_str
+
+
+@register.filter
+def datetime_in_utc(date_obj) -> str:
+    """Formats a datetime object in UTC with timezone displayed.
+    For example: 'Nov. 25, 2024, 01:28 p.m. UTC'"""
+    if date_obj is None:
+        return ""
+    try:
+        return date_filter(
+            date_obj.astimezone(timezone.utc),
+            "M. j, Y, h:i a T",
+        )
+    except (ValueError, TypeError):
+        return date_obj
 
 
 @register.filter
