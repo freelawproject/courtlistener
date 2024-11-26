@@ -150,11 +150,8 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
             if not volume or not volume.isdigit():
                 continue
 
-            if not citation.corrected_reporter():
-                reporter_type = Citation.STATE
-            else:
-                cite_type_str = citation.all_editions[0].reporter.cite_type
-                reporter_type = map_reporter_db_cite_type(cite_type_str)
+            cite_type_str = citation.all_editions[0].reporter.cite_type
+            reporter_type = map_reporter_db_cite_type(cite_type_str)
 
             # Append the validated citation as a dictionary
             validated_citations.append(
