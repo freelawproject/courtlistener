@@ -231,9 +231,15 @@ def combine_initials(case_name: str) -> str:
     :return: the cleaned case caption
     """
 
-    pattern = r"((?:[A-Z]\.?\s?){2,})(\s|$)"
+    initials_pattern = re.compile(r"(\b[A-Z]\.?\s?){2,}(\s|$)")
 
-    return re.sub(pattern, lambda m: m.group(0).replace(".", ""), case_name)
+    matches = initials_pattern.finditer(case_name)
+    if matches:
+        for match in matches:
+            initials = match.group()
+            compressed_initials = re.sub(r"(?!\s$)[\s\.]", "", initials)
+            case_name = case_name.replace(initials, compressed_initials)
+    return case_name
 
 
 def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
