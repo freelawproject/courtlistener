@@ -1,7 +1,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta, timezone
-from typing import Dict, List, Set, TypedDict, Union
+from typing import Any, Dict, List, Set, TypedDict, Union
 
 import eyecite
 from dateutil import parser
@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.db.models import F
+from django.db.models.constants import LOOKUP_SEP
 from django.urls import resolve
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_str
@@ -89,6 +90,96 @@ class DisabledHTMLFilterBackend(RestFrameworkFilterBackend):
 
     def to_html(self, request, queryset, view):
         return ""
+
+
+class FilterManyToManyMixin:
+    """
+    Mixin for filtering nested many-to-many relationships.
+
+    Provides helper methods to efficiently filter nested querysets when using
+    `RelatedFilter` classes in filtersets. This is particularly useful for
+    scenarios where you need to filter on attributes of related models through
+    many-to-many relationships.
+
+    **Required Properties:**
+    - **`join_table_cleanup_mapping`**: A dictionary mapping specific lookups
+      or custom labels used for `RelatedFilter` fields to the corresponding
+      field names in the join table. This mapping is essential for correct
+      filtering.
+    """
+
+    join_table_cleanup_mapping: dict[str, str] = {}
+
+    def _get_filter_label(self: FilterSet, field_name: str) -> str:
+        """
+        Maps a filter field name to its corresponding label.
+
+        When defining filters(Declarative or using the `fields` attribute) in a
+        filterset, the field name used internally might not directly match the
+        the label used in the request. This method helps resolve this
+        discrepancy by mapping the given `field_name` to its correct label.
+
+        This is particularly useful for custom filter methods where only the
+        field name is available, and obtaining the triggering label is not
+        straightforward.
+
+        Args:
+            field_name (str): The field name as used within the filterset.
+
+        Returns:
+            str: The corresponding label for the given field name.
+        """
+
+        FIELD_NAME_LABEL_MAPPING = {
+            filter_class.field_name: label
+            for label, filter_class in self.filters.items()
+        }
+        return FIELD_NAME_LABEL_MAPPING[field_name]
+
+    def get_filters_for_join_table(
+        self: FilterSet, name: str
+    ) -> dict[str, Any]:
+        """
+        Processes request filters for use in a join table query.
+
+        Iterates through the request filters, cleaning and transforming them to
+        be suitable for applying filtering conditions to a join table. Returns
+        a dictionary containing the filtered criteria to be applied to the join
+        table query.
+
+        Args:
+            name: The name of label used to trigger the custom filtering method
+
+        Returns:
+            dict: A dictionary containing the filtered criteria for the join
+            table query.
+        """
+        filters = {}
+        filter_label = self._get_filter_label(name)
+        base_model_prefix = self._meta.model._meta.model_name
+        for filter_key, value in self.data.items():
+            # Skip custom filtering options triggered by the user
+            if filter_key.startswith(filter_label):
+                continue
+
+            cleaned_key = filter_key
+            # Add base model prefix for fields in Meta class
+            for basic_field, _ in self._meta.fields.items():
+                if cleaned_key.startswith(basic_field):
+                    cleaned_key = (
+                        f"{base_model_prefix}{LOOKUP_SEP}{filter_key}"
+                    )
+
+            # Adjust specific lookups for prefetch query compatibility
+            #
+            # To ensure correct filtering, we need to modify these lookups to
+            # reference the appropriate table and field names.
+            for url_key, new_key in self.join_table_cleanup_mapping.items():
+                cleaned_key = cleaned_key.replace(url_key, new_key, 1)
+
+            filters[cleaned_key] = value
+
+        return filters
 
 
 class NoEmptyFilterSet(FilterSet):
