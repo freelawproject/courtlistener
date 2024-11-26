@@ -2,9 +2,9 @@ import random
 
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser, User
-from django.http import HttpRequest
 from rest_framework import permissions
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from cl.lib.redis_utils import get_redis_interface
@@ -52,7 +52,7 @@ class V3APIPermission(permissions.BasePermission):
         return is_blocked_user
 
     @staticmethod
-    def is_v3_api_request(request: HttpRequest) -> bool:
+    def is_v3_api_request(request: Request) -> bool:
         return getattr(request, "version", None) == "v3"
 
     @staticmethod
@@ -62,7 +62,7 @@ class V3APIPermission(permissions.BasePermission):
             return True
         return False
 
-    def has_permission(self, request: HttpRequest, view: APIView) -> bool:
+    def has_permission(self, request: Request, view: APIView) -> bool:
         """Check if the user has permission to access the V3 API.
 
         :param request: The HTTPRequest object.

@@ -19,10 +19,51 @@
   <div class="row">
     <label class="col-xs-12">Event Type</label>
     <div class="col-xs-12">
-      {{ webhook_form.event_type }}
+      {% with option_count=webhook_form.event_type.field.choices|length %}
+        <select name="event_type" id="id_event_type" class="form-control"
+                {% if not webhook_form.event_type.field.widget.attrs.readonly %}
+                  hx-get="{% url 'webhooks-get-available-versions' %}"
+                  hx-target="#version-wrapper"
+                  hx-trigger="{% if option_count == 1 %}load{% else %}change{% endif %}"
+                {% endif %}
+                {% if webhook_form.event_type.field.widget.attrs.readonly %}readonly{% endif %}>
+        {% if option_count > 1 %}
+          <option value="">Select an event type</option>
+        {% endif %}
+          {% for value, label in webhook_form.event_type.field.choices %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      {% endwith %}
       {% if webhook_form.event_type.errors %}
         <p class="help-block">
           {% for error in webhook_form.event_type.errors %}
+            {{ error|escape }}
+          {% endfor %}
+        </p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="form-group">
+  <div class="row">
+    <label class="col-xs-12">Version</label>
+    <div class="col-xs-12">
+      <div id="version-wrapper">
+        <select name="version" id="id_version" class="form-control" {% if webhook_form.version.field.widget.attrs.readonly %}readonly{% endif %}>
+          {% if webhook_form.instance.pk %}
+            <option value="{{ webhook_form.instance.version }}" selected>
+              {{ webhook_form.instance.get_version_display }}
+            </option>
+          {% else %}
+            <option value="">Select an event type first</option>
+          {% endif %}
+        </select>
+      </div>
+      {% if webhook_form.version.errors %}
+        <p class="help-block">
+          {% for error in webhook_form.version.errors %}
             {{ error|escape }}
           {% endfor %}
         </p>

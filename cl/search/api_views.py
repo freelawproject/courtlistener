@@ -4,6 +4,7 @@ import waffle
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
 from cl.api.api_permissions import V3APIPermission
 from cl.api.pagination import ESCursorPagination
@@ -65,7 +66,10 @@ from cl.search.models import (
 
 class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
     serializer_class = OriginalCourtInformationSerializer
-    permission_classes = [V3APIPermission]
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
@@ -80,7 +84,10 @@ class OriginatingCourtInformationViewSet(viewsets.ModelViewSet):
 class DocketViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = DocketSerializer
     filterset_class = DocketFilter
-    permission_classes = [V3APIPermission]
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_created",
@@ -171,7 +178,10 @@ class RECAPDocumentViewSet(
 class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = CourtSerializer
     filterset_class = CourtFilter
-    permission_classes = [V3APIPermission]
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_modified",
@@ -191,7 +201,10 @@ class CourtViewSet(LoggingMixin, viewsets.ModelViewSet):
 class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionClusterSerializer
     filterset_class = OpinionClusterFilter
-    permission_classes = [V3APIPermission]
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_created",
@@ -216,7 +229,10 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
 class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionSerializer
     filterset_class = OpinionFilter
-    permission_classes = [V3APIPermission]
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = (
         "id",
         "date_created",
@@ -240,7 +256,10 @@ class OpinionViewSet(LoggingMixin, viewsets.ModelViewSet):
 class OpinionsCitedViewSet(LoggingMixin, viewsets.ModelViewSet):
     serializer_class = OpinionsCitedSerializer
     filterset_class = OpinionsCitedFilter
-    permission_classes = [V3APIPermission]
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     # Default cursor ordering key
     ordering = "-id"
     # Additional cursor ordering fields
