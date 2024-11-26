@@ -20,10 +20,12 @@ htmx.on('htmx:afterSwap', (e) => {
   let webhook_form = document.getElementById('webhooks-body');
   if (e.detail.target.id === 'webhooks-body') {
     // If the user already have a webhook configured for each type of event, show a message.
-    let event_type_options = document.getElementById('id_event_type').options.length;
+    let event_type_options = Array.from(document.getElementById('id_event_type').options)
+      .filter(option => option.value !== "")  //Filter out <option value="">Select an event type</option> default option
+      .length;
     if (event_type_options === 0) {
       webhook_form.innerHTML =
-        "<b class='text-center'>You already have a webhook configured for each type of event. Please delete one before making another.</b>";
+        "<b class='text-center'>You already have a webhook configured for each type of event and version available. Please delete one before making another.</b>";
     }
     //Toggle form modal
     $('#webhook-modal').modal('toggle');
