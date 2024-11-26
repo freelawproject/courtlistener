@@ -189,11 +189,15 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
 
     document_list = [
         {
-            "_id": f'o_{opinion_pair["pk"]}',
-            "routing": opinion_pair["cluster_id"],
+            "_id": f'o_{pair["pk"]}',
+            "routing": pair["cluster_id"],
+            # Important to match documents in the production cluster
         }
-        for opinion_pair in opinion_cluster_pairs
-    ]
+        for pair in opinion_cluster_pairs
+    ] or [
+        {"_id": f"o_{pk}"} for pk in related_ids
+    ]  # Fall back in case IDs are not found in DB.
+
     more_like_this_fields = SEARCH_MLT_OPINION_QUERY_FIELDS.copy()
     mlt_query = Q(
         "more_like_this",
