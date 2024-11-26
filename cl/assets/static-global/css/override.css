@@ -1031,7 +1031,6 @@ closely the content in the book*/
 
 #headmatter > .footnotes > .footnote > a {
   color: #000099;
-  position: absolute;
   font-size: 1em;
 }
 

@@ -578,6 +578,32 @@ div.footnote:first-of-type {
     margin-left: 2px;
   }
 
+  page-label {
+    font-style: italic;
+    font-size: 0.8em;
+    margin-right: 4px;
+    margin-left: 2px;
+  }
+
+  page-label {
+      cursor: pointer;
+  }
+
+  page-label:hover {
+      color: darkblue;
+      text-decoration: underline;  /* Example hover styling */
+  }
+
+  page-label::after {
+    display: inline;
+    position: relative;
+    content: attr(data-label);
+    float: right;
+    font-size: 1em;
+    color: dimgray;
+    width: 0;
+  }
+
   a.page-label {
     font-style: italic;
     font-size: 0.8em;
@@ -623,6 +649,7 @@ div.footnote:first-of-type {
    /* Adjust to move the entire blockquote to the right */
   blockquote {
     margin-left: 3em;
+    display: block;
   }
 
   div.counsel > a.page-label::after {
@@ -687,7 +714,6 @@ div.footnote:first-of-type {
     display: block;
     text-indent: 1em;
   }
-
 }
 
 html {

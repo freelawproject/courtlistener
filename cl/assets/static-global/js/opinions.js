@@ -279,3 +279,12 @@ document.addEventListener('scroll', function () {
     activeLink.parentElement.classList.add('active');
   }
 });
+
+document.querySelectorAll("page-label").forEach(label => {
+    label.addEventListener("click", function() {
+        const href = this.getAttribute("href");
+        if (href) {
+            window.location.href = href;
+        }
+    });
+});
