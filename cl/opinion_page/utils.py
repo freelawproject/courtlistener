@@ -166,13 +166,11 @@ async def build_cites_clusters_query(
 async def build_related_clusters_query(
     cluster_search: Search,
     sub_opinion_pks: list[str],
-    search_params: dict[str, str],
 ) -> Search:
     """Build the ES related clusters query based on sub-opinion IDs.
 
     :param cluster_search: The Elasticsearch DSL Search object
     :param sub_opinion_pks: A list of IDs representing sub-opinions to be queried.
-    :param search_params: A dict of parameters used to form the query.
     :return: The ES DSL Search object representing the query to find the
     related clusters.
     """
@@ -267,11 +265,13 @@ async def es_get_citing_and_related_clusters_with_cache(
     related_index = citing_index = None
     if cached_related_clusters is None:
         related_query = await build_related_clusters_query(
-            cluster_search, sub_opinion_pks, search_params
+            cluster_search, sub_opinion_pks
         )
         related_query = related_query.extra(
-            size=settings.RELATED_COUNT, track_total_hits=False
+            size=settings.RELATED_COUNT,
+            track_total_hits=False,
         )
+        print("Related query opinion: ", related_query.to_dict())
         multi_search = multi_search.add(related_query)
         related_index = response_index
         response_index += 1

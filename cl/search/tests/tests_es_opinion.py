@@ -2253,6 +2253,7 @@ class OpinionsESSearchTest(
         cluster_2.delete()
 
 
+@override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
