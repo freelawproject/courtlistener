@@ -1,3 +1,4 @@
+{% load extras %}
 {% load widget_tweaks %}
 {% if results %}
   {% for webhook in results %}
@@ -21,11 +22,11 @@
           {% endif %}
         </p>
       </td>
-      <td>{{ webhook.date_created }}</td>
+      <td>{{ webhook.date_created|datetime_in_utc }}</td>
       {% if not webhook.debug %}
         <td class="text-center">
           {% if webhook.next_retry_date %}
-            {{ webhook.next_retry_date }}
+            {{ webhook.next_retry_date|datetime_in_utc }}
           {% else %}
             -
           {% endif %}
