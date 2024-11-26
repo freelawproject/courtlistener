@@ -1,6 +1,5 @@
 import rest_framework_filters as filters
 from django.db.models import Prefetch, QuerySet
-from django.db.models.constants import LOOKUP_SEP
 
 from cl.api.utils import (
     ALL_TEXT_LOOKUPS,
@@ -8,6 +7,7 @@ from cl.api.utils import (
     DATE_LOOKUPS,
     DATETIME_LOOKUPS,
     INTEGER_LOOKUPS,
+    FilterManyToManyMixin,
     NoEmptyFilterSet,
 )
 from cl.people_db.lookup_utils import lookup_judge_by_name_components
@@ -251,7 +251,7 @@ class PersonFilter(NoEmptyFilterSet):
         }
 
 
-class PartyFilter(NoEmptyFilterSet):
+class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
     docket = filters.RelatedFilter(
         "cl.search.filters.DocketFilter",
         field_name="dockets",
@@ -268,6 +268,15 @@ class PartyFilter(NoEmptyFilterSet):
         field_name="roles", method="filter_roles"
     )
 
+    # Attributes for the mixin
+    # **Important:** Keep this mapping up-to-date with any changes to
+    # RelatedFilters or custom labels in this class to avoid unexpected
+    # behavior.
+    join_table_cleanup_mapping = {
+        "attorney__docket": "docket",
+        "attorney__parties_represented": "party",
+    }
+
     class Meta:
         model = Party
         fields = {
@@ -281,32 +290,7 @@ class PartyFilter(NoEmptyFilterSet):
         if not value:
             return qs
 
-        role_filters = {}
-        for filter_key, value in self.data.items():
-            # Skip custom filtering options triggered by the user
-            if filter_key.startswith("filter_nested_results"):
-                continue
-
-            cleaned_key = filter_key
-            # Add "party" prefix for fields in Meta class
-            for basic_field, _ in self._meta.fields.items():
-                if cleaned_key.startswith(basic_field):
-                    cleaned_key = f"party{LOOKUP_SEP}{filter_key}"
-
-            # Adjust specific lookups for prefetch query compatibility
-            #
-            # The `AttorneyFilter` class is designed to work with the `roles`
-            # table. However, the `attorney__docket` and `attorney__parties_represented`
-            # lookups reference the `roles__docket` and `roles__party` fields,
-            # respectively.
-            #
-            # To ensure correct filtering, we need to modify these lookups to
-            # reference the appropriate table and field names.
-            cleaned_key = cleaned_key.replace("attorney__docket", "docket", 1)
-            cleaned_key = cleaned_key.replace(
-                "attorney__parties_represented", "party", 1
-            )
-            role_filters[cleaned_key] = value
+        role_filters = self.get_filters_for_join_table(name)
 
         prefetch = Prefetch(
             name,
@@ -316,7 +300,7 @@ class PartyFilter(NoEmptyFilterSet):
         return qs.prefetch_related(prefetch)
 
 
-class AttorneyFilter(NoEmptyFilterSet):
+class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
     docket = filters.RelatedFilter(
         "cl.search.filters.DocketFilter",
         field_name="roles__docket",
@@ -333,6 +317,16 @@ class AttorneyFilter(NoEmptyFilterSet):
         field_name="roles", method="filter_roles"
     )
 
+    # Attributes for the mixin
+    # **Important:** Keep this mapping up-to-date with any changes to
+    # RelatedFilters or custom labels in this class to avoid unexpected
+    # behavior.
+    join_table_cleanup_mapping = {
+        "parties_represented__docket": "docket",
+        "parties_represented__attorney": "attorney",
+        "parties_represented": "parties",
+    }
+
     class Meta:
         model = Attorney
         fields = {
@@ -346,38 +340,7 @@ class AttorneyFilter(NoEmptyFilterSet):
         if not value:
             return qs
 
-        role_filters = {}
-        for filter_key, value in self.data.items():
-            # Skip custom filtering options triggered by the user
-            if filter_key.startswith("filter_nested_results"):
-                continue
-
-            cleaned_key = filter_key
-            # Add "party" prefix for fields in Meta class without lookup separator
-            # Add "party" prefix for fields in Meta class
-            for basic_field, _ in self._meta.fields.items():
-                if cleaned_key.startswith(basic_field):
-                    cleaned_key = f"attorney{LOOKUP_SEP}{filter_key}"
-
-            # Adjust specific lookups for prefetch query compatibility
-            #
-            # The `PartyFilter` class is designed to work with the `roles`
-            # table. However, the `parties_represented`, `parties_represented__docket`
-            # and `parties_represented__attorney` lookups reference the `party`,
-            # `docket` and `attorney` fields, respectively.
-            #
-            # To ensure correct filtering, we need to modify these lookups to
-            # reference the appropriate table and field names.
-            cleaned_key = cleaned_key.replace(
-                "parties_represented__docket", "docket", 1
-            )
-            cleaned_key = cleaned_key.replace(
-                "parties_represented__attorney", "attorney", 1
-            )
-            cleaned_key = cleaned_key.replace(
-                "parties_represented", "party", 1
-            )
-            role_filters[cleaned_key] = value
+        role_filters = self.get_filters_for_join_table(name)
 
         prefetch = Prefetch(
             name,
