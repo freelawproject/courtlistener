@@ -3467,7 +3467,7 @@ class WebhooksHTMXTests(APITestCase):
         response = await self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         # There shouldn't be results for user_1
-        self.assertEqual(response.content, b"\n\n")
+        self.assertEqual(response.content.strip(), b"")
 
         sa_webhook = await sync_to_async(WebhookFactory)(
             user=self.user_1,
@@ -3485,7 +3485,7 @@ class WebhooksHTMXTests(APITestCase):
         response = await self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         # There should be results for user_1
-        self.assertNotEqual(response.content, b"\n\n")
+        self.assertNotEqual(response.content.strip(), b"")
 
     async def test_get_available_webhook_versions(self) -> None:
         """Can we get users available versions for a webhook event type?"""
