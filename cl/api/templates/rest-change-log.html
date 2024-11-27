@@ -31,6 +31,10 @@
   <h1 id="about">REST API Change Log</h1>
   <ul>
     <li>
+      <p><strong>v4.1</strong>&mdash; This version adds new <code>count=on</code> query parameter to paginated endpoints, allowing for efficient retrieval of total item counts without fetching actual data. Additionally, search results across all search types have been improved by incorporating <strong>score</strong> values to the payload.</p>
+      <p>The docket entry endpoint now supports flexible result sorting through the <code>order_by</code> query parameter. For more precise filtering, the parties and attorneys endpoint has been enhanced with the <code>filter_nested_results=True</code> query parameter. Finally, the court endpoint now allows filtering of results based on parent court relationships using the <code>parent_court</code> query parameter.</p>
+    </li>
+    <li>
       <p><strong>v4.0</strong> — Migrate search to ElasticSearch and enable cursor-based pagination. See the <a href="{% url "migration_guide" %}">Migration Guide</a> for details.</p>
     </li>
     <li>
