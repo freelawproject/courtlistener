@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any, Dict
 from unittest import mock
@@ -86,7 +86,7 @@ from cl.search.api_views import (
     TagViewSet,
 )
 from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import SOURCES, Docket, Opinion
+from cl.search.models import SOURCES, Court, Docket, Opinion
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import MockResponse, make_client
@@ -319,6 +319,56 @@ class ApiQueryCountTests(TransactionTestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         r = self.client.get(path, {"pacer_doc_id__in": "17711118263,asdf"})
         self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    def test_count_on_query_counts(self, mock_logging_prefix) -> None:
+        """
+        Check that a v4 API request with param `count=on` only performs
+        2 queries to the database: one to check the authenticated user,
+        and another to select the count.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            path = reverse("docket-list", kwargs={"version": "v4"})
+            params = {"count": "on"}
+            self.client.get(path, params)
+
+        self.assertEqual(
+            len(ctx.captured_queries),
+            2,
+            msg=f"{len(ctx.captured_queries)} queries executed, 2 expected",
+        )
+
+        executed_queries = [query["sql"] for query in ctx.captured_queries]
+        expected_queries = [
+            'FROM "auth_user" WHERE "auth_user"."id" =',
+            'SELECT COUNT(*) AS "__count"',
+        ]
+        for executed_query, expected_fragment in zip(
+            executed_queries, expected_queries
+        ):
+            self.assertIn(
+                expected_fragment,
+                executed_query,
+                msg=f"Expected query fragment not found: {expected_fragment}",
+            )
+
+    def test_standard_request_no_count_query(
+        self, mock_logging_prefix
+    ) -> None:
+        """
+        Check that a v4 API request without param `count=on` doesn't perform
+        a count query.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            path = reverse("docket-list", kwargs={"version": "v4"})
+            self.client.get(path)
+
+        executed_queries = [query["sql"] for query in ctx.captured_queries]
+        for sql in executed_queries:
+            self.assertNotIn(
+                'SELECT COUNT(*) AS "__count"',
+                sql,
+                msg="Unexpected COUNT query found in standard request.",
+            )
 
 
 class ApiEventCreationTestCase(TestCase):
@@ -666,11 +716,202 @@ class FilteringCountTestCase:
             f"the JSON: \n{r.json()}",
         )
         got = len(r.data["results"])
+        try:
+            path = r.request.get("path")
+            query_string = r.request.get("query_string")
+            url = f"{path}?{query_string}"
+        except AttributeError:
+            url = self.path
         self.assertEqual(
             got,
             expected_count,
-            msg=f"Expected {expected_count}, but got {got}.\n\nr.data was: {r.data}",
+            msg=f"Expected {expected_count}, but got {got} in {url}\n\nr.data was: {r.data}",
         )
+        return r
+
+
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        Court.objects.all().delete()
+
+        cls.parent_court = CourtFactory(
+            id="parent1",
+            full_name="Parent Court",
+            short_name="PC",
+            citation_string="PC",
+            in_use=True,
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=False,
+            position=1,
+            start_date=date(2000, 1, 1),
+            end_date=None,
+            jurisdiction=Court.FEDERAL_APPELLATE,
+            date_modified=datetime(2021, 1, 1, tzinfo=timezone.utc),
+        )
+
+        cls.child_court1 = CourtFactory(
+            id="child1",
+            parent_court=cls.parent_court,
+            full_name="Child Court 1",
+            short_name="CC1",
+            citation_string="CC1",
+            in_use=False,
+            has_opinion_scraper=False,
+            has_oral_argument_scraper=True,
+            position=2,
+            start_date=date(2010, 6, 15),
+            end_date=date(2020, 12, 31),
+            jurisdiction=Court.STATE_SUPREME,
+            date_modified=datetime(2022, 6, 15, tzinfo=timezone.utc),
+        )
+        cls.child_court2 = CourtFactory(
+            id="child2",
+            parent_court=cls.parent_court,
+            full_name="Child Court 2",
+            short_name="CC2",
+            citation_string="CC2",
+            in_use=True,
+            has_opinion_scraper=False,
+            has_oral_argument_scraper=False,
+            position=3,
+            start_date=date(2015, 5, 20),
+            end_date=None,
+            jurisdiction=Court.STATE_TRIAL,
+            date_modified=datetime(2023, 3, 10, tzinfo=timezone.utc),
+        )
+
+        cls.orphan_court = CourtFactory(
+            id="orphan",
+            full_name="Orphan Court",
+            short_name="OC",
+            citation_string="OC",
+            in_use=True,
+            has_opinion_scraper=False,
+            has_oral_argument_scraper=False,
+            position=4,
+            start_date=date(2012, 8, 25),
+            end_date=None,
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            date_modified=datetime(2023, 5, 5, tzinfo=timezone.utc),
+        )
+
+    @async_to_sync
+    async def setUp(self):
+        self.path = reverse("court-list", kwargs={"version": "v4"})
+        self.q: Dict[str, Any] = {}
+
+    async def test_parent_court_filter(self):
+        """Can we filter courts by parent_court id?"""
+        self.q["parent_court"] = "parent1"
+        # Should return child1 and child2:
+        response = await self.assertCountInResults(2)
+
+        # Verify the returned court IDs
+        court_ids = [court["id"] for court in response.data["results"]]
+        self.assertEqual(set(court_ids), {"child1", "child2"})
+
+        # Filter for courts with parent_court id='orphan' (none should match)
+        self.q = {"parent_court": "orphan"}
+        await self.assertCountInResults(0)
+
+    async def test_no_parent_court_filter(self):
+        """Do we get all courts when using no filters?"""
+        self.q = {}
+        await self.assertCountInResults(4)  # Should return all four courts
+
+    async def test_invalid_parent_court_filter(self):
+        """Do we handle invalid parent_court values correctly?"""
+        self.q["parent_court"] = "nonexistent"
+        await self.assertCountInResults(0)
+
+    async def test_id_filter(self):
+        """Can we filter courts by id?"""
+        self.q["id"] = "child1"
+        response = await self.assertCountInResults(1)
+        self.assertEqual(response.data["results"][0]["id"], "child1")
+
+    async def test_in_use_filter(self):
+        """Can we filter courts by in_use field?"""
+        self.q = {"in_use": "true"}
+        await self.assertCountInResults(3)  # parent1, child2, orphan
+        self.q = {"in_use": "false"}
+        await self.assertCountInResults(1)  # child1
+
+    async def test_has_opinion_scraper_filter(self):
+        """Can we filter courts by has_opinion_scraper field?"""
+        self.q = {"has_opinion_scraper": "true"}
+        await self.assertCountInResults(1)  # parent1
+        self.q = {"has_opinion_scraper": "false"}
+        await self.assertCountInResults(3)  # child1, child2, orphan
+
+    async def test_has_oral_argument_scraper_filter(self):
+        """Can we filter courts by has_oral_argument_scraper field?"""
+        self.q = {"has_oral_argument_scraper": "true"}
+        await self.assertCountInResults(1)  # child1
+        self.q = {"has_oral_argument_scraper": "false"}
+        await self.assertCountInResults(3)  # parent1, child2, orphan
+
+    async def test_position_filter(self):
+        """Can we filter courts by position with integer lookups?"""
+        self.q = {"position__gt": "2"}
+        await self.assertCountInResults(2)  # child2 (3), orphan (4)
+        self.q = {"position__lte": "2"}
+        await self.assertCountInResults(2)  # parent1 (1), child1 (2)
+
+    async def test_start_date_filter(self):
+        """Can we filter courts by start_date with date lookups?"""
+        self.q = {"start_date__year": "2015"}
+        await self.assertCountInResults(1)  # child2 (2015-05-20)
+        self.q = {"start_date__gte": "2010-01-01"}
+        await self.assertCountInResults(3)  # child1, child2, orphan
+
+    async def test_end_date_filter(self):
+        """Can we filter courts by end_date with date lookups?"""
+        self.q = {"end_date__day": "31"}
+        await self.assertCountInResults(1)  # parent1, child2, orphan
+        self.q = {"end_date__year": "2024"}
+        await self.assertCountInResults(0)
+
+    async def test_short_name_filter(self):
+        """Can we filter courts by short_name with text lookups?"""
+        self.q = {"short_name__iexact": "Cc1"}
+        await self.assertCountInResults(1)  # child1
+        self.q = {"short_name__icontains": "cc"}
+        await self.assertCountInResults(2)  # child1, child2
+
+    async def test_full_name_filter(self):
+        """Can we filter courts by full_name with text lookups?"""
+        self.q = {"full_name__istartswith": "Child"}
+        await self.assertCountInResults(2)  # child1, child2
+        self.q = {"full_name__iendswith": "Court"}
+        await self.assertCountInResults(2)  # parent1, orphan
+
+    async def test_citation_string_filter(self):
+        """Can we filter courts by citation_string with text lookups?"""
+        self.q = {"citation_string": "OC"}
+        await self.assertCountInResults(1)  # orphan
+        self.q = {"citation_string__icontains": "2"}
+        await self.assertCountInResults(1)  # child2
+
+    async def test_jurisdiction_filter(self):
+        """Can we filter courts by jurisdiction?"""
+        self.q = {
+            "jurisdiction": [
+                Court.FEDERAL_APPELLATE,
+                Court.FEDERAL_DISTRICT,
+            ]
+        }
+        await self.assertCountInResults(2)  # parent1 and orphan
+
+    async def test_combined_filters(self):
+        """Can we filter courts with multiple filters applied?"""
+        self.q = {
+            "in_use": "true",
+            "has_opinion_scraper": "false",
+            "position__gt": "2",
+        }
+        await self.assertCountInResults(2)  # child2 and orphan
 
 
 class DRFJudgeApiFilterTests(
@@ -2584,3 +2825,100 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(await webhook_events.acount(), 2)
         # Confirm no milestone event should be created.
         self.assertEqual(await milestone_events.acount(), 0)
+
+
+class CountParameterTests(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
+        permissions = Permission.objects.filter(
+            codename__in=["has_recap_api_access", "has_recap_upload_access"]
+        )
+        cls.user_1.user.user_permissions.add(*permissions)
+
+        cls.court_canb = CourtFactory(id="canb")
+        cls.court_cand = CourtFactory(id="cand")
+
+        cls.url = reverse("docket-list", kwargs={"version": "v4"})
+
+        for i in range(7):
+            DocketFactory(
+                court=cls.court_canb,
+                source=Docket.RECAP,
+                pacer_case_id=str(100 + i),
+            )
+        for i in range(5):
+            DocketFactory(
+                court=cls.court_cand,
+                source=Docket.HARVARD,
+                pacer_case_id=str(200 + i),
+            )
+
+    def setUp(self):
+        self.client = make_client(self.user_1.user.pk)
+
+    async def test_count_on_returns_only_count(self):
+        """
+        Test that when 'count=on' is specified, the API returns only the count.
+        """
+        params = {"count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        # The response should only contain the 'count' key
+        self.assertEqual(list(response.data.keys()), ["count"])
+        self.assertIsInstance(response.data["count"], int)
+        # The count should match the total number of dockets
+        expected_count = await Docket.objects.acount()
+        self.assertEqual(response.data["count"], expected_count)
+
+    async def test_standard_response_includes_count_url(self):
+        """
+        Test that the standard response includes a 'count' key with the count URL.
+        """
+        response = await self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("count", response.data)
+        count_url = response.data["count"]
+        self.assertIsInstance(count_url, str)
+        self.assertIn("count=on", count_url)
+
+    async def test_invalid_count_parameter(self):
+        """
+        Test that invalid 'count' parameter values are handled appropriately.
+        """
+        params = {"count": "invalid"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        # The response should be the standard paginated response
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
+
+    async def test_count_with_filters(self):
+        """
+        Test that the count returned matches the filters applied.
+        """
+        params = {"court": "canb", "source": Docket.RECAP, "count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        expected_count = await Docket.objects.filter(
+            court__id="canb",
+            source=Docket.RECAP,
+        ).acount()
+        self.assertEqual(response.data["count"], expected_count)
+
+    async def test_count_with_no_results(self):
+        """
+        Test that 'count=on' returns zero when no results match the filters.
+        """
+        params = {"court": "cand", "source": Docket.RECAP, "count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
