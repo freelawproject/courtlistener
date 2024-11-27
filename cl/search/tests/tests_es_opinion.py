@@ -2358,6 +2358,9 @@ class RelatedSearchTest(
             < r.content.decode().index("/opinion/%i/" % expected_second_pk),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
+        # Confirm that results contain a snippet
+        self.assertIn("<mark>plain</mark>", r.content.decode())
+
         # Confirm "related to" cluster legend is within the results' header.
         h2_element = html.fromstring(r.content.decode()).xpath(
             '//h2[@id="result-count"]'

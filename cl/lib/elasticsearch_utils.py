@@ -1260,7 +1260,7 @@ def build_es_base_query(
                         {"opinion": []},
                         [],
                         mlt_query,
-                        child_highlighting=False,
+                        child_highlighting=True,
                         api_version=api_version,
                     )
                 )
