@@ -44,6 +44,8 @@ class VersionBasedPagination(PageNumberPagination):
     }
     ordering = ""
     cursor_ordering_fields = []
+    is_count_request = False
+    count = 0
 
     def __init__(self):
         super().__init__()
@@ -88,6 +90,14 @@ class VersionBasedPagination(PageNumberPagination):
 
         self.version = request.version
         self.request = request
+        self.is_count_request = (
+            request.query_params.get("count") == "on" and self.version == "v4"
+        )
+
+        if self.is_count_request:
+            self.count = queryset.count()
+            return []
+
         do_cursor_pagination, requested_ordering = (
             self.do_v4_cursor_pagination()
         )
@@ -103,10 +113,18 @@ class VersionBasedPagination(PageNumberPagination):
         )
 
     def get_paginated_response(self, data):
+        if self.is_count_request:
+            return Response({"count": self.count})
+
         do_cursor_pagination, _ = self.do_v4_cursor_pagination()
         if do_cursor_pagination:
-            # Get paginated response for CursorPagination
-            return self.cursor_paginator.get_paginated_response(data)
+            response = self.cursor_paginator.get_paginated_response(data)
+            # Build and include the count URL:
+            count_url = self.request.build_absolute_uri()
+            count_url = replace_query_param(count_url, "count", "on")
+            response.data["count"] = count_url
+            response.data.move_to_end("count", last=False)
+            return response
 
         # Get paginated response for PageNumberPagination
         return super().get_paginated_response(data)

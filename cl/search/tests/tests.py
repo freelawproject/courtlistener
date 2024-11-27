@@ -2,6 +2,7 @@ import datetime
 import io
 import os
 from datetime import date
+from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 from urllib.parse import parse_qs
@@ -1089,6 +1090,19 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             search_params,
         )
         self.assertNotIn("encountered an error", r.content.decode())
+
+    def test_raise_forbidden_error_on_depth_pagination(self) -> None:
+        """Confirm that a 403 Forbidden error is raised on depth pagination."""
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Lorem",
+            "page": 101,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):

@@ -320,6 +320,56 @@ class ApiQueryCountTests(TransactionTestCase):
         r = self.client.get(path, {"pacer_doc_id__in": "17711118263,asdf"})
         self.assertEqual(r.status_code, HTTPStatus.OK)
 
+    def test_count_on_query_counts(self, mock_logging_prefix) -> None:
+        """
+        Check that a v4 API request with param `count=on` only performs
+        2 queries to the database: one to check the authenticated user,
+        and another to select the count.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            path = reverse("docket-list", kwargs={"version": "v4"})
+            params = {"count": "on"}
+            self.client.get(path, params)
+
+        self.assertEqual(
+            len(ctx.captured_queries),
+            2,
+            msg=f"{len(ctx.captured_queries)} queries executed, 2 expected",
+        )
+
+        executed_queries = [query["sql"] for query in ctx.captured_queries]
+        expected_queries = [
+            'FROM "auth_user" WHERE "auth_user"."id" =',
+            'SELECT COUNT(*) AS "__count"',
+        ]
+        for executed_query, expected_fragment in zip(
+            executed_queries, expected_queries
+        ):
+            self.assertIn(
+                expected_fragment,
+                executed_query,
+                msg=f"Expected query fragment not found: {expected_fragment}",
+            )
+
+    def test_standard_request_no_count_query(
+        self, mock_logging_prefix
+    ) -> None:
+        """
+        Check that a v4 API request without param `count=on` doesn't perform
+        a count query.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            path = reverse("docket-list", kwargs={"version": "v4"})
+            self.client.get(path)
+
+        executed_queries = [query["sql"] for query in ctx.captured_queries]
+        for sql in executed_queries:
+            self.assertNotIn(
+                'SELECT COUNT(*) AS "__count"',
+                sql,
+                msg="Unexpected COUNT query found in standard request.",
+            )
+
 
 class ApiEventCreationTestCase(TestCase):
     """Check that events are created properly."""
@@ -2775,3 +2825,100 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(await webhook_events.acount(), 2)
         # Confirm no milestone event should be created.
         self.assertEqual(await milestone_events.acount(), 0)
+
+
+class CountParameterTests(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
+        permissions = Permission.objects.filter(
+            codename__in=["has_recap_api_access", "has_recap_upload_access"]
+        )
+        cls.user_1.user.user_permissions.add(*permissions)
+
+        cls.court_canb = CourtFactory(id="canb")
+        cls.court_cand = CourtFactory(id="cand")
+
+        cls.url = reverse("docket-list", kwargs={"version": "v4"})
+
+        for i in range(7):
+            DocketFactory(
+                court=cls.court_canb,
+                source=Docket.RECAP,
+                pacer_case_id=str(100 + i),
+            )
+        for i in range(5):
+            DocketFactory(
+                court=cls.court_cand,
+                source=Docket.HARVARD,
+                pacer_case_id=str(200 + i),
+            )
+
+    def setUp(self):
+        self.client = make_client(self.user_1.user.pk)
+
+    async def test_count_on_returns_only_count(self):
+        """
+        Test that when 'count=on' is specified, the API returns only the count.
+        """
+        params = {"count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        # The response should only contain the 'count' key
+        self.assertEqual(list(response.data.keys()), ["count"])
+        self.assertIsInstance(response.data["count"], int)
+        # The count should match the total number of dockets
+        expected_count = await Docket.objects.acount()
+        self.assertEqual(response.data["count"], expected_count)
+
+    async def test_standard_response_includes_count_url(self):
+        """
+        Test that the standard response includes a 'count' key with the count URL.
+        """
+        response = await self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("count", response.data)
+        count_url = response.data["count"]
+        self.assertIsInstance(count_url, str)
+        self.assertIn("count=on", count_url)
+
+    async def test_invalid_count_parameter(self):
+        """
+        Test that invalid 'count' parameter values are handled appropriately.
+        """
+        params = {"count": "invalid"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        # The response should be the standard paginated response
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
+
+    async def test_count_with_filters(self):
+        """
+        Test that the count returned matches the filters applied.
+        """
+        params = {"court": "canb", "source": Docket.RECAP, "count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        expected_count = await Docket.objects.filter(
+            court__id="canb",
+            source=Docket.RECAP,
+        ).acount()
+        self.assertEqual(response.data["count"], expected_count)
+
+    async def test_count_with_no_results(self):
+        """
+        Test that 'count=on' returns zero when no results match the filters.
+        """
+        params = {"court": "cand", "source": Docket.RECAP, "count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
