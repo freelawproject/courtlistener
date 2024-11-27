@@ -10,9 +10,9 @@ from django.db.models import Q, QuerySet
 from eyecite import get_citations
 from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
+from juriscraper.lib.string_utils import harmonize
 
 from cl.citations.utils import map_reporter_db_cite_type
-from cl.corpus_importer.utils import add_citations_to_cluster
 from cl.search.models import Citation, OpinionCluster
 
 logger = logging.getLogger(__name__)
@@ -59,29 +59,29 @@ def tokenize_case_name(case_name: str) -> set[str]:
     :param case_name: case name to tokenize
     :return: list of words
     """
-    return (
-        set(
-            [
-                word.lower()
-                for word in WORD_PATTERN.findall(case_name)
-                if len(word) > 1
-            ]
-        )
-        - FALSE_POSITIVES
-    )
+    words = []
+    for word in WORD_PATTERN.findall(case_name):
+        if len(word) > 1:
+            # Only keep words with more than one character
+            words.append(word)
+
+    # Return only valid words
+    return set(words) - FALSE_POSITIVES
 
 
-def check_case_names_match(csv_case_name: str, cl_case_name: str) -> bool:
+def check_case_names_match(west_case_name: str, cl_case_name: str) -> bool:
     """Compare two case name and decide whether they are the same or not
 
-    :param csv_case_name: case name from csv
+    Tokenize each string, capturing both words and abbreviations with periods and
+    convert all words to lowercase for case-insensitive matching and check if there is
+    an overlap between case names
+
+    :param west_case_name: case name from csv
     :param cl_case_name: case name from cluster
     :return: True if they match else False
     """
-    # Tokenize each string, capturing both words and abbreviations with periods and
-    # convert all words to lowercase for case-insensitive matching and check if there
-    # is an overlap between case names
-    overlap = tokenize_case_name(csv_case_name) & tokenize_case_name(
+
+    overlap = tokenize_case_name(west_case_name) & tokenize_case_name(
         cl_case_name
     )
 
@@ -90,14 +90,14 @@ def check_case_names_match(csv_case_name: str, cl_case_name: str) -> bool:
         return False
 
     # Check for "v." in title
-    if "v." not in csv_case_name.lower():
+    if "v." not in west_case_name.lower():
         # in the matter of Smith
         # if no V. - likely an "in re" case and only match on at least 1 name
         return True
 
     # otherwise check if a match occurs on both sides of the V
-    v_index = csv_case_name.lower().index("v.")
-    hit_indices = [csv_case_name.lower().find(hit) for hit in overlap]
+    v_index = west_case_name.lower().index("v.")
+    hit_indices = [west_case_name.lower().find(hit) for hit in overlap]
 
     return min(hit_indices) < v_index < max(hit_indices)
 
@@ -122,7 +122,7 @@ def parse_date(date_str: str) -> date | None:
             return datetime.strptime(date_str, fmt).date()
         except (ValueError, TypeError):
             continue
-    logger.warning(f"Invalid date format: {date_str}")
+    logger.warning("Invalid date format: %s", date_str)
     return None
 
 
@@ -136,6 +136,8 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
 
     for cite_str in citation_strings:
         # Get citations from the string
+
+        # We find all the citations that could match a cluster to update the case name
         found_cites = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
         if not found_cites:
             continue
@@ -194,12 +196,12 @@ def query_possible_matches(
 
 
 def update_matched_case_name(
-    matched_cluster: OpinionCluster, csv_case_name: str
+    matched_cluster: OpinionCluster, west_case_name: str
 ) -> tuple[bool, bool]:
     """Update case name of matched cluster and related docket if empty any of them
 
     :param matched_cluster: OpinionCluster object
-    :param csv_case_name: case name from csv row
+    :param west_case_name: case name from csv row
     :return: tuple with boolean values if cluster and related docket case name updated
     """
     cluster_case_name_updated = False
@@ -207,17 +209,17 @@ def update_matched_case_name(
 
     if not matched_cluster.case_name:
         # Save case name in cluster when we don't have it
-        matched_cluster.case_name = csv_case_name
+        matched_cluster.case_name = harmonize(west_case_name)
         matched_cluster.save()
-        logger.info(f"Case name updated for cluster id: {matched_cluster.id}")
+        logger.info("Case name updated for cluster id: %s", matched_cluster.id)
         cluster_case_name_updated = True
 
     if not matched_cluster.docket.case_name:
         # Save case name in docket when we don't have it
-        matched_cluster.docket.case_name = csv_case_name
+        matched_cluster.docket.case_name = harmonize(west_case_name)
         matched_cluster.docket.save()
         logger.info(
-            f"Case name updated for docket id: {matched_cluster.docket.id}"
+            "Case name updated for docket id: %s", matched_cluster.docket.id
         )
         docket_case_name_updated = True
 
@@ -226,6 +228,9 @@ def update_matched_case_name(
 
 def combine_initials(case_name: str) -> str:
     """Combine initials in case captions
+
+    This function identifies initials (e.g., "J. D. E.") in a case name and combines
+    them into a compressed format without spaces or periods (e.g., "JDE").
 
     :param case_name: the case caption
     :return: the cleaned case caption
@@ -252,8 +257,9 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
 
     total_clusters_updated = 0
     total_dockets_updated = 0
+    total_citations_added = 0
 
-    logger.info(f"Processing {filepath}")
+    logger.info("Processing %s", filepath)
     df = pd.read_csv(filepath).dropna()
     for row in df.itertuples():
         (
@@ -269,20 +275,21 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
 
         clean_docket_num = docket.strip('="').strip('"')
         if not clean_docket_num:
-            logger.info(f"Row index: {index} - No docket number found.")
+            logger.info("Row index: %s - No docket number found.", index)
             continue
 
         date_filed = parse_date(date_str)
         if not date_filed:
             logger.info(
-                f"Row index: {index} - No valid date found: {date_str}"
+                "Row index: %s - No valid date found: %s", index, date_str
             )
             continue
 
-        valid_citations = parse_citations([cite1, cite2])
+        west_citations: list[str] = [cite1, cite2]
+        valid_citations = parse_citations(west_citations)
 
         if not valid_citations:
-            logger.info(f"Row index: {index} - Missing two valid citations.")
+            logger.info("Row index: %s - Missing valid citations.", index)
             continue
 
         # Query for possible matches using data from row
@@ -293,7 +300,7 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
         )
 
         if not possible_matches:
-            logger.info(f"Row index: {index} - No matches found.")
+            logger.info("Row index: %s - No possible matches found.", index)
             continue
 
         matches = []
@@ -311,16 +318,31 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
                 west_case_name, cl_case_name
             )
             if case_name_match:
-                matches.append(match)
+                matches.append(match.cluster)
 
-        if len(matches) != 1:
+        if len(matches) == 0:
+            # No match found within possible matches, go to next row
+            logger.info(
+                "Row index: %s - No match found within possible matches.",
+                index,
+            )
+            continue
+        elif len(matches) > 1:
+            # More than one match, log and go to next row
+            matches_found = ", ".join([str(cluster.id) for cluster in matches])
             logger.warning(
-                f"Row index: {index} - Failed, Matches found: {len(matches)} - Matches: {[cluster.id for cluster in matches]}"
+                "Row index: %s - Multiple matches found: %s",
+                index,
+                matches_found,
             )
             continue
 
+        # Single match found
         logger.info(
-            f"Row index: {index} - Match found: {matches[0].cluster_id} - Csv case name: {west_case_name}"
+            "Row index: %s - Match found: %s - West case name: %s",
+            index,
+            matches[0].id,
+            west_case_name,
         )
 
         if dry_run:
@@ -328,7 +350,7 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
             continue
 
         with transaction.atomic():
-            matched_cluster = matches[0].cluster
+            matched_cluster = matches[0]
 
             # Update case names
             cluster_updated, docket_updated = update_matched_case_name(
@@ -342,35 +364,51 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
                 total_dockets_updated = +1
 
             # Add any of the citations if possible
+            citation_to_add = None
+
             for citation in valid_citations:
-                if Citation.objects.filter(
+
+                new_cite_str = f"{citation.get('volume')} {citation.get('reporter')} {citation.get('page')}"
+
+                cites = Citation.objects.filter(
                     cluster_id=matched_cluster.id,
                     reporter=citation.get("reporter"),
-                ).exists():
-                    # Avoid adding a citation if we already have a citation from the
-                    # citation's reporter.
-                    logger.info(
-                        f"Can't add: {citation.get('volume')} {citation.get('reporter')} {citation.get('page')} to cluster id: {matched_cluster.id}. There is already "
-                        f"a citation from that reporter."
-                    )
-                    continue
-                citation["cluster_id"] = matched_cluster.id
-                Citation.objects.get_or_create(**citation)
+                )
 
-            add_citations_to_cluster(
-                [
-                    f"{cite.get('volume')} {cite.get('reporter')} {cite.get('page')}"
-                    for cite in valid_citations
-                ],
-                matches[0].cluster_id,
-            )
+                if cites.exists():
+                    if cites[0].__str__() == new_cite_str:
+                        # We already have that citation
+                        continue
+                    # Same reporter, different citation, revert changes
+                    logger.warning(
+                        "Row index: %s - Revert changes for cluster id: %s",
+                        index,
+                        matched_cluster.id,
+                    )
+                    transaction.set_rollback(True)
+                    citation_to_add = None
+                    break
+
+                # We used one from the row to find the match, we only need to add the other citation
+                citation_to_add = citation
+
+            if citation_to_add:
+                # Add the cluster id and create the new citation
+                citation_to_add["cluster_id"] = matched_cluster.id
+                new_citation = Citation.objects.create(**citation_to_add)
+                logger.info(
+                    "New citation added: %s to cluster id: %s",
+                    new_citation,
+                    matched_cluster.id,
+                )
+                total_citations_added += 1
 
             # Wait between each processed row to avoid sending to many indexing tasks
             time.sleep(delay)
 
-    if not dry_run:
-        logger.info(f"Clusters updated: {total_clusters_updated}")
-        logger.info(f"Dockets updated: {total_dockets_updated}")
+    logger.info("Clusters updated: %s", total_clusters_updated)
+    logger.info("Dockets updated: %s", total_dockets_updated)
+    logger.info("Citations added: %s", total_citations_added)
 
 
 class Command(BaseCommand):
