@@ -63,7 +63,7 @@ def tokenize_case_name(case_name: str) -> set[str]:
     for word in WORD_PATTERN.findall(case_name):
         if len(word) > 1:
             # Only keep words with more than one character
-            words.append(word)
+            words.append(word.lower())
 
     # Return only valid words
     return set(words) - FALSE_POSITIVES
@@ -173,6 +173,9 @@ def query_possible_matches(
 ) -> QuerySet[Citation]:
     """Find matches for row data
 
+    It will remove duplicates, it could happen if we already have both citations, if we
+    have multiple matches, these must be unique
+
     :param valid_citations: list of FullCaseCitation objects
     :param docket_number: cleaned docket number from row
     :param date_filed: formatted filed date from row
@@ -188,9 +191,11 @@ def query_possible_matches(
             cluster__date_filed=date_filed,
         )
         citation_queries |= citation_query
-    possible_matches = Citation.objects.filter(
-        citation_queries
-    ).select_related("cluster")
+    possible_matches = (
+        Citation.objects.filter(citation_queries)
+        .select_related("cluster")
+        .distinct("cluster__id")
+    )
 
     return possible_matches
 
@@ -364,44 +369,32 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
                 total_dockets_updated = +1
 
             # Add any of the citations if possible
-            citation_to_add = None
-
             for citation in valid_citations:
 
-                new_cite_str = f"{citation.get('volume')} {citation.get('reporter')} {citation.get('page')}"
-
-                cites = Citation.objects.filter(
-                    cluster_id=matched_cluster.id,
+                citation["cluster_id"] = matched_cluster.id
+                if Citation.objects.filter(**citation).exists():
+                    # We already have the citation
+                    continue
+                elif Citation.objects.filter(
+                    cluster_id=citation["cluster_id"],
                     reporter=citation.get("reporter"),
-                )
-
-                if cites.exists():
-                    if cites[0].__str__() == new_cite_str:
-                        # We already have that citation
-                        continue
-                    # Same reporter, different citation, revert changes
+                ).exists():
+                    # # Same reporter, different citation, revert changes
                     logger.warning(
                         "Row index: %s - Revert changes for cluster id: %s",
                         index,
                         matched_cluster.id,
                     )
                     transaction.set_rollback(True)
-                    citation_to_add = None
                     break
-
-                # We used one from the row to find the match, we only need to add the other citation
-                citation_to_add = citation
-
-            if citation_to_add:
-                # Add the cluster id and create the new citation
-                citation_to_add["cluster_id"] = matched_cluster.id
-                new_citation = Citation.objects.create(**citation_to_add)
-                logger.info(
-                    "New citation added: %s to cluster id: %s",
-                    new_citation,
-                    matched_cluster.id,
-                )
-                total_citations_added += 1
+                else:
+                    new_citation = Citation.objects.create(**citation)
+                    logger.info(
+                        "New citation added: %s to cluster id: %s",
+                        new_citation,
+                        matched_cluster.id,
+                    )
+                    total_citations_added += 1
 
             # Wait between each processed row to avoid sending to many indexing tasks
             time.sleep(delay)
