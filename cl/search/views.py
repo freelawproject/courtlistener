@@ -729,6 +729,7 @@ def do_es_search(
     query_citation = None
     facet_fields = []
     missing_citations_str = []
+    error = True
 
     search_form = SearchForm(get_params, is_es_form=True, courts=courts)
     match get_params.get("type", SEARCH_TYPES.OPINION):
@@ -827,8 +828,6 @@ def do_es_search(
                     cd if not error else {"type": cd["type"]},
                     search_form,
                 )
-    else:
-        error = True
 
     courts, court_count_human, court_count = merge_form_with_courts(
         courts, search_form
