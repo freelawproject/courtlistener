@@ -31,8 +31,29 @@
   <h1 id="about">REST API Change Log</h1>
   <ul>
     <li>
-      <p><strong>v4.1</strong>&mdash; This version adds new <code>count=on</code> query parameter to paginated endpoints, allowing for efficient retrieval of total item counts without fetching actual data. Additionally, search results across all search types have been improved by incorporating <strong>score</strong> values to the payload.</p>
-      <p>The docket entry endpoint now supports flexible result sorting through the <code>order_by</code> query parameter. For more precise filtering, the parties and attorneys endpoint has been enhanced with the <code>filter_nested_results=True</code> query parameter. Finally, the court endpoint now allows filtering of results based on parent court relationships using the <code>parent_court</code> query parameter.</p>
+      <p><strong>v4.1</strong>&mdash; This release introduces a number of enhancements aimed at improving the efficiency and flexibility of your data retrieval.</p>
+      <ul>
+        <li><strong>Enhanced Paginated Endpoints:</strong> Introduced the <a href="{% url "rest_docs" %}#counting">count=on</a> query parameter to efficiently retrieve total item counts without fetching actual data
+          (<a href="https://github.com/freelawproject/courtlistener/issues/4506">Issue #4506</a>, <a
+            href="https://github.com/freelawproject/courtlistener/pull/4715">PR #4715</a>).
+        </li>
+        <li><strong>Search Results:</strong> Improved search results across all search types by incorporating <a href="{% url "search_api_help" %}#notes">score values</a> to the payload
+          (<a href="https://github.com/freelawproject/courtlistener/issues/4312">Issue #4312</a>, <a
+            href="https://github.com/freelawproject/courtlistener/pull/4712">PR #4712</a>).
+        </li>
+        <li><strong>Flexible Docket Entry Sorting:</strong> The <code>order_by</code> query parameter has been added to the <a href="{% url "pacer_api_help" %}#docket-entry-endpoint">Docket Entry endpoint</a>, enabling you to sort results based on various fields.
+          (<a href="https://github.com/freelawproject/courtlistener/issues/4061">Issue #4061</a>, <a
+            href="https://github.com/freelawproject/courtlistener/pull/4700">PR #4700</a>).
+        </li>
+        <li><strong>Deeper Filtering for Parties and Attorneys:</strong> The <a href="{% url "pacer_api_help" %}#party-endpoint">parties</a> and <a href="{% url "pacer_api_help" %}#attorney-endpoint">attorneys</a> API endpoint has been upgraded with the filter_nested_results=True query parameter. This enables granular filtering of nested data, providing more control over the retrieved information.
+          (<a href="https://github.com/freelawproject/courtlistener/issues/4054">Issue #4054</a>, <a
+            href="https://github.com/freelawproject/courtlistener/pull/4729">PR #4729</a>).
+        </li>
+        <li><strong>Enhanced Court Filtering:</strong> The <code>parent_court</code> query parameter has been added to the <a href="{% url "pacer_api_help" %}#court-endpoint">Court endpoint</a>, allowing you to filter results based on parent-child relationships between courts.
+          (<a href="https://github.com/freelawproject/courtlistener/issues/4711">Issue #4711</a>, <a
+            href="https://github.com/freelawproject/courtlistener/pull/4744">PR #4744</a>).
+        </li>
+      </ul>
     </li>
     <li>
       <p><strong>v4.0</strong> — Migrate search to ElasticSearch and enable cursor-based pagination. See the <a href="{% url "migration_guide" %}">Migration Guide</a> for details.</p>
