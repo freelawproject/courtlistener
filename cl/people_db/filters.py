@@ -324,7 +324,7 @@ class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
     join_table_cleanup_mapping = {
         "parties_represented__docket": "docket",
         "parties_represented__attorney": "attorney",
-        "parties_represented": "parties",
+        "parties_represented": "party",
     }
 
     class Meta:
