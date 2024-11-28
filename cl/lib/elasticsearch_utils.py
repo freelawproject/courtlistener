@@ -196,7 +196,10 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
         for pair in opinion_cluster_pairs
     ] or [
         {"_id": f"o_{pk}"} for pk in related_ids
-    ]  # Fall back in case IDs are not found in DB.
+    ]  # Fallback in case IDs are not found in the database.
+    # The user might have provided non-existent Opinion IDs.
+    # This ensures that the query does not raise an error and instead returns
+    # no results.
 
     more_like_this_fields = SEARCH_MLT_OPINION_QUERY_FIELDS.copy()
     mlt_query = Q(
