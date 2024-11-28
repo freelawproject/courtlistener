@@ -3107,7 +3107,7 @@ def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
 
 def do_collapse_count_query(
     search_type: str, main_query: Search, query: Query
-) -> int | None:
+) -> int:
     """Execute an Elasticsearch count query for queries that uses collapse.
     Uses a query with aggregation to determine the number of unique opinions
     based on the 'cluster_id' or 'docket_id' according to the search_type.
@@ -3132,7 +3132,7 @@ def do_collapse_count_query(
             f"Error on count query request: {search_query.to_dict()}"
         )
         logger.warning(f"Error was: {e}")
-        total_results = None
+        total_results = 0
     return total_results
 
 
