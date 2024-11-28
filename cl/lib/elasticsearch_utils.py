@@ -176,22 +176,45 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
     exclusions for specific opinion clusters.
     """
 
-    document_list = [{"_id": f"o_{id}"} for id in related_ids]
+    opinion_cluster_pairs = [
+        opinion_pair
+        for opinion_id in related_ids
+        if (
+            opinion_pair := await Opinion.objects.filter(pk=opinion_id)
+            .values("pk", "cluster_id")
+            .afirst()
+        )
+    ]
+    unique_clusters = {pair["cluster_id"] for pair in opinion_cluster_pairs}
+
+    document_list = [
+        {
+            "_id": f'o_{pair["pk"]}',
+            "routing": pair["cluster_id"],
+            # Important to match documents in the production cluster
+        }
+        for pair in opinion_cluster_pairs
+    ] or [
+        {"_id": f"o_{pk}"} for pk in related_ids
+    ]  # Fallback in case IDs are not found in the database.
+    # The user might have provided non-existent Opinion IDs.
+    # This ensures that the query does not raise an error and instead returns
+    # no results.
+
     more_like_this_fields = SEARCH_MLT_OPINION_QUERY_FIELDS.copy()
     mlt_query = Q(
         "more_like_this",
         fields=more_like_this_fields,
         like=document_list,
-        min_term_freq=1,
-        max_query_terms=12,
+        min_term_freq=settings.RELATED_MLT_MINTF,
+        max_query_terms=settings.RELATED_MLT_MAXQT,
+        min_word_length=settings.RELATED_MLT_MINWL,
+        max_word_length=settings.RELATED_MLT_MAXWL,
+        max_doc_freq=settings.RELATED_MLT_MAXDF,
+        analyzer="search_analyzer_exact",
     )
     # Exclude opinion clusters to which the related IDs to query belong.
-    cluster_ids_to_exclude = (
-        OpinionCluster.objects.filter(sub_opinions__pk__in=related_ids)
-        .distinct("pk")
-        .values_list("pk", flat=True)
-    )
-    cluster_ids_list = [pk async for pk in cluster_ids_to_exclude.aiterator()]
+    cluster_ids_list = list(unique_clusters)
     exclude_cluster_ids = [Q("terms", cluster_id=cluster_ids_list)]
     bool_query = Q("bool", must=[mlt_query], must_not=exclude_cluster_ids)
     return bool_query
@@ -1240,7 +1263,7 @@ def build_es_base_query(
                         {"opinion": []},
                         [],
                         mlt_query,
-                        child_highlighting=False,
+                        child_highlighting=True,
                         api_version=api_version,
                     )
                 )
