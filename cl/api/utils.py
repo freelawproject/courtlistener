@@ -157,7 +157,7 @@ class FilterManyToManyMixin:
         filters = {}
         filter_label = self._get_filter_label(name)
         base_model_prefix = self._meta.model._meta.model_name
-        for filter_key, value in self.data.items():
+        for filter_key, value in self.form.cleaned_data.items():
             # Skip custom filtering options triggered by the user
             if filter_key.startswith(filter_label):
                 continue
