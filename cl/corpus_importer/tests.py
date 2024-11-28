@@ -4088,9 +4088,14 @@ class CaseNamesTest(SimpleTestCase):
         """Can we check if the case names match?"""
         case_names_tests = (
             (
+                "U.S. v. Smith",
+                "United States v. Smith",
+                True,
+            ),
+            (
                 "US v. Guerrero-Martinez",  # 736793
                 "United States v. Hector Guerrero-Martinez, AKA Hector Guerrero AKA Hector Martinez-Guerrero",
-                False,
+                True,
             ),
             (
                 "In re CP",  # 2140442
@@ -4125,5 +4130,7 @@ class CaseNamesTest(SimpleTestCase):
         )
         for wl_casename, cl_casename, overlap in case_names_tests:
             self.assertEqual(
-                check_case_names_match(wl_casename, cl_casename), overlap
+                check_case_names_match(wl_casename, cl_casename),
+                overlap,
+                msg="Case names don't match",
             )

@@ -54,13 +54,14 @@ DATE_FORMATS = (
 def tokenize_case_name(case_name: str) -> set[str]:
     """Tokenizes case name and removes single-character words except for letters with periods.
 
-    Also removes false positive words
+    It uses harmonize() from juriscraper to make case names cleaner
+    Also removes false positive words, e.g. (U.S -> United States)
 
     :param case_name: case name to tokenize
     :return: list of words
     """
     words = []
-    for word in WORD_PATTERN.findall(case_name):
+    for word in WORD_PATTERN.findall(harmonize(case_name)):
         if len(word) > 1:
             # Only keep words with more than one character
             words.append(word.lower())
