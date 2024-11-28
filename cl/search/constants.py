@@ -110,10 +110,10 @@ SEARCH_OPINION_QUERY_FIELDS = [
     "syllabus",
 ]
 SEARCH_MLT_OPINION_QUERY_FIELDS = [
-    "procedural_history",
-    "posture",
-    "syllabus",
-    "text",
+    "procedural_history.exact",
+    "posture.exact",
+    "syllabus.exact",
+    "text.exact",
 ]
 
 # ES fields that are used for highlighting
