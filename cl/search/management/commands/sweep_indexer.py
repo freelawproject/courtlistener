@@ -359,7 +359,7 @@ class Command(VerboseCommand):
         processed_count = 0
         accumulated_chunk = 0
         throttle = CeleryThrottle(
-            poll_interval=settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL,
+            poll_interval=settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL,  # type: ignore
             min_items=self.chunk_size,
             queue_name=self.queue,
         )
@@ -412,7 +412,7 @@ class Command(VerboseCommand):
                     # it will wait for 0.1 seconds for every 10 documents processed,
                     # maintaining an index rate of 100 documents per second.
                     time.sleep(
-                        1 / settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL
+                        1 / settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL  # type: ignore
                     )
                 self.stdout.write(
                     "\rProcessed {}/{}, ({:.0%}), last {} ID indexed: {},".format(
