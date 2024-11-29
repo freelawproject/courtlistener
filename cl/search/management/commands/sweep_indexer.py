@@ -406,13 +406,13 @@ class Command(VerboseCommand):
 
                 accumulated_chunk += len(chunk)
                 if not testing_mode:
-                    # Wait for 1/ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL
+                    # Wait for 1/ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS
                     # before processing the next chunk.
                     # e.g: With a poll interval of 10 and a chunk size of 10,
                     # it will wait for 0.1 seconds for every 10 documents processed,
                     # maintaining an index rate of 100 documents per second.
                     time.sleep(
-                        1 / settings.ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL  # type: ignore
+                        1 / settings.ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS  # type: ignore
                     )
                 self.stdout.write(
                     "\rProcessed {}/{}, ({:.0%}), last {} ID indexed: {},".format(
