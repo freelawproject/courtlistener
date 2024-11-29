@@ -230,12 +230,20 @@ def update_matched_case_name(
     return cluster_case_name_updated, docket_case_name_updated
 
 
-def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
+def process_csv(
+    filepath: str,
+    delay: float,
+    dry_run: bool,
+    limit: int | None,
+    start_row: int,
+) -> None:
     """Process rows from csv file
 
     :param filepath: path to csv file
     :param delay: delay between saves in seconds
     :param dry_run: flag to simulate update process
+    :param limit: limit number of rows to process
+    :param start_row: start row
     """
 
     total_clusters_updated = 0
@@ -243,7 +251,19 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
     total_citations_added = 0
 
     logger.info("Processing %s", filepath)
-    df = pd.read_csv(filepath).dropna()
+
+    # Generate rows to skip, excluding the header row
+    skip_rows = list(range(1, start_row)) if start_row else None
+
+    df = pd.read_csv(filepath, skiprows=skip_rows, nrows=limit).dropna()
+
+    # Reset the index to start from 0 (needed if we pass skip_rows param)
+    df.reset_index(drop=True, inplace=True)
+
+    if start_row:
+        # Update rows index to reflect the original csv row numbers
+        df.index = range(start_row, start_row + len(df))
+
     for row in df.itertuples():
         index, case_name, court, date_str, cite1, cite2, docket, _ = row
         west_case_name = harmonize(case_name)
@@ -391,15 +411,30 @@ class Command(BaseCommand):
             action="store_true",
             help="Simulate the update process without making changes",
         )
+        parser.add_argument(
+            "--start-row",
+            default=0,
+            type=int,
+            help="Start row (inclusive).",
+        )
+        parser.add_argument(
+            "--limit",
+            default=None,
+            type=int,
+            help="Limit number of rows to process.",
+            required=False,
+        )
 
     def handle(self, *args, **options):
         filepath = options["filepath"]
         delay = options["delay"]
         dry_run = options["dry_run"]
+        limit = options["limit"]
+        start_row = options["start_row"]
 
         if not filepath:
             raise CommandError(
                 "Filepath is required. Use --filepath to specify the CSV file location."
             )
 
-        process_csv(filepath, delay, dry_run)
+        process_csv(filepath, delay, dry_run, limit, start_row)
