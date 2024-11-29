@@ -76,6 +76,10 @@ def update_latest_case_id_and_schedule_iquery_sweep(docket: Docket) -> None:
                 countdown=task_scheduled_countdown,
                 queue=settings.CELERY_IQUERY_QUEUE,
             )
+            logger.info(
+                f"Enqueued iquery docket case ID: {iquery_pacer_case_id_current} "
+                f"for court {court_id} with countdown {task_scheduled_countdown}"
+            )
 
         # Update the iquery_pacer_case_id_current in Redis
         r.hset(
