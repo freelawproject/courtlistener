@@ -9,9 +9,9 @@ $('.star-pagination').each(function (index, element) {
   if ($(this).attr('pagescheme')) {
     // For ANON 2020 this has two sets of numbers but only one can be
     // verified with other databses so only showing one
-    var number = $(this).attr('number')
-    if (number.indexOf("P") > -1) {
-      $(this).attr('label', "");
+    var number = $(this).attr('number');
+    if (number.indexOf('P') > -1) {
+      $(this).attr('label', '');
     } else {
       $(this).attr('label', number);
     }
