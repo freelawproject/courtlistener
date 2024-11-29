@@ -1,3 +1,5 @@
+from typing import Any
+
 import rest_framework_filters as filters
 from django.db.models import Prefetch, QuerySet
 
@@ -251,7 +253,42 @@ class PersonFilter(NoEmptyFilterSet):
         }
 
 
-class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
+class RoleFilteringMixin(FilterManyToManyMixin):
+
+    def filter_roles(
+        filterset: FilterManyToManyMixin, qs: QuerySet, name: str, value: Any
+    ) -> QuerySet:
+        """
+        Filters a QuerySet based on a many-to-many relationship involving the
+        `Role` model.
+
+        Args:
+            filterset: An instance of `FilterManyToManyMixin` used to construct
+            filters.
+            qs: The original QuerySet to be filtered.
+            name: The name of the many-to-many field to filter on.
+            value: The value to filter the many-to-many relationship with.
+
+        Returns:
+            The filtered QuerySet, prefetched with the filtered many-to-many
+            relationship.
+        """
+        if not value:
+            return qs
+
+        role_filters = filterset.get_filters_for_join_table(name)
+        if not role_filters:
+            return qs
+
+        prefetch = Prefetch(
+            name,
+            queryset=Role.objects.filter(**role_filters),
+            to_attr=f"filtered_{name}",
+        )
+        return qs.prefetch_related(prefetch)
+
+
+class PartyFilter(NoEmptyFilterSet, RoleFilteringMixin):
     docket = filters.RelatedFilter(
         "cl.search.filters.DocketFilter",
         field_name="dockets",
@@ -286,21 +323,8 @@ class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
             "name": ALL_TEXT_LOOKUPS,
         }
 
-    def filter_roles(self, qs, name, value):
-        if not value:
-            return qs
 
-        role_filters = self.get_filters_for_join_table(name)
-
-        prefetch = Prefetch(
-            name,
-            queryset=Role.objects.filter(**role_filters),
-            to_attr=f"filtered_{name}",
-        )
-        return qs.prefetch_related(prefetch)
-
-
-class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
+class AttorneyFilter(NoEmptyFilterSet, RoleFilteringMixin):
     docket = filters.RelatedFilter(
         "cl.search.filters.DocketFilter",
         field_name="roles__docket",
@@ -335,16 +359,3 @@ class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
             "date_modified": DATETIME_LOOKUPS,
             "name": ALL_TEXT_LOOKUPS,
         }
-
-    def filter_roles(self, qs, name, value):
-        if not value:
-            return qs
-
-        role_filters = self.get_filters_for_join_table(name)
-
-        prefetch = Prefetch(
-            name,
-            queryset=Role.objects.filter(**role_filters),
-            to_attr=f"filtered_{name}",
-        )
-        return qs.prefetch_related(prefetch)
