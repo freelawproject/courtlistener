@@ -28,6 +28,7 @@ from rest_framework.request import clone_request
 from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
+from rest_framework_filters.filterset import related
 
 from cl.api.models import (
     WEBHOOK_EVENT_STATUS,
@@ -136,6 +137,26 @@ class FilterManyToManyMixin:
         }
         return FIELD_NAME_LABEL_MAPPING[field_name]
 
+    def _clean_join_table_key(self, key: str) -> str:
+        """
+        Cleans and adjusts a given key for compatibility with prefetch queries.
+
+        This method modifies specific lookups within the `key` to ensure
+        correct filtering when used in prefetch queries. It iterates over a
+        mapping of URL keys to new keys, replacing instances of URL keys with
+        their corresponding new keys.
+
+        Args:
+            key (str): The original key to be cleaned.
+
+        Returns:
+            str: The cleaned key, adjusted for prefetch query compatibility.
+        """
+        join_table_key = key
+        for url_key, new_key in self.join_table_cleanup_mapping.items():
+            join_table_key = join_table_key.replace(url_key, new_key, 1)
+        return join_table_key
+
     def get_filters_for_join_table(
         self: FilterSet, name: str
     ) -> dict[str, Any]:
@@ -154,30 +175,25 @@ class FilterManyToManyMixin:
             dict: A dictionary containing the filtered criteria for the join
             table query.
         """
-        filters = {}
+        filters: dict[str, Any] = {}
         filter_label = self._get_filter_label(name)
-        base_model_prefix = self._meta.model._meta.model_name
-        for filter_key, value in self.form.cleaned_data.items():
-            # Skip custom filtering options triggered by the user
-            if filter_key.startswith(filter_label):
+        # Iterate over related filtersets
+        for related_name, related_filterset in self.related_filtersets.items():
+            prefix = f"{related(self, related_name)}{LOOKUP_SEP}"
+            # Check if the related filterset has data to apply
+            if not any(value.startswith(prefix) for value in self.data):
+                # Skip processing if no parameter starts with the prefix
                 continue
 
-            cleaned_key = filter_key
-            # Add base model prefix for fields in Meta class
-            for basic_field, _ in self._meta.fields.items():
-                if cleaned_key.startswith(basic_field):
-                    cleaned_key = (
-                        f"{base_model_prefix}{LOOKUP_SEP}{filter_key}"
-                    )
-
-            # Adjust specific lookups for prefetch query compatibility
-            #
-            # To ensure correct filtering, we need to modify these lookups to
-            # reference the appropriate table and field names.
-            for url_key, new_key in self.join_table_cleanup_mapping.items():
-                cleaned_key = cleaned_key.replace(url_key, new_key, 1)
-
-            filters[cleaned_key] = value
+            # Create a dictionary to store cleaned keys and values
+            cleaned_keys = {
+                self._clean_join_table_key(f"{prefix}{key}"): value
+                for key, value in related_filterset.form.cleaned_data.items()
+                # Only include keys with values and not starting with the filter label
+                if value and not key.startswith(filter_label)
+            }
+            # Update the filters with the cleaned keys
+            filters = filters | cleaned_keys
 
         return filters
 
