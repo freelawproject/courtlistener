@@ -79,8 +79,8 @@ def check_case_names_match(west_case_name: str, cl_case_name: str) -> bool:
     :return: True if they match else False
     """
 
-    west_set = tokenize_case_name(west_case_name)
-    cl_set = tokenize_case_name(cl_case_name)
+    west_set = tokenize_case_name(west_case_name.lower())
+    cl_set = tokenize_case_name(cl_case_name.lower())
 
     overlap = west_set & cl_set
     if not overlap:
@@ -98,7 +98,6 @@ def check_case_names_match(west_case_name: str, cl_case_name: str) -> bool:
     # otherwise check if a match occurs on both sides of the `v.`
     v_index = west_case_name.lower().index("v.")
     hit_indices = [west_case_name.lower().find(hit) for hit in overlap]
-
     return min(hit_indices) < v_index < max(hit_indices)
 
 
@@ -231,27 +230,6 @@ def update_matched_case_name(
     return cluster_case_name_updated, docket_case_name_updated
 
 
-def combine_initials(case_name: str) -> str:
-    """Combine initials in case captions
-
-    This function identifies initials (e.g., "J. D. E.") in a case name and combines
-    them into a compressed format without spaces or periods (e.g., "JDE").
-
-    :param case_name: the case caption
-    :return: the cleaned case caption
-    """
-
-    initials_pattern = re.compile(r"(\b[A-Z]\.?\s?){2,}(\s|$)")
-
-    matches = initials_pattern.finditer(case_name)
-    if matches:
-        for match in matches:
-            initials = match.group()
-            compressed_initials = re.sub(r"(?!\s$)[\s\.]", "", initials)
-            case_name = case_name.replace(initials, compressed_initials)
-    return case_name
-
-
 def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
     """Process rows from csv file
 
@@ -306,9 +284,6 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
                 if match.cluster.case_name_full
                 else match.cluster.case_name
             )
-
-            west_case_name = combine_initials(west_case_name)
-            cl_case_name = combine_initials(cl_case_name)
 
             case_name_match = check_case_names_match(
                 west_case_name, cl_case_name

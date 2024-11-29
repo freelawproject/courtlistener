@@ -4093,7 +4093,7 @@ class CaseNamesTest(SimpleTestCase):
                 True,
             ),
             (
-                "US v. Guerrero-Martinez",  # 736793
+                "United States v. Guerrero-Martinez",  # 736793
                 "United States v. Hector Guerrero-Martinez, AKA Hector Guerrero AKA Hector Martinez-Guerrero",
                 True,
             ),
@@ -4132,5 +4132,5 @@ class CaseNamesTest(SimpleTestCase):
             self.assertEqual(
                 check_case_names_match(wl_casename, cl_casename),
                 overlap,
-                msg="Case names don't match",
+                msg=f"Case names don't match: {wl_casename} - {cl_casename}",
             )
