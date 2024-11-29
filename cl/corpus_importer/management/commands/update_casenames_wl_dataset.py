@@ -54,14 +54,11 @@ DATE_FORMATS = (
 def tokenize_case_name(case_name: str) -> set[str]:
     """Tokenizes case name and removes single-character words except for letters with periods.
 
-    It uses harmonize() from juriscraper to make case names cleaner
-    Also removes false positive words, e.g. (U.S -> United States)
-
     :param case_name: case name to tokenize
     :return: list of words
     """
     words = []
-    for word in WORD_PATTERN.findall(harmonize(case_name)):
+    for word in WORD_PATTERN.findall(case_name):
         if len(word) > 1:
             # Only keep words with more than one character
             words.append(word.lower())
@@ -82,21 +79,23 @@ def check_case_names_match(west_case_name: str, cl_case_name: str) -> bool:
     :return: True if they match else False
     """
 
-    overlap = tokenize_case_name(west_case_name) & tokenize_case_name(
-        cl_case_name
-    )
+    west_set = tokenize_case_name(west_case_name)
+    cl_set = tokenize_case_name(cl_case_name)
 
+    overlap = west_set & cl_set
     if not overlap:
         # if no hits no match on name - move along
         return False
 
     # Check for "v." in title
-    if "v." not in west_case_name.lower():
+    if "v." not in west_case_name.lower() or (
+        len(cl_set) == 1 or len(west_set) == 1
+    ):
         # in the matter of Smith
         # if no V. - likely an "in re" case and only match on at least 1 name
         return True
 
-    # otherwise check if a match occurs on both sides of the V
+    # otherwise check if a match occurs on both sides of the `v.`
     v_index = west_case_name.lower().index("v.")
     hit_indices = [west_case_name.lower().find(hit) for hit in overlap]
 
@@ -215,14 +214,14 @@ def update_matched_case_name(
 
     if not matched_cluster.case_name:
         # Save case name in cluster when we don't have it
-        matched_cluster.case_name = harmonize(west_case_name)
+        matched_cluster.case_name = west_case_name
         matched_cluster.save()
         logger.info("Case name updated for cluster id: %s", matched_cluster.id)
         cluster_case_name_updated = True
 
     if not matched_cluster.docket.case_name:
         # Save case name in docket when we don't have it
-        matched_cluster.docket.case_name = harmonize(west_case_name)
+        matched_cluster.docket.case_name = west_case_name
         matched_cluster.docket.save()
         logger.info(
             "Case name updated for docket id: %s", matched_cluster.docket.id
@@ -268,17 +267,8 @@ def process_csv(filepath: str, delay: float, dry_run: bool) -> None:
     logger.info("Processing %s", filepath)
     df = pd.read_csv(filepath).dropna()
     for row in df.itertuples():
-        (
-            index,
-            west_case_name,
-            court,
-            date_str,
-            cite1,
-            cite2,
-            docket,
-            volume,
-        ) = row
-
+        index, case_name, court, date_str, cite1, cite2, docket, _ = row
+        west_case_name = harmonize(case_name)
         clean_docket_num = docket.strip('="').strip('"')
         if not clean_docket_num:
             logger.info("Row index: %s - No docket number found.", index)
