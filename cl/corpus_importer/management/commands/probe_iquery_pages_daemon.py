@@ -81,7 +81,7 @@ with ID of 1032, the signal will catch that and create tasks to fill in numbers
         iterations_completed = 0
         r = get_redis_interface("CACHE")
         testing = True if testing_iterations else False
-        while True and settings.IQUERY_PROBE_DAEMON_ENABLED:
+        while True and settings.IQUERY_CASE_PROBE_DAEMON_ENABLED:
             for court_id in court_ids:
                 if r.exists(f"iquery:court_wait:{court_id}"):
                     continue

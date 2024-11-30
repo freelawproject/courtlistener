@@ -3346,7 +3346,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
 @override_settings(
-    IQUERY_PROBE_DAEMON_ENABLED=True,
+    IQUERY_CASE_PROBE_DAEMON_ENABLED=True,
     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
     EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"],
 )
