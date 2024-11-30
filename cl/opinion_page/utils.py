@@ -298,7 +298,7 @@ async def es_get_related_clusters_with_cache(
         return related_cluster_result
 
     related_query = await build_related_clusters_query(
-        cluster_search, sub_opinion_pks, search_params
+        cluster_search, sub_opinion_pks
     )
 
     related_query = related_query.params(
