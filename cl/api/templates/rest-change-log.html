@@ -41,11 +41,11 @@
           (<a href="https://github.com/freelawproject/courtlistener/issues/4312">Issue #4312</a>, <a
             href="https://github.com/freelawproject/courtlistener/pull/4712">PR #4712</a>).
         </li>
-        <li><strong>Flexible Docket Entry Sorting:</strong> The <code>order_by</code> query parameter has been added to the <a href="{% url "pacer_api_help" %}#docket-entry-endpoint">Docket Entry endpoint</a>, enabling you to sort results based on various fields.
+        <li><strong>Flexible Docket Entry Sorting:</strong> The <a href="{% url "pacer_api_help" %}#docket-entry-endpoint">Docket Entry endpoint</a> now supports sorting results by <code>recap_sequence_number</code> and <code>entry_number</code>.  This added flexibility allows you to customize your data retrieval to meet specific requirements.
           (<a href="https://github.com/freelawproject/courtlistener/issues/4061">Issue #4061</a>, <a
             href="https://github.com/freelawproject/courtlistener/pull/4700">PR #4700</a>).
         </li>
-        <li><strong>Deeper Filtering for Parties and Attorneys:</strong> The <a href="{% url "pacer_api_help" %}#party-endpoint">parties</a> and <a href="{% url "pacer_api_help" %}#attorney-endpoint">attorneys</a> API endpoint has been upgraded with the filter_nested_results=True query parameter. This enables granular filtering of nested data, providing more control over the retrieved information.
+        <li><strong>Deeper Filtering for Parties and Attorneys:</strong> The <a href="{% url "pacer_api_help" %}#party-endpoint">parties</a> and <a href="{% url "pacer_api_help" %}#attorney-endpoint">attorneys</a> API endpoint has been upgraded with the <code>filter_nested_results=True</code> query parameter. This enables granular filtering of nested data, providing more control over the retrieved information.
           (<a href="https://github.com/freelawproject/courtlistener/issues/4054">Issue #4054</a>, <a
             href="https://github.com/freelawproject/courtlistener/pull/4729">PR #4729</a>).
         </li>
