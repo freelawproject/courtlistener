@@ -12,14 +12,17 @@ from cl.opinion_page.views import (
     download_docket_entries_csv,
     redirect_docket_recap,
     redirect_og_lookup,
-    view_authorities,
     view_docket,
     view_docket_feed,
     view_opinion,
+    view_opinion_authorities,
+    view_opinion_cited_by,
+    view_opinion_pdf,
+    view_opinion_related_cases,
+    view_opinion_summaries,
     view_parties,
     view_recap_authorities,
     view_recap_document,
-    view_summaries,
 )
 
 urlpatterns = [
@@ -32,16 +35,6 @@ urlpatterns = [
     ),
     # Opinion pages
     path(
-        "opinion/<int:pk>/<blank-slug:slug>/summaries/",
-        view_summaries,  # type: ignore[arg-type]
-        name="view_summaries",
-    ),
-    path(
-        "opinion/<int:pk>/<blank-slug:slug>/authorities/",
-        view_authorities,  # type: ignore[arg-type]
-        name="view_authorities",
-    ),
-    path(
         "opinion/<int:pk>/<blank-slug:slug>/visualizations/",
         cluster_visualizations,  # type: ignore[arg-type]
         name="cluster_visualizations",
@@ -52,6 +45,31 @@ urlpatterns = [
         name="docket_feed",
     ),
     path("opinion/<int:pk>/<blank-slug:_>/", view_opinion, name="view_case"),  # type: ignore[arg-type]
+    path(
+        "opinion/<int:pk>/<blank-slug:_>/authorities/",
+        view_opinion_authorities,
+        name="view_case_authorities",
+    ),  # with the tab
+    path(
+        "opinion/<int:pk>/<blank-slug:_>/cited-by/",
+        view_opinion_cited_by,
+        name="view_case_cited_by",
+    ),  # with the tab
+    path(
+        "opinion/<int:pk>/<blank-slug:_>/summaries/",
+        view_opinion_summaries,
+        name="view_case_summaries",
+    ),  # with the tab
+    path(
+        "opinion/<int:pk>/<blank-slug:_>/related-cases/",
+        view_opinion_related_cases,
+        name="view_case_related_cases",
+    ),  # with the tab
+    path(
+        "opinion/<int:pk>/<blank-slug:_>/pdf/",
+        view_opinion_pdf,
+        name="view_case_pdf",
+    ),  # with the tab
     path(
         "docket/<int:docket_id>/download/",
         download_docket_entries_csv,  # type: ignore[arg-type]

@@ -1171,6 +1171,7 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         )
 
 
+@override_flag("ui_flag_for_o", False)
 class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -1311,6 +1312,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         for result in search_results.find_elements(By.TAG_NAME, "article"):
             self.assertIn("1337", result.text)
 
+    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self) -> None:
         # Dora navitages to CL and does a simple wild card search
