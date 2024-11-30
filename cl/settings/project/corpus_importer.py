@@ -1,8 +1,8 @@
 import environ
 
 env = environ.FileAwareEnv()
-IQUERY_PROBE_DAEMON_ENABLED = env.int(
-    "IQUERY_PROBE_DAEMON_ENABLED", default=False
+IQUERY_CASE_PROBE_DAEMON_ENABLED = env.bool(
+    "IQUERY_CASE_PROBE_DAEMON_ENABLED", default=False
 )
 IQUERY_PROBE_ITERATIONS = env.int("IQUERY_PROBE_ITERATIONS", default=9)
 IQUERY_PROBE_WAIT = env.int("IQUERY_PROBE_WAIT", default=300)
