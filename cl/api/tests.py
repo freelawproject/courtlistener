@@ -1,5 +1,5 @@
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any, Dict
 from unittest import mock
@@ -8,9 +8,12 @@ from urllib.parse import parse_qs, urlparse
 from asgiref.sync import async_to_sync, sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
+from django.contrib.sites.models import Site
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
+from django.test import override_settings
 from django.test.client import AsyncClient, AsyncRequestFactory
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -21,9 +24,11 @@ from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
 from cl.alerts.api_views import DocketAlertViewSet, SearchAlertViewSet
+from cl.api.api_permissions import V3APIPermission
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import VersionBasedPagination
+from cl.api.utils import LoggingMixin, get_logging_prefix
 from cl.api.views import coverage_data
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
@@ -81,7 +86,7 @@ from cl.search.api_views import (
     TagViewSet,
 )
 from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import SOURCES, Docket, Opinion
+from cl.search.models import SOURCES, Court, Docket, Opinion
 from cl.stats.models import Event
 from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
 from cl.tests.utils import MockResponse, make_client
@@ -216,6 +221,15 @@ class ApiQueryCountTests(TransactionTestCase):
         "attorney_party.json",
     ]
 
+    def clear_query_caches(self):
+        """
+        Resets all caches that may prevent query execution.
+        Needed to ensure deterministic behavior of ``assertNumQueries`` (or
+        after external changes to some Django database records).
+        """
+        self.addCleanup(Site.objects.clear_cache)
+        self.addCleanup(ContentType.objects.clear_cache)
+
     def setUp(self) -> None:
         # Add the permissions to the user.
         up = UserProfileWithParentsFactory.create(
@@ -234,6 +248,7 @@ class ApiQueryCountTests(TransactionTestCase):
         r = get_redis_interface("STATS")
         api_prefix = "api:test_counts.count"
         r.set(api_prefix, 101)
+        self.clear_query_caches()
 
     def tearDown(self) -> None:
         UserProfile.objects.all().delete()
@@ -279,11 +294,12 @@ class ApiQueryCountTests(TransactionTestCase):
             path = reverse("opinion-list", kwargs={"version": "v3"})
             self.client.get(path)
 
-    def test_party_api_query_counts(self, mock_logging_prefix) -> None:
+    def test_party_endpoint_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(9):
             path = reverse("party-list", kwargs={"version": "v3"})
             self.client.get(path)
 
+    def test_attorney_endpoint_query_counts(self, mock_logging_prefix) -> None:
         with self.assertNumQueries(6):
             path = reverse("attorney-list", kwargs={"version": "v3"})
             self.client.get(path)
@@ -303,6 +319,56 @@ class ApiQueryCountTests(TransactionTestCase):
         self.assertEqual(r.status_code, HTTPStatus.OK)
         r = self.client.get(path, {"pacer_doc_id__in": "17711118263,asdf"})
         self.assertEqual(r.status_code, HTTPStatus.OK)
+
+    def test_count_on_query_counts(self, mock_logging_prefix) -> None:
+        """
+        Check that a v4 API request with param `count=on` only performs
+        2 queries to the database: one to check the authenticated user,
+        and another to select the count.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            path = reverse("docket-list", kwargs={"version": "v4"})
+            params = {"count": "on"}
+            self.client.get(path, params)
+
+        self.assertEqual(
+            len(ctx.captured_queries),
+            2,
+            msg=f"{len(ctx.captured_queries)} queries executed, 2 expected",
+        )
+
+        executed_queries = [query["sql"] for query in ctx.captured_queries]
+        expected_queries = [
+            'FROM "auth_user" WHERE "auth_user"."id" =',
+            'SELECT COUNT(*) AS "__count"',
+        ]
+        for executed_query, expected_fragment in zip(
+            executed_queries, expected_queries
+        ):
+            self.assertIn(
+                expected_fragment,
+                executed_query,
+                msg=f"Expected query fragment not found: {expected_fragment}",
+            )
+
+    def test_standard_request_no_count_query(
+        self, mock_logging_prefix
+    ) -> None:
+        """
+        Check that a v4 API request without param `count=on` doesn't perform
+        a count query.
+        """
+        with CaptureQueriesContext(connection) as ctx:
+            path = reverse("docket-list", kwargs={"version": "v4"})
+            self.client.get(path)
+
+        executed_queries = [query["sql"] for query in ctx.captured_queries]
+        for sql in executed_queries:
+            self.assertNotIn(
+                'SELECT COUNT(*) AS "__count"',
+                sql,
+                msg="Unexpected COUNT query found in standard request.",
+            )
 
 
 class ApiEventCreationTestCase(TestCase):
@@ -326,8 +392,8 @@ class ApiEventCreationTestCase(TestCase):
         if keys:
             self.r.delete(*keys)
 
-    async def hit_the_api(self) -> None:
-        path = reverse("audio-list", kwargs={"version": "v3"})
+    async def hit_the_api(self, api_version) -> None:
+        path = reverse("audio-list", kwargs={"version": f"{api_version}"})
         request = AsyncRequestFactory().get(path)
 
         # Create the view and change the milestones to be something we can test
@@ -337,54 +403,270 @@ class ApiEventCreationTestCase(TestCase):
 
         # Set the attributes needed in the absence of middleware
         request.user = self.user
-
-        await sync_to_async(view)(request)
+        await sync_to_async(view)(request, **{"version": f"{api_version}"})
 
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
         return_value="api:Test",
     )
-    async def test_are_events_created_properly(
+    @mock.patch.object(LoggingMixin, "milestones", new=[1])
+    async def test_are_v3_events_created_properly(
         self, mock_logging_prefix
     ) -> None:
-        """Are event objects created as API requests are made?"""
-        await self.hit_the_api()
+        """Are event objects created as v3 API requests are made?"""
+        await self.hit_the_api("v3")
 
-        expected_event_count = 1
+        expected_event_count = 2
         self.assertEqual(expected_event_count, await Event.objects.acount())
+        event_descriptions = {
+            event.description async for event in Event.objects.all()
+        }
+        expected_descriptions = set()
+        expected_descriptions.add("API v3 has logged 1 total requests.")
+        expected_descriptions.add(
+            f"User '{self.user.username}' has placed their 1st API v3 request."
+        )
+        self.assertEqual(event_descriptions, expected_descriptions)
+
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        return_value="api:Test",
+    )
+    @mock.patch.object(LoggingMixin, "milestones", new=[1])
+    async def test_are_v4_events_created_properly(
+        self, mock_logging_prefix
+    ) -> None:
+        """Are event objects created as V4 API requests are made?"""
+        await self.hit_the_api("v4")
+
+        expected_event_count = 2
+        self.assertEqual(expected_event_count, await Event.objects.acount())
+        event_descriptions = {
+            event.description async for event in Event.objects.all()
+        }
+        expected_descriptions = set()
+        expected_descriptions.add("API v4 has logged 1 total requests.")
+        expected_descriptions.add(
+            f"User '{self.user.username}' has placed their 1st API v4 request."
+        )
+        self.assertEqual(event_descriptions, expected_descriptions)
 
     # Set the api prefix so that other tests
     # run in parallel do not affect this one.
     @mock.patch(
         "cl.api.utils.get_logging_prefix",
-        return_value="api:Test",
+        side_effect=lambda *args, **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
     )
     async def test_api_logged_correctly(self, mock_logging_prefix) -> None:
         # Global stats
         self.assertEqual(mock_logging_prefix.called, 0)
-        await self.hit_the_api()
+        await self.hit_the_api("v3")
         self.assertEqual(mock_logging_prefix.called, 1)
-        self.assertEqual(int(self.r.get("api:Test.count")), 1)
+        self.assertEqual(int(self.r.get("api:v3-Test.count")), 1)
 
         # User stats
         self.assertEqual(
-            self.r.zscore("api:Test.user.counts", self.user.pk), 1.0
+            self.r.zscore("api:v3-Test.user.counts", self.user.pk), 1.0
         )
 
         # IP address
-        keys = self.r.keys("api:Test.d:*")
+        keys = self.r.keys("api:v3-Test.d:*")
         ip_key = [k for k in keys if k.endswith("ip_map")][0]
         self.assertEqual(self.r.hlen(ip_key), 1)
 
         # Endpoints
         self.assertEqual(
-            self.r.zscore("api:Test.endpoint.counts", self.endpoint_name), 1
+            self.r.zscore("api:v3-Test.endpoint.counts", self.endpoint_name), 1
         )
 
         # Timings
         self.assertAlmostEqual(
-            int(self.r.get("api:Test.timing")), 10, delta=2000
+            int(self.r.get("api:v3-Test.timing")), 10, delta=2000
         )
+
+    @mock.patch(
+        "cl.api.utils.get_logging_prefix",
+        side_effect=lambda *args, **kwargs: f"{get_logging_prefix(*args, **kwargs)}-Test",
+    )
+    async def test_api_logged_correctly_v4(self, mock_logging_prefix) -> None:
+        # Global stats
+        self.assertEqual(mock_logging_prefix.called, 0)
+        await self.hit_the_api("v4")
+
+        self.assertEqual(mock_logging_prefix.called, 1)
+        self.assertEqual(int(self.r.get("api:v4-Test.count")), 1)
+
+        # User stats
+        self.assertEqual(
+            self.r.zscore("api:v4-Test.user.counts", self.user.pk), 1.0
+        )
+
+        # IP address
+        keys = self.r.keys("api:v4-Test.d:*")
+        ip_key = [k for k in keys if k.endswith("ip_map")][0]
+        self.assertEqual(self.r.hlen(ip_key), 1)
+
+        # Endpoints
+        self.assertEqual(
+            self.r.zscore("api:v4-Test.endpoint.counts", self.endpoint_name), 1
+        )
+
+        # Timings
+        self.assertAlmostEqual(
+            int(self.r.get("api:v4-Test.timing")), 10, delta=2000
+        )
+
+
+@override_settings(BLOCK_NEW_V3_USERS=True)
+@mock.patch(
+    "cl.api.utils.get_logging_prefix",
+    return_value="api-block-test:v3",
+)
+class BlockV3APITests(TestCase):
+    """Check that V3 API is restricted for anonymous and new users."""
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserFactory()
+        cls.user_2 = UserFactory()
+        cls.client_1 = make_client(cls.user_1.pk)
+        cls.client_2 = make_client(cls.user_2.pk)
+
+        cls.audio_path_v3 = reverse("audio-list", kwargs={"version": "v3"})
+        cls.audio_path_v4 = reverse("audio-list", kwargs={"version": "v4"})
+        cls.debt_path_v4 = reverse("debt-list", kwargs={"version": "v4"})
+        cls.debt_path_v3 = reverse("debt-list", kwargs={"version": "v3"})
+
+    def setUp(self) -> None:
+        self.r = get_redis_interface("STATS")
+        self.flush_stats()
+
+    def tearDown(self) -> None:
+        self.flush_stats()
+
+    def flush_stats(self) -> None:
+        keys = self.r.keys("api-block-test:*")
+        if keys:
+            self.r.delete(*keys)
+
+        v3_user_list = self.r.keys("v3-users-list")
+        if v3_user_list:
+            self.r.delete(*v3_user_list)
+
+        v3_user_blocked_list = self.r.keys("v3-blocked-users-list")
+        if v3_user_blocked_list:
+            self.r.delete(*v3_user_blocked_list)
+
+    def create_v3_user_list(self) -> None:
+        v3_stats_members = self.r.zrange(
+            "api-block-test:v3.user.counts", 0, -1
+        )
+        if v3_stats_members:
+            self.r.sadd("v3-users-list", *v3_stats_members)
+
+    async def test_block_v3_for_new_users(self, mock_api_prefix) -> None:
+        """Confirm new v3 API users are blocked"""
+
+        # A new user request is not detected because we only check some
+        # requests. In this case, it's not checked.
+        with mock.patch.object(
+            V3APIPermission, "check_request", return_value=False
+        ):
+            response = await self.client_1.get(
+                self.audio_path_v3, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+        # Now check the request and block the request and user.
+        with mock.patch.object(
+            V3APIPermission, "check_request", return_value=True
+        ):
+            response = await self.client_1.get(
+                self.audio_path_v3, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(
+            response.json()["detail"],
+            "As a new user, you don't have permission to access V3 of the API. Please use V4 instead.",
+        )
+
+        # Once the user is caught, they are added to the V3 blocked list, so
+        # every consecutive request from the user is blocked.
+        response = await self.client_1.get(self.audio_path_v3, format="json")
+        self.assertEqual(
+            response.status_code,
+            HTTPStatus.FORBIDDEN,
+            msg="Consecutive request.",
+        )
+        self.assertEqual(
+            response.json()["detail"],
+            "As a new user, you don't have permission to access V3 of the API. Please use V4 instead.",
+        )
+
+    async def test_allow_v3_for_existing_users(self, mock_api_prefix) -> None:
+        """Confirm that existing v3 API users are granted access to use it"""
+
+        # Simulate v3 existing user and create v3 user list.
+        self.r.zincrby("api-block-test:v3.user.counts", 1, self.user_2.pk)
+        self.create_v3_user_list()
+        with mock.patch.object(
+            V3APIPermission, "check_request", return_value=True
+        ):
+            response = await self.client_2.get(
+                self.audio_path_v3, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    async def test_block_v3_for_anonymous_users(self, mock_api_prefix) -> None:
+        """Confirm anonymous v3 API users are blocked"""
+        with mock.patch.object(
+            V3APIPermission, "check_request", return_value=True
+        ):
+            response = await self.async_client.get(self.audio_path_v3)
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+        self.assertEqual(
+            response.json()["detail"],
+            "Anonymous users don't have permission to access V3 of the API. Please use V4 instead.",
+        )
+
+    async def test_allow_v4_for_new_users(self, mock_api_prefix) -> None:
+        """Confirm new API users are allowed to use V4 of the API"""
+        with mock.patch.object(
+            V3APIPermission, "check_request", return_value=True
+        ):
+            response = await self.client_2.get(
+                self.audio_path_v4, format="json"
+            )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    async def test_allow_v4_for_anonymous_users(self, mock_api_prefix) -> None:
+        """Confirm V4 anonymous API users are allowed to use V4 of the API"""
+        with mock.patch.object(
+            V3APIPermission, "check_request", return_value=True
+        ):
+            response = await self.async_client.get(self.audio_path_v4)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+
+    async def test_confirm_v4_post_requests_are_not_allowed(
+        self, mock_api_prefix
+    ) -> None:
+        """Confirm V4 users are not allowed to POST requests."""
+        response = await self.client_2.post(self.debt_path_v4, {})
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_confirm_v3_post_requests_are_not_allowed(
+        self, mock_api_prefix
+    ) -> None:
+        """Confirm V3 users are not allowed to POST requests."""
+        response = await self.client_2.post(self.debt_path_v3, {})
+        self.assertEqual(response.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_confirm_anonymous_post_requests_are_not_allowed(
+        self, mock_api_prefix
+    ) -> None:
+        """Confirm anonymous users are not allowed to POST requests."""
+        response = await self.async_client.post(self.debt_path_v4, {})
+        self.assertEqual(response.status_code, HTTPStatus.UNAUTHORIZED)
 
 
 class DRFOrderingTests(TestCase):
@@ -434,11 +716,202 @@ class FilteringCountTestCase:
             f"the JSON: \n{r.json()}",
         )
         got = len(r.data["results"])
+        try:
+            path = r.request.get("path")
+            query_string = r.request.get("query_string")
+            url = f"{path}?{query_string}"
+        except AttributeError:
+            url = self.path
         self.assertEqual(
             got,
             expected_count,
-            msg=f"Expected {expected_count}, but got {got}.\n\nr.data was: {r.data}",
+            msg=f"Expected {expected_count}, but got {got} in {url}\n\nr.data was: {r.data}",
         )
+        return r
+
+
+class DRFCourtApiFilterTests(TestCase, FilteringCountTestCase):
+    @classmethod
+    def setUpTestData(cls):
+        Court.objects.all().delete()
+
+        cls.parent_court = CourtFactory(
+            id="parent1",
+            full_name="Parent Court",
+            short_name="PC",
+            citation_string="PC",
+            in_use=True,
+            has_opinion_scraper=True,
+            has_oral_argument_scraper=False,
+            position=1,
+            start_date=date(2000, 1, 1),
+            end_date=None,
+            jurisdiction=Court.FEDERAL_APPELLATE,
+            date_modified=datetime(2021, 1, 1, tzinfo=timezone.utc),
+        )
+
+        cls.child_court1 = CourtFactory(
+            id="child1",
+            parent_court=cls.parent_court,
+            full_name="Child Court 1",
+            short_name="CC1",
+            citation_string="CC1",
+            in_use=False,
+            has_opinion_scraper=False,
+            has_oral_argument_scraper=True,
+            position=2,
+            start_date=date(2010, 6, 15),
+            end_date=date(2020, 12, 31),
+            jurisdiction=Court.STATE_SUPREME,
+            date_modified=datetime(2022, 6, 15, tzinfo=timezone.utc),
+        )
+        cls.child_court2 = CourtFactory(
+            id="child2",
+            parent_court=cls.parent_court,
+            full_name="Child Court 2",
+            short_name="CC2",
+            citation_string="CC2",
+            in_use=True,
+            has_opinion_scraper=False,
+            has_oral_argument_scraper=False,
+            position=3,
+            start_date=date(2015, 5, 20),
+            end_date=None,
+            jurisdiction=Court.STATE_TRIAL,
+            date_modified=datetime(2023, 3, 10, tzinfo=timezone.utc),
+        )
+
+        cls.orphan_court = CourtFactory(
+            id="orphan",
+            full_name="Orphan Court",
+            short_name="OC",
+            citation_string="OC",
+            in_use=True,
+            has_opinion_scraper=False,
+            has_oral_argument_scraper=False,
+            position=4,
+            start_date=date(2012, 8, 25),
+            end_date=None,
+            jurisdiction=Court.FEDERAL_DISTRICT,
+            date_modified=datetime(2023, 5, 5, tzinfo=timezone.utc),
+        )
+
+    @async_to_sync
+    async def setUp(self):
+        self.path = reverse("court-list", kwargs={"version": "v4"})
+        self.q: Dict[str, Any] = {}
+
+    async def test_parent_court_filter(self):
+        """Can we filter courts by parent_court id?"""
+        self.q["parent_court"] = "parent1"
+        # Should return child1 and child2:
+        response = await self.assertCountInResults(2)
+
+        # Verify the returned court IDs
+        court_ids = [court["id"] for court in response.data["results"]]
+        self.assertEqual(set(court_ids), {"child1", "child2"})
+
+        # Filter for courts with parent_court id='orphan' (none should match)
+        self.q = {"parent_court": "orphan"}
+        await self.assertCountInResults(0)
+
+    async def test_no_parent_court_filter(self):
+        """Do we get all courts when using no filters?"""
+        self.q = {}
+        await self.assertCountInResults(4)  # Should return all four courts
+
+    async def test_invalid_parent_court_filter(self):
+        """Do we handle invalid parent_court values correctly?"""
+        self.q["parent_court"] = "nonexistent"
+        await self.assertCountInResults(0)
+
+    async def test_id_filter(self):
+        """Can we filter courts by id?"""
+        self.q["id"] = "child1"
+        response = await self.assertCountInResults(1)
+        self.assertEqual(response.data["results"][0]["id"], "child1")
+
+    async def test_in_use_filter(self):
+        """Can we filter courts by in_use field?"""
+        self.q = {"in_use": "true"}
+        await self.assertCountInResults(3)  # parent1, child2, orphan
+        self.q = {"in_use": "false"}
+        await self.assertCountInResults(1)  # child1
+
+    async def test_has_opinion_scraper_filter(self):
+        """Can we filter courts by has_opinion_scraper field?"""
+        self.q = {"has_opinion_scraper": "true"}
+        await self.assertCountInResults(1)  # parent1
+        self.q = {"has_opinion_scraper": "false"}
+        await self.assertCountInResults(3)  # child1, child2, orphan
+
+    async def test_has_oral_argument_scraper_filter(self):
+        """Can we filter courts by has_oral_argument_scraper field?"""
+        self.q = {"has_oral_argument_scraper": "true"}
+        await self.assertCountInResults(1)  # child1
+        self.q = {"has_oral_argument_scraper": "false"}
+        await self.assertCountInResults(3)  # parent1, child2, orphan
+
+    async def test_position_filter(self):
+        """Can we filter courts by position with integer lookups?"""
+        self.q = {"position__gt": "2"}
+        await self.assertCountInResults(2)  # child2 (3), orphan (4)
+        self.q = {"position__lte": "2"}
+        await self.assertCountInResults(2)  # parent1 (1), child1 (2)
+
+    async def test_start_date_filter(self):
+        """Can we filter courts by start_date with date lookups?"""
+        self.q = {"start_date__year": "2015"}
+        await self.assertCountInResults(1)  # child2 (2015-05-20)
+        self.q = {"start_date__gte": "2010-01-01"}
+        await self.assertCountInResults(3)  # child1, child2, orphan
+
+    async def test_end_date_filter(self):
+        """Can we filter courts by end_date with date lookups?"""
+        self.q = {"end_date__day": "31"}
+        await self.assertCountInResults(1)  # parent1, child2, orphan
+        self.q = {"end_date__year": "2024"}
+        await self.assertCountInResults(0)
+
+    async def test_short_name_filter(self):
+        """Can we filter courts by short_name with text lookups?"""
+        self.q = {"short_name__iexact": "Cc1"}
+        await self.assertCountInResults(1)  # child1
+        self.q = {"short_name__icontains": "cc"}
+        await self.assertCountInResults(2)  # child1, child2
+
+    async def test_full_name_filter(self):
+        """Can we filter courts by full_name with text lookups?"""
+        self.q = {"full_name__istartswith": "Child"}
+        await self.assertCountInResults(2)  # child1, child2
+        self.q = {"full_name__iendswith": "Court"}
+        await self.assertCountInResults(2)  # parent1, orphan
+
+    async def test_citation_string_filter(self):
+        """Can we filter courts by citation_string with text lookups?"""
+        self.q = {"citation_string": "OC"}
+        await self.assertCountInResults(1)  # orphan
+        self.q = {"citation_string__icontains": "2"}
+        await self.assertCountInResults(1)  # child2
+
+    async def test_jurisdiction_filter(self):
+        """Can we filter courts by jurisdiction?"""
+        self.q = {
+            "jurisdiction": [
+                Court.FEDERAL_APPELLATE,
+                Court.FEDERAL_DISTRICT,
+            ]
+        }
+        await self.assertCountInResults(2)  # parent1 and orphan
+
+    async def test_combined_filters(self):
+        """Can we filter courts with multiple filters applied?"""
+        self.q = {
+            "in_use": "true",
+            "has_opinion_scraper": "false",
+            "position__gt": "2",
+        }
+        await self.assertCountInResults(2)  # child2 and orphan
 
 
 class DRFJudgeApiFilterTests(
@@ -2352,3 +2825,100 @@ class WebhooksMilestoneEventsTest(TestCase):
         self.assertEqual(await webhook_events.acount(), 2)
         # Confirm no milestone event should be created.
         self.assertEqual(await milestone_events.acount(), 0)
+
+
+class CountParameterTests(TestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        cls.user_1 = UserProfileWithParentsFactory.create(
+            user__username="recap-user",
+            user__password=make_password("password"),
+        )
+        permissions = Permission.objects.filter(
+            codename__in=["has_recap_api_access", "has_recap_upload_access"]
+        )
+        cls.user_1.user.user_permissions.add(*permissions)
+
+        cls.court_canb = CourtFactory(id="canb")
+        cls.court_cand = CourtFactory(id="cand")
+
+        cls.url = reverse("docket-list", kwargs={"version": "v4"})
+
+        for i in range(7):
+            DocketFactory(
+                court=cls.court_canb,
+                source=Docket.RECAP,
+                pacer_case_id=str(100 + i),
+            )
+        for i in range(5):
+            DocketFactory(
+                court=cls.court_cand,
+                source=Docket.HARVARD,
+                pacer_case_id=str(200 + i),
+            )
+
+    def setUp(self):
+        self.client = make_client(self.user_1.user.pk)
+
+    async def test_count_on_returns_only_count(self):
+        """
+        Test that when 'count=on' is specified, the API returns only the count.
+        """
+        params = {"count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        # The response should only contain the 'count' key
+        self.assertEqual(list(response.data.keys()), ["count"])
+        self.assertIsInstance(response.data["count"], int)
+        # The count should match the total number of dockets
+        expected_count = await Docket.objects.acount()
+        self.assertEqual(response.data["count"], expected_count)
+
+    async def test_standard_response_includes_count_url(self):
+        """
+        Test that the standard response includes a 'count' key with the count URL.
+        """
+        response = await self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("count", response.data)
+        count_url = response.data["count"]
+        self.assertIsInstance(count_url, str)
+        self.assertIn("count=on", count_url)
+
+    async def test_invalid_count_parameter(self):
+        """
+        Test that invalid 'count' parameter values are handled appropriately.
+        """
+        params = {"count": "invalid"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        # The response should be the standard paginated response
+        self.assertIn("results", response.data)
+        self.assertIsInstance(response.data["results"], list)
+
+    async def test_count_with_filters(self):
+        """
+        Test that the count returned matches the filters applied.
+        """
+        params = {"court": "canb", "source": Docket.RECAP, "count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        expected_count = await Docket.objects.filter(
+            court__id="canb",
+            source=Docket.RECAP,
+        ).acount()
+        self.assertEqual(response.data["count"], expected_count)
+
+    async def test_count_with_no_results(self):
+        """
+        Test that 'count=on' returns zero when no results match the filters.
+        """
+        params = {"court": "cand", "source": Docket.RECAP, "count": "on"}
+        response = await self.client.get(self.url, params)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)

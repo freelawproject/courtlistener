@@ -137,7 +137,7 @@ const TableMaker = (data: Data, key: string, is_admin: boolean) => {
         <div className="table-responsive">
           <h3>
             {title}
-            <a href={`/api/rest/v3/${api_key}/?financial_disclosure__id=${disclosure_id}`}>
+            <a href={`/api/rest/v4/${api_key}/?financial_disclosure__id=${disclosure_id}`}>
               <i className="fa fa-code gray pull-right" />
             </a>
           </h3>
@@ -236,7 +236,7 @@ const Thumb = (id: number, thumbnail: string, filepath: string) => {
       <h3>
         <span>
           Download
-          <a href={`/api/rest/v3/financial-disclosures/${id}/`}>
+          <a href={`/api/rest/v4/financial-disclosures/${id}/`}>
             <i className="fa fa-code gray pull-right" />
           </a>
         </span>

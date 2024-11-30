@@ -28,6 +28,10 @@ class CourtFilter(NoEmptyFilterSet):
         "cl.search.filters.DocketFilter", queryset=Docket.objects.all()
     )
     jurisdiction = filters.MultipleChoiceFilter(choices=Court.JURISDICTIONS)
+    parent_court = filters.CharFilter(
+        field_name="parent_court__id",
+        lookup_expr="exact",
+    )
 
     class Meta:
         model = Court
@@ -42,6 +46,7 @@ class CourtFilter(NoEmptyFilterSet):
             "end_date": DATE_LOOKUPS,
             "short_name": ALL_TEXT_LOOKUPS,
             "full_name": ALL_TEXT_LOOKUPS,
+            "citation_string": ALL_TEXT_LOOKUPS,
         }
 
 

@@ -25,6 +25,7 @@ from eyecite.tokenizers import HyperscanTokenizer
 from httpx import (
     HTTPStatusError,
     NetworkError,
+    ReadError,
     RemoteProtocolError,
     TimeoutException,
 )
@@ -397,8 +398,9 @@ def get_and_save_free_document_report(
             return PACERFreeDocumentLog.SCRAPE_FAILED
         raise self.retry(exc=exc, countdown=5)
 
-    if log_id:
-        # We only save the html when the script is run automatically every day
+    if log_id and not settings.DEVELOPMENT:
+        # We only save the html when the script is run automatically every day and
+        # not in development environment
         log = PACERFreeDocumentLog.objects.get(pk=log_id)
         if hasattr(report, "responses_with_params"):
             for result in report.responses_with_params:
@@ -422,6 +424,15 @@ def get_and_save_free_document_report(
 
     document_rows_to_create = []
     for row in results:
+
+        # There is a document without a case number in pacer, skip it (issue #4547)
+        if not row["docket_number"]:
+            logger.warning(
+                f"No case number for document, court: {row["court_id"]}, "
+                f"date_filed: {row["date_filed"]}"
+            )
+            continue
+
         document_row = PACERFreeDocumentRow(
             court_id=row["court_id"],
             pacer_case_id=row["pacer_case_id"],
@@ -444,7 +455,6 @@ def get_and_save_free_document_report(
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-@throttle_task("1/4s", key="court_id")
 def process_free_opinion_result(
     self,
     row_pk: int,
@@ -589,13 +599,13 @@ def process_free_opinion_result(
         ConnectionError,
         ReadTimeout,
         RedisConnectionError,
+        ReadError,
     ),
     max_retries=15,
     interval_start=5,
     interval_step=5,
     ignore_result=True,
 )
-@throttle_task("1/6s", key="court_id")
 def get_and_process_free_pdf(
     self: Task,
     data: TaskData,
@@ -2223,7 +2233,11 @@ def update_rd_metadata(
         item=rd,
     )
     if response.is_success:
-        rd.page_count = response.text
+        rd.page_count = int(response.text)
+
+    assert isinstance(
+        rd.page_count, (int, type(None))
+    ), "page_count must be an int or None."
 
     # Save and extract, skipping OCR.
     rd.save()
@@ -2708,7 +2722,7 @@ def query_and_save_list_of_creditors(
     backoff=2,
     logger=logger,
 )
-def extract_recap_document(rd: RECAPDocument) -> Response:
+def extract_recap_document_for_opinions(rd: RECAPDocument) -> Response:
     """Call recap-extract from doctor with retries
 
     :param rd: the recap document to extract
@@ -2724,17 +2738,26 @@ def extract_recap_document(rd: RECAPDocument) -> Response:
 
 
 @app.task(bind=True, max_retries=5, ignore_result=True)
-def ingest_recap_document(
+def recap_document_into_opinions(
     self,
-    recap_document_id: int,
-    add_to_solr: bool,
-) -> None:
+    task_data: Optional[TaskData] = None,
+    recap_document_id: Optional[int] = None,
+    add_to_solr: bool = False,
+) -> Optional[TaskData]:
     """Ingest recap document into Opinions
 
+    :param task_data: dictionary that will contain the recap_document_id,
+        if called inside a chain() on the scraper_pacer_free_opinions
+        command. This task should be chained after the PDF has
+        been downloaded from PACER
     :param recap_document_id: The document id to inspect and import
     :param add_to_solr: Whether to add to solr
-    :return:None
+
+    :return: The same `task_data` that came as input
     """
+    if not recap_document_id and task_data:
+        recap_document_id = task_data["rd_pk"]
+
     logger.info(f"Importing recap document {recap_document_id}")
     recap_document = (
         RECAPDocument.objects.select_related("docket_entry__docket")
@@ -2751,17 +2774,27 @@ def ingest_recap_document(
         .get(id=recap_document_id)
     )
     docket = recap_document.docket_entry.docket
-    if recap_document.docket_entry.docket.court.jurisdiction == "FD":
+
+    jurisdiction = recap_document.docket_entry.docket.court.jurisdiction
+    court_id = recap_document.docket_entry.docket.court.id
+    # `dcd` has a regular juriscraper scraper. Avoid duplicates
+    if court_id in ["dcd", "orld"] or jurisdiction not in [
+        Court.FEDERAL_DISTRICT,
+        Court.FEDERAL_BANKRUPTCY,
+    ]:
+        return task_data
+
+    if jurisdiction == Court.FEDERAL_DISTRICT:
         if "cv" not in docket.docket_number.lower():
             logger.info("Skipping non-civil opinion in district court")
-            return
+            return task_data
 
     ops = Opinion.objects.filter(sha1=recap_document.sha1)
     if ops.count() > 0:
         logger.info(f"Skipping previously imported opinion: {ops[0].id}")
-        return
+        return task_data
 
-    response = extract_recap_document(rd=recap_document)
+    response = extract_recap_document_for_opinions(rd=recap_document)
     r = response.json()
 
     try:
@@ -2780,7 +2813,7 @@ def ingest_recap_document(
     case_law_citations = filter_out_non_case_law_citations(citations)
     if len(case_law_citations) == 0:
         logger.info(f"No citation found for rd: {recap_document.id}")
-        return
+        return task_data
 
     with transaction.atomic():
         cluster = OpinionCluster.objects.create(
@@ -2811,3 +2844,5 @@ def ingest_recap_document(
                 cluster.id
             )
         )
+    # Return input task data to preserve the chain in scrape_pacer_free_opinion
+    return task_data

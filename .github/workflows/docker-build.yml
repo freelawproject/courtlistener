@@ -121,10 +121,20 @@ jobs:
       - name: Watch cl-retry-webhooks rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-retry-webhooks
 
+      - name: Rollout cl-send-rt-percolator-alerts
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts cl-send-rt-percolator-alerts=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-send-rt-percolator-alerts rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-send-rt-percolator-alerts
+
       - name: Rollout cl-es-sweep-indexer
         run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer sweep-indexer=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
       - name: Watch cl-es-sweep-indexer rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer
+
+      - name: Rollout cl-iquery-probe
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe cl-iquery-probe=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-iquery-probe rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe
 
 
       # Watch "cronjobs" in k9s

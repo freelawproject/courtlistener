@@ -14,14 +14,17 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db import connection
 from django.test import AsyncRequestFactory, RequestFactory, override_settings
 from django.test.client import AsyncClient
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils.text import slugify
 from factory import RelatedFactory
 from waffle.testutils import override_flag
 
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     CourtTestCase,
@@ -1715,3 +1718,65 @@ class DocketEntryFileDownload(TestCase):
             self.request, self.mocked_docket.id
         )
         self.assertEqual(response["Content-Type"], "text/csv")
+
+
+class CachePageIgnoreParamsTest(TestCase):
+    """Test the cache_page_ignore_params decorator."""
+
+    @classmethod
+    def setUpTestData(cls):
+        court = CourtFactory(id="ca5", jurisdiction="F")
+        cls.docket = DocketFactory(
+            court=court,
+            case_name="Foo v. Bar",
+            docket_number="12-11111",
+            pacer_case_id="12345",
+        )
+
+    def setUp(self):
+        r = get_redis_interface("CACHE")
+        keys_to_delete = r.keys(":1:custom.views.decorator.cache*")
+        if keys_to_delete:
+            r.delete(*keys_to_delete)
+
+    def test_cache_view_docket_feed(self) -> None:
+        """Confirm that cache_page_ignore_params can cache a view while ignoring
+        the GET params from the URL.
+        """
+
+        base_url = reverse(
+            "docket_feed",
+            kwargs={"docket_id": self.docket.id},
+        )
+
+        # Request docket/<int:docket_id>/feed/
+        # Response returned from DB.
+        with CaptureQueriesContext(connection) as queries:
+            response = async_to_sync(self.async_client.get)(base_url)
+            self.assertGreater(
+                len(queries), 0, "Expected more than 0 queries."
+            )
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get 200 OK status code for podcasts.",
+        )
+
+        # Request docket/<int:docket_id>/feed/?ts=12345
+        # Response returned from cache.
+        with CaptureQueriesContext(connection) as queries:
+            response = async_to_sync(self.async_client.get)(
+                base_url, {"ts": 12345}
+            )
+            self.assertEqual(
+                len(queries), 0, "Expected 0 queries for cached response."
+            )
+        self.assertEqual(
+            200,
+            response.status_code,
+            msg="Did not get 200 OK status code for podcasts.",
+        )
+        self.assertIn("Cache-Control", response.headers)
+        self.assertEqual(response.headers["Cache-Control"], "max-age=300")
+        self.assertIn("Expires", response.headers)
+        self.assertIn(self.docket.case_name, response.content.decode())

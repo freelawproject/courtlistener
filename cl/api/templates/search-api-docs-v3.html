@@ -46,6 +46,7 @@
 </div>
 
 <div class="col-xs-12 col-md-8 col-lg-6">
+  {% include "includes/v3-deprecated-warning.html" %}
   <h1 id="about">Legal Search&nbsp;API</h1>
   <h2><code>{% url "search-list" version="v3" %}</code></h2>
   <p class="lead v-offset-above-3">Use this API to search case law, PACER data, judges, and oral argument audio recordings.</p>
@@ -202,7 +203,7 @@
   <pre class="pre-scrollable">curl -X OPTIONS \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \
   "{% get_full_host %}{% url "docket-list" version="v3" %}" \
-  | jq '.actions.POST.docket_number</pre>
+  | jq '.actions.POST.docket_number'</pre>
   <p>After filtering through <a href="https://github.com/jqlang/jq"><code>jq</code></a>, that returns:</p>
   <pre class="pre-scrollable">{
   "type": "string",

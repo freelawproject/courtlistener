@@ -41,6 +41,9 @@
 
 
 <div class="col-xs-12 col-md-8 col-lg-6">
+  {% if version == "v3" %}
+    {% include "includes/v3-deprecated-warning.html" %}
+  {% endif %}
   <h1 id="about">Supreme Court Visualization&nbsp;API</h1>
   <h2><code>{% url "scotusmap-list" version=version %}</code></h2>
   <p class="lead">Use this API to programmatically see and create <a href="{% url "mapper_homepage" %}">visualizations of Supreme Court networks</a> in CourtListener.
