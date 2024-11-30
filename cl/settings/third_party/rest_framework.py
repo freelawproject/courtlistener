@@ -29,8 +29,12 @@ REST_FRAMEWORK = {
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
         # Unresponsive
+        "projecttesting": "1/hour",
         "SAGW": "1/hour",
         # Bounced
+        "riwiko8259": "1/hour",
+        "xicaro7027": "1/hour",
+        "nayibij851": "1/hour",
         "testname2024": "1/hour",
         "cadebe2258": "1/hour",
         # Disposable email
