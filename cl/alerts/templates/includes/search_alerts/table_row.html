@@ -1,6 +1,11 @@
 <tr id='alert-row-{{ alert.id }}' {% if hx_swap %} hx-swap-oob="true" {% endif %}>
   <td>
     <p class="bottom">
+      <a href="/?{{ alert.query }}" rel="nofollow">{{ alert.name }}</a>
+    </p>
+  </td>
+  <td>
+    <p class="bottom">
       {% if alert.alert_type == SEARCH_TYPES.OPINION %}
         Case Law
       {% elif alert.alert_type == SEARCH_TYPES.ORAL_ARGUMENT %}
@@ -8,11 +13,6 @@
       {% elif alert.alert_type == SEARCH_TYPES.RECAP or alert.type == SEARCH_TYPES.DOCKETS %}
         RECAP
       {% endif %}
-    </p>
-  </td>
-  <td>
-    <p class="bottom">
-      <a href="/?{{ alert.query }}" rel="nofollow">{{ alert.name }}</a>
     </p>
   </td>
   {% if is_profile_dashboard %}

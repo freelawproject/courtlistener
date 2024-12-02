@@ -30,7 +30,7 @@ export function isDescendant(parent: HTMLElement | null, child: HTMLElement | nu
 export const fetchDisclosure = async (setData: any, parameters: any) => {
   try {
     const response: boolean | Query = await appFetch(
-      `/api/rest/v3/financial-disclosures/?person=${parameters['judge_id']}&id=${parameters['disclosure_id']}`
+      `/api/rest/v4/financial-disclosures/?person=${parameters['judge_id']}&id=${parameters['disclosure_id']}`
     );
     if (typeof response != 'boolean') {
       const result = response['results'][0];
@@ -63,7 +63,7 @@ export const convertTD = (value: string | number, table: string, key: string) =>
 const fetchData = async (query: string, setData: (arg0: Row[]) => void) => {
   try {
     const response: boolean | Query = await appFetch(
-      `/api/rest/v3/disclosure-typeahead/?fullname=${query}&page_size=5`
+      `/api/rest/v4/disclosure-typeahead/?fullname=${query}&page_size=5`
     );
     if (typeof response != 'boolean') {
       const results: Row[] = response['results'];
