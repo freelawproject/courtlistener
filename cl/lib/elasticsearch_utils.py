@@ -4,6 +4,7 @@ import operator
 import re
 import time
 import traceback
+from collections import defaultdict
 from copy import deepcopy
 from dataclasses import fields
 from functools import reduce, wraps
@@ -175,22 +176,45 @@ async def build_more_like_this_query(related_ids: list[str]) -> Query:
     exclusions for specific opinion clusters.
     """
 
-    document_list = [{"_id": f"o_{id}"} for id in related_ids]
+    opinion_cluster_pairs = [
+        opinion_pair
+        for opinion_id in related_ids
+        if (
+            opinion_pair := await Opinion.objects.filter(pk=opinion_id)
+            .values("pk", "cluster_id")
+            .afirst()
+        )
+    ]
+    unique_clusters = {pair["cluster_id"] for pair in opinion_cluster_pairs}
+
+    document_list = [
+        {
+            "_id": f'o_{pair["pk"]}',
+            "routing": pair["cluster_id"],
+            # Important to match documents in the production cluster
+        }
+        for pair in opinion_cluster_pairs
+    ] or [
+        {"_id": f"o_{pk}"} for pk in related_ids
+    ]  # Fallback in case IDs are not found in the database.
+    # The user might have provided non-existent Opinion IDs.
+    # This ensures that the query does not raise an error and instead returns
+    # no results.
+
     more_like_this_fields = SEARCH_MLT_OPINION_QUERY_FIELDS.copy()
     mlt_query = Q(
         "more_like_this",
         fields=more_like_this_fields,
         like=document_list,
-        min_term_freq=1,
-        max_query_terms=12,
+        min_term_freq=settings.RELATED_MLT_MINTF,
+        max_query_terms=settings.RELATED_MLT_MAXQT,
+        min_word_length=settings.RELATED_MLT_MINWL,
+        max_word_length=settings.RELATED_MLT_MAXWL,
+        max_doc_freq=settings.RELATED_MLT_MAXDF,
+        analyzer="search_analyzer_exact",
     )
     # Exclude opinion clusters to which the related IDs to query belong.
-    cluster_ids_to_exclude = (
-        OpinionCluster.objects.filter(sub_opinions__pk__in=related_ids)
-        .distinct("pk")
-        .values_list("pk", flat=True)
-    )
-    cluster_ids_list = [pk async for pk in cluster_ids_to_exclude.aiterator()]
+    cluster_ids_list = list(unique_clusters)
     exclude_cluster_ids = [Q("terms", cluster_id=cluster_ids_list)]
     bool_query = Q("bool", must=[mlt_query], must_not=exclude_cluster_ids)
     return bool_query
@@ -1239,7 +1263,7 @@ def build_es_base_query(
                         {"opinion": []},
                         [],
                         mlt_query,
-                        child_highlighting=False,
+                        child_highlighting=True,
                         api_version=api_version,
                     )
                 )
@@ -1281,6 +1305,7 @@ def build_es_base_query(
                     mlt_query,
                     child_highlighting=child_highlighting,
                     api_version=api_version,
+                    alerts=alerts,
                 )
             )
 
@@ -2964,9 +2989,10 @@ def do_es_api_query(
     child documents.
     """
 
+    alerts = True if hl_tag == ALERTS_HL_TAG else False
     try:
         es_queries = build_es_base_query(
-            search_query, cd, cd["highlight"], api_version
+            search_query, cd, cd["highlight"], api_version, alerts=alerts
         )
         s = es_queries.search_query
         child_docs_query = es_queries.child_query
@@ -3047,7 +3073,7 @@ def do_es_api_query(
             # parameters as in the frontend. Only switch highlighting according
             # to the user request.
             main_query = add_es_highlighting(
-                s, cd, highlighting=cd["highlight"]
+                s, cd, alerts=alerts, highlighting=cd["highlight"]
             )
 
     return main_query, child_docs_query
@@ -3081,7 +3107,7 @@ def build_cardinality_count(count_query: Search, unique_field: str) -> Search:
 
 def do_collapse_count_query(
     search_type: str, main_query: Search, query: Query
-) -> int | None:
+) -> int:
     """Execute an Elasticsearch count query for queries that uses collapse.
     Uses a query with aggregation to determine the number of unique opinions
     based on the 'cluster_id' or 'docket_id' according to the search_type.
@@ -3106,7 +3132,7 @@ def do_collapse_count_query(
             f"Error on count query request: {search_query.to_dict()}"
         )
         logger.warning(f"Error was: {e}")
-        total_results = None
+        total_results = 0
     return total_results
 
 
@@ -3311,3 +3337,45 @@ def simplify_estimated_count(search_count: int) -> int:
         zeroes = (len(search_count_str) - 2) * "0"
         return int(first_two + zeroes)
     return search_count
+
+
+def set_child_docs_and_score(
+    results: list[Hit] | list[dict[str, Any]] | Response,
+    merge_highlights: bool = False,
+    merge_score: bool = False,
+) -> None:
+    """Process and attach child documents to the main search results.
+
+    :param results: A list of search results, which can be ES Hit objects
+    or a list of dicts.
+    :param merge_highlights: A boolean indicating whether to merge
+    highlight data into the results.
+    :param merge_score: A boolean indicating whether to merge
+    the BM25 score into the results.
+    :return: None. Results are modified in place.
+    """
+
+    for result in results:
+        result_is_dict = isinstance(result, dict)
+        if result_is_dict:
+            # If the result is a dictionary, do nothing, or assign [] to
+            # child_docs if it is not present.
+            result["child_docs"] = result.get("child_docs", [])
+        else:
+            # Process child hits if the result is an ES AttrDict instance,
+            # so they can be properly serialized.
+            child_docs = getattr(result, "child_docs", [])
+            result["child_docs"] = [
+                defaultdict(lambda: None, doc["_source"].to_dict())
+                for doc in child_docs
+            ]
+
+        # Optionally merges highlights. Used for integrating percolator
+        # highlights into the percolated document.
+        if merge_highlights and result_is_dict:
+            meta_hl = result.get("meta", {}).get("highlight", {})
+            merge_highlights_into_result(meta_hl, result)
+
+        # Optionally merges the BM25 score for display in the API.
+        if merge_score and isinstance(result, AttrDict):
+            result["bm25_score"] = result.meta.score

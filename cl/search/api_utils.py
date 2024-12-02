@@ -19,6 +19,7 @@ from cl.lib.elasticsearch_utils import (
     do_es_api_query,
     limit_inner_hits,
     merge_unavailable_fields_on_parent_document,
+    set_child_docs_and_score,
     set_results_highlights,
 )
 from cl.lib.scorched_utils import ExtraSolrInterface
@@ -474,18 +475,7 @@ class CursorESList:
             "v4",
             self.clean_data["highlight"],
         )
-        for result in results:
-            child_result_objects = []
-            if hasattr(result, "child_docs"):
-                for child_doc in result.child_docs:
-                    child_result_objects.append(
-                        defaultdict(
-                            lambda: None, child_doc["_source"].to_dict()
-                        )
-                    )
-                result["child_docs"] = child_result_objects
-            # Include the ES main document score as bm25_score.
-            result["bm25_score"] = result.meta.score
+        set_child_docs_and_score(results, merge_score=True)
 
         if self.reverse:
             # If doing backward pagination, reverse the results of the current

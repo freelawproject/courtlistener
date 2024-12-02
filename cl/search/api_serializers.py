@@ -619,7 +619,7 @@ class OpinionDocumentESResultSerializer(ChildMetaMixin, DocumentSerializer):
         )
 
 
-class OpinionClusterESResultSerializer(MainMetaMixin, DocumentSerializer):
+class OpinionClusterBaseESResultSerializer(DocumentSerializer):
     """The serializer for OpinionCluster Search results."""
 
     opinions = OpinionDocumentESResultSerializer(
@@ -647,6 +647,20 @@ class OpinionClusterESResultSerializer(MainMetaMixin, DocumentSerializer):
             "date_created",
             "timestamp",
         )
+
+
+class OpinionClusterESResultSerializer(
+    OpinionClusterBaseESResultSerializer, MainMetaMixin
+):
+    """The serializer for OpinionCluster Search results."""
+
+
+class OpinionClusterWebhookResultSerializer(
+    OpinionClusterBaseESResultSerializer
+):
+    """The serializer class for OpinionCluster search Webhooks results."""
+
+    meta = BaseMetaDataSerializer(source="*", read_only=True)
 
 
 class PositionESResultSerializer(ChildMetaMixin, DocumentSerializer):
