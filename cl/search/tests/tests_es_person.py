@@ -616,6 +616,7 @@ class PeopleV4APISearchTest(
         search_params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": f"id:{self.person_2.pk} AND nomination_process:(U.S. Senate)",
+            "order_by": "score desc",
         }
         # API
         r = await self._test_api_results_count(search_params, 1, "API fields")
@@ -662,6 +663,7 @@ class PeopleV4APISearchTest(
         search_params = {
             "type": SEARCH_TYPES.PEOPLE,
             "q": f"id:{person.pk}",
+            "order_by": "score desc",
         }
         # API
         r = async_to_sync(self._test_api_results_count)(
@@ -869,6 +871,7 @@ class PeopleV4APISearchTest(
             "q": f"id:{self.person_2.pk} name:Sheindlin dob_city:Brookyln nomination_process:(U.S. Senate) political_affiliation:Democratic",
             "school": "New York Law School",
             "dob_state": "NY",
+            "order_by": "score desc",
         }
 
         # Judged Search type HL disabled.
@@ -1342,7 +1345,8 @@ class PeopleSearchTestElasticSearch(
             "type": SEARCH_TYPES.PEOPLE,
         }
         s = PersonDocument.search()
-        main_query, _ = build_es_base_query(s, cd)
+        es_queries = build_es_base_query(s, cd)
+        main_query = es_queries.search_query
         self.assertEqual(main_query.count(), 2)
 
         # Query by parent field dob_state and child field selection_method.
@@ -1352,7 +1356,8 @@ class PeopleSearchTestElasticSearch(
             "type": SEARCH_TYPES.PEOPLE,
         }
         s = PersonDocument.search()
-        main_query, _ = build_es_base_query(s, cd)
+        es_queries = build_es_base_query(s, cd)
+        main_query = es_queries.search_query
         self.assertEqual(main_query.count(), 1)
 
         position_5.delete()
@@ -2664,7 +2669,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             person = PersonFactory.create(
@@ -2685,7 +2690,7 @@ class PeopleIndexingTest(
         with mock.patch(
             "cl.lib.es_signal_processor.es_save_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                es_save_document, *args, **kwargs
+                es_save_document, True, *args, **kwargs
             ),
         ):
             position = PositionFactory.create(
@@ -2711,9 +2716,9 @@ class PeopleIndexingTest(
 
         # Update a Person without changes.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             person.save()
@@ -2722,9 +2727,9 @@ class PeopleIndexingTest(
 
         # Update a Position without changes.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             position.save()
@@ -2733,9 +2738,9 @@ class PeopleIndexingTest(
 
         # Update a Person tracked field.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             person.name_first = "Barack"
@@ -2757,9 +2762,9 @@ class PeopleIndexingTest(
 
         # Person creation on update.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             person.religion = "pr"
@@ -2772,9 +2777,9 @@ class PeopleIndexingTest(
 
         # Position creation on update.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             position.nomination_process = "state_senate"
@@ -2787,9 +2792,9 @@ class PeopleIndexingTest(
 
         # Position ForeignKey field update.
         with mock.patch(
-            "cl.lib.es_signal_processor.update_es_document.delay",
+            "cl.lib.es_signal_processor.update_es_document.si",
             side_effect=lambda *args, **kwargs: self.count_task_calls(
-                update_es_document, *args, **kwargs
+                update_es_document, True, *args, **kwargs
             ),
         ):
             position.predecessor = self.person_2

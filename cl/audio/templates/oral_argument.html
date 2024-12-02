@@ -125,7 +125,12 @@
         <p class="bottom">
             {% if af.docket.docket_number %}
                 <span class="meta-data-header">Docket Number: </span>
-                <span class="meta-data-value select-all">{{ af.docket.docket_number }}</span>
+                <a
+                    href="/?type=r&amp;docket_number={{ af.docket.docket_number }}&amp;court={{ af.docket.court.pk }}"
+                    rel="nofollow"
+                    data-toggle="tooltip"
+                    data-placement="right"
+                    title="Search for this docket number in the RECAP Archive.">{{ af.docket.docket_number }}</a>
             {% endif %}
         </p>
 

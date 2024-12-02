@@ -330,11 +330,13 @@ def save_and_upload_disclosure(
     if len(disclosure) > 0:
         return disclosure[0]
 
-    page_count = async_to_sync(microservice)(
-        service="page-count",
-        file_type="pdf",
-        file=response.content,
-    ).text
+    page_count = int(
+        async_to_sync(microservice)(
+            service="page-count",
+            file_type="pdf",
+            file=response.content,
+        ).text
+    )
     if not page_count:
         logger.error(
             msg="Page count failed",

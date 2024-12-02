@@ -13,7 +13,12 @@ from cl.alerts.api_serializers import (
 )
 from cl.alerts.models import Alert
 from cl.alerts.utils import OldAlertReport
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookVersions,
+)
 from cl.api.utils import (
     generate_webhook_key_content,
     update_webhook_event_after_request,
@@ -23,6 +28,7 @@ from cl.lib.string_utils import trunc
 from cl.recap.api_serializers import PacerFetchQueueSerializer
 from cl.recap.models import PROCESSING_STATUS, PacerFetchQueue
 from cl.search.api_serializers import (
+    OpinionClusterWebhookResultSerializer,
     SearchResultSerializer,
     V3OpinionESResultSerializer,
 )
@@ -192,10 +198,17 @@ def send_search_alert_webhook(
         ).data
     else:
         # ES results serialization
-        serialized_results = V3OpinionESResultSerializer(
-            results,
-            many=True,
-        ).data
+        match webhook.version:
+            case WebhookVersions.v1:
+                serialized_results = V3OpinionESResultSerializer(
+                    results,
+                    many=True,
+                ).data
+            case WebhookVersions.v2:
+                serialized_results = OpinionClusterWebhookResultSerializer(
+                    results,
+                    many=True,
+                ).data
 
     post_content = {
         "webhook": generate_webhook_key_content(webhook),

@@ -2,12 +2,10 @@ import argparse
 import datetime
 import inspect
 import math
-import os
 import time
 from typing import Callable, Dict, List, Optional, cast
 
 from celery.canvas import chain
-from django.conf import settings
 from django.db.models import F, Q, Window
 from django.db.models.functions import RowNumber
 from django.utils.timezone import now
@@ -23,6 +21,7 @@ from cl.corpus_importer.tasks import (
     get_and_save_free_document_report,
     mark_court_done_on_date,
     process_free_opinion_result,
+    recap_document_into_opinions,
 )
 from cl.corpus_importer.utils import CycleChecker
 from cl.lib.argparse_types import valid_date
@@ -34,9 +33,6 @@ from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
 from cl.search.tasks import add_docket_to_solr_by_rds, add_items_to_solr
-
-PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
-PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
 
 
 def get_last_complete_date(
@@ -335,11 +331,10 @@ def get_pdfs(
                 throttle.update_min_items(min_items)
 
             logger.info(
-                f"Court cycle completed for: {row.court_id}. Current iteration: {cycle_checker.current_iteration}. Sleep 2 seconds "
+                f"Court cycle completed for: {row.court_id}. Current iteration: {cycle_checker.current_iteration}. Sleep 1 second "
                 f"before starting the next cycle."
             )
-            time.sleep(2)
-
+            time.sleep(1)
         logger.info(f"Processing row id: {row.id} from {row.court_id}")
         c = chain(
             process_free_opinion_result.si(
@@ -348,8 +343,14 @@ def get_pdfs(
                 cnt,
             ).set(queue=q),
             get_and_process_free_pdf.s(row.pk, row.court_id).set(queue=q),
+            # `recap_document_into_opinions` uses a different doctor extraction
+            # endpoint, so it doesn't depend on the document's content
+            # being extracted on `get_and_process_free_pdf`, where it's
+            # only extracted if it doesn't require OCR
+            recap_document_into_opinions.s().set(queue=q),
             delete_pacer_row.s(row.pk).set(queue=q),
         )
+
         if index:
             c = c | add_items_to_solr.s("search.RECAPDocument").set(queue=q)
         c.apply_async()
