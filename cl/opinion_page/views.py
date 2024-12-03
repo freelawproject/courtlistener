@@ -1,5 +1,6 @@
 import datetime
 from collections import OrderedDict, defaultdict
+from datetime import timedelta
 from http import HTTPStatus
 from typing import Any, Dict, Union
 from urllib.parse import urlencode
@@ -888,12 +889,14 @@ async def view_opinion_old(
     )[:3]
 
     # Identify opinions updated/added in partnership with v|lex for 3 years
-    three_years_ago = (datetime.now() - timedelta(days=3 * 365)).date()
+    three_years_ago = (
+        datetime.datetime.now() - timedelta(days=3 * 365)
+    ).date()
     date_created = cluster.date_created.date()
     sponsored = (
-        datetime(2022, 6, 1).date()
+        datetime.datetime(2022, 6, 1).date()
         <= date_created
-        <= datetime(2024, 1, 31).date()
+        <= datetime.datetime(2024, 1, 31).date()
         and date_created > three_years_ago
     )
 
@@ -1005,12 +1008,14 @@ async def setup_opinion_context(
         note_form = NoteForm(instance=note)
 
     # Identify opinions updated/added in partnership with v|lex for 3 years
-    three_years_ago = (datetime.now() - timedelta(days=3 * 365)).date()
+    three_years_ago = (
+        datetime.datetime.now() - timedelta(days=3 * 365)
+    ).date()
     date_created = cluster.date_created.date()
     sponsored = (
-        datetime(2022, 6, 1).date()
+        datetime.datetime(2022, 6, 1).date()
         <= date_created
-        <= datetime(2024, 1, 31).date()
+        <= datetime.datetime(2024, 1, 31).date()
         and date_created > three_years_ago
     )
 
