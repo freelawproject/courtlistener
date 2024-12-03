@@ -24,9 +24,10 @@ from django_elasticsearch_dsl.search import Search
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import A, MultiSearch, Q
 from elasticsearch_dsl import Search as SearchDSL
+from elasticsearch_dsl.aggs import DateHistogram
 from elasticsearch_dsl.query import Query, QueryString, Range
 from elasticsearch_dsl.response import Hit, Response
-from elasticsearch_dsl.utils import AttrDict
+from elasticsearch_dsl.utils import AttrDict, AttrList
 
 from cl.audio.models import Audio
 from cl.custom_filters.templatetags.text_filters import html_decode
@@ -80,13 +81,7 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import (
-    SEARCH_TYPES,
-    Court,
-    Opinion,
-    OpinionCluster,
-    RECAPDocument,
-)
+from cl.search.models import SEARCH_TYPES, Court, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
@@ -3379,3 +3374,93 @@ def set_child_docs_and_score(
         # Optionally merges the BM25 score for display in the API.
         if merge_score and isinstance(result, AttrDict):
             result["bm25_score"] = result.meta.score
+
+
+def get_court_opinions_counts(search_query: Search) -> dict[str, int] | None:
+    """Retrieve the opinion counts per each court.
+
+    :param search_query: The ES DSL Search object.
+    :return: A dict mapping court IDs to their respective counts of
+    opinions, or None if an error occurs during query execution.
+    """
+
+    search_query = search_query.extra(size=0)
+    search_query = search_query.query(
+        Q("bool", must=Q("match", cluster_child="opinion"))
+    )
+    search_query.aggs.bucket("court_id", A("terms", field="court_id.raw"))
+    try:
+        response = search_query.execute()
+    except (TransportError, ConnectionError, RequestError):
+        return None
+
+    buckets = response.aggregations.court_id.buckets
+    return {group["key"]: group["doc_count"] for group in buckets}
+
+
+def get_opinions_coverage_over_time(
+    search_query: Search, court_id: str, q: str | None, facet_field: str
+) -> AttrList | None:
+    """Retrieve the coverage of court opinions over time, grouped by year.
+
+    :param search_query: The ES DSL Search object.
+    :param court_id: The court ID or "all" to include opinions from all courts.
+    :param q: Query string to filter the opinions.
+    :param facet_field: The field used for the date aggregation.
+    :return: An AttrList of buckets containing the yearly aggregation opinions
+    or None if an error occurs during query execution.
+    """
+
+    search_query = search_query.extra(size=0)
+    search_query = search_query.query("query_string", query=q or "*")
+    search_query = search_query.filter("match", cluster_child="opinion")
+    if court_id.lower() != "all":
+        search_query = search_query.filter(
+            "term", **{"court_id.exact": court_id}
+        )
+    search_query.aggs.bucket(
+        "opinions_coverage_over_time",
+        DateHistogram(
+            field=facet_field,
+            calendar_interval="year",
+            min_doc_count=0,
+            format="yyyy",
+        ),
+    )
+    try:
+        response = search_query.execute()
+    except (TransportError, ConnectionError, RequestError):
+        return None
+
+    return response.aggregations.opinions_coverage_over_time.buckets
+
+
+def get_opinions_coverage_chart_data(
+    search_query: Search,
+    court_ids: list[str],
+) -> AttrList | list:
+    """Fetches chart data for opinions coverage by filtering ES results
+    and aggregating data by court IDs.
+
+    :param search_query: The ES DSL Search object.
+    :param court_ids: A list of court IDs used to filter the results.
+    :return: An AttrList of buckets containing the aggregation of opinions by
+    dateFiled or None if an error occurs during query execution.
+    """
+
+    search_query = search_query.filter("match", cluster_child="opinion")
+    search_query = search_query.filter("terms", **{"court_id.raw": court_ids})
+    court_agg = A("terms", field="court_id.raw", size=len(court_ids))
+    date_stats = A("stats", field="dateFiled")
+    label_agg = A("terms", field="court_id.raw", size=1)
+
+    search_query.aggs.bucket("courts", court_agg).metric(
+        "date_range", date_stats
+    ).metric("court_label", label_agg)
+    search_query = search_query.extra(size=0, track_total_hits=False)
+    try:
+        response = search_query.execute()
+    except (TransportError, ConnectionError, RequestError):
+        return []
+
+    return response.aggregations.courts.buckets

@@ -11,6 +11,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
+from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.test import override_settings
@@ -29,7 +30,7 @@ from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import LoggingMixin, get_logging_prefix
-from cl.api.views import coverage_data
+from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.factories import AudioFactory
@@ -46,11 +47,7 @@ from cl.disclosures.api_views import (
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import (
-    AudioTestCase,
-    IndexedSolrTestCase,
-    SimpleUserDataMixin,
-)
+from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
     ABARatingViewSet,
     AttorneyViewSet,
@@ -85,10 +82,26 @@ from cl.search.api_views import (
     RECAPDocumentViewSet,
     TagViewSet,
 )
-from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import SOURCES, Court, Docket, Opinion
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactoryWithChildrenAndParents,
+)
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SEARCH_TYPES,
+    SOURCES,
+    Court,
+    Docket,
+    Opinion,
+)
 from cl.stats.models import Event
-from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import UserProfile
@@ -109,7 +122,7 @@ class BasicAPIPageTest(TestCase):
 
     async def test_api_root(self) -> None:
         r = await self.async_client.get(
-            reverse("api-root", kwargs={"version": "v3"}),
+            reverse("api-root", kwargs={"version": "v4"}),
             HTTP_ACCEPT="text/html",
         )
         self.assertEqual(r.status_code, 200)
@@ -148,12 +161,12 @@ class BasicAPIPageTest(TestCase):
 
     async def test_coverage_api(self) -> None:
         r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": 2, "court": "ca1"})
+            reverse("coverage_data", kwargs={"version": 4, "court": "ca1"})
         )
         self.assertEqual(r.status_code, 200)
 
     async def test_coverage_api_via_url(self) -> None:
-        r = await self.async_client.get("/api/rest/v2/coverage/ca1/")
+        r = await self.async_client.get("/api/rest/v4/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
     async def test_api_info_page_displays_latest_rest_docs_by_default(
@@ -166,19 +179,59 @@ class BasicAPIPageTest(TestCase):
     async def test_api_info_page_can_display_different_versions_of_rest_docs(
         self,
     ) -> None:
-        for version in ["v1", "v2"]:
+        for version in ["v1", "v2", "v3"]:
             response = await self.async_client.get(
                 reverse("rest_docs", kwargs={"version": version})
             )
             self.assertEqual(response.status_code, 200)
             self.assertTemplateUsed(response, f"rest-docs-{version}.html")
-            header = f"REST API &ndash; {version.upper()}"
+            version_to_compare = version.upper() if version != "v3" else "v3"
+            header = f"REST API &ndash; {version_to_compare}"
             self.assertContains(response, header)
 
 
-class CoverageTests(IndexedSolrTestCase):
+class CoverageTests(ESIndexTestCase, TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
+
+        cls.c_scotus_1 = OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Strickland v. Lorem.",
+            docket=DocketFactory(
+                court=cls.court_scotus, docket_number="123456"
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            date_filed=date(2000, 8, 15),
+        )
+        cls.c_scotus_2 = OpinionClusterFactoryWithChildrenAndParents(
+            case_name="America vs Bank",
+            docket=DocketFactory(
+                court=cls.court_scotus, docket_number="34-2535"
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.ERRATA,
+            date_filed=date(2024, 6, 15),
+        )
+        cls.c_cand_1 = OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Johnson v. National",
+            docket=DocketFactory(
+                court=cls.court_cand, docket_number="36-2000"
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+            date_filed=date(1999, 7, 15),
+        )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
     async def test_coverage_data_view_provides_court_data(self) -> None:
-        response = await coverage_data(HttpRequest(), "v2", "ca1")
+        response = await coverage_data(HttpRequest(), "v4", "ca1")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, "annual_counts")
@@ -186,7 +239,7 @@ class CoverageTests(IndexedSolrTestCase):
 
     async def test_coverage_data_all_courts(self) -> None:
         r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": "3", "court": "all"})
+            reverse("coverage_data", kwargs={"version": "4", "court": "all"})
         )
         j = json.loads(r.content)
         self.assertTrue(len(j["annual_counts"].keys()) > 0)
@@ -194,11 +247,80 @@ class CoverageTests(IndexedSolrTestCase):
 
     async def test_coverage_data_specific_court(self) -> None:
         r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": "3", "court": "ca1"})
+            reverse(
+                "coverage_data", kwargs={"version": "4", "court": "scotus"}
+            )
         )
         j = json.loads(r.content)
-        self.assertTrue(len(j["annual_counts"].keys()) > 0)
-        self.assertIn("total", j)
+        self.assertEqual(len(j["annual_counts"].keys()), 25)
+        self.assertEqual(j["annual_counts"]["2000"], 1)
+        self.assertEqual(j["annual_counts"]["2024"], 1)
+        self.assertEqual(j["total"], 2)
+
+        # Ensure that coverage can be filtered using a query string.
+        r = await self.async_client.get(
+            reverse(
+                "coverage_data", kwargs={"version": "3", "court": "scotus"}
+            ),
+            {"q": "America"},
+        )
+        j = json.loads(r.content)
+        self.assertEqual(len(j["annual_counts"].keys()), 1)
+        self.assertEqual(j["annual_counts"]["2024"], 1)
+        self.assertEqual(j["total"], 1)
+
+    async def test_make_court_variable(self) -> None:
+        """Confirm opinions counts per court are properly returned."""
+
+        r = get_redis_interface("CACHE")
+        cache_count = r.keys(":1:court_counts_o")
+        if cache_count:
+            r.delete(*cache_count)
+        courts = await make_court_variable()
+        for court in courts:
+            if court.pk == self.court_scotus.pk:
+                self.assertEqual(2, court.count)
+            if court.pk == self.court_cand.pk:
+                self.assertEqual(1, court.count)
+
+    async def test_build_chart_data(self) -> None:
+        """Confirm build_chart_data method returns the right data."""
+
+        chart_data = await sync_to_async(build_chart_data)(["scotus", "cand"])
+        for court_data in chart_data:
+            if (
+                court_data["group"]
+                == self.court_scotus.get_jurisdiction_display()
+            ):
+                data = court_data["data"][0]
+                self.assertEqual(data["id"], self.court_scotus.pk)
+                self.assertEqual(data["data"][0]["val"], 2)
+
+                date_1 = datetime.fromisoformat(
+                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
+                )
+                date_2 = datetime.fromisoformat(
+                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
+                )
+                self.assertEqual(date_1.date(), self.c_scotus_1.date_filed)
+                self.assertEqual(date_2.date(), self.c_scotus_2.date_filed)
+
+            if (
+                court_data["group"]
+                == self.court_cand.get_jurisdiction_display()
+            ):
+                data = court_data["data"][0]
+                self.assertEqual(data["id"], self.court_cand.pk)
+                self.assertEqual(data["data"][0]["val"], 1)
+
+                date_1 = datetime.fromisoformat(
+                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
+                )
+                date_2 = datetime.fromisoformat(
+                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
+                )
+                self.assertEqual(date_1.date(), self.c_cand_1.date_filed)
+                self.assertEqual(date_2.date(), self.c_cand_1.date_filed)
 
 
 @mock.patch(
