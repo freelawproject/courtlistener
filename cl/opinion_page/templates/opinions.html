@@ -333,10 +333,10 @@
                         {% endif %}
                     </li>
                 {% endif %}
-                {% if has_downloads and "pdf" in pdf_path %}
+                {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
                     <li role="presentation" {% if tab == "pdf" %} class="active" {% endif %}>
                         {% if tab == "pdf" %}
-                            <a href="#" data-toggle="tab">{% if "pdf" in pdf_path %}PDF{% endif %}</a>
+                            <a href="#" data-toggle="tab">PDF</a>
                         {% else %}
                             <a href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
                         {% endif %}
