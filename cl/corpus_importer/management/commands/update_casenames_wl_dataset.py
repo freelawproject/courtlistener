@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from eyecite import get_citations
-from eyecite.models import FullCaseCitation
+from eyecite.models import FullCaseCitation, FullJournalCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize
 
@@ -140,11 +140,16 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
         found_cites = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
         if not found_cites:
             continue
-
+        if len(found_cites) == 0:
+            logger.info("Unable to parse %s", cite_str)
+            continue
+        if len(found_cites) > 1:
+            logger.info("Unable to disambiguate %s", cite_str)
+            continue
         citation = found_cites[0]
 
         # Ensure we have valid citations to process
-        if isinstance(citation, FullCaseCitation):
+        if isinstance(citation, (FullCaseCitation, FullJournalCitation)):
             volume = citation.groups.get("volume")
 
             # Validate the volume
