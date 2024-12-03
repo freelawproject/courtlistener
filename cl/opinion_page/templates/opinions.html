@@ -290,55 +290,31 @@
 
             <ul class="nav nav-tabs hidden-print">
                 <li role="presentation" {% if tab == "opinions" or tab == "" %} class="active" {% endif %}>
-                    {% if tab == "opinions" %}
-                        <a href="#" data-toggle="tab">Opinion</a>
-                    {% else %}
-                        <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
-                    {% endif %}
+                    <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
                 </li>
                 {% if authorities_count > 0 %}
                     <li role="presentation" {% if tab == "authorities" %} class="active" {% endif %}>
-                        {% if tab == "authorities" %}
-                            <a href="#" data-toggle="tab">Auth<span class="hidden-sm hidden-md hidden-xs">orities&nbsp;({{ authorities_count }})</a>
-                        {% else %}
-                            <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Auth<span class="hidden-xs hidden-sm hidden-md">orities&nbsp;({{ authorities_count }})</span></a>
-                        {% endif %}
+                        <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Auth<span class="hidden-xs hidden-sm hidden-md">orities&nbsp;({{ authorities_count }})</span></a>
                     </li>
                 {% endif %}
                 {% if cited_by_count > 0 %}
-                <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
-                    {% if tab == "cited-by" %}
-                        <a href="#" data-toggle="tab">Cited<span class="hidden-xs hidden-sm hidden-md">&nbsp;By&nbsp;({{ cited_by_count }})</span></a>
-                    {% else %}
+                    <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
                         <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited<span class="hidden-xs hidden-sm hidden-md">&nbsp;By&nbsp;({{ cited_by_count }})</span></a>
-                    {% endif %}
-                </li>
+                    </li>
                 {% endif %}
                 {% if summaries_count > 0 %}
-                  <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
-                    {% if tab == "summaries" %}
-                        <a href="#" data-toggle="tab">Sum<span class="hidden-xs hidden-sm hidden-md">maries&nbsp;({{ summaries_count }})</span></a>
-                    {% else %}
+                    <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
                         <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}">Sum<span class="hidden-xs hidden-sm hidden-md">maries&nbsp;({{ summaries_count }})</span></a>
-                    {% endif %}
-                  </li>
+                    </li>
                 {% endif %}
                 {% if related_cases_count > 0  %}
                     <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
-                        {% if tab == "related-cases" %}
-                            <a href="#" data-toggle="tab">Related<span class="hidden-xs hidden-sm hidden-md">&nbsp;Cases</span></a>
-                        {% else %}
-                            <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;<span class="hidden-xs hidden-sm hidden-md">Cases</span></a>
-                        {% endif %}
+                        <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;<span class="hidden-xs hidden-sm hidden-md">Cases</span></a>
                     </li>
                 {% endif %}
                 {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
                     <li role="presentation" {% if tab == "pdf" %} class="active" {% endif %}>
-                        {% if tab == "pdf" %}
-                            <a href="#" data-toggle="tab">PDF</a>
-                        {% else %}
-                            <a href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
-                        {% endif %}
+                        <a href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
                     </li>
                 {% endif %}
             </ul>
