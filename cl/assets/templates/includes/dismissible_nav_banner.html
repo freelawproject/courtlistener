@@ -30,7 +30,7 @@
 {% endcomment %}
 
 {% if cookie_name  not in request.COOKIES %}
-<div class="navbar navbar-default subnav alert-info alert-dismissible" role="navigation">
+<div class="navbar navbar-default subnav alert-danger alert-dismissible" role="navigation">
   <div class="container-fluid">
     <div class="row">
       <div class="col-xs-12">
@@ -48,9 +48,9 @@
       </div>
       <div class="{% if single_row %}col-xs-2{% else %}col-xs-12{% endif %} flex justify-content-center justify-content-sm-end {% if not single_row %}second-row-btn{% endif %}">
         <a href="{{link}}"
-            class="btn btn-primary btn-lg hidden-xs">{% if button_emoji %}{{button_emoji}}{% endif %}&nbsp;{% if button_text %}{{button_text}}{% else %}Learn More{% endif %}</a>
+            class="btn btn-danger btn-lg hidden-xs">{% if button_emoji %}{{button_emoji}}{% endif %}&nbsp;{% if button_text %}{{button_text}}{% else %}Learn More{% endif %}</a>
         <a href="{{link}}"
-            class="btn btn-primary btn-sm hidden-sm hidden-md hidden-lg">{% if button_emoji %}{{button_emoji}}&nbsp;{% endif %}{% if button_text %}{{button_text}}{% else %}Learn More{% endif %}</a>
+            class="btn btn-danger btn-sm hidden-sm hidden-md hidden-lg">{% if button_emoji %}{{button_emoji}}&nbsp;{% endif %}{% if button_text %}{{button_text}}{% else %}Learn More{% endif %}</a>
       </div>
     </div>
   </div>
