@@ -108,7 +108,7 @@ from cl.users.models import UserProfile
 from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
-class BasicAPIPageTest(TestCase):
+class BasicAPIPageTest(ESIndexTestCase, TestCase):
     """Test the basic views"""
 
     fixtures = [
@@ -116,6 +116,10 @@ class BasicAPIPageTest(TestCase):
         "test_court.json",
         "test_objects_search.json",
     ]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
 
     def setUp(self) -> None:
         self.async_client = AsyncClient()
