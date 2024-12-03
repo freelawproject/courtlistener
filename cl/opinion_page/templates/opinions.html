@@ -216,13 +216,13 @@
                 </div>
             </div>
 
-                <div class="case-caption jump-link" id="caption">{% if cluster.case_name %}{{ cluster.case_name }}{% elif cluster.case_name_full %} {{ cluster.case_name_full }}{% else %}{{ cluster.case_name_short }}{% endif %}</div>
+                <div class="case-caption jump-link" id="caption">{{ cluster|best_case_name|safe }}</div>
                 <h4 class="case-court">{{ cluster.docket.court }}</h4>
                 <br>
                 <div class="case-details">
                     <ul class="list-unstyled">
                         <li><strong>Citations:</strong> {{ cluster.citation_string|default:"None known" }}</li>
-                        {% if cluster.case_name_full != cluster.case_name and cluster.case_name_full != "" and cluster.case_name != "" %}
+                        {% if cluster.case_name_full != cluster|best_case_name %}
                         <li><strong>Full Case Name:</strong>
                             {{ cluster.case_name_full }}
                         </li>
