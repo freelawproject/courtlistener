@@ -84,9 +84,8 @@
   <header class="row">
     <!-- Donate Banner -->
     {% if FUNDRAISING_MODE %}
-      {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/givingtuesday" text="<strong>Today is GivingTuesday.</strong> Your support of Free Law Project helps make the justice system more transparent and accessible to all." cookie_name="giving_tuesday" button_text="Donate Today!"%}
+      {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/supportflp" cookie_name="eoy_banner" button_text="Make your DONATION TODAY" button_emoji='<i class="fa fa-heart-o"></i>' text="Your support has grown CourtListener to over 10 million opinions, with improved search and API functionality. Help us continue expanding and enhancing access to the law. Donate before the end of 2024 to power free and open legal information for everyone" %}
     {% endif %}
-
     <!-- Broken Email Banner -->
     {% if EMAIL_BAN_REASON %}
       <div class="navbar navbar-default subnav  alert-danger alert-dismissible broken-email-banner" role="navigation">
