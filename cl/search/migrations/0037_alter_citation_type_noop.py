@@ -37,7 +37,7 @@ class Migration(migrations.Migration):
                     (8, "A vendor neutral citation (e.g. 2013 FL 1)"),
                     (
                         9,
-                        "A law journal citation within a scholarly or professional legal periodical (e.g. 95 Yale L.J. 5; 72 Soc.Sec.Rep.Serv. 318",
+                        "A law journal citation within a scholarly or professional legal periodical (e.g. 95 Yale L.J. 5; 72 Soc.Sec.Rep.Serv. 318)",
                     ),
                 ],
                 help_text="The type of citation that this is.",
@@ -70,7 +70,7 @@ class Migration(migrations.Migration):
                     (8, "A vendor neutral citation (e.g. 2013 FL 1)"),
                     (
                         9,
-                        "A law journal citation within a scholarly or professional legal periodical (e.g. 95 Yale L.J. 5; 72 Soc.Sec.Rep.Serv. 318",
+                        "A law journal citation within a scholarly or professional legal periodical (e.g. 95 Yale L.J. 5; 72 Soc.Sec.Rep.Serv. 318)",
                     ),
                 ],
                 help_text="The type of citation that this is.",

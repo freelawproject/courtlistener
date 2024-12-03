@@ -3286,7 +3286,7 @@ class Citation(models.Model):
             JOURNAL,
             "A law journal citation within a scholarly or professional "
             "legal periodical (e.g. 95 Yale L.J. 5; "
-            "72 Soc.Sec.Rep.Serv. 318",
+            "72 Soc.Sec.Rep.Serv. 318)",
         ),
     )
     cluster = models.ForeignKey(
