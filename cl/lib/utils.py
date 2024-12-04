@@ -248,7 +248,7 @@ def cleanup_main_query(query_string: str) -> str:
     """
     inside_a_phrase = False
     cleaned_items = []
-    for item in re.split(r'([^a-zA-Z0-9_\-~":]+)', query_string):
+    for item in re.split(r'([^a-zA-Z0-9_\-^~":]+)', query_string):
         if not item:
             continue
 

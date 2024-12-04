@@ -19,6 +19,7 @@ class ContactTest(SimpleUserDataMixin, TestCase):
     test_msg = {
         "name": "pandora",
         "phone_number": "asdf",
+        "issue_type": "support",
         "message": "123456789012345678901",
         "email": "pandora@box.com",
         "hcaptcha": "xxx",

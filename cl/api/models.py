@@ -7,7 +7,6 @@ from django.core.validators import URLValidator
 from django.db import models
 
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 
 
 class WebhookEventType(models.IntegerChoices):
@@ -17,16 +16,25 @@ class WebhookEventType(models.IntegerChoices):
     OLD_DOCKET_ALERTS_REPORT = 4, "Old Docket Alerts Report"
 
 
+class WebhookVersions(models.IntegerChoices):
+    v1 = 1, "v1"
+    v2 = 2, "v2"
+
+
 HttpStatusCodes = models.IntegerChoices(  # type: ignore
     "HttpStatusCodes", [(s.name, s.value) for s in HTTPStatus]  # type: ignore[arg-type]
 )
 
 
 @pghistory.track(
-    AfterUpdateOrDeleteSnapshot(), model_name="WebhookHistoryEvent"
+    pghistory.UpdateEvent(
+        condition=pghistory.AnyChange(exclude_auto=True), row=pghistory.Old
+    ),
+    pghistory.DeleteEvent(),
+    model_name="WebhookHistoryEvent",
 )
 class Webhook(AbstractDateTimeModel):
-    user: models.ForeignKey = models.ForeignKey(
+    user = models.ForeignKey[User, User](
         User,
         help_text="The user that has provisioned the webhook.",
         related_name="webhooks",
@@ -45,7 +53,9 @@ class Webhook(AbstractDateTimeModel):
         help_text="An on/off switch for the webhook.", default=False
     )
     version: models.IntegerField = models.IntegerField(
-        help_text="The specific version of the webhook provisioned.", default=1
+        help_text="The specific version of the webhook provisioned.",
+        choices=WebhookVersions.choices,
+        default=WebhookVersions.v1,
     )
     failure_count: models.IntegerField = models.IntegerField(
         help_text="The number of failures (400+ status) responses the webhook "
@@ -54,7 +64,7 @@ class Webhook(AbstractDateTimeModel):
     )
 
     def __str__(self) -> str:
-        return f"<Webhook: {self.pk} for event type '{self.get_event_type_display()}'>"
+        return f"<Webhook:{self.pk} V{self.version} for event type '{self.get_event_type_display()}'>"
 
 
 class WEBHOOK_EVENT_STATUS:
@@ -75,7 +85,7 @@ class WEBHOOK_EVENT_STATUS:
 
 
 class WebhookEvent(AbstractDateTimeModel):
-    webhook: models.ForeignKey = models.ForeignKey(
+    webhook = models.ForeignKey[Webhook, Webhook](
         Webhook,
         help_text="The Webhook this event is associated with.",
         related_name="webhook_events",

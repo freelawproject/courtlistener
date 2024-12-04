@@ -84,7 +84,7 @@
   <header class="row">
     <!-- Donate Banner -->
     {% if FUNDRAISING_MODE %}
-      {% include 'includes/dismissible_nav_banner.html' with link="https://free.law/2024/01/18/new-recap-archive-search-is-live" text="A year in the making, today we are launching a huge new search engine for the RECAP Archive" emoji="&#127873;" cookie_name="no_banner"%}
+      {% include 'includes/dismissible_nav_banner.html' with link="https://donate.free.law/forms/supportflp" cookie_name="eoy_banner" button_text="Make your DONATION TODAY" button_emoji='<i class="fa fa-heart-o"></i>' text="Your support has grown CourtListener to over 10 million opinions, with improved search and API functionality. Help us continue expanding and enhancing access to the law. Donate before the end of 2024 to power free and open legal information for everyone" %}
     {% endif %}
 
     <!-- Broken Email Banner -->
@@ -231,17 +231,22 @@
                 <li>
                   <a href="https://free.law/recap/" tabindex="202">Install RECAP</a>
                 </li>
+                {% flag "pray-and-pay" %}
+                  <li>
+                    <a href="{% url "top_prayers" %}#recap-alerts" tabindex="203">Pray and Pay Project</a>
+                  </li>
+                {% endflag %}
                 <li>
-                  <a href="{% url "alert_help" %}#recap-alerts" tabindex="203">Get Case Alerts</a>
+                  <a href="{% url "alert_help" %}#recap-alerts" tabindex="204">Get Case Alerts</a>
                 </li>
                 <li>
-                  <a href="{% url "coverage_recap" %}" tabindex="204">About this Collection</a>
+                  <a href="{% url "coverage_recap" %}" tabindex="205">About this Collection</a>
                 </li>
                 <li>
-                  <a href="https://free.law/data-consulting/" tabindex="205">Bulk Data Service</a>
+                  <a href="https://free.law/data-consulting/" tabindex="206">Bulk Data Service</a>
                 </li>
                 <li>
-                  <a href="{% url "pacer_api_help" %}" tabindex="206">API</a>
+                  <a href="{% url "pacer_api_help" %}" tabindex="207">API</a>
                 </li>
               </ul>
             </li>

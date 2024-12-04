@@ -201,6 +201,15 @@ ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS = env(
     "ELASTICSEARCH_OPINION_NUMBER_OF_REPLICAS", default=0
 )
 
+# RECAP Alerts Percolator index shards and replicas
+ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_SHARDS = env(
+    "ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_SHARDS", default=1
+)
+ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_REPLICAS = env(
+    "ELASTICSEARCH_RECAP_ALERTS_NUMBER_OF_REPLICAS", default=0
+)
+
+
 # ES Auto refresh. In production, it's suggested to wait for ES periodically
 # refresh (every ~1 second) since it's a resource-intensive operation.
 # This setting is overridden for testing.
@@ -215,10 +224,15 @@ ELASTICSEARCH_DSL_AUTO_REFRESH = env(
 #############################################################
 ELASTICSEARCH_PAGINATION_BATCH_SIZE = 100
 
-###################################################
-# The maximum number of scheduled hits per alert. #
-###################################################
+###########################
+# Search Alerts settings #
+###########################
+# The maximum number of scheduled hits per alert.
 SCHEDULED_ALERT_HITS_LIMIT = 20
+
+PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED = env(
+    "PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED", default=False
+)
 
 ################################
 # ES bulk indexing batch size #
@@ -249,6 +263,12 @@ ELASTICSEARCH_SWEEP_INDEXER_CHUNK_SIZE = env(
 )
 ELASTICSEARCH_SWEEP_INDEXER_HEADS_RATE = env(
     "ELASTICSEARCH_SWEEP_INDEXER_HEADS_RATE", default=60
+)
+ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL = env(
+    "ELASTICSEARCH_SWEEP_INDEXER_POLL_INTERVAL", default=10
+)
+ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS = env(
+    "ELASTICSEARCH_SWEEP_INDEXER_WAIT_BETWEEN_CHUNKS", default=3
 )
 ELASTICSEARCH_SWEEP_INDEXER_MODELS = env(
     "ELASTICSEARCH_SWEEP_INDEXER_MODELS",
