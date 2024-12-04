@@ -146,7 +146,6 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
             # In case we have two editions which could have different types
             logger.info("Unable to disambiguate citation: %s", cite_str)
             continue
-        citation = found_cites[0]
 
         # Ensure we have valid citations to process
         if isinstance(citation, (FullCaseCitation, FullJournalCitation)):
