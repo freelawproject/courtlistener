@@ -4113,7 +4113,7 @@ class WestCitationImportTest(TestCase):
             id=1,
             docket=cls.test_docket,
             case_name="",
-            case_name_full=cls.docket_empty.case_name_full,
+            case_name_full=cls.test_docket.case_name_full,
             date_filed=date(2001, 1, 23),
         )
         cls.citation = Citation.objects.create(
