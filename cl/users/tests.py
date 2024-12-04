@@ -31,7 +31,12 @@ from timeout_decorator import timeout_decorator
 from cl.alerts.factories import DocketAlertFactory
 from cl.alerts.models import DocketAlert, DocketAlertEvent
 from cl.api.factories import WebhookEventFactory, WebhookFactory
-from cl.api.models import Webhook, WebhookEvent, WebhookEventType
+from cl.api.models import (
+    Webhook,
+    WebhookEvent,
+    WebhookEventType,
+    WebhookVersions,
+)
 from cl.favorites.factories import UserTagFactory
 from cl.favorites.models import (
     DocketTag,
@@ -3234,11 +3239,13 @@ class WebhooksHTMXTests(APITestCase):
         url="https://example.com",
         event_type=WebhookEventType.DOCKET_ALERT,
         enabled=True,
+        version=WebhookVersions.v1,
     ):
         data = {
             "url": url,
             "event_type": event_type,
             "enabled": enabled,
+            "version": version,
         }
         return await client.post(self.webhook_path, data)
 
@@ -3367,6 +3374,7 @@ class WebhooksHTMXTests(APITestCase):
             "url": "https://example.com/updated",
             "event_type": webhooks_first.event_type,
             "enabled": webhooks_first.enabled,
+            "version": webhooks_first.version,
         }
         response = await self.client.put(webhook_1_path_detail, data_updated)
 
@@ -3459,7 +3467,7 @@ class WebhooksHTMXTests(APITestCase):
         response = await self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         # There shouldn't be results for user_1
-        self.assertEqual(response.content, b"\n\n")
+        self.assertEqual(response.content.strip(), b"")
 
         sa_webhook = await sync_to_async(WebhookFactory)(
             user=self.user_1,
@@ -3477,7 +3485,71 @@ class WebhooksHTMXTests(APITestCase):
         response = await self.client.get(webhook_event_path_list)
         self.assertEqual(response.status_code, HTTPStatus.OK)
         # There should be results for user_1
-        self.assertNotEqual(response.content, b"\n\n")
+        self.assertNotEqual(response.content.strip(), b"")
+
+    async def test_get_available_webhook_versions(self) -> None:
+        """Can we get users available versions for a webhook event type?"""
+
+        await sync_to_async(WebhookFactory)(
+            user=self.user_2,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            version=WebhookVersions.v1,
+            enabled=True,
+        )
+
+        available_versions_path = reverse(
+            "webhooks-get-available-versions",
+            kwargs={"format": "html"},
+        )
+        webhooks = Webhook.objects.all()
+        self.assertEqual(await webhooks.acount(), 1)
+
+        # Test without event_type parameter
+        response = await self.client.get(available_versions_path)
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # No version choices
+        self.assertIn("Select an event type first", response.content.decode())
+
+        # Test with event_type parameter for user_1 (no existing webhooks)
+        response = await self.client.get(
+            available_versions_path,
+            {"event_type": WebhookEventType.DOCKET_ALERT},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Should return all versions available (1,2)
+        self.assertIn('value="1"', response.content.decode())
+        self.assertIn('value="2"', response.content.decode())
+
+        # Create a webhook with version 1 for user_1
+        await sync_to_async(WebhookFactory)(
+            user=self.user_1,
+            event_type=WebhookEventType.DOCKET_ALERT,
+            url="https://example.com/",
+            version=WebhookVersions.v1,
+            enabled=True,
+        )
+        self.assertEqual(await webhooks.acount(), 2)
+
+        # Test with event_type parameter for user_1 (has webhook with version 1)
+        response = await self.client.get(
+            available_versions_path,
+            {"event_type": WebhookEventType.DOCKET_ALERT},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Should return  only version 2 available
+        self.assertNotIn('value="1"', response.content.decode())
+        self.assertIn('value="2"', response.content.decode())
+
+        # Test with a different event_type
+        response = await self.client.get(
+            available_versions_path,
+            {"event_type": WebhookEventType.SEARCH_ALERT},
+        )
+        self.assertEqual(response.status_code, HTTPStatus.OK)
+        # Should return all versions available for SEARCH_ALERT event type
+        self.assertIn('value="1"', response.content.decode())
+        self.assertIn('value="2"', response.content.decode())
 
 
 @override_settings(DEVELOPMENT=False)

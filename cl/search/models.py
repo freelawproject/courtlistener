@@ -18,6 +18,7 @@ from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
+from django.utils.functional import cached_property
 from django.utils.text import slugify
 from eyecite import get_citations
 from eyecite.tokenizers import HyperscanTokenizer
@@ -2836,9 +2837,8 @@ class OpinionCluster(AbstractDateTimeModel):
             else:
                 caption += f", {citations[0]}"
 
-        cluster = await OpinionCluster.objects.aget(pk=self.pk)
-        docket = await Docket.objects.aget(id=cluster.docket_id)
-        court = await Court.objects.aget(pk=docket.court_id)
+        docket = await sync_to_async(lambda: self.docket)()
+        court = await sync_to_async(lambda: docket.court)()
         if docket.court_id != "scotus":
             court = re.sub(" ", "&nbsp;", court.citation_string)
             # Strftime fails before 1900. Do it this way instead.
@@ -2889,6 +2889,30 @@ class OpinionCluster(AbstractDateTimeModel):
             year = self.date_filed.isoformat().split("-")[0]
             caption += f"&nbsp;({court}&nbsp;{year})"
         return caption
+
+    @property
+    def display_citation(self):
+        """Find favorite citation to display
+
+        Identify the proper or favorite citation(s) to display on the front end
+        but don't wrap it together with a title
+        :return: The citation if applicable
+        """
+        citation_list = [citation for citation in self.citations.all()]
+        citations = sorted(citation_list, key=sort_cites)
+        if not citations:
+            citation = ""
+        elif citations[0].type == Citation.NEUTRAL:
+            citation = citations[0]
+        elif (
+            len(citations) >= 2
+            and citations[0].type == Citation.WEST
+            and citations[1].type == Citation.LEXIS
+        ):
+            citation = f"{citations[0]}, {citations[1]}"
+        else:
+            citation = citations[0]
+        return citation
 
     @property
     def citation_string(self):
@@ -3002,7 +3026,13 @@ class OpinionCluster(AbstractDateTimeModel):
         The returned list is sorted by that citation count field.
         """
         authorities_with_data = []
-        async for authority in await self.aauthorities():
+        authorities_base = await self.aauthorities()
+        authorities_qs = (
+            authorities_base.prefetch_related("citations")
+            .select_related("docket__court")
+            .order_by("-citation_count", "-date_filed")
+        )
+        async for authority in authorities_qs:
             authority.citation_depth = (
                 await get_citation_depth_between_clusters(
                     citing_cluster_pk=self.pk, cited_cluster_pk=authority.pk
@@ -3028,6 +3058,19 @@ class OpinionCluster(AbstractDateTimeModel):
 
     def get_absolute_url(self) -> str:
         return reverse("view_case", args=[self.pk, self.slug])
+
+    @cached_property
+    def ordered_opinions(self):
+        # Fetch all sub-opinions ordered by ordering_key
+        sub_opinions = self.sub_opinions.all().order_by("ordering_key")
+
+        # Check if there is more than one sub-opinion
+        if sub_opinions.count() > 1:
+            # Return only sub-opinions with an ordering key
+            return sub_opinions.exclude(ordering_key__isnull=True)
+
+        # If there's only one or no sub-opinions, return the main opinion
+        return sub_opinions
 
     def save(
         self,

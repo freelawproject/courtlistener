@@ -63,3 +63,8 @@ CAP_R2_ENDPOINT_URL = env("CAP_R2_ENDPOINT_URL", default="")
 CAP_R2_ACCESS_KEY_ID = env("CAP_R2_ACCESS_KEY_ID", default="")
 CAP_R2_SECRET_ACCESS_KEY = env("CAP_R2_SECRET_ACCESS_KEY", default="")
 CAP_R2_BUCKET_NAME = env("CAP_R2_BUCKET_NAME", default="cap-static")
+
+# Webhooks
+WEBHOOK_V1_DEPRECATION_DATE = env(
+    "WEBHOOK_V1_DEPRECATION_DATE", default="2024-11-18"
+)

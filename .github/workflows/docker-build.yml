@@ -131,6 +131,11 @@ jobs:
       - name: Watch cl-es-sweep-indexer rollout status
         run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-es-sweep-indexer
 
+      - name: Rollout cl-iquery-probe
+        run: kubectl set image -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe cl-iquery-probe=freelawproject/courtlistener:${{ steps.vars.outputs.sha_short }}-prod
+      - name: Watch cl-iquery-probe rollout status
+        run: kubectl rollout status -n ${{ env.EKS_NAMESPACE }} deployment/cl-iquery-probe
+
 
       # Watch "cronjobs" in k9s
       - name: Update cronjobs

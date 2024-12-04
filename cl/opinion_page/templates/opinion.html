@@ -100,7 +100,7 @@
             {% endfor %}
           </ul>
           <h4>
-            <a href="{% url "view_summaries" pk=cluster.pk slug=cluster.slug %}{% querystring %}"
+            <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}{% querystring %}"
                class="btn btn-default">
               View All Summaries
             </a>
