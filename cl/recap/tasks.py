@@ -667,8 +667,8 @@ async def get_att_data_from_pq(
     :return: A tuple containing the updated pq, att_data, and text.
     """
     try:
-        with pq.filepath_local.open("r") as file:
-            text = file.read().decode()
+        with pq.filepath_local.open("rb") as file:
+            text = file.read().decode("utf-8")
     except IOError as exc:
         msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
