@@ -1605,6 +1605,54 @@ async def clean_duplicate_attachment_entries(
         await duplicate_rd_queryset.exclude(pk=keep_rd.pk).adelete()
 
 
+async def look_for_doppelganger_rds(
+    court: Court, pq: ProcessingQueue, pacer_doc_id: int, text: str
+) -> list[ProcessingQueue]:
+    """Identify and process potential RECAPDocuments with the same pacer_doc_id
+     in the court that likely belong to a doppelgänger case.
+     Return a list of ProcessingQueue instances for processing them.
+
+    :param court: The court associated with the PACER document.
+    :param pq: The original processing queue object.
+    :param pacer_doc_id: The PACER document ID to match against.
+    :param text: The attachment page text.
+    :return: A list of ProcessingQueue objects to process.
+    """
+    main_rds = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .filter(
+            pacer_doc_id=pacer_doc_id,
+            docket_entry__docket__court=court,
+        )
+        .order_by("docket_entry__docket__pacer_case_id")
+        .distinct("docket_entry__docket__pacer_case_id")
+        .only(
+            "pacer_doc_id",
+            "docket_entry__docket__pacer_case_id",
+            "docket_entry__docket__court_id",
+        )
+    )
+    pqs_to_process = [pq]  # Add the original pq to the list of pqs to process
+    original_file_content = text.encode("utf-8")
+    original_file_name = pq.filepath_local.name
+    async for main_rd in main_rds:
+        main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
+        if main_pacer_case_id != pq.pacer_case_id:
+            # Create additional pqs for each doppelgänger case found.
+            pq_created = await ProcessingQueue.objects.acreate(
+                uploader_id=pq.uploader_id,
+                pacer_doc_id=pacer_doc_id,
+                pacer_case_id=main_pacer_case_id,
+                court_id=court.pk,
+                upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+                filepath_local=ContentFile(
+                    original_file_content, name=original_file_name
+                ),
+            )
+            pqs_to_process.append(pq_created)
+    return pqs_to_process
+
+
 async def merge_attachment_page_data(
     court: Court,
     pacer_case_id: int,
@@ -1658,23 +1706,10 @@ async def merge_attachment_page_data(
                 .afirst()
             )
         else:
-            try:
-                main_rd = await RECAPDocument.objects.select_related(
-                    "docket_entry", "docket_entry__docket"
-                ).aget(**params)
-            except RECAPDocument.DoesNotExist as exc:
-                # In cases where we have "doppelgänger" dockets drop pacer
-                # case id and check if the docket exists once more.
-                if params.get("docket_entry__docket__pacer_case_id"):
-                    retry_params = params.copy()
-                    retry_params.pop(
-                        "docket_entry__docket__pacer_case_id", None
-                    )
-                    main_rd = await RECAPDocument.objects.select_related(
-                        "docket_entry", "docket_entry__docket"
-                    ).aget(**retry_params)
-                else:
-                    raise exc
+            main_rd = await RECAPDocument.objects.select_related(
+                "docket_entry", "docket_entry__docket"
+            ).aget(**params)
+
     except RECAPDocument.MultipleObjectsReturned as exc:
         if pacer_case_id:
             duplicate_rd_queryset = RECAPDocument.objects.filter(**params)

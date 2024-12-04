@@ -77,6 +77,7 @@ from cl.recap.mergers import (
     find_docket_object,
     get_data_from_appellate_att_report,
     get_data_from_att_report,
+    look_for_doppelganger_rds,
     merge_attachment_page_data,
     merge_pacer_docket_into_cl_docket,
     process_orphan_documents,
@@ -115,7 +116,7 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         docket = await process_recap_docket(pq.pk)
         await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
-        await process_recap_attachment(pq.pk)
+        await look_for_doppelganger_rds_and_process_recap_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.PDF:
         await process_recap_pdf(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
@@ -657,6 +658,55 @@ async def process_recap_docket(pk):
     }
 
 
+async def get_att_data_from_pq(
+    pq: ProcessingQueue,
+) -> tuple[ProcessingQueue | None, dict | None, str | None]:
+    """Extract attachment data from a ProcessingQueue object.
+
+    :param pq: The ProcessingQueue object.
+    :return: A tuple containing the updated pq, att_data, and text.
+    """
+    try:
+        with pq.filepath_local.open("r") as file:
+            text = file.read().decode()
+    except IOError as exc:
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
+        await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        return None, None, None
+
+    att_data = get_data_from_att_report(text, pq.court_id)
+    if not att_data:
+        msg = "Not a valid attachment page upload."
+        await mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        return None, None, None
+
+    if pq.pacer_case_id in ["undefined", "null"]:
+        pq.pacer_case_id = att_data.get("pacer_case_id")
+        await pq.asave()
+
+    return pq, att_data, text
+
+
+async def look_for_doppelganger_rds_and_process_recap_attachment(
+    pk: int,
+) -> None:
+    """Look for doppelgänger RECAPDocuments and process the corresponding
+    attachment page for each RECAPDocument.
+
+    :param pk: Primary key of the processing queue item.
+    :return: None
+    """
+
+    pq = await ProcessingQueue.objects.aget(pk=pk)
+    court = await Court.objects.aget(id=pq.court_id)
+    pq, att_data, text = await get_att_data_from_pq(pq)
+    pqs_to_process = await look_for_doppelganger_rds(
+        court, pq, att_data["pacer_doc_id"], text
+    )
+    for pq in pqs_to_process:
+        await process_recap_attachment(pq.pk)
+
+
 async def process_recap_attachment(
     pk: int,
     tag_names: Optional[List[str]] = None,
@@ -664,7 +714,6 @@ async def process_recap_attachment(
 ) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
-    :param self: The Celery task
     :param pk: The primary key of the processing queue item you want to work on
     :param tag_names: A list of tag names to add to all items created or
     modified in this function.
@@ -678,30 +727,11 @@ async def process_recap_attachment(
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
-    try:
-        text = pq.filepath_local.read().decode()
-    except IOError as exc:
-        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
-        pq_status, msg = await mark_pq_status(
-            pq, msg, PROCESSING_STATUS.FAILED
-        )
-        return pq_status, msg, []
+    pq = await ProcessingQueue.objects.aget(pk=pk)
+    await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
+    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
-    att_data = get_data_from_att_report(text, pq.court_id)
-    logger.info(f"Parsing completed for item {pq}")
-
-    if att_data == {}:
-        # Bad attachment page.
-        msg = "Not a valid attachment page upload."
-        pq_status, msg = await mark_pq_status(
-            pq, msg, PROCESSING_STATUS.INVALID_CONTENT
-        )
-        return pq_status, msg, []
-
-    if pq.pacer_case_id in ["undefined", "null"]:
-        # Bad data from the client. Fix it with parsed data.
-        pq.pacer_case_id = att_data.get("pacer_case_id")
-        await pq.asave()
+    pq, att_data, text = await get_att_data_from_pq(pq)
 
     if document_number is None:
         document_number = att_data["document_number"]
@@ -735,6 +765,7 @@ async def process_recap_attachment(
     await add_tags_to_objs(tag_names, rds_affected)
     await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
     pq_status, msg = await mark_pq_successful(pq)
+
     return pq_status, msg, rds_affected
 
 
