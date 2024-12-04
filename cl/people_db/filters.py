@@ -310,8 +310,8 @@ class PartyFilter(NoEmptyFilterSet, RoleFilteringMixin):
     # RelatedFilters or custom labels in this class to avoid unexpected
     # behavior.
     join_table_cleanup_mapping = {
-        "attorney__docket": "docket",
-        "attorney__parties_represented": "party",
+        "dockets": "docket",
+        "attorneys": "attorney",
     }
 
     class Meta:
@@ -346,9 +346,8 @@ class AttorneyFilter(NoEmptyFilterSet, RoleFilteringMixin):
     # RelatedFilters or custom labels in this class to avoid unexpected
     # behavior.
     join_table_cleanup_mapping = {
-        "parties_represented__docket": "docket",
-        "parties_represented__attorney": "attorney",
-        "parties_represented": "party",
+        "roles__docket": "docket",
+        "roles__party": "party",
     }
 
     class Meta:

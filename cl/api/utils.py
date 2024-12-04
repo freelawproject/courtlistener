@@ -103,7 +103,7 @@ class FilterManyToManyMixin:
     many-to-many relationships.
 
     **Required Properties:**
-    - **`join_table_cleanup_mapping`**: A dictionary mapping specific lookups
+    - **`join_table_cleanup_mapping`**: A dictionary mapping the field_name
       or custom labels used for `RelatedFilter` fields to the corresponding
       field names in the join table. This mapping is essential for correct
       filtering.
@@ -176,7 +176,6 @@ class FilterManyToManyMixin:
             table query.
         """
         filters: dict[str, Any] = {}
-        filter_label = self._get_filter_label(name)
         # Iterate over related filtersets
         for related_name, related_filterset in self.related_filtersets.items():
             prefix = f"{related(self, related_name)}{LOOKUP_SEP}"
@@ -185,15 +184,40 @@ class FilterManyToManyMixin:
                 # Skip processing if no parameter starts with the prefix
                 continue
 
-            # Create a dictionary to store cleaned keys and values
-            cleaned_keys = {
-                self._clean_join_table_key(f"{prefix}{key}"): value
-                for key, value in related_filterset.form.cleaned_data.items()
-                # Only include keys with values and not starting with the filter label
-                if value and not key.startswith(filter_label)
-            }
-            # Update the filters with the cleaned keys
-            filters = filters | cleaned_keys
+            # Extract and clean the field name to be used as a filter.
+            #
+            # We start with the field name from the `filters` dictionary,
+            # which is associated with the `related_name`.
+            #
+            # The `_clean_join_table_key` method is used to ensure
+            # compatibility with prefetch queries.  The cleaned field name is
+            # then used to  construct a lookup expression that will perform
+            # an `IN` query. This approach is efficient for filtering multiple
+            # values.
+            clean_field_name = self._clean_join_table_key(
+                self.filters[related_name].field_name
+            )
+            lookup_expr = LOOKUP_SEP.join([clean_field_name, "in"])
+
+            # Extract the field name to retrieve values from the subquery.
+            #
+            # This field is determined by the `to_field_name` attribute of
+            # the related filterset's field. If not specified, the default `pk`
+            # (primary key) is used.
+            #
+            # The subquery is constructed using the underlying form's
+            # `cleaned_data` to ensure that invalid lookups in the request are
+            # gracefully ignored.
+            to_field_name = (
+                getattr(
+                    self.filters[related_name].field, "to_field_name", "pk"
+                )
+                or "pk"
+            )
+            subquery = related_filterset.qs.values(to_field_name)
+
+            # Merge the current lookup expression into the existing filter set.
+            filters = filters | {lookup_expr: subquery}
 
         return filters
 
