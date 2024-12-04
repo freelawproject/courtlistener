@@ -141,8 +141,10 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
         if not found_cites:
             logger.info("Unable to parse %s", cite_str)
             continue
-        elif len(found_cites) > 1:
-            logger.info("Unable to disambiguate %s", cite_str)
+        citation = found_cites[0]
+        if len(citation.all_editions) > 1:
+            # In case we have two editions which could have different types
+            logger.info("Unable to disambiguate citation: %s", cite_str)
             continue
         citation = found_cites[0]
 

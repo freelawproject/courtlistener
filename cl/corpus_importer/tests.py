@@ -4090,7 +4090,8 @@ class WestCitationImportTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.docket_empty = DocketFactory.create(
+        cls.test_docket = DocketFactory.create(
+            id=1,
             docket_number="00-1360",
             case_name="",
             case_name_full="Hcmf Corporation Heritage Hall Holding Limited "
@@ -4108,15 +4109,15 @@ class WestCitationImportTest(TestCase):
             "Commonwealth of Virginia the Department of "
             "Medical Assistance Services Frank Medico",
         )
-        cls.empty_cluster = OpinionClusterFactory.create(
+        cls.test_cluster = OpinionClusterFactory.create(
             id=1,
-            docket=cls.docket_empty,
+            docket=cls.test_docket,
             case_name="",
             case_name_full=cls.docket_empty.case_name_full,
             date_filed=date(2001, 1, 23),
         )
         cls.citation = Citation.objects.create(
-            cluster=cls.empty_cluster,
+            cluster=cls.test_cluster,
             volume=238,
             reporter="F.3d",
             page="273",
