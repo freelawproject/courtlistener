@@ -155,7 +155,30 @@ header {
 
 /* Standard target color. */
 *:target {
-  background-color: lightyellow;
+    -webkit-animation: target-fade 3s;
+    -moz-animation: target-fade 3s;
+    -o-animation: target-fade 3s;
+    animation: target-fade 3s;
+}
+
+@-webkit-keyframes target-fade {
+    from { background-color: lightyellow; }
+    to { background-color: transparent; }
+}
+
+@-moz-keyframes target-fade {
+    from { background-color: lightyellow; }
+    to { background-color: transparent; }
+}
+
+@-o-keyframes target-fade {
+    from { background-color: lightyellow; }
+    to { background-color: transparent; }
+}
+
+@keyframes target-fade {
+    from { background-color: lightyellow; }
+    to { background-color: transparent; }
 }
 
 .alt {
@@ -1008,15 +1031,7 @@ closely the content in the book*/
 
 #headmatter > .footnotes > .footnote > a {
   color: #000099;
-  position: absolute;
   font-size: 1em;
-}
-
-#headmatter {
-  border: 1px rgba(210, 210, 210, 0.55) solid;
-  padding: 10px;
-  background: rgba(232, 232, 232, 0.37);
-  margin: 10px;
 }
 
 #headmatter > attorneys, docketnumbers, judges, footnotes, court, decisiondate {
@@ -1476,6 +1491,10 @@ emphasis {
   border-color: #999999;
 }
 
+.alert-dismissible .second-row-btn {
+  margin-bottom: 10px;
+}
+
 .h-captcha > div {
   color: #333333 !important;
   font-family: Helvetica;
@@ -1607,7 +1626,7 @@ textarea {
 
 
 /* Prevent images inside opinion from overflowing */
-#opinion-content img {
+div.subopinion-content img {
   max-width: 100%;
   height: auto;
 }

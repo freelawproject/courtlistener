@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.utils.timezone import make_naive, now
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
+from waffle.testutils import override_flag
 
 from cl.custom_filters.templatetags.pacer import price
 from cl.favorites.factories import NoteFactory, PrayerFactory
@@ -107,6 +108,7 @@ class UserNotesTest(BaseSeleniumTest):
         super().setUp()
 
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
+    @override_flag("ui_flag_for_o", False)
     def test_anonymous_user_is_prompted_when_favoriting_an_opinion(
         self,
     ) -> None:
@@ -167,6 +169,7 @@ class UserNotesTest(BaseSeleniumTest):
         modal_title = self.browser.find_element(By.ID, "save-note-title")
         self.assertIn("Save Note", modal_title.text)
 
+    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_logged_in_user_can_save_note(self) -> None:
         # Meta: assure no Faves even if part of fixtures
