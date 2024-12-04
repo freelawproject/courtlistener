@@ -96,6 +96,7 @@ from cl.search.models import (
     Court,
     Docket,
     DocketEntry,
+    Opinion,
     OpinionCluster,
     Parenthetical,
     RECAPDocument,
@@ -821,7 +822,16 @@ async def view_opinion_old(
     unbound form.
     """
     # Look up the court, cluster, title and note information
-    cluster: OpinionCluster = await aget_object_or_404(OpinionCluster, pk=pk)
+    cluster: OpinionCluster = await aget_object_or_404(
+        OpinionCluster.objects.prefetch_related(
+            Prefetch(
+                "sub_opinions",
+                queryset=Opinion.objects.order_by("ordering_key"),
+                # Replace "some_field" with the desired ordering field
+            )
+        ),
+        pk=pk,
+    )
     title = ", ".join(
         [
             s
