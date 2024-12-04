@@ -1295,6 +1295,7 @@ class OpinionBaseDocument(Document):
     docketNumber = fields.TextField(
         analyzer="text_en_splitting_cl",
         term_vector="with_positions_offsets",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1306,6 +1307,7 @@ class OpinionBaseDocument(Document):
     )
     caseName = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
@@ -1318,6 +1320,7 @@ class OpinionBaseDocument(Document):
     )
     caseNameFull = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1333,6 +1336,7 @@ class OpinionBaseDocument(Document):
     court_id = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1343,6 +1347,7 @@ class OpinionBaseDocument(Document):
     )
     court = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1359,6 +1364,7 @@ class OpinionBaseDocument(Document):
     )
     judge = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1376,6 +1382,7 @@ class OpinionBaseDocument(Document):
     )
     attorney = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1386,6 +1393,7 @@ class OpinionBaseDocument(Document):
     )
     suitNature = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         term_vector="with_positions_offsets",
         fields={
             "exact": fields.TextField(
@@ -1400,6 +1408,7 @@ class OpinionBaseDocument(Document):
         fields.TextField(
             analyzer="text_en_splitting_cl",
             term_vector="with_positions_offsets",
+            copy_to="combined_fields",
             fields={
                 "exact": fields.TextField(
                     analyzer="english_exact",
@@ -1415,6 +1424,7 @@ class OpinionBaseDocument(Document):
     status = fields.TextField(
         analyzer="text_en_splitting_cl",
         search_analyzer="search_analyzer",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1425,6 +1435,7 @@ class OpinionBaseDocument(Document):
     )
     procedural_history = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1435,6 +1446,7 @@ class OpinionBaseDocument(Document):
     )
     posture = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1445,6 +1457,7 @@ class OpinionBaseDocument(Document):
     )
     syllabus = fields.TextField(
         analyzer="text_en_splitting_cl",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1612,6 +1625,7 @@ class OpinionDocument(OpinionBaseDocument):
     text = fields.TextField(
         analyzer="text_en_splitting_cl",
         term_vector="with_positions_offsets",
+        copy_to="combined_fields",
         fields={
             "exact": fields.TextField(
                 analyzer="english_exact",
@@ -1627,6 +1641,11 @@ class OpinionDocument(OpinionBaseDocument):
     )
     joined_by_ids = fields.ListField(
         fields.IntegerField(multi=True),
+    )
+    combined_fields = fields.TextField(
+        analyzer="english_exact",
+        search_analyzer="search_analyzer_exact",
+        term_vector="yes",
     )
 
     class Django:
