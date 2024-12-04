@@ -139,11 +139,9 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
         # We find all the citations that could match a cluster to update the case name
         found_cites = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
         if not found_cites:
-            continue
-        if len(found_cites) == 0:
             logger.info("Unable to parse %s", cite_str)
             continue
-        if len(found_cites) > 1:
+        elif len(found_cites) > 1:
             logger.info("Unable to disambiguate %s", cite_str)
             continue
         citation = found_cites[0]
