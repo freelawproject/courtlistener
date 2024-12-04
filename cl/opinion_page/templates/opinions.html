@@ -24,162 +24,158 @@
 
 
 {% block sidebar %}
-    {% with sponsored_logo=STATIC_URL|add:'img/vlex-logo-150-75.png' %}
-        <div class="col-sm-3 opinion-sidebar hidden-print" id="sidebar">
-            <div class="top-section">
-                {# show the admin tools if applicable #}
-                {% if perms.search.change_docket or perms.search.change_opinioncluster or perms.search.change_citation %}
-                    <div class="sidebar-section">
-                        <h3><span>Admin</span></h3>
-                        <p>
-                            {% if perms.search.change_docket %}
-                                <a href="{% url 'admin:search_docket_change' cluster.docket.pk %}"
-                                   class="btn btn-primary btn-xs">Docket</a>
+    <div class="col-sm-3 opinion-sidebar hidden-print" id="sidebar">
+        <div class="top-section">
+            {# show the admin tools if applicable #}
+            {% if perms.search.change_docket or perms.search.change_opinioncluster or perms.search.change_citation %}
+                <div class="sidebar-section">
+                    <h3><span>Admin</span></h3>
+                    <p>
+                        {% if perms.search.change_docket %}
+                            <a href="{% url 'admin:search_docket_change' cluster.docket.pk %}"
+                               class="btn btn-primary btn-xs">Docket</a>
+                        {% endif %}
+                        {% if perms.search.change_opinioncluster %}
+                            <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
+                               class="btn btn-primary btn-xs">Cluster</a>
+                        {% endif %}
+                        {% if perms.search.change_opinion %}
+                            {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
+                                <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
+                                   class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion</a>
+                            {% endfor %}
+                        {% endif %}
+                        {% if request.user.is_superuser %}
+                            {% if private %}
+                                <div class="btn btn-danger btn-xs">Blocked <i
+                                        class="fa fa-ban"></i></div>
+                            {% else %}
+                                <div class="btn btn-success btn-sm block-item"
+                                     data-id="{{ cluster.pk }}"
+                                     data-type="cluster">Block Cluster and Docket <i
+                                        class="fa fa-ban"></i></div>
                             {% endif %}
-                            {% if perms.search.change_opinioncluster %}
-                                <a href="{% url 'admin:search_opinioncluster_change' cluster.pk %}"
-                                   class="btn btn-primary btn-xs">Cluster</a>
-                            {% endif %}
-                            {% if perms.search.change_opinion %}
-                                {% for sub_opinion in cluster.sub_opinions.all|dictsort:"type" %}
-                                    <a href="{% url 'admin:search_opinion_change' sub_opinion.pk %}"
-                                       class="btn btn-primary btn-xs">{{ sub_opinion.get_type_display|cut:"Opinion" }} opinion</a>
-                                {% endfor %}
-                            {% endif %}
-                            {% if request.user.is_superuser %}
-                                {% if private %}
-                                    <div class="btn btn-danger btn-xs">Blocked <i
-                                            class="fa fa-ban"></i></div>
-                                {% else %}
-                                    <div class="btn btn-success btn-sm block-item"
-                                         data-id="{{ cluster.pk }}"
-                                         data-type="cluster">Block Cluster and Docket <i
-                                            class="fa fa-ban"></i></div>
-                                {% endif %}
-                            {% endif %}
-                        </p>
-                    </div>
-                {% endif %}
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
 
-           <div id="opinion-toc" class="sidebar-section">
-                  <h3> <span>Jump To</span> </h3>
-                  <li class="jump-links active"><a id="nav_top" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#"  class="active">Top</a></li>
-                  <li class="jump-links"><a id="nav_caption" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
-                  {% if cluster.headmatter %}
-                    <li class="jump-links"><a id="nav_o" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o">Headmatter</a></li>
-                  {% else %}
+       <div id="opinion-toc" class="sidebar-section">
+              <h3> <span>Jump To</span> </h3>
+              <li class="jump-links active"><a id="nav_top" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#"  class="active">Top</a></li>
+              <li class="jump-links"><a id="nav_caption" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
+              {% if cluster.headmatter %}
+                <li class="jump-links"><a id="nav_o" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o">Headmatter</a></li>
+              {% else %}
 
-                      {% if cluster.correction %}
-                          <li class="jump-links"><a  id="nav_correction" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#correction">Correction</a></li>
-                      {% endif %}
-                      {% if cluster.attorneys %}
-                          <li class="jump-links"><a id="nav_attorneys" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#attorneys">Attorneys</a></li>
-                      {% endif %}
-                      {% if cluster.headnotes %}
-                          <li class="jump-links"><a id="nav_headnotes" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#headnotes">Headnotes</a></li>
-                      {% endif %}
-                      {% if cluster.syllabus %}
-                          <li class="jump-links"><a id="nav_syllabus" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#syllabus">Syllabus</a></li>
-                      {% endif %}
-                      {% if cluster.summary %}
-                          <li class="jump-links"><a id="nav_summary" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#summary">Summary</a></li>
-                      {% endif %}
-                      {% if cluster.history %}
-                          <li class="jump-links"><a id="nav_history" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#history">History</a></li>
-                      {% endif %}
-                      {% if cluster.disposition %}
-                          <li class="jump-links"><a id="nav_disposition" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#disposition">Disposition</a></li>
-                      {% endif %}
+                  {% if cluster.correction %}
+                      <li class="jump-links"><a  id="nav_correction" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#correction">Correction</a></li>
                   {% endif %}
-                  {% for sub_opinion in cluster.ordered_opinions %}
-                  <li class="jump-links sub-opinion">
-                    <a id="nav_o{{ forloop.counter }}" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o{{ forloop.counter }}" >
-                      {% if cluster.sub_opinions.all.count > 1 %}
-                        {% if sub_opinion.get_type_display == "Concurrence Opinion" %}
-                          Concurrence
-                        {% else %}
-                          {{ sub_opinion.get_type_display }}
-                        {% endif %}
-                            {% if sub_opinion.author_str %}
-                            by {{ sub_opinion.author_str }}
-                        {% endif %}
-                      {% else %}
-                        {{ sub_opinion.get_type_display }}
+                  {% if cluster.attorneys %}
+                      <li class="jump-links"><a id="nav_attorneys" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#attorneys">Attorneys</a></li>
+                  {% endif %}
+                  {% if cluster.headnotes %}
+                      <li class="jump-links"><a id="nav_headnotes" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#headnotes">Headnotes</a></li>
+                  {% endif %}
+                  {% if cluster.syllabus %}
+                      <li class="jump-links"><a id="nav_syllabus" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#syllabus">Syllabus</a></li>
+                  {% endif %}
+                  {% if cluster.summary %}
+                      <li class="jump-links"><a id="nav_summary" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#summary">Summary</a></li>
+                  {% endif %}
+                  {% if cluster.history %}
+                      <li class="jump-links"><a id="nav_history" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#history">History</a></li>
+                  {% endif %}
+                  {% if cluster.disposition %}
+                      <li class="jump-links"><a id="nav_disposition" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#disposition">Disposition</a></li>
+                  {% endif %}
+              {% endif %}
+              {% for sub_opinion in cluster.ordered_opinions %}
+              <li class="jump-links sub-opinion">
+                <a id="nav_o{{ forloop.counter }}" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#o{{ forloop.counter }}" >
+                  {% if cluster.sub_opinions.all.count > 1 %}
+                    {% if sub_opinion.get_type_display == "Concurrence Opinion" %}
+                      Concurrence
+                    {% else %}
+                      {{ sub_opinion.get_type_display }}
+                    {% endif %}
                         {% if sub_opinion.author_str %}
-                          by {{ sub_opinion.author_str }}
-                        {% endif %}
-                      {% endif %}
-                    </a>
-                  </li>
-                  {% endfor %}
-              </div>
+                        by {{ sub_opinion.author_str }}
+                    {% endif %}
+                  {% else %}
+                    {{ sub_opinion.get_type_display }}
+                    {% if sub_opinion.author_str %}
+                      by {{ sub_opinion.author_str }}
+                    {% endif %}
+                  {% endif %}
+                </a>
+              </li>
+              {% endfor %}
+          </div>
 
-            {% if cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source and tab == "opinions" %}
-                <div class="col-sm-12 alert-warning alert v-offset-above-2">
-                    <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
-                    </p>
-                </div>
-                <div class="clearfix"></div>
-            {% endif %}
-
-            {% if tab == "authorities" %}
-                <div class="col-sm-12 alert-warning alert v-offset-above-2">
-                    <p class="bottom">
-                        This page displays all the citations that have been extracted and linked in our system. Please note, it does not serve as a comprehensive list of all citations within the document.
-                    </p>
-                </div>
-                <div class="clearfix"></div>
-            {% endif %}
-
-            {% if tab == "related-cases" %}
-                <div class="col-sm-12 alert-warning alert v-offset-above-2">
-                    <p class="bottom">
-                        The Related Cases query is used to find legal cases
-                        related to a given case by analyzing textual similarities.
-                        It identifies and retrieves cases with similar content,
-                        allowing for the generation of a summary of related cases,
-                        including their names, links, and filing dates,
-                        to help users explore precedents or comparable rulings.
-                    </p>
-                </div>
-                <div class="clearfix"></div>
-            {% endif %}
-
-                {% if tab == "summaries" %}
-                <div class="col-sm-12 alert-warning alert v-offset-above-2">
-                    <p class="bottom">
-                        Summaries or parenthetical groupings are used to
-                        provide concise explanations or clarifications about a
-                        case’s procedural posture, legal principles, or
-                        facts that are immediately relevant to the citation,
-                        typically enclosed in parentheses following a case citation.
-
-                    </p>
-                </div>
-                <div class="clearfix"></div>
-            {% endif %}
+        {% if cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source and tab == "opinions" %}
+            <div class="col-sm-12 alert-warning alert v-offset-above-2">
+                <p class="bottom">The text of this document was obtained by analyzing a scanned document and may have typos.
+                </p>
             </div>
+            <div class="clearfix"></div>
+        {% endif %}
 
-            <div class="bottom-section">
-                {# Sponsored by #}
-                {% if sponsored %}
-                    <div id="sponsored-by" class="sidebar-section">
-                        <h3>
-                          <span>Sponsored By</span>
-                        </h3>
-                        <p>This opinion added to CourtListener with support from v|Lex.</p>
-                        <a href="https://www.vlex.com" rel="sponsored" target="_blank">
-                            <img id="vlex" src="{{ sponsored_logo }}" alt="v|lex logo" class="img-responsive" width="150" height="75" >
-                        </a>
-                    </div>
-                {% else %}
-                    {% include "includes/donate_sidebar.html" with referrer="o-donate-now" %}
-                {% endif %}
+        {% if tab == "authorities" %}
+            <div class="col-sm-12 alert-warning alert v-offset-above-2">
+                <p class="bottom">
+                    This page displays all the citations that have been extracted and linked in our system. Please note, it does not serve as a comprehensive list of all citations within the document.
+                </p>
             </div>
+            <div class="clearfix"></div>
+        {% endif %}
+
+        {% if tab == "related-cases" %}
+            <div class="col-sm-12 alert-warning alert v-offset-above-2">
+                <p class="bottom">
+                    The Related Cases query is used to find legal cases
+                    related to a given case by analyzing textual similarities.
+                    It identifies and retrieves cases with similar content,
+                    allowing for the generation of a summary of related cases,
+                    including their names, links, and filing dates,
+                    to help users explore precedents or comparable rulings.
+                </p>
+            </div>
+            <div class="clearfix"></div>
+        {% endif %}
+
+            {% if tab == "summaries" %}
+            <div class="col-sm-12 alert-warning alert v-offset-above-2">
+                <p class="bottom">
+                    Summaries or parenthetical groupings are used to
+                    provide concise explanations or clarifications about a
+                    case’s procedural posture, legal principles, or
+                    facts that are immediately relevant to the citation,
+                    typically enclosed in parentheses following a case citation.
+
+                </p>
+            </div>
+            <div class="clearfix"></div>
+        {% endif %}
         </div>
 
-
-    {% endwith %}
+        <div class="bottom-section">
+            {# Sponsored by #}
+            {% if sponsored %}
+                <div id="sponsored-by" class="sidebar-section">
+                    <h3>
+                      <span>Sponsored By</span>
+                    </h3>
+                    <p>This opinion added to CourtListener with support from v|Lex.</p>
+                    <a href="https://www.vlex.com" rel="sponsored" target="_blank">
+                        <img id="vlex" src="{% static "img/vlex-logo-150-75.png" %}" alt="v|lex logo" class="img-responsive" width="150" height="75" >
+                    </a>
+                </div>
+            {% else %}
+                {% include "includes/donate_sidebar.html" with referrer="o-donate-now" %}
+            {% endif %}
+        </div>
+    </div>
 {% endblock %}
 
 {% block body-classes %}opinion-body{% endblock %}
@@ -216,14 +212,13 @@
                 </div>
             </div>
 
-                <div class="case-caption jump-link" id="caption">{{ cluster.docket.case_name }}</div>
+                <div class="case-caption jump-link" id="caption">{{ cluster|best_case_name|safe }}</div>
                 <h4 class="case-court">{{ cluster.docket.court }}</h4>
                 <br>
                 <div class="case-details">
                     <ul class="list-unstyled">
                         <li><strong>Citations:</strong> {{ cluster.citation_string|default:"None known" }}</li>
-
-                        {% if cluster.case_name_full != cluster.case_name and cluster.case_name_full != "" %}
+                        {% if cluster.case_name_full != cluster|best_case_name %}
                         <li><strong>Full Case Name:</strong>
                             {{ cluster.case_name_full }}
                         </li>
@@ -291,55 +286,31 @@
 
             <ul class="nav nav-tabs hidden-print">
                 <li role="presentation" {% if tab == "opinions" or tab == "" %} class="active" {% endif %}>
-                    {% if tab == "opinions" %}
-                        <a href="#" data-toggle="tab">Opinion</a>
-                    {% else %}
-                        <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
-                    {% endif %}
+                    <a href="{% url 'view_case' cluster.pk cluster.slug %}">Opinion</a>
                 </li>
                 {% if authorities_count > 0 %}
                     <li role="presentation" {% if tab == "authorities" %} class="active" {% endif %}>
-                        {% if tab == "authorities" %}
-                            <a href="#" data-toggle="tab">Auth<span class="hidden-sm hidden-md hidden-xs">orities&nbsp;({{ authorities_count }})</a>
-                        {% else %}
-                            <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Auth<span class="hidden-xs hidden-sm hidden-md">orities&nbsp;({{ authorities_count }})</span></a>
-                        {% endif %}
+                        <a href="{% url "view_case_authorities" cluster.pk cluster.slug %}">Auth<span class="hidden-xs hidden-sm hidden-md">orities&nbsp;({{ authorities_count }})</span></a>
                     </li>
                 {% endif %}
                 {% if cited_by_count > 0 %}
-                <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
-                    {% if tab == "cited-by" %}
-                        <a href="#" data-toggle="tab">Cited<span class="hidden-xs hidden-sm hidden-md">&nbsp;By&nbsp;({{ cited_by_count }})</span></a>
-                    {% else %}
+                    <li role="presentation" {% if tab == "cited-by" %} class="active" {% endif %}>
                         <a href="{% url "view_case_cited_by" cluster.pk cluster.slug %}">Cited<span class="hidden-xs hidden-sm hidden-md">&nbsp;By&nbsp;({{ cited_by_count }})</span></a>
-                    {% endif %}
-                </li>
+                    </li>
                 {% endif %}
                 {% if summaries_count > 0 %}
-                  <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
-                    {% if tab == "summaries" %}
-                        <a href="#" data-toggle="tab">Sum<span class="hidden-xs hidden-sm hidden-md">maries&nbsp;({{ summaries_count }})</span></a>
-                    {% else %}
+                    <li role="presentation" {% if tab == "summaries" %} class="active" {% endif %}>
                         <a href="{% url "view_case_summaries" cluster.pk cluster.slug %}">Sum<span class="hidden-xs hidden-sm hidden-md">maries&nbsp;({{ summaries_count }})</span></a>
-                    {% endif %}
-                  </li>
+                    </li>
                 {% endif %}
                 {% if related_cases_count > 0  %}
                     <li role="presentation" {% if tab == "related-cases" %} class="active" {% endif %}>
-                        {% if tab == "related-cases" %}
-                            <a href="#" data-toggle="tab">Related<span class="hidden-xs hidden-sm hidden-md">&nbsp;Cases</span></a>
-                        {% else %}
-                            <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;<span class="hidden-xs hidden-sm hidden-md">Cases</span></a>
-                        {% endif %}
+                        <a href="{% url 'view_case_related_cases' cluster.pk cluster.slug %}">Related&nbsp;<span class="hidden-xs hidden-sm hidden-md">Cases</span></a>
                     </li>
                 {% endif %}
-                {% if has_downloads and "pdf" in pdf_path %}
+                {% if has_downloads and "pdf" in pdf_path or cluster.filepath_pdf_harvard %}
                     <li role="presentation" {% if tab == "pdf" %} class="active" {% endif %}>
-                        {% if tab == "pdf" %}
-                            <a href="#" data-toggle="tab">{% if "pdf" in pdf_path %}PDF{% endif %}</a>
-                        {% else %}
-                            <a href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
-                        {% endif %}
+                        <a href="{% url 'view_case_pdf' cluster.pk cluster.slug %}">PDF</a>
                     </li>
                 {% endif %}
             </ul>
