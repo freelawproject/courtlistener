@@ -97,6 +97,7 @@ class AlertTest(SimpleUserDataMixin, TestCase):
             "query": "q=asdf",
             "name": "dummy alert",
             "rate": "dly",
+            "alert_type": SEARCH_TYPES.RECAP,
         }
         self.alert = Alert.objects.create(user_id=1001, **self.alert_params)
 
@@ -105,6 +106,9 @@ class AlertTest(SimpleUserDataMixin, TestCase):
 
     async def test_create_alert(self) -> None:
         """Can we create an alert by sending a post?"""
+        user = await User.objects.aget(username="pandora")
+        alert_user = Alert.objects.filter(user=user)
+        self.assertEqual(await alert_user.acount(), 0)
         self.assertTrue(
             await self.async_client.alogin(
                 username="pandora", password="password"
@@ -115,6 +119,10 @@ class AlertTest(SimpleUserDataMixin, TestCase):
         )
         self.assertEqual(r.redirect_chain[0][1], 302)
         self.assertIn("successfully", r.content.decode())
+        self.assertEqual(await alert_user.acount(), 1)
+        alert_created = await alert_user.afirst()
+        if alert_created:
+            self.assertEqual(alert_created.alert_type, SEARCH_TYPES.RECAP)
         await self.async_client.alogout()
 
     async def test_fail_gracefully(self) -> None:
@@ -131,6 +139,27 @@ class AlertTest(SimpleUserDataMixin, TestCase):
         r = await self.async_client.post("/", bad_alert_params, follow=True)
         self.assertEqual(r.status_code, 200)
         self.assertIn("error creating your alert", r.content.decode())
+        await self.async_client.alogout()
+
+    async def test_fail_gracefully_on_invalid_alert_type(self) -> None:
+        """Do we fail gracefully when an invalid alert type is sent?"""
+        invalid_alert_type_params = self.alert_params.copy()
+        invalid_alert_type_params["alert_type"] = SEARCH_TYPES.PEOPLE
+        self.assertTrue(
+            await self.async_client.alogin(
+                username="pandora", password="password"
+            )
+        )
+        r = await self.async_client.post(
+            "/", invalid_alert_type_params, follow=True
+        )
+        print("r.content.decode()", r.content.decode())
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("error creating your alert", r.content.decode())
+        self.assertIn(
+            f"{SEARCH_TYPES.PEOPLE} is not one of the available choices.",
+            r.content.decode(),
+        )
         await self.async_client.alogout()
 
     def test_new_alert_gets_secret_key(self) -> None:
@@ -160,7 +189,7 @@ class AlertTest(SimpleUserDataMixin, TestCase):
         self.assertIn(
             "Please confirm your unsubscription", response.content.decode()
         )
-        self.assertIn("Your daily opinion alert", response.content.decode())
+        self.assertIn("Your daily RECAP alert", response.content.decode())
         self.assertIn("Unsubscribe", response.content.decode())
 
     async def test_can_we_disable_alert_using_the_one_click_link(
@@ -537,6 +566,7 @@ class AlertAPITests(APITestCase):
         # Get the alert detail for user_1
         response = await self.client.get(alert_1_path_detail)
         self.assertEqual(response.status_code, HTTPStatus.OK)
+        self.assertEqual(response.json()["alert_type"], SEARCH_TYPES.OPINION)
 
         # user_2 tries to get user_1 alert, it should fail
         response = await self.client_2.get(alert_1_path_detail)
@@ -546,7 +576,12 @@ class AlertAPITests(APITestCase):
         """Can we update an alert?"""
 
         # Make one alerts for user_1
-        alert_1 = await self.make_an_alert(self.client, alert_name="alert_1")
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.RECAP}",
+        )
+        self.assertEqual(alert_1.json()["alert_type"], SEARCH_TYPES.RECAP)
         search_alert = Alert.objects.all()
         self.assertEqual(await search_alert.acount(), 1)
         alert_1_path_detail = reverse(
@@ -566,6 +601,20 @@ class AlertAPITests(APITestCase):
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(response.json()["name"], "alert_1_updated")
         self.assertEqual(response.json()["id"], alert_1.json()["id"])
+
+    async def test_invalid_alert_type_fail(self) -> None:
+        """Does creating an alert for an unsupported type raises an error?"""
+        alert_1 = await self.make_an_alert(
+            self.client,
+            alert_name="alert_1",
+            alert_query=f"q=testing_query&type={SEARCH_TYPES.PEOPLE}",
+        )
+        self.assertEqual(
+            alert_1.json()["alert_type"][0],
+            f"Unsupported alert type: {SEARCH_TYPES.PEOPLE}",
+        )
+        search_alert = Alert.objects.all()
+        self.assertEqual(await search_alert.acount(), 0)
 
 
 @override_switch("o-es-alerts-active", active=True)

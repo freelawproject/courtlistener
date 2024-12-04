@@ -3985,6 +3985,11 @@ class SEARCH_TYPES:
         (PARENTHETICAL, "Parenthetical"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
+    SUPPORTED_ALERT_TYPES = (
+        (OPINION, "Opinions"),
+        (RECAP, "RECAP"),
+        (ORAL_ARGUMENT, "Oral Arguments"),
+    )
 
 
 class SearchQuery(models.Model):

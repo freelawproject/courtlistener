@@ -396,7 +396,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
         else:
             # Invalid form. Do the search again and show them the alert form
             # with the errors
-            render_dict.update(do_search(request.GET.copy()))
+            render_dict.update(do_es_search(request.GET.copy()))
             render_dict.update({"alert_form": alert_form})
             return TemplateResponse(request, "search.html", render_dict)
 
@@ -515,7 +515,11 @@ def show_results(request: HttpRequest) -> HttpResponse:
 
         # Create bare-bones alert form.
         alert_form = CreateAlertForm(
-            initial={"query": get_string, "rate": "dly"},
+            initial={
+                "query": get_string,
+                "rate": "dly",
+                "alert_type": request.GET.get("type", SEARCH_TYPES.OPINION),
+            },
             user=request.user,
         )
 
