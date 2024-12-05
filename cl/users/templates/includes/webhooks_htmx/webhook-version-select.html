@@ -1,0 +1,8 @@
+<select name="version" id="id_version" class="form-control" {% if not version_choices %}readonly{% endif %}>
+  <option value="">
+    {% if not version_choices %}Select an event type first{% else %}Select a version{% endif %}
+  </option>
+  {% for value, label in version_choices %}
+    <option value="{{ value }}">{{ label }}</option>
+  {% endfor %}
+</select>

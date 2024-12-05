@@ -257,6 +257,10 @@ async def process_recap_pdf(pk):
 
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq} ")
     try:
+        # Attempt to get RECAPDocument instance.
+        # It is possible for this instance to not have a document yet,
+        # so the document_type field will have a default value,
+        # which is why we do not use it to retrieve the RECAPDocument.
         if pq.pacer_case_id:
             rd = await RECAPDocument.objects.aget(
                 docket_entry__docket__pacer_case_id=pq.pacer_case_id,
@@ -267,6 +271,8 @@ async def process_recap_pdf(pk):
             # work anyway.
             rd = await RECAPDocument.objects.aget(pacer_doc_id=pq.pacer_doc_id)
     except (RECAPDocument.DoesNotExist, RECAPDocument.MultipleObjectsReturned):
+        # Try again but this time using Docket and Docket Entry to get
+        # the RECAPDocument instance. If not found, we create a new one.
         retries = 5
         while True:
             try:
@@ -301,7 +307,7 @@ async def process_recap_pdf(pk):
                 break
 
         # Got the Docket, attempt to get/create the DocketEntry, and then
-        # create the RECAPDocument
+        # get/create the RECAPDocument
         retries = 5
         while True:
             try:
@@ -335,11 +341,23 @@ async def process_recap_pdf(pk):
                         attachment_number=pq.attachment_number,
                         document_type=document_type,
                     )
-                except (
-                    RECAPDocument.DoesNotExist,
-                    RECAPDocument.MultipleObjectsReturned,
-                ):
+                except RECAPDocument.DoesNotExist:
                     # Unable to find it. Make a new item.
+                    rd = RECAPDocument(
+                        docket_entry=de,
+                        pacer_doc_id=pq.pacer_doc_id,
+                        document_type=document_type,
+                    )
+                except RECAPDocument.MultipleObjectsReturned:
+                    # Multiple RECAPDocuments exist for this docket entry,
+                    # which is unexpected. Ideally, we should not create a new
+                    # RECAPDocument when multiples exist. However, since this
+                    # behavior has been in place for years, we're retaining it
+                    # for now. We've added Sentry logging to capture these
+                    # cases for future debugging.
+                    logger.error(
+                        "Multiple RECAPDocuments returned when processing pdf upload"
+                    )
                     rd = RECAPDocument(
                         docket_entry=de,
                         pacer_doc_id=pq.pacer_doc_id,
@@ -352,7 +370,10 @@ async def process_recap_pdf(pk):
     # processor fields tracker from detecting it as a value change, it should
     # be converted to a string.
     rd.document_number = str(pq.document_number)
+    # We update attachment_number and document_type in case the
+    # RECAPDocument didn't have the actual document yet.
     rd.attachment_number = pq.attachment_number
+    rd.document_type = document_type
 
     # Do the file, finally.
     try:
@@ -408,7 +429,7 @@ async def process_recap_pdf(pk):
         try:
             await rd.asave()
         except (IntegrityError, ValidationError):
-            msg = "Duplicate key on unique_together constraint"
+            msg = "Failed to save RECAPDocument (unique_together constraint or doc type issue)"
             await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
             rd.filepath_local.delete(save=False)
             return None
@@ -558,13 +579,25 @@ async def process_recap_docket(pk):
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
 
-    if process.current_process().daemon:
-        data = parse_docket_text(map_cl_to_pacer_id(pq.court_id), text)
-    else:
-        with concurrent.futures.ProcessPoolExecutor() as pool:
-            data = await asyncio.get_running_loop().run_in_executor(
-                pool, parse_docket_text, map_cl_to_pacer_id(pq.court_id), text
-            )
+    try:
+        if process.current_process().daemon:
+            data = parse_docket_text(map_cl_to_pacer_id(pq.court_id), text)
+        else:
+            with concurrent.futures.ProcessPoolExecutor() as pool:
+                data = await asyncio.get_running_loop().run_in_executor(
+                    pool,
+                    parse_docket_text,
+                    map_cl_to_pacer_id(pq.court_id),
+                    text,
+                )
+    except Exception as e:
+        logging.exception(e)
+        await mark_pq_status(
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
+        )
+        return None
     logger.info(f"Parsing completed of item {pq}")
 
     if data == {}:
@@ -735,18 +768,27 @@ async def process_recap_claims_register(pk):
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
 
-    if process.current_process().daemon:
-        data = parse_claims_register_text(
-            map_cl_to_pacer_id(pq.court_id), text
-        )
-    else:
-        with concurrent.futures.ProcessPoolExecutor() as pool:
-            data = await asyncio.get_running_loop().run_in_executor(
-                pool,
-                parse_claims_register_text,
-                map_cl_to_pacer_id(pq.court_id),
-                text,
+    try:
+        if process.current_process().daemon:
+            data = parse_claims_register_text(
+                map_cl_to_pacer_id(pq.court_id), text
             )
+        else:
+            with concurrent.futures.ProcessPoolExecutor() as pool:
+                data = await asyncio.get_running_loop().run_in_executor(
+                    pool,
+                    parse_claims_register_text,
+                    map_cl_to_pacer_id(pq.court_id),
+                    text,
+                )
+    except Exception as e:
+        logging.exception(e)
+        await mark_pq_status(
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
+        )
+        return None
     logger.info(f"Parsing completed for item {pq}")
 
     if not data:
@@ -832,16 +874,27 @@ async def process_recap_docket_history_report(pk):
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
 
-    if process.current_process().daemon:
-        data = parse_docket_history_text(map_cl_to_pacer_id(pq.court_id), text)
-    else:
-        with concurrent.futures.ProcessPoolExecutor() as pool:
-            data = await asyncio.get_running_loop().run_in_executor(
-                pool,
-                parse_docket_history_text,
-                map_cl_to_pacer_id(pq.court_id),
-                text,
+    try:
+        if process.current_process().daemon:
+            data = parse_docket_history_text(
+                map_cl_to_pacer_id(pq.court_id), text
             )
+        else:
+            with concurrent.futures.ProcessPoolExecutor() as pool:
+                data = await asyncio.get_running_loop().run_in_executor(
+                    pool,
+                    parse_docket_history_text,
+                    map_cl_to_pacer_id(pq.court_id),
+                    text,
+                )
+    except Exception as e:
+        logging.exception(e)
+        await mark_pq_status(
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
+        )
+        return None
     logger.info(f"Parsing completed for item {pq}")
 
     if data == {}:
@@ -939,18 +992,27 @@ async def process_case_query_page(pk):
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
 
-    if process.current_process().daemon:
-        data = parse_case_query_page_text(
-            map_cl_to_pacer_id(pq.court_id), text
-        )
-    else:
-        with concurrent.futures.ProcessPoolExecutor() as pool:
-            data = await asyncio.get_running_loop().run_in_executor(
-                pool,
-                parse_case_query_page_text,
-                map_cl_to_pacer_id(pq.court_id),
-                text,
+    try:
+        if process.current_process().daemon:
+            data = parse_case_query_page_text(
+                map_cl_to_pacer_id(pq.court_id), text
             )
+        else:
+            with concurrent.futures.ProcessPoolExecutor() as pool:
+                data = await asyncio.get_running_loop().run_in_executor(
+                    pool,
+                    parse_case_query_page_text,
+                    map_cl_to_pacer_id(pq.court_id),
+                    text,
+                )
+    except Exception as e:
+        logging.exception(e)
+        await mark_pq_status(
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
+        )
+        return None
     logger.info(f"Parsing completed for item {pq}")
 
     if data == {}:
@@ -1073,16 +1135,25 @@ async def process_recap_appellate_docket(pk):
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
 
-    if process.current_process().daemon:
-        data = parse_appellate_text(map_cl_to_pacer_id(pq.court_id), text)
-    else:
-        with concurrent.futures.ProcessPoolExecutor() as pool:
-            data = await asyncio.get_running_loop().run_in_executor(
-                pool,
-                parse_appellate_text,
-                map_cl_to_pacer_id(pq.court_id),
-                text,
-            )
+    try:
+        if process.current_process().daemon:
+            data = parse_appellate_text(map_cl_to_pacer_id(pq.court_id), text)
+        else:
+            with concurrent.futures.ProcessPoolExecutor() as pool:
+                data = await asyncio.get_running_loop().run_in_executor(
+                    pool,
+                    parse_appellate_text,
+                    map_cl_to_pacer_id(pq.court_id),
+                    text,
+                )
+    except Exception as e:
+        logging.exception(e)
+        await mark_pq_status(
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
+        )
+        return None
     logger.info(f"Parsing completed of item {pq}")
 
     if data == {}:
@@ -1177,16 +1248,25 @@ async def process_recap_acms_docket(pk):
         await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
         return None
 
-    if process.current_process().daemon:
-        data = parse_acms_json(map_cl_to_pacer_id(pq.court_id), text)
-    else:
-        with concurrent.futures.ProcessPoolExecutor() as pool:
-            data = await asyncio.get_running_loop().run_in_executor(
-                pool,
-                parse_acms_json,
-                map_cl_to_pacer_id(pq.court_id),
-                text,
-            )
+    try:
+        if process.current_process().daemon:
+            data = parse_acms_json(map_cl_to_pacer_id(pq.court_id), text)
+        else:
+            with concurrent.futures.ProcessPoolExecutor() as pool:
+                data = await asyncio.get_running_loop().run_in_executor(
+                    pool,
+                    parse_acms_json,
+                    map_cl_to_pacer_id(pq.court_id),
+                    text,
+                )
+    except Exception as e:
+        logging.exception(e)
+        await mark_pq_status(
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
+        )
+        return None
     logger.info(f"Parsing completed of item {pq}")
 
     if data == {}:
@@ -1267,19 +1347,28 @@ async def process_recap_acms_appellate_attachment(
         )
         return pq_status, msg, []
 
-    if process.current_process().daemon:
-        # yyy
-        data = parse_acms_attachment_json(
-            map_cl_to_pacer_id(pq.court_id), text
-        )
-    else:
-        with concurrent.futures.ProcessPoolExecutor() as pool:
-            data = await asyncio.get_running_loop().run_in_executor(
-                pool,
-                parse_acms_attachment_json,
-                map_cl_to_pacer_id(pq.court_id),
-                text,
+    try:
+        if process.current_process().daemon:
+            # yyy
+            data = parse_acms_attachment_json(
+                map_cl_to_pacer_id(pq.court_id), text
             )
+        else:
+            with concurrent.futures.ProcessPoolExecutor() as pool:
+                data = await asyncio.get_running_loop().run_in_executor(
+                    pool,
+                    parse_acms_attachment_json,
+                    map_cl_to_pacer_id(pq.court_id),
+                    text,
+                )
+    except Exception as e:
+        logging.exception(e)
+        await mark_pq_status(
+            pq,
+            f"We encountered a parsing error while processing this item: {e}",
+            PROCESSING_STATUS.FAILED,
+        )
+        return None
     logger.info(f"Parsing completed of item {pq}")
 
     if data == {}:
@@ -2046,6 +2135,12 @@ def fetch_docket(self, fq_pk):
         newly_enqueued = enqueue_docket_alert(d_pk)
         if newly_enqueued:
             send_alert_and_webhook(d_pk, start_time)
+
+    # Link docket to fq if not previously linked
+    if not fq.docket_id:
+        fq.docket_id = d_pk
+        fq.save()
+
     return result
 
 

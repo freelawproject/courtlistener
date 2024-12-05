@@ -547,6 +547,23 @@ class OpinionV3APISearchTest(
         for created_opinion in created_opinions:
             created_opinion.delete()
 
+    async def test_bad_syntax_error(self) -> None:
+        """Can we properly raise the ElasticServerError exception?"""
+
+        # Bad syntax due to the / char in the query.
+        params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "This query contains bad/syntax query",
+        }
+        r = await self.async_client.get(
+            reverse("search-list", kwargs={"version": "v3"}), params
+        )
+        self.assertEqual(r.status_code, HTTPStatus.INTERNAL_SERVER_ERROR)
+        self.assertEqual(
+            r.data["detail"],
+            "Internal Server Error. Please try again later or review your query.",
+        )
+
 
 class OpinionV4APISearchTest(
     OpinionSearchAPICommonTests,
@@ -2253,6 +2270,8 @@ class OpinionsESSearchTest(
         cluster_2.delete()
 
 
+@override_flag("ui_flag_for_o", False)
+@override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
@@ -2357,6 +2376,9 @@ class RelatedSearchTest(
             < r.content.decode().index("/opinion/%i/" % expected_second_pk),
             msg="'Howard v. Honda' should come AFTER 'case name cluster 3'.",
         )
+        # Confirm that results contain a snippet
+        self.assertIn("<mark>plain</mark>", r.content.decode())
+
         # Confirm "related to" cluster legend is within the results' header.
         h2_element = html.fromstring(r.content.decode()).xpath(
             '//h2[@id="result-count"]'

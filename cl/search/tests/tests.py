@@ -2,6 +2,7 @@ import datetime
 import io
 import os
 from datetime import date
+from http import HTTPStatus
 from pathlib import Path
 from unittest import mock
 from urllib.parse import parse_qs
@@ -50,7 +51,6 @@ from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.recap.constants import COURT_TIMEZONES
 from cl.recap.factories import DocketEntriesDataFactory, DocketEntryDataFactory
 from cl.recap.mergers import add_docket_entries
-from cl.scrapers.factories import PACERFreeDocumentLogFactory
 from cl.search.documents import (
     ES_CHILD_ID,
     AudioDocument,
@@ -72,7 +72,6 @@ from cl.search.factories import (
     OpinionWithParentsFactory,
     RECAPDocumentFactory,
 )
-from cl.search.management.commands.cl_calculate_pagerank import Command
 from cl.search.management.commands.cl_index_parent_and_child_docs import (
     get_unique_oldest_history_rows,
     log_last_document_indexed,
@@ -447,6 +446,60 @@ class DocketValidationTest(TestCase):
                     pacer_case_id="asdf",
                     court_id=self.court.pk,
                 )
+
+
+class RECAPDocumentValidationTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.docket_entry = DocketEntryWithParentsFactory()
+
+    def test_attachment_with_attachment_number(self):
+        """Attachments with attachment_number should not raise ValidationError."""
+        document = RECAPDocument.objects.create(
+            docket_entry=self.docket_entry,
+            document_type=RECAPDocument.ATTACHMENT,
+            attachment_number=1,
+        )
+        self.assertIsNotNone(document.id)
+
+    def test_attachment_without_attachment_number(self):
+        """Attachments without attachment_number should raise ValidationError."""
+        with self.assertRaises(ValidationError) as cm:
+            RECAPDocument.objects.create(
+                docket_entry=self.docket_entry,
+                document_type=RECAPDocument.ATTACHMENT,
+                attachment_number=None,
+            )
+        # Assert that the error message is as expected
+        self.assertIn("attachment_number", cm.exception.message_dict)
+        self.assertEqual(
+            cm.exception.message_dict["attachment_number"],
+            ["attachment_number cannot be null for an attachment."],
+        )
+
+    def test_main_document_with_attachment_number(self):
+        """Main PACER documents with attachment_number should raise ValidationError."""
+        with self.assertRaises(ValidationError) as cm:
+            RECAPDocument.objects.create(
+                docket_entry=self.docket_entry,
+                document_type=RECAPDocument.PACER_DOCUMENT,
+                attachment_number=1,
+            )
+        # Assert that the error message is as expected
+        self.assertIn("attachment_number", cm.exception.message_dict)
+        self.assertEqual(
+            cm.exception.message_dict["attachment_number"],
+            ["attachment_number must be null for a main PACER document."],
+        )
+
+    def test_main_document_without_attachment_number(self):
+        """Main PACER documents without attachment_number should not raise ValidationError."""
+        document = RECAPDocument.objects.create(
+            docket_entry=self.docket_entry,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            attachment_number=None,
+        )
+        self.assertIsNotNone(document.id)
 
 
 class IndexingTest(EmptySolrTestCase):
@@ -1024,6 +1077,33 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             with self.subTest(test=test, msg="Test estimated search counts."):
                 self.assertEqual(simplify_estimated_count(test[0]), test[1])
 
+    def test_avoid_wrapping_boosted_numbers_in_quotes(self) -> None:
+        """Confirm that numbers in boost queries are not wrapped in quotes
+        that makes the query to fail.
+        """
+        search_params = {
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+            "q": "Jose^3",
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertNotIn("encountered an error", r.content.decode())
+
+    def test_raise_forbidden_error_on_depth_pagination(self) -> None:
+        """Confirm that a 403 Forbidden error is raised on depth pagination."""
+        search_params = {
+            "type": SEARCH_TYPES.OPINION,
+            "q": "Lorem",
+            "page": 101,
+        }
+        r = self.client.get(
+            reverse("show_results"),
+            search_params,
+        )
+        self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
+
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
     """Common tests for the Search API V4 endpoints."""
@@ -1091,38 +1171,7 @@ class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
         )
 
 
-class PagerankTest(TestCase):
-    fixtures = ["test_objects_search.json", "judge_judy.json"]
-
-    @classmethod
-    def setUpTestData(cls) -> None:
-        PACERFreeDocumentLogFactory.create()
-
-    def test_pagerank_calculation(self) -> None:
-        """Create a few items and fake citation relation among them, then
-        run the pagerank algorithm. Check whether this simple case can get the
-        correct result.
-        """
-        # calculate pagerank of these 3 document
-        comm = Command()
-        self.verbosity = 1
-        pr_results = comm.do_pagerank()
-
-        # Verify that whether the answer is correct, based on calculations in
-        # Gephi
-        answers = {
-            1: 0.369323534954,
-            2: 0.204581549974,
-            3: 0.378475867453,
-        }
-        for key, value in answers.items():
-            self.assertTrue(
-                abs(pr_results[key] - value) < 0.0001,
-                msg="The answer for item %s was %s when it should have been "
-                "%s" % (key, pr_results[key], answers[key]),
-            )
-
-
+@override_flag("ui_flag_for_o", False)
 class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
     """
     Test some of the primary search functionality of CL: searching opinions.
@@ -1263,6 +1312,7 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
         for result in search_results.find_elements(By.TAG_NAME, "article"):
             self.assertIn("1337", result.text)
 
+    @override_flag("ui_flag_for_o", False)
     @timeout_decorator.timeout(SELENIUM_TIMEOUT)
     def test_opinion_search_result_detail_page(self) -> None:
         # Dora navitages to CL and does a simple wild card search
@@ -1623,35 +1673,6 @@ class SaveSearchQueryTest(TestCase):
             "Repeated query not marked as having hit cache",
         )
 
-    # Force Solr use
-    @override_flag("oa-es-active", False)
-    @override_flag("r-es-active", False)
-    @override_flag("p-es-active", False)
-    @override_flag("o-es-active", False)
-    def test_search_query_saving_solr(self) -> None:
-        """Are queries saved when using solr search (do_search)"""
-        for query in self.searches:
-            url = f"{reverse('show_results')}?{query}"
-            self.client.get(url)
-            last_query = SearchQuery.objects.last()
-            expected_query = self.normalize_query(query, replace_space=True)
-            stored_query = self.normalize_query(last_query.get_params)
-            self.assertEqual(
-                expected_query,
-                stored_query,
-                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
-            )
-            self.assertEqual(
-                last_query.engine,
-                SearchQuery.SOLR,
-                f"Saved wrong `engine` value, expected {SearchQuery.SOLR}",
-            )
-            self.assertEqual(
-                last_query.source,
-                SearchQuery.WEBSITE,
-                self.source_error_message,
-            )
-
     def test_failed_es_search_queries(self) -> None:
         """Do we flag failed ElasticSearch queries properly?"""
         query = "type=r&q=contains/sproximity token"
@@ -1751,36 +1772,6 @@ class SaveSearchQueryTest(TestCase):
             SearchQuery.ELASTICSEARCH,
             f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
         )
-
-    @override_flag("oa-es-active", False)
-    @override_flag("oa-es-activate", False)
-    @override_flag("r-es-search-api-active", False)
-    @override_flag("p-es-active", False)
-    @override_flag("o-es-search-api-active", False)
-    def test_search_solr_api_v3_query_saving(self) -> None:
-        """Do we save queries on all V3 Search Solr endpoints"""
-        for query in self.base_searches:
-            url = f"{reverse("search-list", kwargs={"version": "v3"})}?{query}"
-            self.client.get(url)
-            # Compare parsed query strings;
-            last_query = SearchQuery.objects.last()
-            expected_query = self.normalize_query(query, replace_space=True)
-            stored_query = self.normalize_query(last_query.get_params)
-            self.assertEqual(
-                expected_query,
-                stored_query,
-                f"Query was not saved properly. Expected {expected_query}, got {stored_query}",
-            )
-            self.assertEqual(
-                last_query.engine,
-                SearchQuery.SOLR,
-                f"Saved wrong `engine` value, expected {SearchQuery.ELASTICSEARCH}",
-            )
-            self.assertEqual(
-                last_query.source,
-                SearchQuery.API,
-                self.source_error_message,
-            )
 
 
 class CaptionTest(TestCase):
@@ -2436,6 +2427,7 @@ class SweepIndexerCommandTest(
             docket_entry=cls.de,
             document_number="1",
             attachment_number=2,
+            document_type=RECAPDocument.ATTACHMENT,
         )
         cls.de_1 = DocketEntryWithParentsFactory(
             docket=DocketFactory(

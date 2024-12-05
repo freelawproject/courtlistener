@@ -1,5 +1,7 @@
 from rest_framework import viewsets
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly
 
+from cl.api.api_permissions import V3APIPermission
 from cl.api.utils import LoggingMixin
 from cl.disclosures.api_serializers import (
     AgreementSerializer,
@@ -39,6 +41,10 @@ from cl.disclosures.models import (
 class AgreementViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Agreement.objects.all().order_by("-id")
     serializer_class = AgreementSerializer
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     filterset_class = AgreementFilter
     # Default cursor ordering key
@@ -54,6 +60,10 @@ class AgreementViewSet(LoggingMixin, viewsets.ModelViewSet):
 class DebtViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Debt.objects.all().order_by("-id")
     serializer_class = DebtSerializer
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     filterset_class = DebtFilter
     # Default cursor ordering key
@@ -84,6 +94,10 @@ class FinancialDisclosureViewSet(LoggingMixin, viewsets.ModelViewSet):
     )
     serializer_class = FinancialDisclosureSerializer
     filterset_class = FinancialDisclosureFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
@@ -99,6 +113,10 @@ class GiftViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Gift.objects.all().order_by("-id")
     serializer_class = GiftSerializer
     filterset_class = GiftFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
@@ -114,6 +132,10 @@ class InvestmentViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Investment.objects.all().order_by("-id")
     serializer_class = InvestmentSerializer
     filterset_class = InvestmentFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
@@ -129,6 +151,10 @@ class NonInvestmentIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = NonInvestmentIncome.objects.all().order_by("-id")
     serializer_class = NonInvestmentIncomeSerializer
     filterset_class = NonInvestmentIncomeFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
@@ -144,6 +170,10 @@ class PositionViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Position.objects.all().order_by("-id")
     serializer_class = PositionSerializer
     filterset_class = PositionFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
@@ -159,6 +189,10 @@ class ReimbursementViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = Reimbursement.objects.all().order_by("-id")
     serializer_class = ReimbursementSerializer
     filterset_class = ReimbursementFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"
@@ -174,6 +208,10 @@ class SpouseIncomeViewSet(LoggingMixin, viewsets.ModelViewSet):
     queryset = SpouseIncome.objects.all().order_by("-id")
     serializer_class = SpouseIncomeSerializer
     filterset_class = SpouseIncomeFilter
+    permission_classes = [
+        DjangoModelPermissionsOrAnonReadOnly,
+        V3APIPermission,
+    ]
     ordering_fields = ("id", "date_created", "date_modified")
     # Default cursor ordering key
     ordering = "-id"

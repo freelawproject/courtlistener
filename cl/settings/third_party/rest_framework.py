@@ -28,6 +28,17 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Unresponsive
+        "projecttesting": "1/hour",
+        "SAGW": "1/hour",
+        # Bounced
+        "riwiko8259": "1/hour",
+        "xicaro7027": "1/hour",
+        "nayibij851": "1/hour",
+        "testname2024": "1/hour",
+        "cadebe2258": "1/hour",
+        # Disposable email
+        "a29883f4-3958-484b-9f46-aa9796110dd0_IddU": "1/hour",
         # Didn't respond to emails, 2024-10-14
         "ashishjaddu": "10/hour",
         # Made 1M requests for commercial enterprise
@@ -118,3 +129,5 @@ REST_FRAMEWORK = {
 
 if DEVELOPMENT:
     REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["anon"] = "10000/day"  # type: ignore
+
+BLOCK_NEW_V3_USERS = env.bool("BLOCK_NEW_V3_USERS", default=False)

@@ -14,7 +14,7 @@ $(document).ready(function () {
     untagOptionButtons.map((button) => {
       button.addEventListener('click', (e) => {
         e.preventDefault()
-        fetch('/api/rest/v3/docket-tags/' + button.dataset.id + '/', {
+        fetch('/api/rest/v4/docket-tags/' + button.dataset.id + '/', {
           method: 'DELETE',
           headers: { 'X-CSRFToken': token },
         })

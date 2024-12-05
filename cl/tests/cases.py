@@ -262,11 +262,25 @@ class V4SearchAPIAssertions(SimpleTestCase):
         meta_expected_value = await sync_to_async(get_meta_expected_value)(
             content_to_compare
         )
-        self.assertEqual(
-            meta_value,
-            meta_expected_value,
-            f"The field '{meta_field}' does not match.",
-        )
+        if meta_field == "score":
+            # Special case for the score field. Only confirm the presence of
+            # keys and avoid comparing values, as they differ in each response.
+            self.assertEqual(
+                set(meta_value.keys()),
+                set(meta_expected_value.keys()),
+                f"The keys in field '{meta_field}' do not match.",
+            )
+            for score_value in meta_value.values():
+                self.assertIsNotNone(
+                    score_value, f"The score value can't be None."
+                )
+
+        else:
+            self.assertEqual(
+                meta_value,
+                meta_expected_value,
+                f"The field '{meta_field}' does not match.",
+            )
 
     async def _test_api_fields_content(
         self,
@@ -296,6 +310,10 @@ class V4SearchAPIAssertions(SimpleTestCase):
                                     meta_value,
                                 ) in child_value.items():
                                     with self.subTest(meta_field=meta_field):
+                                        self.assertFalse(
+                                            meta_field == "score",
+                                            msg="score key should not be present in nested documents",
+                                        )
                                         await self._compare_field(
                                             meta_field,
                                             meta_value,
@@ -399,7 +417,7 @@ class V4SearchAPIAssertions(SimpleTestCase):
         return next_page, previous_page, current_page
 
 
-class RECAPAlertsAssertions:
+class SearchAlertsAssertions:
 
     @staticmethod
     def get_html_content_from_email(email_content):
@@ -493,7 +511,9 @@ class RECAPAlertsAssertions:
                 case_text_cleaned = self.clean_case_title(case_text)
                 if case_title == case_text_cleaned:
                     child_hit_count = len(
-                        case.xpath("following-sibling::ul[1]/li/a")
+                        case.xpath(
+                            "following-sibling::ul[1]/li/a | following-sibling::ul[1]/li/strong"
+                        )
                     )
                     self.assertEqual(
                         child_hit_count,
@@ -522,8 +542,8 @@ class RECAPAlertsAssertions:
             child_documents = case_item.xpath("./following-sibling::ul[1]/li")
             results = []
             for li in child_documents:
-                a_tag = li.xpath(".//a")[0]
-                full_text = a_tag.text_content()
+                child_tag = li.xpath(".//a | .//strong")[0]
+                full_text = child_tag.text_content()
                 first_part = full_text.split("\u2014")[0].strip()
                 results.append(first_part)
 
@@ -550,6 +570,7 @@ class RECAPAlertsAssertions:
         expected_hits,
         case_title,
         expected_child_hits,
+        nested_field="recap_documents",
     ):
         """Confirm the following assertions for the search alert webhook:
         - An specific alert webhook was triggered.
@@ -557,6 +578,8 @@ class RECAPAlertsAssertions:
         - The specified case contains the expected number of child hits.
         """
 
+        matched_alert_name = None
+        matched_case_title = None
         for webhook in webhooks:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 webhook_cases = webhook["payload"]["results"]
@@ -566,14 +589,21 @@ class RECAPAlertsAssertions:
                     msg=f"Did not get the right number of hits for the alert %s. "
                     % alert_title,
                 )
+                matched_alert_name = True
                 for case in webhook["payload"]["results"]:
                     if case_title == strip_tags(case["caseName"]):
+                        matched_case_title = True
+                        if nested_field is None:
+                            self.assertTrue(nested_field not in case)
+                            continue
                         self.assertEqual(
-                            len(case["recap_documents"]),
+                            len(case[nested_field]),
                             expected_child_hits,
                             msg=f"Did not get the right number of child documents for the case %s. "
                             % case_title,
                         )
+        self.assertTrue(matched_alert_name, msg="Alert name didn't match")
+        self.assertTrue(matched_case_title, msg="Case title didn't match")
 
     def _count_percolator_webhook_hits_and_child_hits(
         self,
@@ -638,13 +668,19 @@ class RECAPAlertsAssertions:
         field_name,
         hl_expected,
         child_field,
+        nested_field="recap_documents",
     ):
         """Assert Hl in webhook fields."""
         for webhook in webhooks:
             if webhook["payload"]["alert"]["name"] == alert_title:
                 hit = webhook["payload"]["results"][0]
                 if child_field:
-                    child_field_content = hit["recap_documents"][0][field_name]
+                    self.assertNotIn(
+                        "score",
+                        hit[nested_field][0]["meta"],
+                        msg="score shouldn't be present on webhook nested documents",
+                    )
+                    child_field_content = hit[nested_field][0][field_name]
                     self.assertIn(
                         hl_expected,
                         child_field_content,
@@ -652,6 +688,11 @@ class RECAPAlertsAssertions:
                         % field_name,
                     )
                 else:
+                    self.assertNotIn(
+                        "score",
+                        hit["meta"],
+                        msg="score shouldn't be present on webhook main document",
+                    )
                     parent_field_content = hit[field_name]
                     self.assertIn(
                         hl_expected,
