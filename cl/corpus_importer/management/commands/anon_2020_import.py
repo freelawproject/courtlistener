@@ -17,7 +17,6 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
 from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
-from cl.search.tasks import add_items_to_solr
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -427,9 +426,6 @@ def import_anon_2020_db(
                 found_cites,
                 court_id,
             )
-
-        if make_searchable and docket:
-            add_items_to_solr.delay([docket.pk], "search.Docket")
 
 
 class Command(VerboseCommand):

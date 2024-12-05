@@ -32,7 +32,7 @@ from cl.lib.types import OptionsType
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
-from cl.search.tasks import add_docket_to_solr_by_rds, add_items_to_solr
+from cl.search.tasks import add_docket_to_solr_by_rds
 
 
 def get_last_complete_date(
@@ -351,8 +351,6 @@ def get_pdfs(
             delete_pacer_row.s(row.pk).set(queue=q),
         )
 
-        if index:
-            c = c | add_items_to_solr.s("search.RECAPDocument").set(queue=q)
         c.apply_async()
         completed += 1
         if completed % 1000 == 0:

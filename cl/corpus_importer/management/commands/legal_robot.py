@@ -12,7 +12,6 @@ from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import build_main_query_from_query_string
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
-from cl.search.tasks import add_items_to_solr
 
 PACER_USERNAME = os.environ["PACER_USERNAME"]
 PACER_PASSWORD = os.environ["PACER_PASSWORD"]
@@ -85,7 +84,6 @@ def get_documents(options):
                 tag=TAG,
             ).set(queue=q),
             extract_recap_pdf.si(rd.pk).set(queue=q),
-            add_items_to_solr.si([rd.pk], "search.RECAPDocument").set(queue=q),
         ).apply_async()
 
 
