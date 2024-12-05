@@ -3260,6 +3260,7 @@ class Citation(models.Model):
     LEXIS = 6
     WEST = 7
     NEUTRAL = 8
+    JOURNAL = 9
     CITATION_TYPES = (
         (FEDERAL, "A federal reporter citation (e.g. 5 F. 55)"),
         (
@@ -3281,6 +3282,12 @@ class Citation(models.Model):
         (LEXIS, "A citation in the Lexis system (e.g. 5 LEXIS 55)"),
         (WEST, "A citation in the WestLaw system (e.g. 5 WL 55)"),
         (NEUTRAL, "A vendor neutral citation (e.g. 2013 FL 1)"),
+        (
+            JOURNAL,
+            "A law journal citation within a scholarly or professional "
+            "legal periodical (e.g. 95 Yale L.J. 5; "
+            "72 Soc.Sec.Rep.Serv. 318)",
+        ),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
