@@ -15,7 +15,6 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.recap.tasks import process_recap_attachment
-from cl.search.tasks import add_or_update_recap_docket
 
 
 def get_docket_and_claims(
@@ -46,7 +45,6 @@ def get_docket_and_claims(
         get_bankr_claims_registry.s(
             session_data=cookies_data, tag_names=tags
         ).set(queue=q),
-        add_or_update_recap_docket.s().set(queue=q),
     ).apply_async()
 
 
