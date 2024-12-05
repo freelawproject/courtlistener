@@ -1,5 +1,6 @@
+import json
 import os
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, Tuple
 from urllib.parse import urljoin
 
@@ -8,6 +9,7 @@ import requests
 from asgiref.sync import async_to_sync
 from courts_db import find_court_by_id, find_court_ids_by_name
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.db.models import Q
 from juriscraper import AbstractSite
 from juriscraper.AbstractSite import logger
@@ -20,6 +22,7 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.corpus_importer.utils import winnow_case_name
 from cl.lib.decorators import retry
 from cl.lib.microservice_utils import microservice
+from cl.lib.storage import S3GlacierInstantRetrievalStorage
 from cl.recap.mergers import find_docket_object
 from cl.scrapers.exceptions import (
     EmptyFileError,
@@ -446,3 +449,49 @@ def scraped_citation_object_is_valid(citation_object: dict) -> bool:
         logger.error("Parsed reporter '%s' does not exist", parsed_reporter)
 
     return False
+
+
+def save_response(site: AbstractSite) -> None:
+    """Stores scrapers responses content and headers in a S3 bucket
+
+    This is passed to juriscraper's Site objects as the
+    `save_response_fn` argument, which will make Juriscraper
+    save every response
+
+    :param site: the Site object, used to access the saved response
+    :return None
+    """
+
+    storage = S3GlacierInstantRetrievalStorage()
+    response = site.request["response"]
+    headers = dict(response.headers)
+
+    scraper_id = site.court_id.split(".")[-1]
+    scrape_type = site.court_id.split(".")[1]  # opinions or oral args
+    now_str = datetime.now().strftime("%Y_%m/%d/%H_%M_%S")
+    base_name = f"responses/{scrape_type}/{scraper_id}/{now_str}"
+
+    try:
+        # both tests and parses JSON content
+        content = json.loads(response.content)
+        extension = "json"
+    except:
+        content = response.content
+        extension = "html"
+
+    # Append the headers to the response object, if it's a JSON
+    if isinstance(content, list):
+        content.append({"response_headers": headers})
+        content = json.dumps(content, indent=4)
+    elif isinstance(content, dict):
+        content["response_headers"] = headers
+        content = json.dumps(content, indent=4)
+    else:
+        # Appending the response headers to the content would save a
+        # PUT request and an extra download step, but it may cause
+        # encoding and upload conflicts, so we save them apart
+        json_string = json.dumps(dict(response.headers), indent=4)
+        storage.save(f"{base_name}_headers.json", ContentFile(json_string))
+
+    content_name = f"{base_name}.{extension}"
+    storage.save(content_name, ContentFile(content))
