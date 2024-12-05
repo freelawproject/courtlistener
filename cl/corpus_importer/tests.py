@@ -8,7 +8,6 @@ from random import randint
 from unittest.mock import MagicMock, call, patch
 
 import eyecite
-import pandas as pd
 import pytest
 from asgiref.sync import async_to_sync
 from bs4 import BeautifulSoup
@@ -66,7 +65,6 @@ from cl.corpus_importer.management.commands.troller_bk import (
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
     check_case_names_match,
     parse_citations,
-    process_csv,
 )
 from cl.corpus_importer.signals import (
     handle_update_latest_case_id_and_schedule_iquery_sweep,
