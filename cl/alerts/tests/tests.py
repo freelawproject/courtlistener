@@ -88,7 +88,7 @@ from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import EmailSent
 
 
-class AlertTest(SimpleUserDataMixin, TestCase):
+class AlertTest(SimpleUserDataMixin, ESIndexTestCase, TestCase):
     fixtures = ["test_court.json"]
 
     def setUp(self) -> None:
