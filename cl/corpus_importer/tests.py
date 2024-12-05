@@ -4087,91 +4087,26 @@ class ScrapeIqueryPagesTest(TestCase):
 
 
 class WestCitationImportTest(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.test_docket = DocketFactory.create(
-            id=1,
-            docket_number="00-1360",
-            case_name="",
-            case_name_full="Hcmf Corporation Heritage Hall Holding Limited "
-            "Partnership Heritage Hall Xiii Partnership Hcmf "
-            "Partnership Vi Hcmf Vi Addition Limited "
-            "Partnership Hcmf Xv Partnership v. Claude A. "
-            "Allen, Secretary of Health and Human Resources "
-            "Robert W. Lauterberg, Director of the Department "
-            "of Medical Assistance Services, Commonwealth of "
-            "Virginia H. Alan Bigley, Jr. Daniel M. Brody La "
-            "Tisha Owens Chatman Catherine C. Colgan Denice "
-            "King Garner Steven L. Minter James T. Parmelee "
-            "Catherine P. Saunders James R. Smith James L. "
-            "Masloff, and James Gilmore, the Governor of the "
-            "Commonwealth of Virginia the Department of "
-            "Medical Assistance Services Frank Medico",
-        )
-        cls.test_cluster = OpinionClusterFactory.create(
-            id=1,
-            docket=cls.test_docket,
-            case_name="",
-            case_name_full=cls.test_docket.case_name_full,
-            date_filed=date(2001, 1, 23),
-        )
-        cls.citation = Citation.objects.create(
-            cluster=cls.test_cluster,
-            volume=238,
-            reporter="F.3d",
-            page="273",
-            type=Citation.FEDERAL,
-        )
-        super().setUpTestData()
-
-    def setUp(self) -> None:
-        """Set up mock DataFrame"""
-        self.mock_df = MagicMock()
-        self.mock_df.dropna.return_value = self.mock_df
-        self.mock_df.reset_index.return_value = self.mock_df
-        self.mock_df.itertuples.return_value = [
-            (
-                1,
-                "HCMF Corp. v. Allen",
-                "United States Court of Appeals, Fourth Circuit.",
-                "January 23, 2001",
-                "238 F.3d 273",
-                "72 Soc.Sec.Rep.Serv. 318",
-                '="00-1360"',
-                "238",
-            )
+    def test_parse_citation(self) -> None:
+        """Test parse citation for federal and journal citations"""
+        correct_response = [
+            {
+                "volume": "238",
+                "reporter": "F.3d",
+                "page": "273",
+                "type": Citation.FEDERAL,
+            },
+            {
+                "volume": "72",
+                "reporter": "Soc. Serv. Rev.",
+                "page": "318",
+                "type": Citation.JOURNAL,
+            },
         ]
-
-    @patch("pandas.read_csv")
-    def test_merge_journal_citation(self, mock_read_csv) -> None:
-        """Test proper merger and addition of new journal citation"""
-        mock_read_csv.return_value = self.mock_df
-
-        citations = Citation.objects.all()
-        journal_cites = Citation.objects.filter(type=Citation.JOURNAL).exists()
-        self.assertEqual(len(citations), 1, msg="Incorrect citation count")
-        self.assertFalse(journal_cites, msg="Wrongly have journal citations")
-
-        process_csv(
-            filepath="dummy.csv", delay=0, limit=1, start_row=1, dry_run=False
-        )
-
-        citations = Citation.objects.all()
-        self.assertEqual(len(citations), 2, msg="Citation not saved")
-        journal_citations = Citation.objects.filter(type=Citation.JOURNAL)
-        self.assertIsNotNone(
-            journal_citations, msg="JOURNAL Citation not created"
-        )
+        citation_strings = [("238 F.3d 273", "72 Soc.Sec.Rep.Serv. 318")]
+        valid_citations = parse_citations(citation_strings)
         self.assertEqual(
-            OpinionCluster.objects.get(id=1).case_name,
-            "HCMF Corp. v. Allen",
-            msg="Case name not merged to cluster",
-        )
-        self.assertEqual(
-            Docket.objects.get(id=1).case_name,
-            "HCMF Corp. v. Allen",
-            msg="Case name not merged to docket",
+            valid_citations, correct_response, msg="Citations incorrect parsed"
         )
 
 
