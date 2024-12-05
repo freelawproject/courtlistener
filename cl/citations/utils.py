@@ -25,6 +25,7 @@ def map_reporter_db_cite_type(citation_type: str) -> int:
     Citation = apps.get_model("search.Citation")
     citation_map = {
         "specialty": Citation.SPECIALTY,
+        "journal": Citation.JOURNAL,
         "federal": Citation.FEDERAL,
         "state": Citation.STATE,
         "state_regional": Citation.STATE_REGIONAL,
