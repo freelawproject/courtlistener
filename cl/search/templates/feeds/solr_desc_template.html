@@ -5,17 +5,13 @@
     {% if plain_text %}
       <p>{{ plain_text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
     {% else %}
-      {% flag "o-es-active" %}
-        {% if doc0.child_docs %}
-          {% with doc=doc0.child_docs.0|get_es_doc_content %}
-            <p>{{ doc.text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
-          {% endwith %}
-        {% else %}
-          <p>{{ doc0.text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
-        {% endif %}
+      {% if doc0.child_docs %}
+        {% with doc=doc0.child_docs.0|get_es_doc_content %}
+          <p>{{ doc.text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
+        {% endwith %}
       {% else %}
-        <p>{{ doc0.text|safe|truncatewords:"500" }}</p><br>
-      {% endflag %}
+        <p>{{ doc0.text|render_string_or_list|safe|truncatewords:"500" }}</p><br>
+      {% endif %}
     {% endif %}
     <a href="{{doc0.absolute_url}}">Original document</a>
   {% endwith %}

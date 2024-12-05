@@ -3223,7 +3223,7 @@ def do_es_sweep_alert_query(
     child documents.
     """
 
-    search_form = SearchForm(cd, is_es_form=True)
+    search_form = SearchForm(cd)
     if search_form.is_valid():
         cd = search_form.cleaned_data
     else:

@@ -455,8 +455,6 @@ class SearchForm(forms.Form):
         }
 
     def __init__(self, *args, **kwargs):
-        request = kwargs.pop("request", None)
-        self.is_es_form = kwargs.pop("is_es_form", None)
         self.courts = kwargs.pop("courts", None)
         super().__init__(*args, **kwargs)
 
@@ -467,15 +465,9 @@ class SearchForm(forms.Form):
         fields dict.
         """
 
-        # Default values for Solr version.
-        default_status = "Precedential"
-        status_index = 1
-        if request and waffle.flag_is_active(request, "o-es-active"):
-            self.is_es_form = True
-        if self.is_es_form:
-            # Default values for ES version.
-            default_status = "Published"
-            status_index = 0
+        # Default values for ES version.
+        default_status = "Published"
+        status_index = 0
 
         if not self.courts:
             self.courts = Court.objects.filter(in_use=True)
@@ -593,10 +585,7 @@ class SearchForm(forms.Form):
         Handles validation fixes that need to be performed across fields.
         """
         cleaned_data = self.cleaned_data
-
-        default_status = "stat_Precedential"
-        if self.is_es_form:
-            default_status = "stat_Published"
+        default_status = "stat_Published"
 
         # 1. Make sure that the dates do this |--> <--| rather than <--| |-->
         for field_name in self.get_date_field_names():
@@ -719,20 +708,18 @@ def clean_up_date_formats(
             )
 
 
-def _clean_form(get_params, cd, courts, is_es_form=False):
+def _clean_form(get_params, cd, courts):
     """Returns cleaned up values as a Form object."""
     # Send the user the cleaned up query
     get_params["q"] = cd["q"]
 
-    status_index = 1
-    if is_es_form:
-        status_index = 0
+    status_index = 0
     # Clean up the date formats. This is probably no longer needed since we do
     # date cleanup on the client side via our datepickers, but it's probably
     # fine to leave it here until there's a reason to remove it. It could be
     # helpful if somebody finds a way not to use the datepickers (js off, say)
     for date_field in SearchForm(
-        get_params, is_es_form=is_es_form, courts=courts
+        get_params, courts=courts
     ).get_date_field_names():
         clean_up_date_formats(cd, date_field, get_params)
 
@@ -748,6 +735,6 @@ def _clean_form(get_params, cd, courts, is_es_form=False):
         ]
 
     # Ensure that we have the cleaned_data and other related attributes set.
-    form = SearchForm(get_params, is_es_form=is_es_form, courts=courts)
+    form = SearchForm(get_params, courts=courts)
     form.is_valid()
     return form

@@ -1,11 +1,10 @@
 import re
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from urllib.parse import parse_qs, urlencode
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.core.cache import caches
 from django.core.paginator import Page
 from django.http import HttpRequest, QueryDict
 from eyecite import get_citations
@@ -16,7 +15,6 @@ from scorched.response import SolrResponse
 
 from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
-from cl.lib.bot_detector import is_bot
 from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.lib.utils import (
@@ -34,7 +32,6 @@ from cl.search.constants import (
 )
 from cl.search.forms import SearchForm
 from cl.search.models import (
-    PRECEDENTIAL_STATUS,
     SEARCH_TYPES,
     Court,
     OpinionCluster,
@@ -43,35 +40,6 @@ from cl.search.models import (
 )
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
-
-
-def get_solr_interface(
-    cd: CleanData, http_connection: Session | None = None
-) -> ExtraSolrInterface:
-    """Get the correct solr interface for the query"""
-    search_type = cd["type"]
-    if search_type == SEARCH_TYPES.OPINION:
-        si = ExtraSolrInterface(
-            settings.SOLR_OPINION_URL,
-            http_connection=http_connection,
-            mode="r",
-        )
-    elif search_type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        si = ExtraSolrInterface(
-            settings.SOLR_RECAP_URL, http_connection=http_connection, mode="r"
-        )
-    elif search_type == SEARCH_TYPES.ORAL_ARGUMENT:
-        si = ExtraSolrInterface(
-            settings.SOLR_AUDIO_URL, http_connection=http_connection, mode="r"
-        )
-    elif search_type == SEARCH_TYPES.PEOPLE:
-        si = ExtraSolrInterface(
-            settings.SOLR_PEOPLE_URL, http_connection=http_connection, mode="r"
-        )
-    else:
-        raise NotImplementedError(f"Unknown search type: {search_type}")
-
-    return si
 
 
 def make_get_string(
@@ -93,71 +61,6 @@ def make_get_string(
     if len(get_string) > 0:
         get_string += "&"
     return get_string
-
-
-def get_query_citation(cd: CleanData) -> Optional[List[FullCaseCitation]]:
-    """Extract citations from the query string and return them, or return
-    None
-    """
-    if not cd.get("q"):
-        return None
-    citations = get_citations(cd["q"], tokenizer=HYPERSCAN_TOKENIZER)
-
-    citations = [c for c in citations if isinstance(c, FullCaseCitation)]
-    matches = None
-    if len(citations) == 1:
-        # If it's not exactly one match, user doesn't get special help.
-        matches = search_db_for_fullcitation(citations[0])
-        if len(matches) == 1:
-            # If more than one match, don't show the tip
-            return matches.result.docs[0]
-
-    return matches
-
-
-def make_stats_variable(
-    search_form: SearchForm,
-    paged_results: SolrResponse,
-) -> List[str]:
-    """Create a useful facet variable for use in a template
-
-    This function merges the fields in the form with the facet counts from
-    Solr, creating useful variables for the front end.
-
-    We need to handle two cases:
-      1. Page loads where we don't have facet values. This can happen when the
-         search was invalid (bad date formatting, for example), or when the
-         search itself crashed (bad Solr syntax, for example).
-      2. A regular page load, where everything worked properly.
-
-    In either case, the count value is associated with the form fields as an
-    attribute named "count". If the search didn't work, the value will be None.
-    If it did, the value will be an int.
-    """
-    facet_fields = []
-    try:
-        solr_facet_values = dict(
-            paged_results.object_list.facet_counts.facet_fields["status_exact"]
-        )
-    except (AttributeError, KeyError):
-        # AttributeError: Query failed.
-        # KeyError: Faceting not enabled on field.
-        solr_facet_values = {}
-
-    for field in search_form:
-        if not field.html_name.startswith("stat_"):
-            continue
-
-        try:
-            count = solr_facet_values[field.html_name.replace("stat_", "")]
-        except KeyError:
-            # Happens when a field is iterated on that doesn't exist in the
-            # facets variable
-            count = None
-
-        field.count = count
-        facet_fields.append(field)
-    return facet_fields
 
 
 def merge_form_with_courts(
@@ -884,26 +787,6 @@ def build_coverage_query(court: str, q: str, facet_field: str) -> SearchParam:
     return params
 
 
-def build_alert_estimation_query(cd: CleanData, day_count: int) -> SearchParam:
-    """Build the parameters for estimating the frequency an alert is
-    triggered.
-    """
-    params = cast(
-        SearchParam,
-        {
-            "q": cleanup_main_query(cd["q"] or "*"),
-            "rows": 0,
-            "caller": "alert_estimator",
-        },
-    )
-    cd["filed_after"] = date.today() - timedelta(days=day_count)
-    cd["filed_before"] = None
-    add_filter_queries(params, cd)
-
-    print_params(params)
-    return params
-
-
 def build_court_count_query(group: bool = False) -> SearchParam:
     """Build a query that returns the count of cases for all courts
 
@@ -976,213 +859,6 @@ async def add_depth_counts(
         return None
 
 
-async def get_citing_clusters_with_cache(
-    cluster: OpinionCluster,
-) -> Tuple[list, int]:
-    """Use Solr to get clusters citing the one we're looking at
-
-    :param cluster: The cluster we're targeting
-    :type cluster: OpinionCluster
-    :return: A tuple of the list of solr results and the number of results
-    """
-    cache_key = f"citing:{cluster.pk}"
-    cache = caches["db_cache"]
-    cached_results = await cache.aget(cache_key)
-    if cached_results is not None:
-        return cached_results
-
-    # Cache miss. Get the citing results from Solr
-    sub_opinion_pks = cluster.sub_opinions.values_list("pk", flat=True)
-    ids_str = " OR ".join([str(pk) async for pk in sub_opinion_pks])
-    q = {
-        "q": f"cites:({ids_str})",
-        "rows": 5,
-        "start": 0,
-        "sort": "citeCount desc",
-        "caller": "view_opinion",
-        "fl": "absolute_url,caseName,dateFiled",
-    }
-    conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-    results = conn.query().add_extra(**q).execute()
-    conn.conn.http_connection.close()
-    citing_clusters = list(results)
-    citing_cluster_count = results.result.numFound
-    a_week = 60 * 60 * 24 * 7
-    await cache.aset(
-        cache_key, (citing_clusters, citing_cluster_count), a_week
-    )
-
-    return citing_clusters, citing_cluster_count
-
-
-async def get_related_clusters_with_cache(
-    cluster: OpinionCluster,
-    request: HttpRequest,
-) -> Tuple[List[OpinionCluster], List[int], Dict[str, str]]:
-    """Use Solr to get related opinions with Solr-MoreLikeThis query
-
-    :param cluster: The cluster we're targeting
-    :param request: Request object for checking if user is permitted
-    :return: A list of related clusters, a list of sub-opinion IDs, and a dict
-    of URL parameters
-    """
-
-    # By default all statuses are included
-    available_statuses = dict(PRECEDENTIAL_STATUS.NAMES).values()
-    url_search_params = {f"stat_{v}": "on" for v in available_statuses}
-
-    # Opinions that belong to the targeted cluster
-    sub_opinion_ids = cluster.sub_opinions.values_list("pk", flat=True)
-
-    if is_bot(request) or not await sub_opinion_ids.aexists():
-        # If it is a bot or lacks sub-opinion IDs, return empty results
-        return [], [], url_search_params
-
-    si = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-
-    # Use cache if enabled
-    cache = caches["db_cache"]
-    mlt_cache_key = f"mlt-cluster:{cluster.pk}"
-    related_clusters = (
-        await cache.aget(mlt_cache_key) if settings.RELATED_USE_CACHE else None
-    )
-
-    if settings.RELATED_FILTER_BY_STATUS:
-        # Update URL parameters accordingly
-        url_search_params = {f"stat_{settings.RELATED_FILTER_BY_STATUS}": "on"}
-
-    if related_clusters is None:
-        # Cache is empty
-
-        # Turn list of opinion IDs into list of Q objects
-        sub_opinion_queries = [
-            si.Q(id=sub_id) async for sub_id in sub_opinion_ids
-        ]
-
-        # Take one Q object from the list
-        sub_opinion_query = sub_opinion_queries.pop()
-
-        # OR the Q object with the ones remaining in the list
-        for item in sub_opinion_queries:
-            sub_opinion_query |= item
-
-        # Set MoreLikeThis parameters
-        # (see https://lucene.apache.org/solr/guide/6_6/other-parsers.html#OtherParsers-MoreLikeThisQueryParser)
-        mlt_params = {
-            "fields": "text",
-            "count": settings.RELATED_COUNT,
-            "maxqt": settings.RELATED_MLT_MAXQT,
-            "mintf": settings.RELATED_MLT_MINTF,
-            "minwl": settings.RELATED_MLT_MINWL,
-            "maxwl": settings.RELATED_MLT_MAXWL,
-            "maxdf": settings.RELATED_MLT_MAXDF,
-        }
-
-        mlt_query = (
-            si.query(sub_opinion_query)
-            .mlt(**mlt_params)
-            .field_limit(fields=["id", "caseName", "absolute_url"])
-        )
-
-        if settings.RELATED_FILTER_BY_STATUS:
-            # Filter results by status (e.g., Precedential)
-            mlt_query = mlt_query.filter(
-                status_exact=settings.RELATED_FILTER_BY_STATUS
-            )
-
-        mlt_res = mlt_query.execute()
-
-        if hasattr(mlt_res, "more_like_this"):
-            # Only a single sub opinion
-            related_clusters = mlt_res.more_like_this.docs
-        elif hasattr(mlt_res, "more_like_these"):
-            # Multiple sub opinions
-
-            # Get result list for each sub opinion
-            sub_docs = [
-                sub_res.docs
-                for sub_id, sub_res in mlt_res.more_like_these.items()
-            ]
-
-            # Merge sub results by interleaving
-            # - exclude items that are sub opinions
-            related_clusters = [
-                item
-                for pair in zip(*sub_docs)
-                for item in pair
-                if item["id"] not in sub_opinion_ids
-            ]
-
-            # Limit number of results
-            related_clusters = related_clusters[: settings.RELATED_COUNT]
-        else:
-            # No MLT results are available (this should not happen)
-            related_clusters = []
-
-        await cache.aset(
-            mlt_cache_key, related_clusters, settings.RELATED_CACHE_TIMEOUT
-        )
-    si.conn.http_connection.close()
-    return related_clusters, sub_opinion_ids, url_search_params
-
-
-def get_mlt_query(
-    si: ExtraSolrInterface,
-    cd: CleanData,
-    facet: bool,
-    seed_pks: List[str],
-    filter_query: str,
-) -> SolrResponse:
-    """
-    By default Solr MoreLikeThis queries do not support highlighting. Thus, we
-    use a special search interface and build the Solr query manually.
-
-    :param si: SolrInterface
-    :param cd: Cleaned search form data
-    :param facet: Set to True to enable facets
-    :param seed_pks: List of IDs of the documents for that related documents
-    should be returned
-    :param filter_query:
-    :return: Executed SolrSearch
-    """
-    hl_fields = list(SOLR_OPINION_HL_FIELDS)
-
-    # Exclude citations from MLT highlighting
-    hl_fields.remove("citation")
-
-    # Reset query for query builder
-    cd["q"] = ""
-
-    # Build main query as always
-    q = build_main_query(cd, facet=facet)
-    cleaned_fq = filter_query.strip()
-
-    q.update(
-        {
-            "caller": "mlt_query",
-            "q": f"id:({' OR '.join(seed_pks)})",
-            "mlt": "true",  # Python boolean does not work here
-            "mlt.fl": "text",
-            "mlt.maxqt": settings.RELATED_MLT_MAXQT,
-            "mlt.mintf": settings.RELATED_MLT_MINTF,
-            "mlt.minwl": settings.RELATED_MLT_MINWL,
-            "mlt.maxwl": settings.RELATED_MLT_MAXWL,
-            "mlt.maxdf": settings.RELATED_MLT_MAXDF,
-            # Retrieve fields as highlight replacement
-            "fl": f"{q['fl']},{','.join(hl_fields)}",
-            # Original query as filter query
-            "fq": q["fq"] + [cleaned_fq],
-            # unset fields not used for MLT
-            "boost": "",
-            "pf": "",
-            "ps": "",
-            "qf": "",
-        }
-    )
-
-    return si.mlt_query(hl_fields).add_extra(**q)
-
-
 async def clean_up_recap_document_file(item: RECAPDocument) -> None:
     """Clean up the RecapDocument file-related fields after detecting the file
     doesn't exist in the storage.
@@ -1205,13 +881,10 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
     """Saves an user's search query in a SearchQuery model
 
     :param request: the request object
-    :param search_results: the dict returned by `do_search` or
-        `do_es_search` functions
+    :param search_results: the dict returned by `do_es_search` function
     :return None
     """
     is_error = search_results.get("error")
-    is_es_search = search_results.get("results_details") is not None
-
     search_query = SearchQuery(
         user=None if request.user.is_anonymous else request.user,
         get_params=request.GET.urlencode(),
@@ -1219,23 +892,16 @@ def store_search_query(request: HttpRequest, search_results: dict) -> None:
         query_time_ms=None,
         hit_cache=False,
         source=SearchQuery.WEBSITE,
-        engine=SearchQuery.ELASTICSEARCH if is_es_search else SearchQuery.SOLR,
+        engine=SearchQuery.ELASTICSEARCH,
     )
     if is_error:
         # Leave `query_time_ms` as None if there is an error
         search_query.save()
         return
 
-    if is_es_search:
-        search_query.query_time_ms = search_results["results_details"][0]
-        # do_es_search returns 1 as query time if the micro cache was hit
-        search_query.hit_cache = search_query.query_time_ms == 1
-    else:
-        # Solr searches are not cached unless a cache_key is passed
-        # No cache_key is passed for the endpoints we are storing
-        search_query.query_time_ms = search_results[
-            "results"
-        ].object_list.QTime
+    search_query.query_time_ms = search_results["results_details"][0]
+    # do_es_search returns 1 as query time if the micro cache was hit
+    search_query.hit_cache = search_query.query_time_ms == 1
 
     search_query.save()
 
