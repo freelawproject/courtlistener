@@ -1436,6 +1436,58 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
             results[0]["attorneys"][0]["attorney_id"], self.attorney.pk
         )
 
+        # Add another party type to the party record but linked to a different docket
+        await sync_to_async(PartyTypeFactory.create)(
+            party=self.party, docket=self.docket_2
+        )
+
+        # Fetch all party records for docket
+        self.q = {"docket__id": self.docket.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of attorneys
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of party types
+        self.assertEqual(
+            len(results[0]["party_types"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['party_types'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Fetch top-level record for docket (repeat with "filter_nested_results")
+        self.q = {"docket__id": self.docket.pk, "filter_nested_results": True}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify the record has only one attorney and one party type (due to filter)
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+        self.assertEqual(
+            len(results[0]["party_types"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['party_types'])}.\n\nr.data was: {r.data}",
+        )
+        # Check if retrieved party type matches expected record
+        self.assertNotEqual(
+            results[0]["party_types"][0]["docket_id"], self.docket_2.pk
+        )
+
         # Fetch party details based on attorney lookup
         self.q = {"attorney__docket__id": self.docket_2.pk}
         r = await self.async_client.get(self.path, self.q)
