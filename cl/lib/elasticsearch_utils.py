@@ -80,13 +80,7 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import (
-    SEARCH_TYPES,
-    Court,
-    Opinion,
-    OpinionCluster,
-    RECAPDocument,
-)
+from cl.search.models import SEARCH_TYPES, Court, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 

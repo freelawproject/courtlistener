@@ -289,7 +289,6 @@ class SearchViewSet(LoggingMixin, viewsets.ViewSet):
         if search_form.is_valid():
             cd = search_form.cleaned_data
             search_type = cd["type"]
-            print("search_type", search_type)
             paginator = pagination.PageNumberPagination()
             sl = api_utils.get_object_list(
                 request,

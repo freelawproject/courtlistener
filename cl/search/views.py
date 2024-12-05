@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
-from django.core.paginator import EmptyPage, Page, PageNotAnInteger, Paginator
+from django.core.paginator import EmptyPage, Page, PageNotAnInteger
 from django.db.models import Count, Sum
 from django.http import HttpRequest, HttpResponse
 from django.http.request import QueryDict
@@ -49,7 +49,6 @@ from cl.lib.search_utils import (
     add_depth_counts,
     make_get_string,
     merge_form_with_courts,
-    regroup_snippets,
     store_search_query,
 )
 from cl.lib.types import CleanData
@@ -88,41 +87,6 @@ def check_pagination_depth(page_number):
             page_number,
         )
         raise PermissionDenied
-
-
-def paginate_cached_solr_results(get_params, cd, results, rows, cache_key):
-    # Run the query and set up pagination
-    if cache_key is not None:
-        paged_results = cache.get(cache_key)
-        if paged_results is not None:
-            return paged_results
-
-    try:
-        page = int(get_params.get("page", 1))
-    except ValueError:
-        page = 1
-    check_pagination_depth(page)
-
-    if cd["type"] in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-        rows = 10
-
-    paginator = Paginator(results, rows)
-    try:
-        paged_results = paginator.page(page)
-    except PageNotAnInteger:
-        paged_results = paginator.page(1)
-    except EmptyPage:
-        # Page is out of range (e.g. 9999), deliver last page.
-        paged_results = paginator.page(paginator.num_pages)
-
-    # Post processing of the results
-    regroup_snippets(paged_results)
-
-    if cache_key is not None:
-        six_hours = 60 * 60 * 6
-        cache.set(cache_key, paged_results, six_hours)
-
-    return paged_results
 
 
 @cache_memoize(5 * 60)
@@ -348,21 +312,7 @@ def show_results(request: HttpRequest) -> HttpResponse:
             user=request.user,
         )
 
-    search_type = request.GET.get("type", SEARCH_TYPES.OPINION)
-    match search_type:
-        case SEARCH_TYPES.PARENTHETICAL:
-            search_results = do_es_search(request.GET.copy())
-        case SEARCH_TYPES.ORAL_ARGUMENT:
-            search_results = do_es_search(request.GET.copy())
-        case SEARCH_TYPES.PEOPLE:
-            search_results = do_es_search(request.GET.copy())
-        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
-            search_results = do_es_search(request.GET.copy())
-        case SEARCH_TYPES.RECAP_DOCUMENT:
-            search_results = do_es_search(request.GET.copy())
-        case _:
-            search_results = do_es_search(request.GET.copy())
-
+    search_results = do_es_search(request.GET.copy())
     render_dict.update(search_results)
     store_search_query(request, search_results)
 

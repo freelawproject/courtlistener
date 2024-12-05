@@ -7,15 +7,9 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.core.paginator import Page
 from django.http import HttpRequest, QueryDict
-from eyecite import get_citations
-from eyecite.models import FullCaseCitation
 from eyecite.tokenizers import HyperscanTokenizer
-from requests import Session
-from scorched.response import SolrResponse
 
-from cl.citations.match_citations import search_db_for_fullcitation
 from cl.citations.utils import get_citation_depth_between_clusters
-from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.types import CleanData, SearchParam
 from cl.lib.utils import (
     cleanup_main_query,
@@ -657,42 +651,6 @@ def add_grouping(main_params: SearchParam, cd: CleanData, group: bool) -> None:
             },
         )
         main_params.update(group_params)
-
-
-def regroup_snippets(results):
-    """Regroup the snippets in a grouped result.
-
-    Grouped results will have snippets for each of the group members. Some of
-    the snippets will be the same because they're the same across all items in
-    the group. For example, every opinion in the opinion index contains the
-    name of the attorneys. So, if we have a match on the attorney name, that'll
-    generate a snippet for both the lead opinion and a dissent.
-
-    In this function, we identify these kinds of duplicates and pull them out.
-    We also flatten the results so that snippets are easier to get.
-
-    This also supports results that have been paginated and ones that have not.
-    """
-    if results is None:
-        return
-
-    if hasattr(results, "paginator"):
-        group_field = results.object_list.group_field
-    else:
-        group_field = results.group_field
-    if group_field is not None:
-        if hasattr(results, "paginator"):
-            groups = getattr(results.object_list.groups, group_field)["groups"]
-        else:
-            groups = results
-
-        for group in groups:
-            snippets = []
-            for doc in group["doclist"]["docs"]:
-                for snippet in doc["solr_highlights"]["text"]:
-                    if snippet not in snippets:
-                        snippets.append(snippet)
-            group["snippets"] = snippets
 
 
 def print_params(params: SearchParam) -> None:

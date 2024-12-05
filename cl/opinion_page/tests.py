@@ -59,7 +59,6 @@ from cl.people_db.models import Person
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
-    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
 )
