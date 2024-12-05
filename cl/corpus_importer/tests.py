@@ -4103,7 +4103,7 @@ class WestCitationImportTest(TestCase):
                 "type": Citation.JOURNAL,
             },
         ]
-        citation_strings = [("238 F.3d 273", "72 Soc.Sec.Rep.Serv. 318")]
+        citation_strings = ["238 F.3d 273", "72 Soc.Sec.Rep.Serv. 318"]
         valid_citations = parse_citations(citation_strings)
         self.assertEqual(
             valid_citations, correct_response, msg="Citations incorrect parsed"
