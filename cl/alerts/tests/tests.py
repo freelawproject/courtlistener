@@ -652,36 +652,42 @@ class SearchAlertsWebhooksTest(
             rate=Alert.DAILY,
             name="Test Alert O",
             query=f"q=California&type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
         )
         cls.search_alert_rt = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert O rt",
             query=f"type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
         )
         cls.search_alert_rt_1 = AlertFactory(
             user=cls.user_profile_1.user,
             rate=Alert.REAL_TIME,
             name="Test Alert O rt",
             query=f"type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
         )
         cls.search_alert_oa = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert OA",
             query="type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_o_wly = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert O wly",
             query=f"type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
         )
         cls.search_alert_o_mly = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert O mly",
             query=f"type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
         )
 
         cls.user_profile_2 = UserProfileWithParentsFactory()
@@ -696,6 +702,7 @@ class SearchAlertsWebhooksTest(
             rate=Alert.DAILY,
             name="Test Alert O Disabled",
             query=f"type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
         )
         cls.user_profile_3 = UserProfileWithParentsFactory(
             user__email="test_3@email.com"
@@ -712,6 +719,7 @@ class SearchAlertsWebhooksTest(
             rate=Alert.DAILY,
             name="Test Alert 2 O Enabled",
             query=f"q=California hearing&type=o&stat_{unpublished_status}=on",
+            alert_type=SEARCH_TYPES.OPINION,
         )
         cls.c1 = CourtFactory(
             id="canb", jurisdiction="I", citation_string="Bankr. C.D. Cal."
@@ -2065,42 +2073,49 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rate=Alert.REAL_TIME,
             name="Test Alert OA",
             query="q=RT+Test+OA+19-5735&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_2 = AlertFactory(
             user=cls.user_profile_2.user,
             rate=Alert.REAL_TIME,
             name="Test Alert OA 2",
             query="q=RT+Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_3 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert OA Daily",
             query="q=Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_4 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert OA Daily 2",
             query="q=DLY+Test+V2+19-5741&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_5 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert OA Weekly",
             query="q=Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_6 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert OA Monthly",
             query="q=Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_7 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert OA RT Docket ID",
             query=f"q=docket_id:{cls.docket.pk}&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
 
     @classmethod
@@ -2381,6 +2396,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rate=Alert.REAL_TIME,
             name="Test Alert OA",
             query="type=oa&docket_number=19-1010",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
 
         # Confirm it was properly indexed in ES.
@@ -2752,6 +2768,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 rate=Alert.REAL_TIME,
                 name=f"Test Alert RT {i}",
                 query="q=RT+Test+OA&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
             alerts_created.append(alert)
 
@@ -2828,6 +2845,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 rate=Alert.DAILY,
                 name=f"Test Alert OA {i}",
                 query="q=OA&+19-5735&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
             alerts_created.append(alert)
             # Create a new document that triggers each existing alert created
@@ -2904,6 +2922,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
                 rate=Alert.REAL_TIME,
                 name=f"Test Alert RT {i}",
                 query="q=Lorem+Ipsum+20-5739&type=oa",
+                alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
             )
             alerts_created.append(alert)
 
@@ -2962,12 +2981,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rate=Alert.OFF,
             name="Test Alert OA Daily",
             query="q=Disabled+Alert&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         dly_alert_disabled = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.OFF,
             name="Test Alert OA Daily",
             query="q=Disabled+Alert&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -3006,6 +3027,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rate=Alert.DAILY,
             name="Test Alert OA Daily",
             query="q=Scheduled+Alert&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -3101,6 +3123,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rate=Alert.MONTHLY,
             name="Test Alert OA MONTHLY",
             query="q=Monthly+Hit&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -3151,18 +3174,21 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             rate=Alert.DAILY,
             name="Test Alert OA Daily 1",
             query="q=USA+vs+Bank+&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         alert_2 = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert OA Daily 2",
             query="q=Texas+vs+Corp&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         alert_3 = AlertFactory(
             user=self.user_profile_2.user,
             rate=Alert.DAILY,
             name="Test Alert OA Daily 3",
             query="q=Texas+vs+Corp&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
 
         oa_created = []
@@ -3238,48 +3264,42 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
             rate=Alert.REAL_TIME,
             name="Test Alert OA",
             query="q=RT+Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_2 = AlertFactory(
             user=cls.user_profile_2.user,
             rate=Alert.REAL_TIME,
             name="Test Alert OA 2",
             query="q=RT+Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_3 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert OA Daily",
             query="q=Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_4 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.WEEKLY,
             name="Test Alert OA Weekly",
             query="q=Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_5 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert OA Monthly",
             query="q=Test+OA&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         cls.search_alert_6 = AlertFactory(
             user=cls.user_profile.user,
             rate=Alert.MONTHLY,
             name="Test Alert O RT",
             query="q=Test+Opinion Alert",
-        )
-        cls.search_alert_7 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.REAL_TIME,
-            name="Test Alert D",
-            query="q=Test+O&type=d",
-        )
-        cls.search_alert_8 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert D",
-            query="q=Test+O&type=d",
+            alert_type=SEARCH_TYPES.OPINION,
         )
 
     def tearDown(self) -> None:
@@ -3368,12 +3388,14 @@ class SearchAlertsIndexingCommandTests(ESIndexTestCase, TestCase):
             rate=Alert.DAILY,
             name="Test Alert OA Daily 2",
             query="q=DLY+Test+V2&type=oa&argued_after=1",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         valid_alert = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.DAILY,
             name="Test Alert OA Daily 2",
             query="q=DLY+Test+V2&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         # Call cl_index_search_alerts command.
         call_command(
@@ -3421,113 +3443,6 @@ class OneClickUnsubscribeTests(TestCase):
         # check unsubscription confirmation email
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("[Unsubscribed]", mail.outbox[0].subject)
-
-
-class CleanUpSearchAlertsCommandTests(ESIndexTestCase, TestCase):
-    """Test the clean_up_search_alerts command"""
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.user_profile = UserProfileWithParentsFactory()
-        cls.search_alert_0 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert O",
-            query="q=test&type=o&order_by=score%20desc&stat_Precedential=on",
-        )
-        cls.search_alert_1 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert 1",
-            query="q=test&type=o&order_by=score%20desc&stat_Non-Precedential=on",
-        )
-        cls.search_alert_2 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert O",
-            query="q=test&type=o&order_by=score%20desc&stat_Errata=on",
-        )
-        cls.search_alert_3 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert O",
-            query="q=test&type=o&order_by=score%20desc&stat_Separate%20Opinion=on",
-        )
-        cls.search_alert_4 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert O",
-            query="q=test&type=o&order_by=score%20desc&stat_In-chambers=on",
-        )
-        cls.search_alert_5 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert O",
-            query="q=test&type=o&stat_Relating-to%20orders=on&order_by=score%20desc",
-        )
-        cls.search_alert_6 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert O",
-            query="q=caseName%3A&type=o&stat_Unknown%20Status=on&order_by=score%20desc",
-        )
-        cls.search_alert_7 = AlertFactory(
-            user=cls.user_profile.user,
-            rate=Alert.DAILY,
-            name="Test Alert O",
-            query="q=test&type=o&order_by=score%20desc&stat_Precedential=on&stat_Errata=on&stat_Separate%20Opinion=on",
-        )
-
-    def test_clean_up_alerts(self):
-        """Confirm clean_up_alerts properly replaces the stat_ filters on
-        Opinions Search Alerts queries.
-        """
-        with mock.patch(
-            "cl.alerts.management.commands.clean_up_search_alerts.logger"
-        ) as mock_logger:
-            call_command("clean_up_search_alerts", action="clean-up")
-            mock_logger.info.assert_called_with(
-                "\r Successfully fixed 6 opinions search alerts."
-            )
-
-        expected_query = {
-            self.search_alert_0.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.PUBLISHED}=on",
-            self.search_alert_1.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.UNPUBLISHED}=on",
-            self.search_alert_2.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.ERRATA}=on",
-            self.search_alert_3.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.SEPARATE}=on",
-            self.search_alert_4.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.IN_CHAMBERS}=on",
-            self.search_alert_5.pk: f"q=test&type=o&stat_{PRECEDENTIAL_STATUS.RELATING_TO}=on&order_by=score%20desc",
-            self.search_alert_6.pk: f"q=caseName%3A&type=o&stat_{PRECEDENTIAL_STATUS.UNKNOWN}=on&order_by=score%20desc",
-            self.search_alert_7.pk: f"q=test&type=o&order_by=score%20desc&stat_{PRECEDENTIAL_STATUS.PUBLISHED}=on&stat_{PRECEDENTIAL_STATUS.ERRATA}=on&stat_{PRECEDENTIAL_STATUS.SEPARATE}=on",
-        }
-
-        alerts = Alert.objects.all().values_list("pk", "query")
-        for alert in alerts:
-            with self.subTest("Alert query", alert=alert):
-                self.assertEqual(expected_query[alert[0]], alert[1])
-
-    def test_validate_queries_syntax(self):
-        """Confirm that the command can correctly report alerts for Opinions
-        search with incorrect syntax.
-        """
-        with mock.patch(
-            "cl.alerts.management.commands.clean_up_search_alerts.logger"
-        ) as mock_logger:
-            # Clean up the alerts first to avoid syntax errors due to the old
-            # filter values.
-            call_command("clean_up_search_alerts", action="clean-up")
-            call_command(
-                "clean_up_search_alerts",
-                action="validate-queries",
-                validation_wait=0,
-            )
-            mock_logger.info.assert_called_with(
-                "\r Checked 8 opinions search alerts. There were 1 invalid queries."
-            )
-            self.assertIn(
-                "Invalid Search Alert syntax.",
-                mock_logger.error.call_args[0][0],
-            )
 
 
 @override_settings(EMAIL_BACKEND="cl.lib.email_backends.EmailBackend")
