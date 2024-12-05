@@ -1635,12 +1635,7 @@ class RECAPDocument(
             from cl.scrapers.tasks import extract_recap_pdf
 
             tasks.append(extract_recap_pdf.si(self.pk))
-        if index:
-            from cl.search.tasks import add_items_to_solr
 
-            tasks.append(
-                add_items_to_solr.si([self.pk], "search.RECAPDocument")
-            )
         if len(tasks) > 0:
             chain(*tasks)()
 
@@ -1679,17 +1674,6 @@ class RECAPDocument(
             )
             logger.error(msg)
             raise ValidationError({"attachment_number": msg})
-
-    def delete(self, *args, **kwargs):
-        """
-        Note that this doesn't get called when an entire queryset
-        is deleted, but that should be OK.
-        """
-        id_cache = self.pk
-        super().delete(*args, **kwargs)
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([id_cache], "search.RECAPDocument")
 
     def get_docket_metadata(self):
         """The metadata for the item that comes from the Docket."""
@@ -3084,12 +3068,6 @@ class OpinionCluster(AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"slug"}.union(update_fields)
         super().save(update_fields=update_fields, *args, **kwargs)
-        if index:
-            from cl.search.tasks import add_items_to_solr
-
-            add_items_to_solr.delay(
-                [self.pk], "search.OpinionCluster", force_commit
-            )
 
     async def asave(
         self,
@@ -3106,17 +3084,6 @@ class OpinionCluster(AbstractDateTimeModel):
             *args,
             **kwargs,
         )
-
-    def delete(self, *args, **kwargs):
-        """
-        Note that this doesn't get called when an entire queryset
-        is deleted, but that should be OK.
-        """
-        id_cache = self.pk
-        super().delete(*args, **kwargs)
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([id_cache], "search.Opinion")
 
     def as_search_list(self):
         # IDs
@@ -3589,10 +3556,6 @@ class Opinion(AbstractDateTimeModel):
     ) -> None:
         self.clean()
         super().save(*args, **kwargs)
-        if index:
-            from cl.search.tasks import add_items_to_solr
-
-            add_items_to_solr.delay([self.pk], "search.Opinion", force_commit)
 
     def as_search_dict(self) -> Dict[str, Any]:
         """Create a dict that can be ingested by Solr."""
