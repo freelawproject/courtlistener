@@ -298,6 +298,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             ):
                 data = court_data["data"][0]
                 self.assertEqual(data["id"], self.court_scotus.pk)
+                self.assertEqual(data["label"], self.court_scotus.full_name)
                 self.assertEqual(data["data"][0]["val"], 2)
 
                 date_1 = datetime.fromisoformat(
@@ -315,6 +316,7 @@ class CoverageTests(ESIndexTestCase, TestCase):
             ):
                 data = court_data["data"][0]
                 self.assertEqual(data["id"], self.court_cand.pk)
+                self.assertEqual(data["label"], self.court_cand.full_name)
                 self.assertEqual(data["data"][0]["val"], 1)
 
                 date_1 = datetime.fromisoformat(

@@ -3376,10 +3376,14 @@ def set_child_docs_and_score(
             result["bm25_score"] = result.meta.score
 
 
-def get_court_opinions_counts(search_query: Search) -> dict[str, int] | None:
+def get_court_opinions_counts(
+    search_query: Search, courts_count: int
+) -> dict[str, int] | None:
     """Retrieve the opinion counts per each court.
 
     :param search_query: The ES DSL Search object.
+    :param courts_count: The number of courts in the database, used as the size
+    for the terms aggregation.
     :return: A dict mapping court IDs to their respective counts of
     opinions, or None if an error occurs during query execution.
     """
@@ -3388,7 +3392,9 @@ def get_court_opinions_counts(search_query: Search) -> dict[str, int] | None:
     search_query = search_query.query(
         Q("bool", must=Q("match", cluster_child="opinion"))
     )
-    search_query.aggs.bucket("court_id", A("terms", field="court_id.raw"))
+    search_query.aggs.bucket(
+        "court_id", A("terms", field="court_id.raw", size=courts_count)
+    )
     try:
         response = search_query.execute()
     except (TransportError, ConnectionError, RequestError):
@@ -3452,11 +3458,10 @@ def get_opinions_coverage_chart_data(
     search_query = search_query.filter("terms", **{"court_id.raw": court_ids})
     court_agg = A("terms", field="court_id.raw", size=len(court_ids))
     date_stats = A("stats", field="dateFiled")
-    label_agg = A("terms", field="court_id.raw", size=1)
 
     search_query.aggs.bucket("courts", court_agg).metric(
         "date_range", date_stats
-    ).metric("court_label", label_agg)
+    )
     search_query = search_query.extra(size=0, track_total_hits=False)
     try:
         response = search_query.execute()

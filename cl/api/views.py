@@ -41,7 +41,7 @@ max_court_id_length = Court._meta.get_field("id").max_length
 VALID_COURT_ID_REGEX = re.compile(rf"^\w{{1,{max_court_id_length}}}$")
 
 
-async def get_cached_court_counts() -> dict[str, int]:
+async def get_cached_court_counts(courts_queryset: QuerySet) -> dict[str, int]:
     """Fetch court counts from cache or ES if not available.
     :return: A dict mapping court IDs to their respective counts of
     opinions, or None if no counts are available.
@@ -52,8 +52,9 @@ async def get_cached_court_counts() -> dict[str, int]:
     if court_counts:
         return court_counts
 
+    courts_count = await courts_queryset.acount()
     court_counts = await sync_to_async(get_court_opinions_counts)(
-        OpinionClusterDocument.search()
+        OpinionClusterDocument.search(), courts_count
     )
     if court_counts:
         cache.set(
@@ -71,7 +72,7 @@ async def make_court_variable() -> QuerySet:
     """
 
     courts = Court.objects.exclude(jurisdiction=Court.TESTING_COURT)
-    courts_counts = await get_cached_court_counts()
+    courts_counts = await get_cached_court_counts(courts)
     # Add the count attribute to courts.
     async for court in courts:
         court.count = courts_counts.get(court.pk, 0)
