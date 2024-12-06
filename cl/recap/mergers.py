@@ -147,6 +147,14 @@ async def find_docket_object(
                 "pacer_case_id": pacer_case_id,
                 "docket_number_core": docket_number_core,
             },
+            # Appellate docket uploads usually include a pacer_case_id.
+            # Therefore, include the following lookup to attempt matching
+            # existing dockets without a pacer_case_id using docket_number_core
+            # to avoid creating duplicated dockets.
+            {
+                "pacer_case_id": None,
+                "docket_number_core": docket_number_core,
+            },
             {"pacer_case_id": pacer_case_id},
         ]
     if docket_number_core and not pacer_case_id:
@@ -362,6 +370,7 @@ async def update_docket_metadata(
     d = update_case_names(d, docket_data["case_name"])
     await mark_ia_upload_needed(d, save_docket=False)
     d.docket_number = docket_data["docket_number"] or d.docket_number
+    d.pacer_case_id = d.pacer_case_id or docket_data.get("pacer_case_id")
     d.date_filed = docket_data.get("date_filed") or d.date_filed
     d.date_last_filing = (
         docket_data.get("date_last_filing") or d.date_last_filing
