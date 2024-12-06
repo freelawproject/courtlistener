@@ -49,7 +49,14 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import SOURCES, Citation, Court, Docket, Opinion
+from cl.search.models import (
+    SEARCH_TYPES,
+    SOURCES,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+)
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
@@ -72,6 +79,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             rate=Alert.DAILY,
             name="Test Alert OA",
             query="type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
 
     def test_extension(self):

@@ -2270,6 +2270,7 @@ class OpinionsESSearchTest(
         cluster_2.delete()
 
 
+@override_flag("ui_flag_for_o", False)
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase

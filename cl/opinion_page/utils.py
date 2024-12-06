@@ -157,8 +157,19 @@ async def build_cites_clusters_query(
     cluster_cites_query = cluster_search.query(cites_query)
     search_query = (
         cluster_cites_query.sort({"citeCount": {"order": "desc"}})
-        .source(includes=["absolute_url", "caseName", "dateFiled"])
-        .extra(size=5, track_total_hits=True)
+        .source(
+            includes=[
+                "absolute_url",
+                "caseName",
+                "cluster_id",
+                "docketNumber",
+                "citation",
+                "status",
+                "dateFiled",
+            ]
+        )
+        .extra(size=20, track_total_hits=True)
+        .collapse(field="cluster_id")
     )
     return search_query
 
@@ -190,8 +201,18 @@ async def build_related_clusters_query(
     cluster_related_query = cluster_search.query(main_query)
     search_query = (
         cluster_related_query.sort({"_score": {"order": "desc"}})
-        .source(includes=["absolute_url", "caseName", "cluster_id"])
-        .extra(size=5)
+        .source(
+            includes=[
+                "absolute_url",
+                "caseName",
+                "cluster_id",
+                "docketNumber",
+                "citations",
+                "status",
+                "dateFiled",
+            ]
+        )
+        .extra(size=20)
         .collapse(field="cluster_id")
     )
     return search_query
@@ -207,6 +228,186 @@ class RelatedCitingResults:
     citing_clusters: list[OpinionClusterDocument] = field(default_factory=list)
     citing_cluster_count: int = 0
     timeout: bool = False
+
+
+@dataclass
+class RelatedClusterResults:
+    related_clusters: list[OpinionClusterDocument] = field(
+        default_factory=list
+    )
+    sub_opinion_pks: list[int] = field(default_factory=list)
+    url_search_params: dict[str, str] = field(default_factory=dict)
+    timeout: bool = False
+
+
+async def es_get_related_clusters_with_cache(
+    cluster: OpinionCluster,
+    request: HttpRequest,
+) -> RelatedClusterResults:
+    """Elastic Related Clusters Search or Cache
+
+    :param cluster:The cluster to use
+    :param request:The user request
+    :return:Related Cluster Data
+    """
+    cache = caches["db_cache"]
+    mlt_cache_key = f"clusters-mlt-es:{cluster.pk}"
+    # By default, all statuses are included. Retrieve the PRECEDENTIAL_STATUS
+    # attributes (since they're indexed in ES) instead of the NAMES values.
+    search_params: CleanData = {}
+    url_search_params = {
+        f"stat_{v[0]}": "on" for v in PRECEDENTIAL_STATUS.NAMES
+    }
+    sub_opinion_pks = [
+        str(pk)
+        async for pk in cluster.sub_opinions.values_list("pk", flat=True)
+    ]
+    if settings.RELATED_FILTER_BY_STATUS:
+        # Filter results by status (e.g., Precedential)
+        # Update URL parameters accordingly
+        search_params[
+            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}"
+        ] = True
+        url_search_params = {
+            f"stat_{PRECEDENTIAL_STATUS.get_status_value(settings.RELATED_FILTER_BY_STATUS)}": "on"
+        }
+
+    related_cluster_result = RelatedClusterResults(
+        url_search_params=url_search_params
+    )
+
+    if is_bot(request) or not sub_opinion_pks:
+        return related_cluster_result
+
+    cached_related_clusters, timeout_related = (
+        await cache.aget(mlt_cache_key) or (None, False)
+        if settings.RELATED_USE_CACHE
+        else (None, False)
+    )
+
+    # Prepare related cluster query if not cached results.
+    cluster_search = OpinionClusterDocument.search()
+
+    if cached_related_clusters is not None:
+        related_cluster_result.related_clusters = cached_related_clusters
+        related_cluster_result.timeout = timeout_related
+        related_cluster_result.sub_opinion_pks = list(
+            map(int, sub_opinion_pks)
+        )
+        related_cluster_result.url_search_params = url_search_params
+        return related_cluster_result
+
+    related_query = await build_related_clusters_query(
+        cluster_search, sub_opinion_pks
+    )
+
+    related_query = related_query.params(
+        timeout=f"{settings.ELASTICSEARCH_FAST_QUERIES_TIMEOUT}s"
+    )
+    related_query = related_query.extra(
+        size=settings.RELATED_COUNT, track_total_hits=False
+    )
+    try:
+        # Execute the Related Query if needed
+        response = related_query.execute()
+        timeout_related = False
+    except (ConnectionError, RequestError, ApiError) as e:
+        logger.warning("Error getting cited and related clusters: %s", e)
+        if settings.DEBUG is True:
+            traceback.print_exc()
+        return related_cluster_result
+    except ConnectionTimeout as e:
+        logger.warning(
+            "ConnectionTimeout getting cited and related clusters: %s", e
+        )
+        response = None
+        timeout_related = True
+
+    related_cluster_result.related_clusters = (
+        response if response is not None else cached_related_clusters or []
+    )
+    related_cluster_result.timeout = False
+    related_cluster_result.sub_opinion_pks = list(map(int, sub_opinion_pks))
+
+    if timeout_related == False:
+        await cache.aset(
+            mlt_cache_key,
+            (related_cluster_result.related_clusters, timeout_related),
+            settings.RELATED_CACHE_TIMEOUT,
+        )
+    return related_cluster_result
+
+
+async def es_get_cited_clusters_with_cache(
+    cluster: OpinionCluster,
+    request: HttpRequest,
+) -> RelatedCitingResults:
+    """Elastic cited by cluster search or cache
+
+    :param cluster:The cluster to check
+    :param request:The user request
+    :return:The cited by data
+    """
+    cache = caches["db_cache"]
+    cache_citing_key = f"clusters-cited-es:{cluster.pk}"
+
+    sub_opinion_pks = [
+        str(pk)
+        async for pk in cluster.sub_opinions.values_list("pk", flat=True)
+    ]
+    cluster_results = RelatedCitingResults()
+    if is_bot(request) or not sub_opinion_pks:
+        return cluster_results
+
+    cached_citing_results, cached_citing_clusters_count, timeout_cited = (
+        await cache.aget(cache_citing_key) or (None, False, False)
+        if settings.RELATED_USE_CACHE
+        else (None, False, False)
+    )
+
+    if cached_citing_results is not None:
+        cluster_results.citing_clusters = cached_citing_results
+        cluster_results.citing_cluster_count = cached_citing_clusters_count
+        cluster_results.timeout = timeout_cited
+        return cluster_results
+
+    cluster_search = OpinionClusterDocument.search()
+    cited_query = await build_cites_clusters_query(
+        cluster_search, sub_opinion_pks
+    )
+    try:
+        # Execute the Related Query if needed
+        response = cited_query.execute()
+        timeout_cited = False
+    except (ConnectionError, RequestError, ApiError) as e:
+        logger.warning("Error getting cited and related clusters: %s", e)
+        if settings.DEBUG is True:
+            traceback.print_exc()
+        return cluster_results
+    except ConnectionTimeout as e:
+        logger.warning(
+            "ConnectionTimeout getting cited and related clusters: %s", e
+        )
+        response = None
+        timeout_cited = True
+
+    citing_clusters = list(response) if not timeout_cited else []
+    cluster_results.citing_clusters = citing_clusters
+    cluster_results.citing_cluster_count = (
+        response.hits.total.value if response is not None else 0
+    )
+    cluster_results.timeout = False if citing_clusters else timeout_cited
+    if not cluster_results.timeout:
+        await cache.aset(
+            cache_citing_key,
+            (
+                cluster_results.citing_clusters,
+                cluster_results.citing_cluster_count,
+                cluster_results.timeout,
+            ),
+            settings.RELATED_CACHE_TIMEOUT,
+        )
+    return cluster_results
 
 
 async def es_get_citing_and_related_clusters_with_cache(
@@ -249,9 +450,12 @@ async def es_get_citing_and_related_clusters_with_cache(
     if is_bot(request) or not sub_opinion_pks:
         return RelatedCitingResults(url_search_params=url_search_params)
 
-    cached_citing_results, cached_citing_cluster_count, timeout_cited = (
-        await cache.aget(cache_citing_key) or (None, 0, False)
-    )
+    (
+        cached_citing_results,
+        cached_citing_cluster_count,
+        timeout_cited,
+    ) = await cache.aget(cache_citing_key) or (None, 0, False)
+
     cached_related_clusters, timeout_related = (
         await cache.aget(mlt_cache_key) or (None, False)
         if settings.RELATED_USE_CACHE
@@ -339,3 +543,77 @@ async def es_get_citing_and_related_clusters_with_cache(
     results.timeout = any([timeout_cited, timeout_related])
     results.sub_opinion_pks = list(map(int, sub_opinion_pks))
     return results
+
+
+async def es_cited_case_count(
+    cluster_id: int, sub_opinion_pks: list[str]
+) -> int:
+    """Elastic quick cited by count query
+
+    :param cluster_id: The cluster id to search with
+    :param sub_opinion_pks: The subopinion ids of the cluster
+    :return: Opinion Cited Count
+    """
+    cache = caches["db_cache"]
+    cache_cited_by_key = f"cited-by-count-es:{cluster_id}"
+    cached_cited_by_count = await cache.aget(cache_cited_by_key) or None
+    if cached_cited_by_count is not None:
+        return cached_cited_by_count
+
+    cluster_search = OpinionClusterDocument.search()
+    cites_query = Q(
+        "bool",
+        filter=[
+            Q("match", cluster_child="opinion"),
+            Q("terms", **{"cites": sub_opinion_pks}),
+        ],
+    )
+    cluster_cites_query = cluster_search.query(cites_query)
+    cited_by_count = cluster_cites_query.count()
+
+    await cache.aset(
+        cache_cited_by_key,
+        cited_by_count,
+        settings.RELATED_CACHE_TIMEOUT,
+    )
+
+    return cited_by_count
+
+
+async def es_related_case_count(cluster_id, sub_opinion_pks: list[str]) -> int:
+    """Elastic quick related cases count
+
+    :param cluster_id: The cluster id of the object
+    :param sub_opinion_pks: The sub opinion ids of the cluster
+    :return: The count of related cases in elastic
+    """
+    cache = caches["db_cache"]
+    cache_related_cases_key = f"related-cases-count-es:{cluster_id}"
+    cached_related_cases_count = (
+        await cache.aget(cache_related_cases_key) or None
+    )
+    if cached_related_cases_count is not None:
+        return cached_related_cases_count
+
+    cluster_search = OpinionClusterDocument.search()
+    mlt_query = await build_more_like_this_query(sub_opinion_pks)
+    parent_filters = await sync_to_async(build_join_es_filters)(
+        {"type": SEARCH_TYPES.OPINION, "stat_published": True}
+    )
+    default_parent_filter = [Q("match", cluster_child="opinion")]
+    parent_filters.extend(default_parent_filter)
+    main_query = Q(
+        "bool",
+        filter=default_parent_filter,
+        should=mlt_query,
+        minimum_should_match=1,
+    )
+    cluster_related_query = cluster_search.query(main_query)
+    related_cases_count = cluster_related_query.count()
+    await cache.aset(
+        cache_related_cases_key,
+        related_cases_count,
+        settings.RELATED_CACHE_TIMEOUT,
+    )
+
+    return related_cases_count

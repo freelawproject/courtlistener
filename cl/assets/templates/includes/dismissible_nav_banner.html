@@ -3,12 +3,19 @@
   available and takes up to four keyword arguments described below:
 
   Parameters:
-    link: The URL for the "Learn More" button.
-    text: Text of the banner.
-    cookie_name: Name of the cookie used to remember if the user has already dismissed
-    the banner. This prevents them from seeing the same message repeatedly.
-    emoji: Insert an emoji next to your banner message using its decimal HTML entity
-    code (like &#128077;).
+    - text: Text of the banner.
+    - link: The URL for the button.
+    - cookie_name: Name of the cookie used to remember if the user has already
+    dismissed the banner. This prevents them from seeing the same message
+    repeatedly.
+    - single_row (optional): A Boolean flag that, when set to True for medium
+    and large resolutions, condenses the banner into a single line of text
+    with a button positioned to the right. Defaults to False.
+    - button_text (optional): Text for the button. Defaults to "Learn More".
+    - button_emoji (optional): An Idiomatic Text element (<i></i>) to display
+    inside the button.
+    - emoji (optional): An HTML entity code (e.g., &#128077;) to insert an
+    emoji next to the banner message.
 
   It's advisable to wrap this template within an if tag and use the parent element to add
   extra conditions to handle the visibility of the banner. The current template only checks
@@ -23,7 +30,7 @@
 {% endcomment %}
 
 {% if cookie_name  not in request.COOKIES %}
-<div class="navbar navbar-default subnav alert-info alert-dismissible" role="navigation">
+<div class="navbar navbar-default subnav alert-danger alert-dismissible" role="navigation">
   <div class="container-fluid">
     <div class="row">
       <div class="col-xs-12">
@@ -35,15 +42,15 @@
                   class="x-large">&times;</span></button>
       </div>
     </div>
-    <div class="row flex flex-column flex-sm-row align-items-center justify-content-between">
-      <div class="col-xs-12 col-sm-9 navbar-text lead">
+    <div class="row flex flex-column {% if single_row %}flex-sm-row{% endif %} align-items-center justify-content-between">
+      <div class="col-xs-12 {% if single_row %}col-sm-10{% endif %} navbar-text lead">
         <p>{% if emoji %}{{emoji}}{% endif %} {{text}}</p>
       </div>
-      <div class="col-xs-3 flex justify-content-center justify-content-sm-end">
+      <div class="{% if single_row %}col-xs-2{% else %}col-xs-12{% endif %} flex justify-content-center justify-content-sm-end {% if not single_row %}second-row-btn{% endif %}">
         <a href="{{link}}"
-            class="btn btn-primary btn-lg hidden-xs"><i class="fa fa-search"></i>&nbsp;Learn More</a>
+            class="btn btn-danger btn-lg hidden-xs">{% if button_emoji %}{{button_emoji}}{% endif %}&nbsp;{% if button_text %}{{button_text}}{% else %}Learn More{% endif %}</a>
         <a href="{{link}}"
-            class="btn btn-primary btn-sm hidden-sm hidden-md hidden-lg"><i class="fa fa-search"></i>&nbsp;Learn More</a>
+            class="btn btn-danger btn-sm hidden-sm hidden-md hidden-lg">{% if button_emoji %}{{button_emoji}}&nbsp;{% endif %}{% if button_text %}{{button_text}}{% else %}Learn More{% endif %}</a>
       </div>
     </div>
   </div>
