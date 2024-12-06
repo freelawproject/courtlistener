@@ -390,6 +390,6 @@ class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
         prefetch = Prefetch(
             name,
             queryset=Role.objects.filter(**role_filters),
-            to_attr=f"filtered_{name}",
+            to_attr=f"filtered_roles",
         )
         return qs.prefetch_related(prefetch)
