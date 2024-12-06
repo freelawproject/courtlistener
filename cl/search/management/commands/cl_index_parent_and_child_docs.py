@@ -526,7 +526,9 @@ class Command(VerboseCommand):
                 match task_to_use:
                     case "index_parent_and_child_docs":
                         index_parent_and_child_docs.si(
-                            chunk, search_type, testing_mode=testing_mode
+                            chunk,
+                            search_type,
+                            testing_mode=testing_mode,
                         ).set(queue=queue).apply_async()
 
                     case "index_parent_or_child_docs":

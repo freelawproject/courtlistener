@@ -28,7 +28,12 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework_filters import FilterSet, RelatedFilter
 from rest_framework_filters.backends import RestFrameworkFilterBackend
 
-from cl.api.models import WEBHOOK_EVENT_STATUS, Webhook, WebhookEvent
+from cl.api.models import (
+    WEBHOOK_EVENT_STATUS,
+    Webhook,
+    WebhookEvent,
+    WebhookVersions,
+)
 from cl.citations.utils import filter_out_non_case_law_and_non_valid_citations
 from cl.lib.redis_utils import get_redis_interface
 from cl.stats.models import Event
@@ -186,11 +191,11 @@ class SimpleMetadataWithFilters(SimpleMetadata):
         return actions
 
 
-def get_logging_prefix() -> str:
+def get_logging_prefix(api_version: str) -> str:
     """Simple tool for getting the prefix for logging API requests. Useful for
     mocking the logger.
     """
-    return "api:v3"
+    return f"api:{api_version}"
 
 
 class LoggingMixin:
@@ -227,7 +232,7 @@ class LoggingMixin:
             # noinspection PyBroadException
             try:
                 results = self._log_request(request)
-                self._handle_events(results, request.user)
+                self._handle_events(results, request.user, request.version)
             except Exception as e:
                 logger.exception(
                     "Unable to log API response timing info: %s", e
@@ -255,7 +260,7 @@ class LoggingMixin:
 
         r = get_redis_interface("STATS")
         pipe = r.pipeline()
-        api_prefix = get_logging_prefix()
+        api_prefix = get_logging_prefix(request.version)
 
         # Global and daily tallies for all URLs.
         pipe.incr(f"{api_prefix}.count")
@@ -291,19 +296,23 @@ class LoggingMixin:
         results = pipe.execute()
         return results
 
-    def _handle_events(self, results, user):
+    def _handle_events(self, results, user, api_version):
         total_count = results[0]
         user_count = results[4]
 
         if total_count in MILESTONES_FLAT:
             Event.objects.create(
-                description=f"API has logged {total_count} total requests."
+                description=f"API {api_version} has logged {total_count} total requests."
             )
         if user.is_authenticated:
             if user_count in self.milestones:
                 Event.objects.create(
-                    description="User '%s' has placed their %s API request."
-                    % (user.username, intcomma(ordinal(user_count))),
+                    description="User '%s' has placed their %s API %s request."
+                    % (
+                        user.username,
+                        intcomma(ordinal(user_count)),
+                        api_version,
+                    ),
                     user=user,
                 )
 
@@ -874,12 +883,47 @@ class WebhookKeyType(TypedDict):
     deprecation_date: str | None
 
 
+def get_webhook_deprecation_date(webhook_deprecation_date: str) -> str:
+    """Convert a webhook deprecation date string to ISO-8601 format with
+     UTC timezone.
+
+    :param webhook_deprecation_date: The deprecation date as a string in
+    "YYYY-MM-DD" format.
+    :return: The ISO-8601 formatted date string with UTC timezone.
+    """
+
+    deprecation_date = (
+        datetime.strptime(webhook_deprecation_date, "%Y-%m-%d")
+        .replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+        )
+        .isoformat()
+    )
+    return deprecation_date
+
+
 def generate_webhook_key_content(webhook: Webhook) -> WebhookKeyType:
+    """Generate a dictionary representing the content for the webhook key.
+
+    :param webhook: The Webhook instance.
+    :return: A dictionary containing webhook details, event type, version,
+    creation date in ISO format, and deprecation date according webhook version.
+    """
+
+    deprecation_date: str | None = None
+    match webhook.version:
+        case WebhookVersions.v1:
+            deprecation_date = get_webhook_deprecation_date(
+                settings.WEBHOOK_V1_DEPRECATION_DATE  # type: ignore
+            )
+        case WebhookVersions.v2:
+            deprecation_date = None
+
     return {
         "event_type": webhook.event_type,
         "version": webhook.version,
         "date_created": webhook.date_created.isoformat(),
-        "deprecation_date": None,
+        "deprecation_date": deprecation_date,
     }
 
 

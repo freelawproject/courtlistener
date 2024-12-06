@@ -2,17 +2,28 @@ from datetime import datetime
 
 import pghistory
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.http import QueryDict
 from django.utils.crypto import get_random_string
 
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.pghistory import AfterUpdateOrDeleteSnapshot
 from cl.search.models import SEARCH_TYPES, Docket
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+def validate_alert_type(value):
+    """Validate if the provided alert type is supported.
+    :param value: The alert type to validate.
+    :return: None.
+    """
+    valid_types = dict(SEARCH_TYPES.SUPPORTED_ALERT_TYPES)
+    if value not in valid_types:
+        raise ValidationError(f"Unsupported alert type: {value}")
+
+
+@pghistory.track()
 class Alert(AbstractDateTimeModel):
     REAL_TIME = "rt"
     DAILY = "dly"
@@ -47,10 +58,12 @@ class Alert(AbstractDateTimeModel):
     )
     alert_type = models.CharField(
         help_text="The type of search alert this is, one of: %s"
-        % ", ".join(f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.NAMES),
+        % ", ".join(
+            f"{t[0]} ({t[1]})" for t in SEARCH_TYPES.SUPPORTED_ALERT_TYPES
+        ),
         max_length=3,
-        choices=SEARCH_TYPES.NAMES,
-        default=SEARCH_TYPES.OPINION,
+        validators=[validate_alert_type],
+        choices=SEARCH_TYPES.SUPPORTED_ALERT_TYPES,
     )
     secret_key = models.CharField(
         verbose_name="A key to be used in links to access the alert without "
@@ -69,10 +82,6 @@ class Alert(AbstractDateTimeModel):
         """Ensure we get a token when we save the first time."""
         if self.pk is None:
             self.secret_key = get_random_string(length=40)
-
-        # Set the search type based on the provided query.
-        qd = QueryDict(self.query.encode(), mutable=True)
-        self.alert_type = qd.get("type", SEARCH_TYPES.OPINION)
         super().save(*args, **kwargs)
 
 
@@ -81,7 +90,7 @@ class DocketAlertManager(models.Manager):
         return self.filter(alert_type=DocketAlert.SUBSCRIPTION)
 
 
-@pghistory.track(AfterUpdateOrDeleteSnapshot())
+@pghistory.track()
 class DocketAlert(AbstractDateTimeModel):
     UNSUBSCRIPTION = 0
     SUBSCRIPTION = 1
@@ -202,3 +211,13 @@ class ScheduledAlertHit(AbstractDateTimeModel):
         default=SCHEDULED_ALERT_HIT_STATUS.SCHEDULED,
         choices=SCHEDULED_ALERT_HIT_STATUS.STATUS,
     )
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, null=True
+    )
+    object_id = models.PositiveIntegerField(null=True)
+    content_object = GenericForeignKey("content_type", "object_id")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]

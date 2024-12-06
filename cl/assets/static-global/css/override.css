@@ -155,7 +155,30 @@ header {
 
 /* Standard target color. */
 *:target {
-  background-color: lightyellow;
+    -webkit-animation: target-fade 3s;
+    -moz-animation: target-fade 3s;
+    -o-animation: target-fade 3s;
+    animation: target-fade 3s;
+}
+
+@-webkit-keyframes target-fade {
+    from { background-color: lightyellow; }
+    to { background-color: transparent; }
+}
+
+@-moz-keyframes target-fade {
+    from { background-color: lightyellow; }
+    to { background-color: transparent; }
+}
+
+@-o-keyframes target-fade {
+    from { background-color: lightyellow; }
+    to { background-color: transparent; }
+}
+
+@keyframes target-fade {
+    from { background-color: lightyellow; }
+    to { background-color: transparent; }
 }
 
 .alt {
@@ -1008,15 +1031,7 @@ closely the content in the book*/
 
 #headmatter > .footnotes > .footnote > a {
   color: #000099;
-  position: absolute;
   font-size: 1em;
-}
-
-#headmatter {
-  border: 1px rgba(210, 210, 210, 0.55) solid;
-  padding: 10px;
-  background: rgba(232, 232, 232, 0.37);
-  margin: 10px;
 }
 
 #headmatter > attorneys, docketnumbers, judges, footnotes, court, decisiondate {
@@ -1476,6 +1491,10 @@ emphasis {
   border-color: #999999;
 }
 
+.alert-dismissible .second-row-btn {
+  margin-bottom: 10px;
+}
+
 .h-captcha > div {
   color: #333333 !important;
   font-family: Helvetica;
@@ -1545,6 +1564,10 @@ emphasis {
   margin-right: 0.25em;
 }
 
+.mr-2 {
+  margin-right: 0.5em;
+}
+
 [data-loading] {
   display: none;
 }
@@ -1603,7 +1626,7 @@ textarea {
 
 
 /* Prevent images inside opinion from overflowing */
-#opinion-content img {
+div.subopinion-content img {
   max-width: 100%;
   height: auto;
 }
@@ -1722,4 +1745,87 @@ rect.series-segment {
     width 300ms ease-out,
     opacity 150ms 150ms ease-in;
   transform: translate3d(0, 0, 0);
+}
+
+/* CSS for responsive tables with stacked columns */
+/* requires responsive-table.js */
+.responsive-table-wrapper table {
+  width: 100%;
+  color: #555555;
+}
+@media screen and (min-width: 767px) {
+  .responsive-table-wrapper tbody td::before {
+    display: none;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .responsive-table-wrapper thead tr > *:not(:first-child) {
+    display: none;
+  }
+
+  .responsive-table-wrapper tbody,
+  .responsive-table-wrapper tbody tr,
+  .responsive-table-wrapper tbody td {
+    display: flex;
+    flex-direction: column;
+    word-break: break-word;
+    white-space: normal !important;
+    max-width: 100%;
+  }
+  .responsive-table-wrapper .row-active td:first-child {
+    margin-bottom: -1rem;
+  }
+
+  .responsive-table-wrapper tbody td:not(:first-child) {
+    padding-block: clamp(1.44rem, calc(0.01rem + 2.49vw), 2.34rem);
+  }
+
+  .responsive-table-wrapper tbody td:first-child {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .responsive-table-wrapper tbody td:first-child::before {
+    display: none;
+  }
+
+  .responsive-table-wrapper tbody tr > *:not(:first-child) {
+    transition: padding 0.3s ease;
+    overflow: hidden;
+  }
+
+  .responsive-table-wrapper tbody tr:not(.row-active) > *:not(:first-child) {
+    max-width: 0;
+    max-height: 0;
+    padding-block: 0;
+    opacity: 0;
+  }
+
+  .responsive-table-wrapper tbody button {
+    display: inline-block;
+  }
+
+  .responsive-table-wrapper tbody td:not(:first-child)::before {
+    display: block;
+    font-weight: 600;
+  }
+
+  .responsive-table-wrapper tbody td:first-child::after {
+    content: '\25BC'; /* Down arrow */
+    margin-left: 0.5rem;
+    transition: transform 0.3s;
+  }
+
+  .responsive-table-wrapper tbody tr.row-active td:first-child::after {
+    transform: rotate(180deg); /* Rotate to point up when expanded */
+  }
+}
+
+.prayer-button[data-gap-size="small"] {
+  margin-left: 8px;
+}
+
+.prayer-button[data-gap-size="large"]{
+  margin-left: 44px;
 }

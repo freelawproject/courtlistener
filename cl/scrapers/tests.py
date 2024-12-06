@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from pathlib import Path
 from unittest import TestCase, mock
@@ -7,6 +7,7 @@ from unittest import TestCase, mock
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.test.utils import override_settings
 from django.utils.timezone import now
 from juriscraper.AbstractSite import logger
 
@@ -16,8 +17,7 @@ from cl.api.factories import WebhookFactory
 from cl.api.models import WebhookEvent, WebhookEventType
 from cl.audio.factories import AudioWithParentsFactory
 from cl.audio.models import Audio
-from cl.donate.factories import DonationFactory
-from cl.donate.models import Donation
+from cl.lib.juriscraper_utils import get_module_by_court_id
 from cl.lib.microservice_utils import microservice
 from cl.lib.test_helpers import generate_docket_target_sources
 from cl.scrapers.DupChecker import DupChecker
@@ -30,6 +30,7 @@ from cl.scrapers.management.commands import (
     cl_back_scrape_citations,
     cl_scrape_opinions,
     cl_scrape_oral_arguments,
+    update_from_text,
 )
 from cl.scrapers.models import UrlHash
 from cl.scrapers.tasks import extract_doc_content, process_audio_file
@@ -39,6 +40,7 @@ from cl.scrapers.utils import (
     get_binary_content,
     get_existing_docket,
     get_extension,
+    scraped_citation_object_is_valid,
     update_or_create_docket,
 )
 from cl.search.factories import (
@@ -47,7 +49,14 @@ from cl.search.factories import (
     OpinionClusterFactory,
     OpinionFactory,
 )
-from cl.search.models import Citation, Court, Docket, Opinion
+from cl.search.models import (
+    SEARCH_TYPES,
+    SOURCES,
+    Citation,
+    Court,
+    Docket,
+    Opinion,
+)
 from cl.settings import MEDIA_ROOT
 from cl.tests.cases import ESIndexTestCase, SimpleTestCase, TestCase
 from cl.tests.fixtures import ONE_SECOND_MP3_BYTES, SMALL_WAV_BYTES
@@ -59,12 +68,6 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="test", jurisdiction="F")
         cls.user_profile = UserProfileWithParentsFactory()
-        cls.donation = DonationFactory(
-            donor=cls.user_profile.user,
-            amount=20,
-            status=Donation.PROCESSED,
-            send_annual_reminder=True,
-        )
         cls.webhook_enabled = WebhookFactory(
             user=cls.user_profile.user,
             event_type=WebhookEventType.SEARCH_ALERT,
@@ -76,6 +79,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
             rate=Alert.DAILY,
             name="Test Alert OA",
             query="type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
 
     def test_extension(self):
@@ -219,6 +223,7 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
                             msg="The source does not match.",
                         )
 
+    @override_settings(PERCOLATOR_RECAP_SEARCH_ALERTS_ENABLED=True)
     def test_ingest_oral_arguments(self) -> None:
         """Can we successfully ingest oral arguments at a high level?"""
 
@@ -254,7 +259,9 @@ class ScraperIngestionTest(ESIndexTestCase, TestCase):
         # scraped and its MP3 file is processed.
         # Two webhook events should be sent, both of them to user_profile user
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 2)
+        self.assertEqual(
+            len(webhook_events), 2, msg="Wrong number of webhook events."
+        )
 
         cases_names = ["Jeremy v. Julian", "Ander v. Leo"]
         for webhook_sent in webhook_events:
@@ -866,4 +873,169 @@ class ScraperDocketMatchingTest(TestCase):
         )
         self.assertEqual(
             docket, self.ca2_docket, "Should match using docket number core"
+        )
+
+
+class UpdateFromTextCommandTest(TestCase):
+    """Test the input processing and DB querying for the command"""
+
+    def setUp(self):
+        self.vt = CourtFactory(id="vt")
+        self.sc = CourtFactory(id="sc")
+        self.docket_sc = DocketFactory(court=self.sc, docket_number="20")
+
+        # Different dates, status and courts to test command behaviour
+        self.opinion_2020 = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=DocketFactory(court=self.vt, docket_number="12"),
+                date_filed=date(2020, 6, 1),
+                precedential_status="Published",
+                source=SOURCES.COURT_M_HARVARD,
+            ),
+            plain_text="""Docket Number: 2020-12
+            Disposition: Affirmed
+            2020 VT 11""",
+        )
+        self.opinion_2020_unpub = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=DocketFactory(court=self.vt, docket_number="13"),
+                date_filed=date(2020, 7, 1),
+                precedential_status="Unpublished",
+                source=SOURCES.COURT_WEBSITE,
+            ),
+            plain_text="Docket Number: 2020-13\nDisposition: Affirmed",
+        )
+
+        self.opinion_sc = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=self.docket_sc,
+                date_filed=date(2021, 6, 1),
+                precedential_status="Published",
+                source=SOURCES.COURT_WEBSITE,
+            ),
+            plain_text="Some text with no matches",
+            id=101,
+        )
+
+        self.opinion_2022 = OpinionFactory(
+            cluster=OpinionClusterFactory(
+                docket=DocketFactory(court=self.vt, docket_number="13"),
+                date_filed=date(2022, 6, 1),
+                precedential_status="Unpublished",
+                source=SOURCES.COURT_WEBSITE,
+            ),
+            id=100,
+            plain_text="Docket Number: 2022-13\n2022 VT 11",
+        )
+
+    def test_inputs(self):
+        """Do all command inputs work properly?"""
+
+        # will target a single opinion, for which extract_from_text
+        # extracts no metadata. No object should be updated
+        cmd = update_from_text.Command()
+        with mock.patch(
+            "cl.scrapers.tasks.get_scraper_object_by_name",
+            return_value=test_opinion_scraper.Site(),
+        ):
+            cmd.handle(court_id="somepath.sc", opinion_ids=[101])
+
+        self.assertFalse(
+            any(
+                [
+                    cmd.stats["Docket"],
+                    cmd.stats["OpinionCluster"],
+                    cmd.stats["Citation"],
+                    cmd.stats["Opinion"],
+                ]
+            ),
+            "No object should be modified",
+        )
+
+        # will target 1 opinion, there are 2 in the time period
+        # and 3 for the court
+        with mock.patch(
+            "cl.scrapers.tasks.get_scraper_object_by_name",
+            return_value=test_opinion_scraper.Site(),
+        ):
+            update_from_text.Command().handle(
+                court_id="somepath.vt",
+                opinion_ids=[],
+                date_filed_gte=datetime(2020, 5, 1),
+                date_filed_lte=datetime(2021, 6, 1),
+                cluster_status="Published",
+            )
+
+        # Test that objects were actually updated / created
+        self.assertEqual(
+            Citation.objects.filter(cluster=self.opinion_2020.cluster).count(),
+            1,
+            "There should be a single citation for this cluster",
+        )
+        self.opinion_2020.refresh_from_db()
+        self.opinion_2020.cluster.refresh_from_db()
+        self.opinion_2020.cluster.docket.refresh_from_db()
+        self.assertEqual(
+            self.opinion_2020.cluster.disposition,
+            "Affirmed",
+            "OpinionCluster.disposition was not updated",
+        )
+        self.assertEqual(
+            self.opinion_2020.cluster.docket.docket_number,
+            "2020-12",
+            "Docket.docket_number was not updated",
+        )
+
+        # Check that other objects in the time period and court
+        # were not modified. Meaning, the filter worked
+        self.assertEqual(
+            self.opinion_2020_unpub.cluster.docket.docket_number,
+            "13",
+            "Unpublished docket should not be modified",
+        )
+
+    def test_scraped_citation_object_is_valid(self):
+        """Can we validate Citation dicts got from `Site.extract_from_text`"""
+        bad_type = {"reporter": "WI", "type": Citation.FEDERAL}
+        self.assertFalse(
+            scraped_citation_object_is_valid(bad_type),
+            "Citation should be marked as invalid. Type does not match reporter",
+        )
+
+        bad_reporter = {"reporter": "Some text"}
+        self.assertFalse(
+            scraped_citation_object_is_valid(bad_reporter),
+            "Citation should be marked as invalid. Reporter does not exist",
+        )
+
+        valid_citation = {"reporter": "WI", "type": Citation.NEUTRAL}
+        self.assertTrue(
+            scraped_citation_object_is_valid(valid_citation),
+            "Citation object should be marked as valid",
+        )
+
+
+class CommandInputTest(TestCase):
+    def test_get_module_by_court_id(self):
+        """Test if get_module_by_court_id helper is working properly"""
+        try:
+            get_module_by_court_id("lactapp", "opinions")
+            self.fail("Court id matches more than 1 Site object, should fail")
+        except ValueError:
+            pass
+
+        try:
+            get_module_by_court_id("ca1", "something")
+            self.fail("Invalid module type, should fail")
+        except ValueError:
+            pass
+
+        # same court, different type
+        self.assertEqual(
+            "juriscraper.opinions.united_states.federal_appellate.ca1",
+            get_module_by_court_id("ca1", "opinions"),
+        )
+        self.assertEqual(
+            "juriscraper.oral_args.united_states.federal_appellate.ca1",
+            get_module_by_court_id("ca1", "oral_args"),
         )

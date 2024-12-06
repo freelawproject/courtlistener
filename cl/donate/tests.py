@@ -1,44 +1,20 @@
 from collections import defaultdict
-from datetime import timedelta
 from http import HTTPStatus
 from unittest.mock import patch
 
 from asgiref.sync import sync_to_async
-from django.core import mail
 from django.test import override_settings
 from django.test.client import AsyncClient, Client
 from django.urls import reverse
 from django.utils.timezone import now
 
 from cl.donate.api_views import MembershipWebhookViewSet
-from cl.donate.factories import DonationFactory, NeonWebhookEventFactory
-from cl.donate.management.commands.cl_send_donation_reminders import (
-    Command as DonationReminderCommand,
-)
-from cl.donate.models import Donation, NeonMembership, NeonWebhookEvent
+from cl.donate.factories import NeonWebhookEventFactory
+from cl.donate.models import NeonMembership, NeonWebhookEvent
 from cl.lib.test_helpers import UserProfileWithParentsFactory
 from cl.tests.cases import TestCase
 from cl.users.models import UserProfile
 from cl.users.utils import create_stub_account
-
-
-class EmailCommandTest(TestCase):
-    @classmethod
-    def setUpTestData(cls) -> None:
-        about_a_year_ago = now() - timedelta(days=354, hours=12)
-        d = DonationFactory.create(
-            send_annual_reminder=True, status=Donation.PROCESSED
-        )
-        d.date_created = about_a_year_ago
-        d.save()
-
-    def test_sending_an_email(self) -> None:
-        """Do we send emails correctly?"""
-        DonationReminderCommand().handle()
-
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertIn("you donated $", mail.outbox[0].body)
-        self.assertIn("you donated $", mail.outbox[0].alternatives[0][0])
 
 
 class MembershipWebhookTest(TestCase):

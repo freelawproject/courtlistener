@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -36,12 +37,16 @@ from cl.api.management.commands.cl_retry_webhooks import (
     retry_webhook_events,
 )
 from cl.api.models import Webhook, WebhookEvent, WebhookEventType
-from cl.api.utils import get_next_webhook_retry_date
+from cl.api.utils import (
+    get_next_webhook_retry_date,
+    get_webhook_deprecation_date,
+)
 from cl.lib.pacer import is_pacer_court_accessible, lookup_and_save
 from cl.lib.recap_utils import needs_ocr
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import generate_docket_target_sources
+from cl.people_db.factories import PersonFactory, PositionFactory
 from cl.people_db.models import (
     Attorney,
     AttorneyOrganizationAssociation,
@@ -62,6 +67,7 @@ from cl.recap.factories import (
     DocketEntryWithAttachmentsDataFactory,
     FjcIntegratedDatabaseFactory,
     MinuteDocketEntryDataFactory,
+    OriginatingCourtInformationDataFactory,
     PacerFetchQueueFactory,
     ProcessingQueueFactory,
     RECAPEmailDocketDataFactory,
@@ -84,6 +90,7 @@ from cl.recap.mergers import (
     merge_attachment_page_data,
     normalize_long_description,
     update_case_names,
+    update_docket_appellate_metadata,
     update_docket_metadata,
 )
 from cl.recap.models import (
@@ -816,6 +823,7 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
 
         fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.docket)
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
         rds = RECAPDocument.objects.all()
         self.assertEqual(rds.count(), 1)
@@ -832,6 +840,7 @@ class RecapDocketFetchApiTest(TestCase):
         result = do_pacer_fetch(fq)
         result.get()
         fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.docket)
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
         rds = RECAPDocument.objects.all()
         self.assertEqual(rds.count(), 1)
@@ -868,6 +877,8 @@ class RecapDocketFetchApiTest(TestCase):
         result.get()
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn(fakes.CASE_NAME, mail.outbox[0].subject)
+        fq.refresh_from_db()
+        self.assertEqual(fq.docket, self.docket)
 
 
 @mock.patch("cl.recap.api_serializers.get_or_cache_pacer_cookies")
@@ -1485,7 +1496,8 @@ class RecapPdfTaskTest(TestCase):
         Alas, we fail. In theory, this shouldn't happen.
         """
         self.de.delete()
-        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        with mock.patch("cl.recap.tasks.asyncio.sleep"):
+            rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertIsNone(rd)
         self.pq.refresh_from_db()
         # Confirm PQ values.
@@ -1506,7 +1518,9 @@ class RecapPdfTaskTest(TestCase):
         self.assertTrue(rd.is_available)
         self.assertTrue(rd.sha1)
         self.assertTrue(rd.filepath_local)
-        self.assertIn("gov.uscourts.scotus.asdf.1.0", rd.filepath_local.name)
+        file_name = rd.filepath_local.name.split("/")[2]
+        self.assertIn("gov", file_name)
+        self.assertIn("uscourts.scotus.asdf.1.0", file_name)
 
         mock_extract.assert_called_once()
 
@@ -1524,7 +1538,8 @@ class RecapPdfTaskTest(TestCase):
         In practice, this shouldn't happen.
         """
         self.docket.delete()
-        rd = async_to_sync(process_recap_pdf)(self.pq.pk)
+        with mock.patch("cl.recap.tasks.asyncio.sleep"):
+            rd = async_to_sync(process_recap_pdf)(self.pq.pk)
         self.assertIsNone(rd)
         self.pq.refresh_from_db()
         # Confirm PQ values.
@@ -2291,6 +2306,28 @@ class RecapDocketTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls) -> None:
         cls.court = CourtFactory(id="scotus", jurisdiction="F")
+        cls.judge = PersonFactory.create(name_first="John", name_last="Miller")
+        PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court_id=cls.court.pk,
+            date_start=date(2020, 11, 10),
+            position_type="c-jud",
+            person=cls.judge,
+            how_selected="a_legis",
+            nomination_process="fed_senate",
+        )
+        cls.judge_2 = PersonFactory.create(
+            name_first="Debbie", name_last="Roe"
+        )
+        PositionFactory.create(
+            date_granularity_start="%Y-%m-%d",
+            court_id=cls.court.pk,
+            date_start=date(2019, 11, 10),
+            position_type="c-jud",
+            person=cls.judge_2,
+            how_selected="a_legis",
+            nomination_process="fed_senate",
+        )
 
     def setUp(self) -> None:
         self.user = User.objects.get(username="recap")
@@ -2636,6 +2673,196 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(d.federal_defendant_number, 1)
 
         d.delete()
+
+    def test_clean_up_docket_judge_fields(
+        self,
+    ) -> None:
+        """Ensure the referred_to or assigned_to fields are cleared if the
+        referred_to_str or assigned_to_str fields are changed and the judges
+        don't exist in people_db.
+        """
+
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+            date_filed=date(2023, 12, 14),
+        )
+        docket_data = DocketDataFactory(
+            court_id=d.court_id,
+            referred_to_str="John Miller",
+            assigned_to_str="Debbie Roe",
+        )
+
+        d_a = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="123421",
+            court_id=self.court.pk,
+            date_filed=date(2023, 12, 14),
+            appeal_from=self.court,
+        )
+        docket_data_a = DocketDataFactory(
+            court_id=d.court_id,
+            originating_court_information=OriginatingCourtInformationDataFactory(
+                assigned_to="Debbie Roe",
+                ordering_judge="John Miller",
+                court_id=self.court.pk,
+                date_filed=date(2022, 12, 14),
+            ),
+        )
+
+        # Test for district docket. Related judges exist in the people_db
+        async_to_sync(update_docket_metadata)(d, docket_data)
+        d.save()
+        d.refresh_from_db()
+
+        self.assertEqual(d.referred_to_str, "John Miller")
+        self.assertEqual(d.assigned_to_str, "Debbie Roe")
+        self.assertEqual(d.referred_to_id, self.judge.pk)
+        self.assertEqual(d.assigned_to_id, self.judge_2.pk)
+
+        # Confirm that related judges are not removed if no referred_to_str or
+        # assigned_to_str are available in the docket metadata.
+        docket_data_updated_no_judge_data = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00034",
+            referred_to_str="",
+            assigned_to_str="",
+        )
+        async_to_sync(update_docket_metadata)(
+            d, docket_data_updated_no_judge_data
+        )
+        d.save()
+        d.refresh_from_db()
+        self.assertEqual(d.referred_to_str, "John Miller")
+        self.assertEqual(d.assigned_to_str, "Debbie Roe")
+        self.assertEqual(d.referred_to_id, self.judge.pk)
+        self.assertEqual(d.assigned_to_id, self.judge_2.pk)
+
+        # Judges have changed from the source. Confirm that referred_to_str and
+        # assigned_to_str are updated, while referred_to_id and assigned_to_id
+        # are cleared.
+        docket_data_updated = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00034",
+            referred_to_str="Marcus Carter",
+            assigned_to_str="Evelyn Whitfield",
+        )
+        async_to_sync(update_docket_metadata)(d, docket_data_updated)
+        d.save()
+        d.refresh_from_db()
+        self.assertEqual(d.referred_to_str, "Marcus Carter")
+        self.assertEqual(d.assigned_to_str, "Evelyn Whitfield")
+        self.assertEqual(d.referred_to_id, None)
+        self.assertEqual(d.assigned_to_id, None)
+
+        # Test for appellate Docket originating_court_information.
+        d_a, og_info = async_to_sync(update_docket_appellate_metadata)(
+            d_a, docket_data_a
+        )
+        og_info.save()
+        d_a.originating_court_information = og_info
+        d_a.save()
+        d_a.refresh_from_db()
+
+        self.assertEqual(
+            d_a.originating_court_information.ordering_judge_str, "John Miller"
+        )
+        self.assertEqual(
+            d_a.originating_court_information.assigned_to_str, "Debbie Roe"
+        )
+        self.assertEqual(
+            d_a.originating_court_information.ordering_judge_id, self.judge.pk
+        )
+        self.assertEqual(
+            d_a.originating_court_information.assigned_to_id, self.judge_2.pk
+        )
+
+        # Clean up judges in originating_court_information
+        docket_data_a_updated = DocketDataFactory(
+            court_id=d.court_id,
+            docket_number="3:20-cr-00035",
+            originating_court_information=OriginatingCourtInformationDataFactory(
+                assigned_to="Marcus Carter",
+                ordering_judge="Evelyn Whitfield",
+                court_id=self.court.pk,
+                date_filed=date(2022, 12, 14),
+            ),
+        )
+        d_a, og_info = async_to_sync(update_docket_appellate_metadata)(
+            d_a, docket_data_a_updated
+        )
+        og_info.save()
+        d_a.originating_court_information = og_info
+        d_a.save()
+        d_a.refresh_from_db()
+
+        self.assertEqual(
+            d_a.originating_court_information.ordering_judge_str,
+            "Evelyn Whitfield",
+        )
+        self.assertEqual(
+            d_a.originating_court_information.assigned_to_str, "Marcus Carter"
+        )
+        self.assertEqual(
+            d_a.originating_court_information.ordering_judge_id, None
+        )
+        self.assertEqual(
+            d_a.originating_court_information.assigned_to_id, None
+        )
+        d.delete()
+        d_a.delete()
+
+    def test_clean_up_docket_judge_fields_command(
+        self,
+    ) -> None:
+        """Ensure the command clean_up_docket_judges works correct.
+        The referred_to or assigned_to fields are cleared if the
+        referred_to_str or assigned_to_str judges don't exist in people_db.
+        """
+
+        d = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="12345",
+            court_id=self.court.pk,
+            date_filed=date(2023, 12, 14),
+            referred_to_str="Marcus Carter",
+            assigned_to_str="Evelyn Whitfield",
+            referred_to_id=self.judge.pk,
+            assigned_to_id=self.judge_2.pk,
+        )
+
+        d_a = DocketFactory.create(
+            source=Docket.DEFAULT,
+            pacer_case_id="123421",
+            court_id=self.court.pk,
+            date_filed=date(2023, 12, 14),
+            appeal_from=self.court,
+            referred_to_str="Marcus Carter",
+            assigned_to_str="John Miller",
+            referred_to_id=self.judge.pk,
+            assigned_to_id=self.judge_2.pk,
+        )
+
+        self.assertEqual(d.referred_to_str, "Marcus Carter")
+        self.assertEqual(d.assigned_to_str, "Evelyn Whitfield")
+        self.assertEqual(d.referred_to_id, self.judge.pk)
+        self.assertEqual(d.assigned_to_id, self.judge_2.pk)
+
+        call_command("clean_up_docket_judges", testing_mode=True)
+
+        d.refresh_from_db()
+        self.assertEqual(d.referred_to_str, "Marcus Carter")
+        self.assertEqual(d.assigned_to_str, "Evelyn Whitfield")
+        self.assertEqual(d.referred_to_id, None)
+        self.assertEqual(d.assigned_to_id, None)
+
+        # Only one Judge should be cleaned up.
+        d_a.refresh_from_db()
+        self.assertEqual(d_a.referred_to_str, "Marcus Carter")
+        self.assertEqual(d_a.assigned_to_str, "John Miller")
+        self.assertEqual(d_a.referred_to_id, None)
+        self.assertEqual(d_a.assigned_to_id, self.judge.pk)
 
 
 @mock.patch("cl.recap.tasks.add_items_to_solr")
@@ -3279,12 +3506,14 @@ class RecapEmailDocketAlerts(TestCase):
             event_type=WebhookEventType.DOCKET_ALERT,
             url="https://example.com/",
             enabled=True,
+            version=1,
         )
         cls.webhook_2 = WebhookFactory(
             user=cls.user_profile_2.user,
             event_type=WebhookEventType.DOCKET_ALERT,
             url="https://example.com/",
             enabled=True,
+            version=2,
         )
         test_dir = Path(settings.INSTALL_ROOT) / "cl" / "recap" / "test_assets"
         with (
@@ -3559,6 +3788,19 @@ class RecapEmailDocketAlerts(TestCase):
             WEBHOOK_EVENT_STATUS.SUCCESSFUL,
         )
 
+        with mock.patch("cl.users.signals.notify_new_or_updated_webhook"):
+            webhook_2_1 = await sync_to_async(WebhookFactory)(
+                user=self.user_profile.user,
+                event_type=WebhookEventType.DOCKET_ALERT,
+                url="https://example.com/",
+                enabled=True,
+                version=2,
+            )
+        self.assertEqual(
+            await Webhook.objects.all().acount(),
+            3,
+            msg="Wrong number of webhook endpoints",
+        )
         # Trigger a new recap.email notification, same case, different document
         # from testing_1@recap.email, auto-subscription option enabled
         await self.async_client.post(self.path, self.data, format="json")
@@ -3584,10 +3826,14 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(message_sent.to, [self.recipient_user.user.email])
         self.assertEqual(len(mail.outbox), 3)
 
-        # Two more webhooks should be triggered, one for testing_2@recap.email
-        # and one for testing_1@recap.email
+        # 3 more webhooks should be triggered, one for testing_2@recap.email
+        # and 2 for testing_1@recap.email
         webhooks_triggered = WebhookEvent.objects.filter()
-        self.assertEqual(await webhooks_triggered.acount(), 3)
+        self.assertEqual(
+            await webhooks_triggered.acount(),
+            4,
+            msg="Wrong number of webhooks.",
+        )
 
         async for webhook_sent in webhooks_triggered:
             self.assertEqual(
@@ -3597,6 +3843,36 @@ class RecapEmailDocketAlerts(TestCase):
         self.assertEqual(await webhook_user_2.acount(), 2)
         webhook_user_1 = WebhookEvent.objects.filter(webhook=self.webhook)
         self.assertEqual(await webhook_user_1.acount(), 1)
+        webhook_2_user_1 = WebhookEvent.objects.filter(webhook=webhook_2_1)
+        self.assertEqual(await webhook_2_user_1.acount(), 1)
+
+        # Confirm webhook versions.
+        version_1_webhook = await webhook_user_1.afirst()
+        webhook_version = version_1_webhook.content["webhook"]["version"]
+        self.assertEqual(webhook_version, 1)
+
+        version_2_webhook = await webhook_2_user_1.afirst()
+        webhook_version = version_2_webhook.content["webhook"]["version"]
+        self.assertEqual(webhook_version, 2)
+
+        version_2_webhook = await webhook_user_2.afirst()
+        webhook_version = version_2_webhook.content["webhook"]["version"]
+        self.assertEqual(webhook_version, 2)
+
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = await WebhookEvent.objects.filter(
+            webhook=self.webhook
+        ).afirst()
+        v2_webhook_event = await WebhookEvent.objects.filter(
+            webhook=webhook_2_1
+        ).afirst()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
+        )
 
     @mock.patch(
         "cl.recap.tasks.download_pdf_by_magic_number",
@@ -7280,11 +7556,19 @@ class RecapFetchWebhooksTest(TestCase):
     def setUpTestData(cls):
         cls.court = CourtFactory(id="canb", jurisdiction="FB")
         cls.user_profile = UserProfileWithParentsFactory()
-        cls.webhook_enabled = WebhookFactory(
+        cls.webhook_v1_enabled = WebhookFactory(
             user=cls.user_profile.user,
             event_type=WebhookEventType.RECAP_FETCH,
             url="https://example.com/",
             enabled=True,
+            version=1,
+        )
+        cls.webhook_v2_enabled = WebhookFactory(
+            user=cls.user_profile.user,
+            event_type=WebhookEventType.RECAP_FETCH,
+            url="https://example.com/",
+            enabled=True,
+            version=2,
         )
 
         cls.user_profile_2 = UserProfileWithParentsFactory()
@@ -7338,12 +7622,16 @@ class RecapFetchWebhooksTest(TestCase):
 
         self.assertEqual(dockets.count(), 2)
 
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
         self.assertEqual(
             webhook_events[0].webhook.user,
+            self.user_profile.user,
+        )
+        self.assertEqual(
+            webhook_events[1].webhook.user,
             self.user_profile.user,
         )
         content = webhook_events[0].content
@@ -7357,6 +7645,27 @@ class RecapFetchWebhooksTest(TestCase):
             content["payload"]["status"], PROCESSING_STATUS.SUCCESSFUL
         )
         self.assertNotEqual(content["payload"]["date_completed"], None)
+
+        # Confirm webhooks for V1 and V2 are properly triggered.
+        webhook_versions = {
+            webhook.content["webhook"]["version"] for webhook in webhook_events
+        }
+        self.assertEqual(webhook_versions, {1, 2})
+
+        # Confirm deprecation date webhooks according the version.
+        v1_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_v1_enabled
+        ).first()
+        v2_webhook_event = WebhookEvent.objects.filter(
+            webhook=self.webhook_v2_enabled
+        ).first()
+        self.assertEqual(
+            v1_webhook_event.content["webhook"]["deprecation_date"],
+            get_webhook_deprecation_date(settings.WEBHOOK_V1_DEPRECATION_DATE),
+        )
+        self.assertEqual(
+            v2_webhook_event.content["webhook"]["deprecation_date"], None
+        )
 
     @mock.patch(
         "cl.recap.mergers.AttachmentPage",
@@ -7396,10 +7705,10 @@ class RecapFetchWebhooksTest(TestCase):
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
 
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
 
         self.assertEqual(
             webhook_events[0].webhook.user,
@@ -7457,10 +7766,10 @@ class RecapFetchWebhooksTest(TestCase):
         fq.refresh_from_db()
         self.assertEqual(fq.status, PROCESSING_STATUS.SUCCESSFUL)
 
-        # Only one webhook event should be triggered for user_profile since
+        # Two webhook events (v1, v2) should be triggered for user_profile since
         # user_profile_2 webhook endpoint is disabled.
         webhook_events = WebhookEvent.objects.all()
-        self.assertEqual(len(webhook_events), 1)
+        self.assertEqual(len(webhook_events), 2)
 
         self.assertEqual(
             webhook_events[0].webhook.user,

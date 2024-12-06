@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from queue import Queue
 from random import randint
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 import eyecite
 import pytest
@@ -61,6 +61,10 @@ from cl.corpus_importer.management.commands.troller_bk import (
     download_files_concurrently,
     log_added_items_to_redis,
     merge_rss_data,
+)
+from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
+    check_case_names_match,
+    parse_citations,
 )
 from cl.corpus_importer.signals import (
     handle_update_latest_case_id_and_schedule_iquery_sweep,
@@ -3343,7 +3347,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam quis elit sed du
 
 @patch("cl.corpus_importer.tasks.get_or_cache_pacer_cookies")
 @override_settings(
-    IQUERY_PROBE_DAEMON_ENABLED=True,
+    IQUERY_CASE_PROBE_DAEMON_ENABLED=True,
     IQUERY_SWEEP_UPLOADS_SIGNAL_ENABLED=True,
     EGRESS_PROXY_HOSTS=["http://proxy_1:9090", "http://proxy_2:9090"],
 )
@@ -4078,3 +4082,80 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+
+class WestCitationImportTest(TestCase):
+    def test_parse_citation(self) -> None:
+        """Test parse citation for federal and journal citations"""
+        correct_response = [
+            {
+                "volume": "238",
+                "reporter": "F.3d",
+                "page": "273",
+                "type": Citation.FEDERAL,
+            },
+            {
+                "volume": "72",
+                "reporter": "Soc. Serv. Rev.",
+                "page": "318",
+                "type": Citation.JOURNAL,
+            },
+        ]
+        citation_strings = ["238 F.3d 273", "72 Soc.Sec.Rep.Serv. 318"]
+        valid_citations = parse_citations(citation_strings)
+        self.assertEqual(
+            valid_citations, correct_response, msg="Citations incorrect parsed"
+        )
+
+
+class CaseNamesTest(SimpleTestCase):
+    def test_check_case_names_match(self) -> None:
+        """Can we check if the case names match?"""
+        case_names_tests = (
+            (
+                "U.S. v. Smith",
+                "United States v. Smith",
+                True,
+            ),
+            (
+                "United States v. Guerrero-Martinez",  # 736793
+                "United States v. Hector Guerrero-Martinez, AKA Hector Guerrero AKA Hector Martinez-Guerrero",
+                True,
+            ),
+            (
+                "In re CP",  # 2140442
+                "In Re CP",
+                True,
+            ),
+            (
+                "Dennis v. City of Easton",  # 730246
+                "Richard Dennis, Penelope Dennis, Loretta M. Dennis v. City of Easton, Edward J. Ferraro, Robet S. Stein, Doris Asteak, Paul Schleuter, Howard B. White, Easton Board of Health",
+                True,
+            ),
+            (
+                "Parmelee v. Bruggeman",  # 736598
+                "Allan Parmelee v. Milford Bruggeman Janine Bruggeman Friend of the Court for the State of Michigan Nancy Rose, Employee of the State of Michigan for the Friend of the Court Glenda Friday, Employee of the State of Michigan for the Friend of the Court Karen Dunn, Employee of the State of Michigan for the Friend of the Court Thomas Kreckman, Employee of the State of Michigan for the Friend of the Court State of Michigan",
+                True,
+            ),
+            (
+                "Automobile Assur. Financial Corp. v. Syrett Corp.",  # 735935
+                "Automobile Assurance Financial Corporation, a Utah Corporation Venuti and Associates, Inc., a Utah Corporation Venuti Partners, Ltd., a Utah Limited Partnership Frank P. Venuti, an Individual, Parker M. Nielson v. Syrett Corporation, a Delaware Corporation, Formerly a Utah Corporation, John R. Riley, an Individual, Third-Party-Defendant",
+                True,
+            ),
+            (
+                "Christopher Ambroze, M.D., PC v. Aetna Health Plans of New York, Inc.",  # 735476
+                "Christopher Ambroze, M.D., P.C., Rockville Anesthesia Group, Llp, Harvey Finkelstein, Plainview Anesthesiologists, P.C., Joseph A. Singer, Atlantic Anesthesia Associates, P.C. v. Aetna Health Plans of New York, Inc., Aetna Health Management, Inc., Aetna Life and Casualty Company, C. Frederick Berger, and Gregg Stolzberg",
+                True,
+            ),
+            (
+                "O'Neal v. Merkel",  # 730350
+                "Terence Kenneth O'Neal v. T.E. Merkel Nurse Cashwell Nurse Allen Nurse Davis Mr. Conn, and Franklin E. Freeman, Jr. Gary Dixon Doctor Lowy Doctor Shaw Doctor Castalloe Harry Allsbrook Mr. Cherry",
+                True,
+            ),
+        )
+        for wl_casename, cl_casename, overlap in case_names_tests:
+            self.assertEqual(
+                check_case_names_match(wl_casename, cl_casename),
+                overlap,
+                msg=f"Case names don't match: {wl_casename} - {cl_casename}",
+            )

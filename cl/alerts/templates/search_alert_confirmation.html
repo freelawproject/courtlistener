@@ -18,7 +18,7 @@
     <div class="text-center">
       <h1> Please confirm your unsubscription </h1>
       <h3 class="gray alt">&mdash; from &mdash;</h3>
-      <h3>Your {{alert.get_rate_display|lower}} {% if alert.alert_type == 'o' %}opinion{% elif alert.alert_type == 'oa' %}oral argument{% endif %} alert &mdash; <span class="gray">"{{ alert.name }}"</span></h3>
+      <h3>Your {{alert.get_rate_display|lower}} {% if alert.alert_type == 'o' %}opinion{% elif alert.alert_type == 'oa' %}oral argument{% elif alert.alert_type == 'r' %}RECAP{% endif %} alert &mdash; <span class="gray">"{{ alert.name }}"</span></h3>
       <form id="confirmation" action="" method="post">{% csrf_token %}
         <div class="form-group">
           {{ form.hcaptcha }}
