@@ -211,6 +211,7 @@ async def create_prayer_view(
 ) -> HttpResponse:
     user = request.user
     is_htmx_request = request.META.get("HTTP_HX_REQUEST", False)
+    regular_size = bool(request.POST.get("regular_size"))
     if not await prayer_eligible(request.user):
         if is_htmx_request:
             return TemplateResponse(
@@ -221,6 +222,7 @@ async def create_prayer_view(
                     "document_id": recap_document,
                     "count": 0,
                     "daily_limit_reached": True,
+                    "regular_size": regular_size,
                 },
             )
         return HttpResponseServerError(
@@ -240,6 +242,7 @@ async def create_prayer_view(
                 "document_id": recap_document.pk,
                 "count": 0,
                 "daily_limit_reached": False,
+                "regular_size": regular_size,
             },
         )
     return HttpResponse("It worked.")
@@ -254,7 +257,7 @@ async def delete_prayer_view(
 
     # Call the delete_prayer async function
     await delete_prayer(user, recap_document)
-
+    regular_size = bool(request.POST.get("regular_size"))
     if request.META.get("HTTP_HX_REQUEST"):
         return TemplateResponse(
             request,
@@ -263,6 +266,7 @@ async def delete_prayer_view(
                 "prayer_exists": False,
                 "document_id": recap_document.pk,
                 "count": 0,
+                "regular_size": regular_size,
             },
         )
     return HttpResponse("It worked.")

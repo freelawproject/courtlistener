@@ -185,26 +185,26 @@
               </p>
             </div>
           {% else %}
-            <div class="col-sm-12 alert-warning alert">
+            <div class="flex col-sm-12 alert-warning alert justify-content-between">
               <p class="bottom">This item is not yet in the RECAP collection.
-                <span class="float-right">
-                  {% if rd.pacer_url %}
-                    <a class="btn btn-primary btn-sm"
-                       href="{{ rd.pacer_url }}"
-                       rel="nofollow"
-                       target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
-                  {% endif %}
-                  {% if not request.COOKIES.recap_install_plea %}
-                    <a href="https://free.law/recap/"
-                       class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
-                  {% endif %}
-                  {% flag "pray-and-pay" %}
-                  <div class="prayer-button" data-gap-size="2px">
-                    {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count%}
-                  </div>
-                  {% endflag %}
-                </span>
               </p>
+              <div class="flex flex-row gap-2">
+                {% if rd.pacer_url %}
+                  <a class="btn btn-primary btn-sm"
+                     href="{{ rd.pacer_url }}"
+                     rel="nofollow"
+                     target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
+                {% endif %}
+                {% if not request.COOKIES.recap_install_plea %}
+                  <a href="https://free.law/recap/"
+                     class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
+                {% endif %}
+                {% flag "pray-and-pay" %}
+                <div class="prayer-button">
+                  {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count regular_size=True%}
+                </div>
+                {% endflag %}
+              </div>
             </div>
           {% endif %}
         {% endif %}
