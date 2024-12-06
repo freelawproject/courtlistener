@@ -157,9 +157,7 @@ class FilterManyToManyMixin:
             join_table_key = join_table_key.replace(url_key, new_key, 1)
         return join_table_key
 
-    def get_filters_for_join_table(
-        self: FilterSet, name: str
-    ) -> dict[str, Any]:
+    def get_filters_for_join_table(self: FilterSet) -> dict[str, Any]:
         """
         Processes request filters for use in a join table query.
 

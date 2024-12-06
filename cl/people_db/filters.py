@@ -308,7 +308,7 @@ class PartyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
         if not value:
             return qs
 
-        filters = self.get_filters_for_join_table(name)
+        filters = self.get_filters_for_join_table()
         if not filters:
             return qs
 
@@ -383,7 +383,7 @@ class AttorneyFilter(NoEmptyFilterSet, FilterManyToManyMixin):
         if not value:
             return qs
 
-        role_filters = self.get_filters_for_join_table(name)
+        role_filters = self.get_filters_for_join_table()
         if not role_filters:
             return qs
 
