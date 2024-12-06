@@ -28,15 +28,12 @@ class CreateAlertForm(ModelForm):
     class Meta:
         model = Alert
         exclude = ("user", "secret_key")
-        fields = (
-            "name",
-            "query",
-            "rate",
-        )
+        fields = ("name", "query", "rate", "alert_type")
         widgets = {
             "query": HiddenInput(),
             "name": TextInput(attrs={"class": "form-control"}),
             "rate": Select(attrs={"class": "form-control"}),
+            "alert_type": HiddenInput(),
         }
 
 
