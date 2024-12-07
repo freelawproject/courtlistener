@@ -66,8 +66,6 @@ def resolve_fullcase_citation(
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
         db_search_results: SolrResponse | list[Hit]
-        # Revolve citations using ES; enable once all the opinions are
-        # indexed.
         db_search_results, _ = es_search_db_for_full_citation(full_citation)
         # If there is one search result, try to return it
         if len(db_search_results) == 1:

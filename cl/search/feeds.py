@@ -82,7 +82,7 @@ class SearchFeed(Feed):
     link = "https://www.courtlistener.com/"
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
-    description_template = "feeds/solr_desc_template.html"
+    description_template = "feeds/description_template.html"
     feed_copyright = "Created for the public domain by Free Law Project"
 
     def get_object(self, request, get_string):
@@ -94,39 +94,38 @@ class SearchFeed(Feed):
         For RECAP SearchFeed returns RECAPDocuments.
         """
         search_form = SearchForm(obj.GET)
-        if search_form.is_valid():
-            cd = search_form.cleaned_data
-            order_by = "dateFiled"
-            match cd["type"]:
-                case SEARCH_TYPES.OPINION:
-                    document_text_key = "text"
-                    es_search_query = OpinionClusterDocument.search()
-                    override_params = {
-                        "order_by": f"{order_by} desc",
-                    }
-                    exclude_docs_for_empty_field = order_by
-                case SEARCH_TYPES.RECAP:
-                    document_text_key = "plain_text"
-                    es_search_query = ESRECAPDocument.search()
-                    override_params = {
-                        "order_by": "entry_date_filed_feed desc",
-                    }
-                    exclude_docs_for_empty_field = "entry_date_filed"
-                case _:
-                    return []
-
-            # Do an ES query.
-            cd.update(override_params)
-            items = do_es_feed_query(
-                es_search_query,
-                cd,
-                rows=20,
-                exclude_docs_for_empty_field=exclude_docs_for_empty_field,
-            )
-            cleanup_control_chars(items, document_text_key)
-            return items
-        else:
+        if not search_form.is_valid():
             return []
+
+        cd = search_form.cleaned_data
+        order_by = "dateFiled"
+        match cd["type"]:
+            case SEARCH_TYPES.OPINION:
+                document_text_key = "text"
+                es_search_query = OpinionClusterDocument.search()
+                override_params = {
+                    "order_by": f"{order_by} desc",
+                }
+                exclude_docs_for_empty_field = order_by
+            case SEARCH_TYPES.RECAP:
+                document_text_key = "plain_text"
+                es_search_query = ESRECAPDocument.search()
+                override_params = {
+                    "order_by": "entry_date_filed_feed desc",
+                }
+                exclude_docs_for_empty_field = "entry_date_filed"
+            case _:
+                return []
+
+        cd.update(override_params)
+        items = do_es_feed_query(
+            es_search_query,
+            cd,
+            rows=20,
+            exclude_docs_for_empty_field=exclude_docs_for_empty_field,
+        )
+        cleanup_control_chars(items, document_text_key)
+        return items
 
     def item_link(self, item):
         return get_item(item)["absolute_url"]
@@ -163,7 +162,7 @@ class JurisdictionFeed(Feed):
     author_name = "Free Law Project"
     author_email = "feeds@courtlistener.com"
     feed_copyright = "Created for the public domain by Free Law Project"
-    description_template = "feeds/solr_desc_template.html"
+    description_template = "feeds/description_template.html"
 
     def title(self, obj):
         return f"CourtListener.com: All opinions for the {obj.full_name}"

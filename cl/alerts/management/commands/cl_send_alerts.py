@@ -6,7 +6,6 @@ from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.mail import EmailMultiAlternatives
-from django.db.models import Q
 from django.http import QueryDict
 from django.template import loader
 from django.urls import reverse
@@ -166,7 +165,7 @@ class Command(VerboseCommand):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.options = {}
-        self.valid_ids = {}
+        self.valid_ids = []
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -202,31 +201,22 @@ class Command(VerboseCommand):
         cut_off_date = get_cut_off_date(rate)
         # Default to 'o', if not available, according to the front end.
         query_type = qd.get("type", SEARCH_TYPES.OPINION)
-        if query_type in [SEARCH_TYPES.OPINION, SEARCH_TYPES.RECAP]:
-            qd["filed_after"] = cut_off_date
-        elif query_type == SEARCH_TYPES.ORAL_ARGUMENT:
-            qd["argued_after"] = cut_off_date
+        qd["filed_after"] = cut_off_date
+        if query_type != SEARCH_TYPES.OPINION:
+            # This command now only serves OPINION search alerts.
+            return query_type, results, v1_results
 
         logger.info(f"Data sent to SearchForm is: {qd}\n")
         search_form = SearchForm(qd)
         if search_form.is_valid():
             cd = search_form.cleaned_data
 
-            if (
-                rate == Alert.REAL_TIME
-                and len(self.valid_ids[query_type]) == 0
-            ):
+            if rate == Alert.REAL_TIME and len(self.valid_ids) == 0:
                 # Bail out. No results will be found if no valid_ids.
                 return query_type, results, v1_results
 
             if rate == Alert.REAL_TIME:
-                cd.update(
-                    {
-                        "id": " ".join(
-                            [str(i) for i in self.valid_ids[query_type]]
-                        )
-                    }
-                )
+                cd.update({"id": " ".join([str(i) for i in self.valid_ids])})
             results, v1_results = query_alerts_es(cd, v1_webhook)
 
         logger.info(f"There were {len(results)} results.")
@@ -282,8 +272,7 @@ class Command(VerboseCommand):
                     for user_webhook in user_webhooks:
                         results = (
                             v1_results
-                            if alert.alert_type == SEARCH_TYPES.OPINION
-                            and user_webhook.version == WebhookVersions.v1
+                            if user_webhook.version == WebhookVersions.v1
                             else results
                         )
                         send_search_alert_webhook(results, user_webhook, alert)
@@ -299,10 +288,9 @@ class Command(VerboseCommand):
         """Clean out any items in the RealTime queue once they've been run or
         if they are stale.
         """
-        q = Q()
-        for item_type, ids in self.valid_ids.items():
-            q |= Q(item_type=item_type, item_pk__in=ids)
-        RealTimeQueue.objects.filter(q).delete()
+        RealTimeQueue.objects.filter(
+            item_type=SEARCH_TYPES.OPINION, item_pk__in=self.valid_ids
+        ).delete()
 
     def remove_stale_rt_items(self, age=2):
         """Remove anything old from the RTQ.
@@ -318,32 +306,24 @@ class Command(VerboseCommand):
 
     def get_new_ids(self):
         """Get an intersection of the items that are new in the DB and those
-        that have made it into Solr or ES.
+        that have made it into ES.
 
-        For every item that's in the RealTimeQueue, query ES/Solr and see which
+        For every item that's in the RealTimeQueue, query ES and see which
         have made it to the index. We'll use these to run the alerts.
 
-        Returns a dict like so:
-            {
-                'oa': [list, of, ids],
-                'o': [list, of, ids],
-            }
+        Returns a list like so: [list, of, ids]
         """
-        valid_ids = {}
-        for item_type in SEARCH_TYPES.ALL_TYPES:
-            ids = RealTimeQueue.objects.filter(item_type=item_type)
-            if not ids.exists():
-                valid_ids[item_type] = []
-                continue
-            # Get valid RT IDs from ES.
-            search_query = OpinionDocument.search()
-            ids_query = ES_Q("terms", id=[str(i.item_pk) for i in ids])
-            s = search_query.query(ids_query)
-            s = s.source(includes=["id"])
-            s = s.extra(
-                from_=0,
-                size=MAX_RT_ITEM_QUERY,
-            )
-            results = s.execute()
-            valid_ids[item_type] = [int(r["id"]) for r in results]
-        return valid_ids
+        ids = RealTimeQueue.objects.filter(item_type=SEARCH_TYPES.OPINION)
+        if not ids.exists():
+            return []
+        # Get valid RT IDs from ES.
+        search_query = OpinionDocument.search()
+        ids_query = ES_Q("terms", id=[str(i.item_pk) for i in ids])
+        s = search_query.query(ids_query)
+        s = s.source(includes=["id"])
+        s = s.extra(
+            from_=0,
+            size=MAX_RT_ITEM_QUERY,
+        )
+        results = s.execute()
+        return [int(r["id"]) for r in results]

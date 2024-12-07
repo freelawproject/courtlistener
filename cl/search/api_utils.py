@@ -50,35 +50,24 @@ def get_object_list(request, cd, paginator):
     page_size = paginator.get_page_size(request)
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
     offset = max(0, (page_number - 1) * page_size)
-    group = False
-    if cd["type"] == SEARCH_TYPES.DOCKETS:
-        group = True
 
-    is_oral_argument_active = cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT
-    is_people_active = cd["type"] == SEARCH_TYPES.PEOPLE
-    is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION
-    is_recap_active = cd["type"] in [
-        SEARCH_TYPES.RECAP,
-        SEARCH_TYPES.DOCKETS,
-    ]
+    use_default_query = True
+    match cd["type"]:
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            search_query = AudioDocument.search()
+            use_default_query = False
+        case SEARCH_TYPES.PEOPLE:
+            search_query = PersonDocument.search()
+        case SEARCH_TYPES.OPINION:
+            search_query = OpinionDocument.search()
+            use_default_query = False
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            search_query = ESRECAPDocument.search()
+        case _:
+            search_query = None
 
-    if is_oral_argument_active:
-        search_query = AudioDocument.search()
-    elif is_people_active:
-        search_query = PersonDocument.search()
-    elif is_opinion_active:
-        search_query = OpinionDocument.search()
-    elif is_recap_active:
-        search_query = ESRECAPDocument.search()
-    else:
-        search_query = None
-
-    if search_query and (is_people_active or is_oral_argument_active):
-        (
-            main_query,
-            child_docs_count_query,
-            top_hits_limit,
-        ) = build_es_main_query(search_query, cd)
+    if search_query and use_default_query:
+        main_query, _, _ = build_es_main_query(search_query, cd)
     else:
         cd["highlight"] = True
         highlighting_fields = {}
@@ -93,10 +82,6 @@ def get_object_list(request, cd, paginator):
             SEARCH_HL_TAG,
             request.version,
         )
-
-    if not is_recap_active and cd["type"] == SEARCH_TYPES.RECAP:
-        # Convert the date_filed sorting to a docket entry sorting parameter.
-        main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
 
     sl = ESList(
         request=request,
