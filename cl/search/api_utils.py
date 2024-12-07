@@ -51,22 +51,22 @@ def get_object_list(request, cd, paginator):
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
     offset = max(0, (page_number - 1) * page_size)
 
-    use_default_query = True
+    use_default_query = False
     match cd["type"]:
         case SEARCH_TYPES.ORAL_ARGUMENT:
             search_query = AudioDocument.search()
-            use_default_query = False
+            use_default_query = True
         case SEARCH_TYPES.PEOPLE:
             search_query = PersonDocument.search()
+            use_default_query = True
         case SEARCH_TYPES.OPINION:
             search_query = OpinionDocument.search()
-            use_default_query = False
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             search_query = ESRECAPDocument.search()
         case _:
             search_query = None
 
-    if search_query and use_default_query:
+    if use_default_query:
         main_query, _, _ = build_es_main_query(search_query, cd)
     else:
         cd["highlight"] = True
