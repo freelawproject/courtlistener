@@ -6,6 +6,7 @@ from cl.simple_pages.views import (
     advanced_search,
     alert_help,
     broken_email_help,
+    components,
     contact,
     contact_thanks,
     contribute,
@@ -25,7 +26,6 @@ from cl.simple_pages.views import (
     recap_email_help,
     tag_notes_help,
     validate_for_wot,
-    components,
 )
 
 urlpatterns = [

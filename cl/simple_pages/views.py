@@ -18,6 +18,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 
 from cl.audio.models import Audio
+from cl.components import date
 from cl.disclosures.models import (
     Agreement,
     Debt,
@@ -39,7 +40,6 @@ from cl.search.models import (
 )
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
-from cl.components import date
 
 logger = logging.getLogger(__name__)
 

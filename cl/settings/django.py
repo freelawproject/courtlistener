@@ -111,14 +111,17 @@ TEMPLATES = [
                 "cl.lib.context_processors.inject_email_ban_status",
             ),
             "debug": DEBUG,
-            "loaders":[(
-                "django.template.loaders.cached.Loader", [
-                    "django.template.loaders.filesystem.Loader",
-                    # Inluding this is the same as APP_DIRS=True
-                    "django.template.loaders.app_directories.Loader",
-                    "django_components.template_loader.Loader",
-                ]
-            )],
+            "loaders": [
+                (
+                    "django.template.loaders.cached.Loader",
+                    [
+                        "django.template.loaders.filesystem.Loader",
+                        # Inluding this is the same as APP_DIRS=True
+                        "django.template.loaders.app_directories.Loader",
+                        "django_components.template_loader.Loader",
+                    ],
+                )
+            ],
         },
     }
 ]
