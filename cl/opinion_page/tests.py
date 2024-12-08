@@ -59,7 +59,6 @@ from cl.people_db.models import Person
 from cl.recap.factories import (
     AppellateAttachmentFactory,
     AppellateAttachmentPageFactory,
-    DocketDataFactory,
     DocketEntriesDataFactory,
     DocketEntryDataFactory,
 )
@@ -292,7 +291,6 @@ class CitationRedirectorTest(TestCase):
         r = await self.async_client.get(reverse("citation_homepage"))
         self.assertStatus(r, HTTPStatus.OK)
 
-    @override_flag("o-es-active", False)
     def test_with_a_citation(self) -> None:
         """Make sure that the url paths are working properly."""
         # Are we redirected to the correct place when we use GET or POST?
@@ -652,7 +650,6 @@ class CitationRedirectorTest(TestCase):
         self.assertEqual(volume_previous, None)
         self.assertEqual(volume_next, None)
 
-    @override_flag("o-es-active", False)
     @override_flag("ui_flag_for_o", False)
     def test_full_citation_redirect(self) -> None:
         """Do we get redirected to the correct URL when we pass in a full

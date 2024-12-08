@@ -32,13 +32,11 @@ from waffle.testutils import override_flag
 from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import simplify_estimated_count
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.search_utils import make_fq
 from cl.lib.storage import clobbering_get_name
 from cl.lib.test_helpers import (
     AudioTestCase,
     CourtTestCase,
     EmptySolrTestCase,
-    IndexedSolrTestCase,
     PeopleTestCase,
     SolrTestCase,
 )
@@ -559,95 +557,6 @@ class IndexingTest(EmptySolrTestCase):
         Docket.objects.all().delete()
         DocketEntry.objects.all().delete()
         RECAPDocument.objects.all().delete()
-
-
-class AdvancedTest(IndexedSolrTestCase):
-    """
-    Advanced query techniques
-    """
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.court = CourtFactory(id="canb", jurisdiction="FB")
-        cls.de = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=cls.court, case_name="SUBPOENAS SERVED ON"
-            ),
-            description="MOTION for Leave to File Amicus Curiae august",
-        )
-        cls.rd = RECAPDocumentFactory(
-            docket_entry=cls.de, description="Leave to File"
-        )
-
-        cls.de_1 = DocketEntryWithParentsFactory(
-            docket=DocketFactory(
-                court=cls.court, case_name="SUBPOENAS SERVED OFF"
-            ),
-            description="MOTION for Leave to File Amicus Curiae september",
-        )
-        cls.rd_1 = RECAPDocumentFactory(
-            docket_entry=cls.de_1, description="Leave to File"
-        )
-        super().setUpTestData()
-
-    def test_make_fq(self) -> None:
-        """Test make_fq method, checks query formatted is correctly performed."""
-        args = (
-            {
-                "q": "",
-                "description": '"leave to file" AND amicus',
-            },
-            "description",
-            "description",
-        )
-        fq = make_fq(*args)
-        self.assertEqual(fq, 'description:("leave to file" AND amicus)')
-
-        args[0]["description"] = '"leave to file" curie'
-        fq = make_fq(*args)
-        self.assertEqual(fq, 'description:("leave to file" AND curie)')
-
-        args[0]["description"] = '"leave to file" AND "amicus curie"'
-        fq = make_fq(*args)
-        self.assertEqual(
-            fq, 'description:("leave to file" AND "amicus curie")'
-        )
-
-        args[0][
-            "description"
-        ] = '"leave to file" AND "amicus curie" "by august"'
-        fq = make_fq(*args)
-        self.assertEqual(
-            fq,
-            'description:("leave to file" AND "amicus curie" AND "by august")',
-        )
-
-        args[0][
-            "description"
-        ] = '"leave to file" AND "amicus curie" OR "by august"'
-        fq = make_fq(*args)
-        self.assertEqual(
-            fq,
-            'description:("leave to file" AND "amicus curie" OR "by august")',
-        )
-        args[0][
-            "description"
-        ] = '"leave to file" NOT "amicus curie" OR "by august"'
-        fq = make_fq(*args)
-        self.assertEqual(
-            fq,
-            'description:("leave to file" NOT "amicus curie" OR "by august")',
-        )
-
-        args[0]["description"] = '"leave to file amicus curie"'
-        fq = make_fq(*args)
-        self.assertEqual(fq, 'description:("leave to file amicus curie")')
-
-        args[0]["description"] = "leave to file AND amicus curie"
-        fq = make_fq(*args)
-        self.assertEqual(
-            fq, "description:(leave AND to AND file AND amicus AND curie)"
-        )
 
 
 class ESCommonSearchTest(ESIndexTestCase, TestCase):
