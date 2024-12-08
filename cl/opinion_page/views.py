@@ -912,16 +912,15 @@ async def setup_opinion_context(
     :param tab: The tab to load
     :return: The opinion page context used to generate the page
     """
-    title = ", ".join(
-        [
-            s
-            for s in [
-                trunc(best_case_name(cluster), 100, ellipsis="..."),
-                await cluster.acitation_string(),
-            ]
-            if s.strip()
-        ]
-    )
+    tab_intros = {
+        "authorities": "Authorities for ",
+        "cited-by": "Citations to ",
+        "related-cases": "Similar cases to ",
+        "summaries": "Summaries of ",
+        "pdf": "Download PDF for ",
+    }
+    tab_intro = tab_intros.get(tab, "")
+    title = f"{tab_intro}{trunc(best_case_name(cluster), 100, ellipsis='...')}"
     has_downloads = False
     pdf_path = None
     if cluster.filepath_pdf_harvard:
