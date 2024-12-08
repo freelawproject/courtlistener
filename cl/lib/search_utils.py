@@ -154,68 +154,6 @@ def merge_form_with_courts(
     return court_tabs, court_count_human, court_count
 
 
-def build_coverage_query(court: str, q: str, facet_field: str) -> SearchParam:
-    """
-    Create a coverage that can be used to make a facet query
-
-    :param court: String representation of the court to filter to, e.g. 'ca1',
-    defaults to 'all'.
-    :param q: A query to limit the coverage query, defaults to '*'
-    :param facet_field: The field to do faceting on
-    :type facet_field: str
-    :return: A coverage query dict
-    """
-    params = cast(
-        SearchParam,
-        {
-            "facet": "true",
-            "facet.range": facet_field,
-            "facet.range.start": "1600-01-01T00:00:00Z",  # Assume very early date.
-            "facet.range.end": "NOW/DAY",
-            "facet.range.gap": "+1YEAR",
-            "rows": 0,
-            "q": q or "*",  # Without this, results will be omitted.
-            "caller": "build_coverage_query",
-        },
-    )
-    if court.lower() != "all":
-        params["fq"] = [f"court_exact:{court}"]
-    return params
-
-
-def build_court_count_query(group: bool = False) -> SearchParam:
-    """Build a query that returns the count of cases for all courts
-
-    :param group: Should the results be grouped? Note that grouped facets have
-    bad performance.
-    """
-    params = cast(
-        SearchParam,
-        {
-            "q": "*",
-            "facet": "true",
-            "facet.field": "court_exact",
-            "facet.limit": -1,
-            "rows": 0,
-            "caller": "build_court_count_query",
-        },
-    )
-    if group:
-        params.update(
-            cast(
-                SearchParam,
-                {
-                    "group": "true",
-                    "group.ngroups": "true",
-                    "group.field": "docket_id",
-                    "group.limit": "0",
-                    "group.facet": "true",
-                },
-            )
-        )
-    return params
-
-
 async def add_depth_counts(
     search_data: dict[str, Any],
     search_results: Page,

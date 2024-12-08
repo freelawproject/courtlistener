@@ -4,12 +4,23 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import aget_object_or_404
 from django.template.response import TemplateResponse
 from django.urls import reverse
+from elasticsearch.exceptions import RequestError, TransportError
+from elasticsearch_dsl import MultiSearch
+from elasticsearch_dsl.response import Response
 from judge_pics.search import ImageSizes, portrait
-from requests import Session
 
-from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.people_db.models import Person
-from cl.people_db.utils import make_title_str
+from cl.people_db.utils import (
+    build_authored_opinions_query,
+    build_oral_arguments_heard,
+    build_recap_cases_assigned_query,
+    make_title_str,
+)
+from cl.search.documents import (
+    AudioDocument,
+    DocketDocument,
+    OpinionClusterDocument,
+)
 
 
 async def view_person(request, pk, slug):
@@ -42,87 +53,42 @@ async def view_person(request, pk, slug):
             other_positions.append(p)
     positions = judicial_positions + other_positions
 
-    # Use Solr to get relevant opinions that the person wrote
+    # Use Elasticsearch to get relevant opinions that the person wrote, related
+    # RECAP cases or related Oral arguments.
     @sync_to_async
-    def authored_opinions(p):
-        with Session() as session:
-            conn = ExtraSolrInterface(
-                settings.SOLR_OPINION_URL, http_connection=session, mode="r"
-            )
-            q = {
-                "q": f"author_id:{p.pk} OR panel_ids:{p.pk}",
-                "fl": [
-                    "id",
-                    "court_id",
-                    "caseName",
-                    "absolute_url",
-                    "court",
-                    "court_citation_string",
-                    "dateFiled",
-                    "docketNumber",
-                    "citeCount",
-                    "status",
-                    "citation",
-                ],
-                "rows": 5,
-                "start": 0,
-                "sort": "dateFiled desc",
-                "caller": "view_person",
-            }
-            return conn.query().add_extra(**q).execute()
+    def get_related_content_from_es(person_id: int) -> Response | None:
+        """Use a single ES request to retrieve content related to a person."""
+        authored_opinions_query = build_authored_opinions_query(
+            OpinionClusterDocument.search(), person_id
+        )
+        oral_arguments_heard_query = build_oral_arguments_heard(
+            AudioDocument.search(), person_id
+        )
+        recap_cases_assigned_query = build_recap_cases_assigned_query(
+            DocketDocument.search(), person_id
+        )
+        multi_search = MultiSearch()
+        multi_search = (
+            multi_search.add(authored_opinions_query)
+            .add(oral_arguments_heard_query)
+            .add(recap_cases_assigned_query)
+        )
 
-    # Use Solr to get the oral arguments for the judge
-    @sync_to_async
-    def oral_arguments_heard(p):
-        with Session() as session:
-            conn = ExtraSolrInterface(
-                settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
-            )
-            q = {
-                "q": f"panel_ids:{p.pk}",
-                "fl": [
-                    "id",
-                    "absolute_url",
-                    "caseName",
-                    "court_id",
-                    "dateArgued",
-                    "docketNumber",
-                    "court_citation_string",
-                ],
-                "rows": 5,
-                "start": 0,
-                "sort": "dateArgued desc",
-                "caller": "view_person",
-            }
-            return conn.query().add_extra(**q).execute()
+        try:
+            return multi_search.execute()
+        except (TransportError, ConnectionError, RequestError):
+            return None
 
-    @sync_to_async
-    def recap_cases_assigned(p):
-        with Session() as session:
-            conn = ExtraSolrInterface(
-                settings.SOLR_RECAP_URL, http_connection=session, mode="r"
-            )
-            q = {
-                "q": f"assigned_to_id:{p.pk} OR referred_to_id:{p.pk}",
-                "fl": [
-                    "id",
-                    "docket_absolute_url",
-                    "caseName",
-                    "court_citation_string",
-                    "dateFiled",
-                    "docketNumber",
-                ],
-                "group": "true",
-                "group.ngroups": "true",
-                "group.limit": 1,
-                "group.field": "docket_id",
-                "group.sort": "dateFiled desc",
-                "rows": 5,
-                "start": 0,
-                "sort": "dateFiled desc",
-                "caller": "view_person",
-            }
-            return conn.query().add_extra(**q).execute()
+    people_content_response = await get_related_content_from_es(person.id)
+    authored_opinions = (
+        people_content_response[0] if people_content_response else []
+    )
+    oral_arguments_heard = (
+        people_content_response[1] if people_content_response else []
+    )
+    recap_cases_assigned = (
+        people_content_response[2] if people_content_response else []
+    )
 
     return TemplateResponse(
         request,
@@ -138,9 +104,9 @@ async def view_person(request, pk, slug):
             "disclosures": person.financial_disclosures.all().order_by("year"),
             "positions": positions,
             "educations": person.educations.all().order_by("-degree_year"),
-            "authored_opinions": await authored_opinions(person),
-            "oral_arguments_heard": await oral_arguments_heard(person),
-            "recap_cases_assigned": await recap_cases_assigned(person),
+            "authored_opinions": authored_opinions,
+            "oral_arguments_heard": oral_arguments_heard,
+            "recap_cases_assigned": recap_cases_assigned,
             "ftm_last_updated": settings.FTM_LAST_UPDATED,
             "private": False,
         },
