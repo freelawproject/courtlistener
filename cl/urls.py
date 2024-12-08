@@ -89,6 +89,10 @@ urlpatterns = [
         "removal/",
         RedirectView.as_view(url="/terms/#removal", permanent=True),
     ),
+    path(
+        "__reload__/",
+        include("django_browser_reload.urls"),
+    ),
 ]
 
 if settings.DEVELOPMENT:

@@ -39,6 +39,7 @@ from cl.search.models import (
 )
 from cl.simple_pages.coverage_utils import fetch_data, fetch_federal_data
 from cl.simple_pages.forms import ContactForm
+from cl.components import date
 
 logger = logging.getLogger(__name__)
 
@@ -454,6 +455,10 @@ async def latest_terms(request: HttpRequest) -> HttpResponse:
             "private": False,
         },
     )
+
+
+async def components(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "components.html", {"private": False})
 
 
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:

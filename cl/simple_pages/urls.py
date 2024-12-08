@@ -25,6 +25,7 @@ from cl.simple_pages.views import (
     recap_email_help,
     tag_notes_help,
     validate_for_wot,
+    components,
 )
 
 urlpatterns = [
@@ -76,6 +77,7 @@ urlpatterns = [
     ),
     path("terms/v/<int:v>/", old_terms, name="old_terms"),  # type: ignore[arg-type]
     path("terms/", latest_terms, name="terms"),  # type: ignore[arg-type]
+    path("components/", components, name="components"),  # type: ignore[arg-type]
     # Robots
     path(
         "robots.txt",

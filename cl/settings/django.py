@@ -3,6 +3,7 @@ from typing import List
 
 import environ
 from django.contrib.messages import constants as message_constants
+from django_components import ComponentsSettings
 
 from .project.testing import TESTING
 from .third_party.redis import REDIS_DATABASES, REDIS_HOST, REDIS_PORT
@@ -99,7 +100,6 @@ TEMPLATES = [
             # Don't forget to use absolute paths, not relative paths.
             str(TEMPLATE_ROOT),
         ],
-        "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": (
                 "django.contrib.messages.context_processors.messages",
@@ -111,6 +111,14 @@ TEMPLATES = [
                 "cl.lib.context_processors.inject_email_ban_status",
             ),
             "debug": DEBUG,
+            "loaders":[(
+                "django.template.loaders.cached.Loader", [
+                    "django.template.loaders.filesystem.Loader",
+                    # Inluding this is the same as APP_DIRS=True
+                    "django.template.loaders.app_directories.Loader",
+                    "django_components.template_loader.Loader",
+                ]
+            )],
         },
     }
 ]
@@ -122,7 +130,7 @@ MIDDLEWARE = [
     "django_permissions_policy.PermissionsPolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "csp.middleware.CSPMiddleware",
+    # "csp.middleware.CSPMiddleware", # need to remove this for Vue to work
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django_ratelimit.middleware.RatelimitMiddleware",
@@ -130,6 +138,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "cl.lib.middleware.RobotsHeaderMiddleware",
     "pghistory.middleware.HistoryMiddleware",
+    "django_browser_reload.middleware.BrowserReloadMiddleware",
 ]
 
 ROOT_URLCONF = "cl.urls"
@@ -160,6 +169,10 @@ INSTALLED_APPS = [
     "django_elasticsearch_dsl",
     "pghistory",
     "pgtrigger",
+    "tailwind",
+    "theme",
+    "django_browser_reload",
+    "django_components",
     # CourtListener Apps
     "cl.alerts",
     "cl.audio",
@@ -188,7 +201,17 @@ if DEVELOPMENT:
     INSTALLED_APPS.append("django_extensions")
     MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
 
+TAILWIND_APP_NAME = "theme"
+
 ASGI_APPLICATION = "cl.asgi.application"
+
+BASE_DIR = Path(__file__).resolve().parent
+
+COMPONENTS = ComponentsSettings(
+    dirs=[
+        Path(BASE_DIR) / "components",
+    ],
+)
 
 ################
 # Misc. Django #

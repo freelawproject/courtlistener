@@ -49,6 +49,7 @@
     "webpack-dev-server": "^4.10.0"
   },
   "dependencies": {
+    "@tailwindcss/cli": "^4.0.0-beta.6",
     "@types/react-bootstrap": "^0.32.23",
     "@types/showdown": "^1.9.3",
     "css-loader": "^5.2.4",
@@ -58,6 +59,7 @@
     "react-input-switch": "^2.2.2",
     "react-markdown-editor-lite": "^1.2.4",
     "react-showdown": "^2.3.0",
-    "style-loader": "^2.0.0"
+    "style-loader": "^2.0.0",
+    "tailwindcss": "^4.0.0-beta.6"
   }
 }
