@@ -80,13 +80,7 @@ from cl.search.exception import (
     UnbalancedQuotesQuery,
 )
 from cl.search.forms import SearchForm
-from cl.search.models import (
-    SEARCH_TYPES,
-    Court,
-    Opinion,
-    OpinionCluster,
-    RECAPDocument,
-)
+from cl.search.models import SEARCH_TYPES, Court, Opinion, RECAPDocument
 
 logger = logging.getLogger(__name__)
 
@@ -3223,7 +3217,7 @@ def do_es_sweep_alert_query(
     child documents.
     """
 
-    search_form = SearchForm(cd, is_es_form=True)
+    search_form = SearchForm(cd)
     if search_form.is_valid():
         cd = search_form.cleaned_data
     else:
