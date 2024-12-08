@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load component_tags %}
+{% load static %}
+
+{% block title %}Components – CourtListener.com{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="col-xs-12">
+    <h1 class="">Components</h1>
+  </div>
+
+  <div class="col-sm-5 flex gap-2">
+    {% component "date" date="2024-11-06" %}{% endcomponent %}
+
+    <div id="vue-component" class="py-2 px-4 rounded border border-gray-200">
+      [[ message ]]
+    </div>
+  </div>
+
+  <script>
+    var app = new Vue({
+      delimiters: ["[[", "]]"],
+      el: '#vue-component',
+      data: {
+        message: 'Hello from Vue!'
+      }
+    })
+  </script>
+{% endblock %}
