@@ -32,7 +32,7 @@ from cl.search.models import (
     Parenthetical,
     RECAPDocument,
 )
-from cl.search.tasks import add_items_to_solr, index_related_cites_fields
+from cl.search.tasks import index_related_cites_fields
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
@@ -128,11 +128,6 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
             # Threading problem in httplib, which is used in the Solr query.
             raise self.retry(exc=e, countdown=2)
 
-    # If a Solr update was requested, do a single one at the end with all the
-    # pks of the passed opinions
-    if index:
-        add_items_to_solr.delay(opinion_pks, "search.Opinion")
-
 
 def store_opinion_citations_and_update_parentheticals(
     opinion: Opinion, index: bool
@@ -224,11 +219,6 @@ def store_opinion_citations_and_update_parentheticals(
             citation_count=F("citation_count") + 1
         )
 
-        if index:
-            add_items_to_solr.delay(
-                opinion_clusters_to_update.values_list("pk", flat=True),
-                "search.OpinionCluster",
-            )
         # Nuke existing citations and parentheticals
         OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
         Parenthetical.objects.filter(describing_opinion_id=opinion.pk).delete()

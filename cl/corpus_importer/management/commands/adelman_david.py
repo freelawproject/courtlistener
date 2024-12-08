@@ -13,7 +13,6 @@ from cl.corpus_importer.tasks import (
 from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import CommandUtils, VerboseCommand, logger
 from cl.lib.pacer_session import ProxyPacerSession, SessionData
-from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
@@ -64,7 +63,6 @@ def download_dockets(options):
                         "show_caption": True,
                     },
                 ).set(queue=q),
-                add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
         else:
             chain(
@@ -93,7 +91,6 @@ def download_dockets(options):
                         "show_list_of_member_cases": True,
                     },
                 ).set(queue=q),
-                add_or_update_recap_docket.s().set(queue=q),
             ).apply_async()
 
     f.close()

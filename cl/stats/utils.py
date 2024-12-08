@@ -91,17 +91,6 @@ def check_postgresql() -> bool:
     return True
 
 
-def check_solr() -> bool:
-    """Check if we can connect to Solr"""
-    s = requests.Session()
-    for domain in {settings.SOLR_HOST, settings.SOLR_RECAP_HOST}:
-        try:
-            s.get(f"{domain}/solr/admin/ping?wt=json", timeout=2)
-        except ConnectionError:
-            return False
-    return True
-
-
 def get_replication_statuses() -> dict[str, list[dict[str, str | int]]]:
     """Return the replication status information for all publishers
 

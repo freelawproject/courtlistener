@@ -26,7 +26,6 @@ from cl.people_db.models import (
     School,
     Source,
 )
-from cl.search.tasks import add_items_to_solr, delete_items
 
 
 class RetentionEventInline(admin.TabularInline):
@@ -49,25 +48,6 @@ class PositionAdmin(admin.ModelAdmin):
         "person__name_last",
         "person__name_first",
     )
-
-    def save_model(
-        self,
-        request: HttpRequest,
-        obj: Position,
-        form: ModelForm,
-        change: bool,
-    ) -> None:
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.person_id], "people_db.Person")
-
-    def delete_model(self, request: HttpRequest, obj: Position) -> None:
-        # Update the person to remove the position from them.
-        obj.delete()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.person_id], "people_db.Person")
 
 
 class PositionInline(admin.StackedInline):
@@ -152,36 +132,6 @@ class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
     raw_id_fields = ("is_alias_of",)
     readonly_fields = ("has_photo",)
     actions = ("update_in_solr", "delete_from_solr")
-
-    def save_model(self, request, obj, form, change):
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.pk], "people_db.Person")
-
-    def delete_model(self, request, obj):
-        obj.delete()
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([obj.pk], "people_db.Person")
-
-    @admin.action(description="Update selected people in Solr")
-    def update_in_solr(self, request: HttpRequest, queryset: QuerySet) -> None:
-        add_items_to_solr.delay([p.pk for p in queryset], "people_db.Person")
-        self.message_user(
-            request,
-            f"Successfully updated {queryset.count()} people in Solr",
-        )
-
-    @admin.action(description="Delete selected people from Solr")
-    def delete_from_solr(
-        self, request: HttpRequest, queryset: QuerySet
-    ) -> None:
-        delete_items.delay([p.pk for p in queryset], "people_db.Person")
-        self.message_user(
-            request,
-            f"Successfully deleted {queryset.count()} people from Solr",
-        )
 
 
 @admin.register(Race)

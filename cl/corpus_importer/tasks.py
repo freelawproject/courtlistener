@@ -127,7 +127,6 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
-from cl.search.tasks import add_items_to_solr
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -2441,7 +2440,6 @@ def get_pacer_doc_by_rd_and_description(
 
     # Skip OCR for now. It'll happen in a second step.
     async_to_sync(extract_recap_pdf_base)(rd.pk, ocr_available=False)
-    add_items_to_solr([rd.pk], "search.RECAPDocument")
 
 
 @app.task(
@@ -2834,10 +2832,6 @@ def recap_document_into_opinions(
             local_path=recap_document.filepath_local,
             extracted_by_ocr=r["extracted_by_ocr"],
         )
-
-        if add_to_solr:
-            # Add opinions to solr
-            add_items_to_solr.delay([opinion.id], "search.Opinion")
 
         logger.info(
             "Successfully imported https://www.courtlistener.com/opinion/{}/decision/".format(

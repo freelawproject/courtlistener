@@ -212,24 +212,6 @@ class Audio(AbstractDateTimeModel):
         indexing it?
         """
         super().save(*args, **kwargs)  # type: ignore
-        if index:
-            from cl.search.tasks import add_items_to_solr
-
-            add_items_to_solr([self.pk], "audio.Audio", force_commit)
-
-    def delete(  # type: ignore[override]
-        self,
-        *args: List,
-        **kwargs: Dict,
-    ) -> None:
-        """
-        Update the index as items are deleted.
-        """
-        id_cache = self.pk
-        super().delete(*args, **kwargs)  # type: ignore
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([id_cache], "audio.Audio")
 
     def as_search_dict(self) -> Dict[str, Union[int, List[int], str]]:
         """Create a dict that can be ingested by Solr"""

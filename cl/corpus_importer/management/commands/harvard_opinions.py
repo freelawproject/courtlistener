@@ -32,7 +32,6 @@ from cl.lib.utils import human_sort
 from cl.people_db.lookup_utils import extract_judge_last_name
 from cl.scrapers.utils import update_or_create_docket
 from cl.search.models import SOURCES, Court, Docket, Opinion, OpinionCluster
-from cl.search.tasks import add_items_to_solr
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -548,9 +547,6 @@ def add_new_case(
             [c.get("cite") for c in data.get("citations", [])], cluster.id
         )
         new_op_pks = add_opinions(soup, cluster.id, citation)
-
-    if make_searchable:
-        add_items_to_solr.delay(new_op_pks, "search.Opinion")
 
     logger.info("Finished: %s", citation.corrected_citation())
     logger.info(
