@@ -75,7 +75,6 @@ simplejson = "^3.19.3"
 timeout-decorator = "*"
 unidecode = "*"
 usaddress = "^0.5.11"
-scorched = {git = "https://github.com/freelawproject/scorched.git", branch="main"}
 djangorestframework-filters = "1.0.0.dev2"
 gunicorn = "^23.0.0"
 django-hCaptcha = "^0.2.0"
