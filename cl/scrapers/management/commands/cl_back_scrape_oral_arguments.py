@@ -7,6 +7,7 @@ from cl.scrapers.management.commands import cl_scrape_oral_arguments
 from cl.scrapers.management.commands.cl_back_scrape_opinions import (
     add_backscraper_arguments,
 )
+from cl.scrapers.utils import save_response
 
 
 class Command(cl_scrape_oral_arguments.Command):
@@ -25,6 +26,7 @@ class Command(cl_scrape_oral_arguments.Command):
                 days_interval=options.get("days_interval"),
             ).back_scrape_iterable,
             mod,
+            save_response_fn=save_response,
         ):
             site.parse()
             self.scrape_court(site, full_crawl=True, backscrape=True)
