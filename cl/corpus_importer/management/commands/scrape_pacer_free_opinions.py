@@ -32,7 +32,6 @@ from cl.lib.types import OptionsType
 from cl.scrapers.models import PACERFreeDocumentLog, PACERFreeDocumentRow
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Court, RECAPDocument
-from cl.search.tasks import add_docket_to_solr_by_rds
 
 
 def get_last_complete_date(
@@ -381,9 +380,8 @@ def ocr_available(queue: str, index: bool) -> None:
                 queue=q
             ).apply_async()
         else:
-            chain(
-                extract_recap_pdf.si(pk, ocr_available=True).set(queue=q),
-                add_docket_to_solr_by_rds.s().set(queue=q),
+            extract_recap_pdf.si(pk, ocr_available=True).set(
+                queue=q
             ).apply_async()
         if i % 1000 == 0:
             logger.info(f"Sent {i + 1}/{count} tasks to celery so far.")
