@@ -448,5 +448,4 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         report.response.text,
         d,
         tag_names=None,
-        add_to_solr=True,
     )

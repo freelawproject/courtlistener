@@ -1918,7 +1918,6 @@ def save_iquery_to_docket(
     iquery_text: str,
     d: Docket,
     tag_names: Optional[List[str]],
-    add_to_solr: bool = False,
     avoid_trigger_signal: bool = False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
@@ -1928,7 +1927,6 @@ def save_iquery_to_docket(
     :param iquery_text: The HTML text data from a successful iquery response
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
-    :param add_to_solr: Whether to save the completed docket to solr
     :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.

@@ -1299,7 +1299,6 @@ def make_docket_by_iquery_base(
         report_text,
         d,
         tag_names,
-        add_to_solr=True,
         avoid_trigger_signal=avoid_trigger_signal,
     )
 
