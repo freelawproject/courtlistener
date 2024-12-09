@@ -353,10 +353,10 @@ def process_csv(
             )
 
             if cluster_updated:
-                total_clusters_updated = +1
+                total_clusters_updated += 1
 
             if docket_updated:
-                total_dockets_updated = +1
+                total_dockets_updated += 1
 
             # Add any of the citations if possible
             for citation in valid_citations:
