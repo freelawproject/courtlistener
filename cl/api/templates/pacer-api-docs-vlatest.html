@@ -201,7 +201,8 @@
   </p>
   <p>This API can be filtered by docket ID to show all the parties for a particular case.
   </p>
-  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> Filters apply to this endpoint, not the data nested within it. Therefore, each party returned by this API will list all the attorneys that have represented them in any case, even if the parties themselves are filtered to a particular case.
+  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> Filters applied to this endpoint only affect the top-level data, not the data nested records within it. Therefore, each party returned by this API will list all the attorneys that have represented them in any case, even if the parties themselves are filtered to a particular case. <br><br>
+    To filter the nested attorney data for each party, include the <code>filter_nested_results=True</code> parameter in your API request.
   </p>
   <p>For example, this query returns the parties for docket number <code>123</code>:</p>
   <pre class="pre-scrollable">curl -v \
@@ -280,6 +281,8 @@
   <p>Use this API to look up an attorney in our system.</p>
   <p>To look up field descriptions or options for filtering, ordering, or rendering, complete an HTTP OPTIONS request.</p>
   <p>Like docket entries and parties, attorneys can be filtered to a particular docket. For example:
+  </p>
+  <p class="alert alert-warning"><i class="fa fa-warning"></i> <strong>Listen Up:</strong> Like the parties endpoint, filters applied to this endpoint only affect the top-level data. To filter the nested data for each attorney, include the <code>filter_nested_results=True</code> parameter in your API request URL.
   </p>
   <pre class="pre-scrollable">curl -v \
   --header 'Authorization: Token {% if user.is_authenticated %}{{ user.auth_token }}{% else %}&lt;your-token-here&gt;{% endif %}' \

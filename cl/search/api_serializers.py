@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from datetime import timezone
 
 from drf_dynamic_fields import DynamicFieldsMixin
@@ -266,57 +265,6 @@ class TagSerializer(DynamicFieldsMixin, HyperlinkedModelSerializerWithId):
     class Meta:
         model = Tag
         fields = "__all__"
-
-
-class SearchResultSerializer(serializers.Serializer):
-    """The serializer for search results.
-
-    Does not presently support the fields argument.
-    """
-
-    def update(self, instance, validated_data):
-        raise NotImplementedError
-
-    def create(self, validated_data):
-        raise NotImplementedError
-
-    solr_field_mappings = {
-        "boolean": serializers.BooleanField,
-        "string": serializers.CharField,
-        "text_en_splitting_cl": serializers.CharField,
-        "text_no_word_parts": serializers.CharField,
-        "date": serializers.DateTimeField,
-        # Numbers
-        "int": serializers.IntegerField,
-        "tint": serializers.IntegerField,
-        "long": serializers.IntegerField,
-        # schema.SolrFloatField: serializers.FloatField,
-        # schema.SolrDoubleField: serializers.IntegerField,
-        # Other
-        "pagerank": serializers.CharField,
-    }
-    skipped_fields = ["_version_", "django_ct", "django_id", "text"]
-
-    def get_fields(self):
-        """Return a list of fields so that they don't have to be declared one
-        by one and updated whenever there's a new field.
-        """
-        fields = {
-            "snippet": serializers.CharField(read_only=True),
-        }
-        # Map each field in the Solr schema to a DRF field
-        for field in self._context["schema"]["fields"]:
-            if field.get("multiValued"):
-                drf_field = serializers.ListField
-            else:
-                drf_field = self.solr_field_mappings[field["type"]]
-            fields[field["name"]] = drf_field(read_only=True)
-
-        for field in self.skipped_fields:
-            if field in fields:
-                fields.pop(field)
-        fields = OrderedDict(sorted(fields.items()))  # Sort by key
-        return fields
 
 
 class V3OAESResultSerializer(DocumentSerializer):

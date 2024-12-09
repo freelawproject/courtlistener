@@ -1,7 +1,6 @@
 import logging
 from collections import defaultdict
 
-import waffle
 from django.conf import settings
 from elasticsearch.exceptions import ApiError, RequestError, TransportError
 from elasticsearch_dsl import MultiSearch, Q
@@ -9,7 +8,6 @@ from elasticsearch_dsl.response import Response
 from elasticsearch_dsl.utils import AttrList
 from rest_framework.exceptions import ParseError
 
-from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
     build_es_main_query,
@@ -22,7 +20,6 @@ from cl.lib.elasticsearch_utils import (
     set_child_docs_and_score,
     set_results_highlights,
 )
-from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.search_utils import store_search_api_query
 from cl.lib.utils import map_to_docket_entry_sorting
 from cl.search.constants import SEARCH_HL_TAG, cardinality_query_unique_ids
@@ -41,7 +38,7 @@ from cl.search.types import ESCursor
 logger = logging.getLogger(__name__)
 
 
-def get_object_list(request, cd, paginator, es_flag_status):
+def get_object_list(request, cd, paginator):
     """Perform the Solr work"""
     # Set the offset value
     try:
@@ -53,42 +50,25 @@ def get_object_list(request, cd, paginator, es_flag_status):
     page_size = paginator.get_page_size(request)
     # Assume page_size = 20, then: 1 --> 0, 2 --> 20, 3 --> 40
     offset = max(0, (page_number - 1) * page_size)
-    group = False
-    if cd["type"] == SEARCH_TYPES.DOCKETS:
-        group = True
 
-    is_oral_argument_active = (
-        cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT and es_flag_status
-    )
-    is_people_active = cd["type"] == SEARCH_TYPES.PEOPLE and es_flag_status
-    is_opinion_active = cd["type"] == SEARCH_TYPES.OPINION and es_flag_status
-    is_recap_active = (
-        cd["type"]
-        in [
-            SEARCH_TYPES.RECAP,
-            SEARCH_TYPES.DOCKETS,
-        ]
-        and es_flag_status
-    )
+    use_default_query = False
+    match cd["type"]:
+        case SEARCH_TYPES.ORAL_ARGUMENT:
+            search_query = AudioDocument.search()
+            use_default_query = True
+        case SEARCH_TYPES.PEOPLE:
+            search_query = PersonDocument.search()
+            use_default_query = True
+        case SEARCH_TYPES.OPINION:
+            search_query = OpinionDocument.search()
+        case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
+            search_query = ESRECAPDocument.search()
+        case _:
+            search_query = None
 
-    if is_oral_argument_active:
-        search_query = AudioDocument.search()
-    elif is_people_active:
-        search_query = PersonDocument.search()
-    elif is_opinion_active:
-        search_query = OpinionDocument.search()
-    elif is_recap_active:
-        search_query = ESRECAPDocument.search()
+    if use_default_query:
+        main_query, _, _ = build_es_main_query(search_query, cd)
     else:
-        search_query = None
-
-    if search_query and (is_people_active or is_oral_argument_active):
-        (
-            main_query,
-            child_docs_count_query,
-            top_hits_limit,
-        ) = build_es_main_query(search_query, cd)
-    elif search_query and (is_opinion_active or is_recap_active):
         cd["highlight"] = True
         highlighting_fields = {}
         if cd["type"] == SEARCH_TYPES.OPINION:
@@ -102,37 +82,14 @@ def get_object_list(request, cd, paginator, es_flag_status):
             SEARCH_HL_TAG,
             request.version,
         )
-    else:
-        main_query = search_utils.build_main_query(
-            cd, highlight="text", facet=False, group=group
-        )
-        main_query["caller"] = "api_search"
 
-    if not is_recap_active and cd["type"] == SEARCH_TYPES.RECAP:
-        # Convert the date_filed sorting to a docket entry sorting parameter.
-        main_query["sort"] = map_to_docket_entry_sorting(main_query["sort"])
-
-    if (
-        is_oral_argument_active
-        or is_people_active
-        or is_opinion_active
-        or is_recap_active
-    ):
-        sl = ESList(
-            request=request,
-            main_query=main_query,
-            offset=offset,
-            page_size=page_size,
-            type=cd["type"],
-        )
-    else:
-        sl = SolrList(
-            request=request,
-            main_query=main_query,
-            offset=offset,
-            type=cd["type"],
-        )
-
+    sl = ESList(
+        request=request,
+        main_query=main_query,
+        offset=offset,
+        page_size=page_size,
+        type=cd["type"],
+    )
     return sl
 
 
@@ -231,93 +188,6 @@ class ESList:
 
     def append(self, p_object):
         """Lightly override the append method so we get items duplicated in
-        our cache.
-        """
-        self._item_cache.append(p_object)
-
-
-class SolrList:
-    """This implements a yielding list object that fetches items as they are
-    queried.
-    """
-
-    def __init__(self, request, main_query, offset, type, length=None):
-        super().__init__()
-        self.request = request
-        self.main_query = main_query
-        self.offset = offset
-        self.type = type
-        self._item_cache = []
-        if self.type == SEARCH_TYPES.OPINION:
-            self.conn = ExtraSolrInterface(settings.SOLR_OPINION_URL, mode="r")
-        elif self.type == SEARCH_TYPES.ORAL_ARGUMENT:
-            self.conn = ExtraSolrInterface(settings.SOLR_AUDIO_URL, mode="r")
-        elif self.type in [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]:
-            self.conn = ExtraSolrInterface(settings.SOLR_RECAP_URL, mode="r")
-        elif self.type == SEARCH_TYPES.PEOPLE:
-            self.conn = ExtraSolrInterface(settings.SOLR_PEOPLE_URL, mode="r")
-        self._length = length
-
-    def __len__(self):
-        if self._length is None:
-            mq = self.main_query.copy()  # local copy for manipulation
-            mq["caller"] = "api_search_count"
-            count = self.conn.query().add_extra(**mq).count()
-            self._length = count
-        return self._length
-
-    def __iter__(self):
-        for item in range(0, len(self)):
-            try:
-                yield self._item_cache[item]
-            except IndexError:
-                yield self.__getitem__(item)
-
-    def __getitem__(self, item):
-        self.main_query["start"] = self.offset
-        r = self.conn.query().add_extra(**self.main_query).execute()
-        self.conn.conn.http_connection.close()
-        # Store search query.
-        store_search_api_query(
-            request=self.request,
-            failed=False,
-            query_time=r.QTime,
-            engine=SearchQuery.SOLR,
-        )
-        if r.group_field is None:
-            # Pull the text snippet up a level
-            for result in r.result.docs:
-                result["snippet"] = "&hellip;".join(
-                    result["solr_highlights"]["text"]
-                )
-                self._item_cache.append(ResultObject(initial=result))
-        else:
-            # Flatten group results, and pull up the text snippet as above.
-            for group in getattr(r.groups, r.group_field)["groups"]:
-                for doc in group["doclist"]["docs"]:
-                    doc["snippet"] = "&hellip;".join(
-                        doc["solr_highlights"]["text"]
-                    )
-                    self._item_cache.append(ResultObject(initial=doc))
-
-        # Now, assuming our _item_cache is all set, we just get the item.
-        if isinstance(item, slice):
-            s = slice(
-                item.start - int(self.offset),
-                item.stop - int(self.offset),
-                item.step,
-            )
-            return self._item_cache[s]
-        else:
-            # Not slicing.
-            try:
-                return self._item_cache[item]
-            except IndexError:
-                # No results!
-                return []
-
-    def append(self, p_object):
-        """Lightly override the append method, so we get items duplicated in
         our cache.
         """
         self._item_cache.append(p_object)

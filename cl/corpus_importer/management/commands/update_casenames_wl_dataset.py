@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from eyecite import get_citations
-from eyecite.models import FullCaseCitation
+from eyecite.models import FullCaseCitation, FullJournalCitation
 from eyecite.tokenizers import HyperscanTokenizer
 from juriscraper.lib.string_utils import harmonize
 
@@ -139,12 +139,16 @@ def parse_citations(citation_strings: list[str]) -> list[dict]:
         # We find all the citations that could match a cluster to update the case name
         found_cites = get_citations(cite_str, tokenizer=HYPERSCAN_TOKENIZER)
         if not found_cites:
+            logger.info("Unable to parse %s", cite_str)
+            continue
+        citation = found_cites[0]
+        if len(citation.all_editions) > 1:
+            # In case we have two editions which could have different types
+            logger.info("Unable to disambiguate citation: %s", cite_str)
             continue
 
-        citation = found_cites[0]
-
         # Ensure we have valid citations to process
-        if isinstance(citation, FullCaseCitation):
+        if isinstance(citation, (FullCaseCitation, FullJournalCitation)):
             volume = citation.groups.get("volume")
 
             # Validate the volume
@@ -349,10 +353,10 @@ def process_csv(
             )
 
             if cluster_updated:
-                total_clusters_updated = +1
+                total_clusters_updated += 1
 
             if docket_updated:
-                total_dockets_updated = +1
+                total_dockets_updated += 1
 
             # Add any of the citations if possible
             for citation in valid_citations:
