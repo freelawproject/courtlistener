@@ -196,23 +196,6 @@ class Audio(AbstractDateTimeModel):
     def get_absolute_url(self) -> str:
         return reverse("view_audio_file", args=[self.pk, self.docket.slug])
 
-    def save(  # type: ignore[override]
-        self,
-        index: bool = True,
-        force_commit: bool = False,
-        *args: List,
-        **kwargs: Dict,
-    ) -> None:
-        """
-        Overrides the normal save method, but provides integration with the
-        bulk files and with Solr indexing.
-
-        :param index: Should the item be added to the Solr index?
-        :param force_commit: Should a commit be performed in solr after
-        indexing it?
-        """
-        super().save(*args, **kwargs)  # type: ignore
-
     def as_search_dict(self) -> Dict[str, Union[int, List[int], str]]:
         """Create a dict that can be ingested by Solr"""
         # IDs

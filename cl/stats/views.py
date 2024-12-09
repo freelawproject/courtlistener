@@ -18,7 +18,7 @@ def health_check(request: HttpRequest) -> JsonResponse:
     is_postgresql_up = check_postgresql()
 
     status = HTTPStatus.OK
-    if not all([is_redis_up, is_postgresql_up, is_solr_up]):
+    if not all([is_redis_up, is_postgresql_up]):
         status = HTTPStatus.INTERNAL_SERVER_ERROR
 
     return JsonResponse(

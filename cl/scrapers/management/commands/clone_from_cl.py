@@ -527,8 +527,7 @@ def clone_audio_files(
             audio.local_path_mp3.save(file_name, cf, save=False)
 
         with transaction.atomic():
-            # Prevent solr from indexing the file
-            audio.save(index=False)
+            audio.save()
             print(f"Cloned audio with id {audio_id}")
 
 
