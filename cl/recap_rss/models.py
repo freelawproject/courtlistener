@@ -101,13 +101,11 @@ class RssFeedData(AbstractDateTimeModel):
     def reprocess_item(
         self,
         metadata_only: bool = False,
-        index: bool = True,
     ) -> None:
         """Reprocess the RSS feed
 
         :param metadata_only: If True, only do the metadata, not the docket
         entries.
-        :param index: Whether to save to Solr (note that none will be sent
         when doing medata only since no entries are modified).
         """
         from cl.recap_rss.tasks import merge_rss_feed_contents
