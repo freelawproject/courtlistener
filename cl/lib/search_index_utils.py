@@ -3,7 +3,20 @@ from datetime import date
 from cl.lib.date_time import midnight_pt
 
 
-def solr_list(m2m_list, field):
+def extract_field_values(m2m_list, field):
+    """Extracts values from a list of objects.
+
+    This function iterates over a list of objects, extracts the specified field value
+    from each object, and returns a new list of values.
+    If the field value is a `datetime.date` object, it is converted to midnight Pacific Time.
+
+    Args:
+        m2m_list: A list of objects.
+        field_name: The name of the field to extract values from.
+
+    Returns:
+        A list of extracted field values
+    """
     new_list = []
     for obj in m2m_list:
         obj = getattr(obj, field)
