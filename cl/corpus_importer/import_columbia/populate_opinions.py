@@ -444,7 +444,7 @@ def make_and_save(
         try:
             docket.save()
             cluster.docket = docket
-            cluster.save(index=False)
+            cluster.save()
             for citation in found_citations:
                 citation.cluster = cluster
                 citation.save()

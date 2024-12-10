@@ -2902,15 +2902,11 @@ class OpinionCluster(AbstractDateTimeModel):
     async def asave(
         self,
         update_fields=None,
-        index=True,
-        force_commit=False,
         *args,
         **kwargs,
     ):
         return await sync_to_async(self.save)(
             update_fields=update_fields,
-            index=index,
-            force_commit=force_commit,
             *args,
             **kwargs,
         )
