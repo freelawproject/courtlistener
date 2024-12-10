@@ -206,7 +206,7 @@ def store_opinion_citations_and_update_parentheticals(
                 )
 
     # Finally, commit these changes to the database in a single
-    # transcation block. Trigger a single Solr update as well, if
+    # transcation block. Trigger a single update as well, if
     # required.
     with transaction.atomic():
         opinion_clusters_to_update = OpinionCluster.objects.filter(
@@ -240,8 +240,8 @@ def store_opinion_citations_and_update_parentheticals(
                 OpinionCluster.objects.get(pk=cluster_id)
             )
 
-        # Save all the changes to the citing opinion (send to solr later)
-        opinion.save(index=False)
+        # Save all the changes to the citing opinion
+        opinion.save()
 
     # Update changes in ES.
     cluster_ids_to_update = list(

@@ -452,7 +452,7 @@ def make_and_save(
                 cluster.panel.add(member)
             for opinion, joined_by in opinions:
                 opinion.cluster = cluster
-                opinion.save(index=False)
+                opinion.save()
                 for joiner in joined_by:
                     opinion.joined_by.add(joiner)
             if settings.DEBUG:

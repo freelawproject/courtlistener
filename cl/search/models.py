@@ -3282,8 +3282,6 @@ class Opinion(AbstractDateTimeModel):
 
     def save(
         self,
-        index: bool = True,
-        force_commit: bool = False,
         *args: List,
         **kwargs: Dict,
     ) -> None:
