@@ -548,8 +548,7 @@ async def process_recap_docket(pk):
             // The PK of the docket that's created or updated
             'docket_pk': 22,
             // A boolean indicating whether a new docket entry or
-            // recap document was created (implying a Solr needs
-            // updating).
+            // recap document was created
             'content_updated': True,
         }
 
@@ -849,7 +848,7 @@ async def process_recap_docket_history_report(pk):
     """Process the docket history report.
 
     :param pk: The primary key of the processing queue item you want to work on
-    :returns: A dict indicating whether the docket needs Solr re-indexing.
+    :returns: A dict indicating whether the docket needs re-indexing.
     """
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -967,7 +966,7 @@ async def process_case_query_page(pk):
     """Process the case query (iquery.pl) page.
 
     :param pk: The primary key of the processing queue item you want to work on
-    :returns: A dict indicating whether the docket needs Solr re-indexing.
+    :returns: A dict indicating whether the docket needs re-indexing.
     """
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -1023,7 +1022,7 @@ async def process_case_query_page(pk):
     d.add_recap_source()
     await update_docket_metadata(d, data)
 
-    # Update the docket in SOLR if the case name has changed and contains
+    # Update the docket if the case name has changed and contains
     # docket entries
     content_updated = False
     if current_case_name != d.case_name and d.pk:
@@ -1103,8 +1102,7 @@ async def process_recap_appellate_docket(pk):
             // The PK of the docket that's created or updated
             'docket_pk': 22,
             // A boolean indicating whether a new docket entry or
-            // recap document was created (implying a Solr needs
-            // updating).
+            // recap document was created
             'content_updated': True,
         }
 
@@ -1217,8 +1215,7 @@ async def process_recap_acms_docket(pk):
             // The PK of the docket that's created or updated
             'docket_pk': 22,
             // A boolean indicating whether a new docket entry or
-            // recap document was created (implying a Solr needs
-            // updating).
+            // recap document was created.
             'content_updated': True,
         }
 
