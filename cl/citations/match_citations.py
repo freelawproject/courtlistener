@@ -32,14 +32,6 @@ DEBUG = True
 NO_MATCH_RESOURCE = Resource(case_citation(source_text="UNMATCHED_CITATION"))
 
 
-def build_date_range(start_year: int, end_year: int) -> str:
-    """Build a date range to be handed off to a solr query."""
-    start = datetime(start_year, 1, 1)
-    end = datetime(end_year, 12, 31)
-    date_range = f"[{start.isoformat()}Z TO {end.isoformat()}Z]"
-    return date_range
-
-
 def filter_by_matching_antecedent(
     opinion_candidates: Iterable[Opinion],
     antecedent_guess: Optional[str],
