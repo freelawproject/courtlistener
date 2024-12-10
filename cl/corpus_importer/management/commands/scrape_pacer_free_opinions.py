@@ -252,7 +252,6 @@ def get_pdfs(
     courts: list[Optional[str]],
     date_start: datetime.date,
     date_end: datetime.date,
-    index: bool,
     queue: str,
 ) -> None:
     """Get PDFs for the results of the Free Document Report queries.
@@ -269,7 +268,6 @@ def get_pdfs(
     courts
     :param date_end: optionally an end date to query all the specified courts or all
     courts
-    :param index: true if we should index as we process the data or do it later
     :param queue: the queue name
     :return: None
     """
@@ -304,8 +302,6 @@ def get_pdfs(
     )
     count = rows.count()
     task_name = "downloading"
-    if index:
-        task_name += " and indexing"
     logger.info(
         f"{task_name} {count} items from PACER from {date_start} to {date_end}."
     )
@@ -358,11 +354,10 @@ def get_pdfs(
             )
 
 
-def ocr_available(queue: str, index: bool) -> None:
-    """Do the OCR for any items that need it, then save to the solr index.
+def ocr_available(queue: str) -> None:
+    """Do the OCR for any items that need it, then save to the ES index.
 
     :param queue: the queue name
-    :param index: true if we should index as we process the data or do it later
     """
     q = cast(str, queue)
     rds = (
@@ -375,19 +370,12 @@ def ocr_available(queue: str, index: bool) -> None:
     throttle = CeleryThrottle(queue_name=q)
     for i, pk in enumerate(rds):
         throttle.maybe_wait()
-        if index:
-            extract_recap_pdf.si(pk, ocr_available=True).set(
-                queue=q
-            ).apply_async()
-        else:
-            extract_recap_pdf.si(pk, ocr_available=True).set(
-                queue=q
-            ).apply_async()
+        extract_recap_pdf.si(pk, ocr_available=True).set(queue=q).apply_async()
         if i % 1000 == 0:
             logger.info(f"Sent {i + 1}/{count} tasks to celery so far.")
 
 
-def do_everything(courts, date_start, date_end, index, queue):
+def do_everything(courts, date_start, date_end, queue):
     """Execute the entire process of obtaining the metadata of the free documents,
     downloading them and ingesting them into the system
 
@@ -396,15 +384,14 @@ def do_everything(courts, date_start, date_end, index, queue):
     courts
     :param date_end: optionally an end date to query all the specified courts or all
     courts
-    :param index: true if we should index as we process the data or do it later
     :param queue: the queue name
     """
     logger.info("Running and compiling free document reports.")
     get_and_save_free_document_reports(courts, date_start, date_end)
     logger.info("Getting PDFs from free document reports")
-    get_pdfs(courts, date_start, date_end, index, queue)
-    logger.info("Doing OCR and saving items to Solr.")
-    ocr_available(queue, index)
+    get_pdfs(courts, date_start, date_end, queue)
+    logger.info("Doing OCR and saving items.")
+    ocr_available(queue)
 
 
 class Command(VerboseCommand):
@@ -464,12 +451,6 @@ class Command(VerboseCommand):
             type=str,
             default="pacerdoc1",
             help="The celery queue where the tasks should be processed.",
-        )
-        parser.add_argument(
-            "--index",
-            action="store_true",
-            default=False,
-            help="Do we index as we go, or leave that to be done later?",
         )
         parser.add_argument(
             "--courts",
