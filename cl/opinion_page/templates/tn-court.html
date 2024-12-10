@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% load auth %}
 {% load static %}
-{% load waffle_tags %}
 
 {% block title %}
   Decisions for Tennessee Workers' Compensation Courts – CourtListener.com
@@ -112,11 +111,7 @@
                 class="btn btn-default">Upload New CWCC Decision</a></p>
         {% endif %}
         {% if results_tennworkcompcl.paginator.count > 0 %}
-          {% flag "o-es-active" %}
-            {% include "includes/search_result.html" with results=results_tennworkcompcl type_override=SEARCH_TYPES.OPINION simple=True %}
-          {% else %}
-            {% include "includes/search_result_solr.html" with results=results_tennworkcompcl type_override=SEARCH_TYPES.OPINION simple=True %}
-          {% endflag %}
+          {% include "includes/search_result.html" with results=results_tennworkcompcl type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
             <a href="/?court_tennworkcompcl=on&order_by=dateFiled+desc&court=tennworkcompcl"
                class="btn btn-default btn-lg v-offset-above-2"
@@ -134,11 +129,7 @@
                 class="btn btn-default">Upload New Appeals Board Decision</a></p>
         {% endif %}
         {% if results_tennworkcompapp.paginator.count > 0 %}
-          {% flag "o-es-active" %}
-            {% include "includes/search_result.html" with results=results_tennworkcompapp type_override=SEARCH_TYPES.OPINION simple=True %}
-          {% else %}
-            {% include "includes/search_result_solr.html" with results=results_tennworkcompapp type_override=SEARCH_TYPES.OPINION simple=True %}
-          {% endflag %}
+          {% include "includes/search_result.html" with results=results_tennworkcompapp type_override=SEARCH_TYPES.OPINION simple=True %}
           <p class="right">
             <a href="/?court_tennworkcompapp=on&order_by=dateFiled+desc&court=tennworkcompapp"
                class="btn btn-default btn-lg v-offset-above-2"

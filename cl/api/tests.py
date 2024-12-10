@@ -11,6 +11,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.humanize.templatetags.humanize import intcomma, ordinal
 from django.contrib.sites.models import Site
+from django.core.management import call_command
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.test import override_settings
@@ -29,7 +30,7 @@ from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import VersionBasedPagination
 from cl.api.utils import LoggingMixin, get_logging_prefix
-from cl.api.views import coverage_data
+from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
 from cl.audio.factories import AudioFactory
@@ -46,11 +47,7 @@ from cl.disclosures.api_views import (
 )
 from cl.favorites.api_views import DocketTagViewSet, UserTagViewSet
 from cl.lib.redis_utils import get_redis_interface
-from cl.lib.test_helpers import (
-    AudioTestCase,
-    IndexedSolrTestCase,
-    SimpleUserDataMixin,
-)
+from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
 from cl.people_db.api_views import (
     ABARatingViewSet,
     AttorneyViewSet,
@@ -64,7 +61,13 @@ from cl.people_db.api_views import (
     SchoolViewSet,
     SourceViewSet,
 )
-from cl.people_db.factories import PartyFactory, PartyTypeFactory
+from cl.people_db.factories import (
+    AttorneyFactory,
+    AttorneyOrganizationFactory,
+    PartyFactory,
+    PartyTypeFactory,
+    RoleFactory,
+)
 from cl.people_db.models import Attorney
 from cl.recap.factories import ProcessingQueueFactory
 from cl.recap.views import (
@@ -85,17 +88,33 @@ from cl.search.api_views import (
     RECAPDocumentViewSet,
     TagViewSet,
 )
-from cl.search.factories import CourtFactory, DocketFactory
-from cl.search.models import SOURCES, Court, Docket, Opinion
+from cl.search.factories import (
+    CourtFactory,
+    DocketFactory,
+    OpinionClusterFactoryWithChildrenAndParents,
+)
+from cl.search.models import (
+    PRECEDENTIAL_STATUS,
+    SEARCH_TYPES,
+    SOURCES,
+    Court,
+    Docket,
+    Opinion,
+)
 from cl.stats.models import Event
-from cl.tests.cases import SimpleTestCase, TestCase, TransactionTestCase
+from cl.tests.cases import (
+    ESIndexTestCase,
+    SimpleTestCase,
+    TestCase,
+    TransactionTestCase,
+)
 from cl.tests.utils import MockResponse, make_client
 from cl.users.factories import UserFactory, UserProfileWithParentsFactory
 from cl.users.models import UserProfile
 from cl.visualizations.api_views import JSONViewSet, VisualizationViewSet
 
 
-class BasicAPIPageTest(TestCase):
+class BasicAPIPageTest(ESIndexTestCase, TestCase):
     """Test the basic views"""
 
     fixtures = [
@@ -104,12 +123,16 @@ class BasicAPIPageTest(TestCase):
         "test_objects_search.json",
     ]
 
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
+
     def setUp(self) -> None:
         self.async_client = AsyncClient()
 
     async def test_api_root(self) -> None:
         r = await self.async_client.get(
-            reverse("api-root", kwargs={"version": "v3"}),
+            reverse("api-root", kwargs={"version": "v4"}),
             HTTP_ACCEPT="text/html",
         )
         self.assertEqual(r.status_code, 200)
@@ -148,12 +171,12 @@ class BasicAPIPageTest(TestCase):
 
     async def test_coverage_api(self) -> None:
         r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": 2, "court": "ca1"})
+            reverse("coverage_data", kwargs={"version": 4, "court": "ca1"})
         )
         self.assertEqual(r.status_code, 200)
 
     async def test_coverage_api_via_url(self) -> None:
-        r = await self.async_client.get("/api/rest/v2/coverage/ca1/")
+        r = await self.async_client.get("/api/rest/v4/coverage/ca1/")
         self.assertEqual(r.status_code, 200)
 
     async def test_api_info_page_displays_latest_rest_docs_by_default(
@@ -166,19 +189,59 @@ class BasicAPIPageTest(TestCase):
     async def test_api_info_page_can_display_different_versions_of_rest_docs(
         self,
     ) -> None:
-        for version in ["v1", "v2"]:
+        for version in ["v1", "v2", "v3"]:
             response = await self.async_client.get(
                 reverse("rest_docs", kwargs={"version": version})
             )
             self.assertEqual(response.status_code, 200)
             self.assertTemplateUsed(response, f"rest-docs-{version}.html")
-            header = f"REST API &ndash; {version.upper()}"
+            version_to_compare = version.upper() if version != "v3" else "v3"
+            header = f"REST API &ndash; {version_to_compare}"
             self.assertContains(response, header)
 
 
-class CoverageTests(IndexedSolrTestCase):
+class CoverageTests(ESIndexTestCase, TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.OpinionCluster")
+        cls.court_scotus = CourtFactory(id="scotus", jurisdiction="F")
+        cls.court_cand = CourtFactory(id="cand", jurisdiction="FD")
+
+        cls.c_scotus_1 = OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Strickland v. Lorem.",
+            docket=DocketFactory(
+                court=cls.court_scotus, docket_number="123456"
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
+            date_filed=date(2000, 8, 15),
+        )
+        cls.c_scotus_2 = OpinionClusterFactoryWithChildrenAndParents(
+            case_name="America vs Bank",
+            docket=DocketFactory(
+                court=cls.court_scotus, docket_number="34-2535"
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.ERRATA,
+            date_filed=date(2024, 6, 15),
+        )
+        cls.c_cand_1 = OpinionClusterFactoryWithChildrenAndParents(
+            case_name="Johnson v. National",
+            docket=DocketFactory(
+                court=cls.court_cand, docket_number="36-2000"
+            ),
+            precedential_status=PRECEDENTIAL_STATUS.UNPUBLISHED,
+            date_filed=date(1999, 7, 15),
+        )
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
     async def test_coverage_data_view_provides_court_data(self) -> None:
-        response = await coverage_data(HttpRequest(), "v2", "ca1")
+        response = await coverage_data(HttpRequest(), "v4", "ca1")
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response, JsonResponse)
         self.assertContains(response, "annual_counts")
@@ -186,7 +249,7 @@ class CoverageTests(IndexedSolrTestCase):
 
     async def test_coverage_data_all_courts(self) -> None:
         r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": "3", "court": "all"})
+            reverse("coverage_data", kwargs={"version": "4", "court": "all"})
         )
         j = json.loads(r.content)
         self.assertTrue(len(j["annual_counts"].keys()) > 0)
@@ -194,11 +257,82 @@ class CoverageTests(IndexedSolrTestCase):
 
     async def test_coverage_data_specific_court(self) -> None:
         r = await self.async_client.get(
-            reverse("coverage_data", kwargs={"version": "3", "court": "ca1"})
+            reverse(
+                "coverage_data", kwargs={"version": "4", "court": "scotus"}
+            )
         )
         j = json.loads(r.content)
-        self.assertTrue(len(j["annual_counts"].keys()) > 0)
-        self.assertIn("total", j)
+        self.assertEqual(len(j["annual_counts"].keys()), 25)
+        self.assertEqual(j["annual_counts"]["2000"], 1)
+        self.assertEqual(j["annual_counts"]["2024"], 1)
+        self.assertEqual(j["total"], 2)
+
+        # Ensure that coverage can be filtered using a query string.
+        r = await self.async_client.get(
+            reverse(
+                "coverage_data", kwargs={"version": "3", "court": "scotus"}
+            ),
+            {"q": "America"},
+        )
+        j = json.loads(r.content)
+        self.assertEqual(len(j["annual_counts"].keys()), 1)
+        self.assertEqual(j["annual_counts"]["2024"], 1)
+        self.assertEqual(j["total"], 1)
+
+    async def test_make_court_variable(self) -> None:
+        """Confirm opinions counts per court are properly returned."""
+
+        r = get_redis_interface("CACHE")
+        cache_count = r.keys(":1:court_counts_o")
+        if cache_count:
+            r.delete(*cache_count)
+        courts = await make_court_variable()
+        for court in courts:
+            if court.pk == self.court_scotus.pk:
+                self.assertEqual(2, court.count)
+            if court.pk == self.court_cand.pk:
+                self.assertEqual(1, court.count)
+
+    async def test_build_chart_data(self) -> None:
+        """Confirm build_chart_data method returns the right data."""
+
+        chart_data = await sync_to_async(build_chart_data)(["scotus", "cand"])
+        for court_data in chart_data:
+            if (
+                court_data["group"]
+                == self.court_scotus.get_jurisdiction_display()
+            ):
+                data = court_data["data"][0]
+                self.assertEqual(data["id"], self.court_scotus.pk)
+                self.assertEqual(data["label"], self.court_scotus.full_name)
+                self.assertEqual(data["data"][0]["val"], 2)
+
+                date_1 = datetime.fromisoformat(
+                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
+                )
+                date_2 = datetime.fromisoformat(
+                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
+                )
+                self.assertEqual(date_1.date(), self.c_scotus_1.date_filed)
+                self.assertEqual(date_2.date(), self.c_scotus_2.date_filed)
+
+            if (
+                court_data["group"]
+                == self.court_cand.get_jurisdiction_display()
+            ):
+                data = court_data["data"][0]
+                self.assertEqual(data["id"], self.court_cand.pk)
+                self.assertEqual(data["label"], self.court_cand.full_name)
+                self.assertEqual(data["data"][0]["val"], 1)
+
+                date_1 = datetime.fromisoformat(
+                    data["data"][0]["timeRange"][0].replace("Z", "+00:00")
+                )
+                date_2 = datetime.fromisoformat(
+                    data["data"][0]["timeRange"][1].replace("Z", "+00:00")
+                )
+                self.assertEqual(date_1.date(), self.c_cand_1.date_filed)
+                self.assertEqual(date_2.date(), self.c_cand_1.date_filed)
 
 
 @mock.patch(
@@ -1110,10 +1244,7 @@ class DRFJudgeApiFilterTests(
 
 
 class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
-    fixtures = [
-        "recap_docs.json",
-        "attorney_party.json",
-    ]
+    fixtures = ["recap_docs.json"]
 
     @classmethod
     def setUpTestData(cls) -> None:
@@ -1124,6 +1255,40 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         )
         ps = Permission.objects.filter(codename="has_recap_api_access")
         up.user.user_permissions.add(*ps)
+
+        cls.docket = Docket.objects.get(pk=1)
+        cls.docket_2 = DocketFactory()
+        firm = AttorneyOrganizationFactory(
+            name="Lawyers LLP", lookup_key="6201in816"
+        )
+        cls.attorney = AttorneyFactory(
+            name="Juneau",
+            contact_raw="Juneau\r\nAlaska",
+            phone="555-555-5555",
+            fax="555-555-5555",
+            email="j@me.com",
+            date_created="2017-04-25T23:52:43.497Z",
+            date_modified="2017-04-25T23:52:43.497Z",
+            organizations=[firm],
+            docket=cls.docket,
+        )
+        cls.attorney_2 = AttorneyFactory(
+            organizations=[firm], docket=cls.docket_2
+        )
+        cls.party = PartyFactory(
+            name="Honker",
+            extra_info="",
+            docket=cls.docket,
+            attorneys=[cls.attorney],
+            date_created="2017-04-25T23:53:11.745Z",
+            date_modified="2017-04-25T23:53:11.745Z",
+        )
+        PartyTypeFactory.create(
+            party=cls.party,
+            name="Defendant",
+            extra_info="Klaxon",
+            docket=cls.docket,
+        )
 
     @async_to_sync
     async def setUp(self) -> None:
@@ -1215,19 +1380,19 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
     async def test_attorney_filters(self) -> None:
         self.path = reverse("attorney-list", kwargs={"version": "v3"})
 
-        self.q["id"] = 1
+        self.q["id"] = self.attorney.pk
         await self.assertCountInResults(1)
-        self.q["id"] = 2
+        self.q["id"] = self.attorney_2.pk
+        await self.assertCountInResults(1)
+
+        self.q = {"docket__id": self.docket.pk}
+        await self.assertCountInResults(1)
+        self.q = {"docket__id": self.docket_2.pk}
         await self.assertCountInResults(0)
 
-        self.q = {"docket__id": 1}
+        self.q = {"parties_represented__id": self.party.pk}
         await self.assertCountInResults(1)
-        self.q = {"docket__id": 2}
-        await self.assertCountInResults(0)
-
-        self.q = {"parties_represented__id": 1}
-        await self.assertCountInResults(1)
-        self.q = {"parties_represented__id": 2}
+        self.q = {"parties_represented__id": 9999}
         await self.assertCountInResults(0)
         self.q = {"parties_represented__name__contains": "Honker"}
         await self.assertCountInResults(1)
@@ -1237,40 +1402,119 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         # Adds extra role to the existing attorney
         docket = await Docket.objects.afirst()
         attorney = await Attorney.objects.afirst()
+        party = await sync_to_async(PartyFactory)(
+            docket=self.docket_2,
+            attorneys=[attorney],
+        )
         await sync_to_async(PartyTypeFactory.create)(
-            party=await sync_to_async(PartyFactory)(
-                docket=docket,
-                attorneys=[attorney],
-            ),
-            docket=docket,
+            party=party,
+            docket=self.docket_2,
         )
         self.q = {"docket__date_created__range": "2017-04-14,2017-04-15"}
         await self.assertCountInResults(1)
         self.q = {"docket__date_created__range": "2017-04-15,2017-04-16"}
         await self.assertCountInResults(0)
 
+        # Initial request: Fetch all related records
+        self.q = {"docket__id": self.docket.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of parties
+        self.assertEqual(
+            len(results[0]["parties_represented"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['parties_represented'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Fetch attorney records for docket (repeat request with "filter_nested_results")
+        self.q = {"docket__id": self.docket.pk, "filter_nested_results": True}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify top-level record has single party (due to filter)
+        self.assertEqual(
+            len(results[0]["parties_represented"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['parties_represented'])}.\n\nr.data was: {r.data}",
+        )
+        # Verify expected party is present in the parties_represented list
+        self.assertIn(
+            str(self.party.pk), results[0]["parties_represented"][0]["party"]
+        )
+
+        # Request using parties_represented lookup: Fetch all related records
+        self.q = {"parties_represented__docket__id": self.docket_2.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of parties
+        self.assertEqual(
+            len(results[0]["parties_represented"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['parties_represented'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Fetch attorney records for parties associated with docket_2 (repeat with "filter_nested_results")
+        self.q = {
+            "parties_represented__docket__id": self.docket_2.pk,
+            "filter_nested_results": True,
+        }
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of parties
+        self.assertEqual(
+            len(results[0]["parties_represented"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['parties_represented'])}.\n\nr.data was: {r.data}",
+        )
+        # Verify expected party is present in the parties_represented list
+        self.assertIn(
+            str(party.pk), results[0]["parties_represented"][0]["party"]
+        )
+
     async def test_party_filters(self) -> None:
         self.path = reverse("party-list", kwargs={"version": "v3"})
 
-        self.q["id"] = 1
+        self.q["id"] = self.party.pk
         await self.assertCountInResults(1)
-        self.q["id"] = 2
+        self.q["id"] = 999_999
         await self.assertCountInResults(0)
 
         # This represents dockets that the party was a part of.
-        self.q = {"docket__id": 1}
+        self.q = {"docket__id": self.docket.id}
         await self.assertCountInResults(1)
-        self.q = {"docket__id": 2}
+        self.q = {"docket__id": self.docket_2.id}
         await self.assertCountInResults(0)
 
         # Contrasted with this, which joins based on their attorney.
-        self.q = {"attorney__docket__id": 1}
+        self.q = {"attorney__docket__id": self.docket.pk}
         await self.assertCountInResults(1)
-        self.q = {"attorney__docket__id": 2}
+        self.q = {"attorney__docket__id": self.docket_2.pk}
         await self.assertCountInResults(0)
 
         self.q = {"name": "Honker"}
         await self.assertCountInResults(1)
+        self.q = {"name__icontains": "Honk"}
+        await self.assertCountInResults(1)
+
         self.q = {"name": "Cardinal Bonds"}
         await self.assertCountInResults(0)
 
@@ -1278,6 +1522,137 @@ class DRFRecapApiFilterTests(TestCase, FilteringCountTestCase):
         await self.assertCountInResults(1)
         self.q = {"attorney__name__icontains": "Juno"}
         await self.assertCountInResults(0)
+
+        # Add another attorney to the party record but linked to another docket
+        await sync_to_async(RoleFactory.create)(
+            party=self.party, docket=self.docket_2, attorney=self.attorney_2
+        )
+
+        # Fetch all party records for docket
+        self.q = {"docket__id": self.docket.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of attorneys
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Fetch top-level record for docket (repeat with "filter_nested_results")
+        self.q = {"docket__id": self.docket.pk, "filter_nested_results": True}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify the record has only one attorney (due to filter)
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+        # Check if retrieved attorney matches expected record
+        self.assertEqual(
+            results[0]["attorneys"][0]["attorney_id"], self.attorney.pk
+        )
+
+        # Add another party type to the party record but linked to a different docket
+        await sync_to_async(PartyTypeFactory.create)(
+            party=self.party, docket=self.docket_2
+        )
+
+        # Fetch all party records for docket
+        self.q = {"docket__id": self.docket.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of attorneys
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of party types
+        self.assertEqual(
+            len(results[0]["party_types"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['party_types'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Fetch top-level record for docket (repeat with "filter_nested_results")
+        self.q = {"docket__id": self.docket.pk, "filter_nested_results": True}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify the record has only one attorney and one party type (due to filter)
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+        self.assertEqual(
+            len(results[0]["party_types"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['party_types'])}.\n\nr.data was: {r.data}",
+        )
+        # Check if retrieved party type matches expected record
+        self.assertNotEqual(
+            results[0]["party_types"][0]["docket_id"], self.docket_2.pk
+        )
+
+        # Fetch party details based on attorney lookup
+        self.q = {"attorney__docket__id": self.docket_2.pk}
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Verify record has expected number of attorneys
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            2,
+            msg=f"Expected 2, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+
+        # Apply additional filter to refine previous request
+        self.q = {
+            "attorney__docket__id": self.docket_2.pk,
+            "filter_nested_results": True,
+        }
+        r = await self.async_client.get(self.path, self.q)
+        results = r.data["results"]
+        self.assertEqual(
+            len(results),
+            1,
+            msg=f"Expected 1, but got {len(results)}.\n\nr.data was: {r.data}",
+        )
+        # Ensure only attorney_2 is associated with the filtered party
+        self.assertEqual(
+            len(results[0]["attorneys"]),
+            1,
+            msg=f"Expected 1, but got {len(results[0]['attorneys'])}.\n\nr.data was: {r.data}",
+        )
+        self.assertEqual(
+            results[0]["attorneys"][0]["attorney_id"], self.attorney_2.pk
+        )
 
 
 class DRFSearchAppAndAudioAppApiFilterTest(
