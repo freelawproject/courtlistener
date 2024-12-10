@@ -159,13 +159,13 @@ async def add_depth_counts(
     search_results: Page,
 ) -> OpinionCluster | None:
     """If the search data contains a single "cites" term (e.g., "cites:(123)"),
-    calculate and append the citation depth information between each Solr/ES
+    calculate and append the citation depth information between each ES
     result and the cited OpinionCluster. We only do this for *single* "cites"
     terms to avoid the complexity of trying to render multiple depth
     relationships for all the possible result-citation combinations.
 
     :param search_data: The cleaned search form data
-    :param search_results: The paginated Solr/ES results
+    :param search_results: The paginated ES results
     :return The OpinionCluster if the lookup was successful
     """
 
