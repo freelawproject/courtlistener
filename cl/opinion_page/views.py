@@ -1699,7 +1699,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
             if cluster is not None:
                 cluster.blocked = True
                 cluster.date_blocked = now()
-                await cluster.asave(index=False)
+                await cluster.asave()
 
         docket_pk = (
             pk

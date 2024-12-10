@@ -2891,8 +2891,6 @@ class OpinionCluster(AbstractDateTimeModel):
     def save(
         self,
         update_fields=None,
-        index=True,
-        force_commit=False,
         *args,
         **kwargs,
     ):
