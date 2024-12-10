@@ -4,18 +4,6 @@ from typing import Dict
 
 from cl.search.models import SEARCH_TYPES, Opinion
 
-SOLR_OPINION_HL_FIELDS = [
-    "caseName",
-    "citation",
-    "court_citation_string",
-    "docketNumber",
-    "judge",
-    "lexisCite",
-    "neutralCite",
-    "suitNature",
-    "text",
-]
-SOLR_PEOPLE_HL_FIELDS = ["name", "dob_city", "dob_state", "name_reverse"]
 PEOPLE_ES_HL_FIELDS = {
     "name": 0,
     "dob_city": 0,
@@ -119,13 +107,6 @@ SEARCH_MLT_OPINION_QUERY_FIELDS = [
 # ES fields that are used for highlighting
 SEARCH_HL_TAG = "mark"
 ALERTS_HL_TAG = "strong"
-SEARCH_ORAL_ARGUMENT_HL_FIELDS = [
-    "text",
-    "caseName",
-    "judge",
-    "docketNumber",
-    "court_citation_string",
-]
 SEARCH_ORAL_ARGUMENT_ES_HL_FIELDS = {
     "caseName": 0,
     "judge": 0,
@@ -138,18 +119,6 @@ SEARCH_ALERTS_ORAL_ARGUMENT_ES_HL_FIELDS = {
     "docketNumber": 0,
     "judge": 0,
 }
-SOLR_RECAP_HL_FIELDS = [
-    "assignedTo",
-    "caseName",
-    "cause",
-    "court_citation_string",
-    "docketNumber",
-    "juryDemand",
-    "referredTo",
-    "short_description",
-    "suitNature",
-    "text",
-]
 SEARCH_RECAP_HL_FIELDS = {
     "assignedTo": 0,
     "caseName": 0,
@@ -276,16 +245,6 @@ BOOSTS: Dict[str, Dict[str, Dict[str, float]]] = {
         SEARCH_TYPES.DOCKETS: recap_boosts_es,
         SEARCH_TYPES.RECAP_DOCUMENT: recap_boosts_es,
         SEARCH_TYPES.OPINION: opinion_boosts_es,
-    },
-    # Phrase-based boosts.
-    "pf": {
-        SEARCH_TYPES.OPINION: {"text": 3.0, "caseName": 3.0},
-        SEARCH_TYPES.RECAP: recap_boosts_pf,
-        SEARCH_TYPES.DOCKETS: recap_boosts_pf,
-        SEARCH_TYPES.ORAL_ARGUMENT: {"caseName": 3.0},
-        SEARCH_TYPES.PEOPLE: {
-            # None here. Phrases don't make much sense for people.
-        },
     },
 }
 

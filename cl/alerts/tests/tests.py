@@ -19,7 +19,6 @@ from django.utils.timezone import now
 from lxml import html
 from selenium.webdriver.common.by import By
 from timeout_decorator import timeout_decorator
-from waffle.testutils import override_switch
 
 from cl.alerts.factories import AlertFactory, DocketAlertWithParentsFactory
 from cl.alerts.management.commands.cl_send_scheduled_alerts import (
@@ -617,7 +616,6 @@ class AlertAPITests(APITestCase):
         self.assertEqual(await search_alert.acount(), 0)
 
 
-@override_switch("o-es-alerts-active", active=True)
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 class SearchAlertsWebhooksTest(
     ESIndexTestCase, TestCase, SearchAlertsAssertions
@@ -2030,7 +2028,6 @@ class DocketAlertGetNotesTagsTests(TestCase):
         self.assertEqual(tags_docket_3_user_1, [])
 
 
-@override_switch("oa-es-alerts-active", active=True)
 @mock.patch("cl.search.tasks.percolator_alerts_models_supported", new=[Audio])
 @mock.patch(
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
