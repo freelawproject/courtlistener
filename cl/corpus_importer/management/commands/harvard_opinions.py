@@ -597,8 +597,7 @@ def add_opinions(
             per_curiam=per_curiam,
             extracted_by_ocr=True,
         )
-        # Don't index now; do so later if desired
-        op.save(index=False)
+        op.save()
         new_op_pks.append(op.pk)
     return new_op_pks
 

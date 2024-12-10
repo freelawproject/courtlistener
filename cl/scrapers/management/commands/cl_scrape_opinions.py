@@ -210,7 +210,7 @@ def save_everything(
                 cluster.panel.add(candidate)
 
     opinion.cluster = cluster
-    opinion.save(index=index)
+    opinion.save()
     if not backscrape:
         RealTimeQueue.objects.create(
             item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
