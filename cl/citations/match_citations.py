@@ -16,7 +16,6 @@ from eyecite.models import (
 )
 from eyecite.test_factories import case_citation
 from eyecite.utils import strip_punct
-from scorched.response import SolrResponse
 
 from cl.citations.match_citations_queries import es_search_db_for_full_citation
 from cl.citations.types import (
@@ -65,7 +64,7 @@ def resolve_fullcase_citation(
 ) -> MatchedResourceType:
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
-        db_search_results: SolrResponse | list[Hit]
+        db_search_results: list[Hit]
         db_search_results, _ = es_search_db_for_full_citation(full_citation)
         # If there is one search result, try to return it
         if len(db_search_results) == 1:
