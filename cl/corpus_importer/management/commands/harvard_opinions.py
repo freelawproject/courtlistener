@@ -534,7 +534,7 @@ def add_new_case(
             judges=judges,
             filepath_json_harvard=file_path,
         )
-        cluster.save(index=False)
+        cluster.save()
         logger.info("Saving cluster for: %s", cluster.id)
 
         logger.info("Adding citation for: %s", citation.corrected_citation())

@@ -207,7 +207,7 @@ def add_new_records(
         correction=data["publication_status_note"] or "",
         judges=judges.replace("{", "").replace("}", "") or "",
     )
-    cluster.save(index=False)
+    cluster.save()
 
     for citation in found_citations:
         logger.info("Adding citation for: %s", citation.corrected_citation())

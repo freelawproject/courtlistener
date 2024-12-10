@@ -185,7 +185,7 @@ def save_everything(
     opinion, citations = items["opinion"], items["citations"]
     docket.save()
     cluster.docket = docket
-    cluster.save(index=False)  # Index only when the opinion is associated.
+    cluster.save()
 
     for citation in citations:
         citation.cluster_id = cluster.pk
