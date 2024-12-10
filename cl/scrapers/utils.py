@@ -464,34 +464,22 @@ def save_response(site: AbstractSite) -> None:
 
     storage = S3GlacierInstantRetrievalStorage()
     response = site.request["response"]
-    headers = dict(response.headers)
 
     scraper_id = site.court_id.split(".")[-1]
     scrape_type = site.court_id.split(".")[1]  # opinions or oral args
-    now_str = datetime.now().strftime("%Y_%m/%d/%H_%M_%S")
+    now_str = datetime.now().strftime("%Y/%m/%d/%H_%M_%S")
     base_name = f"responses/{scrape_type}/{scraper_id}/{now_str}"
 
+    headers_json = json.dumps(dict(response.headers), indent=4)
+    storage.save(f"{base_name}_headers.json", ContentFile(headers_json))
+
     try:
-        # both tests and parses JSON content
+        # both tests for and parses JSON content
         content = json.loads(response.content)
         extension = "json"
     except:
         content = response.content
         extension = "html"
-
-    # Append the headers to the response object, if it's a JSON
-    if isinstance(content, list):
-        content.append({"response_headers": headers})
-        content = json.dumps(content, indent=4)
-    elif isinstance(content, dict):
-        content["response_headers"] = headers
-        content = json.dumps(content, indent=4)
-    else:
-        # Appending the response headers to the content would save a
-        # PUT request and an extra download step, but it may cause
-        # encoding and upload conflicts, so we save them apart
-        json_string = json.dumps(dict(response.headers), indent=4)
-        storage.save(f"{base_name}_headers.json", ContentFile(json_string))
 
     content_name = f"{base_name}.{extension}"
     storage.save(content_name, ContentFile(content))
