@@ -1,5 +1,3 @@
-from typing import Dict, List, Union
-
 import pghistory
 from django.db import models
 from django.urls import reverse
