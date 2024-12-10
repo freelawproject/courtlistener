@@ -6,7 +6,6 @@ from random import randint
 from typing import Any, Generator
 
 import scorched
-import waffle
 from celery import Task
 from celery.canvas import chain
 from django.apps import apps
@@ -399,12 +398,6 @@ def es_save_document(
     ):
         # Only send search alerts when a new instance of a model that support
         # Alerts is indexed in ES _version:1
-        if es_document == AudioDocument and not waffle.switch_is_active(
-            "oa-es-alerts-active"
-        ):
-            # Disable ES Alerts if oa-es-alerts-active switch is not enabled
-            self.request.chain = None
-            return None
         return SaveESDocumentReturn(
             document_id=response["_id"].split("_")[-1],
             document_content=doc,

@@ -1,14 +1,9 @@
-import waffle
-from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.templatetags.static import static
 from django.utils.timezone import is_naive
-from requests import Session
 
-from cl.lib import search_utils
 from cl.lib.elasticsearch_utils import do_es_feed_query
 from cl.lib.podcast import iTunesPodcastsFeedGenerator
-from cl.lib.scorched_utils import ExtraSolrInterface
 from cl.lib.timezone_helpers import localize_naive_datetime_to_court_timezone
 from cl.search.documents import AudioDocument
 from cl.search.feeds import JurisdictionFeed, get_item
@@ -43,31 +38,15 @@ class JurisdictionPodcast(JurisdictionFeed):
         Returns a list of items to publish in this feed.
         """
         request, court = obj
-        if not waffle.flag_is_active(request, "oa-es-active"):
-            with Session() as session:
-                solr = ExtraSolrInterface(
-                    settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
-                )
-                params = {
-                    "q": "*",
-                    "fq": f"court_exact:{court.pk}",
-                    "sort": "dateArgued desc",
-                    "rows": "20",
-                    "start": "0",
-                    "caller": "JurisdictionPodcast",
-                }
-                items = solr.query().add_extra(**params).execute()
-                return items
-        else:
-            cd = {
-                "q": "*",
-                "court": court.pk,
-                "order_by": "dateArgued desc",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            }
-            search_query = AudioDocument.search()
-            items = do_es_feed_query(search_query, cd, rows=20)
-            return items
+        cd = {
+            "q": "*",
+            "court": court.pk,
+            "order_by": "dateArgued desc",
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
+        search_query = AudioDocument.search()
+        items = do_es_feed_query(search_query, cd, rows=20)
+        return items
 
     def feed_extra_kwargs(self, obj):
         extra_args = {
@@ -125,29 +104,14 @@ class AllJurisdictionsPodcast(JurisdictionPodcast):
         return request
 
     def items(self, obj):
-        if not waffle.flag_is_active(obj, "oa-es-active"):
-            with Session() as session:
-                solr = ExtraSolrInterface(
-                    settings.SOLR_AUDIO_URL, http_connection=session, mode="r"
-                )
-                params = {
-                    "q": "*",
-                    "sort": "dateArgued desc",
-                    "rows": "20",
-                    "start": "0",
-                    "caller": "AllJurisdictionsPodcast",
-                }
-                items = solr.query().add_extra(**params).execute()
-                return items
-        else:
-            cd = {
-                "q": "*",
-                "order_by": "dateArgued desc",
-                "type": SEARCH_TYPES.ORAL_ARGUMENT,
-            }
-            search_query = AudioDocument.search()
-            items = do_es_feed_query(search_query, cd, rows=20)
-            return items
+        cd = {
+            "q": "*",
+            "order_by": "dateArgued desc",
+            "type": SEARCH_TYPES.ORAL_ARGUMENT,
+        }
+        search_query = AudioDocument.search()
+        items = do_es_feed_query(search_query, cd, rows=20)
+        return items
 
 
 class SearchPodcast(JurisdictionPodcast):
@@ -160,37 +124,16 @@ class SearchPodcast(JurisdictionPodcast):
         search_form = SearchForm(obj.GET)
         if search_form.is_valid():
             cd = search_form.cleaned_data
-            if not waffle.flag_is_active(obj, "oa-es-active"):
-                with Session() as session:
-                    solr = ExtraSolrInterface(
-                        settings.SOLR_AUDIO_URL,
-                        http_connection=session,
-                        mode="r",
-                    )
-                    main_params = search_utils.build_main_query(
-                        cd, highlight=False, facet=False
-                    )
-                    main_params.update(
-                        {
-                            "sort": "dateArgued desc",
-                            "rows": "20",
-                            "start": "0",
-                            "caller": "SearchFeed",
-                        }
-                    )
-                    items = solr.query().add_extra(**main_params).execute()
-                    return items
-            else:
-                override_params = {
-                    "order_by": "dateArgued desc",
-                }
-                cd.update(override_params)
-                search_query = AudioDocument.search()
-                items = do_es_feed_query(
-                    search_query,
-                    cd,
-                    rows=20,
-                )
-                return items
+            override_params = {
+                "order_by": "dateArgued desc",
+            }
+            cd.update(override_params)
+            search_query = AudioDocument.search()
+            items = do_es_feed_query(
+                search_query,
+                cd,
+                rows=20,
+            )
+            return items
         else:
             return []
