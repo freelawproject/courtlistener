@@ -199,14 +199,7 @@ def extract_doc_content(
     try:
         opinion.cluster.docket.save()
         opinion.cluster.save()
-        if not citation_jitter:
-            # No waiting around. Save to the database now, but don't bother
-            # with the index yet because citations are being done imminently.
-            opinion.save()
-        else:
-            # Save to the index now, citations come later, commit comes
-            # according to schedule
-            opinion.save()
+        opinion.save()
     except Exception:
         logger.error(
             "****Error saving text to the db for: %s****\n%s",
