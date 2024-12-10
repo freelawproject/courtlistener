@@ -131,7 +131,6 @@ class PersonAdmin(admin.ModelAdmin, AdminTweaksMixin):
     )
     raw_id_fields = ("is_alias_of",)
     readonly_fields = ("has_photo",)
-    actions = ("update_in_solr", "delete_from_solr")
 
 
 @admin.register(Race)
