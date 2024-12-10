@@ -2739,7 +2739,6 @@ def recap_document_into_opinions(
     self,
     task_data: Optional[TaskData] = None,
     recap_document_id: Optional[int] = None,
-    add_to_solr: bool = False,
 ) -> Optional[TaskData]:
     """Ingest recap document into Opinions
 
@@ -2748,7 +2747,6 @@ def recap_document_into_opinions(
         command. This task should be chained after the PDF has
         been downloaded from PACER
     :param recap_document_id: The document id to inspect and import
-    :param add_to_solr: Whether to add to solr
 
     :return: The same `task_data` that came as input
     """
