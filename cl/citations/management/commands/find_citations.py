@@ -157,7 +157,7 @@ class Command(VerboseCommand):
             chunk.append(opinion_pk)
             if processed_count % chunk_size == 0 or last_item:
                 find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                    args=(chunk, True),
+                    args=(chunk,),
                     queue=queue_name,
                 )
                 chunk = []
