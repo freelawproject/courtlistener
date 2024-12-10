@@ -84,7 +84,7 @@ def import_opinions_from_recap(
             )
             throttle.maybe_wait()
             recap_document_into_opinions.apply_async(
-                args=[{}, recap_document.id, add_to_solr], queue=queue
+                args=[{}, recap_document.id], queue=queue
             )
             count += 1
             if total_count > 0 and count >= total_count:
