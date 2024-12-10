@@ -320,9 +320,7 @@ async def extract_recap_pdf_base(
                 rd.ocr_status = RECAPDocument.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
-        # Do not do indexing here. Creates race condition in celery.
         await rd.asave(
-            index=False,
             do_extraction=False,
             update_fields=["ocr_status", "plain_text"],
         )
