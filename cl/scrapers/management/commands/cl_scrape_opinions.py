@@ -177,7 +177,6 @@ def make_objects(
 @transaction.atomic
 def save_everything(
     items: Dict[str, Any],
-    index: bool = False,
     backscrape: bool = False,
 ) -> None:
     """Saves all the sub items and associates them as appropriate."""
@@ -368,8 +367,7 @@ class Command(ScraperCommand):
                 "opinion": opinion,
                 "cluster": cluster,
                 "citations": citations,
-            },
-            index=False,
+            }
         )
         extract_doc_content.delay(
             opinion.pk,
