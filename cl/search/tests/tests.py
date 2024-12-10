@@ -1,9 +1,7 @@
 import datetime
 import io
-import os
 from datetime import date
 from http import HTTPStatus
-from pathlib import Path
 from unittest import mock
 from urllib.parse import parse_qs
 

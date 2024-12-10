@@ -1,6 +1,5 @@
 import logging
-import socket
-from datetime import date, timedelta
+from datetime import date
 from importlib import import_module
 from random import randint
 from typing import Any, Generator
@@ -11,7 +10,6 @@ from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Prefetch, QuerySet
-from django.utils.timezone import now
 from elasticsearch.exceptions import (
     ApiError,
     ConflictError,
@@ -27,7 +25,6 @@ from elasticsearch.helpers import (
     streaming_bulk,
 )
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
-from requests import Session
 
 from cl.alerts.tasks import (
     percolator_response_processing,
@@ -36,10 +33,7 @@ from cl.alerts.tasks import (
 from cl.audio.models import Audio
 from cl.celery_init import app
 from cl.lib.elasticsearch_utils import build_daterange_query
-from cl.lib.search_index_utils import (
-    InvalidDocumentError,
-    get_parties_from_case_name,
-)
+from cl.lib.search_index_utils import get_parties_from_case_name
 from cl.people_db.models import Person, Position
 from cl.search.documents import (
     ES_CHILD_ID,
