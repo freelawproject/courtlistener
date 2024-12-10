@@ -51,7 +51,6 @@ class AudioFactory(DjangoModelFactory):
         if create and results:
             # Some post-generation hooks ran, and may have modified the instance.
             instance.save(
-                index=False,
                 update_fields=["local_path_mp3", "local_path_original_file"],
             )
 
