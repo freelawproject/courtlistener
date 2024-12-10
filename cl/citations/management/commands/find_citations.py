@@ -2,8 +2,7 @@ import sys
 import time
 from typing import Iterable, List, cast
 
-from django.conf import settings
-from django.core.management import CommandError, call_command
+from django.core.management import CommandError
 from django.core.management.base import CommandParser
 
 from cl.citations.tasks import (
@@ -61,27 +60,6 @@ class Command(VerboseCommand):
             help="Parse citations for all items",
         )
         parser.add_argument(
-            "--index",
-            type=str,
-            default="all-at-end",
-            choices=("all-at-end", "concurrently", "False"),
-            help=(
-                "When/if to save changes to the Solr index. Options are "
-                "all-at-end, concurrently or False. Saving 'concurrently' "
-                "is least efficient, since each document is updated once "
-                "for each citation to it, however this setting will show "
-                "changes in the index in realtime. Saving 'all-at-end' can "
-                "be considerably more efficient, but will not show changes "
-                "until the process has finished and the index has been "
-                "completely regenerated from the database. Setting this to "
-                "False disables changes to Solr, if that is what's desired. "
-                "Finally, only 'concurrently' will avoid reindexing the "
-                "entire collection. If you are only updating a subset of "
-                "the opinions, it is thus generally wise to use "
-                "'concurrently'."
-            ),
-        )
-        parser.add_argument(
             "--queue",
             default="batch1",
             help="The celery queue where the tasks should be processed.",
@@ -114,8 +92,6 @@ class Command(VerboseCommand):
                 "everything."
             )
 
-        self.index = options["index"]
-
         # Use query chaining to build the query
         query = Opinion.objects.all().order_by("pk")
         if options.get("doc_id"):
@@ -141,7 +117,6 @@ class Command(VerboseCommand):
         self.timings: List[float] = []
         opinion_pks = query.values_list("pk", flat=True).iterator()
         self.update_documents(opinion_pks, cast(str, options["queue"]))
-        self.add_to_solr(cast(str, options["queue"]))
 
     def log_progress(self, processed_count: int, last_pk: int) -> None:
         if processed_count % 1000 == 1:
@@ -171,10 +146,6 @@ class Command(VerboseCommand):
         sys.stdout.write(f"Graph size is {self.count:d} nodes.\n")
         sys.stdout.flush()
 
-        index_during_subtask = False
-        if self.index == "concurrently":
-            index_during_subtask = True
-
         chunk = []
         chunk_size = 100
         processed_count = 0
@@ -186,28 +157,9 @@ class Command(VerboseCommand):
             chunk.append(opinion_pk)
             if processed_count % chunk_size == 0 or last_item:
                 find_citations_and_parentheticals_for_opinion_by_pks.apply_async(
-                    args=(chunk, index_during_subtask),
+                    args=(chunk, True),
                     queue=queue_name,
                 )
                 chunk = []
 
             self.log_progress(processed_count, opinion_pk)
-
-    def add_to_solr(self, queue_name: str) -> None:
-        if self.index == "all-at-end":
-            # fmt: off
-            call_command(
-                'cl_update_index',
-                '--type', 'search.Opinion',
-                '--solr-url', settings.SOLR_OPINION_URL,
-                '--noinput',
-                '--update',
-                '--everything',
-                '--queue', queue_name,
-            )
-            # fmt: on
-        elif self.index == "False":
-            sys.stdout.write(
-                "Solr index not updated after running citation "
-                "finder. You may want to do so manually."
-            )
