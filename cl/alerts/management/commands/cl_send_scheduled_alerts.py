@@ -2,7 +2,6 @@ import datetime
 from collections import defaultdict
 from typing import Any, DefaultDict
 
-import waffle
 from asgiref.sync import async_to_sync
 from django.conf import settings
 
@@ -220,7 +219,4 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        if not waffle.switch_is_active("oa-es-alerts-active"):
-            logger.info("ES OA Alerts are disabled.")
-            return None
         send_scheduled_alerts(options["rate"])

@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from queue import Queue
 from random import randint
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 import eyecite
 import pytest
@@ -62,6 +62,7 @@ from cl.corpus_importer.management.commands.troller_bk import (
 )
 from cl.corpus_importer.management.commands.update_casenames_wl_dataset import (
     check_case_names_match,
+    parse_citations,
 )
 from cl.corpus_importer.signals import (
     handle_update_latest_case_id_and_schedule_iquery_sweep,
@@ -4006,6 +4007,30 @@ class ScrapeIqueryPagesTest(TestCase):
             f"iquery:court_empty_probe_attempts:{self.court_cacd.pk}"
         )
         self.assertEqual(int(court_empty_attempts), 0)
+
+
+class WestCitationImportTest(TestCase):
+    def test_parse_citation(self) -> None:
+        """Test parse citation for federal and journal citations"""
+        correct_response = [
+            {
+                "volume": "238",
+                "reporter": "F.3d",
+                "page": "273",
+                "type": Citation.FEDERAL,
+            },
+            {
+                "volume": "72",
+                "reporter": "Soc. Serv. Rev.",
+                "page": "318",
+                "type": Citation.JOURNAL,
+            },
+        ]
+        citation_strings = ["238 F.3d 273", "72 Soc.Sec.Rep.Serv. 318"]
+        valid_citations = parse_citations(citation_strings)
+        self.assertEqual(
+            valid_citations, correct_response, msg="Citations incorrect parsed"
+        )
 
 
 class CaseNamesTest(SimpleTestCase):

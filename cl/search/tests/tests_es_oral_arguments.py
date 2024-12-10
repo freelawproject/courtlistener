@@ -292,7 +292,6 @@ class OASearchAPICommonTests(AudioESTestCase):
         self.assertIn("Wallace", r.content.decode())
 
 
-@override_flag("oa-es-activate", active=True)
 class OAV3SearchAPITests(
     OASearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
 ):

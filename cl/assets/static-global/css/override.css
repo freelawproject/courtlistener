@@ -1491,6 +1491,10 @@ emphasis {
   border-color: #999999;
 }
 
+.alert-dismissible .second-row-btn {
+  margin-bottom: 10px;
+}
+
 .h-captcha > div {
   color: #333333 !important;
   font-family: Helvetica;
