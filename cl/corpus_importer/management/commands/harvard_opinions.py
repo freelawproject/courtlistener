@@ -228,7 +228,6 @@ class OptionsType(TypedDict):
     page: str
     court_id: Optional[str]
     location: Optional[str]
-    make_searchable: bool
     bankruptcy: bool
 
 
@@ -292,7 +291,7 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     If neither is provided, code will cycle through all downloaded files.
 
     :param options: The command line options including (reporter,
-    volume court_id and make_searchable)
+    volume and court_id)
     :return: None
     """
 
@@ -300,7 +299,6 @@ def parse_harvard_opinions(options: OptionsType) -> None:
     volumes = options["volumes"]
     page = options["page"]
     court_id = options["court_id"]
-    make_searchable = options["make_searchable"]
     is_bankruptcy = options["bankruptcy"]
 
     if not reporter and volumes:
@@ -420,7 +418,6 @@ def parse_harvard_opinions(options: OptionsType) -> None:
             citation,
             court_id,
             file_path,
-            make_searchable,
         )
 
 
@@ -435,7 +432,6 @@ def add_new_case(
     citation: FullCaseCitation,
     court_id: Optional[str],
     file_path: str,
-    make_searchable: bool,
 ) -> None:
     """Add new case to Courtlistener.com
 
@@ -449,7 +445,6 @@ def add_new_case(
     :param citation: The citation we use in logging and first citation parsed
     :param court_id: The CL Court ID
     :param file_path: The path to the Harvard JSON
-    :param make_searchable: Should we add this case to SOLR
     :return: None
     """
     soup = BeautifulSoup(case_body, "lxml")
@@ -728,12 +723,6 @@ class Command(VerboseCommand):
             "for courts-db differentiation.",
             required=False,
             default=None,
-        )
-        parser.add_argument(
-            "--make-searchable",
-            action="store_true",
-            help="Add items to solr as we create opinions. "
-            "Items are not searchable unless flag is raised.",
         )
         parser.add_argument(
             "--bankruptcy",
