@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-
-from datetime import datetime
 from typing import Dict, Iterable, List, Optional, no_type_check
 
 from elasticsearch_dsl.response import Hit
