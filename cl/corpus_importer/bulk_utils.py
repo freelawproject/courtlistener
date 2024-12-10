@@ -6,7 +6,6 @@ from cl.lib.command_utils import logger
 from cl.lib.pacer_session import ProxyPacerSession, SessionData
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import RECAPDocument
-from cl.search.tasks import add_items_to_solr
 
 
 def make_bankr_docket_number(docket_number: str, office_code: str) -> str:
@@ -69,5 +68,4 @@ def get_petitions(
                 tag=tag_petitions,
             ).set(queue=q),
             extract_recap_pdf.si(rd_pk).set(queue=q),
-            add_items_to_solr.si([rd_pk], "search.RECAPDocument").set(queue=q),
         ).apply_async()

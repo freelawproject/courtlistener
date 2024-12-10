@@ -17,7 +17,6 @@ from cl.citations.utils import map_reporter_db_cite_type
 from cl.lib.command_utils import VerboseCommand, logger
 from cl.lib.string_utils import trunc
 from cl.search.models import SOURCES, Citation, Docket, Opinion, OpinionCluster
-from cl.search.tasks import add_items_to_solr
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -208,7 +207,7 @@ def add_new_records(
         correction=data["publication_status_note"] or "",
         judges=judges.replace("{", "").replace("}", "") or "",
     )
-    cluster.save(index=False)
+    cluster.save()
 
     for citation in found_citations:
         logger.info("Adding citation for: %s", citation.corrected_citation())
@@ -360,7 +359,6 @@ def process_dates(
 def import_anon_2020_db(
     import_dir: str,
     skip_until: Optional[str],
-    make_searchable: Optional[bool],
 ) -> None:
     """Import data from anon 2020 DB into our system.
 
@@ -372,7 +370,6 @@ def import_anon_2020_db(
 
     :param import_dir: Location of directory of import data.
     :param skip_until: ID for case we should begin processing, if any.
-    :param make_searchable: Should we add content to SOLR.
     :return: None.
     """
     directories = iglob(f"{import_dir}/*/????-*.json")
@@ -428,20 +425,11 @@ def import_anon_2020_db(
                 court_id,
             )
 
-        if make_searchable and docket:
-            add_items_to_solr.delay([docket.pk], "search.Docket")
-
 
 class Command(VerboseCommand):
     help = "Import anon 2020 DB."
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--make-searchable",
-            action="store_true",
-            help="Add items to solr as we create opinions. "
-            "Items are not searchable unless flag is raised.",
-        )
         parser.add_argument(
             "--import-dir",
             default="cl/assets/media/x-db/all_dir/",
@@ -459,5 +447,4 @@ class Command(VerboseCommand):
     def handle(self, *args, **options):
         skip_until = options["skip_until"]
         import_dir = options["import_dir"]
-        make_searchable = options["make_searchable"]
-        import_anon_2020_db(import_dir, skip_until, make_searchable)
+        import_anon_2020_db(import_dir, skip_until)

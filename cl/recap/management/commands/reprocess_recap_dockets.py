@@ -9,7 +9,6 @@ from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
 from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument
-from cl.search.tasks import add_items_to_solr
 
 
 def extract_unextracted_rds_and_add_to_solr(queue: str) -> None:
@@ -44,7 +43,6 @@ def extract_unextracted_rds_and_add_to_solr(queue: str) -> None:
             throttle.maybe_wait()
             chain(
                 extract_recap_pdf.si(chunk).set(queue=queue),
-                add_items_to_solr.s("search.RECAPDocument").set(queue=queue),
             ).apply_async()
             chunk = []
             sys.stdout.write(

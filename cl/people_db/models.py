@@ -1,6 +1,5 @@
 import pghistory
 from django.db import models
-from django.template import loader
 from django.urls import reverse
 from django.utils.text import slugify
 from localflavor.us.models import (
@@ -11,7 +10,6 @@ from localflavor.us.models import (
 from model_utils import FieldTracker
 
 from cl.custom_filters.templatetags.extras import granular_date
-from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import (
     make_choices_group_lookup,
     validate_all_or_none,
@@ -25,11 +23,6 @@ from cl.lib.model_helpers import (
     validate_supervisor,
 )
 from cl.lib.models import AbstractDateTimeModel
-from cl.lib.search_index_utils import (
-    normalize_search_dicts,
-    null_map,
-    solr_list,
-)
 from cl.lib.string_utils import trunc
 from cl.search.models import Court
 
@@ -278,134 +271,6 @@ class Person(AbstractDateTimeModel):
         return any(
             position.is_judicial_position for position in self.positions.all()
         )
-
-    def as_search_dict(self):
-        """Create a dict that can be ingested by Solr"""
-        out = {
-            "id": self.pk,
-            "fjc_id": self.fjc_id,
-            "cl_id": "none",  # Deprecated, but required by Solr
-            "alias_ids": [alias.pk for alias in self.aliases.all()],
-            "races": [r.get_race_display() for r in self.race.all()],
-            "gender": self.get_gender_display(),
-            "religion": self.religion,
-            "name": self.name_full,
-            "name_reverse": self.name_full_reverse,
-            "date_granularity_dob": self.date_granularity_dob,
-            "date_granularity_dod": self.date_granularity_dod,
-            "dob_city": self.dob_city,
-            "dob_state": self.get_dob_state_display(),
-            "dob_state_id": self.dob_state,
-            "absolute_url": self.get_absolute_url(),
-            "school": [e.school.name for e in self.educations.all()],
-            "political_affiliation": [
-                pa.get_political_party_display()
-                for pa in self.political_affiliations.all()
-                if pa
-            ],
-            "political_affiliation_id": [
-                pa.political_party
-                for pa in self.political_affiliations.all()
-                if pa
-            ],
-            "aba_rating": [
-                r.get_rating_display() for r in self.aba_ratings.all() if r
-            ],
-        }
-
-        # Dates
-        if self.date_dob is not None:
-            out["dob"] = midnight_pt(self.date_dob)
-        if self.date_dod is not None:
-            out["dod"] = midnight_pt(self.date_dod)
-
-        # Joined Values. Brace yourself.
-        positions = self.positions.all()
-        if positions.count() > 0:
-            p_out = {
-                "court": [p.court.short_name for p in positions if p.court],
-                "court_exact": [p.court.pk for p in positions if p.court],
-                "position_type": [
-                    p.get_position_type_display() for p in positions
-                ],
-                "appointer": [
-                    p.appointer.person.name_full_reverse
-                    for p in positions
-                    if p.appointer
-                ],
-                "supervisor": [
-                    p.supervisor.name_full_reverse
-                    for p in positions
-                    if p.supervisor
-                ],
-                "predecessor": [
-                    p.predecessor.name_full_reverse
-                    for p in positions
-                    if p.predecessor
-                ],
-                "date_nominated": solr_list(positions, "date_nominated"),
-                "date_elected": solr_list(positions, "date_elected"),
-                "date_recess_appointment": solr_list(
-                    positions,
-                    "date_recess_appointment",
-                ),
-                "date_referred_to_judicial_committee": solr_list(
-                    positions,
-                    "date_referred_to_judicial_committee",
-                ),
-                "date_judicial_committee_action": solr_list(
-                    positions,
-                    "date_judicial_committee_action",
-                ),
-                "date_hearing": solr_list(positions, "date_hearing"),
-                "date_confirmation": solr_list(positions, "date_confirmation"),
-                "date_start": solr_list(positions, "date_start"),
-                "date_granularity_start": solr_list(
-                    positions,
-                    "date_granularity_start",
-                ),
-                "date_retirement": solr_list(
-                    positions,
-                    "date_retirement",
-                ),
-                "date_termination": solr_list(
-                    positions,
-                    "date_termination",
-                ),
-                "date_granularity_termination": solr_list(
-                    positions,
-                    "date_granularity_termination",
-                ),
-                "judicial_committee_action": [
-                    p.get_judicial_committee_action_display()
-                    for p in positions
-                    if p.judicial_committee_action
-                ],
-                "nomination_process": [
-                    p.get_nomination_process_display()
-                    for p in positions
-                    if p.nomination_process
-                ],
-                "selection_method": [
-                    p.get_how_selected_display()
-                    for p in positions
-                    if p.how_selected
-                ],
-                "selection_method_id": [
-                    p.how_selected for p in positions if p.how_selected
-                ],
-                "termination_reason": [
-                    p.get_termination_reason_display()
-                    for p in positions
-                    if p.termination_reason
-                ],
-            }
-            out.update(p_out)
-
-        text_template = loader.get_template("indexes/person_text.txt")
-        out["text"] = text_template.render({"item": self}).translate(null_map)
-
-        return normalize_search_dicts(out)
 
 
 @pghistory.track()

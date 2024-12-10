@@ -15,14 +15,13 @@ from cl.corpus_importer.tasks import (
 )
 from cl.lib.celery_utils import CeleryThrottle
 from cl.recap.tasks import process_recap_attachment
-from cl.search.tasks import add_or_update_recap_docket
 
 
 def get_docket_and_claims(
     docket_number, court, case_name, cookies_data, tags, q
 ):
-    """Get the docket report, claims history report, and save it all to the DB
-    and Solr
+    """
+    Get the docket report, claims history report, and save it all to the DB
     """
     chain(
         get_pacer_case_id_and_title.s(
@@ -46,7 +45,6 @@ def get_docket_and_claims(
         get_bankr_claims_registry.s(
             session_data=cookies_data, tag_names=tags
         ).set(queue=q),
-        add_or_update_recap_docket.s().set(queue=q),
     ).apply_async()
 
 

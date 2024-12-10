@@ -26,7 +26,6 @@ from cl.search.models import (
     RECAPDocument,
     SearchQuery,
 )
-from cl.search.tasks import add_items_to_solr
 
 
 @admin.register(Opinion)
@@ -46,18 +45,6 @@ class OpinionAdmin(CursorPaginatorAdmin):
         "date_created",
         "date_modified",
     )
-
-    def save_model(self, request, obj, form, change):
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.pk], "search.Opinion")
-
-    def delete_model(self, request, obj):
-        obj.delete()
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([obj.pk], "search.Opinion")
 
 
 @admin.register(Citation)
@@ -98,12 +85,6 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
         "date_modified",
         "date_created",
     )
-
-    def save_model(self, request, obj, form, change):
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.pk], "search.OpinionCluster")
 
 
 @admin.register(Court)
@@ -203,11 +184,6 @@ class RECAPDocumentAdmin(CursorPaginatorAdmin):
             ocr_status=None,
         )
 
-        # Update solr
-        add_items_to_solr.delay(
-            [rd.pk for rd in queryset], "search.RECAPDocument"
-        )
-
         # Do a CloudFront invalidation
         invalidate_cloudfront([f"/{path}" for path in deleted_filepaths])
 
@@ -235,11 +211,6 @@ class RECAPDocumentInline(admin.StackedInline):
         "date_modified",
     )
     raw_id_fields = ("tags",)
-
-    # Essential so that we remove sealed content from Solr when updating it via
-    # admin interface.
-    def save_model(self, request, obj, form, change):
-        obj.save(index=True)
 
 
 @admin.register(DocketEntry)
@@ -289,37 +260,6 @@ class DocketAdmin(CursorPaginatorAdmin):
         "parent_docket",
     )
 
-    def save_model(
-        self,
-        request: HttpRequest,
-        obj: Docket,
-        form: ModelForm,
-        change: bool,
-    ) -> None:
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        ids = list(
-            RECAPDocument.objects.filter(
-                docket_entry__docket_id=obj.pk,
-            ).values_list("id", flat=True)
-        )
-        add_items_to_solr.delay(ids, "search.RECAPDocument")
-
-    def delete_model(self, request: HttpRequest, obj: Docket) -> None:
-        # Do the query before deleting the item. Otherwise, the query returns
-        # nothing.
-        ids = list(
-            RECAPDocument.objects.filter(
-                docket_entry__docket_id=obj.pk
-            ).values_list("id", flat=True)
-        )
-
-        from cl.search.tasks import delete_items
-
-        delete_items.delay(ids, "search.RECAPDocument")
-        obj.delete()
-
 
 @admin.register(OpinionsCited)
 class OpinionsCitedAdmin(CursorPaginatorAdmin):
@@ -328,12 +268,6 @@ class OpinionsCitedAdmin(CursorPaginatorAdmin):
         "cited_opinion",
     )
     search_fields = ("=citing_opinion__id",)
-
-    def save_model(self, request, obj, form, change):
-        obj.save()
-        from cl.search.tasks import add_items_to_solr
-
-        add_items_to_solr.delay([obj.citing_opinion_id], "search.Opinion")
 
 
 @admin.register(Parenthetical)

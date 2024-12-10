@@ -166,7 +166,7 @@ def send_search_alert_webhook(
     """Send a search alert webhook event containing search results from a
     search alert object.
 
-    :param results: The search results returned by SOLR for this alert.
+    :param results: The search results returned for this alert.
     :param webhook: The webhook endpoint object to send the event to.
     :param alert: The search alert object.
     """

@@ -41,7 +41,6 @@ from cl.recap_rss.tasks import (
     is_cached,
 )
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
-from cl.search.tasks import add_items_to_solr
 
 FILES_BUFFER_THRESHOLD = 3
 
@@ -610,8 +609,6 @@ def iterate_and_import_files(
         rds_for_solr, dockets_created = async_to_sync(merge_rss_data)(
             feed_data, court_id, build_date
         )
-
-        add_items_to_solr.delay(rds_for_solr, "search.RECAPDocument")
 
         total_dockets_created += dockets_created
         total_rds_created += len(rds_for_solr)
