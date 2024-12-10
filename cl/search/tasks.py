@@ -5,7 +5,6 @@ from importlib import import_module
 from random import randint
 from typing import Any, Generator
 
-import scorched
 from celery import Task
 from celery.canvas import chain
 from django.apps import apps
@@ -29,7 +28,6 @@ from elasticsearch.helpers import (
 )
 from elasticsearch_dsl import Document, Q, UpdateByQuery, connections
 from requests import Session
-from scorched.exc import SolrError
 
 from cl.alerts.tasks import (
     percolator_response_processing,
