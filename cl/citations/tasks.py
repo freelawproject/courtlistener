@@ -102,7 +102,7 @@ def find_citations_and_parantheticals_for_recap_documents(
         try:
             store_recap_citations(d)
         except ResponseNotReady as e:
-            # Threading problem in httplib, which is used in the Solr query.
+            # Threading problem in httplib.
             raise self.retry(exc=e, countdown=2)
 
 
@@ -110,12 +110,10 @@ def find_citations_and_parantheticals_for_recap_documents(
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
     opinion_pks: List[int],
-    index: bool = True,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
-    :param index: Whether to add the items to Solr
     :return: None
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
@@ -123,20 +121,19 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     )
     for opinion in opinions:
         try:
-            store_opinion_citations_and_update_parentheticals(opinion, index)
+            store_opinion_citations_and_update_parentheticals(opinion)
         except ResponseNotReady as e:
-            # Threading problem in httplib, which is used in the Solr query.
+            # Threading problem in httplib.
             raise self.retry(exc=e, countdown=2)
 
 
 def store_opinion_citations_and_update_parentheticals(
-    opinion: Opinion, index: bool
+    opinion: Opinion,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion, as well as parenthetical info for the cited opinions.
 
     :param opinion: A search.Opinion object.
-    :param index: Whether to add the item to Solr
     :return: None
     """
 
