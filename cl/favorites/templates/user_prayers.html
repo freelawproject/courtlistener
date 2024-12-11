@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load extras %}
+{% load text_filters %}
+{% load static %}
+{% load pacer %}
+{% load tz %}
+{% load humanize %}
+
+{% block title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block og_title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
+{% block og_description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
+
+{% block content %}
+  <div class="col-xs-12">
+    <h1 class="text-center">{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %}</h1>
+  </div>
+
+  <div class="col-xs-12">
+    <div class="well well-sm">
+      {% if is_page_owner %}
+        <p>You have had <b>{{ count|intcomma }}</b> requests fulfilled for documents that cost <b>${{ total_cost|floatformat:2 }}</b>.<p>
+        <p>{% if is_eligible %}You are eligible to make document requests.{% else %}You have reached your daily limit; wait 24 hours to make new requests.{% endif %}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-xs-12">
+    <div class="table-responsive">
+      <table class="settings-table table">
+        <thead>
+            <tr>
+              <th>Court</th>
+              <th>Case Name</th>
+              <th>Document Number</th>
+              <th>Document Description</th>
+              <th>Requested On</th>
+              <th>Status</th>
+              {% if is_page_owner %}<th>Delete</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for prayer in prayers %}
+            <tr>
+              <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
+              {% with docket=prayer.docket_entry.docket %}
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}">
+                  {{ prayer.docket_entry.docket|best_case_name|safe|v_wrapper }} ({{ prayer.docket_entry.docket.docket_number }})
+                </a>
+              </td>
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}#entry-{{ prayer.docket_entry.entry_number }}">
+                  {{ prayer.document_number }}
+                </a>
+              </td>
+              {% endwith %}
+              <td>{{ prayer.description }}</td>
+              <td>{{ prayer.date_created|date:"M j, Y"  }}</td>
+              <td>{% if prayer.status == WAITING %} Pending {% elif prayer.status == GRANTED %}
+                <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
+                                  {% if rd.filepath_local %}
+                                    <a href="{{ rd.filepath_local.url }}"
+                                       rel="nofollow"
+                                       role="button"
+                                       class="btn btn-primary btn-xs"
+                                            {% if rd.date_upload %}
+                                       title="Uploaded {{ rd.date_upload|timezone:timezone }}"
+                                            {% endif %}>
+                                      Download PDF
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-primary btn-xs dropdown-toggle"
+                                            data-toggle="dropdown"
+                                            aria-haspopup="true"
+                                            aria-expanded="false">
+                                      <span class="caret"></span>
+                                      <span class="sr-only">Toggle Dropdown</span>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                      <li>
+                                        <a href="{{ rd.filepath_local.url }}" rel="nofollow">From
+                                          CourtListener</a>
+                                      </li>
+                                      {% if rd.filepath_ia %}
+                                        <li>
+                                          <a href="{{ rd.filepath_ia }}"
+                                             rel="nofollow">From
+                                            Internet Archive</a>
+                                        </li>
+                                      {% endif %} {% endif %} {% endif %}</td>
+              {% if is_page_owner %}<td><a href="{% url 'delete_prayer' recap_document=prayer.pk %}">Delete</a></td>{% endif %}
+              {% comment %} <td><a href="{{ prayer.pacer_url }}"
+                {% if not request.COOKIES.buy_on_pacer_modal and not request.COOKIES.recap_install_plea %}
+                  class="open_buy_pacer_modal btn btn-default btn-xs"
+                  data-toggle="modal" data-target="#modal-buy-pacer"
+                {% else%}
+                  class="btn btn-default btn-xs"
+                {% endif %}
+                  target="_blank"
+                  rel="nofollow">Buy on PACER {% if prayer.page_count %}(${{ prayer|price }}){% endif %}</td> {% endcomment %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2">No document requests made. Consider making one!</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+
+{% block footer-scripts %}
+  <script defer type="text/javascript"
+            src="{% static "js/buy_pacer_modal.js" %}"></script>
+  {% include "includes/buy_pacer_modal.html" %}
+{% endblock %}

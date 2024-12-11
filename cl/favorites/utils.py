@@ -1,16 +1,23 @@
+from dataclasses import dataclass
 from datetime import timedelta
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.db.models import (
     Avg,
+    Case,
     Count,
     ExpressionWrapper,
     F,
     FloatField,
     Q,
     Subquery,
+    Sum,
+    Value,
+    When,
 )
 from django.db.models.functions import Cast, Extract, Now, Sqrt
 from django.template import loader
@@ -117,11 +124,16 @@ async def get_top_prayers() -> list[RECAPDocument]:
             "attachment_number",
             "pacer_doc_id",
             "page_count",
+            "is_free_on_pacer",
             "description",
+            "docket_entry__entry_number",
             "docket_entry__docket_id",
             "docket_entry__docket__slug",
+            "docket_entry__docket__case_name",
+            "docket_entry__docket__docket_number",
             "docket_entry__docket__pacer_case_id",
             "docket_entry__docket__court__jurisdiction",
+            "docket_entry__docket__court__citation_string",
             "docket_entry__docket__court_id",
         )
         .annotate(
@@ -145,6 +157,46 @@ async def get_top_prayers() -> list[RECAPDocument]:
     )
 
     return [doc async for doc in documents.aiterator()]
+
+
+async def get_user_prayers(user: User) -> list[Prayer]:
+    user_prayers = Prayer.objects.filter(user=user).values("recap_document_id")
+
+    documents = (
+        RECAPDocument.objects.filter(id__in=Subquery(user_prayers))
+        .select_related(
+            "docket_entry",
+            "docket_entry__docket",
+            "docket_entry__docket__court",
+        )
+        .only(
+            "pk",
+            "document_type",
+            "document_number",
+            "attachment_number",
+            "pacer_doc_id",
+            "page_count",
+            "is_free_on_pacer",
+            "description",
+            "date_created",
+            "docket_entry__entry_number",
+            "docket_entry__docket_id",
+            "docket_entry__docket__slug",
+            "docket_entry__docket__case_name",
+            "docket_entry__docket__docket_number",
+            "docket_entry__docket__pacer_case_id",
+            "docket_entry__docket__court__jurisdiction",
+            "docket_entry__docket__court__citation_string",
+            "docket_entry__docket__court_id",
+        )
+        .annotate(
+            prayer_status=F("prayers__status"),
+            prayer_date_created=F("prayers__date_created"),
+        )
+        .order_by("prayers__date_created")
+    )
+
+    return [document async for document in documents.aiterator()]
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
@@ -211,19 +263,69 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
     return count, total_cost
 
 
-async def get_lifetime_prayer_stats() -> tuple[int, int, float]:
+@dataclass
+class PrayerStats:
+    prayer_count: int
+    distinct_count: int
+    total_cost: str
 
-    filtered_list = Prayer.objects.filter(status=Prayer.GRANTED)
 
-    count = await filtered_list.acount()
+async def get_lifetime_prayer_stats(
+    status: int,
+) -> (
+    PrayerStats
+):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
 
-    total_cost = 0
-    distinct_documents = set()
+    cache_key = f"prayer-stats-{status}"
 
-    async for prayer in filtered_list:
-        distinct_documents.add(prayer.recap_document)
-        total_cost += float(await price(prayer.recap_document))
+    data = await cache.aget(cache_key)
 
-    num_distinct_purchases = len(distinct_documents)
+    if data is not None:
+        return PrayerStats(
+            prayer_count=data["count"],
+            distinct_count=data["num_distinct_purchases"],
+            total_cost=data["total_cost"],
+        )
 
-    return count, num_distinct_purchases, total_cost
+    prayer_by_status = Prayer.objects.filter(status=status)
+
+    prayer_count = await prayer_by_status.acount()
+
+    distinct_prayers = (
+        await prayer_by_status.values("recap_document").distinct().acount()
+    )
+
+    total_cost = await (
+        prayer_by_status.select_related("recap_document")
+        .values("recap_document")
+        .distinct()
+        .annotate(
+            price=Case(
+                When(recap_document__is_free_on_pacer=True, then=Value(0.0)),
+                When(recap_document__page_count__gt=30, then=Value(3.0)),
+                When(
+                    recap_document__page_count__gt=0,
+                    recap_document__page_count__lte=30,
+                    then=F("recap_document__page_count") * 0.10,
+                ),
+                default=Value(0.0),
+            )
+        )
+        .aaggregate(Sum("price", default=0.0))
+    )
+
+    total_cost = total_cost["price__sum"]
+
+    data = {
+        "count": prayer_count,
+        "num_distinct_purchases": distinct_prayers,
+        "total_cost": f"{total_cost:,.2f}",
+    }
+    one_day = 60 * 60 * 24
+    await cache.aset(cache_key, data, one_day)
+
+    return PrayerStats(
+        prayer_count=prayer_count,
+        distinct_count=distinct_prayers,
+        total_cost=f"{total_cost:,.2f}",
+    )
