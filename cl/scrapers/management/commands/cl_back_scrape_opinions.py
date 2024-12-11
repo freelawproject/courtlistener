@@ -87,5 +87,5 @@ class Command(cl_scrape_opinions.Command):
                 )
                 time.sleep(wait)
 
-    def save_everything(self, items, index=False, backscrape=True):
-        super().save_everything(items, index, backscrape)
+    def save_everything(self, items, backscrape=True):
+        super().save_everything(items, backscrape)
