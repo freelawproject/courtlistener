@@ -84,7 +84,6 @@ def lookup_and_save(new, debug=False):
             d = ds[0]
         elif count > 1:
             # Too many dockets returned. Disambiguate.
-            logger.error("Got multiple results while attempting save.")
 
             def is_different(x):
                 return x.pacer_case_id and x.pacer_case_id != new.pacer_case_id
