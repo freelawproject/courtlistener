@@ -475,7 +475,7 @@ def save_response(site: AbstractSite) -> None:
 
     try:
         # both tests for and parses JSON content
-        content = json.loads(response.content)
+        content = json.dumps(json.loads(response.content), indent=4)
         extension = "json"
     except (UnicodeDecodeError, json.decoder.JSONDecodeError):
         content = response.content
