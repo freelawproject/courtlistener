@@ -1,32 +1,31 @@
 Hello{% if name %} {{ name }}{% endif %},
 
 I'm Mike, one of the co-founders of Free Law Project, the non-profit that
-sponsors the development of CourtListener and RECAP. This is an automated
+builds and maintains CourtListener, RECAP, and Bots.law. This is an automated
 message, but I like to send it anyway just to say hello and to welcome you to
 the site. Welcome!
 
-Whether you'd just like to set up some daily alerts for topics that interest
-you, download our data, or even contribute somehow to our efforts, I'm glad
-you've signed up and would be happy to try to help you with whatever you're
-trying to do.
+Whether you're here to monitor cases, do research, download our data, or even
+contribute somehow to our efforts, I'm glad you've signed up and would be happy
+to help you with whatever you're trying to do.
 
 Some of the highlights of CourtListener and RECAP are:
 
- - A searchable case law archive with high quality metadata and citations:
+ - A searchable case law archive with high-quality metadata and citations:
 
        https://www.courtlistener.com{% url "advanced_o" %}
 
- - The RECAP Archive, one of the largest open collections of federal court
-   data:
+ - The RECAP Archive, which has over 200M pages of PACER content and over 60M
+   federal cases:
 
        https://www.courtlistener.com{% url "advanced_r" %}
 
- - The RECAP Extension for Firefox and Chrome, which helps make PACER better
-   and cheaper, while contributing to the RECAP Archive:
+ - The RECAP Extension for Firefox, Chrome, Edge, and Safari, which helps make
+   PACER better and cheaper, while contributing to the RECAP Archive:
 
        https://free.law/recap/
 
- - Our oral argument audio archive, containing over a million minutes of
+ - Our oral argument audio archive, containing over three million minutes of
    recordings:
 
        https://www.courtlistener.com{% url "advanced_oa" %}
