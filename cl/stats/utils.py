@@ -1,11 +1,15 @@
 from collections import OrderedDict
 
 import redis
-import requests
-from django.conf import settings
 from django.db import OperationalError, connections
 from django.db.models import F
 from django.utils.timezone import now
+from elasticsearch.exceptions import (
+    ConnectionError,
+    ConnectionTimeout,
+    RequestError,
+)
+from elasticsearch_dsl import connections as es_connections
 
 from cl.lib.db_tools import fetchall_as_dict
 from cl.lib.redis_utils import get_redis_interface
@@ -77,6 +81,31 @@ def check_redis() -> bool:
     except (redis.exceptions.ConnectionError, ConnectionRefusedError):
         return False
     return True
+
+
+def check_elasticsearch() -> bool:
+    """
+    Checks the health of the connected Elasticsearch cluster.
+
+    it retrieves the cluster health information and returns:
+
+    * True:  if the cluster health status is "green" (healthy).
+    * False: if the cluster health is not "green" or an error occurs
+              during connection or health retrieval.
+    """
+    try:
+        es = es_connections.get_connection()
+        cluster_health = es.cluster.health()
+    except (
+        ConnectionError,
+        ConnectionTimeout,
+        RequestError,
+    ):
+        return False
+
+    if cluster_health["status"] == "green":
+        return True
+    return False
 
 
 def check_postgresql() -> bool:
