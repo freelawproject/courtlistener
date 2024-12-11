@@ -206,8 +206,7 @@ def store_opinion_citations_and_update_parentheticals(
                 )
 
     # Finally, commit these changes to the database in a single
-    # transcation block. Trigger a single update as well, if
-    # required.
+    # transcation block.
     with transaction.atomic():
         opinion_clusters_to_update = OpinionCluster.objects.filter(
             sub_opinions__pk__in=opinion_ids_to_update
