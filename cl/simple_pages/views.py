@@ -18,6 +18,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 
 from cl.audio.models import Audio
+from cl.components import date
 from cl.disclosures.models import (
     Agreement,
     Debt,
@@ -454,6 +455,10 @@ async def latest_terms(request: HttpRequest) -> HttpResponse:
             "private": False,
         },
     )
+
+
+async def components(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "components.html", {"private": False})
 
 
 async def validate_for_wot(request: HttpRequest) -> HttpResponse:
