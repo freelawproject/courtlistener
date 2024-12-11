@@ -5,6 +5,7 @@ from juriscraper.AbstractSite import logger
 from juriscraper.lib.importer import site_yielder
 
 from cl.scrapers.management.commands import cl_scrape_opinions
+from cl.scrapers.utils import save_response
 
 
 def add_backscraper_arguments(parser) -> None:
@@ -74,6 +75,7 @@ class Command(cl_scrape_opinions.Command):
                 days_interval=options.get("days_interval"),
             ).back_scrape_iterable,
             mod,
+            save_response_fn=save_response,
         ):
             site.parse()
             self.scrape_court(site, full_crawl=True)

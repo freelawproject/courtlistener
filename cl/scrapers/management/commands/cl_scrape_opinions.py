@@ -33,6 +33,7 @@ from cl.scrapers.utils import (
     get_binary_content,
     get_child_court,
     get_extension,
+    save_response,
     signal_handler,
     update_or_create_docket,
 )
@@ -383,7 +384,7 @@ class Command(ScraperCommand):
         )
 
     def parse_and_scrape_site(self, mod, options: dict):
-        site = mod.Site().parse()
+        site = mod.Site(save_response_fn=save_response).parse()
         self.scrape_court(site, options["full_crawl"])
 
     def handle(self, *args, **options):
