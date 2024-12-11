@@ -178,7 +178,6 @@ def make_objects(
 @transaction.atomic
 def save_everything(
     items: Dict[str, Any],
-    index: bool = False,
     backscrape: bool = False,
 ) -> None:
     """Saves all the sub items and associates them as appropriate."""
@@ -186,7 +185,7 @@ def save_everything(
     opinion, citations = items["opinion"], items["citations"]
     docket.save()
     cluster.docket = docket
-    cluster.save(index=False)  # Index only when the opinion is associated.
+    cluster.save()
 
     for citation in citations:
         citation.cluster_id = cluster.pk
@@ -211,7 +210,7 @@ def save_everything(
                 cluster.panel.add(candidate)
 
     opinion.cluster = cluster
-    opinion.save(index=index)
+    opinion.save()
     if not backscrape:
         RealTimeQueue.objects.create(
             item_type=SEARCH_TYPES.OPINION, item_pk=opinion.pk
@@ -369,8 +368,7 @@ class Command(ScraperCommand):
                 "opinion": opinion,
                 "cluster": cluster,
                 "citations": citations,
-            },
-            index=False,
+            }
         )
         extract_doc_content.delay(
             opinion.pk,

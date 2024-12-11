@@ -12,7 +12,7 @@ from elasticsearch_dsl import Q
 from lxml import html
 
 from cl.lib.elasticsearch_utils import build_es_base_query, build_es_main_query
-from cl.lib.search_index_utils import solr_list
+from cl.lib.search_index_utils import extract_field_values
 from cl.lib.test_helpers import (
     CourtTestCase,
     PeopleTestCase,
@@ -464,39 +464,47 @@ class PeopleV3APISearchTest(
         positions = self.person_2.positions.all()
         self.assertEqual(
             Counter(r.data["results"][0]["date_nominated"]),
-            Counter(solr_list(positions, "date_nominated")),
+            Counter(extract_field_values(positions, "date_nominated")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_elected"]),
-            Counter(solr_list(positions, "date_elected")),
+            Counter(extract_field_values(positions, "date_elected")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_recess_appointment"]),
-            Counter(solr_list(positions, "date_recess_appointment")),
+            Counter(
+                extract_field_values(positions, "date_recess_appointment")
+            ),
         )
         self.assertEqual(
             Counter(
                 r.data["results"][0]["date_referred_to_judicial_committee"]
             ),
             Counter(
-                solr_list(positions, "date_referred_to_judicial_committee")
+                extract_field_values(
+                    positions, "date_referred_to_judicial_committee"
+                )
             ),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_judicial_committee_action"]),
-            Counter(solr_list(positions, "date_judicial_committee_action")),
+            Counter(
+                extract_field_values(
+                    positions, "date_judicial_committee_action"
+                )
+            ),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_hearing"]),
-            Counter(solr_list(positions, "date_hearing")),
+            Counter(extract_field_values(positions, "date_hearing")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_confirmation"]),
-            Counter(solr_list(positions, "date_confirmation")),
+            Counter(extract_field_values(positions, "date_confirmation")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_start"]),
-            Counter(solr_list(positions, "date_start")),
+            Counter(extract_field_values(positions, "date_start")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_granularity_start"]),
@@ -510,11 +518,11 @@ class PeopleV3APISearchTest(
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_retirement"]),
-            Counter(solr_list(positions, "date_retirement")),
+            Counter(extract_field_values(positions, "date_retirement")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_termination"]),
-            Counter(solr_list(positions, "date_termination")),
+            Counter(extract_field_values(positions, "date_termination")),
         )
         self.assertEqual(
             Counter(r.data["results"][0]["date_granularity_termination"]),
