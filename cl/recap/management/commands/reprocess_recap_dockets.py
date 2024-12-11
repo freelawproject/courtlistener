@@ -11,9 +11,9 @@ from cl.scrapers.tasks import extract_recap_pdf
 from cl.search.models import Docket, RECAPDocument
 
 
-def extract_unextracted_rds_and_add_to_solr(queue: str) -> None:
+def extract_unextracted_rds(queue: str) -> None:
     """Performs content extraction for all recap documents that need to be
-    extracted and then add to solr.
+    extracted.
 
     :param queue: The celery queue to use
     :return: None
@@ -74,22 +74,20 @@ class Command(VerboseCommand):
         )
 
         parser.add_argument(
-            "--extract-and-add-solr-unextracted-rds",
+            "--extract-unextracted-rds",
             action="store_true",
             default=False,
-            help="Extract all recap documents that need to be extracted and "
-            "then add to solr.",
+            help="Extract all recap documents that need to be extracted.",
         )
 
     def handle(self, *args, **options):
         super().handle(*args, **options)
-        if options["extract_and_add_solr_unextracted_rds"]:
+        if options["extract_unextracted_rds"]:
             queue = options["queue"]
             sys.stdout.write(
-                "Extracting all recap documents that need extraction and then "
-                "add to solr. \n"
+                "Extracting all recap documents that need extraction. \n"
             )
-            extract_unextracted_rds_and_add_to_solr(queue)
+            extract_unextracted_rds(queue)
             return
 
         ds = (
