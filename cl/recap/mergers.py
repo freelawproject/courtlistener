@@ -56,7 +56,7 @@ from cl.search.models import (
     RECAPDocument,
     Tag,
 )
-from cl.search.tasks import add_items_to_solr, index_docket_parties_in_es
+from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 
@@ -1912,9 +1912,6 @@ async def merge_attachment_page_data(
                 pass
         await rd.asave()
 
-        # Do *not* do this async — that can cause race conditions.
-        await sync_to_async(add_items_to_solr)([rd.pk], "search.RECAPDocument")
-
     if not is_acms_attachment:
         await clean_duplicate_attachment_entries(de, attachment_dicts)
     await mark_ia_upload_needed(de.docket, save_docket=True)
@@ -1930,7 +1927,6 @@ def save_iquery_to_docket(
     iquery_text: str,
     d: Docket,
     tag_names: Optional[List[str]],
-    add_to_solr: bool = False,
     avoid_trigger_signal: bool = False,
 ) -> Optional[int]:
     """Merge iquery results into a docket
@@ -1940,7 +1936,6 @@ def save_iquery_to_docket(
     :param iquery_text: The HTML text data from a successful iquery response
     :param d: A docket object to work with
     :param tag_names: Tags to add to the items
-    :param add_to_solr: Whether to save the completed docket to solr
     :param avoid_trigger_signal: Whether to avoid triggering the iquery sweep
     signal. Useful for ignoring reports added by the probe daemon or the iquery
     sweep itself.
@@ -1960,8 +1955,6 @@ def save_iquery_to_docket(
         raise self.retry(exc=exc)
 
     async_to_sync(add_tags_to_objs)(tag_names, [d])
-    if add_to_solr:
-        add_items_to_solr([d.pk], "search.Docket")
     logger.info(f"Created/updated docket: {d}")
 
     # Add the CASE_QUERY_PAGE to the docket in case we need it someday.
@@ -2051,7 +2044,6 @@ def process_case_query_report(
     d.avoid_trigger_signal = avoid_trigger_signal
     d.save()
     add_bankruptcy_data_to_docket(d, report_data)
-    add_items_to_solr([d.pk], "search.Docket")
     logger.info(
         f"Created/updated docket: {d} from court: {court_id} and pacer_case_id {pacer_case_id}"
     )

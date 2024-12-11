@@ -1385,8 +1385,7 @@ class DebugRecapUploadtest(TestCase):
         self.assertEqual(DocketEntry.objects.count(), 0)
         self.assertEqual(RECAPDocument.objects.count(), 0)
 
-    @mock.patch("cl.recap.tasks.add_items_to_solr")
-    def test_debug_does_not_create_recap_documents(self, mock):
+    def test_debug_does_not_create_recap_documents(self):
         """If debug is passed, do we avoid creating recap documents?"""
         d = Docket.objects.create(
             source=0, court_id="scotus", pacer_case_id="asdf"
@@ -1409,7 +1408,6 @@ class DebugRecapUploadtest(TestCase):
         self.assertEqual(Docket.objects.count(), 1)
         self.assertEqual(DocketEntry.objects.count(), 1)
         self.assertEqual(RECAPDocument.objects.count(), 1)
-        mock.assert_not_called()
 
 
 class RecapPdfTaskTest(TestCase):
@@ -2865,7 +2863,6 @@ class RecapDocketTaskTest(TestCase):
         self.assertEqual(d_a.assigned_to_id, self.judge.pk)
 
 
-@mock.patch("cl.recap.tasks.add_items_to_solr")
 class RecapDocketAttachmentTaskTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -2893,7 +2890,7 @@ class RecapDocketAttachmentTaskTest(TestCase):
         Docket.objects.all().delete()
         RECAPDocument.objects.all().delete()
 
-    def test_attachments_get_created(self, mock):
+    def test_attachments_get_created(self):
         """Do attachments get created if we have a RECAPDocument to match
         on?"""
         async_to_sync(process_recap_docket)(self.pq.pk)
@@ -2913,7 +2910,6 @@ class RecapDocketAttachmentTaskTest(TestCase):
     )
     def test_main_document_doesnt_match_attachment_zero_on_creation(
         self,
-        mock_solr,
         mock_webhook_post,
     ):
         """Confirm that attachment 0 is properly set as the Main document if
@@ -2973,7 +2969,6 @@ class RecapDocketAttachmentTaskTest(TestCase):
     )
     def test_main_document_doesnt_match_attachment_zero_existing(
         self,
-        mock_solr,
         mock_webhook_post,
     ):
         """Confirm that attachment 0 is properly set as the Main document if
@@ -3058,7 +3053,6 @@ class RecapDocketAttachmentTaskTest(TestCase):
     )
     def test_main_rd_lookup_fallback_for_attachment_merging(
         self,
-        mock_solr,
         mock_webhook_post,
     ):
         """Confirm that attachment data can be properly merged when the current
@@ -3285,7 +3279,6 @@ class RecapCriminalDataUploadTaskTest(TestCase):
         )
 
 
-@mock.patch("cl.recap.tasks.add_items_to_solr")
 class RecapAttachmentPageTaskTest(TestCase):
     def setUp(self) -> None:
         user = User.objects.get(username="recap")
@@ -3319,7 +3312,7 @@ class RecapAttachmentPageTaskTest(TestCase):
             document_type=RECAPDocument.ATTACHMENT,
         ).delete()
 
-    def test_attachments_get_created(self, mock):
+    def test_attachments_get_created(self):
         """Do attachments get created if we have a RECAPDocument to match
         on?"""
         async_to_sync(process_recap_attachment)(self.pq.pk)
@@ -3336,7 +3329,7 @@ class RecapAttachmentPageTaskTest(TestCase):
         self.assertEqual(self.pq.docket_id, self.d.pk)
         self.assertEqual(self.pq.docket_entry_id, self.de.pk)
 
-    def test_no_rd_match(self, mock):
+    def test_no_rd_match(self):
         """If there's no RECAPDocument to match on, do we fail gracefully?"""
         RECAPDocument.objects.all().delete()
         pq_status, msg, items = async_to_sync(process_recap_attachment)(

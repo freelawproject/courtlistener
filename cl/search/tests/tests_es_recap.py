@@ -3138,7 +3138,6 @@ class RECAPSearchAPICommonTests(RECAPSearchTestCase):
         )
 
 
-@override_flag("r-es-search-api-active", active=True)
 class RECAPSearchAPIV3Test(
     RECAPSearchAPICommonTests, ESIndexTestCase, TestCase, V4SearchAPIAssertions
 ):
