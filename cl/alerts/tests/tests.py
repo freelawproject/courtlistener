@@ -1164,7 +1164,7 @@ class SearchAlertsWebhooksTest(
             ):
                 # Monthly alerts cannot be run on the 29th, 30th or 31st.
                 with time_machine.travel(self.mock_date, tick=False):
-                    # Send Solr Alerts (Except OA)
+                    # Send Alerts (Except OA)
                     call_command("cl_send_alerts", rate=rate)
                     # Send ES Alerts (Only OA for now)
                     call_command("cl_send_scheduled_alerts", rate=rate)

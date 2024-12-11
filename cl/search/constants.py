@@ -1,4 +1,4 @@
-# Solr fields that are used for highlighting or other output in the search results
+# fields that are used for highlighting or other output in the search results
 import re
 from typing import Dict
 

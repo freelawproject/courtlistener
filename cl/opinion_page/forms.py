@@ -513,8 +513,7 @@ class BaseCourtUploadForm(forms.Form):
                 "opinion": opinion,
                 "cluster": cluster,
                 "citations": citations,
-            },
-            index=False,
+            }
         )
 
         if self.cleaned_data.get("lower_court_docket_number"):
