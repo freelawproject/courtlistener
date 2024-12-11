@@ -15,7 +15,6 @@ def import_opinions_from_recap(
     total_count: int = 0,
     queue: str = "batch1",
     db_connection: str = "default",
-    add_to_solr: bool = False,
 ) -> None:
     """Import recap documents into opinion db
 
@@ -25,7 +24,6 @@ def import_opinions_from_recap(
     :param total_count: The number of new opinions to add
     :param queue: The queue to use for celery
     :param db_connection: The db to use
-    :param add_to_solr: Whether to add to solr
     :return: None
     """
     court_query = Court.objects.using(db_connection)
@@ -84,7 +82,7 @@ def import_opinions_from_recap(
             )
             throttle.maybe_wait()
             recap_document_into_opinions.apply_async(
-                args=[{}, recap_document.id, add_to_solr], queue=queue
+                args=[{}, recap_document.id], queue=queue
             )
             count += 1
             if total_count > 0 and count >= total_count:
@@ -140,12 +138,6 @@ class Command(BaseCommand):
             default=False,
             help="Use this flag to run the queries in the replica db",
         )
-        parser.add_argument(
-            "--add-to-solr",
-            action="store_true",
-            default=False,
-            help="Use this flag to add items to solr",
-        )
 
     def handle(self, *args, **options):
         jurisdiction = options.get("jurisdiction")
@@ -153,7 +145,6 @@ class Command(BaseCommand):
         skip_until = options.get("skip_until")
         total_count = options.get("total")
         queue = options.get("queue")
-        add_to_solr = options.get("add_to_solr")
         db_connection = (
             "replica"
             if options.get("use_replica") and "replica" in settings.DATABASES
@@ -167,5 +158,4 @@ class Command(BaseCommand):
             total_count,
             queue,
             db_connection,
-            add_to_solr,
         )

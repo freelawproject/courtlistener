@@ -95,11 +95,7 @@ from cl.recap.models import (
 )
 from cl.scrapers.tasks import extract_recap_pdf, extract_recap_pdf_base
 from cl.search.models import Court, Docket, DocketEntry, RECAPDocument
-from cl.search.tasks import (
-    add_items_to_solr,
-    add_or_update_recap_docket,
-    index_docket_parties_in_es,
-)
+from cl.search.tasks import index_docket_parties_in_es
 
 logger = logging.getLogger(__name__)
 cnt = CaseNameTweaker()
@@ -113,17 +109,14 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     """
     if pq.upload_type == UPLOAD_TYPE.DOCKET:
         docket = await process_recap_docket(pq.pk)
-        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
         await process_recap_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.PDF:
         await process_recap_pdf(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         docket = await process_recap_docket_history_report(pq.pk)
-        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
         docket = await process_recap_appellate_docket(pq.pk)
-        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_ATTACHMENT_PAGE:
         await process_recap_appellate_attachment(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CLAIMS_REGISTER:
@@ -132,7 +125,6 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         await process_recap_zip(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_PAGE:
         docket = await process_case_query_page(pq.pk)
-        await sync_to_async(add_or_update_recap_docket.delay)(docket)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_CASE_QUERY_PAGE:
         await sync_to_async(process_recap_appellate_case_query_page)(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.CASE_QUERY_RESULT_PAGE:
@@ -158,7 +150,6 @@ def do_pacer_fetch(fq: PacerFetchQueue):
         # Request by docket_id
         c = chain(
             fetch_docket.si(fq.pk),
-            add_or_update_recap_docket.s(),
             mark_fq_successful.si(fq.pk),
         )
         result = c.apply_async()
@@ -168,7 +159,6 @@ def do_pacer_fetch(fq: PacerFetchQueue):
         result = chain(
             fetch_pacer_doc_by_rd.si(rd_pk, fq.pk),
             extract_recap_pdf.si(rd_pk),
-            add_items_to_solr.si([rd_pk], "search.RECAPDocument"),
             mark_fq_successful.si(fq.pk),
         ).apply_async()
     elif fq.request_type == REQUEST_TYPE.ATTACHMENT_PAGE:
@@ -438,7 +428,6 @@ async def process_recap_pdf(pk):
         await sync_to_async(
             chain(
                 extract_recap_pdf.si(rd.pk),
-                add_items_to_solr.s("search.RECAPDocument"),
             ).apply_async
         )()
 
@@ -559,8 +548,7 @@ async def process_recap_docket(pk):
             // The PK of the docket that's created or updated
             'docket_pk': 22,
             // A boolean indicating whether a new docket entry or
-            // recap document was created (implying a Solr needs
-            // updating).
+            // recap document was created
             'content_updated': True,
         }
 
@@ -860,7 +848,7 @@ async def process_recap_docket_history_report(pk):
     """Process the docket history report.
 
     :param pk: The primary key of the processing queue item you want to work on
-    :returns: A dict indicating whether the docket needs Solr re-indexing.
+    :returns: A dict indicating whether the docket needs re-indexing.
     """
     start_time = now()
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -978,7 +966,7 @@ async def process_case_query_page(pk):
     """Process the case query (iquery.pl) page.
 
     :param pk: The primary key of the processing queue item you want to work on
-    :returns: A dict indicating whether the docket needs Solr re-indexing.
+    :returns: A dict indicating whether the docket needs re-indexing.
     """
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
@@ -1034,7 +1022,7 @@ async def process_case_query_page(pk):
     d.add_recap_source()
     await update_docket_metadata(d, data)
 
-    # Update the docket in SOLR if the case name has changed and contains
+    # Update the docket if the case name has changed and contains
     # docket entries
     content_updated = False
     if current_case_name != d.case_name and d.pk:
@@ -1114,8 +1102,7 @@ async def process_recap_appellate_docket(pk):
             // The PK of the docket that's created or updated
             'docket_pk': 22,
             // A boolean indicating whether a new docket entry or
-            // recap document was created (implying a Solr needs
-            // updating).
+            // recap document was created
             'content_updated': True,
         }
 
@@ -1228,8 +1215,7 @@ async def process_recap_acms_docket(pk):
             // The PK of the docket that's created or updated
             'docket_pk': 22,
             // A boolean indicating whether a new docket entry or
-            // recap document was created (implying a Solr needs
-            // updating).
+            // recap document was created.
             'content_updated': True,
         }
 
@@ -2791,5 +2777,4 @@ def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
     return chain(
         process_recap_email.si(epq.pk, user.pk),
         extract_recap_pdf.s(),
-        add_items_to_solr.s("search.RECAPDocument"),
     ).apply_async()
