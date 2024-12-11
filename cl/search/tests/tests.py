@@ -981,6 +981,14 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
                 '"this is a test" 22cv3332',
                 '"this is a test" docketNumber:"22-cv-3332"~1',
             ),
+            (
+                '"this is a test" ~2',
+                '"this is a test"~2',
+            ),
+            (
+                '"this is a test" ~2 and "net neutrality" ~5 and 22cv3332',
+                '"this is a test"~2 and "net neutrality"~5 and docketNumber:"22-cv-3332"~1',
+            ),
         )
         for q, a in q_a:
             print("Does {q} --> {a} ? ".format(**{"q": q, "a": a}))
