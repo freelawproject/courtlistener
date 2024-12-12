@@ -290,7 +290,7 @@ class CitationTextTest(SimpleTestCase):
                 s=s,
                 expected_html=expected_html,
             ):
-                opinion = Opinion(html=s)
+                opinion = Opinion(xml_harvard=s)
                 get_and_clean_opinion_text(opinion)
                 citations = get_citations(
                     opinion.cleaned_text, tokenizer=HYPERSCAN_TOKENIZER

@@ -16,6 +16,8 @@ def get_and_clean_opinion_text(document: Opinion | RECAPDocument) -> None:
 
     :param document: The Opinion or RECAPDocument whose text should be parsed
     """
+
+    # We prefer CAP data (xml_harvard) first.
     for attr in [
         "xml_harvard",
         "html_anon_2020",
