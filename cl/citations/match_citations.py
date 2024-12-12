@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-
-from datetime import datetime
 from typing import Dict, Iterable, List, Optional, no_type_check
 
 from elasticsearch_dsl.response import Hit
@@ -16,7 +14,6 @@ from eyecite.models import (
 )
 from eyecite.test_factories import case_citation
 from eyecite.utils import strip_punct
-from scorched.response import SolrResponse
 
 from cl.citations.match_citations_queries import es_search_db_for_full_citation
 from cl.citations.types import (
@@ -31,14 +28,6 @@ DEBUG = True
 
 
 NO_MATCH_RESOURCE = Resource(case_citation(source_text="UNMATCHED_CITATION"))
-
-
-def build_date_range(start_year: int, end_year: int) -> str:
-    """Build a date range to be handed off to a solr query."""
-    start = datetime(start_year, 1, 1)
-    end = datetime(end_year, 12, 31)
-    date_range = f"[{start.isoformat()}Z TO {end.isoformat()}Z]"
-    return date_range
 
 
 def filter_by_matching_antecedent(
@@ -65,7 +54,7 @@ def resolve_fullcase_citation(
 ) -> MatchedResourceType:
     # Case 1: FullCaseCitation
     if type(full_citation) is FullCaseCitation:
-        db_search_results: SolrResponse | list[Hit]
+        db_search_results: list[Hit]
         db_search_results, _ = es_search_db_for_full_citation(full_citation)
         # If there is one search result, try to return it
         if len(db_search_results) == 1:

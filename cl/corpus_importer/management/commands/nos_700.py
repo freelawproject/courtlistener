@@ -77,7 +77,6 @@ from cl.recap.constants import (
 )
 from cl.recap.models import FjcIntegratedDatabase
 from cl.search.models import RECAPDocument
-from cl.search.tasks import add_or_update_recap_docket
 
 PACER_USERNAME = os.environ.get("PACER_USERNAME", settings.PACER_USERNAME)
 PACER_PASSWORD = os.environ.get("PACER_PASSWORD", settings.PACER_PASSWORD)
@@ -272,7 +271,6 @@ def get_dockets(options, items, tags, sample_size=0):
                     "show_list_of_member_cases": True,
                 },
             ).set(queue=q),
-            add_or_update_recap_docket.s().set(queue=q),
         ).apply_async()
 
 

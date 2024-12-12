@@ -295,8 +295,6 @@ class Command(VerboseCommand):
     def remove_stale_rt_items(self, age=2):
         """Remove anything old from the RTQ.
 
-        This helps avoid issues with solr hitting the maxboolean clause errors.
-
         :param age: How many days old should items be before we start deleting
         them?
         """
