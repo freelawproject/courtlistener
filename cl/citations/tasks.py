@@ -32,7 +32,7 @@ from cl.search.models import (
     Parenthetical,
     RECAPDocument,
 )
-from cl.search.tasks import add_items_to_solr, index_related_cites_fields
+from cl.search.tasks import index_related_cites_fields
 
 # This is the distance two reporter abbreviations can be from each other if
 # they are considered parallel reporters. For example,
@@ -102,7 +102,7 @@ def find_citations_and_parantheticals_for_recap_documents(
         try:
             store_recap_citations(d)
         except ResponseNotReady as e:
-            # Threading problem in httplib, which is used in the Solr query.
+            # Threading problem in httplib.
             raise self.retry(exc=e, countdown=2)
 
 
@@ -110,12 +110,10 @@ def find_citations_and_parantheticals_for_recap_documents(
 def find_citations_and_parentheticals_for_opinion_by_pks(
     self,
     opinion_pks: List[int],
-    index: bool = True,
 ) -> None:
     """Find citations and authored parentheticals for search.Opinion objects.
 
     :param opinion_pks: An iterable of search.Opinion PKs
-    :param index: Whether to add the items to Solr
     :return: None
     """
     opinions: QuerySet[Opinion, Opinion] = Opinion.objects.filter(
@@ -123,25 +121,19 @@ def find_citations_and_parentheticals_for_opinion_by_pks(
     )
     for opinion in opinions:
         try:
-            store_opinion_citations_and_update_parentheticals(opinion, index)
+            store_opinion_citations_and_update_parentheticals(opinion)
         except ResponseNotReady as e:
-            # Threading problem in httplib, which is used in the Solr query.
+            # Threading problem in httplib.
             raise self.retry(exc=e, countdown=2)
-
-    # If a Solr update was requested, do a single one at the end with all the
-    # pks of the passed opinions
-    if index:
-        add_items_to_solr.delay(opinion_pks, "search.Opinion")
 
 
 def store_opinion_citations_and_update_parentheticals(
-    opinion: Opinion, index: bool
+    opinion: Opinion,
 ) -> None:
     """
     Updates counts of citations to other opinions within a given court opinion, as well as parenthetical info for the cited opinions.
 
     :param opinion: A search.Opinion object.
-    :param index: Whether to add the item to Solr
     :return: None
     """
 
@@ -214,8 +206,7 @@ def store_opinion_citations_and_update_parentheticals(
                 )
 
     # Finally, commit these changes to the database in a single
-    # transcation block. Trigger a single Solr update as well, if
-    # required.
+    # transcation block.
     with transaction.atomic():
         opinion_clusters_to_update = OpinionCluster.objects.filter(
             sub_opinions__pk__in=opinion_ids_to_update
@@ -224,11 +215,6 @@ def store_opinion_citations_and_update_parentheticals(
             citation_count=F("citation_count") + 1
         )
 
-        if index:
-            add_items_to_solr.delay(
-                opinion_clusters_to_update.values_list("pk", flat=True),
-                "search.OpinionCluster",
-            )
         # Nuke existing citations and parentheticals
         OpinionsCited.objects.filter(citing_opinion_id=opinion.pk).delete()
         Parenthetical.objects.filter(describing_opinion_id=opinion.pk).delete()
@@ -253,8 +239,8 @@ def store_opinion_citations_and_update_parentheticals(
                 OpinionCluster.objects.get(pk=cluster_id)
             )
 
-        # Save all the changes to the citing opinion (send to solr later)
-        opinion.save(index=False)
+        # Save all the changes to the citing opinion
+        opinion.save()
 
     # Update changes in ES.
     cluster_ids_to_update = list(

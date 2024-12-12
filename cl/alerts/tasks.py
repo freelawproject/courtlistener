@@ -373,27 +373,20 @@ def send_alert_and_webhook(
 
 
 @app.task(ignore_result=True)
-def send_alerts_and_webhooks(
-    data: Dict[str, Union[List[Tuple], List[int]]]
-) -> List[int]:
+def send_alerts_and_webhooks(data: list[tuple[int, datetime]]) -> List[int]:
     """Send many docket alerts at one time without making numerous calls
     to the send_alert_and_webhook function.
 
-    :param data: A dict with up to two keys:
+    :param data: A list of tuples. Each tuple contains the docket ID, and
+        a time. The time indicates that alerts should be sent for
+        items *after* that point.
 
-      d_pks_to_alert: A list of tuples. Each tuple contains the docket ID, and
-                      a time. The time indicates that alerts should be sent for
-                      items *after* that point.
-        rds_for_solr: A list of RECAPDocument ids that need to be sent to Solr
-                      to be made searchable.
-    :returns: Simply passes through the rds_for_solr list, in case it is
-    consumed by the next task. If rds_for_solr is not provided, returns an
-    empty list.
+    :returns: An empty list
     """
-    for args in data["d_pks_to_alert"]:
+    for args in data:
         send_alert_and_webhook(*args)
 
-    return cast(List[int], data.get("rds_for_solr", []))
+    return []
 
 
 @app.task(ignore_result=True)

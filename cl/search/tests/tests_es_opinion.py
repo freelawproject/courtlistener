@@ -11,7 +11,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.core.management import call_command
 from django.db.models import F
 from django.http import HttpRequest
-from django.test import AsyncRequestFactory, override_settings
+from django.test import override_settings
 from django.urls import reverse
 from django.utils.html import strip_tags
 from django.utils.timezone import now
@@ -28,7 +28,6 @@ from cl.lib.elasticsearch_utils import do_es_api_query
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.test_helpers import (
     CourtTestCase,
-    EmptySolrTestCase,
     PeopleTestCase,
     SearchTestCase,
     opinion_document_v4_api_keys,
@@ -74,7 +73,6 @@ from cl.search.tasks import (
     update_children_docs_by_query,
     update_es_document,
 )
-from cl.search.views import do_search
 from cl.tests.cases import (
     CountESTasksTestCase,
     ESIndexTestCase,
@@ -400,7 +398,6 @@ class OpinionSearchAPICommonTests(
         )
 
 
-@override_flag("o-es-search-api-active", active=True)
 class OpinionV3APISearchTest(
     OpinionSearchAPICommonTests, ESIndexTestCase, TestCase
 ):
@@ -2670,99 +2667,6 @@ class RelatedSearchTest(
             msg="Unexpected opinion cited.",
         )
         await sync_to_async(self.async_client.logout)()
-
-
-class GroupedSearchTest(EmptySolrTestCase):
-    @classmethod
-    def setUpTestData(cls):
-        court = CourtFactory(id="ca1", jurisdiction="F")
-
-        docket = DocketFactory.create(
-            date_reargument_denied=datetime.date(2015, 8, 15),
-            date_reargued=datetime.date(2015, 8, 15),
-            court_id=court.pk,
-            case_name_full="Voutila v. Bonvini",
-            date_argued=datetime.date(2015, 8, 15),
-            case_name="case name docket 10",
-            case_name_short="short name for Voutila v. Bonvini",
-            docket_number="1337-np",
-            slug="case-name",
-            pacer_case_id="666666",
-            blocked=False,
-            source=Docket.HARVARD,
-            date_blocked=None,
-        )
-
-        grouped_cluster = OpinionClusterFactory.create(
-            case_name_full="Reference to Voutila v. Bonvini",
-            case_name_short="Case name in short for Voutila v. Bonvini",
-            syllabus="some rando syllabus",
-            date_filed=datetime.date(2015, 12, 20),
-            procedural_history="some rando history",
-            source="C",
-            judges="",
-            case_name="Voutila v. Bonvini",
-            attorneys="a bunch of crooks!",
-            slug="case-name-cluster",
-            precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
-            citation_count=1,
-            posture="",
-            scdb_id="",
-            nature_of_suit="",
-            docket=docket,
-        )
-
-        OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=None,
-            plain_text="This is a lead opinion too.",
-            cluster=grouped_cluster,
-            local_path="txt/2015/12/28/opinion_text.txt",
-            per_curiam=False,
-            type="020lead",
-        )
-
-        OpinionFactory.create(
-            extracted_by_ocr=False,
-            author=None,
-            plain_text="This is a combined opinion.",
-            cluster=grouped_cluster,
-            local_path="doc/2005/05/04/state_of_indiana_v._charles_barker.doc",
-            per_curiam=False,
-            type=Opinion.COMBINED,
-        )
-        super().setUpTestData()
-
-    def setUp(self) -> None:
-        # Set up some handy variables
-        super().setUp()
-        args = [
-            "--type",
-            "search.Opinion",
-            "--solr-url",
-            f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
-            "--update",
-            "--everything",
-            "--do-commit",
-            "--noinput",
-        ]
-        call_command("cl_update_index", *args)
-        self.factory = AsyncRequestFactory()
-
-    def test_grouped_queries(self) -> None:
-        """When we have a cluster with multiple opinions, do results get
-        grouped?
-        """
-        request = self.factory.get(reverse("show_results"), {"q": "Voutila"})
-        response = do_search(request.GET.copy())
-        result_count = response["results"].object_list.result.numFound
-        num_expected = 1
-        self.assertEqual(
-            result_count,
-            num_expected,
-            msg="Found %s items, but should have found %s if the items were "
-            "grouped properly." % (result_count, num_expected),
-        )
 
 
 class IndexOpinionDocumentsCommandTest(
