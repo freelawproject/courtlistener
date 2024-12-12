@@ -62,8 +62,8 @@
                     </p>
                 </div>
             {% endif %}
-
-       <div id="opinion-toc" class="sidebar-section">
+        {% if tab == "opinion" %}
+        <div id="opinion-toc" class="sidebar-section">
               <h3> <span>Jump To</span> </h3>
               <li class="jump-links active"><a id="nav_top" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#"  class="active">Top</a></li>
               <li class="jump-links"><a id="nav_caption" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#caption" >Caption</a></li>
@@ -115,6 +115,7 @@
               </li>
               {% endfor %}
           </div>
+        {% endif %}
 
         {% if cluster.sub_opinions.all.first.extracted_by_ocr or "U" in cluster.source and tab == "opinions" %}
             <div class="col-sm-12 alert-warning alert v-offset-above-2">
