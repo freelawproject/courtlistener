@@ -6,7 +6,6 @@
 .opinion-body {
 
   .harvard > * {
-    font-family: "Source Sans Pro", Arial, Helvetica, sans-serif;
     font-size: 15px;
     letter-spacing: 0.2px;
     text-align: justify;
@@ -433,7 +432,6 @@ div.footnote:first-of-type {
 
   #opinion-caption {
     margin-top: 20px;
-    font-family: "Source Sans Pro", Arial, Helvetica, sans-serif;
     font-size: 15px;
     letter-spacing: 0.2px;
     line-height: 2.3em;
@@ -524,7 +522,6 @@ div.footnote:first-of-type {
   }
 
   div.subopinion-content > .harvard {
-    font-family: "Open Sans", Arial, Helvetica, sans-serif;
     font-size: 15px;
     letter-spacing: 0.2px;
     line-height: 2.3em;
@@ -532,7 +529,6 @@ div.footnote:first-of-type {
   }
 
   #columbia-text {
-    font-family: "Open Sans", Arial, Helvetica, sans-serif;
     font-size: 15px;
     letter-spacing: 0.2px;
     line-height: 2.3em;
@@ -678,14 +674,12 @@ div.footnote:first-of-type {
   }
 
   .case-details {
-    font-family: "Source Sans Pro", Arial, Helvetica, sans-serif;
     letter-spacing: 0.2px;
     line-height:2.3em;
   }
 
   .opinion-section-title {
     margin-top: 50px;
-    font-family: "Source Sans Pro", Arial, Helvetica, sans-serif;
   }
 
   /*Add style to align roman numerals */
