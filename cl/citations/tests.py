@@ -40,10 +40,6 @@ from cl.citations.group_parentheticals import (
     get_parenthetical_tokens,
     get_representative_parenthetical,
 )
-from cl.citations.management.commands.add_parallel_citations import (
-    identify_parallel_citations,
-    make_edge_list,
-)
 from cl.citations.match_citations import (
     NO_MATCH_RESOURCE,
     do_resolve_citations,
@@ -54,12 +50,7 @@ from cl.citations.tasks import (
     find_citations_and_parentheticals_for_opinion_by_pks,
     store_recap_citations,
 )
-from cl.lib.test_helpers import (
-    CourtTestCase,
-    IndexedSolrTestCase,
-    PeopleTestCase,
-    SearchTestCase,
-)
+from cl.lib.test_helpers import CourtTestCase, PeopleTestCase, SearchTestCase
 from cl.search.factories import (
     CitationWithParentsFactory,
     CourtFactory,
@@ -1088,8 +1079,6 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
         args = [
             "--doc-id",
             f"{self.opinion_id2}",
-            "--index",
-            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
@@ -1098,8 +1087,6 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             "--doc-id",
             f"{self.opinion_id3}",
             f"{self.opinion_id2}",
-            "--index",
-            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
@@ -1107,8 +1094,6 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
         args = [
             "--start-id",
             f"{min(self.opinion_id2, self.opinion_id3)}",
-            "--index",
-            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
@@ -1118,8 +1103,6 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
             f"{min(self.opinion_id2, self.opinion_id3)}",
             "--end-id",
             f"{max(self.opinion_id2, self.opinion_id3)}",
-            "--index",
-            "concurrently",
         ]
         self.call_command_and_test_it(args)
 
@@ -1127,75 +1110,8 @@ class CitationCommandTest(ESIndexTestCase, TestCase):
         args = [
             "--filed-after",
             f"{OpinionCluster.objects.get(pk=self.citation2.cluster_id).date_filed - timedelta(days=1)}",
-            "--index",
-            "concurrently",
         ]
         self.call_command_and_test_it(args)
-
-
-class ParallelCitationTest(SimpleTestCase):
-    databases = "__all__"
-
-    def test_identifying_parallel_citations(self) -> None:
-        """Given a string, can we identify parallel citations"""
-        tests = (
-            # A pair consisting of a test string and the number of parallel
-            # citations that should be identifiable in that string.
-            # Simple case
-            ("1 U.S. 1 (22 U.S. 33)", 1, 2),
-            # Too far apart
-            ("1 U.S. 1 too many words 22 U.S. 33", 0, 0),
-            # Three citations
-            # ("1 U.S. 1, (44 U.S. 33, 99 U.S. 100)", 1, 3),
-            # Parallel citation after a valid citation too early on
-            ("1 U.S. 1 too many words, then 22 U.S. 33, 13 WL 33223", 1, 2),
-        )
-        for q, citation_group_count, expected_num_parallel_citations in tests:
-            with self.subTest(
-                f"Testing parallel citation identification for: {q}...",
-                q=q,
-                citation_group_count=citation_group_count,
-                expected_num_parallel_citations=expected_num_parallel_citations,
-            ):
-                citations = get_citations(q, tokenizer=HYPERSCAN_TOKENIZER)
-                citation_groups = identify_parallel_citations(citations)
-                computed_num_citation_groups = len(citation_groups)
-                self.assertEqual(
-                    computed_num_citation_groups,
-                    citation_group_count,
-                    msg="Did not have correct number of citation groups. Got %s, "
-                    "not %s."
-                    % (computed_num_citation_groups, citation_group_count),
-                )
-                if not citation_groups:
-                    # Add an empty list to make testing easier.
-                    citation_groups = [[]]
-                computed_num_parallel_citation = len(list(citation_groups)[0])
-                self.assertEqual(
-                    computed_num_parallel_citation,
-                    expected_num_parallel_citations,
-                    msg="Did not identify correct number of parallel citations in "
-                    "the group. Got %s, not %s"
-                    % (
-                        computed_num_parallel_citation,
-                        expected_num_parallel_citations,
-                    ),
-                )
-
-    def test_making_edge_list(self) -> None:
-        """Can we make network-friendly edge lists?"""
-        tests = [
-            ([1, 2], [(1, 2)]),
-            ([1, 2, 3], [(1, 2), (2, 3)]),
-            ([1, 2, 3, 4], [(1, 2), (2, 3), (3, 4)]),
-        ]
-        for q, a in tests:
-            with self.subTest(
-                f"Testing network-friendly edge creation for: {q}...",
-                q=q,
-                a=a,
-            ):
-                self.assertEqual(make_edge_list(q), a)
 
 
 class FilterParentheticalTest(SimpleTestCase):

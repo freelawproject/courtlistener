@@ -1,22 +1,11 @@
-from typing import Dict, List, Union
-
 import pghistory
 from django.db import models
-from django.template import loader
-from django.urls import NoReverseMatch, reverse
+from django.urls import reverse
 from model_utils import FieldTracker
 
-from cl.custom_filters.templatetags.text_filters import best_case_name
-from cl.lib.date_time import midnight_pt
 from cl.lib.model_helpers import make_upload_path
 from cl.lib.models import AbstractDateTimeModel, s3_warning_note
-from cl.lib.search_index_utils import (
-    InvalidDocumentError,
-    normalize_search_dicts,
-    null_map,
-)
 from cl.lib.storage import IncrementingAWSMediaStorage
-from cl.lib.utils import deepgetattr
 from cl.people_db.models import Person
 from cl.search.models import SOURCES, Docket
 
@@ -195,98 +184,6 @@ class Audio(AbstractDateTimeModel):
 
     def get_absolute_url(self) -> str:
         return reverse("view_audio_file", args=[self.pk, self.docket.slug])
-
-    def save(  # type: ignore[override]
-        self,
-        index: bool = True,
-        force_commit: bool = False,
-        *args: List,
-        **kwargs: Dict,
-    ) -> None:
-        """
-        Overrides the normal save method, but provides integration with the
-        bulk files and with Solr indexing.
-
-        :param index: Should the item be added to the Solr index?
-        :param force_commit: Should a commit be performed in solr after
-        indexing it?
-        """
-        super().save(*args, **kwargs)  # type: ignore
-        if index:
-            from cl.search.tasks import add_items_to_solr
-
-            add_items_to_solr([self.pk], "audio.Audio", force_commit)
-
-    def delete(  # type: ignore[override]
-        self,
-        *args: List,
-        **kwargs: Dict,
-    ) -> None:
-        """
-        Update the index as items are deleted.
-        """
-        id_cache = self.pk
-        super().delete(*args, **kwargs)  # type: ignore
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([id_cache], "audio.Audio")
-
-    def as_search_dict(self) -> Dict[str, Union[int, List[int], str]]:
-        """Create a dict that can be ingested by Solr"""
-        # IDs
-        out = {
-            "id": self.pk,
-            "docket_id": self.docket_id,
-            "court_id": self.docket.court_id,
-        }
-
-        # Docket
-        docket = {"docketNumber": self.docket.docket_number}
-        if self.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pt(self.docket.date_argued)
-        if self.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pt(self.docket.date_reargued)
-        if self.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pt(
-                self.docket.date_reargument_denied
-            )
-        out.update(docket)
-
-        # Court
-        out.update(
-            {
-                "court": self.docket.court.full_name,
-                "court_citation_string": self.docket.court.citation_string,
-                "court_exact": self.docket.court_id,  # For faceting
-            }
-        )
-
-        # Audio File
-        out.update(
-            {
-                "caseName": best_case_name(self),
-                "panel_ids": [judge.pk for judge in self.panel.all()],
-                "judge": self.judges,
-                "file_size_mp3": deepgetattr(
-                    self, "local_path_mp3.size", None
-                ),
-                "duration": self.duration,
-                "source": self.source,
-                "download_url": self.download_url,
-                "local_path": deepgetattr(self, "local_path_mp3.name", None),
-            }
-        )
-        try:
-            out["absolute_url"] = self.get_absolute_url()
-        except NoReverseMatch:
-            raise InvalidDocumentError(
-                f"Unable to save to index due to missing absolute_url: {self.pk}"
-            )
-
-        text_template = loader.get_template("indexes/audio_text.txt")
-        out["text"] = text_template.render({"item": self}).translate(null_map)
-
-        return normalize_search_dicts(out)
 
 
 @pghistory.track(

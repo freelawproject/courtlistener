@@ -30,13 +30,12 @@ cnt = CaseNameTweaker()
 @transaction.atomic
 def save_everything(
     items: Dict[str, Union[Docket, Audio]],
-    index: bool = False,
     backscrape: bool = False,
 ) -> None:
     docket, af = items["docket"], items["audio_file"]
     docket.save()
     af.docket = docket
-    af.save(index=index)
+    af.save()
     candidate_judges = []
     if af.docket.court_id != "scotus":
         if af.judges:
@@ -143,7 +142,6 @@ class Command(cl_scrape_opinions.Command):
 
         save_everything(
             items={"docket": docket, "audio_file": audio_file},
-            index=False,
             backscrape=backscrape,
         )
         process_audio_file.delay(audio_file.pk)

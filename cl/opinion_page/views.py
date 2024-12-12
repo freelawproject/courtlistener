@@ -57,11 +57,7 @@ from cl.lib.http import is_ajax
 from cl.lib.model_helpers import choices_to_csv
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.ratelimiter import ratelimiter_all_10_per_h
-from cl.lib.search_utils import (
-    get_citing_clusters_with_cache,
-    get_related_clusters_with_cache,
-    make_get_string,
-)
+from cl.lib.search_utils import make_get_string
 from cl.lib.string_utils import trunc
 from cl.lib.thumbnails import make_png_thumbnail_for_instance
 from cl.lib.url_utils import get_redirect_or_abort
@@ -101,7 +97,7 @@ from cl.search.models import (
     RECAPDocument,
 )
 from cl.search.selectors import get_clusters_from_citation_str
-from cl.search.views import do_es_search, do_search
+from cl.search.views import do_es_search
 
 HYPERSCAN_TOKENIZER = HyperscanTokenizer(cache_dir=".hyperscan")
 
@@ -155,39 +151,18 @@ async def court_homepage(request: HttpRequest, pk: str) -> HttpResponse:
             results = "results"
 
         mutable_GET = request.GET.copy()
-
-        es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-            request, "o-es-active"
+        # Do es search
+        mutable_GET.update(
+            {
+                "order_by": "dateFiled desc",
+                "type": SEARCH_TYPES.OPINION,
+                "court": court,
+                "filed_after": (
+                    datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
+                ),
+            }
         )
-
-        if not es_flag_for_o:
-            # Do solr search
-            response = await sync_to_async(do_search)(
-                mutable_GET,
-                override_params={
-                    "filed_after": (
-                        datetime.datetime.today()
-                        - datetime.timedelta(days=28)
-                        # type: ignore
-                    ),
-                    "order_by": "dateFiled desc",
-                    "court": court,
-                },
-                facet=False,
-            )
-        else:
-            # Do es search
-            mutable_GET.update(
-                {
-                    "order_by": "dateFiled desc",
-                    "type": SEARCH_TYPES.OPINION,
-                    "court": court,
-                    "filed_after": (
-                        datetime.datetime.today() - datetime.timedelta(days=28)  # type: ignore
-                    ),
-                }
-            )
-            response = await sync_to_async(do_es_search)(mutable_GET)
+        response = await sync_to_async(do_es_search)(mutable_GET)
 
         render_dict[results] = response["results"]
     return TemplateResponse(request, template, render_dict)
@@ -856,30 +831,16 @@ async def view_opinion_old(
     else:
         note_form = NoteForm(instance=note)
 
-    es_flag_for_o = await sync_to_async(waffle.flag_is_active)(
-        request, "o-es-active"
-    )
     queries_timeout = False
-    if es_flag_for_o:
-        results = await es_get_citing_and_related_clusters_with_cache(
-            cluster, request
-        )
-        related_clusters = results.related_clusters
-        sub_opinion_ids = results.sub_opinion_pks
-        related_search_params = results.url_search_params
-        citing_clusters = results.citing_clusters
-        citing_cluster_count = results.citing_cluster_count
-        queries_timeout = results.timeout
-    else:
-        (
-            related_clusters,
-            sub_opinion_ids,
-            related_search_params,
-        ) = await get_related_clusters_with_cache(cluster, request)
-        (
-            citing_clusters,
-            citing_cluster_count,
-        ) = await get_citing_clusters_with_cache(cluster)
+    results = await es_get_citing_and_related_clusters_with_cache(
+        cluster, request
+    )
+    related_clusters = results.related_clusters
+    sub_opinion_ids = results.sub_opinion_pks
+    related_search_params = results.url_search_params
+    citing_clusters = results.citing_clusters
+    citing_cluster_count = results.citing_cluster_count
+    queries_timeout = results.timeout
 
     get_parenthetical_groups = await get_or_create_parenthetical_groups(
         cluster,
@@ -932,8 +893,7 @@ async def view_opinion_old(
             "related_algorithm": "mlt",
             "related_clusters": related_clusters,
             "related_cluster_ids": [
-                item["cluster_id"] if es_flag_for_o else item["id"]
-                for item in related_clusters
+                item["cluster_id"] for item in related_clusters
             ],
             "related_search_params": f"&{urlencode(related_search_params)}",
             "sponsored": sponsored,
@@ -952,16 +912,15 @@ async def setup_opinion_context(
     :param tab: The tab to load
     :return: The opinion page context used to generate the page
     """
-    title = ", ".join(
-        [
-            s
-            for s in [
-                trunc(best_case_name(cluster), 100, ellipsis="..."),
-                await cluster.acitation_string(),
-            ]
-            if s.strip()
-        ]
-    )
+    tab_intros = {
+        "authorities": "Authorities for ",
+        "cited-by": "Citations to ",
+        "related-cases": "Similar cases to ",
+        "summaries": "Summaries of ",
+        "pdf": "Download PDF for ",
+    }
+    tab_intro = tab_intros.get(tab, "")
+    title = f"{tab_intro}{trunc(best_case_name(cluster), 100, ellipsis='...')}"
     has_downloads = False
     pdf_path = None
     if cluster.filepath_pdf_harvard:
@@ -1740,7 +1699,7 @@ async def block_item(request: HttpRequest) -> HttpResponse:
             if cluster is not None:
                 cluster.blocked = True
                 cluster.date_blocked = now()
-                await cluster.asave(index=False)
+                await cluster.asave()
 
         docket_pk = (
             pk
