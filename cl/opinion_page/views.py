@@ -802,7 +802,6 @@ async def view_opinion_old(
             Prefetch(
                 "sub_opinions",
                 queryset=Opinion.objects.order_by("ordering_key"),
-                # Replace "some_field" with the desired ordering field
             )
         ),
         pk=pk,
