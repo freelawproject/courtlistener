@@ -883,16 +883,19 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
                 source=Docket.RECAP,
             )
 
+        cause_str = "31:3730 Qui Tam False Claims Act"
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "q": 'cause:"31:3730 Qui Tam False Claims Act"',
+            # Do it in main query box
+            "q": f'cause:"{cause_str}"',
         }
         async_to_sync(self._test_article_count)(
             params, 2, "faceted_cause_query_string"
         )
         params = {
             "type": SEARCH_TYPES.RECAP,
-            "cause": '"31:3730 Qui Tam False Claims Act"',
+            # Do it in the cause field as a phrase
+            "cause": f'"{cause_str}"',
         }
         async_to_sync(self._test_article_count)(params, 2, "cause_filter")
 
