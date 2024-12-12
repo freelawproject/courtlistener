@@ -864,6 +864,42 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             docket.delete()
             docket_2.delete()
 
+    def test_cause_filter(self) -> None:
+        """Confirm cause filter works properly"""
+        # Confirm parties extracted from case_name are available in filters.
+        with self.captureOnCommitCallbacks(execute=True):
+            d = DocketFactory(
+                court=self.court,
+                docket_number="23-cv-12335",
+                case_name="Lockhart v. Gainwell Technologies LLC",
+                cause="31:3730 Qui Tam False Claims Act",
+                source=Docket.RECAP,
+            )
+            d_2 = DocketFactory(
+                court=self.court,
+                docket_number="22-cv-00526",
+                case_name="Schermerhorn v. Quality Enterprises USA, Inc.",
+                cause="31:3730 Qui Tam False Claims Act",
+                source=Docket.RECAP,
+            )
+
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "q": 'cause:"31:3730 Qui Tam False Claims Act"',
+        }
+        async_to_sync(self._test_article_count)(
+            params, 2, "faceted_cause_query_string"
+        )
+        params = {
+            "type": SEARCH_TYPES.RECAP,
+            "cause": '"31:3730 Qui Tam False Claims Act"',
+        }
+        async_to_sync(self._test_article_count)(params, 2, "cause_filter")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            d.delete()
+            d_2.delete()
+
     def test_party_name_filter(self) -> None:
         """Confirm party_name filter works properly"""
 
