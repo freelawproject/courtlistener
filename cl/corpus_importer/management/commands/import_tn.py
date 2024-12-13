@@ -132,8 +132,7 @@ def import_tn_corpus(
                 "opinion": opinion,
                 "cluster": cluster,
                 "citations": citations,
-            },
-            index=False,
+            }
         )
 
         extract_doc_content.delay(

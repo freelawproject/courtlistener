@@ -16,15 +16,6 @@ class AudioFactory(DjangoModelFactory):
     sha1 = Faker("sha1")
     download_url = Faker("url")
 
-    @classmethod
-    def _create(cls, model_class, *args, **kwargs):
-        """Creates an instance of the model class without indexing."""
-        obj = model_class(*args, **kwargs)
-        # explicitly sets `index=False` to prevent it from being indexed in SOLR.
-        # Once Solr is removed, we can just remove this method completely.
-        obj.save(index=False)
-        return obj
-
     """
     These hooks are necessary to make this factory compatible with the
     `make_dev_command`. by delegating the file creation to the hooks, we prevent
@@ -60,7 +51,6 @@ class AudioFactory(DjangoModelFactory):
         if create and results:
             # Some post-generation hooks ran, and may have modified the instance.
             instance.save(
-                index=False,
                 update_fields=["local_path_mp3", "local_path_original_file"],
             )
 

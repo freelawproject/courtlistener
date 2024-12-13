@@ -1,9 +1,7 @@
 import datetime
 import io
-import os
 from datetime import date
 from http import HTTPStatus
-from pathlib import Path
 from unittest import mock
 from urllib.parse import parse_qs
 
@@ -33,13 +31,7 @@ from cl.audio.factories import AudioFactory
 from cl.lib.elasticsearch_utils import simplify_estimated_count
 from cl.lib.redis_utils import get_redis_interface
 from cl.lib.storage import clobbering_get_name
-from cl.lib.test_helpers import (
-    AudioTestCase,
-    CourtTestCase,
-    EmptySolrTestCase,
-    PeopleTestCase,
-    SolrTestCase,
-)
+from cl.lib.test_helpers import AudioTestCase, CourtTestCase, PeopleTestCase
 from cl.lib.utils import (
     cleanup_main_query,
     get_child_court_ids_for_parents,
@@ -92,120 +84,12 @@ from cl.search.models import (
     SearchQuery,
     sort_cites,
 )
-from cl.search.tasks import (
-    add_docket_to_solr_by_rds,
-    get_es_doc_id_and_parent_id,
-    index_dockets_in_bulk,
-)
+from cl.search.tasks import get_es_doc_id_and_parent_id, index_dockets_in_bulk
 from cl.search.types import EventTable
 from cl.tests.base import SELENIUM_TIMEOUT, BaseSeleniumTest
 from cl.tests.cases import ESIndexTestCase, TestCase
 from cl.tests.utils import get_with_wait
 from cl.users.factories import UserProfileWithParentsFactory
-
-
-class UpdateIndexCommandTest(SolrTestCase):
-    args = [
-        "--type",
-        "search.Opinion",
-        "--noinput",
-    ]
-
-    def _get_result_count(self, results):
-        return results.result.numFound
-
-    def test_updating_all_opinions(self) -> None:
-        """If we have items in the DB, can we add/delete them to/from Solr?
-
-        This tests is rather long because we need to test adding and deleting,
-        and it's hard to setup/dismantle the indexes before/after every test.
-        """
-
-        # First, we add everything to Solr.
-        args = list(self.args)  # Make a copy of the list.
-        args.extend(
-            [
-                "--solr-url",
-                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
-                "--update",
-                "--everything",
-                "--do-commit",
-            ]
-        )
-        call_command("cl_update_index", *args)
-        results = self.si_opinion.query("*").execute()
-        actual_count = self._get_result_count(results)
-        self.assertEqual(
-            actual_count,
-            self.expected_num_results_opinion,
-            msg="Did not get expected number of results.\n"
-            "\tGot:\t%s\n\tExpected:\t %s"
-            % (
-                actual_count,
-                self.expected_num_results_opinion,
-            ),
-        )
-
-        # Check a simple citation query
-        results = self.si_opinion.query(cites=self.opinion_3.pk).execute()
-        actual_count = self._get_result_count(results)
-        expected_citation_count = 2
-        self.assertEqual(
-            actual_count,
-            expected_citation_count,
-            msg="Did not get the expected number of citation counts.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
-        )
-
-        # Next, we delete everything from Solr
-        args = list(self.args)  # Make a copy of the list.
-        args.extend(
-            [
-                "--solr-url",
-                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
-                "--delete",
-                "--everything",
-                "--do-commit",
-            ]
-        )
-        call_command("cl_update_index", *args)
-        results = self.si_opinion.query("*").execute()
-        actual_count = self._get_result_count(results)
-        expected_citation_count = 0
-        self.assertEqual(
-            actual_count,
-            expected_citation_count,
-            msg="Did not get the expected number of counts in empty index.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
-        )
-
-        # Add things back, but do it by ID
-        args = list(self.args)  # Make a copy of the list.
-        args.extend(
-            [
-                "--solr-url",
-                f"{settings.SOLR_HOST}/solr/{self.core_name_opinion}",
-                "--update",
-                "--items",
-                f"{self.opinion_1.pk}",
-                f"{self.opinion_2.pk}",
-                f"{self.opinion_3.pk}",
-                "--do-commit",
-            ]
-        )
-        call_command("cl_update_index", *args)
-        results = self.si_opinion.query("*").execute()
-        actual_count = self._get_result_count(results)
-        expected_citation_count = 3
-        self.assertEqual(
-            actual_count,
-            expected_citation_count,
-            msg="Did not get the expected number of citation counts.\n"
-            "\tGot:\t %s\n\tExpected:\t%s"
-            % (actual_count, expected_citation_count),
-        )
 
 
 class ModelTest(TestCase):
@@ -250,7 +134,7 @@ class ModelTest(TestCase):
             cf = ContentFile(io.BytesIO(b"blah").read())
             self.o.file_with_date = date(1899, 1, 1)
             self.o.local_path.save("file_name.pdf", cf, save=False)
-            self.o.save(index=False)
+            self.o.save()
         except ValueError:
             raise ValueError(
                 "Unable to save a case older than 1900. Did you "
@@ -498,65 +382,6 @@ class RECAPDocumentValidationTest(TestCase):
             attachment_number=None,
         )
         self.assertIsNotNone(document.id)
-
-
-class IndexingTest(EmptySolrTestCase):
-    """Are things indexed properly?"""
-
-    fixtures = ["test_court.json"]
-
-    def test_issue_729_url_coalescing(self) -> None:
-        """Are URL's coalesced properly?"""
-        # Save a docket to the backend using coalescing
-
-        test_dir = (
-            Path(settings.INSTALL_ROOT)
-            / "cl"
-            / "assets"
-            / "media"
-            / "test"
-            / "search"
-        )
-        self.att_filename = "fake_document.html"
-        fake_path = os.path.join(test_dir, self.att_filename)
-
-        d = Docket.objects.create(
-            source=Docket.RECAP,
-            docket_number="asdf",
-            pacer_case_id="asdf",
-            court_id="test",
-        )
-        de = DocketEntry.objects.create(docket=d, entry_number=1)
-        rd1 = RECAPDocument.objects.create(
-            docket_entry=de,
-            document_type=RECAPDocument.PACER_DOCUMENT,
-            document_number="1",
-            pacer_doc_id="1",
-            filepath_local=fake_path,
-        )
-        rd2 = RECAPDocument.objects.create(
-            docket_entry=de,
-            document_type=RECAPDocument.ATTACHMENT,
-            document_number="1",
-            attachment_number=1,
-            pacer_doc_id="2",
-            filepath_local=fake_path,
-        )
-        # Do the absolute URLs differ when pulled from the DB?
-        self.assertNotEqual(rd1.get_absolute_url(), rd2.get_absolute_url())
-
-        add_docket_to_solr_by_rds([rd1.pk, rd2.pk], force_commit=True)
-
-        # Do the absolute URLs differ when pulled from Solr?
-        r1 = self.si_recap.get(rd1.pk)
-        r2 = self.si_recap.get(rd2.pk)
-        self.assertNotEqual(
-            r1.result.docs[0]["absolute_url"],
-            r2.result.docs[0]["absolute_url"],
-        )
-        Docket.objects.all().delete()
-        DocketEntry.objects.all().delete()
-        RECAPDocument.objects.all().delete()
 
 
 class ESCommonSearchTest(ESIndexTestCase, TestCase):
@@ -1155,6 +980,14 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
             (
                 '"this is a test" 22cv3332',
                 '"this is a test" docketNumber:"22-cv-3332"~1',
+            ),
+            (
+                '"this is a test" ~2',
+                '"this is a test"~2',
+            ),
+            (
+                '"this is a test" ~2 and "net neutrality" ~5 and 22cv3332',
+                '"this is a test"~2 and "net neutrality"~5 and docketNumber:"22-cv-3332"~1',
             ),
         )
         for q, a in q_a:
