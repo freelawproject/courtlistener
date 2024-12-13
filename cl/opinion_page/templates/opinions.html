@@ -62,7 +62,7 @@
                     </p>
                 </div>
             {% endif %}
-        {% if tab == "opinion" %}
+        {% if tab == "opinions" %}
         <div id="opinion-toc" class="sidebar-section">
               <h3> <span>Jump To</span> </h3>
               <li class="jump-links active"><a id="nav_top" href="{% if tab != "opinions" %}{% url 'view_case' cluster.pk cluster.slug %}{% endif %}#"  class="active">Top</a></li>
