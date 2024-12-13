@@ -7988,6 +7988,17 @@ class LookupDocketsTest(TestCase):
             case_name="Barton v. State", docket_number="3:17-mj-01477"
         )
 
+        cls.docket_data_appellate = RECAPEmailDocketDataFactory(
+            case_name="Wright v. State Updated",
+            docket_number="20-10394",
+            pacer_case_id="67653",
+        )
+        cls.docket_data_appellate_no_case_id = RECAPEmailDocketDataFactory(
+            case_name="Wright v. State Updated",
+            docket_number="20-10394",
+            pacer_case_id=None,
+        )
+
     def test_case_id_and_docket_number_core_lookup(self):
         """Confirm if lookup by pacer_case_id and docket_number_core works
         properly.
@@ -8392,6 +8403,68 @@ class LookupDocketsTest(TestCase):
         # DN components are not used to match the docket. The oldest one is
         # selected instead.
         self.assertEqual(docket_matched.pk, oldest_d_1.pk)
+
+    def test_avoid_duplicating_dockets_with_no_pacer_case_id(self):
+        """Confirm we can match an existing docket with no pacer_case_id by
+        docket_number_core when lookup includes a pacer_case_id.
+        """
+
+        d_1 = DocketFactory(
+            case_name="Wright v. State",
+            docket_number="20-10394",
+            court=self.court_appellate,
+            source=Docket.RECAP,
+            pacer_case_id=None,
+        )
+        self.assertEqual(Docket.objects.all().count(), 5)
+
+        # Lookup includes pacer_case_id
+        d_lookup = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            self.docket_data_appellate["pacer_case_id"],
+            self.docket_data_appellate["docket_number"],
+            None,
+            None,
+            None,
+        )
+
+        async_to_sync(update_docket_metadata)(
+            d_lookup, self.docket_data_appellate
+        )
+        d_lookup.save()
+
+        # Confirm that no new docket was created
+        self.assertEqual(Docket.objects.all().count(), 5)
+        # Confirm that the docket was properly matched and the pacer_case_id
+        # was updated.
+        self.assertEqual(d_lookup.id, d_1.id)
+        d_1.refresh_from_db()
+        self.assertEqual(
+            d_1.pacer_case_id, self.docket_data_appellate["pacer_case_id"]
+        )
+
+        # Now lookup again with no pacer_case_id.
+        d_lookup = async_to_sync(find_docket_object)(
+            self.court_appellate.pk,
+            self.docket_data_appellate_no_case_id["pacer_case_id"],
+            self.docket_data_appellate_no_case_id["docket_number"],
+            None,
+            None,
+            None,
+        )
+
+        async_to_sync(update_docket_metadata)(
+            d_lookup, self.docket_data_appellate_no_case_id
+        )
+        d_lookup.save()
+
+        # The docket should be properly matched.
+        self.assertEqual(Docket.objects.all().count(), 5)
+        self.assertEqual(d_lookup.id, d_1.id)
+        d_1.refresh_from_db()
+        self.assertEqual(
+            d_1.pacer_case_id, self.docket_data_appellate["pacer_case_id"]
+        )
 
 
 class CleanUpDuplicateAppellateEntries(TestCase):
