@@ -77,7 +77,6 @@ from cl.recap.mergers import (
     find_docket_object,
     get_data_from_appellate_att_report,
     get_data_from_att_report,
-    look_for_doppelganger_rds,
     merge_attachment_page_data,
     merge_pacer_docket_into_cl_docket,
     process_orphan_documents,
@@ -111,7 +110,9 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     if pq.upload_type == UPLOAD_TYPE.DOCKET:
         docket = await process_recap_docket(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
-        await look_for_doppelganger_rds_and_process_recap_attachment(pq.pk)
+        sub_docket_att_page_pks = await find_subdocket_att_page_rds(pq.pk)
+        for pq_pk in sub_docket_att_page_pks:
+            await process_recap_attachment(pq_pk)
     elif pq.upload_type == UPLOAD_TYPE.PDF:
         await process_recap_pdf(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
@@ -675,24 +676,55 @@ async def get_att_data_from_pq(
     return pq, att_data, text
 
 
-async def look_for_doppelganger_rds_and_process_recap_attachment(
+async def find_subdocket_att_page_rds(
     pk: int,
-) -> None:
-    """Look for doppelgänger RECAPDocuments and process the corresponding
-    attachment page for each RECAPDocument.
+) -> list[int]:
+    """Look for RECAP Documents that belong to subdockets, and create a PQ
+    object for each additional attachment page that requires processing.
 
     :param pk: Primary key of the processing queue item.
-    :return: None
+    :return: A list of ProcessingQueue pks to process.
     """
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     court = await Court.objects.aget(id=pq.court_id)
     pq, att_data, text = await get_att_data_from_pq(pq)
-    pqs_to_process = await look_for_doppelganger_rds(
-        court, pq, att_data["pacer_doc_id"], text
+    pacer_doc_id = att_data["pacer_doc_id"]
+    main_rds = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .filter(
+            pacer_doc_id=pacer_doc_id,
+            docket_entry__docket__court=court,
+        )
+        .order_by("docket_entry__docket__pacer_case_id")
+        .distinct("docket_entry__docket__pacer_case_id")
+        .only(
+            "pacer_doc_id",
+            "docket_entry__docket__pacer_case_id",
+            "docket_entry__docket__court_id",
+        )
+        .exclude(docket_entry__docket__pacer_case_id=pq.pacer_case_id)
     )
-    for pq in pqs_to_process:
-        await process_recap_attachment(pq.pk)
+    pqs_to_process_pks = [
+        pq.pk
+    ]  # Add the original pq to the list of pqs to process
+    original_file_content = text.encode("utf-8")
+    original_file_name = pq.filepath_local.name
+    async for main_rd in main_rds:
+        main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
+        # Create additional pqs for each subdocket case found.
+        pq_created = await ProcessingQueue.objects.acreate(
+            uploader_id=pq.uploader_id,
+            pacer_doc_id=pacer_doc_id,
+            pacer_case_id=main_pacer_case_id,
+            court_id=court.pk,
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=ContentFile(
+                original_file_content, name=original_file_name
+            ),
+        )
+        pqs_to_process_pks.append(pq_created.pk)
+    return pqs_to_process_pks
 
 
 async def process_recap_attachment(

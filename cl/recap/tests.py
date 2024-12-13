@@ -108,7 +108,6 @@ from cl.recap.tasks import (
     do_pacer_fetch,
     fetch_pacer_doc_by_rd,
     get_and_copy_recap_attachment_docs,
-    look_for_doppelganger_rds_and_process_recap_attachment,
     process_recap_acms_appellate_attachment,
     process_recap_acms_docket,
     process_recap_appellate_attachment,
@@ -117,6 +116,7 @@ from cl.recap.tasks import (
     process_recap_claims_register,
     process_recap_docket,
     process_recap_pdf,
+    process_recap_upload,
     process_recap_zip,
 )
 from cl.recap_rss.tasks import merge_rss_feed_contents
@@ -793,8 +793,8 @@ class RecapUploadsTest(TestCase):
             main_attachment[0].document_type, RECAPDocument.ATTACHMENT
         )
 
-    def test_processing_doppelganger_case_attachment_page(self, mock_upload):
-        """Can we replicate an attachment page upload from a doppelgänger case
+    def test_processing_subdocket_case_attachment_page(self, mock_upload):
+        """Can we replicate an attachment page upload from a subdocket case
         to its corresponding RD across all related dockets?
         """
 
@@ -871,9 +871,7 @@ class RecapUploadsTest(TestCase):
             side_effect=lambda x, y: self.att_data_2,
         ):
             # Process the attachment page containing 2 attachments.
-            async_to_sync(
-                look_for_doppelganger_rds_and_process_recap_attachment
-            )(pq.pk)
+            async_to_sync(process_recap_upload)(pq)
 
         # After adding attachments, it should exist 3 RD on every docket.
         self.assertEqual(
@@ -963,7 +961,7 @@ class RecapUploadsTest(TestCase):
             att_2_data["attachment_number"],
         )
 
-        # Assert the number of PQs created to process the additional doppelgänger RDs.
+        # Assert the number of PQs created to process the additional subdocket RDs.
         pqs_created = ProcessingQueue.objects.all()
         self.assertEqual(pqs_created.count(), 3)
 
@@ -983,11 +981,11 @@ class RecapUploadsTest(TestCase):
             {de.pk for de in DocketEntry.objects.all()}, related_htmls_de
         )
 
-    def test_process_attachments_for_doppelganger_pq_with_missing_main_rd(
+    def test_process_attachments_for_subdocket_pq_with_missing_main_rd(
         self, mock_upload
     ):
         """Confirm that if the RD related to the initial PQ is missing,
-        we can still process attachments for doppelgänger cases where the
+        we can still process attachments for subdocket cases where the
         main RD matches.
         """
 
@@ -1040,9 +1038,7 @@ class RecapUploadsTest(TestCase):
             side_effect=lambda x, y: self.att_data_2,
         ):
             # Process the attachment page containing 2 attachments.
-            async_to_sync(
-                look_for_doppelganger_rds_and_process_recap_attachment
-            )(pq.pk)
+            async_to_sync(process_recap_upload)(pq)
 
         # After adding attachments, it should exist 3 RD on every docket.
         self.assertEqual(
