@@ -239,6 +239,7 @@ def cleanup_main_query(query_string: str) -> str:
      - Add hyphens to district docket numbers that lack them
      - Ignore tokens inside phrases
      - Handle query punctuation correctly by mostly ignoring it
+     - Removes spaces between phrase query and tilde(~) operator
      - Capture "court_id:court" queries, retrieve the child courts for each
      court in the query, append them, and then add them back to the original
      query.
@@ -289,6 +290,8 @@ def cleanup_main_query(query_string: str) -> str:
             cleaned_items.append(f'"{item}"')
 
     cleaned_query = "".join(cleaned_items)
+    # Removes spaces between phrase query and tilde(~) operator
+    cleaned_query = re.sub(r'(")\s*(?=~\d+)', r"\1", cleaned_query)
     # If it's a court_id query, parse it, append the child courts, and then
     # reintegrate them into the original query.
     final_query = modify_court_id_queries(cleaned_query)

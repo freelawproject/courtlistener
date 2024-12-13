@@ -14,7 +14,6 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, models, transaction
 from django.db.models import Q, QuerySet
 from django.db.models.functions import MD5
-from django.template import loader
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.encoding import force_str
@@ -38,14 +37,9 @@ from cl.lib.model_helpers import (
     make_upload_path,
 )
 from cl.lib.models import AbstractDateTimeModel, AbstractPDF, s3_warning_note
-from cl.lib.search_index_utils import (
-    InvalidDocumentError,
-    normalize_search_dicts,
-    null_map,
-)
+from cl.lib.search_index_utils import InvalidDocumentError
 from cl.lib.storage import IncrementingAWSMediaStorage
 from cl.lib.string_utils import trunc
-from cl.lib.utils import deepgetattr
 from cl.search.docket_sources import DocketSources
 from cl.users.models import User
 
@@ -993,117 +987,6 @@ class Docket(AbstractDateTimeModel, DocketSources):
     def pacer_view_doc_url(self):
         return self.pacer_district_url("qryDocument.pl")
 
-    def as_search_list(self):
-        """Create list of search dicts from a single docket. This should be
-        faster than creating a search dict per document on the docket.
-        """
-        search_list = []
-
-        # Docket
-        out = {
-            "docketNumber": self.docket_number,
-            "caseName": best_case_name(self),
-            "suitNature": self.nature_of_suit,
-            "cause": self.cause,
-            "juryDemand": self.jury_demand,
-            "jurisdictionType": self.jurisdiction_type,
-        }
-        if self.date_argued is not None:
-            out["dateArgued"] = midnight_pt(self.date_argued)
-        if self.date_filed is not None:
-            out["dateFiled"] = midnight_pt(self.date_filed)
-        if self.date_terminated is not None:
-            out["dateTerminated"] = midnight_pt(self.date_terminated)
-        try:
-            out["docket_absolute_url"] = self.get_absolute_url()
-        except NoReverseMatch:
-            raise InvalidDocumentError(
-                f"Unable to save to index due to missing absolute_url: {self.pk}"
-            )
-
-        # Judges
-        if self.assigned_to is not None:
-            out["assignedTo"] = self.assigned_to.name_full
-        elif self.assigned_to_str:
-            out["assignedTo"] = self.assigned_to_str
-        if self.referred_to is not None:
-            out["referredTo"] = self.referred_to.name_full
-        elif self.referred_to_str:
-            out["referredTo"] = self.referred_to_str
-
-        # Court
-        out.update(
-            {
-                "court": self.court.full_name,
-                "court_exact": self.court_id,  # For faceting
-                "court_citation_string": self.court.citation_string,
-            }
-        )
-
-        # Do RECAPDocument and Docket Entries in a nested loop
-        for de in self.docket_entries.all().iterator():
-            # Docket Entry
-            de_out = {
-                "description": de.description,
-            }
-            if de.entry_number is not None:
-                de_out["entry_number"] = de.entry_number
-            if de.date_filed is not None:
-                de_out["entry_date_filed"] = midnight_pt(de.date_filed)
-            rds = de.recap_documents.all()
-
-            if len(rds) == 0:
-                # Minute entry or other entry that lacks docs.
-                # For now, we punt.
-                # https://github.com/freelawproject/courtlistener/issues/784
-                continue
-
-            for rd in rds:
-                # IDs
-                rd_out = {
-                    "id": rd.pk,
-                    "docket_entry_id": de.pk,
-                    "docket_id": self.pk,
-                    "court_id": self.court.pk,
-                    "assigned_to_id": getattr(self.assigned_to, "pk", None),
-                    "referred_to_id": getattr(self.referred_to, "pk", None),
-                }
-
-                # RECAPDocument
-                rd_out.update(
-                    {
-                        "short_description": rd.description,
-                        "document_type": rd.get_document_type_display(),
-                        "document_number": rd.document_number or None,
-                        "attachment_number": rd.attachment_number,
-                        "is_available": rd.is_available,
-                        "page_count": rd.page_count,
-                    }
-                )
-                if rd.filepath_local:
-                    rd_out["filepath_local"] = rd.filepath_local.name
-                try:
-                    rd_out["absolute_url"] = rd.get_absolute_url()
-                except NoReverseMatch:
-                    raise InvalidDocumentError(
-                        "Unable to save to index due to missing "
-                        f"absolute_url: {self.pk}"
-                    )
-
-                text_template = loader.get_template("indexes/dockets_text.txt")
-                rd_out["text"] = text_template.render({"item": rd}).translate(
-                    null_map
-                )
-
-                # Ensure that loops to bleed into each other
-                out_copy = out.copy()
-                out_copy.update(rd_out)
-                out_copy.update(de_out)
-
-                search_list.append(normalize_search_dicts(out_copy))
-
-        return search_list
-
     def reprocess_recap_content(self, do_original_xml: bool = False) -> None:
         """Go over any associated RECAP files and reprocess them.
 
@@ -1635,12 +1518,7 @@ class RECAPDocument(
             from cl.scrapers.tasks import extract_recap_pdf
 
             tasks.append(extract_recap_pdf.si(self.pk))
-        if index:
-            from cl.search.tasks import add_items_to_solr
 
-            tasks.append(
-                add_items_to_solr.si([self.pk], "search.RECAPDocument")
-            )
         if len(tasks) > 0:
             chain(*tasks)()
 
@@ -1679,17 +1557,6 @@ class RECAPDocument(
             )
             logger.error(msg)
             raise ValidationError({"attachment_number": msg})
-
-    def delete(self, *args, **kwargs):
-        """
-        Note that this doesn't get called when an entire queryset
-        is deleted, but that should be OK.
-        """
-        id_cache = self.pk
-        super().delete(*args, **kwargs)
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([id_cache], "search.RECAPDocument")
 
     def get_docket_metadata(self):
         """The metadata for the item that comes from the Docket."""
@@ -1745,57 +1612,6 @@ class RECAPDocument(
             }
         )
         return out
-
-    def as_search_dict(self, docket_metadata=None):
-        """Create a dict that can be ingested by Solr.
-
-        Search results are presented as Dockets, but they're indexed as
-        RECAPDocument's, which are then grouped back together in search results
-        to form Dockets.
-
-        Since it's common to update an entire docket, there's a shortcut,
-        get_docket_metadata that lets you query that information first and then
-        pass it in as an argument so that it doesn't have to be queried for
-        every RECAPDocument on the docket. This can provide big performance
-        boosts.
-        """
-        out = docket_metadata or self.get_docket_metadata()
-
-        # IDs
-        out.update({"id": self.pk, "docket_entry_id": self.docket_entry.pk})
-
-        # RECAPDocument
-        out.update(
-            {
-                "short_description": self.description,
-                "document_type": self.get_document_type_display(),
-                "document_number": self.document_number or None,
-                "attachment_number": self.attachment_number,
-                "is_available": self.is_available,
-                "page_count": self.page_count,
-            }
-        )
-        if self.filepath_local:
-            out["filepath_local"] = self.filepath_local.name
-
-        try:
-            out["absolute_url"] = self.get_absolute_url()
-        except NoReverseMatch:
-            raise InvalidDocumentError(
-                f"Unable to save to index due to missing absolute_url: {self.pk}"
-            )
-
-        # Docket Entry
-        out["description"] = self.docket_entry.description
-        if self.docket_entry.entry_number is not None:
-            out["entry_number"] = self.docket_entry.entry_number
-        if self.docket_entry.date_filed is not None:
-            out["entry_date_filed"] = midnight_pt(self.docket_entry.date_filed)
-
-        text_template = loader.get_template("indexes/dockets_text.txt")
-        out["text"] = text_template.render({"item": self}).translate(null_map)
-
-        return normalize_search_dicts(out)
 
     def get_csv_columns(self, get_column_name=False):
         columns = [
@@ -3075,8 +2891,6 @@ class OpinionCluster(AbstractDateTimeModel):
     def save(
         self,
         update_fields=None,
-        index=True,
-        force_commit=False,
         *args,
         **kwargs,
     ):
@@ -3084,145 +2898,18 @@ class OpinionCluster(AbstractDateTimeModel):
         if update_fields is not None:
             update_fields = {"slug"}.union(update_fields)
         super().save(update_fields=update_fields, *args, **kwargs)
-        if index:
-            from cl.search.tasks import add_items_to_solr
-
-            add_items_to_solr.delay(
-                [self.pk], "search.OpinionCluster", force_commit
-            )
 
     async def asave(
         self,
         update_fields=None,
-        index=True,
-        force_commit=False,
         *args,
         **kwargs,
     ):
         return await sync_to_async(self.save)(
             update_fields=update_fields,
-            index=index,
-            force_commit=force_commit,
             *args,
             **kwargs,
         )
-
-    def delete(self, *args, **kwargs):
-        """
-        Note that this doesn't get called when an entire queryset
-        is deleted, but that should be OK.
-        """
-        id_cache = self.pk
-        super().delete(*args, **kwargs)
-        from cl.search.tasks import delete_items
-
-        delete_items.delay([id_cache], "search.Opinion")
-
-    def as_search_list(self):
-        # IDs
-        out = {}
-
-        # Court
-        court = {
-            "court_id": self.docket.court.pk,
-            "court": self.docket.court.full_name,
-            "court_citation_string": self.docket.court.citation_string,
-            "court_exact": self.docket.court_id,
-        }
-        out.update(court)
-
-        # Docket
-        docket = {
-            "docket_id": self.docket_id,
-            "docketNumber": self.docket.docket_number,
-        }
-        if self.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pt(self.docket.date_argued)
-        if self.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pt(self.docket.date_reargued)
-        if self.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pt(
-                self.docket.date_reargument_denied
-            )
-        out.update(docket)
-
-        # Cluster
-        out.update(
-            {
-                "cluster_id": self.pk,
-                "caseName": best_case_name(self),
-                "caseNameShort": self.case_name_short,
-                "panel_ids": [judge.pk for judge in self.panel.all()],
-                "non_participating_judge_ids": [
-                    judge.pk for judge in self.non_participating_judges.all()
-                ],
-                "judge": self.judges,
-                "citation": [str(cite) for cite in self.citations.all()],
-                "scdb_id": self.scdb_id,
-                "source": self.source,
-                "attorney": self.attorneys,
-                "suitNature": self.nature_of_suit,
-                "citeCount": self.citation_count,
-                "status": self.get_precedential_status_display(),
-                "status_exact": self.get_precedential_status_display(),
-                "sibling_ids": [
-                    sibling.pk for sibling in self.sub_opinions.all()
-                ],
-            }
-        )
-        try:
-            out["lexisCite"] = str(
-                self.citations.filter(type=Citation.LEXIS)[0]
-            )
-        except IndexError:
-            pass
-        try:
-            out["neutralCite"] = str(
-                self.citations.filter(type=Citation.NEUTRAL)[0]
-            )
-        except IndexError:
-            pass
-
-        if self.date_filed is not None:
-            out["dateFiled"] = midnight_pt(self.date_filed)
-        try:
-            out["absolute_url"] = self.get_absolute_url()
-        except NoReverseMatch:
-            raise InvalidDocumentError(
-                "Unable to save to index due to missing absolute_url "
-                "(court_id: %s, item.pk: %s). Might the court have in_use set "
-                "to False?" % (self.docket.court_id, self.pk)
-            )
-
-        # Opinion
-        search_list = []
-        text_template = loader.get_template("indexes/opinion_text.txt")
-        for opinion in self.sub_opinions.all():
-            # Always make a copy to get a fresh version above metadata. Failure
-            # to do this pushes metadata from previous iterations to objects
-            # where it doesn't belong.
-            out_copy = out.copy()
-            out_copy.update(
-                {
-                    "id": opinion.pk,
-                    "cites": [o.pk for o in opinion.opinions_cited.all()],
-                    "author_id": getattr(opinion.author, "pk", None),
-                    "joined_by_ids": [j.pk for j in opinion.joined_by.all()],
-                    "type": opinion.type,
-                    "download_url": opinion.download_url or None,
-                    "local_path": deepgetattr(self, "local_path.name", None),
-                    "text": text_template.render(
-                        {
-                            "item": opinion,
-                            "citation_string": self.citation_string,
-                        }
-                    ).translate(null_map),
-                }
-            )
-
-            search_list.append(normalize_search_dicts(out_copy))
-
-        return search_list
 
 
 @pghistory.track(
@@ -3260,6 +2947,7 @@ class Citation(models.Model):
     LEXIS = 6
     WEST = 7
     NEUTRAL = 8
+    JOURNAL = 9
     CITATION_TYPES = (
         (FEDERAL, "A federal reporter citation (e.g. 5 F. 55)"),
         (
@@ -3281,6 +2969,12 @@ class Citation(models.Model):
         (LEXIS, "A citation in the Lexis system (e.g. 5 LEXIS 55)"),
         (WEST, "A citation in the WestLaw system (e.g. 5 WL 55)"),
         (NEUTRAL, "A vendor neutral citation (e.g. 2013 FL 1)"),
+        (
+            JOURNAL,
+            "A law journal citation within a scholarly or professional "
+            "legal periodical (e.g. 95 Yale L.J. 5; "
+            "72 Soc.Sec.Rep.Serv. 318)",
+        ),
     )
     cluster = models.ForeignKey(
         OpinionCluster,
@@ -3582,118 +3276,11 @@ class Opinion(AbstractDateTimeModel):
 
     def save(
         self,
-        index: bool = True,
-        force_commit: bool = False,
         *args: List,
         **kwargs: Dict,
     ) -> None:
         self.clean()
         super().save(*args, **kwargs)
-        if index:
-            from cl.search.tasks import add_items_to_solr
-
-            add_items_to_solr.delay([self.pk], "search.Opinion", force_commit)
-
-    def as_search_dict(self) -> Dict[str, Any]:
-        """Create a dict that can be ingested by Solr."""
-        # IDs
-        out = {
-            "id": self.pk,
-            "docket_id": self.cluster.docket.pk,
-            "cluster_id": self.cluster.pk,
-            "court_id": self.cluster.docket.court.pk,
-        }
-
-        # Opinion
-        out.update(
-            {
-                "cites": [opinion.pk for opinion in self.opinions_cited.all()],
-                "author_id": getattr(self.author, "pk", None),
-                # 'per_curiam': self.per_curiam,
-                "joined_by_ids": [judge.pk for judge in self.joined_by.all()],
-                "type": self.type,
-                "download_url": self.download_url or None,
-                "local_path": deepgetattr(self, "local_path.name", None),
-            }
-        )
-
-        # Cluster
-        out.update(
-            {
-                "caseName": best_case_name(self.cluster),
-                "caseNameShort": self.cluster.case_name_short,
-                "sibling_ids": [sibling.pk for sibling in self.siblings.all()],
-                "panel_ids": [judge.pk for judge in self.cluster.panel.all()],
-                "non_participating_judge_ids": [
-                    judge.pk
-                    for judge in self.cluster.non_participating_judges.all()
-                ],
-                "judge": self.cluster.judges,
-                "citation": [
-                    str(cite) for cite in self.cluster.citations.all()
-                ],
-                "scdb_id": self.cluster.scdb_id,
-                "source": self.cluster.source,
-                "attorney": self.cluster.attorneys,
-                "suitNature": self.cluster.nature_of_suit,
-                "citeCount": self.cluster.citation_count,
-                "status": self.cluster.get_precedential_status_display(),
-                "status_exact": self.cluster.get_precedential_status_display(),
-            }
-        )
-        try:
-            out["lexisCite"] = str(
-                self.cluster.citations.filter(type=Citation.LEXIS)[0]
-            )
-        except IndexError:
-            pass
-
-        try:
-            out["neutralCite"] = str(
-                self.cluster.citations.filter(type=Citation.NEUTRAL)[0]
-            )
-        except IndexError:
-            pass
-
-        if self.cluster.date_filed is not None:
-            out["dateFiled"] = midnight_pt(self.cluster.date_filed)
-        try:
-            out["absolute_url"] = self.cluster.get_absolute_url()
-        except NoReverseMatch:
-            raise InvalidDocumentError(
-                "Unable to save to index due to missing absolute_url "
-                "(court_id: %s, item.pk: %s). Might the court have in_use set "
-                "to False?" % (self.cluster.docket.court_id, self.pk)
-            )
-
-        # Docket
-        docket = {"docketNumber": self.cluster.docket.docket_number}
-        if self.cluster.docket.date_argued is not None:
-            docket["dateArgued"] = midnight_pt(self.cluster.docket.date_argued)
-        if self.cluster.docket.date_reargued is not None:
-            docket["dateReargued"] = midnight_pt(
-                self.cluster.docket.date_reargued
-            )
-        if self.cluster.docket.date_reargument_denied is not None:
-            docket["dateReargumentDenied"] = midnight_pt(
-                self.cluster.docket.date_reargument_denied
-            )
-        out.update(docket)
-
-        court = {
-            "court": self.cluster.docket.court.full_name,
-            "court_citation_string": self.cluster.docket.court.citation_string,
-            "court_exact": self.cluster.docket.court_id,  # For faceting
-        }
-        out.update(court)
-
-        # Load the document text using a template for cleanup and concatenation
-        text_template = loader.get_template("indexes/opinion_text.txt")
-        out["text"] = text_template.render(
-            {"item": self, "citation_string": self.cluster.citation_string}
-        ).translate(null_map)
-
-        return normalize_search_dicts(out)
 
 
 @pghistory.track(
@@ -3985,6 +3572,11 @@ class SEARCH_TYPES:
         (PARENTHETICAL, "Parenthetical"),
     )
     ALL_TYPES = [OPINION, RECAP, ORAL_ARGUMENT, PEOPLE]
+    SUPPORTED_ALERT_TYPES = (
+        (OPINION, "Opinions"),
+        (RECAP, "RECAP"),
+        (ORAL_ARGUMENT, "Oral Arguments"),
+    )
 
 
 class SearchQuery(models.Model):

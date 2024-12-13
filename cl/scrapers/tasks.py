@@ -194,19 +194,12 @@ def extract_doc_content(
         )
         return
 
-    # Save item, and index Solr if needed.
+    # Save item
     # noinspection PyBroadException
     try:
         opinion.cluster.docket.save()
-        opinion.cluster.save(index=False)
-        if not citation_jitter:
-            # No waiting around. Save to the database now, but don't bother
-            # with the index yet because citations are being done imminently.
-            opinion.save(index=False)
-        else:
-            # Save to the index now, citations come later, commit comes
-            # according to schedule
-            opinion.save(index=True)
+        opinion.cluster.save()
+        opinion.save()
     except Exception:
         logger.error(
             "****Error saving text to the db for: %s****\n%s",
@@ -327,9 +320,7 @@ async def extract_recap_pdf_base(
                 rd.ocr_status = RECAPDocument.OCR_NEEDED
 
         rd.plain_text, _ = anonymize(content)
-        # Do not do indexing here. Creates race condition in celery.
         await rd.asave(
-            index=False,
             do_extraction=False,
             update_fields=["ocr_status", "plain_text"],
         )
@@ -448,5 +439,4 @@ def update_docket_info_iquery(self, d_pk: int, court_id: str) -> None:
         report.response.text,
         d,
         tag_names=None,
-        add_to_solr=True,
     )

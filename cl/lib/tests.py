@@ -4,7 +4,6 @@ from typing import Tuple, TypedDict, cast
 from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
-from django.conf import settings
 from django.core.files.base import ContentFile
 from django.test import override_settings
 from requests.cookies import RequestsCookieJar
@@ -40,7 +39,6 @@ from cl.lib.redis_utils import (
     get_redis_interface,
     release_redis_lock,
 )
-from cl.lib.search_utils import make_fq
 from cl.lib.string_utils import normalize_dashes, trunc
 from cl.lib.utils import (
     check_for_proximity_tokens,
@@ -260,26 +258,6 @@ class TestStringUtils(SimpleTestCase):
         for test, answer in tests.items():
             computed = normalize_dashes(test)
             self.assertEqual(computed, answer)
-
-
-class TestMakeFQ(SimpleTestCase):
-    def test_make_fq(self) -> None:
-        test_pairs = (
-            ("1 2", "1 AND 2"),
-            ("1 and 2", "1 AND 2"),
-            ('"1 AND 2"', '"1 AND 2"'),
-            ('"1 2"', '"1 2"'),
-            ("1 OR 2", "1 OR 2"),
-            ("1 NOT 2", "1 NOT 2"),
-            ("cause:sympathy", "cause AND sympathy"),
-        )
-        for test in test_pairs:
-            field = "f"
-            key = "key"
-            self.assertEqual(
-                make_fq(cd={key: test[0]}, field=field, key=key),
-                f"{field}:({test[1]})",
-            )
 
 
 class TestModelHelpers(TestCase):
