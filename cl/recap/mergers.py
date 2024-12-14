@@ -1670,6 +1670,7 @@ async def merge_attachment_page_data(
             main_rd = await RECAPDocument.objects.select_related(
                 "docket_entry", "docket_entry__docket"
             ).aget(**params)
+
     except RECAPDocument.MultipleObjectsReturned as exc:
         if pacer_case_id:
             duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
