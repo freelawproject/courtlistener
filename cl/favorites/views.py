@@ -286,7 +286,7 @@ async def user_prayers_view(
 
     count, total_cost = await get_user_prayer_history(requested_user)
 
-    is_eligible = prayer_eligible(requested_user)
+    is_eligible = await prayer_eligible(requested_user)
 
     context = {
         "prayers": prayers,
