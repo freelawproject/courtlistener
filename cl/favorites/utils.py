@@ -252,13 +252,18 @@ def send_prayer_emails(instance: RECAPDocument) -> None:
 
 
 async def get_user_prayer_history(user: User) -> tuple[int, float]:
-    filtered_list = Prayer.objects.filter(user=user, status=Prayer.GRANTED)
+    filtered_list = Prayer.objects.filter(
+        user=user, status=Prayer.GRANTED
+    ).select_related("recap_document")
 
     count = await filtered_list.acount()
 
     total_cost = 0
     async for prayer in filtered_list:
-        total_cost += float(price(prayer.recap_document))
+        doc_price = price(prayer.recap_document)
+        if not doc_price:
+            continue
+        total_cost += float(doc_price)
 
     return count, total_cost
 
