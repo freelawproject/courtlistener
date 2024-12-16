@@ -1,6 +1,6 @@
 {% if request.user.is_authenticated %}
   <form id="pray_{{document_id}}" hx-post="{% if prayer_exists %}{% url 'delete_prayer' document_id %}{% else %}{% url 'create_prayer' document_id %}{% endif %}"
-    hx-swap="none" class="flex" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-swap-oob="true">
+    hx-swap="none" class="flex" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' {% if should_swap %}hx-swap-oob="true"{% endif %}>
     <input type="hidden" name="regular_size" value="{% if regular_size %}{{ regular_size }}{% endif %}">
     <button type="submit"
             class="btn {% if regular_size %}btn-sm{% else %}btn-xs{% endif %} {% if prayer_exists %}btn-primary{% else %}btn-default{% endif %}"
