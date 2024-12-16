@@ -784,9 +784,9 @@ class RECAPPrayAndPay(TestCase):
         self.assertEqual(await prays.acount(), 6)
 
         top_prayers = await get_top_prayers()
-        self.assertEqual(len(top_prayers), 3)
+        self.assertEqual(await top_prayers.acount(), 3)
         expected_top_prayers = [self.rd_2.pk, self.rd_4.pk, self.rd_3.pk]
-        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
         self.assertEqual(
             actual_top_prayers,
             expected_top_prayers,
@@ -814,9 +814,9 @@ class RECAPPrayAndPay(TestCase):
             await create_prayer(self.user_2, self.rd_3)
 
         top_prayers = await get_top_prayers()
-        self.assertEqual(len(top_prayers), 3)
+        self.assertEqual(await top_prayers.acount(), 3)
         expected_top_prayers = [self.rd_3.pk, self.rd_2.pk, self.rd_4.pk]
-        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
 
         self.assertEqual(
             actual_top_prayers,
@@ -850,7 +850,7 @@ class RECAPPrayAndPay(TestCase):
             )  # 2 prayers, 4 days old
 
         top_prayers = await get_top_prayers()
-        self.assertEqual(len(top_prayers), 4)
+        self.assertEqual(await top_prayers.acount(), 4)
 
         expected_top_prayers = [
             self.rd_4.pk,
@@ -858,7 +858,7 @@ class RECAPPrayAndPay(TestCase):
             self.rd_5.pk,
             self.rd_3.pk,
         ]
-        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
 
         self.assertEqual(
             actual_top_prayers,
@@ -916,11 +916,11 @@ class RECAPPrayAndPay(TestCase):
         # Confirm top prayers list is as expected.
         top_prayers = await get_top_prayers()
         self.assertEqual(
-            len(top_prayers), 2, msg="Wrong number of top prayers"
+            await top_prayers.acount(), 2, msg="Wrong number of top prayers"
         )
 
         expected_top_prayers = [rd_6.pk, self.rd_4.pk]
-        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
         self.assertEqual(
             actual_top_prayers, expected_top_prayers, msg="Wrong top_prayers."
         )
@@ -1017,9 +1017,13 @@ class RECAPPrayAndPay(TestCase):
         )
 
         top_prayers = await get_top_prayers()
-        self.assertEqual(len(top_prayers), 1, msg="Wrong top_prayers.")
         self.assertEqual(
-            top_prayers[0], self.rd_4, msg="The top prayer didn't match."
+            await top_prayers.acount(), 1, msg="Wrong top_prayers."
+        )
+        self.assertEqual(
+            await top_prayers.afirst(),
+            self.rd_4,
+            msg="The top prayer didn't match.",
         )
 
 

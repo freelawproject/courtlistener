@@ -100,7 +100,7 @@ async def get_existing_prayers_in_bulk(
     return {rd_id: True async for rd_id in existing_prayers}
 
 
-async def get_top_prayers() -> list[RECAPDocument]:
+async def get_top_prayers() -> QuerySet[RECAPDocument]:
     # Calculate the age of each prayer
     prayer_age = ExpressionWrapper(
         Extract(Now() - F("prayers__date_created"), "epoch"),
@@ -156,7 +156,7 @@ async def get_top_prayers() -> list[RECAPDocument]:
         .order_by("-geometric_mean")[:50]
     )
 
-    return [doc async for doc in documents.aiterator()]
+    return documents
 
 
 async def get_user_prayers(user: User) -> QuerySet[Prayer]:
