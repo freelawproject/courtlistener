@@ -272,6 +272,7 @@ async def delete_prayer_view(
                 "regular_size": regular_size,
                 "should_swap": True if source != "user_prayer_list" else False,
             },
+            headers={"HX-Trigger": "prayersListChanged"},
         )
     return HttpResponse("It worked.")
 
