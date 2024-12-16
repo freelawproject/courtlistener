@@ -14,6 +14,7 @@ from django.db.models import (
     F,
     FloatField,
     Q,
+    QuerySet,
     Subquery,
     Sum,
     Value,
@@ -159,7 +160,7 @@ async def get_top_prayers() -> list[RECAPDocument]:
     return [doc async for doc in documents.aiterator()]
 
 
-async def get_user_prayers(user: User) -> list[Prayer]:
+async def get_user_prayers(user: User) -> QuerySet[Prayer]:
     user_prayers = Prayer.objects.filter(user=user).values("recap_document_id")
 
     documents = (
@@ -196,7 +197,7 @@ async def get_user_prayers(user: User) -> list[Prayer]:
         .order_by("prayers__date_created")
     )
 
-    return [document async for document in documents.aiterator()]
+    return documents
 
 
 def send_prayer_emails(instance: RECAPDocument) -> None:
@@ -282,15 +283,6 @@ async def get_lifetime_prayer_stats(
 ):  # status can be only 1 (WAITING) or 2 (GRANTED) based on the Prayer model
 
     cache_key = f"prayer-stats-{status}"
-
-    data = await cache.aget(cache_key)
-
-    if data is not None:
-        return PrayerStats(
-            prayer_count=data["count"],
-            distinct_count=data["num_distinct_purchases"],
-            total_cost=data["total_cost"],
-        )
 
     prayer_by_status = Prayer.objects.filter(status=status)
 
