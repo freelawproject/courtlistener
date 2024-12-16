@@ -1614,7 +1614,7 @@ def get_docket_by_pacer_case_id(
     :param tag_names: A list of tag names that should be stored with the item
     in the DB.
     :param kwargs: A variety of keyword args to pass to DocketReport.query().
-    :return: A dict indicating if we need to update Solr.
+    :return: A dict indicating if we need to update the search engine.
     """
     if data is None:
         logger.info("Empty data argument. Terminating chains and exiting.")
