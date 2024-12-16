@@ -486,6 +486,7 @@ def build_text_filter(field: str, value: str) -> List:
                 "query": value,
                 "fields": [field],
                 "default_operator": "AND",
+                "quote_field_suffix": ".exact",
             }
         }
         if "caseName" in field and '"' not in value:
