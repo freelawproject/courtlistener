@@ -29,6 +29,8 @@ REST_FRAMEWORK = {
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
         # Unresponsive
+        "court_test_account": "1/hour",
+        "jmmckinnie": "1/hour",
         "projecttesting": "1/hour",
         "SAGW": "1/hour",
         # Bounced
