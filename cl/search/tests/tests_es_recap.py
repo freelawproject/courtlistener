@@ -1795,8 +1795,9 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
             "case_name": "SUBPOENAS SERVED ON",
         }
         r = await self._test_article_count(params, 1, "highlights caseName")
-        # Count child documents under docket.
-        self.assertIn("<mark>SUBPOENAS SERVED ON</mark>", r.content.decode())
+        self.assertIn("<mark>SUBPOENAS</mark>", r.content.decode())
+        self.assertIn("<mark>SERVED</mark>", r.content.decode())
+        self.assertIn("<mark>ON</mark>", r.content.decode())
 
         # Highlight filter: description
         params = {
@@ -2806,6 +2807,24 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         r = async_to_sync(self._test_article_count)(cd, 1, "Disable stemming")
         self.assertIn("<mark>Howells v. Indiana</mark>", r.content.decode())
 
+        # No quoted case_name filter: A match for 'Indiana Howell' is expected,
+        # as the order is not mandatory
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": "Indiana Howell",
+        }
+        r = async_to_sync(self._test_article_count)(cd, 1, "No phrase search.")
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
+        self.assertIn("<mark>Indiana</mark>", r.content.decode())
+
+        # Quoted case_name filter: "Indiana v. Howells" match is not expected
+        # as order is mandatory
+        cd = {
+            "type": SEARCH_TYPES.RECAP,
+            "case_name": '"Indiana v. Howells"',
+        }
+        async_to_sync(self._test_article_count)(cd, 0, "Phrase search.")
+
         # text query: Howell
         cd = {
             "type": SEARCH_TYPES.RECAP,
@@ -3718,7 +3737,7 @@ class RECAPSearchAPIV4Test(
             "result": self.rd_api,
             "V4": True,
             "assignedTo": "<mark>George</mark> Doe II",
-            "caseName": "<mark>America vs API</mark> Lorem",
+            "caseName": "<mark>America</mark> <mark>vs</mark> <mark>API</mark> Lorem",
             "cause": "<mark>401</mark> <mark>Civil</mark>",
             "court_citation_string": "<mark>Appeals</mark>. CA9.",
             "docketNumber": "<mark>1:24-bk-0000</mark>",
