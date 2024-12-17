@@ -2274,7 +2274,6 @@ class OpinionsESSearchTest(
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
-
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
