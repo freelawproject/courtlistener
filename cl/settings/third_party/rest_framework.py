@@ -28,6 +28,12 @@ REST_FRAMEWORK = {
     },
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
+        # Multiple accounts
+        "JamesBond": "1/hour",
+        "JackSparrow": "1/hour",
+        "PeterPan": "1/hour",
+        "HomerSimpson": "1/hour",
+        "BruceWayne": "1/hour",
         # Unresponsive
         "court_test_account": "1/hour",
         "jmmckinnie": "1/hour",
