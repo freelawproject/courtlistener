@@ -159,7 +159,7 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
     return documents
 
 
-async def get_user_prayers(user: User) -> QuerySet[Prayer]:
+async def get_user_prayers(user: User) -> QuerySet[RECAPDocument]:
     user_prayers = Prayer.objects.filter(user=user).values("recap_document_id")
 
     documents = (
@@ -176,13 +176,18 @@ async def get_user_prayers(user: User) -> QuerySet[Prayer]:
             "attachment_number",
             "pacer_doc_id",
             "page_count",
+            "filepath_local",
+            "filepath_ia",
             "is_free_on_pacer",
             "description",
+            "date_upload",
             "date_created",
             "docket_entry__entry_number",
             "docket_entry__docket_id",
             "docket_entry__docket__slug",
             "docket_entry__docket__case_name",
+            "docket_entry__docket__case_name_short",
+            "docket_entry__docket__case_name_full",
             "docket_entry__docket__docket_number",
             "docket_entry__docket__pacer_case_id",
             "docket_entry__docket__court__jurisdiction",
