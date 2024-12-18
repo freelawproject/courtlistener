@@ -290,6 +290,14 @@ async def get_lifetime_prayer_stats(
 
     cache_key = f"prayer-stats-{status}"
 
+    data = await cache.aget(cache_key)
+    if data is not None:
+        return PrayerStats(
+            prayer_count=data["count"],
+            distinct_count=data["num_distinct_purchases"],
+            total_cost=data["total_cost"],
+        )
+
     prayer_by_status = Prayer.objects.filter(status=status)
 
     prayer_count = await prayer_by_status.acount()
