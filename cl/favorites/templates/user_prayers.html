@@ -49,24 +49,24 @@
             </tr>
         </thead>
         <tbody>
-            {% for prayer in prayers %}
+            {% for rd in rd_with_prayers %}
             <tr>
-              <td>{{ prayer.docket_entry.docket.court.citation_string }}</td>
-              {% with docket=prayer.docket_entry.docket %}
+              <td>{{ rd.docket_entry.docket.court.citation_string }}</td>
+              {% with docket=rd.docket_entry.docket %}
               <td>
                 <a href="{% url "view_docket" docket.pk docket.slug %}">
-                  {{ prayer.docket_entry.docket|best_case_name|safe|v_wrapper }} ({{ prayer.docket_entry.docket.docket_number }})
+                  {{ docket|best_case_name|safe|v_wrapper }} ({{ docket.docket_number }})
                 </a>
               </td>
               <td>
-                <a href="{% url "view_docket" docket.pk docket.slug %}#entry-{{ prayer.docket_entry.entry_number }}">
-                  {{ prayer.document_number }}
+                <a href="{% url "view_docket" docket.pk docket.slug %}#entry-{{ rd.docket_entry.entry_number }}">
+                  {{ rd.document_number }}
                 </a>
               </td>
               {% endwith %}
-              <td>{{ prayer.description }}</td>
-              <td>{{ prayer.date_created|date:"M j, Y"  }}</td>
-              <td>{% if prayer.prayer_status == 1 %} Pending {% elif prayer.prayer_status == 2 %}
+              <td>{{ rd.description }}</td>
+              <td>{{ rd.prayer_date_created|date:"M j, Y"  }}</td>
+              <td>{% if rd.prayer_status == 1 %} Pending {% elif rd.prayer_status == 2 %}
                 <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
                   {% if rd.filepath_local %}
                     <a href="{{ rd.filepath_local.url }}"
@@ -74,7 +74,7 @@
                         role="button"
                         class="btn btn-primary btn-xs"
                             {% if rd.date_upload %}
-                        title="Uploaded {{ rd.date_upload|timezone:timezone }}"
+                        title="Uploaded {{ rd.date_upload|datetime_in_utc }}"
                             {% endif %}>
                       Download PDF
                     </a>
@@ -103,18 +103,18 @@
                 </div>
                 {% endif %}
               </td>
-              {% if is_page_owner and prayer.prayer_status != 2 %}
+              {% if is_page_owner and rd.prayer_status != 2 %}
                 <td>
                   <div class="flex justify-content-center">
-                    <form id="pray_{{prayer.pk}}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-swap="none"
-                      hx-post="{% url 'delete_prayer' prayer.pk %}" hx-indicator="#delete-spinner-{{prayer.pk}}">
+                    <form id="pray_{{rd.pk}}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-swap="none"
+                      hx-post="{% url 'delete_prayer' rd.pk %}" hx-indicator="#delete-spinner-{{rd.pk}}">
                       <input type="hidden" name="source" value="user_prayer_list">
                       <button class="btn btn-danger btn-xs">
                         <i class="fa fa-trash-o"></i>
                       </button>
                     </form>
                     &nbsp;
-                    <span id="delete-spinner-{{prayer.pk}}" class="htmx-hidden-indicator" >
+                    <span id="delete-spinner-{{rd.pk}}" class="htmx-hidden-indicator" >
                       <i class="fa fa-spinner fa-spin fa-lg"></i>
                     </span>
                   </div>
