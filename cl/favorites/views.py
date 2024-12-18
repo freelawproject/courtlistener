@@ -287,14 +287,14 @@ async def user_prayers_view(
     if not is_page_owner:
         return redirect("top_prayers")
 
-    prayers = await get_user_prayers(requested_user)
+    rd_with_prayers = await get_user_prayers(requested_user)
 
     count, total_cost = await get_user_prayer_history(requested_user)
 
     is_eligible = await prayer_eligible(requested_user)
 
     context = {
-        "prayers": prayers,
+        "rd_with_prayers": rd_with_prayers,
         "requested_user": requested_user,
         "is_page_owner": is_page_owner,
         "count": count,
