@@ -376,7 +376,6 @@ async def view_docket(
 
     paginated_entries = await paginate_docket_entries(de_list, page)
 
-    prayer_is_eligible = False
     flag_for_prayers = await sync_to_async(waffle.flag_is_active)(
         request, "pray-and-pay"
     )
@@ -396,7 +395,6 @@ async def view_docket(
             existing_prayers = await get_existing_prayers_in_bulk(
                 request.user, recap_documents
             )
-            prayer_is_eligible = await prayer_eligible(request.user)
 
         # Merge counts and existing prayer status to RECAPDocuments.
         for rd in recap_documents:
@@ -412,7 +410,6 @@ async def view_docket(
             "sort_order_asc": sort_order_asc,
             "form": form,
             "get_string": make_get_string(request),
-            "prayer_eligible": prayer_is_eligible,
         }
     )
     return TemplateResponse(request, "docket.html", context)
@@ -712,7 +709,6 @@ async def view_recap_document(
     de = await DocketEntry.objects.aget(id=rd.docket_entry_id)
     d = await Docket.objects.aget(id=de.docket_id)
 
-    prayer_is_eligible = False
     flag_for_prayers = await sync_to_async(waffle.flag_is_active)(
         request, "pray-and-pay"
     )
@@ -725,7 +721,6 @@ async def view_recap_document(
             existing_prayers = await get_existing_prayers_in_bulk(
                 request.user, [rd]
             )
-            prayer_is_eligible = await prayer_eligible(request.user)
 
         # Merge counts and existing prayer status to RECAPDocuments.
         rd.prayer_count = prayer_counts.get(rd.id, 0)
@@ -743,7 +738,6 @@ async def view_recap_document(
             "timezone": COURT_TIMEZONES.get(d.court_id, "US/Eastern"),
             "redirect_to_pacer_modal": redirect_to_pacer_modal,
             "authorities": await rd.cited_opinions.aexists(),
-            "prayer_eligible": prayer_is_eligible,
         },
     )
 
