@@ -1,7 +1,6 @@
 from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 from django.db.models import QuerySet
-from django.forms import ModelForm
 from django.http import HttpRequest
 
 from cl.alerts.admin import DocketAlertInline

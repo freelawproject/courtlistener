@@ -228,10 +228,10 @@ def show_results(request: HttpRequest) -> HttpResponse:
         mutable_GET["filed_before"] = date.today()
 
         # Load the render_dict with good results that can be shown in the
-        # "Latest Cases" section
+        # "Latest Opinions" section
         mutable_GET.update(
             {
-                "order_by": "dateArgued desc",
+                "order_by": "dateFiled desc",
                 "type": SEARCH_TYPES.OPINION,
             }
         )
