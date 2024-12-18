@@ -1,5 +1,6 @@
 {% load text_filters %}
 {% load humanize %}
+{% load extras %}
 {% load tz %}
 
 <!DOCTYPE html>
@@ -44,7 +45,7 @@
           <td style="text-align: center">{{ docket_entry.entry_number }}{% if rd.attachment_number  %}-{{ rd.attachment_number }}{% endif %}</td>
           <td>
             {% if docket_entry.datetime_filed %}
-              <span title="{{ docket_entry.datetime_filed|timezone:timezone}}">{{ docket_entry.datetime_filed|timezone:timezone|date:"M j, Y" }}</span>
+              <span title="{{ docket_entry.datetime_filed|datetime_in_utc}}">{{ docket_entry.datetime_filed|datetime_in_utc|date:"M j, Y" }}</span>
             {% else %}
               {{ docket_entry.date_filed|date:"M j, Y"|default:'<em class="gray">Unknown</em>' }}
             {% endif %}
