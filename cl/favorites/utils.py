@@ -206,6 +206,38 @@ async def get_user_prayers(user: User) -> QuerySet[RECAPDocument]:
     return documents
 
 
+async def compute_prayer_total_cost(queryset: QuerySet[Prayer]) -> float:
+    """
+    Computes the total cost of a given queryset of Prayer objects.
+
+    Args:
+        queryset: A QuerySet of Prayer objects.
+
+    Returns:
+        The total cost of the prayers in the queryset, as a float.
+    """
+    cost = await (
+        queryset.values("recap_document")
+        .distinct()
+        .annotate(
+            price=Case(
+                When(recap_document__is_free_on_pacer=True, then=Value(0.0)),
+                When(
+                    recap_document__page_count__gt=0,
+                    then=Least(
+                        Value(3.0),
+                        F("recap_document__page_count") * Value(0.10),
+                    ),
+                ),
+                default=Value(0.0),
+            )
+        )
+        .aaggregate(Sum("price", default=0.0))
+    )
+
+    return cost["price__sum"]
+
+
 def send_prayer_emails(instance: RECAPDocument) -> None:
     open_prayers = Prayer.objects.filter(
         recap_document=instance, status=Prayer.WAITING
@@ -265,26 +297,7 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
 
     count = await filtered_list.acount()
 
-    cost = await (
-        filtered_list.values("recap_document")
-        .distinct()
-        .annotate(
-            price=Case(
-                When(recap_document__is_free_on_pacer=True, then=Value(0.0)),
-                When(
-                    recap_document__page_count__gt=0,
-                    then=Least(
-                        Value(3.0),
-                        F("recap_document__page_count") * Value(0.10),
-                    ),
-                ),
-                default=Value(0.0),
-            )
-        )
-        .aaggregate(Sum("price", default=0.0))
-    )
-
-    total_cost = cost["price__sum"]
+    total_cost = await compute_prayer_total_cost(filtered_list)
 
     return count, total_cost
 
@@ -320,27 +333,9 @@ async def get_lifetime_prayer_stats(
         await prayer_by_status.values("recap_document").distinct().acount()
     )
 
-    total_cost = await (
+    total_cost = await compute_prayer_total_cost(
         prayer_by_status.select_related("recap_document")
-        .values("recap_document")
-        .distinct()
-        .annotate(
-            price=Case(
-                When(recap_document__is_free_on_pacer=True, then=Value(0.0)),
-                When(
-                    recap_document__page_count__gt=0,
-                    then=Least(
-                        Value(3.0),
-                        F("recap_document__page_count") * Value(0.10),
-                    ),
-                ),
-                default=Value(0.0),
-            )
-        )
-        .aaggregate(Sum("price", default=0.0))
     )
-
-    total_cost = total_cost["price__sum"]
 
     data = {
         "count": prayer_count,
