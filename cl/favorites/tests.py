@@ -2,11 +2,13 @@ import math
 import time
 from datetime import date, timedelta
 from http import HTTPStatus
+from unittest.mock import patch
 
 import time_machine
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.core import mail
+from django.core.cache import cache
 from django.template.defaultfilters import date as template_date
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -23,6 +25,7 @@ from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
     get_existing_prayers_in_bulk,
+    get_lifetime_prayer_stats,
     get_prayer_counts_in_bulk,
     get_top_prayers,
     get_user_prayer_history,
@@ -924,6 +927,96 @@ class RECAPPrayAndPay(TestCase):
         count, total_cost = await get_user_prayer_history(self.user)
         self.assertEqual(count, 2)
         self.assertEqual(total_cost, 3.20)
+
+    @patch("cl.favorites.utils.cache.aget")
+    async def test_get_lifetime_prayer_stats(self, mock_cache_aget) -> None:
+        """Does the get_lifetime_prayer_stats method work properly?"""
+        mock_cache_aget.return_value = None
+
+        # Update page counts for recap documents
+        self.rd_2.page_count = 5
+        await self.rd_2.asave()
+        self.rd_3.page_count = 1
+        await self.rd_3.asave()
+        self.rd_4.page_count = 45
+        await self.rd_4.asave()
+        self.rd_5.page_count = 20
+        await self.rd_5.asave()
+
+        # Create prayer requests for the following user-document pairs:
+        # - User: Recap Document 2, Recap Document 3, Recap Document 5
+        # - User 2: Recap Document 2, Recap Document 3, Recap Document 4
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user_2, self.rd_4)
+        await create_prayer(self.user, self.rd_5)
+
+        # Verify expected values for waiting prayers:
+        # - Total count of 6 prayers
+        # - 4 distinct documents
+        # - Total cost of $5.60 (sum of individual document costs)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(prayer_stats.prayer_count, 6)
+        self.assertEqual(prayer_stats.distinct_count, 4)
+        self.assertEqual(prayer_stats.total_cost, "5.60")
+
+        # Verify that no prayers have been granted:
+        # - Zero count of granted prayers
+        # - Zero distinct documents
+        # - Zero total cost
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+        self.assertEqual(prayer_stats.prayer_count, 0)
+        self.assertEqual(prayer_stats.distinct_count, 0)
+        self.assertEqual(prayer_stats.total_cost, "0.00")
+
+        # rd_2 is granted.
+        self.rd_2.is_available = True
+        await self.rd_2.asave()
+
+        # Verify that granting `rd_2` reduces the number of waiting prayers:
+        # - Total waiting prayers should decrease by 2 (as `rd_2` had 2 prayers)
+        # - Distinct documents should decrease by 1
+        # - Total cost should decrease to 5.10 (excluding `rd_2`'s cost)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(prayer_stats.prayer_count, 4)
+        self.assertEqual(prayer_stats.distinct_count, 3)
+        self.assertEqual(prayer_stats.total_cost, "5.10")
+
+        # Verify that granting `rd_2` increases the number of granted prayers:
+        # - Total granted prayers should increase by 2 (as `rd_2` had 2 prayers)
+        # - Distinct documents should increase by 1
+        # - Total cost should increase by 0.50 (the cost of granting `rd_2`)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+        self.assertEqual(prayer_stats.prayer_count, 2)
+        self.assertEqual(prayer_stats.distinct_count, 1)
+        self.assertEqual(prayer_stats.total_cost, "0.50")
+
+        # rd_4 is granted.
+        self.rd_4.is_available = True
+        await self.rd_4.asave()
+
+        # Verify that granting `rd_4` reduces the number of waiting prayers:
+        # - Total waiting prayers should decrease by 3 (2 from `rd_2` and 1 from `rd_4`)
+        # - Distinct documents should decrease by 2 (`rd_2` and `rd_4`)
+        # - Total cost should decrease to 2.10 (excluding costs of `rd_2` and `rd_4`)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(prayer_stats.prayer_count, 3)
+        self.assertEqual(prayer_stats.distinct_count, 2)
+        self.assertEqual(prayer_stats.total_cost, "2.10")
+
+        # Verify that granting `rd_4` increases the number of granted prayers:
+        # - Total granted prayers should increase by 3 (2 from `rd_2` and 1 from `rd_4`)
+        # - Distinct documents should increase by 1 (`rd_2` and `rd_4` are now granted)
+        # - Total cost should increase by 3.50 (the combined cost of `rd_2` and `rd_4`)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+        self.assertEqual(prayer_stats.prayer_count, 3)
+        self.assertEqual(prayer_stats.distinct_count, 2)
+        self.assertEqual(prayer_stats.total_cost, "3.50")
+
+        await cache.adelete(f"prayer-stats-{Prayer.WAITING}")
+        await cache.adelete(f"prayer-stats-{Prayer.GRANTED}")
 
     async def test_prayers_integration(self) -> None:
         """Integration test for prayers."""

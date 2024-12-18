@@ -327,11 +327,12 @@ async def get_lifetime_prayer_stats(
         .annotate(
             price=Case(
                 When(recap_document__is_free_on_pacer=True, then=Value(0.0)),
-                When(recap_document__page_count__gt=30, then=Value(3.0)),
                 When(
                     recap_document__page_count__gt=0,
-                    recap_document__page_count__lte=30,
-                    then=F("recap_document__page_count") * 0.10,
+                    then=Least(
+                        Value(3.0),
+                        F("recap_document__page_count") * Value(0.10),
+                    ),
                 ),
                 default=Value(0.0),
             )
