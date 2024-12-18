@@ -21,8 +21,9 @@ class ProcessingQueueAdmin(CursorPaginatorAdmin):
         "pacer_case_id",
         "document_number",
         "attachment_number",
+        "date_created",
     )
-    list_filter = ("status",)
+    list_filter = ("status", "date_created")
     search_fields = (
         "pacer_case_id",
         "court__pk",
@@ -41,15 +42,8 @@ class ProcessingQueueAdmin(CursorPaginatorAdmin):
 
 @admin.register(PacerFetchQueue)
 class PacerFetchQueueAdmin(CursorPaginatorAdmin):
-    list_display = (
-        "__str__",
-        "court",
-        "request_type",
-    )
-    list_filter = (
-        "status",
-        "request_type",
-    )
+    list_display = ("__str__", "court", "request_type", "date_created")
+    list_filter = ("status", "request_type", "date_created")
     readonly_fields = (
         "date_created",
         "date_modified",
