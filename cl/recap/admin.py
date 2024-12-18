@@ -88,14 +88,15 @@ def reprocess_failed_epq(modeladmin, request, queryset):
 
 @admin.register(EmailProcessingQueue)
 class EmailProcessingQueueAdmin(CursorPaginatorAdmin):
-    list_display = (
-        "__str__",
-        "status",
-    )
-    list_filter = ("status",)
+    list_display = ("__str__", "status", "date_created")
+    list_filter = ("status", "date_created")
     actions = [reprocess_failed_epq]
     raw_id_fields = ["uploader", "court"]
     exclude = ["recap_documents", "filepath"]
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
 
 
 admin.site.register(FjcIntegratedDatabase)
