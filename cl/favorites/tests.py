@@ -25,6 +25,7 @@ from cl.favorites.utils import (
     get_existing_prayers_in_bulk,
     get_prayer_counts_in_bulk,
     get_top_prayers,
+    get_user_prayer_history,
     prayer_eligible,
 )
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
@@ -884,6 +885,45 @@ class RECAPPrayAndPay(TestCase):
         self.assertAlmostEqual(
             top_prayers[3].geometric_mean, rd_3_score, places=2
         )
+
+    async def test_get_user_prayer_history(self) -> None:
+        """Does the get_user_prayer_history method work properly?"""
+        # Prayers for user_2
+        await create_prayer(self.user_2, self.rd_4)
+
+        # Prayers for user
+        await create_prayer(self.user, self.rd_2)
+        prayer_rd3 = await create_prayer(self.user, self.rd_3)
+        prayer_rd5 = await create_prayer(self.user, self.rd_5)
+
+        # Verify that the initial prayer count and total cost are 0.
+        count, total_cost = await get_user_prayer_history(self.user)
+        self.assertEqual(count, 0)
+        self.assertEqual(total_cost, 0.0)
+
+        # Update `rd_3`'s page count and set `prayer_rd3`'s status to `GRANTED`
+        self.rd_3.page_count = 2
+        await self.rd_3.asave()
+
+        prayer_rd3.status = Prayer.GRANTED
+        await prayer_rd3.asave()
+
+        # Verify that the count is 1 and total cost is 0.20.
+        count, total_cost = await get_user_prayer_history(self.user)
+        self.assertEqual(count, 1)
+        self.assertEqual(total_cost, 0.20)
+
+        # Update `rd_5`'s page count and set `prayer_rd5`'s status to `GRANTED`
+        self.rd_5.page_count = 40
+        await self.rd_5.asave()
+
+        prayer_rd5.status = Prayer.GRANTED
+        await prayer_rd5.asave()
+
+        # Verify that the count is 2 and the total cost is now 3.20.
+        count, total_cost = await get_user_prayer_history(self.user)
+        self.assertEqual(count, 2)
+        self.assertEqual(total_cost, 3.20)
 
     async def test_prayers_integration(self) -> None:
         """Integration test for prayers."""

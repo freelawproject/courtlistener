@@ -19,7 +19,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Cast, Extract, Now, Sqrt
+from django.db.models.functions import Cast, Extract, Least, Now, Sqrt
 from django.template import loader
 from django.utils import timezone
 
@@ -265,12 +265,26 @@ async def get_user_prayer_history(user: User) -> tuple[int, float]:
 
     count = await filtered_list.acount()
 
-    total_cost = 0
-    async for prayer in filtered_list:
-        doc_price = price(prayer.recap_document)
-        if not doc_price:
-            continue
-        total_cost += float(doc_price)
+    cost = await (
+        filtered_list.values("recap_document")
+        .distinct()
+        .annotate(
+            price=Case(
+                When(recap_document__is_free_on_pacer=True, then=Value(0.0)),
+                When(
+                    recap_document__page_count__gt=0,
+                    then=Least(
+                        Value(3.0),
+                        F("recap_document__page_count") * Value(0.10),
+                    ),
+                ),
+                default=Value(0.0),
+            )
+        )
+        .aaggregate(Sum("price", default=0.0))
+    )
+
+    total_cost = cost["price__sum"]
 
     return count, total_cost
 
