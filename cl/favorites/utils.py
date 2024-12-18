@@ -130,6 +130,8 @@ async def get_top_prayers() -> QuerySet[RECAPDocument]:
             "docket_entry__docket_id",
             "docket_entry__docket__slug",
             "docket_entry__docket__case_name",
+            "docket_entry__docket__case_name_short",
+            "docket_entry__docket__case_name_full",
             "docket_entry__docket__docket_number",
             "docket_entry__docket__pacer_case_id",
             "docket_entry__docket__court__jurisdiction",
