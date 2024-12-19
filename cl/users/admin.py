@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
 from rest_framework.authtoken.models import Token
 
@@ -42,7 +43,24 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
 
 
+class CustomUserChangeForm(UserChangeForm):
+    class Meta(UserChangeForm.Meta):
+        model = User
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ensure user_permissions field uses an optimized queryset
+        if "user_permissions" in self.fields:
+            self.fields["user_permissions"].queryset = (
+                Permission.objects.select_related("content_type").order_by(
+                    "content_type__app_label", "codename"
+                )
+            )
+
+
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
+    form = CustomUserChangeForm  # optimize queryset for user_permissions field
     inlines = (
         UserProfileInline,
         DonationInline,
