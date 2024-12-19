@@ -88,7 +88,14 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
 
 @admin.register(Court)
 class CourtAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "short_name", "position", "in_use", "pk")
+    list_display = (
+        "full_name",
+        "short_name",
+        "position",
+        "in_use",
+        "pk",
+        "jurisdiction",
+    )
     list_filter = (
         "jurisdiction",
         "in_use",
