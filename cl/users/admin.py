@@ -65,6 +65,7 @@ class CustomUserChangeForm(UserChangeForm):
 
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     form = CustomUserChangeForm  # optimize queryset for user_permissions field
+    change_form_template = "user_change_form.html"
     inlines = (
         UserProfileInline,
         DonationInline,
@@ -88,6 +89,28 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "last_name",
         "email",
     )
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """Add links to related event admin pages filtered by user/profile."""
+        extra_context = extra_context or {}
+        user = self.get_object(request, object_id)
+        proxy_events_url = (
+            f"/admin/{UserProxyEvent._meta.app_label}/"
+            f"{UserProxyEvent._meta.model_name}/?pgh_obj={object_id}"
+        )
+        extra_context["proxy_events_url"] = proxy_events_url
+
+        if user and hasattr(user, "profile"):
+            profile_id = user.profile.pk
+            profile_events_url = (
+                f"/admin/{UserProfileEvent._meta.app_label}/"
+                f"{UserProfileEvent._meta.model_name}/?pgh_obj={profile_id}"
+            )
+            extra_context["profile_events_url"] = profile_events_url
+
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )
 
 
 @admin.register(EmailFlag)
