@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.contrib import admin
 from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
@@ -19,6 +20,9 @@ from cl.users.models import (
     FailedEmail,
     UserProfile,
 )
+
+UserProxyEvent = apps.get_model("users", "UserProxyEvent")
+UserProfileEvent = apps.get_model("users", "UserProfileEvent")
 
 
 def get_email_confirmed(obj):
@@ -133,6 +137,50 @@ class FailedEmailAdmin(admin.ModelAdmin):
         "date_created",
     )
     raw_id_fields = ("stored_email",)
+
+
+class BaseUserEventAdmin(admin.ModelAdmin):
+    ordering = ("-pgh_created_at",)
+    # Define common attributes to be extended:
+    common_list_display = ("get_pgh_created", "get_pgh_label")
+    common_list_filters = ("pgh_created_at",)
+    common_search_fields = ("pgh_obj",)
+    # Default to common attributes:
+    list_display = common_list_display
+    list_filter = common_list_filters
+    search_fields = common_search_fields
+
+    @admin.display(ordering="pgh_created_at", description="Event triggered")
+    def get_pgh_created(self, obj):
+        return obj.pgh_created_at
+
+    @admin.display(ordering="pgh_label", description="Event label")
+    def get_pgh_label(self, obj):
+        return obj.pgh_label
+
+
+@admin.register(UserProxyEvent)
+class UserProxyEventAdmin(BaseUserEventAdmin):
+    search_fields = BaseUserEventAdmin.common_search_fields + (
+        "email",
+        "username",
+    )
+    list_display = BaseUserEventAdmin.list_display + (
+        "email",
+        "username",
+    )
+
+
+@admin.register(UserProfileEvent)
+class UserProfileEventAdmin(BaseUserEventAdmin):
+    search_fields = BaseUserEventAdmin.common_search_fields + (
+        "user__username",
+    )
+    list_display = BaseUserEventAdmin.common_list_display + (
+        "user",
+        "email_confirmed",
+    )
+    list_filter = BaseUserEventAdmin.common_list_filters + ("email_confirmed",)
 
 
 # Replace the normal User admin with our better one.
