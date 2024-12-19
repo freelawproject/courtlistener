@@ -736,7 +736,10 @@ def invert_user_logs(
 
     dates = make_date_str_list(start, end)
     for d in dates:
-        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1, withscores=True)
+        for version in ["v3", "v4"]:
+            pipe.zrange(
+                f"api:{version}.user.d:{d}.counts", 0, -1, withscores=True
+            )
     results = pipe.execute()
 
     # results is a list of results for each of the zrange queries above. Zip
