@@ -1084,12 +1084,6 @@ def combine_plain_filters_and_queries(
         final_query.filter = reduce(operator.iand, filters)
     if filters and string_query:
         final_query.minimum_should_match = 1
-
-    if cd["type"] == SEARCH_TYPES.ORAL_ARGUMENT:
-        # Apply custom score for dateArgued sorting in the V4 API.
-        final_query = apply_custom_score_to_main_query(
-            cd, final_query, api_version
-        )
     return final_query
 
 
@@ -1377,14 +1371,24 @@ def build_es_base_query(
             child_query=child_docs_query,
         )
 
+    boost_mode = "multiply"
     if plain_doc:
         # Combine the filters and string query for plain documents like Oral
         # arguments and parentheticals
         main_query = combine_plain_filters_and_queries(
             cd, filters, string_query, api_version
         )
+        if not string_query:
+            boost_mode = "replace"
+    else:
+        main_query_dict = main_query.to_dict()
+        contain_query_string = "should" in main_query_dict["bool"]["should"][1]["bool"] and "query_string" in main_query_dict["bool"]["should"][1]["bool"]["should"][0]
+        if not contain_query_string:
+            boost_mode = "replace"
 
-    main_query = apply_custom_score_to_main_query(cd, main_query, api_version)
+
+    main_query = apply_custom_score_to_main_query(cd, main_query, api_version, boost_mode=boost_mode)
+
     return EsMainQueries(
         search_query=search_query.query(main_query),
         parent_query=parent_query,
@@ -2219,6 +2223,7 @@ def fetch_es_results(
 
         # Execute the ES main query + count queries in a single request.
         multi_search = MultiSearch()
+        print("MAin query: ", main_query.to_dict())
         multi_search = multi_search.add(main_query).add(main_doc_count_query)
         if child_total_query:
             multi_search = multi_search.add(child_total_query)
@@ -2567,6 +2572,7 @@ def apply_custom_score_to_main_query(
     :param cd: The query CleanedData
     :param query: The ES Query object to be modified.
     :param api_version: Optional, the request API version.
+    :param boost_mode: Optional, the boost mode to apply for the decay relevancy score
     :return: The function_score query contains the base query, applied when
     child_order is used.
     """
@@ -2588,9 +2594,10 @@ def apply_custom_score_to_main_query(
     )
 
     valid_decay_relevance_types = {
+        SEARCH_TYPES.OPINION: ["dateFiled"],
         SEARCH_TYPES.RECAP: ["dateFiled"],
         SEARCH_TYPES.DOCKETS: ["dateFiled"],
-        SEARCH_TYPES.RECAP_DOCUMENT: ["dateFiled", "entry_date_filed"],
+        SEARCH_TYPES.RECAP_DOCUMENT: ["dateFiled"],
         SEARCH_TYPES.ORAL_ARGUMENT: ["dateArgued"],
     }
     main_order_by = cd.get("order_by", "")

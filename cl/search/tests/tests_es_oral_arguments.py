@@ -113,7 +113,7 @@ class OASearchAPICommonTests(AudioESTestCase):
         )
         self.assertTrue(
             r.content.decode().index("Jose")
-            > r.content.decode().index("Hong Liu"),
+            < r.content.decode().index("Hong Liu"),
             msg="'Jose' should come AFTER 'Hong Liu' when order_by relevance.",
         )
 
@@ -273,9 +273,9 @@ class OASearchAPICommonTests(AudioESTestCase):
         )
         self.assertTrue(
             r.content.decode().index("Jose")
-            > r.content.decode().index("Hong Liu Lorem")
+            < r.content.decode().index("Hong Liu Lorem")
             < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come AFTER 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
+            msg="'Jose' should come Before 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
         )
 
     @skip_if_common_tests_skipped
@@ -983,14 +983,13 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
     @staticmethod
     def save_percolator_query(cd):
         search_query = AudioDocument.search()
+        # Sorting key is not required in percolator queries.
+        del cd["order_by"]
         es_queries = build_es_base_query(search_query, cd)
-        search_query = es_queries.search_query
-        query_dict = search_query.to_dict()["query"]
         percolator_query = AudioPercolator(
-            percolator_query=query_dict, rate=Alert.REAL_TIME
+            percolator_query=es_queries.search_query.to_dict()["query"], rate=Alert.REAL_TIME
         )
         percolator_query.save(refresh=True)
-
         return percolator_query.meta.id
 
     @staticmethod
@@ -1052,9 +1051,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Jose")
-            > r.content.decode().index("Hong Liu"),
-            msg="'Jose' should come AFTER 'Hong Liu' when order_by relevance.",
+            r.content.decode().index("Jose") # 2015, 8, 15
+            < r.content.decode().index("Hong Liu"), # 2015, 8, 14
+            msg="'Jose' should come Before 'Hong Liu' when order_by relevance.",
         )
 
     def test_oa_results_search_match_phrase(self) -> None:
@@ -1642,10 +1641,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang")
-            < r.content.decode().index("Jose"),
-            msg="'Hong Liu Lorem' should come BEFORE 'Hong Liu Yang' and 'Jose' when order_by relevance.",
+            r.content.decode().index("Hong Liu Lorem") # 2015, 8, 14 - 9.486339
+            < r.content.decode().index("Hong Liu Yang")  # 2015, 8, 14 - 9.034608
+            < r.content.decode().index("Jose"), # 2015, 8, 15 - 4.7431693
+            msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
         )
 
         # Relevance order, two words match, reverse order.
@@ -1663,10 +1662,10 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Jose")
-            > r.content.decode().index("Hong Liu Lorem")
-            < r.content.decode().index("Hong Liu Yang"),
-            msg="'Jose' should come AFTER 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
+            r.content.decode().index("Jose") # 2015, 8, 15
+            < r.content.decode().index("Hong Liu Lorem") # 2015, 8, 14
+            < r.content.decode().index("Hong Liu Yang"), # 2015, 8, 14
+            msg="'Jose' should come Before 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
         )
 
         # Relevance order, hyphenated compound word.

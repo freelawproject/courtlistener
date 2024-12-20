@@ -139,6 +139,7 @@ class ESList:
 
         error_to_raise = None
         try:
+            print("Query V3: ", self.main_query.to_dict())
             results = self.main_query.execute()
         except (TransportError, ConnectionError, RequestError) as e:
             error_to_raise = ElasticServerError

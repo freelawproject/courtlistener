@@ -2269,6 +2269,262 @@ class OpinionsESSearchTest(
         cluster_2.delete()
 
 
+class OpinionSearchDecayRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """
+    Opinion Search Decay Relevancy Tests
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Rebuild the Opinion index
+        cls.rebuild_index("search.OpinionCluster")
+
+
+        # Same keywords but different date_filed
+        cls.opinion_old = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(1732, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-old",
+            precedential_status="Published",
+            docket=DocketFactory(
+            case_name="Base Docket",
+            docket_number="1:21-bk-1235",
+            source=Docket.HARVARD,
+            date_filed=datetime.date(1900, 1, 1),
+            )
+        )
+        cls.opinion_recent = OpinionClusterFactory.create(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2024, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-recent",
+            precedential_status="Published",
+            docket=DocketFactory(
+            case_name="Base Docket",
+            docket_number="1:21-bk-1236",
+            source=Docket.HARVARD,
+            date_filed=datetime.date(1900, 1, 1),
+        )
+        )
+
+        # Different relevance with same dateFiled
+        cls.opinion_high_relevance = OpinionClusterFactory.create(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2022, 2, 23),
+            procedural_history="More Highly Relevant Keywords",
+            source="C",
+            attorneys="More Highly Relevant Keywords",
+            slug="opinion-high-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+                case_name="Base Docket",
+                docket_number="1:21-bk-1237",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.opinion_low_relevance = OpinionClusterFactory.create(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2022, 2, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-low-rel",
+            precedential_status="Published",
+            docket=DocketFactory(
+            case_name="Base Docket",
+            docket_number="1:21-bk-1238",
+            source=Docket.HARVARD,
+            date_filed=datetime.date(1900, 1, 1),
+        ),
+        )
+
+
+        # Different relevance with different dateFiled
+        cls.opinion_high_relevance_old_date = OpinionClusterFactory.create(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(1800, 2, 23),
+            procedural_history="More Ipsum Dolor Terms",
+            source="C",
+            attorneys="More Ipsum Dolor Terms",
+            slug="opinion-high-rel-old",
+            precedential_status="Published",
+            docket=DocketFactory(
+            case_name="Base Docket",
+            docket_number="1:21-bk-1239",
+            source=Docket.HARVARD,
+            date_filed=datetime.date(1900, 1, 1),
+        ),
+        )
+
+        cls.opinion_low_relevance_new_date = OpinionClusterFactory.create(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            date_filed=datetime.date(2024, 12, 23),
+            procedural_history="",
+            source="C",
+            attorneys="",
+            slug="opinion-low-rel-new",
+            precedential_status="Published",
+            docket=DocketFactory(
+            case_name="Base Docket",
+            docket_number="1:21-bk-1241",
+            source=Docket.HARVARD,
+            date_filed=datetime.date(1900, 1, 1),
+        ),
+        )
+
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.OPINION,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    def _assert_order_in_html(
+        self, decoded_content: str, expected_order: list
+    ) -> None:
+        """Assert that the expected order of fields appears correctly in the HTML content."""
+
+        for i in range(len(expected_order) - 1):
+            print("str(expected_order[i])", str(expected_order[i]))
+            print("str(expected_order[i + 1])", str(expected_order[i + 1]))
+
+            self.assertTrue(
+                decoded_content.index(str(expected_order[i]))
+                < decoded_content.index(str(expected_order[i + 1])),
+                f"Expected {expected_order[i]} to appear before {expected_order[i + 1]} in the HTML content.",
+            )
+
+    async def _test_article_count(self, params, expected_count, field_name):
+        r = await self.async_client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        got = len(tree.xpath("//article"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in Frontend with %s "
+                "filter applied.\n"
+                "Expected: %s\n"
+                "     Got: %s\n\n"
+                "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    def test_relevancy_decay_scoring(self) -> None:
+        """Test relevancy decay scoring for Opinion search results."""
+        test_cases = [
+            {
+                "name": "Same keywords, order by score desc",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    self.opinion_recent.docket.docket_number,  # Most recent dateFiled
+                    self.opinion_old.docket.docket_number,  # Oldest dateFiled
+                ],
+                "expected_order": [
+                    self.opinion_recent.pk,  # Most recent dateFiled
+                    self.opinion_old.pk,  # Oldest dateFiled
+                ],
+            },
+            {
+                "name": "Different relevancy same dateFiled, order by score desc",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    self.opinion_high_relevance.docket.docket_number,  # Most relevant by keywords
+                    self.opinion_low_relevance.docket.docket_number,  # Less relevant by keywords
+                ],
+                "expected_order": [
+                    self.opinion_high_relevance.pk,  # Most relevant by keywords
+                    self.opinion_low_relevance.pk,   # Less relevant by keywords
+                ],
+            },
+            {
+                "name": "Different relevancy different dateFiled, order by score desc",
+                "search_params": {
+                    "q": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                "expected_order_frontend": [
+                    self.opinion_low_relevance_new_date.docket.docket_number,
+                    self.opinion_high_relevance_old_date.docket.docket_number,
+                ],
+                "expected_order": [
+                    self.opinion_low_relevance_new_date.pk,
+                    self.opinion_high_relevance_old_date.pk,
+                ],
+            },
+            {
+                "name": "Match all query decay relevancy.",
+                "search_params": {
+                    "q": "",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.OPINION,
+                },
+                # Order by recency and then by relevancy as per decay scoring logic
+                "expected_order_frontend": [
+                    self.opinion_low_relevance_new_date.docket.docket_number,    # 2024-12-23 1:21-bk-1241
+                    self.opinion_recent.docket.docket_number,                    # 2024-02-23 1:21-bk-1236
+                    self.opinion_high_relevance.docket.docket_number,            # 2022-02-23 1:21-bk-1237
+                    self.opinion_low_relevance.docket.docket_number,             # 2022-02-23 1:21-bk-1238
+                    self.opinion_high_relevance_old_date.docket.docket_number,   # 1800-02-23 1:21-bk-1239
+                    self.opinion_old.docket.docket_number,                       # 1732-02-23 1:21-bk-1235
+                ],
+                "expected_order": [
+                    self.opinion_low_relevance_new_date.pk,     # 2024-12-23
+                    self.opinion_recent.pk,                     # 2024-02-23
+                    self.opinion_low_relevance.pk,              # 2022-02-23 Higher PK
+                    self.opinion_high_relevance.pk,  # 2022-02-23 More relevant Lower PK
+                    self.opinion_high_relevance_old_date.pk,    # 1800-02-23
+                    self.opinion_old.pk,                        # 1732-02-23
+                ],
+            },
+        ]
+
+        for test in test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test['name']}",
+                )
+                self._assert_order_in_html(r.content.decode(), test["expected_order_frontend"])
+
+        for test in test_cases:
+            self._test_results_ordering(test, "cluster_id")
+
+
+
+
+
 @override_flag("ui_flag_for_o", False)
 @override_settings(RELATED_MLT_MINTF=1)
 class RelatedSearchTest(
