@@ -25,20 +25,6 @@ UserProxyEvent = apps.get_model("users", "UserProxyEvent")
 UserProfileEvent = apps.get_model("users", "UserProfileEvent")
 
 
-def get_email_confirmed(obj):
-    return obj.profile.email_confirmed
-
-
-get_email_confirmed.short_description = "Email Confirmed?"
-
-
-def get_stub_account(obj):
-    return obj.profile.stub_account
-
-
-get_stub_account.short_description = "Stub Account?"
-
-
 class TokenInline(admin.StackedInline):
     model = Token
 
@@ -80,8 +66,8 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     )
     list_display = (
         "username",
-        get_email_confirmed,
-        get_stub_account,
+        "get_email_confirmed",
+        "get_stub_account",
     )
     search_fields = (
         "username",
@@ -111,6 +97,14 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
         )
+
+    @admin.display(description="Email Confirmed?")
+    def get_email_confirmed(self, obj):
+        return obj.profile.email_confirmed
+
+    @admin.display(description="Stub Account?")
+    def get_stub_account(self, obj):
+        return obj.profile.stub_account
 
 
 @admin.register(EmailFlag)
