@@ -1,0 +1,12 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {% if docket_entries_url %}
+    <li>
+      <a class="historylink" href="{{ docket_entries_url }}">
+        View Docket Entries
+      </a>
+    </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock object-tools-items %}

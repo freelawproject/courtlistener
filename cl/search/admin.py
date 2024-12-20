@@ -254,12 +254,6 @@ class DocketEntryAdmin(CursorPaginatorAdmin):
         return trunc(obj.description, 35, ellipsis="...")
 
 
-class DocketEntryInline(admin.TabularInline):
-    model = DocketEntry
-    extra = 1
-    raw_id_fields = ("tags",)
-
-
 @admin.register(OriginatingCourtInformation)
 class OriginatingCourtInformationAdmin(admin.ModelAdmin):
     raw_id_fields = (
@@ -270,9 +264,9 @@ class OriginatingCourtInformationAdmin(admin.ModelAdmin):
 
 @admin.register(Docket)
 class DocketAdmin(CursorPaginatorAdmin):
+    change_form_template = "admin/docket_change_form.html"
     prepopulated_fields = {"slug": ["case_name"]}
     inlines = (
-        DocketEntryInline,
         BankruptcyInformationInline,
         DocketAlertInline,
     )
@@ -291,6 +285,22 @@ class DocketAdmin(CursorPaginatorAdmin):
         "idb_data",
         "parent_docket",
     )
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """Add links to pre-filtered related admin pages."""
+        extra_context = extra_context or {}
+        docket = self.get_object(request, object_id)
+
+        if docket and hasattr(docket, "docket_entries"):
+            docket_entries_url = (
+                f"/admin/{DocketEntry._meta.app_label}/"
+                f"{DocketEntry._meta.model_name}/?docket={object_id}"
+            )
+            extra_context["docket_entries_url"] = docket_entries_url
+
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )
 
 
 @admin.register(OpinionsCited)
