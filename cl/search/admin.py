@@ -227,9 +227,7 @@ class DocketEntryAdmin(CursorPaginatorAdmin):
         "Search DocketEntries by Docket ID or RECAP sequence number."
     )
     search_fields = (
-        "description",
         "docket__id",
-        "docket__case_name",
         "recap_sequence_number",
     )
     list_display = (
