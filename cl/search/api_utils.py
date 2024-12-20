@@ -64,7 +64,7 @@ def get_object_list(request, cd, paginator):
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             search_query = ESRECAPDocument.search()
         case _:
-            search_query = None
+            raise ElasticBadRequestError("Unsupported search type.")
 
     if use_default_query:
         main_query, _, _ = build_es_main_query(search_query, cd)
@@ -139,7 +139,6 @@ class ESList:
 
         error_to_raise = None
         try:
-            print("Query V3: ", self.main_query.to_dict())
             results = self.main_query.execute()
         except (TransportError, ConnectionError, RequestError) as e:
             error_to_raise = ElasticServerError

@@ -2281,7 +2281,6 @@ class OpinionSearchDecayRelevancyTest(
         # Rebuild the Opinion index
         cls.rebuild_index("search.OpinionCluster")
 
-
         # Same keywords but different date_filed
         cls.opinion_old = OpinionClusterFactory.create(
             case_name="Keyword Match",
@@ -2294,12 +2293,16 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-old",
             precedential_status="Published",
             docket=DocketFactory(
-            case_name="Base Docket",
-            docket_number="1:21-bk-1235",
-            source=Docket.HARVARD,
-            date_filed=datetime.date(1900, 1, 1),
-            )
+                case_name="Base Docket",
+                docket_number="1:21-bk-1235",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
         )
+        cls.child_opinion_old = OpinionFactory.create(
+            cluster=cls.opinion_old, plain_text="", author_str=""
+        )
+
         cls.opinion_recent = OpinionClusterFactory.create(
             case_name="Keyword Match",
             case_name_full="",
@@ -2311,11 +2314,14 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-recent",
             precedential_status="Published",
             docket=DocketFactory(
-            case_name="Base Docket",
-            docket_number="1:21-bk-1236",
-            source=Docket.HARVARD,
-            date_filed=datetime.date(1900, 1, 1),
+                case_name="Base Docket",
+                docket_number="1:21-bk-1236",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
         )
+        cls.child_opinion_recent = OpinionFactory.create(
+            cluster=cls.opinion_recent, plain_text="", author_str=""
         )
 
         # Different relevance with same dateFiled
@@ -2336,6 +2342,10 @@ class OpinionSearchDecayRelevancyTest(
                 date_filed=datetime.date(1900, 1, 1),
             ),
         )
+        cls.child_opinion_high_relevance = OpinionFactory.create(
+            cluster=cls.opinion_high_relevance, plain_text="", author_str=""
+        )
+
         cls.opinion_low_relevance = OpinionClusterFactory.create(
             case_name="Highly Relevant Keywords",
             case_name_full="",
@@ -2347,13 +2357,15 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-low-rel",
             precedential_status="Published",
             docket=DocketFactory(
-            case_name="Base Docket",
-            docket_number="1:21-bk-1238",
-            source=Docket.HARVARD,
-            date_filed=datetime.date(1900, 1, 1),
-        ),
+                case_name="Base Docket",
+                docket_number="1:21-bk-1238",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
         )
-
+        cls.child_opinion_low_relevance = OpinionFactory.create(
+            cluster=cls.opinion_low_relevance, plain_text="", author_str=""
+        )
 
         # Different relevance with different dateFiled
         cls.opinion_high_relevance_old_date = OpinionClusterFactory.create(
@@ -2367,11 +2379,16 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-high-rel-old",
             precedential_status="Published",
             docket=DocketFactory(
-            case_name="Base Docket",
-            docket_number="1:21-bk-1239",
-            source=Docket.HARVARD,
-            date_filed=datetime.date(1900, 1, 1),
-        ),
+                case_name="Base Docket",
+                docket_number="1:21-bk-1239",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_high_relevance_old_date = OpinionFactory.create(
+            cluster=cls.opinion_high_relevance_old_date,
+            plain_text="",
+            author_str="",
         )
 
         cls.opinion_low_relevance_new_date = OpinionClusterFactory.create(
@@ -2385,11 +2402,16 @@ class OpinionSearchDecayRelevancyTest(
             slug="opinion-low-rel-new",
             precedential_status="Published",
             docket=DocketFactory(
-            case_name="Base Docket",
-            docket_number="1:21-bk-1241",
-            source=Docket.HARVARD,
-            date_filed=datetime.date(1900, 1, 1),
-        ),
+                case_name="Base Docket",
+                docket_number="1:21-bk-1241",
+                source=Docket.HARVARD,
+                date_filed=datetime.date(1900, 1, 1),
+            ),
+        )
+        cls.child_opinion_low_relevance_new_date = OpinionFactory.create(
+            cluster=cls.opinion_low_relevance_new_date,
+            plain_text="",
+            author_str="",
         )
 
         super().setUpTestData()
@@ -2401,39 +2423,7 @@ class OpinionSearchDecayRelevancyTest(
             testing_mode=True,
         )
 
-    def _assert_order_in_html(
-        self, decoded_content: str, expected_order: list
-    ) -> None:
-        """Assert that the expected order of fields appears correctly in the HTML content."""
-
-        for i in range(len(expected_order) - 1):
-            print("str(expected_order[i])", str(expected_order[i]))
-            print("str(expected_order[i + 1])", str(expected_order[i + 1]))
-
-            self.assertTrue(
-                decoded_content.index(str(expected_order[i]))
-                < decoded_content.index(str(expected_order[i + 1])),
-                f"Expected {expected_order[i]} to appear before {expected_order[i + 1]} in the HTML content.",
-            )
-
-    async def _test_article_count(self, params, expected_count, field_name):
-        r = await self.async_client.get("/", params)
-        tree = html.fromstring(r.content.decode())
-        got = len(tree.xpath("//article"))
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of search results in Frontend with %s "
-                "filter applied.\n"
-                "Expected: %s\n"
-                "     Got: %s\n\n"
-                "Params were: %s" % (field_name, expected_count, got, params),
-        )
-        return r
-
-    def test_relevancy_decay_scoring(self) -> None:
-        """Test relevancy decay scoring for Opinion search results."""
-        test_cases = [
+        cls.test_cases = [
             {
                 "name": "Same keywords, order by score desc",
                 "search_params": {
@@ -2442,12 +2432,12 @@ class OpinionSearchDecayRelevancyTest(
                     "type": SEARCH_TYPES.OPINION,
                 },
                 "expected_order_frontend": [
-                    self.opinion_recent.docket.docket_number,  # Most recent dateFiled
-                    self.opinion_old.docket.docket_number,  # Oldest dateFiled
+                    cls.opinion_recent.docket.docket_number,  # Most recent dateFiled
+                    cls.opinion_old.docket.docket_number,  # Oldest dateFiled
                 ],
                 "expected_order": [
-                    self.opinion_recent.pk,  # Most recent dateFiled
-                    self.opinion_old.pk,  # Oldest dateFiled
+                    cls.opinion_recent.pk,  # Most recent dateFiled
+                    cls.opinion_old.pk,  # Oldest dateFiled
                 ],
             },
             {
@@ -2458,12 +2448,12 @@ class OpinionSearchDecayRelevancyTest(
                     "type": SEARCH_TYPES.OPINION,
                 },
                 "expected_order_frontend": [
-                    self.opinion_high_relevance.docket.docket_number,  # Most relevant by keywords
-                    self.opinion_low_relevance.docket.docket_number,  # Less relevant by keywords
+                    cls.opinion_high_relevance.docket.docket_number,  # Most relevant by keywords
+                    cls.opinion_low_relevance.docket.docket_number,  # Less relevant by keywords
                 ],
                 "expected_order": [
-                    self.opinion_high_relevance.pk,  # Most relevant by keywords
-                    self.opinion_low_relevance.pk,   # Less relevant by keywords
+                    cls.opinion_high_relevance.pk,  # Most relevant by keywords
+                    cls.opinion_low_relevance.pk,  # Less relevant by keywords
                 ],
             },
             {
@@ -2474,12 +2464,12 @@ class OpinionSearchDecayRelevancyTest(
                     "type": SEARCH_TYPES.OPINION,
                 },
                 "expected_order_frontend": [
-                    self.opinion_low_relevance_new_date.docket.docket_number,
-                    self.opinion_high_relevance_old_date.docket.docket_number,
+                    cls.opinion_low_relevance_new_date.docket.docket_number,
+                    cls.opinion_high_relevance_old_date.docket.docket_number,
                 ],
                 "expected_order": [
-                    self.opinion_low_relevance_new_date.pk,
-                    self.opinion_high_relevance_old_date.pk,
+                    cls.opinion_low_relevance_new_date.pk,
+                    cls.opinion_high_relevance_old_date.pk,
                 ],
             },
             {
@@ -2491,38 +2481,57 @@ class OpinionSearchDecayRelevancyTest(
                 },
                 # Order by recency and then by relevancy as per decay scoring logic
                 "expected_order_frontend": [
-                    self.opinion_low_relevance_new_date.docket.docket_number,    # 2024-12-23 1:21-bk-1241
-                    self.opinion_recent.docket.docket_number,                    # 2024-02-23 1:21-bk-1236
-                    self.opinion_high_relevance.docket.docket_number,            # 2022-02-23 1:21-bk-1237
-                    self.opinion_low_relevance.docket.docket_number,             # 2022-02-23 1:21-bk-1238
-                    self.opinion_high_relevance_old_date.docket.docket_number,   # 1800-02-23 1:21-bk-1239
-                    self.opinion_old.docket.docket_number,                       # 1732-02-23 1:21-bk-1235
+                    cls.opinion_low_relevance_new_date.docket.docket_number,  # 2024-12-23 1:21-bk-1241
+                    cls.opinion_recent.docket.docket_number,  # 2024-02-23 1:21-bk-1236
+                    cls.opinion_high_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1237
+                    cls.opinion_low_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1238
+                    cls.opinion_high_relevance_old_date.docket.docket_number,  # 1800-02-23 1:21-bk-1239
+                    cls.opinion_old.docket.docket_number,  # 1732-02-23 1:21-bk-1235
                 ],
                 "expected_order": [
-                    self.opinion_low_relevance_new_date.pk,     # 2024-12-23
-                    self.opinion_recent.pk,                     # 2024-02-23
-                    self.opinion_low_relevance.pk,              # 2022-02-23 Higher PK
-                    self.opinion_high_relevance.pk,  # 2022-02-23 More relevant Lower PK
-                    self.opinion_high_relevance_old_date.pk,    # 1800-02-23
-                    self.opinion_old.pk,                        # 1732-02-23
+                    cls.opinion_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.opinion_recent.pk,  # 2024-02-23
+                    cls.opinion_low_relevance.pk,  # 2022-02-23 Higher PK
+                    cls.opinion_high_relevance.pk,  # 2022-02-23 More relevant Lower PK
+                    cls.opinion_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.opinion_old.pk,  # 1732-02-23
+                ],
+                "expected_order_v3": [
+                    cls.opinion_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.opinion_recent.pk,  # 2024-02-23
+                    cls.opinion_high_relevance.pk,  # 2022-02-23 Indexed first
+                    cls.opinion_low_relevance.pk,  # 2022-02-23
+                    cls.opinion_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.opinion_old.pk,  # 1732-02-23
                 ],
             },
         ]
 
-        for test in test_cases:
+    def test_relevancy_decay_scoring_frontend(self) -> None:
+        """Test relevancy decay scoring for Opinion search Frontend"""
+
+        for test in self.test_cases:
             with self.subTest(test["name"]):
                 r = async_to_sync(self._test_article_count)(
                     test["search_params"],
                     len(test["expected_order_frontend"]),
                     f"Failed count {test['name']}",
                 )
-                self._assert_order_in_html(r.content.decode(), test["expected_order_frontend"])
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
 
-        for test in test_cases:
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test relevancy decay scoring for Opinion search V4 API"""
+
+        for test in self.test_cases:
             self._test_results_ordering(test, "cluster_id")
 
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test relevancy decay scoring for Opinion search V3 API"""
 
-
+        for test in self.test_cases:
+            self._test_results_ordering(test, "cluster_id", version="v3")
 
 
 @override_flag("ui_flag_for_o", False)

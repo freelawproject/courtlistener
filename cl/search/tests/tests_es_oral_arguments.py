@@ -987,7 +987,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         del cd["order_by"]
         es_queries = build_es_base_query(search_query, cd)
         percolator_query = AudioPercolator(
-            percolator_query=es_queries.search_query.to_dict()["query"], rate=Alert.REAL_TIME
+            percolator_query=es_queries.search_query.to_dict()["query"],
+            rate=Alert.REAL_TIME,
         )
         percolator_query.save(refresh=True)
         return percolator_query.meta.id
@@ -1051,8 +1052,8 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Jose") # 2015, 8, 15
-            < r.content.decode().index("Hong Liu"), # 2015, 8, 14
+            r.content.decode().index("Jose")  # 2015, 8, 15
+            < r.content.decode().index("Hong Liu"),  # 2015, 8, 14
             msg="'Jose' should come Before 'Hong Liu' when order_by relevance.",
         )
 
@@ -1641,9 +1642,13 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Hong Liu Lorem") # 2015, 8, 14 - 9.486339
-            < r.content.decode().index("Hong Liu Yang")  # 2015, 8, 14 - 9.034608
-            < r.content.decode().index("Jose"), # 2015, 8, 15 - 4.7431693
+            r.content.decode().index(
+                "Hong Liu Lorem"
+            )  # 2015, 8, 14 - 9.486339
+            < r.content.decode().index(
+                "Hong Liu Yang"
+            )  # 2015, 8, 14 - 9.034608
+            < r.content.decode().index("Jose"),  # 2015, 8, 15 - 4.7431693
             msg="'Jose' should come BEFORE 'Hong Liu Yang' and 'Hong Liu Lorem' when order_by relevance.",
         )
 
@@ -1662,9 +1667,9 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         expected = 3
         self.assertEqual(actual, expected)
         self.assertTrue(
-            r.content.decode().index("Jose") # 2015, 8, 15
-            < r.content.decode().index("Hong Liu Lorem") # 2015, 8, 14
-            < r.content.decode().index("Hong Liu Yang"), # 2015, 8, 14
+            r.content.decode().index("Jose")  # 2015, 8, 15
+            < r.content.decode().index("Hong Liu Lorem")  # 2015, 8, 14
+            < r.content.decode().index("Hong Liu Yang"),  # 2015, 8, 14
             msg="'Jose' should come Before 'Hong Liu Lorem' and 'Hong Liu Yang' when order_by relevance.",
         )
 
@@ -2485,6 +2490,286 @@ class OASearchTestElasticSearch(ESIndexTestCase, AudioESTestCase, TestCase):
         )
         self.assertEqual(self.get_article_count(r), 1)
         self.assertIn("<mark>Howells</mark>", r.content.decode())
+
+
+class OralArgumentsSearchDecayRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """Oral Arguments Search Decay Relevancy Tests"""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Same keywords but different date_argued
+        with cls.captureOnCommitCallbacks(execute=True):
+            cls.docket_old = DocketFactory.create(
+                docket_number="1:21-bk-1235",
+                date_argued=datetime.date(1732, 2, 23),
+            )
+            cls.audio_old = AudioFactory.create(
+                case_name="Keyword Match",
+                case_name_full="",
+                docket_id=cls.docket_old.pk,
+                duration=420,
+                judges="Judge Old",
+                local_path_original_file="test/audio/audio_old.mp3",
+                local_path_mp3="test/audio/audio_old.mp3",
+                source="C",
+                blocked=False,
+                sha1="old_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="Transcript for old audio",
+            )
+
+            cls.docket_recent = DocketFactory.create(
+                docket_number="1:21-bk-1236",
+                date_argued=datetime.date(2024, 2, 23),
+            )
+            cls.audio_recent = AudioFactory.create(
+                case_name="Keyword Match",
+                case_name_full="",
+                docket_id=cls.docket_recent.pk,
+                duration=420,
+                judges="Judge Recent",
+                local_path_original_file="test/audio/audio_recent.mp3",
+                local_path_mp3="test/audio/audio_recent.mp3",
+                source="C",
+                blocked=False,
+                sha1="recent_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="Transcript for recent audio",
+            )
+
+            # Different relevance with same date_argued
+            cls.docket_low_relevance = DocketFactory.create(
+                case_name="Highly Relevant Keywords",
+                docket_number="1:21-bk-1238",
+                date_argued=datetime.date(2022, 2, 23),
+            )
+            cls.audio_low_relevance = AudioFactory.create(
+                case_name="Highly Relevant Keywords",
+                case_name_full="",
+                docket_id=cls.docket_low_relevance.pk,
+                duration=420,
+                judges="Judge Low",
+                local_path_original_file="test/audio/audio_low_rel.mp3",
+                local_path_mp3="test/audio/audio_low_rel.mp3",
+                source="C",
+                blocked=False,
+                sha1="low_rel_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="",
+            )
+
+            cls.docket_high_relevance = DocketFactory.create(
+                case_name="Highly Relevant Keywords",
+                docket_number="1:21-bk-1237",
+                date_argued=datetime.date(2022, 2, 23),
+            )
+            cls.audio_high_relevance = AudioFactory.create(
+                case_name="Highly Relevant Keywords",
+                case_name_full="",
+                docket_id=cls.docket_high_relevance.pk,
+                duration=420,
+                judges="Judge High",
+                local_path_original_file="test/audio/audio_high_rel.mp3",
+                local_path_mp3="test/audio/audio_high_rel.mp3",
+                source="C",
+                blocked=False,
+                sha1="high_rel_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                # More relevancy can be indicated by adding more relevant keywords in transcript
+                stt_transcript="More Highly Relevant Keywords in the transcript",
+            )
+
+            # Different relevance with different date_argued
+            cls.docket_high_relevance_old_date = DocketFactory.create(
+                case_name="Ipsum Dolor Terms",
+                docket_number="1:21-bk-1239",
+                date_argued=datetime.date(1800, 2, 23),
+            )
+            cls.audio_high_relevance_old_date = AudioFactory.create(
+                case_name="Ipsum Dolor Terms",
+                case_name_full="",
+                docket_id=cls.docket_high_relevance_old_date.pk,
+                duration=420,
+                judges="Judge Old Relevant",
+                local_path_original_file="test/audio/audio_high_rel_old.mp3",
+                local_path_mp3="test/audio/audio_high_rel_old.mp3",
+                source="C",
+                blocked=False,
+                sha1="high_rel_old_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="More Ipsum Dolor Terms",
+            )
+
+            cls.docket_high_relevance_null_date = DocketFactory.create(
+                case_name="Ipsum Dolor Terms",
+                docket_number="1:21-bk-1240",
+                date_argued=None,
+            )
+            cls.audio_high_relevance_null_date = AudioFactory.create(
+                case_name="Ipsum Dolor Terms",
+                case_name_full="",
+                docket_id=cls.docket_high_relevance_null_date.pk,
+                duration=420,
+                judges="Judge Null",
+                local_path_original_file="test/audio/audio_high_rel_null.mp3",
+                local_path_mp3="test/audio/audio_high_rel_null.mp3",
+                source="C",
+                blocked=False,
+                sha1="high_rel_null_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="More Ipsum Dolor Terms",
+            )
+
+            cls.docket_low_relevance_new_date = DocketFactory.create(
+                case_name="Ipsum Dolor Terms",
+                docket_number="1:21-bk-1241",
+                date_argued=datetime.date(2024, 12, 23),
+            )
+            cls.audio_low_relevance_new_date = AudioFactory.create(
+                case_name="Ipsum Dolor Terms",
+                case_name_full="",
+                docket_id=cls.docket_low_relevance_new_date.pk,
+                duration=420,
+                judges="Judge New Low",
+                local_path_original_file="test/audio/audio_low_rel_new.mp3",
+                local_path_mp3="test/audio/audio_low_rel_new.mp3",
+                source="C",
+                blocked=False,
+                sha1="low_rel_new_sha1",
+                stt_status=Audio.STT_COMPLETE,
+                stt_transcript="",
+            )
+
+        cls.test_cases = [
+            {
+                "name": "Same keywords, order by score desc",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_recent.docket_number,  # Most recent date_argued
+                    cls.docket_old.docket_number,  # Oldest date_argued
+                ],
+                "expected_order": [
+                    cls.audio_recent.pk,
+                    cls.audio_old.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy same dateArgued, order by score desc",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_high_relevance.docket_number,  # Most relevant by keywords
+                    cls.docket_low_relevance.docket_number,  # Less relevant by keywords
+                ],
+                "expected_order": [
+                    cls.audio_high_relevance.pk,
+                    cls.audio_low_relevance.pk,
+                ],
+            },
+            {
+                "name": "Different relevancy different dateArgued, order by score desc",
+                "search_params": {
+                    "q": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,
+                ],
+                "expected_order": [
+                    cls.audio_low_relevance_new_date.pk,
+                    cls.audio_high_relevance_old_date.pk,
+                    cls.audio_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Fixed main score (Filtering) different dateArgued, order by score desc",
+                "search_params": {
+                    "case_name": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,
+                ],
+                "expected_order": [
+                    cls.audio_low_relevance_new_date.pk,
+                    cls.audio_high_relevance_old_date.pk,
+                    cls.audio_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Match all query decay relevancy.",
+                "search_params": {
+                    "q": "",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.ORAL_ARGUMENT,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,  # 2024-12-23 1:21-bk-1241
+                    cls.docket_recent.docket_number,  # 2024-02-23 1:21-bk-1236
+                    cls.docket_low_relevance.docket_number,  # 2022-02-23 1:21-bk-1238
+                    cls.docket_high_relevance.docket_number,  # 2022-02-23 1:21-bk-1237
+                    cls.docket_high_relevance_old_date.docket_number,  # 1800-02-23 1:21-bk-1239
+                    cls.docket_old.docket_number,  # 1732-02-23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.docket_number,  # Null date 1:21-bk-1240
+                ],
+                "expected_order": [
+                    cls.audio_low_relevance_new_date.pk,
+                    cls.audio_recent.pk,
+                    cls.audio_high_relevance.pk,
+                    cls.audio_low_relevance.pk,
+                    cls.audio_high_relevance_old_date.pk,
+                    cls.audio_old.pk,
+                    cls.audio_high_relevance_null_date.pk,
+                ],
+                "expected_order_v3": [
+                    cls.audio_low_relevance_new_date.pk,
+                    cls.audio_recent.pk,
+                    cls.audio_low_relevance.pk,
+                    cls.audio_high_relevance.pk,
+                    cls.audio_high_relevance_old_date.pk,
+                    cls.audio_old.pk,
+                    cls.audio_high_relevance_null_date.pk,
+                ],
+            },
+        ]
+
+    def test_relevancy_decay_scoring_frontend(self) -> None:
+        """Test relevancy decay scoring for Oral Arguments search Frontend"""
+        for test in self.test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test['name']}",
+                )
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
+
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test relevancy decay scoring for Oral Arguments search V4 API"""
+        for test in self.test_cases:
+            self._test_results_ordering(test, "id", version="v4")
+
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test relevancy decay scoring for Oral Arguments search V3 API"""
+        for test in self.test_cases:
+            self._test_results_ordering(test, "id", version="v3")
 
 
 class OralArgumentIndexingTest(

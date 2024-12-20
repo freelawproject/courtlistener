@@ -2874,6 +2874,17 @@ class RECAPSearchDecayRelevancyTest(
             source=Docket.RECAP,
             date_filed=datetime.date(1732, 2, 23),
         )
+        cls.rd_old = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_old,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000435",
+        )
+
         cls.docket_recent = DocketFactory(
             case_name="Keyword Match",
             case_name_full="",
@@ -2881,6 +2892,16 @@ class RECAPSearchDecayRelevancyTest(
             docket_number="1:21-bk-1236",
             source=Docket.RECAP,
             date_filed=datetime.date(2024, 2, 23),
+        )
+        cls.rd_recent = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_recent,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000436",
         )
 
         # Different relevance with same dateFiled
@@ -2893,6 +2914,17 @@ class RECAPSearchDecayRelevancyTest(
             source=Docket.RECAP,
             date_filed=datetime.date(2022, 2, 23),
         )
+        cls.rd_low_relevance = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_low_relevance,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="019036000437",
+        )
+
         cls.docket_high_relevance = DocketFactory(
             case_name="Highly Relevant Keywords",
             case_name_full="",
@@ -2902,6 +2934,16 @@ class RECAPSearchDecayRelevancyTest(
             nature_of_suit="More Highly Relevant Keywords",
             cause="More Highly Relevant Keywords",
             date_filed=datetime.date(2022, 2, 23),
+        )
+        cls.rd_high_relevance = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600048",
         )
 
         # Different relevance with different dateFiled
@@ -2915,6 +2957,17 @@ class RECAPSearchDecayRelevancyTest(
             cause="More Ipsum Dolor Terms",
             date_filed=datetime.date(1800, 2, 23),
         )
+        cls.rd_high_relevance_old_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance_old_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600049",
+        )
+
         cls.docket_high_relevance_null_date = DocketFactory(
             case_name="Ipsum Dolor Terms",
             case_name_full="",
@@ -2925,6 +2978,17 @@ class RECAPSearchDecayRelevancyTest(
             cause="More Ipsum Dolor Terms",
             date_filed=None,
         )
+        cls.rd_high_relevance_null_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_high_relevance_null_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600050",
+        )
+
         cls.docket_low_relevance_new_date = DocketFactory(
             case_name="Ipsum Dolor Terms",
             case_name_full="",
@@ -2934,6 +2998,17 @@ class RECAPSearchDecayRelevancyTest(
             source=Docket.RECAP,
             date_filed=datetime.date(2024, 12, 23),
         )
+        cls.rd_low_relevance_new_date = RECAPDocumentFactory(
+            docket_entry=DocketEntryWithParentsFactory(
+                docket=cls.docket_low_relevance_new_date,
+                entry_number=1,
+                description="",
+            ),
+            description="",
+            is_available=False,
+            pacer_doc_id="01903600051",
+        )
+
         super().setUpTestData()
         call_command(
             "cl_index_parent_and_child_docs",
@@ -2943,40 +3018,7 @@ class RECAPSearchDecayRelevancyTest(
             testing_mode=True,
         )
 
-    def _assert_order_in_html(
-        self, decoded_content: str, expected_order: list
-    ) -> None:
-        """Assert that the expected order of fields appears correctly in the HTML content."""
-
-        for i in range(len(expected_order) - 1):
-
-            print("str(expected_order[i])", str(expected_order[i]))
-            print("str(expected_order[i + 1])", str(expected_order[i + 1]))
-
-            self.assertTrue(
-                decoded_content.index(str(expected_order[i]))
-                < decoded_content.index(str(expected_order[i + 1])),
-                f"Expected {expected_order[i]} to appear before {expected_order[i + 1]} in the HTML content.",
-            )
-
-    async def _test_article_count(self, params, expected_count, field_name):
-        r = await self.async_client.get("/", params)
-        tree = html.fromstring(r.content.decode())
-        got = len(tree.xpath("//article"))
-        self.assertEqual(
-            got,
-            expected_count,
-            msg="Did not get the right number of search results in Frontend with %s "
-            "filter applied.\n"
-            "Expected: %s\n"
-            "     Got: %s\n\n"
-            "Params were: %s" % (field_name, expected_count, got, params),
-        )
-        return r
-
-    def test_relevancy_decay_scoring(self) -> None:
-        """Test relevancy decay scoring for RECAP search results."""
-        test_cases = [
+        cls.test_cases = [
             {
                 "name": "Same keywords, order by score desc",
                 "search_params": {
@@ -2985,12 +3027,12 @@ class RECAPSearchDecayRelevancyTest(
                     "type": SEARCH_TYPES.RECAP,
                 },
                 "expected_order_frontend": [
-                    self.docket_recent.docket_number,  # Most recent dateFiled
-                    self.docket_old.docket_number,  # Oldest dateFiled
+                    cls.docket_recent.docket_number,  # Most recent dateFiled
+                    cls.docket_old.docket_number,  # Oldest dateFiled
                 ],
                 "expected_order": [
-                    self.docket_recent.pk,  # Most recent dateFiled
-                    self.docket_old.pk,  # Oldest dateFiled
+                    cls.docket_recent.pk,  # Most recent dateFiled
+                    cls.docket_old.pk,  # Oldest dateFiled
                 ],
             },
             {
@@ -3001,13 +3043,15 @@ class RECAPSearchDecayRelevancyTest(
                     "type": SEARCH_TYPES.RECAP,
                 },
                 "expected_order_frontend": [
-                    self.docket_high_relevance.docket_number,  # Most relevant by keywords
-                    self.docket_low_relevance.docket_number,  # Less relevant by keywords
+                    cls.docket_high_relevance.docket_number,
+                    # Most relevant by keywords
+                    cls.docket_low_relevance.docket_number,
+                    # Less relevant by keywords
                 ],
                 "expected_order": [
-                    self.docket_high_relevance.pk,
+                    cls.docket_high_relevance.pk,
                     # Most relevant by keywords
-                    self.docket_low_relevance.pk,
+                    cls.docket_low_relevance.pk,
                     # Less relevant by keywords
                 ],
             },
@@ -3019,14 +3063,32 @@ class RECAPSearchDecayRelevancyTest(
                     "type": SEARCH_TYPES.RECAP,
                 },
                 "expected_order_frontend": [
-                    self.docket_low_relevance_new_date.docket_number,
-                    self.docket_high_relevance_old_date.docket_number,
-                    self.docket_high_relevance_null_date.docket_number,
+                    cls.docket_low_relevance_new_date.docket_number,
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,
                 ],
                 "expected_order": [
-                    self.docket_low_relevance_new_date.pk,
-                    self.docket_high_relevance_old_date.pk,
-                    self.docket_high_relevance_null_date.pk,
+                    cls.docket_low_relevance_new_date.pk,
+                    cls.docket_high_relevance_old_date.pk,
+                    cls.docket_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Fixed main score (Filtering) different dateFiled, order by score desc",
+                "search_params": {
+                    "case_name": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    cls.docket_low_relevance_new_date.docket_number,
+                    cls.docket_high_relevance_old_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,
+                ],
+                "expected_order": [
+                    cls.docket_low_relevance_new_date.pk,
+                    cls.docket_high_relevance_old_date.pk,
+                    cls.docket_high_relevance_null_date.pk,
                 ],
             },
             {
@@ -3037,33 +3099,57 @@ class RECAPSearchDecayRelevancyTest(
                     "type": SEARCH_TYPES.RECAP,
                 },
                 "expected_order_frontend": [
-                    self.docket_low_relevance_new_date.docket_number,  # 2024, 12, 23 1:21-bk-1241
-                    self.docket_recent.docket_number,  # 2024, 2, 23 1:21-bk-1236
-                    self.docket_low_relevance.docket_number,  # 2022, 2, 23 1:21-bk-1238
-                    self.docket_high_relevance.docket_number,  # 2022, 2, 23 1:21-bk-1237
-                    self.docket_high_relevance_old_date.docket_number,  # 1800, 2, 23 1:21-bk-1239
-                    self.docket_old.docket_number,  # 1732, 2, 23 1:21-bk-1235
-                    self.docket_high_relevance_null_date.docket_number,  # Null 1:21-bk-1240
+                    cls.docket_low_relevance_new_date.docket_number,
+                    # 2024, 12, 23 1:21-bk-1241
+                    cls.docket_recent.docket_number,
+                    # 2024, 2, 23 1:21-bk-1236
+                    cls.docket_low_relevance.docket_number,
+                    # 2022, 2, 23 1:21-bk-1238
+                    cls.docket_high_relevance.docket_number,
+                    # 2022, 2, 23 1:21-bk-1237
+                    cls.docket_high_relevance_old_date.docket_number,
+                    # 1800, 2, 23 1:21-bk-1239
+                    cls.docket_old.docket_number,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.docket_number,
+                    # Null 1:21-bk-1240
                 ],
                 "expected_order": [
-                    self.docket_low_relevance_new_date.pk,
+                    cls.docket_low_relevance_new_date.pk,
                     # 2024, 12, 23 1:21-bk-1241
-                    self.docket_recent.pk,
+                    cls.docket_recent.pk,
                     # 2024, 2, 23 1:21-bk-1236
-                    self.docket_high_relevance.pk,
+                    cls.docket_high_relevance.pk,
                     # 2022, 2, 23 1:21-bk-1237 Greater PK
-                    self.docket_low_relevance.pk,
+                    cls.docket_low_relevance.pk,
                     # 2022, 2, 23 1:21-bk-1238
-                    self.docket_high_relevance_old_date.pk,
+                    cls.docket_high_relevance_old_date.pk,
                     # 1800, 2, 23 1:21-bk-1239
-                    self.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
-                    self.docket_high_relevance_null_date.pk,
+                    cls.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.pk,
+                    # Null 1:21-bk-1240
+                ],
+                "expected_order_v3": [
+                    cls.docket_low_relevance_new_date.pk,
+                    # 2024, 12, 23 1:21-bk-1241
+                    cls.docket_recent.pk,
+                    # 2024, 2, 23 1:21-bk-1236
+                    cls.docket_low_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1238 Indexed first than 1:21-bk-1237
+                    cls.docket_high_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1237
+                    cls.docket_high_relevance_old_date.pk,
+                    # 1800, 2, 23 1:21-bk-1239
+                    cls.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
+                    cls.docket_high_relevance_null_date.pk,
                     # Null 1:21-bk-1240
                 ],
             },
         ]
 
-        for test in test_cases:
+    def test_relevancy_decay_scoring_frontend(self) -> None:
+        """Test relevancy decay scoring for RECAP search Frontend"""
+
+        for test in self.test_cases:
             with self.subTest(test["name"]):
                 r = async_to_sync(self._test_article_count)(
                     test["search_params"],
@@ -3074,11 +3160,27 @@ class RECAPSearchDecayRelevancyTest(
                     r.content.decode(), test["expected_order_frontend"]
                 )
 
+    def test_relevancy_decay_scoring_v4_api(self) -> None:
+        """Test relevancy decay scoring for RECAP search V4 API"""
+
+        search_types = [
+            SEARCH_TYPES.RECAP,
+            SEARCH_TYPES.DOCKETS,
+            SEARCH_TYPES.RECAP_DOCUMENT,
+        ]
+        for search_type in search_types:
+            for test in self.test_cases:
+                test["search_params"]["type"] = search_type
+                self._test_results_ordering(test, "docket_id", version="v4")
+
+    def test_relevancy_decay_scoring_v3_api(self) -> None:
+        """Test relevancy decay scoring for RECAP search V4 API"""
+
         search_types = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
         for search_type in search_types:
-            for test in test_cases:
+            for test in self.test_cases:
                 test["search_params"]["type"] = search_type
-                self._test_results_ordering(test, "docket_id")
+                self._test_results_ordering(test, "docket_id", version="v3")
 
 
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
@@ -3625,17 +3727,17 @@ class RECAPSearchAPIV3Test(
         # API
         r = await self._test_api_results_count(params, 3, "order score desc")
         self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by score desc.",
+            r.content.decode().index("12-1235")  # 2016, 8, 16
+            < r.content.decode().index("1:21-bk-1234"),  # 2015, 8, 16
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by score desc.",
         )
 
         params["type"] = SEARCH_TYPES.DOCKETS
         r = await self._test_api_results_count(params, 2, "order")
         self.assertTrue(
-            r.content.decode().index("1:21-bk-1234")
-            < r.content.decode().index("12-1235"),
-            msg="'1:21-bk-1234' should come BEFORE '12-1235' when order_by score desc.",
+            r.content.decode().index("12-1235")  # 2016, 8, 16
+            < r.content.decode().index("1:21-bk-1234"),  # 2015, 8, 16
+            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by score desc.",
         )
 
         # Order by entry_date_filed desc

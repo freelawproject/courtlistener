@@ -1,6 +1,5 @@
 from http import HTTPStatus
 
-import waffle
 from django.db.models import Prefetch
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
