@@ -79,6 +79,9 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "profile__email_confirmed",
         "profile__stub_account",
     )
+    search_help_text = (
+        "Search Users by username, first name, last name, or email."
+    )
     search_fields = (
         "username",
         "first_name",
@@ -188,6 +191,7 @@ class BaseUserEventAdmin(admin.ModelAdmin):
 
 @admin.register(UserProxyEvent)
 class UserProxyEventAdmin(BaseUserEventAdmin):
+    search_help_text = "Search UserProxyEvents by pgh_obj, email, or username."
     search_fields = BaseUserEventAdmin.common_search_fields + (
         "email",
         "username",
@@ -203,6 +207,7 @@ class UserProxyEventAdmin(BaseUserEventAdmin):
 
 @admin.register(UserProfileEvent)
 class UserProfileEventAdmin(BaseUserEventAdmin):
+    search_help_text = "Search UserProxyEvents by pgh_obj or username."
     search_fields = BaseUserEventAdmin.common_search_fields + (
         "user__username",
     )

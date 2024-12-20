@@ -24,6 +24,7 @@ class ProcessingQueueAdmin(CursorPaginatorAdmin):
         "date_created",
     )
     list_filter = ("status", "date_created")
+    search_help_text = "Search ProcessingQueues by pacer_case_id or court__pk."
     search_fields = (
         "pacer_case_id",
         "court__pk",

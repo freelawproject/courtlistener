@@ -223,6 +223,9 @@ class RECAPDocumentInline(admin.StackedInline):
 @admin.register(DocketEntry)
 class DocketEntryAdmin(CursorPaginatorAdmin):
     inlines = (RECAPDocumentInline,)
+    search_help_text = (
+        "Search DocketEntries by Docket ID or RECAP sequence number."
+    )
     search_fields = (
         "description",
         "docket__id",
