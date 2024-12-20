@@ -1,4 +1,6 @@
+from django.apps import apps
 from django.contrib import admin
+from django.contrib.auth.forms import UserChangeForm
 from django.contrib.auth.models import Permission, User
 from rest_framework.authtoken.models import Token
 
@@ -19,19 +21,8 @@ from cl.users.models import (
     UserProfile,
 )
 
-
-def get_email_confirmed(obj):
-    return obj.profile.email_confirmed
-
-
-get_email_confirmed.short_description = "Email Confirmed?"
-
-
-def get_stub_account(obj):
-    return obj.profile.stub_account
-
-
-get_stub_account.short_description = "Stub Account?"
+UserProxyEvent = apps.get_model("users", "UserProxyEvent")
+UserProfileEvent = apps.get_model("users", "UserProfileEvent")
 
 
 class TokenInline(admin.StackedInline):
@@ -42,7 +33,25 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
 
 
+class CustomUserChangeForm(UserChangeForm):
+    class Meta(UserChangeForm.Meta):
+        model = User
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Ensure user_permissions field uses an optimized queryset
+        if "user_permissions" in self.fields:
+            self.fields["user_permissions"].queryset = (
+                Permission.objects.select_related("content_type").order_by(
+                    "content_type__app_label", "codename"
+                )
+            )
+
+
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
+    form = CustomUserChangeForm  # optimize queryset for user_permissions field
+    change_form_template = "user_change_form.html"
     inlines = (
         UserProfileInline,
         DonationInline,
@@ -57,8 +66,8 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     )
     list_display = (
         "username",
-        get_email_confirmed,
-        get_stub_account,
+        "get_email_confirmed",
+        "get_stub_account",
     )
     search_fields = (
         "username",
@@ -66,6 +75,36 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "last_name",
         "email",
     )
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """Add links to related event admin pages filtered by user/profile."""
+        extra_context = extra_context or {}
+        user = self.get_object(request, object_id)
+        proxy_events_url = (
+            f"/admin/{UserProxyEvent._meta.app_label}/"
+            f"{UserProxyEvent._meta.model_name}/?pgh_obj={object_id}"
+        )
+        extra_context["proxy_events_url"] = proxy_events_url
+
+        if user and hasattr(user, "profile"):
+            profile_id = user.profile.pk
+            profile_events_url = (
+                f"/admin/{UserProfileEvent._meta.app_label}/"
+                f"{UserProfileEvent._meta.model_name}/?pgh_obj={profile_id}"
+            )
+            extra_context["profile_events_url"] = profile_events_url
+
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )
+
+    @admin.display(description="Email Confirmed?")
+    def get_email_confirmed(self, obj):
+        return obj.profile.email_confirmed
+
+    @admin.display(description="Stub Account?")
+    def get_stub_account(self, obj):
+        return obj.profile.stub_account
 
 
 @admin.register(EmailFlag)
@@ -115,6 +154,50 @@ class FailedEmailAdmin(admin.ModelAdmin):
         "date_created",
     )
     raw_id_fields = ("stored_email",)
+
+
+class BaseUserEventAdmin(admin.ModelAdmin):
+    ordering = ("-pgh_created_at",)
+    # Define common attributes to be extended:
+    common_list_display = ("get_pgh_created", "get_pgh_label")
+    common_list_filters = ("pgh_created_at",)
+    common_search_fields = ("pgh_obj",)
+    # Default to common attributes:
+    list_display = common_list_display
+    list_filter = common_list_filters
+    search_fields = common_search_fields
+
+    @admin.display(ordering="pgh_created_at", description="Event triggered")
+    def get_pgh_created(self, obj):
+        return obj.pgh_created_at
+
+    @admin.display(ordering="pgh_label", description="Event label")
+    def get_pgh_label(self, obj):
+        return obj.pgh_label
+
+
+@admin.register(UserProxyEvent)
+class UserProxyEventAdmin(BaseUserEventAdmin):
+    search_fields = BaseUserEventAdmin.common_search_fields + (
+        "email",
+        "username",
+    )
+    list_display = BaseUserEventAdmin.list_display + (
+        "email",
+        "username",
+    )
+
+
+@admin.register(UserProfileEvent)
+class UserProfileEventAdmin(BaseUserEventAdmin):
+    search_fields = BaseUserEventAdmin.common_search_fields + (
+        "user__username",
+    )
+    list_display = BaseUserEventAdmin.common_list_display + (
+        "user",
+        "email_confirmed",
+    )
+    list_filter = BaseUserEventAdmin.common_list_filters + ("email_confirmed",)
 
 
 # Replace the normal User admin with our better one.
