@@ -2854,6 +2854,233 @@ class RECAPSearchTest(RECAPSearchTestCase, ESIndexTestCase, TestCase):
         docket_2.delete()
 
 
+class RECAPSearchDecayRelevancyTest(
+    ESIndexTestCase, V4SearchAPIAssertions, TestCase
+):
+    """
+    RECAP Search Decay Relevancy  Tests
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.rebuild_index("search.Docket")
+
+        # Same keywords but different dateFiled
+        cls.docket_old = DocketFactory(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1235",
+            source=Docket.RECAP,
+            date_filed=datetime.date(1732, 2, 23),
+        )
+        cls.docket_recent = DocketFactory(
+            case_name="Keyword Match",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1236",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2024, 2, 23),
+        )
+
+        # Different relevance with same dateFiled
+        cls.docket_low_relevance = DocketFactory(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            nature_of_suit="",
+            docket_number="1:21-bk-1238",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2022, 2, 23),
+        )
+        cls.docket_high_relevance = DocketFactory(
+            case_name="Highly Relevant Keywords",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1237",
+            source=Docket.RECAP,
+            nature_of_suit="More Highly Relevant Keywords",
+            cause="More Highly Relevant Keywords",
+            date_filed=datetime.date(2022, 2, 23),
+        )
+
+        # Different relevance with different dateFiled
+        cls.docket_high_relevance_old_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1239",
+            source=Docket.RECAP,
+            nature_of_suit="More Ipsum Dolor Terms",
+            cause="More Ipsum Dolor Terms",
+            date_filed=datetime.date(1800, 2, 23),
+        )
+        cls.docket_high_relevance_null_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            docket_number="1:21-bk-1240",
+            source=Docket.RECAP,
+            nature_of_suit="More Ipsum Dolor Terms",
+            cause="More Ipsum Dolor Terms",
+            date_filed=None,
+        )
+        cls.docket_low_relevance_new_date = DocketFactory(
+            case_name="Ipsum Dolor Terms",
+            case_name_full="",
+            case_name_short="",
+            nature_of_suit="",
+            docket_number="1:21-bk-1241",
+            source=Docket.RECAP,
+            date_filed=datetime.date(2024, 12, 23),
+        )
+        super().setUpTestData()
+        call_command(
+            "cl_index_parent_and_child_docs",
+            search_type=SEARCH_TYPES.RECAP,
+            queue="celery",
+            pk_offset=0,
+            testing_mode=True,
+        )
+
+    def _assert_order_in_html(
+        self, decoded_content: str, expected_order: list
+    ) -> None:
+        """Assert that the expected order of fields appears correctly in the HTML content."""
+
+        for i in range(len(expected_order) - 1):
+
+            print("str(expected_order[i])", str(expected_order[i]))
+            print("str(expected_order[i + 1])", str(expected_order[i + 1]))
+
+            self.assertTrue(
+                decoded_content.index(str(expected_order[i]))
+                < decoded_content.index(str(expected_order[i + 1])),
+                f"Expected {expected_order[i]} to appear before {expected_order[i + 1]} in the HTML content.",
+            )
+
+    async def _test_article_count(self, params, expected_count, field_name):
+        r = await self.async_client.get("/", params)
+        tree = html.fromstring(r.content.decode())
+        got = len(tree.xpath("//article"))
+        self.assertEqual(
+            got,
+            expected_count,
+            msg="Did not get the right number of search results in Frontend with %s "
+            "filter applied.\n"
+            "Expected: %s\n"
+            "     Got: %s\n\n"
+            "Params were: %s" % (field_name, expected_count, got, params),
+        )
+        return r
+
+    def test_relevancy_decay_scoring(self) -> None:
+        """Test relevancy decay scoring for RECAP search results."""
+        test_cases = [
+            {
+                "name": "Same keywords, order by score desc",
+                "search_params": {
+                    "q": "Keyword Match",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    self.docket_recent.docket_number,  # Most recent dateFiled
+                    self.docket_old.docket_number,  # Oldest dateFiled
+                ],
+                "expected_order": [
+                    self.docket_recent.pk,  # Most recent dateFiled
+                    self.docket_old.pk,  # Oldest dateFiled
+                ],
+            },
+            {
+                "name": "Different relevancy same dateFiled, order by score desc",
+                "search_params": {
+                    "q": "Highly Relevant Keywords",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    self.docket_high_relevance.docket_number,  # Most relevant by keywords
+                    self.docket_low_relevance.docket_number,  # Less relevant by keywords
+                ],
+                "expected_order": [
+                    self.docket_high_relevance.pk,
+                    # Most relevant by keywords
+                    self.docket_low_relevance.pk,
+                    # Less relevant by keywords
+                ],
+            },
+            {
+                "name": "Different relevancy different dateFiled, order by score desc",
+                "search_params": {
+                    "q": "Ipsum Dolor Terms",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    self.docket_low_relevance_new_date.docket_number,
+                    self.docket_high_relevance_old_date.docket_number,
+                    self.docket_high_relevance_null_date.docket_number,
+                ],
+                "expected_order": [
+                    self.docket_low_relevance_new_date.pk,
+                    self.docket_high_relevance_old_date.pk,
+                    self.docket_high_relevance_null_date.pk,
+                ],
+            },
+            {
+                "name": "Match all query decay relevancy.",
+                "search_params": {
+                    "q": "",
+                    "order_by": "score desc",
+                    "type": SEARCH_TYPES.RECAP,
+                },
+                "expected_order_frontend": [
+                    self.docket_low_relevance_new_date.docket_number,  # 2024, 12, 23 1:21-bk-1241
+                    self.docket_recent.docket_number,  # 2024, 2, 23 1:21-bk-1236
+                    self.docket_low_relevance.docket_number,  # 2022, 2, 23 1:21-bk-1238
+                    self.docket_high_relevance.docket_number,  # 2022, 2, 23 1:21-bk-1237
+                    self.docket_high_relevance_old_date.docket_number,  # 1800, 2, 23 1:21-bk-1239
+                    self.docket_old.docket_number,  # 1732, 2, 23 1:21-bk-1235
+                    self.docket_high_relevance_null_date.docket_number,  # Null 1:21-bk-1240
+                ],
+                "expected_order": [
+                    self.docket_low_relevance_new_date.pk,
+                    # 2024, 12, 23 1:21-bk-1241
+                    self.docket_recent.pk,
+                    # 2024, 2, 23 1:21-bk-1236
+                    self.docket_high_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1237 Greater PK
+                    self.docket_low_relevance.pk,
+                    # 2022, 2, 23 1:21-bk-1238
+                    self.docket_high_relevance_old_date.pk,
+                    # 1800, 2, 23 1:21-bk-1239
+                    self.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
+                    self.docket_high_relevance_null_date.pk,
+                    # Null 1:21-bk-1240
+                ],
+            },
+        ]
+
+        for test in test_cases:
+            with self.subTest(test["name"]):
+                r = async_to_sync(self._test_article_count)(
+                    test["search_params"],
+                    len(test["expected_order_frontend"]),
+                    f"Failed count {test["name"]}",
+                )
+                self._assert_order_in_html(
+                    r.content.decode(), test["expected_order_frontend"]
+                )
+
+        search_types = [SEARCH_TYPES.RECAP, SEARCH_TYPES.DOCKETS]
+        for search_type in search_types:
+            for test in test_cases:
+                test["search_params"]["type"] = search_type
+                self._test_results_ordering(test, "docket_id")
+
+
 class RECAPSearchAPICommonTests(RECAPSearchTestCase):
 
     version_api = "v3"
@@ -3910,7 +4137,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by dateFiled desc",
                 "search_params": search_params,
-                "expected_results": 5,
                 "expected_order": [
                     docket_entry_recent.docket.pk,  # 2024/02/23
                     self.de_1.docket.pk,  # 2016/08/16
@@ -3922,7 +4148,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by dateFiled asc",
                 "search_params": params_date_filed_asc,
-                "expected_results": 5,
                 "expected_order": [
                     docket_old.pk,  # 1732/2/23
                     self.de.docket.pk,  # 2015/8/16
@@ -3934,7 +4159,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by dateFiled desc",
                 "search_params": params_match_all_date_filed_desc,
-                "expected_results": 8,
                 "expected_order": [
                     docket_entry_recent.docket.pk,  # 2024/2/23
                     self.de_1.docket.pk,  # 2016/8/16
@@ -3949,7 +4173,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by dateFiled asc",
                 "search_params": params_match_all_date_filed_asc,
-                "expected_results": 8,
                 "expected_order": [
                     docket_old.pk,  # 1732/2/23
                     self.de.docket.pk,  # 2015/8/16
@@ -3964,7 +4187,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Query string, order by entry_date_filed asc",
                 "search_params": params_entry_date_filed_asc,
-                "expected_results": 5,
                 "expected_order": [
                     self.de_1.docket.pk,  # 2014/7/19
                     self.de.docket.pk,  # 2015/8/16
@@ -3976,7 +4198,6 @@ class RECAPSearchAPIV4Test(
             {
                 "name": "Match all query, order by  entry_date_filed asc",
                 "search_params": params_match_all_entry_date_filed_asc,
-                "expected_results": 8,
                 "expected_order": [
                     self.de_1.docket.pk,  # 2014/7/19
                     self.de.docket.pk,  # 2015/8/16

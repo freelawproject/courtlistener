@@ -354,7 +354,9 @@ class V4SearchAPIAssertions(SimpleTestCase):
                 reverse("search-list", kwargs={"version": "v4"}),
                 test["search_params"],
             )
-            self.assertEqual(len(r.data["results"]), test["expected_results"])
+            self.assertEqual(
+                len(r.data["results"]), len(test["expected_order"])
+            )
             # Note that dockets where the date_field is null are sent to the bottom
             # of the results
             actual_order = [result[field] for result in r.data["results"]]

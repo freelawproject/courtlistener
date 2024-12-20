@@ -938,6 +938,69 @@ def build_custom_function_score_for_date(
     return query
 
 
+def build_decay_relevance_score(
+    query: QueryString | str,
+    date_field: str,
+    scale: int,
+    decay: float,
+    default_missing_date: str = "1600-01-01T00:00:00Z",
+    boost_mode: str = "multiply",
+) -> QueryString:
+    """
+    Build a decay relevance score query for Elasticsearch that adjusts the
+    relevance of documents based on a date field.
+
+    :param query: The Elasticsearch query string or QueryString object.
+    :param date_field: The date field used to compute the relevance decay.
+    :param scale: The scale (in years) that determines the rate of decay.
+    :param decay: The decay factor.
+    :param default_missing_date: The default date to use when the date field
+    is null.
+    :param boost_mode: The mode to combine the decay score with the query's
+    original relevance score.
+    :return:  The modified QueryString object with applied function score.
+    """
+
+    query = Q(
+        "function_score",
+        query=query,
+        script_score={
+            "script": {
+                "source": f"""
+                    def default_missing_date = Instant.parse(params.default_missing_date).toEpochMilli();
+                    def decay = (double)params.decay;
+                    def now = new Date().getTime();
+
+                    // Convert scale parameter into milliseconds.
+                    def scaleStr = params.scale;
+                    double years = (double)params.scale;
+                    // Convert years to milliseconds 1 year = 365 days
+                    long scaleMillis = (long)(years * 365 * 24 * 60 * 60 * 1000);
+
+                    // Retrieve the document date. If missing or null, use default_missing_date
+                    def docDate = default_missing_date;
+                    if (doc['{date_field}'].size() > 0) {{
+                        docDate = doc['{date_field}'].value.toInstant().toEpochMilli();
+                    }}
+                    // λ = ln(decay)/scale
+                    def lambda = Math.log(decay) / scaleMillis;
+                    // Absolute distance from now
+                    def diff = Math.abs(docDate - now);
+                    // Score: exp( λ * max(0, |docDate - now|) )
+                    return Math.exp(lambda * diff);
+                    """,
+                "params": {
+                    "default_missing_date": default_missing_date,
+                    "scale": scale,  # Years
+                    "decay": decay,
+                },
+            },
+        },
+        boost_mode=boost_mode,
+    )
+    return query
+
+
 def build_has_child_query(
     query: QueryString | str,
     child_type: str,
@@ -1093,7 +1156,7 @@ def get_match_all_query(
                 minimum_should_match=1,
             )
             final_match_all_query = apply_custom_score_to_main_query(
-                cd, final_match_all_query, api_version
+                cd, final_match_all_query, api_version, boost_mode="replace"
             )
         case SEARCH_TYPES.OPINION:
             # Only return Opinion clusters.
@@ -1112,12 +1175,15 @@ def get_match_all_query(
             final_match_all_query = Q(
                 "bool", should=q_should, minimum_should_match=1
             )
+            final_match_all_query = apply_custom_score_to_main_query(
+                cd, final_match_all_query, api_version, boost_mode="replace"
+            )
         case _:
             # No string_query or filters in plain search types like OA and
             # Parentheticals. Use a match_all query.
             match_all_query = Q("match_all")
             final_match_all_query = apply_custom_score_to_main_query(
-                cd, match_all_query, api_version
+                cd, match_all_query, api_version, boost_mode="replace"
             )
 
     return search_query.query(final_match_all_query)
@@ -1304,6 +1370,7 @@ def build_es_base_query(
         match_all_query = get_match_all_query(
             cd, search_query, api_version, child_highlighting
         )
+
         return EsMainQueries(
             search_query=match_all_query,
             parent_query=parent_query,
@@ -1317,6 +1384,7 @@ def build_es_base_query(
             cd, filters, string_query, api_version
         )
 
+    main_query = apply_custom_score_to_main_query(cd, main_query, api_version)
     return EsMainQueries(
         search_query=search_query.query(main_query),
         parent_query=parent_query,
@@ -2489,7 +2557,10 @@ def nullify_query_score(query: Query) -> Query:
 
 
 def apply_custom_score_to_main_query(
-    cd: CleanData, query: Query, api_version: Literal["v3", "v4"] | None = None
+    cd: CleanData,
+    query: Query,
+    api_version: Literal["v3", "v4"] | None = None,
+    boost_mode: str = "multiply",
 ) -> Query:
     """Apply a custom function score to the main query.
 
@@ -2516,6 +2587,13 @@ def apply_custom_score_to_main_query(
         else False
     )
 
+    valid_decay_relevance_types = {
+        SEARCH_TYPES.RECAP: ["dateFiled"],
+        SEARCH_TYPES.DOCKETS: ["dateFiled"],
+        SEARCH_TYPES.RECAP_DOCUMENT: ["dateFiled", "entry_date_filed"],
+        SEARCH_TYPES.ORAL_ARGUMENT: ["dateArgued"],
+    }
+    main_order_by = cd.get("order_by", "")
     if is_valid_custom_score_field and api_version == "v4":
         # Applies a custom function score to sort Documents based on
         # a date field. This serves as a workaround to enable the use of the
@@ -2526,7 +2604,14 @@ def apply_custom_score_to_main_query(
             default_score=0,
             default_current_date=cd["request_date"],
         )
-
+    elif (
+        main_order_by == "score desc"
+        and cd["type"] in valid_decay_relevance_types
+    ):
+        date_field = valid_decay_relevance_types[cd["type"]][0]
+        query = build_decay_relevance_score(
+            query, date_field, scale=10, decay=0.5, boost_mode=boost_mode
+        )
     return query
 
 
@@ -2732,15 +2817,14 @@ def build_full_join_es_queries(
     if not q_should:
         return [], child_docs_query, parent_query
 
-    main_join_query = apply_custom_score_to_main_query(
-        cd,
+    return (
         Q(
             "bool",
             should=q_should,
         ),
-        api_version,
+        child_docs_query,
+        parent_query,
     )
-    return (main_join_query, child_docs_query, parent_query)
 
 
 def limit_inner_hits(
@@ -3427,6 +3511,7 @@ def get_opinions_coverage_over_time(
             format="yyyy",
         ),
     )
+
     try:
         response = search_query.execute()
     except (TransportError, ConnectionError, RequestError):
