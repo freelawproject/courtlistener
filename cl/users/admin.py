@@ -49,6 +49,11 @@ class CustomUserChangeForm(UserChangeForm):
             )
 
 
+# Replace the normal User admin with our better one.
+admin.site.unregister(User)
+
+
+@admin.register(User)
 class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
     form = CustomUserChangeForm  # optimize queryset for user_permissions field
     change_form_template = "user_change_form.html"
@@ -200,8 +205,5 @@ class UserProfileEventAdmin(BaseUserEventAdmin):
     list_filter = BaseUserEventAdmin.common_list_filters + ("email_confirmed",)
 
 
-# Replace the normal User admin with our better one.
-admin.site.unregister(User)
-admin.site.register(User, UserAdmin)
 admin.site.register(BarMembership)
 admin.site.register(Permission)
