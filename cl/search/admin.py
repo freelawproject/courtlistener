@@ -6,6 +6,7 @@ from django.http import HttpRequest
 from cl.alerts.admin import DocketAlertInline
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.string_utils import trunc
 from cl.recap.management.commands.delete_document_from_ia import delete_from_ia
 from cl.search.models import (
     BankruptcyInformation,
@@ -222,11 +223,35 @@ class RECAPDocumentInline(admin.StackedInline):
 @admin.register(DocketEntry)
 class DocketEntryAdmin(CursorPaginatorAdmin):
     inlines = (RECAPDocumentInline,)
+    search_fields = (
+        "description",
+        "docket__id",
+        "docket__case_name",
+        "recap_sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "get_trunc_description",
+        "date_filed",
+        "time_filed",
+        "entry_number",
+        "recap_sequence_number",
+        "pacer_sequence_number",
+    )
     raw_id_fields = ("docket", "tags")
     readonly_fields = (
         "date_created",
         "date_modified",
     )
+    list_filter = ("date_filed", "date_created", "date_modified")
+
+    @admin.display(description="Docket entry")
+    def get_pk(self, obj):
+        return obj.pk
+
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
 
 
 class DocketEntryInline(admin.TabularInline):
