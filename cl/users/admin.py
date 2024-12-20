@@ -74,6 +74,11 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         "get_email_confirmed",
         "get_stub_account",
     )
+    list_filter = (
+        "is_superuser",
+        "profile__email_confirmed",
+        "profile__stub_account",
+    )
     search_fields = (
         "username",
         "first_name",
