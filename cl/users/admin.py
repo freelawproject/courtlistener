@@ -191,6 +191,9 @@ class UserProxyEventAdmin(BaseUserEventAdmin):
         "email",
         "username",
     )
+    readonly_fields = [
+        field.name for field in UserProxyEvent._meta.get_fields()
+    ]
 
 
 @admin.register(UserProfileEvent)
@@ -203,6 +206,9 @@ class UserProfileEventAdmin(BaseUserEventAdmin):
         "email_confirmed",
     )
     list_filter = BaseUserEventAdmin.common_list_filters + ("email_confirmed",)
+    readonly_fields = [
+        field.name for field in UserProfileEvent._meta.get_fields()
+    ]
 
 
 admin.site.register(BarMembership)
