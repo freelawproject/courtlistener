@@ -79,7 +79,7 @@ from cl.recap.management.commands.remove_appellate_entries_with_long_numbers imp
     clean_up_duplicate_appellate_entries,
 )
 from cl.recap.management.commands.reprocess_recap_dockets import (
-    extract_unextracted_rds_and_add_to_solr,
+    extract_unextracted_rds,
 )
 from cl.recap.mergers import (
     add_attorney,
@@ -6226,7 +6226,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         ]
         self.assertEqual(len(rd_needs_extraction), 2)
 
-        extract_unextracted_rds_and_add_to_solr("celery")
+        extract_unextracted_rds("celery")
 
         rd_needs_extraction_after = [
             x.pk
@@ -6265,7 +6265,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         self.assertEqual(rd[0].sha1, "asdfasdfasdfasdfasdfasddf")
         self.assertEqual(rd[0].date_upload, date_upload)
 
-        extract_unextracted_rds_and_add_to_solr("celery")
+        extract_unextracted_rds("celery")
         # File related fields should be cleaned up after the failed extraction.
         self.assertEqual(rd[0].is_available, False)
         self.assertEqual(rd[0].file_size, None)

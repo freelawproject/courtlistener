@@ -11,16 +11,19 @@ from django.http import (
     HttpResponseNotAllowed,
     HttpResponseServerError,
 )
-from django.shortcuts import aget_object_or_404
+from django.shortcuts import aget_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.utils.datastructures import MultiValueDictKeyError
 
 from cl.favorites.forms import NoteForm
-from cl.favorites.models import DocketTag, Note, UserTag
+from cl.favorites.models import DocketTag, Note, Prayer, UserTag
 from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
+    get_lifetime_prayer_stats,
     get_top_prayers,
+    get_user_prayer_history,
+    get_user_prayers,
     prayer_eligible,
 )
 from cl.lib.decorators import cache_page_ignore_params
@@ -189,9 +192,14 @@ async def open_prayers(request: HttpRequest) -> HttpResponse:
 
     top_prayers = await get_top_prayers()
 
+    granted_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+    waiting_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+
     context = {
         "top_prayers": top_prayers,
         "private": False,
+        "granted_stats": granted_stats,
+        "waiting_stats": waiting_stats,
     }
 
     return TemplateResponse(request, "top_prayers.html", context)
@@ -203,6 +211,7 @@ async def create_prayer_view(
 ) -> HttpResponse:
     user = request.user
     is_htmx_request = request.META.get("HTTP_HX_REQUEST", False)
+    regular_size = bool(request.POST.get("regular_size"))
     if not await prayer_eligible(request.user):
         if is_htmx_request:
             return TemplateResponse(
@@ -213,6 +222,8 @@ async def create_prayer_view(
                     "document_id": recap_document,
                     "count": 0,
                     "daily_limit_reached": True,
+                    "regular_size": regular_size,
+                    "should_swap": True,
                 },
             )
         return HttpResponseServerError(
@@ -232,6 +243,8 @@ async def create_prayer_view(
                 "document_id": recap_document.pk,
                 "count": 0,
                 "daily_limit_reached": False,
+                "regular_size": regular_size,
+                "should_swap": True,
             },
         )
     return HttpResponse("It worked.")
@@ -246,7 +259,8 @@ async def delete_prayer_view(
 
     # Call the delete_prayer async function
     await delete_prayer(user, recap_document)
-
+    regular_size = bool(request.POST.get("regular_size"))
+    source = request.POST.get("source", "")
     if request.META.get("HTTP_HX_REQUEST"):
         return TemplateResponse(
             request,
@@ -255,6 +269,38 @@ async def delete_prayer_view(
                 "prayer_exists": False,
                 "document_id": recap_document.pk,
                 "count": 0,
+                "regular_size": regular_size,
+                "should_swap": True if source != "user_prayer_list" else False,
             },
+            headers={"HX-Trigger": "prayersListChanged"},
         )
     return HttpResponse("It worked.")
+
+
+async def user_prayers_view(
+    request: HttpRequest, username: str
+) -> HttpResponse:
+    requested_user = await aget_object_or_404(User, username=username)
+    is_page_owner = await request.auser() == requested_user
+
+    # this is a temporary restriction for the MVP. The intention is to eventually treat like tags.
+    if not is_page_owner:
+        return redirect("top_prayers")
+
+    rd_with_prayers = await get_user_prayers(requested_user)
+
+    count, total_cost = await get_user_prayer_history(requested_user)
+
+    is_eligible = await prayer_eligible(requested_user)
+
+    context = {
+        "rd_with_prayers": rd_with_prayers,
+        "requested_user": requested_user,
+        "is_page_owner": is_page_owner,
+        "count": count,
+        "total_cost": total_cost,
+        "is_eligible": is_eligible,
+        "private": False,
+    }
+
+    return TemplateResponse(request, "user_prayers.html", context)

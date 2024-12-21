@@ -2231,7 +2231,8 @@ class OpinionsESSearchTest(
         r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
-        self.assertIn("<mark>Maecenas Howell</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas</mark>", r.content.decode())
+        self.assertIn("<mark>Howell</mark>", r.content.decode())
 
         # case_name filter: Howells
         search_params = {
@@ -2241,7 +2242,8 @@ class OpinionsESSearchTest(
         r = async_to_sync(self._test_article_count)(
             search_params, 1, "case_name exact filter"
         )
-        self.assertIn("<mark>Maecenas Howells</mark>", r.content.decode())
+        self.assertIn("<mark>Maecenas</mark>", r.content.decode())
+        self.assertIn("<mark>Howells</mark>", r.content.decode())
 
         # text query: Howell
         search_params = {
@@ -2272,7 +2274,6 @@ class OpinionsESSearchTest(
 class RelatedSearchTest(
     ESIndexTestCase, CourtTestCase, PeopleTestCase, SearchTestCase, TestCase
 ):
-
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()

@@ -395,7 +395,13 @@ def build_fulltext_query(
             q_should.append(
                 Q(
                     "match_phrase",
-                    caseName={"query": query_value, "boost": 2, "slop": 1},
+                    **{
+                        "caseName.exact": {
+                            "query": query_value,
+                            "boost": 2,
+                            "slop": 1,
+                        }
+                    },
                 )
             )
 
@@ -481,26 +487,14 @@ def build_text_filter(field: str, value: str) -> List:
         if isinstance(value, str):
             validate_query_syntax(value, QueryType.FILTER)
 
-        base_query_string = {
-            "query_string": {
-                "query": value,
-                "fields": [field],
-                "default_operator": "AND",
-            }
-        }
-        if "caseName" in field and '"' not in value:
-            # Use phrase with slop, and give it a boost to prioritize the
-            # phrase match to ensure that caseName filtering returns exactly
-            # this order as the first priority.
-            # Avoid applying slop to quoted queries, as they expect exact matches.
-            base_query_string["query_string"].update(
-                {
-                    "type": "phrase",
-                    "phrase_slop": "1",
-                    "boost": "2",  # Boosting the phrase match to ensure it's ranked higher than individual term matches
-                }
+        return [
+            Q(
+                "query_string",
+                query=value,
+                fields=[field],
+                default_operator="AND",
             )
-        return [Q(base_query_string)]
+        ]
     return []
 
 

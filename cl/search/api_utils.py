@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_object_list(request, cd, paginator):
-    """Perform the Solr work"""
+    """Perform the search engine work"""
     # Set the offset value
     try:
         page_number = int(request.GET.get(paginator.page_query_param, 1))

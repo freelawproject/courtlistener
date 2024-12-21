@@ -2814,7 +2814,7 @@ def process_recap_email(
         all_updated_rds += docket_updated.rds_updated
 
     if not is_potentially_sealed_entry:
-        rds_to_extract_add_to_solr = all_attachment_rds + all_created_rds
+        rds_to_extract = all_attachment_rds + all_created_rds
         rds_updated_or_created = (
             all_attachment_rds + all_created_rds + all_updated_rds
         )
@@ -2827,13 +2827,13 @@ def process_recap_email(
         msg = "Successful upload! Nice work."
         status = PROCESSING_STATUS.SUCCESSFUL
     else:
-        rds_to_extract_add_to_solr = []
+        rds_to_extract = []
         self.request.chain = None
         msg = "Could not retrieve Docket Entry"
         status = PROCESSING_STATUS.FAILED
 
     async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
-    return [rd.pk for rd in rds_to_extract_add_to_solr]
+    return [rd.pk for rd in rds_to_extract]
 
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:
