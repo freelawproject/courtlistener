@@ -4,6 +4,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 
 from cl.alerts.admin import DocketAlertInline
+from cl.alerts.models import DocketAlert
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.string_utils import trunc
@@ -275,10 +276,7 @@ class DocketAdmin(CursorPaginatorAdmin):
     )
     search_help_text = "Search dockets by PK, PACER case ID, or Docket number."
     search_fields = ("pk", "pacer_case_id", "docket_number")
-    inlines = (
-        BankruptcyInformationInline,
-        DocketAlertInline,
-    )
+    inlines = (BankruptcyInformationInline,)
     readonly_fields = (
         "date_created",
         "date_modified",
@@ -306,6 +304,13 @@ class DocketAdmin(CursorPaginatorAdmin):
                 f"{DocketEntry._meta.model_name}/?docket={object_id}"
             )
             extra_context["docket_entries_url"] = docket_entries_url
+
+        if docket and hasattr(docket, "alerts"):
+            docket_alerts_url = (
+                f"/admin/{DocketAlert._meta.app_label}/"
+                f"{DocketAlert._meta.model_name}/?docket={object_id}"
+            )
+            extra_context["docket_alerts_url"] = docket_alerts_url
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context

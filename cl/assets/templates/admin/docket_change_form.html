@@ -8,5 +8,12 @@
       </a>
     </li>
   {% endif %}
+  {% if docket_alerts_url %}
+    <li>
+      <a class="historylink" href="{{ docket_alerts_url }}">
+        View Docket Alerts
+      </a>
+    </li>
+  {% endif %}
   {{ block.super }}
 {% endblock object-tools-items %}
