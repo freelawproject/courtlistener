@@ -732,31 +732,43 @@ def invert_user_logs(
     :return The inverted dictionary
     """
     r = get_redis_interface("STATS")
-    pipe = r.pipeline()
 
     dates = make_date_str_list(start, end)
-    for d in dates:
-        for version in ["v3", "v4"]:
+
+    versions = ["v3", "v4"]
+
+    for version in versions:
+        pipe = r.pipeline()
+        for d in dates:
             pipe.zrange(
                 f"api:{version}.user.d:{d}.counts", 0, -1, withscores=True
             )
-    results = pipe.execute()
+
+    all_results = pipe.execute()
+    results_by_version_all_dates = [
+        all_results[i : i + len(dates)]
+        for i in range(0, len(all_results), len(dates))
+    ]
 
     # results is a list of results for each of the zrange queries above. Zip
     # those results with the date that created it, and invert the whole thing.
     out: defaultdict = defaultdict(dict)
-    for d, result in zip(dates, results):
-        for user_id, count in result:
-            if user_id == "None" or user_id == "AnonymousUser":
-                user_id = "AnonymousUser"
-            else:
-                user_id = int(user_id)
-            count = int(count)
-            if out.get(user_id):
-                out[user_id][d] = count
-                out[user_id]["total"] += count
-            else:
-                out[user_id] = {d: count, "total": count}
+    for d, *results_by_version_for_date in zip(
+        dates, *results_by_version_all_dates
+    ):
+        for result in results_by_version_for_date:
+            for user_id, count in result:
+                if user_id == "None" or user_id == "AnonymousUser":
+                    user_id = "AnonymousUser"
+                else:
+                    user_id = int(user_id)
+                count = int(count)
+                if out.get(user_id):
+                    existing_count = out[user_id].get(d, 0)
+                    out[user_id][d] = existing_count + count
+                    out[user_id]["total"] += count
+                else:
+                    out[user_id] = {d: count, "total": count}
 
     # Sort the values
     for k, v in out.items():
