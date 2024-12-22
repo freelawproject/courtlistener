@@ -732,13 +732,13 @@ def invert_user_logs(
     :return The inverted dictionary
     """
     r = get_redis_interface("STATS")
+    pipe = r.pipeline()
 
     dates = make_date_str_list(start, end)
 
     versions = ["v3", "v4"]
 
     for version in versions:
-        pipe = r.pipeline()
         for d in dates:
             pipe.zrange(
                 f"api:{version}.user.d:{d}.counts", 0, -1, withscores=True
