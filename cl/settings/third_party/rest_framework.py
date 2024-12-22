@@ -40,6 +40,7 @@ REST_FRAMEWORK = {
         "court_api_2": "1/hour",
         "court_api_3": "1/hour",
         "court_api_4": "1/hour",
+        "court_api_5": "1/hour",
         "JamesBond": "1/hour",
         "JackSparrow": "1/hour",
         "PeterPan": "1/hour",
