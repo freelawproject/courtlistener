@@ -2281,7 +2281,7 @@ class OpinionSearchDecayRelevancyTest(
         # Rebuild the Opinion index
         cls.rebuild_index("search.OpinionCluster")
 
-        # Same keywords but different date_filed
+        # Same keywords but different dateFiled
         cls.opinion_old = OpinionClusterFactory.create(
             case_name="Keyword Match",
             case_name_full="",
@@ -2425,7 +2425,7 @@ class OpinionSearchDecayRelevancyTest(
 
         cls.test_cases = [
             {
-                "name": "Same keywords, order by score desc",
+                "name": "Same keywords, different dateFiled",
                 "search_params": {
                     "q": "Keyword Match",
                     "order_by": "score desc",
@@ -2435,13 +2435,13 @@ class OpinionSearchDecayRelevancyTest(
                     cls.opinion_recent.docket.docket_number,  # Most recent dateFiled
                     cls.opinion_old.docket.docket_number,  # Oldest dateFiled
                 ],
-                "expected_order": [
-                    cls.opinion_recent.pk,  # Most recent dateFiled
-                    cls.opinion_old.pk,  # Oldest dateFiled
+                "expected_order": [  # API
+                    cls.opinion_recent.pk,
+                    cls.opinion_old.pk,
                 ],
             },
             {
-                "name": "Different relevancy same dateFiled, order by score desc",
+                "name": "Different relevancy same dateFiled",
                 "search_params": {
                     "q": "Highly Relevant Keywords",
                     "order_by": "score desc",
@@ -2451,23 +2451,23 @@ class OpinionSearchDecayRelevancyTest(
                     cls.opinion_high_relevance.docket.docket_number,  # Most relevant by keywords
                     cls.opinion_low_relevance.docket.docket_number,  # Less relevant by keywords
                 ],
-                "expected_order": [
+                "expected_order": [  # API
                     cls.opinion_high_relevance.pk,  # Most relevant by keywords
                     cls.opinion_low_relevance.pk,  # Less relevant by keywords
                 ],
             },
             {
-                "name": "Different relevancy different dateFiled, order by score desc",
+                "name": "Different relevancy and different dateFiled",
                 "search_params": {
                     "q": "Ipsum Dolor Terms",
                     "order_by": "score desc",
                     "type": SEARCH_TYPES.OPINION,
                 },
                 "expected_order_frontend": [
-                    cls.opinion_low_relevance_new_date.docket.docket_number,
+                    cls.opinion_low_relevance_new_date.docket.docket_number,  # Combination of relevance and date rank it first.
                     cls.opinion_high_relevance_old_date.docket.docket_number,
                 ],
-                "expected_order": [
+                "expected_order": [  # API
                     cls.opinion_low_relevance_new_date.pk,
                     cls.opinion_high_relevance_old_date.pk,
                 ],
@@ -2483,23 +2483,23 @@ class OpinionSearchDecayRelevancyTest(
                 "expected_order_frontend": [
                     cls.opinion_low_relevance_new_date.docket.docket_number,  # 2024-12-23 1:21-bk-1241
                     cls.opinion_recent.docket.docket_number,  # 2024-02-23 1:21-bk-1236
-                    cls.opinion_high_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1237
+                    cls.opinion_high_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1237 Indexed first, displayed first.
                     cls.opinion_low_relevance.docket.docket_number,  # 2022-02-23 1:21-bk-1238
                     cls.opinion_high_relevance_old_date.docket.docket_number,  # 1800-02-23 1:21-bk-1239
                     cls.opinion_old.docket.docket_number,  # 1732-02-23 1:21-bk-1235
                 ],
-                "expected_order": [
+                "expected_order": [  # V4 API
                     cls.opinion_low_relevance_new_date.pk,  # 2024-12-23
                     cls.opinion_recent.pk,  # 2024-02-23
-                    cls.opinion_low_relevance.pk,  # 2022-02-23 Higher PK
-                    cls.opinion_high_relevance.pk,  # 2022-02-23 More relevant Lower PK
+                    cls.opinion_low_relevance.pk,  # 2022-02-23 Higher PK in V4, API pk is a secondary sorting key.
+                    cls.opinion_high_relevance.pk,  # 2022-02-23 Lower PK
                     cls.opinion_high_relevance_old_date.pk,  # 1800-02-23
                     cls.opinion_old.pk,  # 1732-02-23
                 ],
-                "expected_order_v3": [
+                "expected_order_v3": [  # V3 API
                     cls.opinion_low_relevance_new_date.pk,  # 2024-12-23
                     cls.opinion_recent.pk,  # 2024-02-23
-                    cls.opinion_high_relevance.pk,  # 2022-02-23 Indexed first
+                    cls.opinion_high_relevance.pk,  # 2022-02-23 Indexed first, displayed first.
                     cls.opinion_low_relevance.pk,  # 2022-02-23
                     cls.opinion_high_relevance_old_date.pk,  # 1800-02-23
                     cls.opinion_old.pk,  # 1732-02-23

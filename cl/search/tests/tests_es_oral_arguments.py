@@ -2499,7 +2499,8 @@ class OralArgumentsSearchDecayRelevancyTest(
 
     @classmethod
     def setUpTestData(cls):
-        # Same keywords but different date_argued
+
+        # Same keywords but different dateArgued
         with cls.captureOnCommitCallbacks(execute=True):
             cls.docket_old = DocketFactory.create(
                 docket_number="1:21-bk-1235",
@@ -2539,7 +2540,7 @@ class OralArgumentsSearchDecayRelevancyTest(
                 stt_transcript="Transcript for recent audio",
             )
 
-            # Different relevance with same date_argued
+            # Different relevance with same dateArgued
             cls.docket_low_relevance = DocketFactory.create(
                 case_name="Highly Relevant Keywords",
                 docket_number="1:21-bk-1238",
@@ -2577,11 +2578,10 @@ class OralArgumentsSearchDecayRelevancyTest(
                 blocked=False,
                 sha1="high_rel_sha1",
                 stt_status=Audio.STT_COMPLETE,
-                # More relevancy can be indicated by adding more relevant keywords in transcript
                 stt_transcript="More Highly Relevant Keywords in the transcript",
             )
 
-            # Different relevance with different date_argued
+            # Different relevance with different dateArgued
             cls.docket_high_relevance_old_date = DocketFactory.create(
                 case_name="Ipsum Dolor Terms",
                 docket_number="1:21-bk-1239",
@@ -2644,23 +2644,23 @@ class OralArgumentsSearchDecayRelevancyTest(
 
         cls.test_cases = [
             {
-                "name": "Same keywords, order by score desc",
+                "name": "Same keywords different dateArgued",
                 "search_params": {
                     "q": "Keyword Match",
                     "order_by": "score desc",
                     "type": SEARCH_TYPES.ORAL_ARGUMENT,
                 },
                 "expected_order_frontend": [
-                    cls.docket_recent.docket_number,  # Most recent date_argued
-                    cls.docket_old.docket_number,  # Oldest date_argued
+                    cls.docket_recent.docket_number,  # Most recent dateArgued
+                    cls.docket_old.docket_number,  # Oldest dateArgued
                 ],
-                "expected_order": [
+                "expected_order": [  # API
                     cls.audio_recent.pk,
                     cls.audio_old.pk,
                 ],
             },
             {
-                "name": "Different relevancy same dateArgued, order by score desc",
+                "name": "Different relevancy same dateArgued",
                 "search_params": {
                     "q": "Highly Relevant Keywords",
                     "order_by": "score desc",
@@ -2676,36 +2676,36 @@ class OralArgumentsSearchDecayRelevancyTest(
                 ],
             },
             {
-                "name": "Different relevancy different dateArgued, order by score desc",
+                "name": "Different relevancy different dateArgued",
                 "search_params": {
                     "q": "Ipsum Dolor Terms",
                     "order_by": "score desc",
                     "type": SEARCH_TYPES.ORAL_ARGUMENT,
                 },
                 "expected_order_frontend": [
-                    cls.docket_low_relevance_new_date.docket_number,
+                    cls.docket_low_relevance_new_date.docket_number,  # Combination of relevance and date rank it first.
                     cls.docket_high_relevance_old_date.docket_number,
-                    cls.docket_high_relevance_null_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
                 ],
-                "expected_order": [
+                "expected_order": [  # API
                     cls.audio_low_relevance_new_date.pk,
                     cls.audio_high_relevance_old_date.pk,
                     cls.audio_high_relevance_null_date.pk,
                 ],
             },
             {
-                "name": "Fixed main score (Filtering) different dateArgued, order by score desc",
+                "name": "Fixed main score for all (0 or 1) (using filters) and different dateArgued",
                 "search_params": {
                     "case_name": "Ipsum Dolor Terms",
                     "order_by": "score desc",
                     "type": SEARCH_TYPES.ORAL_ARGUMENT,
                 },
                 "expected_order_frontend": [
-                    cls.docket_low_relevance_new_date.docket_number,
+                    cls.docket_low_relevance_new_date.docket_number,  # Most recent dateFiled
                     cls.docket_high_relevance_old_date.docket_number,
-                    cls.docket_high_relevance_null_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
                 ],
-                "expected_order": [
+                "expected_order": [  # API
                     cls.audio_low_relevance_new_date.pk,
                     cls.audio_high_relevance_old_date.pk,
                     cls.audio_high_relevance_null_date.pk,
@@ -2721,29 +2721,29 @@ class OralArgumentsSearchDecayRelevancyTest(
                 "expected_order_frontend": [
                     cls.docket_low_relevance_new_date.docket_number,  # 2024-12-23 1:21-bk-1241
                     cls.docket_recent.docket_number,  # 2024-02-23 1:21-bk-1236
-                    cls.docket_low_relevance.docket_number,  # 2022-02-23 1:21-bk-1238
+                    cls.docket_low_relevance.docket_number,  # 2022-02-23 1:21-bk-1238 Indexed first, displayed first.
                     cls.docket_high_relevance.docket_number,  # 2022-02-23 1:21-bk-1237
                     cls.docket_high_relevance_old_date.docket_number,  # 1800-02-23 1:21-bk-1239
                     cls.docket_old.docket_number,  # 1732-02-23 1:21-bk-1235
-                    cls.docket_high_relevance_null_date.docket_number,  # Null date 1:21-bk-1240
+                    cls.docket_high_relevance_null_date.docket_number,  # Null dateArgued 1:21-bk-1240
                 ],
-                "expected_order": [
-                    cls.audio_low_relevance_new_date.pk,
-                    cls.audio_recent.pk,
-                    cls.audio_high_relevance.pk,
-                    cls.audio_low_relevance.pk,
-                    cls.audio_high_relevance_old_date.pk,
-                    cls.audio_old.pk,
-                    cls.audio_high_relevance_null_date.pk,
+                "expected_order": [  # V4 API
+                    cls.audio_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.audio_recent.pk,  # 2024-02-23
+                    cls.audio_high_relevance.pk,  # 2022-02-23 Higher PK in V4 API, pk is a secondary sorting key.
+                    cls.audio_low_relevance.pk,  # 2022-02-23
+                    cls.audio_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.audio_old.pk,  # 1732-02-23
+                    cls.audio_high_relevance_null_date.pk,  # Null dateArgued
                 ],
-                "expected_order_v3": [
-                    cls.audio_low_relevance_new_date.pk,
-                    cls.audio_recent.pk,
-                    cls.audio_low_relevance.pk,
-                    cls.audio_high_relevance.pk,
-                    cls.audio_high_relevance_old_date.pk,
-                    cls.audio_old.pk,
-                    cls.audio_high_relevance_null_date.pk,
+                "expected_order_v3": [  # V3 API
+                    cls.audio_low_relevance_new_date.pk,  # 2024-12-23
+                    cls.audio_recent.pk,  # 2024-02-23
+                    cls.audio_low_relevance.pk,  # 2022-02-23 Indexed first, displayed first.
+                    cls.audio_high_relevance.pk,  # 2022-02-23
+                    cls.audio_high_relevance_old_date.pk,  # 1800-02-23
+                    cls.audio_old.pk,  # 1732-02-23
+                    cls.audio_high_relevance_null_date.pk,  # Null dateArgued
                 ],
             },
         ]

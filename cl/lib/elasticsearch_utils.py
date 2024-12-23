@@ -72,6 +72,7 @@ from cl.search.constants import (
     SEARCH_RECAP_PARENT_QUERY_FIELDS,
     api_child_highlight_map,
     cardinality_query_unique_ids,
+    date_decay_relevance_types,
     recap_boosts_es,
 )
 from cl.search.exception import (
@@ -2127,15 +2128,27 @@ def merge_unavailable_fields_on_parent_document(
 def clean_count_query(search_query: Search) -> SearchDSL:
     """Cleans a given ES Search object for a count query.
 
-    Modifies the input Search object by removing 'inner_hits' from
-    any 'has_child' queries within the 'should' clause of the boolean query.
+    Modifies the input Search object by removing 'function_score' from the main
+    query if present and/or 'inner_hits' from any 'has_child' queries within
+    the 'should' clause of the boolean query.
     It then creates a new Search object with the modified query.
 
     :param search_query: The ES Search object.
     :return: A new ES Search object with the count query.
     """
 
-    parent_total_query_dict = search_query.to_dict()
+    parent_total_query_dict = search_query.to_dict(count=True)
+    try:
+        # Clean function_score in queries that contain it
+        parent_total_query_dict = parent_total_query_dict["query"][
+            "function_score"
+        ]
+        del parent_total_query_dict["boost_mode"]
+        del parent_total_query_dict["functions"]
+    except KeyError:
+        # Omit queries that don't contain it.
+        pass
+
     try:
         # Clean the has_child query in queries that contain it.
         for query in parent_total_query_dict["query"]["bool"]["should"]:
@@ -2571,29 +2584,9 @@ def apply_custom_score_to_main_query(
         else False
     )
 
-    valid_decay_relevance_types: dict[str, dict[str, str | int | float]] = {
-        SEARCH_TYPES.OPINION: {
-            "field": "dateFiled",
-            "scale": 50,
-            "decay": 0.5,
-        },
-        SEARCH_TYPES.RECAP: {"field": "dateFiled", "scale": 50, "decay": 0.5},
-        SEARCH_TYPES.DOCKETS: {
-            "field": "dateFiled",
-            "scale": 50,
-            "decay": 0.5,
-        },
-        SEARCH_TYPES.RECAP_DOCUMENT: {
-            "field": "dateFiled",
-            "scale": 50,
-            "decay": 0.5,
-        },
-        SEARCH_TYPES.ORAL_ARGUMENT: {
-            "field": "dateArgued",
-            "scale": 50,
-            "decay": 0.5,
-        },
-    }
+    valid_decay_relevance_types: dict[str, dict[str, str | int | float]] = (
+        date_decay_relevance_types
+    )
     main_order_by = cd.get("order_by", "")
     if is_valid_custom_score_field and api_version == "v4":
         # Applies a custom function score to sort Documents based on

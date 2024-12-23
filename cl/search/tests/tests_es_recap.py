@@ -3020,7 +3020,7 @@ class RECAPSearchDecayRelevancyTest(
 
         cls.test_cases = [
             {
-                "name": "Same keywords, order by score desc",
+                "name": "Same keywords, different dateFiled",
                 "search_params": {
                     "q": "Keyword Match",
                     "order_by": "score desc",
@@ -3030,13 +3030,13 @@ class RECAPSearchDecayRelevancyTest(
                     cls.docket_recent.docket_number,  # Most recent dateFiled
                     cls.docket_old.docket_number,  # Oldest dateFiled
                 ],
-                "expected_order": [
-                    cls.docket_recent.pk,  # Most recent dateFiled
-                    cls.docket_old.pk,  # Oldest dateFiled
+                "expected_order": [  # API
+                    cls.docket_recent.pk,
+                    cls.docket_old.pk,
                 ],
             },
             {
-                "name": "Different relevancy same dateFiled, order by score desc",
+                "name": "Different relevancy same dateFiled",
                 "search_params": {
                     "q": "Highly Relevant Keywords",
                     "order_by": "score desc",
@@ -3048,44 +3048,42 @@ class RECAPSearchDecayRelevancyTest(
                     cls.docket_low_relevance.docket_number,
                     # Less relevant by keywords
                 ],
-                "expected_order": [
+                "expected_order": [  # API
                     cls.docket_high_relevance.pk,
-                    # Most relevant by keywords
                     cls.docket_low_relevance.pk,
-                    # Less relevant by keywords
                 ],
             },
             {
-                "name": "Different relevancy different dateFiled, order by score desc",
+                "name": "Different relevancy different dateFiled",
                 "search_params": {
                     "q": "Ipsum Dolor Terms",
                     "order_by": "score desc",
                     "type": SEARCH_TYPES.RECAP,
                 },
                 "expected_order_frontend": [
-                    cls.docket_low_relevance_new_date.docket_number,
+                    cls.docket_low_relevance_new_date.docket_number,  # Combination of relevance and date rank it first.
                     cls.docket_high_relevance_old_date.docket_number,
-                    cls.docket_high_relevance_null_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
                 ],
-                "expected_order": [
+                "expected_order": [  # API
                     cls.docket_low_relevance_new_date.pk,
                     cls.docket_high_relevance_old_date.pk,
                     cls.docket_high_relevance_null_date.pk,
                 ],
             },
             {
-                "name": "Fixed main score (Filtering) different dateFiled, order by score desc",
+                "name": "Fixed main score for all (0 or 1) (using filters) and different dateFiled",
                 "search_params": {
                     "case_name": "Ipsum Dolor Terms",
                     "order_by": "score desc",
                     "type": SEARCH_TYPES.RECAP,
                 },
                 "expected_order_frontend": [
-                    cls.docket_low_relevance_new_date.docket_number,
+                    cls.docket_low_relevance_new_date.docket_number,  # Most recent dateFiled
                     cls.docket_high_relevance_old_date.docket_number,
-                    cls.docket_high_relevance_null_date.docket_number,
+                    cls.docket_high_relevance_null_date.docket_number,  # docs with a null dateFiled are ranked lower.
                 ],
-                "expected_order": [
+                "expected_order": [  # API
                     cls.docket_low_relevance_new_date.pk,
                     cls.docket_high_relevance_old_date.pk,
                     cls.docket_high_relevance_null_date.pk,
@@ -3104,37 +3102,37 @@ class RECAPSearchDecayRelevancyTest(
                     cls.docket_recent.docket_number,
                     # 2024, 2, 23 1:21-bk-1236
                     cls.docket_low_relevance.docket_number,
-                    # 2022, 2, 23 1:21-bk-1238
+                    # 2022, 2, 23 1:21-bk-1238 Indexed first, displayed first.
                     cls.docket_high_relevance.docket_number,
                     # 2022, 2, 23 1:21-bk-1237
                     cls.docket_high_relevance_old_date.docket_number,
                     # 1800, 2, 23 1:21-bk-1239
                     cls.docket_old.docket_number,  # 1732, 2, 23 1:21-bk-1235
                     cls.docket_high_relevance_null_date.docket_number,
-                    # Null 1:21-bk-1240
+                    # Null dateFiled 1:21-bk-1240
                 ],
-                "expected_order": [
+                "expected_order": [  # V4 API
                     cls.docket_low_relevance_new_date.pk,
                     # 2024, 12, 23 1:21-bk-1241
                     cls.docket_recent.pk,
                     # 2024, 2, 23 1:21-bk-1236
                     cls.docket_high_relevance.pk,
-                    # 2022, 2, 23 1:21-bk-1237 Greater PK
+                    # 2022, 2, 23 1:21-bk-1237 Higher PK in V4, API pk is a secondary sorting key.
                     cls.docket_low_relevance.pk,
-                    # 2022, 2, 23 1:21-bk-1238
+                    # 2022, 2, 23 1:21-bk-1238 Lower PK
                     cls.docket_high_relevance_old_date.pk,
                     # 1800, 2, 23 1:21-bk-1239
                     cls.docket_old.pk,  # 1732, 2, 23 1:21-bk-1235
                     cls.docket_high_relevance_null_date.pk,
                     # Null 1:21-bk-1240
                 ],
-                "expected_order_v3": [
+                "expected_order_v3": [  # V3 API
                     cls.docket_low_relevance_new_date.pk,
                     # 2024, 12, 23 1:21-bk-1241
                     cls.docket_recent.pk,
                     # 2024, 2, 23 1:21-bk-1236
                     cls.docket_low_relevance.pk,
-                    # 2022, 2, 23 1:21-bk-1238 Indexed first than 1:21-bk-1237
+                    # 2022, 2, 23 1:21-bk-1238 Indexed first, displayed first.
                     cls.docket_high_relevance.pk,
                     # 2022, 2, 23 1:21-bk-1237
                     cls.docket_high_relevance_old_date.pk,
@@ -3717,28 +3715,6 @@ class RECAPSearchAPIV3Test(
         }
         # API
         await self._test_api_results_count(params, 3, "order random")
-
-        # Order by score desc (relevance).
-        params = {
-            "type": SEARCH_TYPES.RECAP,
-            "q": "SUBPOENAS SERVED",
-            "order_by": "score desc",
-        }
-        # API
-        r = await self._test_api_results_count(params, 3, "order score desc")
-        self.assertTrue(
-            r.content.decode().index("12-1235")  # 2016, 8, 16
-            < r.content.decode().index("1:21-bk-1234"),  # 2015, 8, 16
-            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by score desc.",
-        )
-
-        params["type"] = SEARCH_TYPES.DOCKETS
-        r = await self._test_api_results_count(params, 2, "order")
-        self.assertTrue(
-            r.content.decode().index("12-1235")  # 2016, 8, 16
-            < r.content.decode().index("1:21-bk-1234"),  # 2015, 8, 16
-            msg="'12-1235' should come BEFORE '1:21-bk-1234' when order_by score desc.",
-        )
 
         # Order by entry_date_filed desc
         params = {
