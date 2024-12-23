@@ -116,11 +116,7 @@ if conf.CELERY_TASK_REPETITION:
                 cached_urls: CacheableList | None = db_cache.get(cache_key)
 
                 # Cursor of the current page
-                curr_cursor: str | None = (
-                    cached_urls.current_cursor
-                    if cached_urls is CacheableList
-                    else None
-                )
+                curr_cursor: str | None = getattr(cached_urls, "current_cursor", None)
 
                 # Need to regenerate the cache, because previous and current cursors do not match
                 force_regenerate: bool = (
