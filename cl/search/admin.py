@@ -282,7 +282,10 @@ class DocketAdmin(CursorPaginatorAdmin):
         "date_modified",
         "view_count",
     )
-    autocomplete_fields = ("court",)
+    autocomplete_fields = (
+        "court",
+        "appeal_from",
+    )
     raw_id_fields = (
         "panel",
         "tags",
