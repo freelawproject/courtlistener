@@ -12,7 +12,7 @@ from cl.donate.admin import (
     NeonMembershipInline,
 )
 from cl.favorites.admin import NoteInline, UserTagInline
-from cl.lib.admin import AdminTweaksMixin
+from cl.lib.admin import AdminTweaksMixin, build_admin_url
 from cl.users.models import (
     BarMembership,
     EmailFlag,
@@ -93,19 +93,18 @@ class UserAdmin(admin.ModelAdmin, AdminTweaksMixin):
         """Add links to related event admin pages filtered by user/profile."""
         extra_context = extra_context or {}
         user = self.get_object(request, object_id)
-        proxy_events_url = (
-            f"/admin/{UserProxyEvent._meta.app_label}/"
-            f"{UserProxyEvent._meta.model_name}/?pgh_obj={object_id}"
+
+        extra_context["proxy_events_url"] = build_admin_url(
+            UserProxyEvent,
+            {"pgh_obj": object_id},
         )
-        extra_context["proxy_events_url"] = proxy_events_url
 
         if user and hasattr(user, "profile"):
             profile_id = user.profile.pk
-            profile_events_url = (
-                f"/admin/{UserProfileEvent._meta.app_label}/"
-                f"{UserProfileEvent._meta.model_name}/?pgh_obj={profile_id}"
+            extra_context["profile_events_url"] = build_admin_url(
+                UserProfileEvent,
+                {"pgh_obj": profile_id},
             )
-            extra_context["profile_events_url"] = profile_events_url
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context

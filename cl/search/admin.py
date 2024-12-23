@@ -3,8 +3,8 @@ from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
 
-from cl.alerts.admin import DocketAlertInline
 from cl.alerts.models import DocketAlert
+from cl.lib.admin import build_admin_url
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.models import THUMBNAIL_STATUSES
 from cl.lib.string_utils import trunc
@@ -300,20 +300,19 @@ class DocketAdmin(CursorPaginatorAdmin):
         """Add links to pre-filtered related admin pages."""
         extra_context = extra_context or {}
         docket = self.get_object(request, object_id)
+        query_params = {"docket": object_id}
 
         if docket and hasattr(docket, "docket_entries"):
-            docket_entries_url = (
-                f"/admin/{DocketEntry._meta.app_label}/"
-                f"{DocketEntry._meta.model_name}/?docket={object_id}"
+            extra_context["docket_entries_url"] = build_admin_url(
+                DocketEntry,
+                query_params,
             )
-            extra_context["docket_entries_url"] = docket_entries_url
 
         if docket and hasattr(docket, "alerts"):
-            docket_alerts_url = (
-                f"/admin/{DocketAlert._meta.app_label}/"
-                f"{DocketAlert._meta.model_name}/?docket={object_id}"
+            extra_context["docket_alerts_url"] = build_admin_url(
+                DocketAlert,
+                query_params,
             )
-            extra_context["docket_alerts_url"] = docket_alerts_url
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
