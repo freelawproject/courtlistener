@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 from django.conf import settings
 
-from cl.sitemaps.base_sitemap import InfinitePaginatorSitemap
+from cl.sitemaps_infinite.base_sitemap import InfinitePaginatorSitemap
 
 # call sitemap file generation every 10 minutes
 CELERY_TASK_REPETITION: int = getattr(

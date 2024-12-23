@@ -9,7 +9,7 @@ from django.core.paginator import InvalidPage
 from redis import Redis
 
 from cl.lib.redis_utils import get_redis_interface
-from cl.sitemaps.types import SitemapsPagesNumber
+from cl.sitemaps_infinite.types import SitemapsPagesNumber
 
 REDIS_DB = "CACHE"
 HASH_NAME = "large-sitemaps:num_pages"

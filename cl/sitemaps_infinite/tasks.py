@@ -10,12 +10,12 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes, iri_to_uri
 from django.utils.timezone import now as tz_now
 from redis import Redis
-from sitemaps import conf
+from sitemaps_infinite import conf
 
 from cl.celery_init import app
 from cl.lib.redis_utils import get_redis_interface
-from cl.sitemaps.base_sitemap import CacheableList, InfinitePaginatorSitemap
-from cl.sitemaps.types import TaskCursorData
+from cl.sitemaps_infinite.base_sitemap import CacheableList, InfinitePaginatorSitemap
+from cl.sitemaps_infinite.types import TaskCursorData
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from django.contrib import sitemaps
 from django.db.models import Q, QuerySet
 
 from cl.search.models import PRECEDENTIAL_STATUS, SEARCH_TYPES, Docket, OpinionCluster
-from cl.sitemaps.base_sitemap import InfinitePaginatorSitemap
+from cl.sitemaps_infinite.base_sitemap import InfinitePaginatorSitemap
 
 
 class OpinionSitemap(sitemaps.Sitemap):
