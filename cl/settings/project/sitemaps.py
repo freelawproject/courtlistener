@@ -1,6 +1,3 @@
-from cl.opinion_page.sitemap import DocketSitemap
-from cl.search.models import SEARCH_TYPES
-
 # call sitemap file generation every 10 minutes
 SITEMAPS_TASK_REPEAT_SEC = 10 * 60
 
@@ -8,4 +5,6 @@ SITEMAPS_TASK_REPEAT_SEC = 10 * 60
 SITEMAPS_FILES_PER_CALL = 100
 
 # list of the sitemaps that should be generated in celery task
-SITEMAPS_GENERATED_OFFLINE = {SEARCH_TYPES.RECAP: DocketSitemap}
+SITEMAPS_GENERATED_OFFLINE = {
+    "cl.search.models.SEARCH_TYPES.RECAP": "cl.opinion_page.sitemap.DocketSitemap"
+}
