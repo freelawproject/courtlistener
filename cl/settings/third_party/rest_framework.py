@@ -29,11 +29,20 @@ REST_FRAMEWORK = {
     "OVERRIDE_THROTTLE_RATES": {
         # Throttling down.
         # Multiple accounts
+        "api_1": "1/hour",
+        "api_2": "1/hour",
         "api_account_1": "1/hour",
         "api_account_2": "1/hour",
         "api_account_3": "1/hour",
         "api_account_4": "1/hour",
         "api_account_5": "1/hour",
+        "court_test_account_3": "1/hour",
+        "court_test_account_2": "1/hour",
+        "court_api_1": "1/hour",
+        "court_api_2": "1/hour",
+        "court_api_3": "1/hour",
+        "court_api_4": "1/hour",
+        "court_api_5": "1/hour",
         "JamesBond": "1/hour",
         "JackSparrow": "1/hour",
         "PeterPan": "1/hour",
