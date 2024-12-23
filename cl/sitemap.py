@@ -53,7 +53,7 @@ def cached_sitemap(
 
     if section not in sitemaps:
         raise Http404(f"No sitemap available for section: {section!r}")
-    site = sitemaps[section]
+    sitemap = sitemaps[section]
     page = request.GET.get("p", 1)
 
     cache = caches["db_cache"]
@@ -61,9 +61,9 @@ def cached_sitemap(
     urls = cache.get(cache_key, [])
     if not urls:
         try:
-            if callable(site):
-                site = site()
-            urls = site.get_urls(
+            if callable(sitemap):
+                sitemap = sitemap()
+            urls = sitemap.get_urls(
                 page=page, site=req_site, protocol=req_protocol
             )
         except EmptyPage:
@@ -71,7 +71,7 @@ def cached_sitemap(
         except PageNotAnInteger:
             raise Http404(f"No page '{page}'")
 
-        if len(urls) == site.limit:
+        if len(urls) == sitemap.limit:
             # Full sitemap. Cache it a long time.
             cache_length = 60 * 60 * 24 * 180
         else:
@@ -82,7 +82,7 @@ def cached_sitemap(
     lastmod = None
     all_sites_lastmod = True
     if all_sites_lastmod:
-        site_lastmod = getattr(site, "latest_lastmod", None)
+        site_lastmod = getattr(sitemap, "latest_lastmod", None)
         if site_lastmod is not None:
             site_lastmod = (
                 site_lastmod.utctimetuple()
