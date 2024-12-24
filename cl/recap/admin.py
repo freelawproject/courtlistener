@@ -21,8 +21,10 @@ class ProcessingQueueAdmin(CursorPaginatorAdmin):
         "pacer_case_id",
         "document_number",
         "attachment_number",
+        "date_created",
     )
-    list_filter = ("status",)
+    list_filter = ("status", "date_created")
+    search_help_text = "Search ProcessingQueues by pacer_case_id or court__pk."
     search_fields = (
         "pacer_case_id",
         "court__pk",
@@ -41,15 +43,8 @@ class ProcessingQueueAdmin(CursorPaginatorAdmin):
 
 @admin.register(PacerFetchQueue)
 class PacerFetchQueueAdmin(CursorPaginatorAdmin):
-    list_display = (
-        "__str__",
-        "court",
-        "request_type",
-    )
-    list_filter = (
-        "status",
-        "request_type",
-    )
+    list_display = ("__str__", "court", "request_type", "date_created")
+    list_filter = ("status", "request_type", "date_created")
     readonly_fields = (
         "date_created",
         "date_modified",
@@ -94,14 +89,15 @@ def reprocess_failed_epq(modeladmin, request, queryset):
 
 @admin.register(EmailProcessingQueue)
 class EmailProcessingQueueAdmin(CursorPaginatorAdmin):
-    list_display = (
-        "__str__",
-        "status",
-    )
-    list_filter = ("status",)
+    list_display = ("__str__", "status", "date_created")
+    list_filter = ("status", "date_created")
     actions = [reprocess_failed_epq]
     raw_id_fields = ["uploader", "court"]
     exclude = ["recap_documents", "filepath"]
+    readonly_fields = (
+        "date_created",
+        "date_modified",
+    )
 
 
 admin.site.register(FjcIntegratedDatabase)
