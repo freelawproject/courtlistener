@@ -7,7 +7,7 @@ from cl.sitemaps_infinite.utils import make_sitemaps_list
 
 # call sitemap file generation every 10 minutes
 CELERY_TASK_REPETITION: int = getattr(
-    settings, "SITEMAPS_TASK_REPEAT_SEC", 10 * 60
+    settings, "SITEMAPS_TASK_REPEAT_SEC", 0
 )
 
 # The number of sitemap 'files' (pages) to cache per sitemap generation task call
