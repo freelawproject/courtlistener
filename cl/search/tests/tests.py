@@ -940,6 +940,8 @@ class OpinionSearchFunctionalTest(AudioTestCase, BaseSeleniumTest):
                 "12-9238 happy Gilmore",
                 'docketNumber:"12-9238"~1 happy Gilmore',
             ),
+            ("“ping tree” leads", '"ping tree" leads'),
+            ('"this is” a “test"', '"this is" a "test"'),
             ("1chicken NUGGET", '"1chicken" NUGGET'),
             (
                 "We can drive her home with 1headlight",
