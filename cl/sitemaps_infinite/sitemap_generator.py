@@ -13,7 +13,10 @@ from redis import Redis
 from cl.sitemaps_infinite import conf
 
 from cl.lib.redis_utils import get_redis_interface
-from cl.sitemaps_infinite.base_sitemap import CacheableList, InfinitePaginatorSitemap
+from cl.sitemaps_infinite.base_sitemap import (
+    CacheableList,
+    InfinitePaginatorSitemap,
+)
 from cl.sitemaps_infinite.types import TaskCursorData
 
 logger = logging.getLogger(__name__)
@@ -36,6 +39,7 @@ cursor_data_default = TaskCursorData(
 
 short_cache_timeout = 60 * 60 * 24
 long_cache_timeout = 60 * 60 * 24 * 180
+
 
 # Set up a task if repetition period is set in conf
 @transaction.atomic
@@ -92,18 +96,24 @@ def generate_urls_chunk() -> None:
                 logger.info(
                     f"No more URLs to generate for section: {section}, page: {cursor_data.get('last_page')} and cursor: {cursor_data.get('cursor')}."
                 )
+
+                # the infinite paginator saves the last page in the current section to its cache
+                sitemapObject.paginator.save_num_pages(
+                    cursor_data.get("last_page")
+                )
+
                 break
 
             # Make the cache key, @see cl.sitemap.make_cache_key()
-            cache_key = make_cache_key(
-                sitemapObject, section, current_page
-            )
+            cache_key = make_cache_key(sitemapObject, section, current_page)
 
             # read the last existing page from the cache
             cached_urls: CacheableList | None = db_cache.get(cache_key)
 
             # Cursor of the current page
-            curr_cursor: str | None = getattr(cached_urls, "current_cursor", None)
+            curr_cursor: str | None = getattr(
+                cached_urls, "current_cursor", None
+            )
 
             # Need to regenerate the cache, because previous and current cursors do not match
             force_regenerate: bool = (
@@ -118,9 +128,7 @@ def generate_urls_chunk() -> None:
             if (
                 not force_regenerate
                 and cached_urls is CacheableList
-                and (
-                    tz_now() - cached_urls.expiration_time
-                ).total_seconds()
+                and (tz_now() - cached_urls.expiration_time).total_seconds()
                 > short_cache_timeout
             ):
                 # No need to regenerate the cache, because it's a full page, move the cursor to the next page
@@ -184,6 +192,7 @@ def generate_urls_chunk() -> None:
             mapping=cursor_data,
         )
 
+
 def make_cache_key(
     sitemapObject: InfinitePaginatorSitemap, section: str, page: str | int
 ) -> str:
@@ -204,6 +213,7 @@ def make_cache_key(
     url = hashlib.md5(force_bytes(iri_to_uri(uri)))
 
     return f"sitemap.{section}.{url.hexdigest()}"
+
 
 def make_expiration_time(cache: BaseCache, timeout: int) -> datetime:
     """Make the expiration time for the cache"""

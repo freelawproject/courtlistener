@@ -58,6 +58,13 @@ class CustomCursorPaginator(CursorPaginator):
 
         return num_pages_cached.get(self.section, 1)
 
+    def save_num_pages(self, num: int) -> None:
+        """
+        Saves the number of pages for the current section to the cache.
+        """
+        redis_db: Redis = get_redis_interface(REDIS_DB)
+        redis_db.hset(HASH_NAME, self.section, num)
+
 
 class InfinitePaginatorSitemap(sitemaps.Sitemap):
     """
