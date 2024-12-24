@@ -2392,7 +2392,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test Alert OA",
-            query="type=oa&docket_number=19-1010",
+            query="type=oa&docket_number=19-1010&order_by=score desc",
             alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
 
@@ -2402,6 +2402,7 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase):
         response_str = str(doc.to_dict())
         self.assertIn("'query': '19-1010'", response_str)
         self.assertIn("'rate': 'rt'", response_str)
+        self.assertNotIn("function_score", response_str)
 
         # Update Alert
         search_alert_1.query = "type=oa&docket_number=19-1020"
