@@ -1,5 +1,5 @@
-# call sitemap file generation every 10 minutes
-SITEMAPS_TASK_REPEAT_SEC = 10 * 60
+# call sitemap file generation every 10 minutes, set 0 to disable task (default)
+SITEMAPS_TASK_REPEAT_SEC = 0
 
 # The number of sitemap 'files' (pages) to cache per sitemap generation task call
 SITEMAPS_FILES_PER_CALL = 100
