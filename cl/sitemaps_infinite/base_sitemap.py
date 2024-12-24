@@ -1,10 +1,12 @@
 from datetime import datetime
 from functools import cached_property
-from typing import Any, Tuple
+from typing import Any, Tuple, Union
 
 from cursor_pagination import CursorPaginator
 from django.conf import settings
 from django.contrib import sitemaps
+from django.contrib.sites.models import Site
+from django.contrib.sites.requests import RequestSite
 from django.core.paginator import InvalidPage
 from redis import Redis
 
@@ -68,7 +70,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
     taking an optional cursor parameter to fetch the next set of URLs.
     """
 
-    _cursor: str | None | False = False
+    _cursor: Union[str, None, False] = False
     _has_next: bool = False
 
     @property
@@ -76,7 +78,9 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         """
         The section of the response that this cursor data applies to, as a string or bytes.
         """
-        raise Exception("The section property should by provided by the subclass.")
+        raise Exception(
+            "The section property should by provided by the subclass."
+        )
 
     def set_cursor(self, cursor: str | None = None):
         self._cursor = cursor
@@ -118,7 +122,7 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
 
     def get_urls_by_cursor(
         self,
-        site: sitemaps.Site | sitemaps.RequestSite | None = None,
+        site: Site | RequestSite | None = None,
         protocol: str | None = None,
     ) -> CacheableList[dict[str, Any]]:
         """
