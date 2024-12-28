@@ -20,6 +20,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
+from django.db.models import QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
@@ -114,7 +115,9 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
         for pq_pk in sub_docket_att_page_pks:
             await process_recap_attachment(pq_pk)
     elif pq.upload_type == UPLOAD_TYPE.PDF:
-        await process_recap_pdf(pq.pk)
+        sub_docket_pdf_pks = await find_subdocket_pdf_rds(pq.pk)
+        for pq_pk in sub_docket_pdf_pks:
+            await process_recap_pdf(pq_pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         docket = await process_recap_docket_history_report(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
@@ -676,6 +679,30 @@ async def get_att_data_from_pq(
     return pq, att_data, text
 
 
+def get_main_rds(court: Court, pacer_doc_id: str) -> QuerySet:
+    """
+    Return the main RECAPDocument queryset for a given court and pacer_doc_id.
+    :param court: The court to query.
+    :param pacer_doc_id: The pacer document ID.
+    :return: The main RECAPDocument queryset.
+    """
+    main_rds_qs = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .filter(
+            pacer_doc_id=pacer_doc_id,
+            docket_entry__docket__court=court,
+        )
+        .order_by("docket_entry__docket__pacer_case_id")
+        .distinct("docket_entry__docket__pacer_case_id")
+        .only(
+            "pacer_doc_id",
+            "docket_entry__docket__pacer_case_id",
+            "docket_entry__docket__court_id",
+        )
+    )
+    return main_rds_qs
+
+
 async def find_subdocket_att_page_rds(
     pk: int,
 ) -> list[int]:
@@ -690,40 +717,92 @@ async def find_subdocket_att_page_rds(
     court = await Court.objects.aget(id=pq.court_id)
     pq, att_data, text = await get_att_data_from_pq(pq)
     pacer_doc_id = att_data["pacer_doc_id"]
-    main_rds = (
-        RECAPDocument.objects.select_related("docket_entry__docket")
-        .filter(
-            pacer_doc_id=pacer_doc_id,
-            docket_entry__docket__court=court,
-        )
-        .order_by("docket_entry__docket__pacer_case_id")
-        .distinct("docket_entry__docket__pacer_case_id")
-        .only(
-            "pacer_doc_id",
-            "docket_entry__docket__pacer_case_id",
-            "docket_entry__docket__court_id",
-        )
-        .exclude(docket_entry__docket__pacer_case_id=pq.pacer_case_id)
+    main_rds = get_main_rds(court, pacer_doc_id).exclude(
+        docket_entry__docket__pacer_case_id=pq.pacer_case_id
     )
     pqs_to_process_pks = [
         pq.pk
     ]  # Add the original pq to the list of pqs to process
     original_file_content = text.encode("utf-8")
     original_file_name = pq.filepath_local.name
-    async for main_rd in main_rds:
-        main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
-        # Create additional pqs for each subdocket case found.
-        pq_created = await ProcessingQueue.objects.acreate(
-            uploader_id=pq.uploader_id,
-            pacer_doc_id=pacer_doc_id,
-            pacer_case_id=main_pacer_case_id,
-            court_id=court.pk,
-            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
-            filepath_local=ContentFile(
-                original_file_content, name=original_file_name
-            ),
+
+    @sync_to_async
+    def save_pq_instances():
+        with transaction.atomic():
+            for main_rd in main_rds:
+                main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
+                # Create additional pqs for each subdocket case found.
+                pq_created = ProcessingQueue.objects.create(
+                    uploader_id=pq.uploader_id,
+                    pacer_doc_id=pacer_doc_id,
+                    pacer_case_id=main_pacer_case_id,
+                    court_id=court.pk,
+                    upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+                    filepath_local=ContentFile(
+                        original_file_content, name=original_file_name
+                    ),
+                )
+                pqs_to_process_pks.append(pq_created.pk)
+
+    await save_pq_instances()
+    return pqs_to_process_pks
+
+
+async def find_subdocket_pdf_rds(
+    pk: int,
+) -> list[int]:
+    """Look for RECAP Documents that belong to subdockets, and create a PQ
+    object for each additional PDF upload that requires processing.
+
+    :param pk: Primary key of the processing queue item.
+    :return: A list of ProcessingQueue pks to process.
+    """
+
+    pq = await ProcessingQueue.objects.aget(pk=pk)
+    court = await Court.objects.aget(id=pq.court_id)
+    pacer_doc_id = pq.pacer_doc_id
+    main_rds = get_main_rds(court, pacer_doc_id)
+    pqs_to_process_pks = [
+        pq.pk
+    ]  # Add the original pq to the list of pqs to process
+    if pq.pacer_case_id:
+        main_rds = main_rds.exclude(
+            docket_entry__docket__pacer_case_id=pq.pacer_case_id
         )
-        pqs_to_process_pks.append(pq_created.pk)
+    pdf_binary_content = pq.filepath_local.read()
+
+    @sync_to_async
+    def save_pq_instances():
+        with transaction.atomic():
+            for i, main_rd in enumerate(main_rds):
+                if not pq.pacer_case_id and i == 0:
+                    # If there's no pacer_case_id from the original PQ,
+                    # set a pacer_case_id from one of the matched RDs
+                    # to make the RD lookup process_recap_pdf succeed.
+                    pq.pacer_case_id = (
+                        main_rd.docket_entry.docket.pacer_case_id
+                    )
+                    pq.save()
+                    continue
+
+                main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
+                # Create additional pqs for each subdocket case found.
+                pdf_file = ContentFile(
+                    pdf_binary_content, name=pq.filepath_local.name
+                )
+                pq_created = ProcessingQueue.objects.create(
+                    uploader_id=pq.uploader_id,
+                    pacer_doc_id=pacer_doc_id,
+                    pacer_case_id=main_pacer_case_id,
+                    document_number=pq.document_number,
+                    attachment_number=pq.attachment_number,
+                    court_id=court.pk,
+                    upload_type=UPLOAD_TYPE.PDF,
+                    filepath_local=pdf_file,
+                )
+                pqs_to_process_pks.append(pq_created.pk)
+
+    await save_pq_instances()
     return pqs_to_process_pks
 
 
