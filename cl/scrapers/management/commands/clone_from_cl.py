@@ -37,6 +37,11 @@ manage.py clone_from_cl --type search.OpinionCluster --id 1814616 --clone-person
 manage.py clone_from_cl --type people_db.Person --id 4173 --clone-person-positions
 manage.py clone_from_cl --type search.Docket --id 5377675 --clone-person-positions
 
+Note: for cloned Opinion Clusters to appear in docket authorities pages, use the
+`find_citations_and_parantheticals_for_recap_documents` method in the Django shell.
+You can pass all RECAPDocument IDs, for example:
+`RECAPDocument.objects.values_list('pk', flat=True)`, or only a subset if needed.
+
 This is still work in progress, some data is not cloned yet.
 """
 
