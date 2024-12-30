@@ -1075,8 +1075,8 @@ class ReplicateRecapUploadsTest(TestCase):
 
     @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
     def test_processing_subdocket_case_pdf_upload(self, mock_extract):
-        """Can we replicate a PDF document upload from a subdocket case
-        to its corresponding RD across all related dockets?
+        """Can we duplicate a PDF document upload from a subdocket case to the
+        corresponding RD across all related dockets?
         """
 
         # Add the docket entry to every case.
@@ -1189,8 +1189,8 @@ class ReplicateRecapUploadsTest(TestCase):
     def test_processing_subdocket_case_pdf_attachment_upload(
         self, mock_extract
     ):
-        """Can we replicate a PDF attachment document upload from a subdocket case
-        to its corresponding RD across all related dockets?
+        """Can we duplicate a PDF attachment document upload from a subdocket
+        case to the corresponding RD across all related dockets?
         """
 
         # Add the docket entry to every case.

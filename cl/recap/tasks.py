@@ -679,10 +679,10 @@ async def get_att_data_from_pq(
     return pq, att_data, text
 
 
-def get_main_rds(court: Court, pacer_doc_id: str) -> QuerySet:
+def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
     """
     Return the main RECAPDocument queryset for a given court and pacer_doc_id.
-    :param court: The court to query.
+    :param court_id: The court ID to query.
     :param pacer_doc_id: The pacer document ID.
     :return: The main RECAPDocument queryset.
     """
@@ -690,7 +690,7 @@ def get_main_rds(court: Court, pacer_doc_id: str) -> QuerySet:
         RECAPDocument.objects.select_related("docket_entry__docket")
         .filter(
             pacer_doc_id=pacer_doc_id,
-            docket_entry__docket__court=court,
+            docket_entry__docket__court_id=court_id,
         )
         .order_by("docket_entry__docket__pacer_case_id")
         .distinct("docket_entry__docket__pacer_case_id")
@@ -714,10 +714,9 @@ async def find_subdocket_att_page_rds(
     """
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
-    court = await Court.objects.aget(id=pq.court_id)
     pq, att_data, text = await get_att_data_from_pq(pq)
     pacer_doc_id = att_data["pacer_doc_id"]
-    main_rds = get_main_rds(court, pacer_doc_id).exclude(
+    main_rds = get_main_rds(pq.court_id, pacer_doc_id).exclude(
         docket_entry__docket__pacer_case_id=pq.pacer_case_id
     )
     pqs_to_process_pks = [
@@ -736,7 +735,7 @@ async def find_subdocket_att_page_rds(
                     uploader_id=pq.uploader_id,
                     pacer_doc_id=pacer_doc_id,
                     pacer_case_id=main_pacer_case_id,
-                    court_id=court.pk,
+                    court_id=pq.court_id,
                     upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
                     filepath_local=ContentFile(
                         original_file_content, name=original_file_name
@@ -759,26 +758,40 @@ async def find_subdocket_pdf_rds(
     """
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
-    court = await Court.objects.aget(id=pq.court_id)
-    pacer_doc_id = pq.pacer_doc_id
-    main_rds = get_main_rds(court, pacer_doc_id)
+    main_rds = get_main_rds(pq.court_id, pq.pacer_doc_id)
     pqs_to_process_pks = [
         pq.pk
     ]  # Add the original pq to the list of pqs to process
+
+    appellate_court_ids = [
+        court_pk
+        async for court_pk in (
+            Court.federal_courts.appellate_pacer_courts().values_list(
+                "pk", flat=True
+            )
+        )
+    ]
+    if pq.court_id in appellate_court_ids:
+        # Abort the process for appellate documents. Subdockets cannot be found
+        # in appellate cases.
+        return pqs_to_process_pks
+
     if pq.pacer_case_id:
+        # If pq already has a pacer_case_id, exclude it from the queryset.
         main_rds = main_rds.exclude(
             docket_entry__docket__pacer_case_id=pq.pacer_case_id
         )
+
     pdf_binary_content = pq.filepath_local.read()
 
     @sync_to_async
     def save_pq_instances():
         with transaction.atomic():
             for i, main_rd in enumerate(main_rds):
-                if not pq.pacer_case_id and i == 0:
-                    # If there's no pacer_case_id from the original PQ,
-                    # set a pacer_case_id from one of the matched RDs
-                    # to make the RD lookup process_recap_pdf succeed.
+                if i == 0 and not pq.pacer_case_id:
+                    # If the original PQ does not have a pacer_case_id,
+                    # assign it a pacer_case_id from one of the matched RDs
+                    # to ensure the RD lookup in process_recap_pdf succeeds.
                     pq.pacer_case_id = (
                         main_rd.docket_entry.docket.pacer_case_id
                     )
@@ -787,18 +800,17 @@ async def find_subdocket_pdf_rds(
 
                 main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
                 # Create additional pqs for each subdocket case found.
-                pdf_file = ContentFile(
-                    pdf_binary_content, name=pq.filepath_local.name
-                )
                 pq_created = ProcessingQueue.objects.create(
                     uploader_id=pq.uploader_id,
-                    pacer_doc_id=pacer_doc_id,
+                    pacer_doc_id=pq.pacer_doc_id,
                     pacer_case_id=main_pacer_case_id,
                     document_number=pq.document_number,
                     attachment_number=pq.attachment_number,
-                    court_id=court.pk,
+                    court_id=pq.court_id,
                     upload_type=UPLOAD_TYPE.PDF,
-                    filepath_local=pdf_file,
+                    filepath_local=ContentFile(
+                        pdf_binary_content, name=pq.filepath_local.name
+                    ),
                 )
                 pqs_to_process_pks.append(pq_created.pk)
 
@@ -821,10 +833,6 @@ async def process_recap_attachment(
     :return: Tuple indicating the status of the processing and a related
     message
     """
-
-    pq = await ProcessingQueue.objects.aget(pk=pk)
-    await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
-    logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
     pq = await ProcessingQueue.objects.aget(pk=pk)
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
