@@ -2872,7 +2872,7 @@ class RECAPSearchDecayRelevancyTest(
             case_name_short="",
             docket_number="1:21-bk-1235",
             source=Docket.RECAP,
-            date_filed=datetime.date(1732, 2, 23),
+            date_filed=datetime.date(1832, 2, 23),
         )
         cls.rd_old = RECAPDocumentFactory(
             docket_entry=DocketEntryWithParentsFactory(
@@ -2955,7 +2955,7 @@ class RECAPSearchDecayRelevancyTest(
             source=Docket.RECAP,
             nature_of_suit="More Ipsum Dolor Terms",
             cause="More Ipsum Dolor Terms",
-            date_filed=datetime.date(1800, 2, 23),
+            date_filed=datetime.date(1900, 2, 23),
         )
         cls.rd_high_relevance_old_date = RECAPDocumentFactory(
             docket_entry=DocketEntryWithParentsFactory(

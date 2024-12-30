@@ -281,22 +281,31 @@ date_decay_relevance_types = {
     SEARCH_TYPES.OPINION: {
         "field": "dateFiled",
         "scale": 50,
-        "decay": 0.5,
+        "decay": 0.2,
+        "min_score": 0.1,
     },
-    SEARCH_TYPES.RECAP: {"field": "dateFiled", "scale": 50, "decay": 0.5},
+    SEARCH_TYPES.RECAP: {
+        "field": "dateFiled",
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
+    },
     SEARCH_TYPES.DOCKETS: {
         "field": "dateFiled",
-        "scale": 50,
-        "decay": 0.5,
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
     },
     SEARCH_TYPES.RECAP_DOCUMENT: {
         "field": "dateFiled",
-        "scale": 50,
-        "decay": 0.5,
+        "scale": 20,
+        "decay": 0.2,
+        "min_score": 0.1,
     },
     SEARCH_TYPES.ORAL_ARGUMENT: {
         "field": "dateArgued",
         "scale": 50,
-        "decay": 0.5,
+        "decay": 0.2,
+        "min_score": 0.1,
     },
 }

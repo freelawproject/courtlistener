@@ -947,6 +947,7 @@ def build_decay_relevance_score(
     decay: float,
     default_missing_date: str = "1600-01-01T00:00:00Z",
     boost_mode: str = "multiply",
+    min_score: float = 0.0,
 ) -> QueryString:
     """
     Build a decay relevance score query for Elasticsearch that adjusts the
@@ -960,6 +961,7 @@ def build_decay_relevance_score(
     is null.
     :param boost_mode: The mode to combine the decay score with the query's
     original relevance score.
+    :param min_score: The minimum score where the decay function stabilizes.
     :return:  The modified QueryString object with applied function score.
     """
 
@@ -972,9 +974,9 @@ def build_decay_relevance_score(
                     def default_missing_date = Instant.parse(params.default_missing_date).toEpochMilli();
                     def decay = (double)params.decay;
                     def now = new Date().getTime();
+                    def min_score = (double)params.min_score;
 
                     // Convert scale parameter into milliseconds.
-                    def scaleStr = params.scale;
                     double years = (double)params.scale;
                     // Convert years to milliseconds 1 year = 365 days
                     long scaleMillis = (long)(years * 365 * 24 * 60 * 60 * 1000);
@@ -989,12 +991,15 @@ def build_decay_relevance_score(
                     // Absolute distance from now
                     def diff = Math.abs(docDate - now);
                     // Score: exp( λ * max(0, |docDate - now|) )
-                    return Math.exp(lambda * diff);
+                    def decay_score = Math.exp(lambda * diff);
+                    // Adjust the decay score to have a minimum value
+                    return min_score + ((1 - min_score) * decay_score);
                     """,
                 "params": {
                     "default_missing_date": default_missing_date,
                     "scale": scale,  # Years
                     "decay": decay,
+                    "min_score": min_score,
                 },
             },
         },
@@ -2605,8 +2610,14 @@ def apply_custom_score_to_main_query(
         date_field = str(valid_decay_relevance_types[cd["type"]]["field"])
         scale = int(valid_decay_relevance_types[cd["type"]]["scale"])
         decay = float(valid_decay_relevance_types[cd["type"]]["decay"])
+        min_score = float(valid_decay_relevance_types[cd["type"]]["min_score"])
         query = build_decay_relevance_score(
-            query, date_field, scale=scale, decay=decay, boost_mode=boost_mode
+            query,
+            date_field,
+            scale=scale,
+            decay=decay,
+            boost_mode=boost_mode,
+            min_score=min_score,
         )
     return query
 

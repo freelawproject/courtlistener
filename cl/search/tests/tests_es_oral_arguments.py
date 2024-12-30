@@ -2504,7 +2504,7 @@ class OralArgumentsSearchDecayRelevancyTest(
         with cls.captureOnCommitCallbacks(execute=True):
             cls.docket_old = DocketFactory.create(
                 docket_number="1:21-bk-1235",
-                date_argued=datetime.date(1732, 2, 23),
+                date_argued=datetime.date(1832, 2, 23),
             )
             cls.audio_old = AudioFactory.create(
                 case_name="Keyword Match",
@@ -2585,7 +2585,7 @@ class OralArgumentsSearchDecayRelevancyTest(
             cls.docket_high_relevance_old_date = DocketFactory.create(
                 case_name="Ipsum Dolor Terms",
                 docket_number="1:21-bk-1239",
-                date_argued=datetime.date(1800, 2, 23),
+                date_argued=datetime.date(1900, 2, 23),
             )
             cls.audio_high_relevance_old_date = AudioFactory.create(
                 case_name="Ipsum Dolor Terms",

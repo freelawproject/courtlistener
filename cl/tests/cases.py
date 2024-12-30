@@ -372,7 +372,8 @@ class V4SearchAPIAssertions(SimpleTestCase):
             self.assertEqual(
                 actual_order,
                 test[expected_order_key],
-                msg=f"Expected order {test[expected_order_key]}, but got {actual_order}",
+                msg=f"Expected order {test[expected_order_key]}, but got {actual_order} for "
+                f"Search type: {test["search_params"]["type"]}",
             )
 
     def _assert_order_in_html(
