@@ -272,7 +272,6 @@ class DocketAdmin(CursorPaginatorAdmin):
         "__str__",
         "pacer_case_id",
         "docket_number",
-        "pacer_case_id",
     )
     search_help_text = "Search dockets by PK, PACER case ID, or Docket number."
     search_fields = ("pk", "pacer_case_id", "docket_number")
