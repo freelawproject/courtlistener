@@ -40,9 +40,7 @@ class CustomUserChangeForm(UserChangeForm):
         # Ensure user_permissions field uses an optimized queryset
         if "user_permissions" in self.fields:
             self.fields["user_permissions"].queryset = (
-                Permission.objects.select_related("content_type").order_by(
-                    "content_type__app_label", "codename"
-                )
+                Permission.objects.select_related("content_type")
             )
 
 
