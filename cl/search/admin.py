@@ -298,20 +298,17 @@ class DocketAdmin(CursorPaginatorAdmin):
     def change_view(self, request, object_id, form_url="", extra_context=None):
         """Add links to pre-filtered related admin pages."""
         extra_context = extra_context or {}
-        docket = self.get_object(request, object_id)
         query_params = {"docket": object_id}
 
-        if docket and hasattr(docket, "docket_entries"):
-            extra_context["docket_entries_url"] = build_admin_url(
-                DocketEntry,
-                query_params,
-            )
+        extra_context["docket_entries_url"] = build_admin_url(
+            DocketEntry,
+            query_params,
+        )
 
-        if docket and hasattr(docket, "alerts"):
-            extra_context["docket_alerts_url"] = build_admin_url(
-                DocketAlert,
-                query_params,
-            )
+        extra_context["docket_alerts_url"] = build_admin_url(
+            DocketAlert,
+            query_params,
+        )
 
         return super().change_view(
             request, object_id, form_url, extra_context=extra_context
