@@ -182,6 +182,9 @@ class BaseUserEventAdmin(admin.ModelAdmin):
     def get_pgh_label(self, obj):
         return obj.pgh_label
 
+    def get_readonly_fields(self, request, obj=None):
+        return [field.name for field in self.model._meta.get_fields()]
+
 
 @admin.register(UserProxyEvent)
 class UserProxyEventAdmin(BaseUserEventAdmin):
@@ -194,9 +197,6 @@ class UserProxyEventAdmin(BaseUserEventAdmin):
         "email",
         "username",
     )
-    readonly_fields = [
-        field.name for field in UserProxyEvent._meta.get_fields()
-    ]
 
 
 @admin.register(UserProfileEvent)
@@ -210,9 +210,6 @@ class UserProfileEventAdmin(BaseUserEventAdmin):
         "email_confirmed",
     )
     list_filter = BaseUserEventAdmin.common_list_filters + ("email_confirmed",)
-    readonly_fields = [
-        field.name for field in UserProfileEvent._meta.get_fields()
-    ]
 
 
 admin.site.register(BarMembership)
