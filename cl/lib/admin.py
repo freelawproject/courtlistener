@@ -43,5 +43,5 @@ def build_admin_url(
     entries_changelist_url = reverse(
         f"admin:{app_label}_{model_name}_changelist"
     )
-    query_params = urlencode(query_params)
-    return f"{entries_changelist_url}?{query_params}"
+    encoded_query_params = urlencode(query_params)
+    return f"{entries_changelist_url}?{encoded_query_params}"
