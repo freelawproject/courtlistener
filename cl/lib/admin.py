@@ -18,13 +18,12 @@ class NotesInline(GenericTabularInline):
     extra = 1
 
 
-def build_admin_url(model_class, query_params=None, view_name="changelist"):
+def build_admin_url(model_class, query_params=None):
     """
     Construct a URL for a given model's admin view, optionally appending query parameters.
 
     :param model_class: The Django model class for which the admin URL will be built.
     :param query_params: A dictionary of query parameters to append to the URL (e.g. {"docket": 123}).
-    :param view_name: An admin view suffix, such as "changelist", "change", or "delete". Defaults to "changelist".
     :return: A string representing the fully constructed admin URL, including any query parameters.
 
     Example usage:
@@ -37,7 +36,7 @@ def build_admin_url(model_class, query_params=None, view_name="changelist"):
     model_name = model_class._meta.model_name
     # "admin:app_label_modelname_changelist" is the standard naming for admin changelist
     entries_changelist_url = reverse(
-        f"admin:{app_label}_{model_name}_{view_name}"
+        f"admin:{app_label}_{model_name}_changelist"
     )
     query_params = urlencode(query_params)
     return f"{entries_changelist_url}?{query_params}"
