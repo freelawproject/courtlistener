@@ -15,7 +15,7 @@ TaskCursorData = TypedDict(
     {
         "section": str | bytes,
         "last_page": int | str,
-        "has_next": bool,
+        "has_next": int,
     },
 )
 

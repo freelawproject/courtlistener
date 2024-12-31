@@ -33,7 +33,7 @@ cursor_data_default = TaskCursorData(
     {
         "section": None,
         "last_page": 0,
-        "has_next": True,
+        "has_next": 1,
     }
 )
 
