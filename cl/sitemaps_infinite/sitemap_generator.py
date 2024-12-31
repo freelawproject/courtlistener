@@ -10,9 +10,9 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes, iri_to_uri
 from django.utils.timezone import now as tz_now
 from redis import Redis
-from cl.sitemaps_infinite import conf
 
 from cl.lib.redis_utils import get_redis_interface
+from cl.sitemaps_infinite import conf
 from cl.sitemaps_infinite.base_sitemap import (
     CacheableList,
     InfinitePaginatorSitemap,
@@ -43,8 +43,13 @@ long_cache_timeout = 60 * 60 * 24 * 180
 
 # Set up a task if repetition period is set in conf
 @transaction.atomic
-def generate_urls_chunk() -> None:
-    """Generate next sitemap chunk."""
+def generate_urls_chunk(force_regenerate: bool = False) -> None:
+    """Generates the next chunk of URLs for the sitemap. This function is responsible for managing the sitemap generation process, including caching, cursor handling, and limiting the number of files generated per call.
+
+    The function iterates over the configured sitemap sections, loading the appropriate `InfinitePaginatorSitemap` class for each section. It then generates the sitemap pages for each section, caching the results and updating the cursor data in Redis. The function stops generating new pages once the configured limit of files per call has been reached.
+
+    The function uses the `make_cache_key()` and `make_expiration_time()` helper functions to generate the cache keys and expiration times for the sitemap pages. It also handles cases where the cached cursor data does not match the current cursor, indicating that the sitemap data may have changed and needs to be regenerated.
+    """
 
     redis_db: Redis = get_redis_interface(REDIS_DB)
 
@@ -56,15 +61,22 @@ def generate_urls_chunk() -> None:
     if cursor_data_cached:
         cursor_data.update(cursor_data_cached)
 
+    # Make sure the cursor data is in the correct format
+    # TODO: use serializer to store the cursor data in redis keeping the proper field types
+    cursor_data.update(
+        {
+            "last_page": int(cursor_data.get("last_page")),
+            "has_next": int(cursor_data.get("has_next")),
+        }
+    )
+
     # count the number of files generated, stop when we reach the limit
     num_files: int = 0
     current_page: int = cursor_data.get("last_page")
+    forced_exit = False
 
     # Iterate over the sitemap sections, find the place where we left off, and continue from there
     for section, sitemapClass in conf.SITEMAPS.items():
-
-        if num_files >= conf.FILES_PER_CALL:
-            break
 
         # Get from the cache the cursor value for the sitemap section, processed last time
         cursor_section: str | None = cursor_data.get("section")
@@ -75,33 +87,26 @@ def generate_urls_chunk() -> None:
 
         try:
             sitemapObject: InfinitePaginatorSitemap = sitemapClass()
+            logger.info(
+                f"Loaded the sitemap class '{sitemapClass.__name__}' for section {section}."
+            )
         except Exception as e:
             logger.error(
-                f"Error while loading the sitemap class {sitemapClass.__class__} for section {section}: {e}"
+                f"Error while loading the sitemap class '{sitemapClass.__name__}' for section {section}: {e}"
             )
             continue
 
-        prev_cursor: str | None = None
+        current_cursor: str | None = None
 
-        # Pre-generate sitemap pages
+        # Pre-generate sitemap pages in the current section
         while True:
 
             if num_files >= conf.FILES_PER_CALL:
                 logger.info(
                     f"Reached the limit of {conf.FILES_PER_CALL} files per call for section: {section} and page: {cursor_data.get('last_page')}."
                 )
-                break
 
-            if not cursor_data.get("has_next", True):
-                logger.info(
-                    f"No more URLs to generate for section: {section}, page: {cursor_data.get('last_page')} and cursor: {cursor_data.get('cursor')}."
-                )
-
-                # the infinite paginator saves the last page in the current section to its cache
-                sitemapObject.paginator.save_num_pages(
-                    cursor_data.get("last_page")
-                )
-
+                forced_exit = True
                 break
 
             # Make the cache key, @see cl.sitemap.make_cache_key()
@@ -110,55 +115,75 @@ def generate_urls_chunk() -> None:
             # read the last existing page from the cache
             cached_urls: CacheableList | None = db_cache.get(cache_key)
 
-            # Cursor of the current page
-            curr_cursor: str | None = getattr(
+            if (
+                current_cursor is None
+                and cached_urls is None
+                and current_page > 1
+            ):
+                # reset the section page number to 1 and regenerate the whole section
+                current_page = 1
+                continue
+
+            # Cursor of the current page read from the cache
+            cached_cursor: str | None = getattr(
                 cached_urls, "current_cursor", None
             )
 
-            # Need to regenerate the cache, because previous and current cursors do not match
-            force_regenerate: bool = (
-                prev_cursor is not None
-                and curr_cursor is not None
-                and curr_cursor != prev_cursor
+            logger.info(
+                f"Cursor of the current page read from the cache: {cached_cursor}, passed from the previous iteration: {current_cursor}, current_page: {current_page}"
             )
 
-            if force_regenerate:
-                curr_cursor = prev_cursor
+            # Need to regenerate the cache, because cached and currently processed cursors do not match
+            # probably, the items inside the previous page were deleted or the whole section is just started
+            force_regenerate: bool = force_regenerate or (
+                current_cursor is not None
+                and cached_cursor is not None
+                and cached_cursor != current_cursor
+            )
 
             if (
                 not force_regenerate
-                and cached_urls is CacheableList
-                and (tz_now() - cached_urls.expiration_time).total_seconds()
+                and hasattr(
+                    cached_urls, "expiration_time"
+                )  # cached_urls is CacheableList
+                and (cached_urls.expiration_time - tz_now()).total_seconds()
                 > short_cache_timeout
             ):
+                logger.info(
+                    f"No need to regenerate the cache '{cache_key}' for the page {current_page}, because it's a full page, move the cursor to the next page"
+                )
+
                 # No need to regenerate the cache, because it's a full page, move the cursor to the next page
                 current_page += 1
 
-                prev_cursor = cached_urls.next_cursor
+                current_cursor = cached_urls.next_cursor
 
                 cursor_data.update(
                     {
                         "section": section,
                         "last_page": current_page,
-                        "has_next": True,
+                        "has_next": 1,
                     }
                 )
             else:
+                current_cursor = current_cursor or cached_cursor
+
+                logger.info(
+                    f"(Re)generating the cache '{cache_key}' for the page {current_page}, because the previous and current cursors do not match"
+                )
+
                 # either re-read the current page or start from the beginning, if `cursor` is None
-                sitemapObject.set_cursor(curr_cursor)
+                sitemapObject.set_cursor(current_cursor)
 
                 # Get the next page of URLs by cursor
                 urls = sitemapObject.get_urls_by_cursor()
 
                 if not urls or len(urls) == 0:
                     logger.info(
-                        f"Empty urls query for section: {section}, page: {cursor_data.get('last_page')} and cursor: {cursor_data.get('cursor')}."
+                        f"Empty urls query for section: {section}, page: {current_page} and cursor: {cursor_data.get('cursor')}."
                     )
-                    cursor_data["has_next"] = False
-                    break
-
-                current_page += 1
-                # Generate the sitemap cache for the current page
+                    cursor_data["has_next"] = 0
+                    continue
 
                 if len(urls) == sitemapObject.limit:
                     # Full sitemap. Cache it a long time.
@@ -172,17 +197,36 @@ def generate_urls_chunk() -> None:
                     db_cache, cache_timeout
                 )
 
+                # Save the sitemap page data to the cache
                 db_cache.set(cache_key, urls, cache_timeout)
 
-                prev_cursor = sitemapObject.cursor
+                logger.info(
+                    f"Generated sitemap cache for section: {section}, page: {current_page} and cursor: {current_cursor}."
+                )
 
                 cursor_data.update(
                     {
                         "section": section,
                         "last_page": current_page,
-                        "has_next": sitemapObject.has_next,
+                        "has_next": int(sitemapObject.has_next),
                     }
                 )
+
+                if not sitemapObject.has_next:
+                    logger.info(
+                        f"No more URLs to generate for section: {section}, page: {current_page} and cursor: {current_cursor}."
+                    )
+
+                    # the infinite paginator saves the last page in the current section to its cache
+                    sitemapObject.paginator.save_num_pages(current_page)
+
+                    current_cursor = None
+
+                    break
+
+                # Move the cursor to the next page
+                current_cursor = sitemapObject.cursor
+                current_page += 1
 
                 num_files += 1
 
@@ -191,6 +235,19 @@ def generate_urls_chunk() -> None:
             HASH_NAME,
             mapping=cursor_data,
         )
+
+    if not forced_exit:
+        # All sections are generated, resetting the cursor data to restart generation for all sitemaps sections on next run
+        reset_sitemaps_cursor()
+        logger.info(
+            "Resetting the cursor data to restart generation for all sitemaps sections"
+        )
+
+
+def reset_sitemaps_cursor() -> None:
+    """Reset the cursor data for all sitemaps sections"""
+    redis_db: Redis = get_redis_interface(REDIS_DB)
+    redis_db.delete(HASH_NAME)
 
 
 def make_cache_key(
@@ -208,7 +265,7 @@ def make_cache_key(
     scheme = sitemapObject.get_protocol()
     host = sitemapObject.get_domain()
 
-    uri = f"{scheme}://{host}/{reverse('sitemaps', section=section)}?p={page}"
+    uri = f"{scheme}://{host}/{reverse('sitemaps', kwargs={"section": section})}?p={page}"
 
     url = hashlib.md5(force_bytes(iri_to_uri(uri)))
 
@@ -218,7 +275,7 @@ def make_cache_key(
 def make_expiration_time(cache: BaseCache, timeout: int) -> datetime:
     """Make the expiration time for the cache"""
 
-    timeout = cache.get_backend_timeout(timeout)
+    timeout = cache.get_backend_timeout(timeout)  # timestamp in future
 
     if timeout is None:
         exp = datetime.max
