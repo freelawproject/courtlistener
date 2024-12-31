@@ -1,6 +1,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta, timezone
+from itertools import chain
 from typing import Any, Dict, List, Set, TypedDict, Union
 
 import eyecite
@@ -737,23 +738,26 @@ def invert_user_logs(
     dates = make_date_str_list(start, end)
     for d in dates:
         pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1, withscores=True)
+        pipe.zrange(f"api:v4.user.d:{d}.counts", 0, -1, withscores=True)
     results = pipe.execute()
 
     # results is a list of results for each of the zrange queries above. Zip
     # those results with the date that created it, and invert the whole thing.
     out: defaultdict = defaultdict(dict)
-    for d, result in zip(dates, results):
-        for user_id, count in result:
-            if user_id == "None" or user_id == "AnonymousUser":
-                user_id = "AnonymousUser"
-            else:
-                user_id = int(user_id)
-            count = int(count)
-            if out.get(user_id):
-                out[user_id][d] = count
-                out[user_id]["total"] += count
-            else:
-                out[user_id] = {d: count, "total": count}
+
+    def update_user_counts(_user_id, _count, _date):
+        user_is_anonymous = _user_id == "None" or _user_id == "AnonymousUser"
+        _user_id = "AnonymousUser" if user_is_anonymous else int(_user_id)
+        _count = int(_count)
+        out.setdefault(_user_id, OrderedDict())
+        out[_user_id].setdefault(_date, 0)
+        out[_user_id][_date] += _count
+        out[_user_id].setdefault("total", 0)
+        out[_user_id]["total"] += _count  # Update total
+
+    for d, v3_data, v4_data in zip(dates, results[::2], results[1::2]):
+        for user_id, count in chain(v3_data, v4_data):
+            update_user_counts(user_id, count, d)
 
     # Sort the values
     for k, v in out.items():
