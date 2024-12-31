@@ -56,7 +56,7 @@ class CustomCursorPaginator(CursorPaginator):
         if self.section is None:
             raise Exception("The section is not set in the paginator.")
 
-        return num_pages_cached.get(self.section, 1)
+        return int(num_pages_cached.get(self.section, 1))
 
     def save_num_pages(self, num: int) -> None:
         """
