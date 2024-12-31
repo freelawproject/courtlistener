@@ -705,32 +705,19 @@ def invert_user_logs(
     end: Union[str, datetime],
     add_usernames: bool = True,
 ) -> Dict[str, Dict[str, int]]:
-    """Invert the user logs for a period of time
+    """Aggregate API usage statistics per user over a date range.
 
-    The user logs have the date in the key and the user as part of the set:
+    - Anonymous users are aggregated under the key 'AnonymousUser'.
+    - Both v3 and v4 API counts are combined in the results.
 
-        'api:v3.user.d:2016-10-01.counts': {
-           mlissner: 22,
-           joe_hazard: 33,
-        }
+    :param start: Beginning date (inclusive) for the query range
+    :param end: End date (inclusive) for the query range
+    :param add_usernames: If True, replaces user IDs with usernames as keys.
+        When False, uses only user IDs as keys.
 
-    This inverts these entries to:
-
-        users: {
-            mlissner: {
-                2016-10-01: 22,
-                total: 22,
-            },
-            joe_hazard: {
-                2016-10-01: 33,
-                total: 33,
-            }
-        }
-    :param start: The beginning date (inclusive) you want the results for. A
-    :param end: The end date (inclusive) you want the results for.
-    :param add_usernames: Stats are stored with the user ID. If this is True,
-    add an alias in the returned dictionary that contains the username as well.
-    :return The inverted dictionary
+    :return: Dictionary mapping user identifiers (usernames if `add_usernames=True`,
+        otherwise user IDs) to their daily API usage counts and totals.
+        Inner dictionaries are ordered by date. Only dates with usage are included.
     """
     r = get_redis_interface("STATS")
     pipe = r.pipeline()
@@ -739,10 +726,22 @@ def invert_user_logs(
     for d in dates:
         pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1, withscores=True)
         pipe.zrange(f"api:v4.user.d:{d}.counts", 0, -1, withscores=True)
+
+    # results contains alternating v3/v4 API usage data for each date queried.
+    # For example, if querying 2023-01-01 to 2023-01-02, results might look like:
+    # [
+    #     # 2023-01-01 v3 data: [(user_id, count), ...]
+    #     [("1", 100.0), ("2", 50.0)],
+    #     # 2023-01-01 v4 data
+    #     [("1", 50.0), ("2", 25.0)],
+    #     # 2023-01-02 v3 data
+    #     [("1", 200.0), ("2", 100.0)],
+    #     # 2023-01-02 v4 data
+    #     [("1", 100.0), ("2", 50.0)]
+    # ]
+    # We zip this with dates to combine v3/v4 counts per user per day
     results = pipe.execute()
 
-    # results is a list of results for each of the zrange queries above. Zip
-    # those results with the date that created it, and invert the whole thing.
     out: defaultdict = defaultdict(dict)
 
     def update_user_counts(_user_id, _count, _date):
@@ -753,7 +752,7 @@ def invert_user_logs(
         out[_user_id].setdefault(_date, 0)
         out[_user_id][_date] += _count
         out[_user_id].setdefault("total", 0)
-        out[_user_id]["total"] += _count  # Update total
+        out[_user_id]["total"] += _count
 
     for d, v3_data, v4_data in zip(dates, results[::2], results[1::2]):
         for user_id, count in chain(v3_data, v4_data):
