@@ -84,7 +84,7 @@ class DocketSitemap(InfinitePaginatorSitemap):
                 blocked=False,
             )
             # .order_by("pk")
-            .only("view_count", "date_modified", "pk", "slug")
+            .only("case_name", "view_count", "date_modified", "pk", "slug")
         )
 
     def lastmod(self, obj: Docket) -> datetime:
