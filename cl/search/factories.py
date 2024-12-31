@@ -284,6 +284,8 @@ class DocketFactory(DjangoModelFactory):
     docket_number = Faker("federal_district_docket_number")
     slug = Faker("slug")
     date_argued = Faker("date_object")
+    date_filed = Faker("date_between", start_date="-2y", end_date="today")
+    view_count = Faker("pyint", min_value=0, max_value=1000)
 
     """
     This hook is necessary to make this factory compatible with the
