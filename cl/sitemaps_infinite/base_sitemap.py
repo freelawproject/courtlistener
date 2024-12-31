@@ -217,7 +217,11 @@ class InfinitePaginatorSitemap(sitemaps.Sitemap):
         if all_items_lastmod and latest_lastmod:
             self.latest_lastmod = latest_lastmod
 
-        next_cursor = self.paginator.cursor(paginator_page[-1])
+        next_cursor = (
+            self.paginator.cursor(paginator_page[-1])
+            if len(paginator_page)
+            else None
+        )
 
         # Save `next_cursor` in the list as cached metadata
         urls.next_cursor = next_cursor
