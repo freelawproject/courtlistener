@@ -265,8 +265,7 @@ def make_cache_key(
     scheme = sitemapObject.get_protocol()
     host = sitemapObject.get_domain()
 
-    uri = f"{scheme}://{host}/{reverse('sitemaps', kwargs={"section": section})}?p={page}"
-
+    uri = f"{scheme}://{host}{reverse('sitemaps-pregenerated', kwargs={"section": section})}?p={page}"
     url = hashlib.md5(force_bytes(iri_to_uri(uri)))
 
     return f"sitemap.{section}.{url.hexdigest()}"
