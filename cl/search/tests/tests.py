@@ -422,19 +422,29 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815</p>",
+                html_columbia="<p>Code, &#167; 1-815 Lorem §247</p>",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="Strickland v. Lorem.",
             docket=DocketFactory(court=cls.court, docket_number="123456"),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Random plain_text",
+            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
         OpinionClusterFactoryWithChildrenAndParents(
             case_name="America vs Bank",
             docket=DocketFactory(
                 court=cls.child_court_1, docket_number="34-2535"
+            ),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Lorem 247",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
@@ -443,6 +453,11 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             docket=DocketFactory(
                 court=cls.child_court_2_2, docket_number="36-2000"
             ),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Random plain_text",
+            ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
 
@@ -450,6 +465,11 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             case_name="California v. Nevada",
             docket=DocketFactory(
                 court=cls.child_gand_2, docket_number="38-1000"
+            ),
+            sub_opinions=RelatedFactory(
+                OpinionWithChildrenFactory,
+                factory_related_name="cluster",
+                plain_text="Random plain_text",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
@@ -837,6 +857,17 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             search_params,
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
+
+    async def test_avoid_splitting_terms_on_phrase_queries(self) -> None:
+        """Can we avoid splitting words in phrase queries such as "§247"?"""
+
+        # A search for "Lorem §247" shouldn't match "Lorem 247"
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": '"Lorem §247"'}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("1:21-cv-1234", r.content.decode())
 
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):

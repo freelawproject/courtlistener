@@ -125,6 +125,7 @@ ELASTICSEARCH_DSL = {
         "filter": {
             "custom_word_delimiter_filter": {
                 "type": "word_delimiter",
+                "type_table": ["§ => ALPHANUM"],
                 "split_on_numerics": False,
                 "preserve_original": True,
             },
