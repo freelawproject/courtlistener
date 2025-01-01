@@ -251,7 +251,10 @@ def cleanup_main_query(query_string: str) -> str:
     cleaned_items = []
     # Replace smart quotes with standard double quotes for consistency.
     query_string = re.sub(r"[“”]", '"', query_string)
-    for item in re.split(r'([^a-zA-Z0-9_\-^~":§]+)', query_string):
+    # Tweaks to the following regex for special characters exceptions
+    # like §, $, %, and ¶ should also be applied to type_table in
+    # custom_word_delimiter_filter.
+    for item in re.split(r'([^a-zA-Z0-9_\-^~":§$%¶]+)', query_string):
         if not item:
             continue
 

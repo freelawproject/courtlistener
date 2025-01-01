@@ -422,7 +422,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
                 factory_related_name="cluster",
-                html_columbia="<p>Code, &#167; 1-815 Lorem §247</p>",
+                html_columbia="<p>Code, &#167; 1-815 Lorem §247 $247 %247 ¶247</p>",
             ),
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
         )
@@ -858,41 +858,57 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
-    async def test_avoid_splitting_terms_with_section_mark(self) -> None:
+    async def test_avoid_splitting_terms_on_special_chars(self) -> None:
         """Can we avoid splitting words in queries such as §247 and phrases
         like "§247"?
         """
 
-        # A search for phrase "Lorem §247" shouldn't match "Lorem 247"
-        r = await self.async_client.get(
-            reverse("show_results"), {"q": '"Lorem §247"'}
-        )
-        actual = self.get_article_count(r)
-        self.assertEqual(actual, 1)
-        self.assertIn("1:21-cv-1234", r.content.decode())
+        special_chars_exceptions = ["§", "$", "%", "¶"]
+        # A search for phrase "§247" shouldn't match "247"
+        for special_char in special_chars_exceptions:
+            with self.subTest(
+                special_char=special_char, msg="Phrase query and special char."
+            ):
+                r = await self.async_client.get(
+                    reverse("show_results"), {"q": f'"{special_char}247"'}
+                )
+                actual = self.get_article_count(r)
+                self.assertEqual(
+                    actual, 1, msg="Didn't get the right number of results"
+                )
+                self.assertIn("1:21-cv-1234", r.content.decode())
 
-        # A search for phrase "Lorem 247" shouldn't match "Lorem §247"
+        # A search for phrase "247" shouldn't match "§247"
         r = await self.async_client.get(
-            reverse("show_results"), {"q": '"Lorem 247"'}
+            reverse("show_results"), {"q": '"247"'}
         )
         actual = self.get_article_count(r)
-        self.assertEqual(actual, 1)
+        self.assertEqual(
+            actual, 1, msg="Didn't get the right number of results"
+        )
         self.assertIn("34-2535", r.content.decode())
 
-        # A search for Lorem §247 shouldn't match Lorem 247
-        r = await self.async_client.get(
-            reverse("show_results"), {"q": "Lorem §247"}
-        )
-        actual = self.get_article_count(r)
-        self.assertEqual(actual, 1)
-        self.assertIn("1:21-cv-1234", r.content.decode())
+        # A search for §247 shouldn't match 247
+        for special_char in special_chars_exceptions:
+            with self.subTest(
+                special_char=special_char,
+                msg="Non-phrase query and special char.",
+            ):
+                r = await self.async_client.get(
+                    reverse("show_results"), {"q": f"{special_char}247"}
+                )
+                actual = self.get_article_count(r)
+                self.assertEqual(
+                    actual, 1, msg="Didn't get the right number of results"
+                )
+                self.assertIn("1:21-cv-1234", r.content.decode())
 
-        # A search for Lorem 247 shouldn't match Lorem §247
-        r = await self.async_client.get(
-            reverse("show_results"), {"q": "Lorem 247"}
-        )
+        # A search for 247 shouldn't match §247
+        r = await self.async_client.get(reverse("show_results"), {"q": "247"})
         actual = self.get_article_count(r)
-        self.assertEqual(actual, 1)
+        self.assertEqual(
+            actual, 1, msg="Didn't get the right number of results"
+        )
         self.assertIn("34-2535", r.content.decode())
 
 
