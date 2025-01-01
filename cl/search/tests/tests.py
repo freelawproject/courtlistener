@@ -858,16 +858,42 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
         )
         self.assertEqual(r.status_code, HTTPStatus.FORBIDDEN)
 
-    async def test_avoid_splitting_terms_on_phrase_queries(self) -> None:
-        """Can we avoid splitting words in phrase queries such as "§247"?"""
+    async def test_avoid_splitting_terms_with_section_mark(self) -> None:
+        """Can we avoid splitting words in queries such as §247 and phrases
+        like "§247"?
+        """
 
-        # A search for "Lorem §247" shouldn't match "Lorem 247"
+        # A search for phrase "Lorem §247" shouldn't match "Lorem 247"
         r = await self.async_client.get(
             reverse("show_results"), {"q": '"Lorem §247"'}
         )
         actual = self.get_article_count(r)
         self.assertEqual(actual, 1)
         self.assertIn("1:21-cv-1234", r.content.decode())
+
+        # A search for phrase "Lorem 247" shouldn't match "Lorem §247"
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": '"Lorem 247"'}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("34-2535", r.content.decode())
+
+        # A search for Lorem §247 shouldn't match Lorem 247
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "Lorem §247"}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("1:21-cv-1234", r.content.decode())
+
+        # A search for Lorem 247 shouldn't match Lorem §247
+        r = await self.async_client.get(
+            reverse("show_results"), {"q": "Lorem 247"}
+        )
+        actual = self.get_article_count(r)
+        self.assertEqual(actual, 1)
+        self.assertIn("34-2535", r.content.decode())
 
 
 class SearchAPIV4CommonTest(ESIndexTestCase, TestCase):
