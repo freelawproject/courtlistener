@@ -14,16 +14,16 @@
 
 {% block content %}
   <div class="col-xs-12">
-    <h1 class="text-center">Community's Most Requested Documents</h1>
+    <h1 class="text-center">Community's Most Wanted PACER Documents</h1>
+    <br>
+    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> prayers granted totaling <b>${{ granted_stats.total_cost }}</b>.</h3>
+    <br>
+    <h3 class="text-center"><b>{{ waiting_stats.prayer_count|intcomma }}</b> prayers pending totaling at least <b>${{ waiting_stats.total_cost }}</b>.</h3>
   </div>
 
 
   <div class="col-xs-12">
     <div class="well well-sm">
-      <p>There have been <b>{{ granted_stats.prayer_count|intcomma }}</b> requests granted for <b>{{ granted_stats.distinct_count|intcomma }}</b> unique documents that cost <b>${{ granted_stats.total_cost }}</b>.</p>
-      <br>
-      <p>There are <b>{{ waiting_stats.prayer_count|intcomma }}</b> requests pending for <b>{{ waiting_stats.distinct_count|intcomma }}</b> unique documents that cost at least <b>${{ waiting_stats.total_cost }}</b>.</p>
-      <br>
       <p>{% if user.is_authenticated %}
       <a href="{% url 'user_prayers' user.username %}">View your prayers</a>
       {% else %}
