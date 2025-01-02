@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Type
+from typing import Any, Type
 from urllib.parse import urlencode
 
 from django.contrib.contenttypes.admin import GenericTabularInline
@@ -22,7 +22,7 @@ class NotesInline(GenericTabularInline):
 
 def build_admin_url(
     model_class: Type[Model],
-    query_params: Optional[Dict[str, Any]] = None,
+    query_params: dict[str, Any] | None = None,
 ) -> str:
     """
     Construct a URL for a given model's admin view, optionally appending query parameters.
