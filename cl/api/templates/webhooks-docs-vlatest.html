@@ -216,7 +216,7 @@
   <p>Fixed webhook endpoints can be re-enabled in the webhooks panel.
   </p>
   <p>
-    <img src="{% static "png/re-enable-webhook.png" %}"
+    <img src="{% static "png/re-enable-webhook-v2.png" %}"
        alt="screenshot of how to re-enable a webhook endpoint"
        class="img-responsive img-rounded shadow center-block"
        height="261"
@@ -418,6 +418,14 @@ xargs -I % curl -X POST \
     <li>
       <p><strong>v1</strong> First release
       </p>
+    </li>
+    <li>
+      <p><strong>v2</strong> - This release introduces support for Case Law Search Alerts results with nested documents.</p>
+      <p>You can now select the webhook version when configuring an endpoint. For most event types, there are no differences between <code>v1</code> and <code>v2</code>, as the payload remains unchanged.
+      </p>
+      <p>However, for the Search Alert event type, the <code>v2</code> payload now includes results with nested documents for search types that support it, such as Case Law. If you select <code>v1</code>, the payload remains unchanged from the previous version.
+      </p>
+      <p>For other search types, such as Oral Arguments, the payload in <code>v2</code> is identical to that in <code>v1</code>.</p>
     </li>
   </ul>
 </div>

@@ -104,7 +104,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
   <p>To set up a webhook endpoint, begin by logging into CourtListener and going to the <a href="{% url 'view_webhooks' %}">Webhooks panel in your profile</a>:
   </p>
   <p>
-    <img src="{% static "png/webhooks-panel.png" %}"
+    <img src="{% static "png/webhooks-panel-v2.png" %}"
        alt="screenshot of the webhook panel"
        class="img-responsive img-rounded shadow center-block"
        height="261"
@@ -114,7 +114,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
   <p class="v-offset-above-2">Click the “Add webhook” button and the “Add webhook endpoint” modal pops up:
   </p>
   <p>
-    <img src="{% static "png/add-webhook-endpoint.png" %}"
+    <img src="{% static "png/add-webhook-endpoint-v2.png" %}"
        alt="screenshot of how to add a webhook endpoint"
        class="img-responsive img-rounded shadow center-block"
        height="261"
@@ -129,7 +129,11 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
     </li>
     <li>
       <p>Select the Event Type for which you wish to receive events.</p>
-      <p>You can only create one Webhook endpoint for each type of event. Please get in touch if this limitation causes difficulty for your application.
+    </li>
+    <li>
+      <p>Choose the webhook version you wish to set up.</p>
+      <p>Refer to the <a href="{% url "webhooks_docs" version="v2" %}#change-log">Change Log</a> for more details on webhook versions.</p>
+      <p>You can only create one Webhook endpoint for each type of event and version. Please get in touch if this limitation causes difficulty for your application.
       </p>
     </li>
     <li>
@@ -141,7 +145,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
   <p>Click “Create webhook”</p>
   <p>Your Webhook endpoint is now created:</p>
   <p>
-    <img src="{% static "png/webhook-disabled.png" %}"
+    <img src="{% static "png/webhook-disabled-v2.png" %}"
        alt="screenshot of a disabled webhook endpoint"
        class="img-responsive img-rounded shadow center-block"
        height="261"
@@ -152,7 +156,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
   <p>Getting a webhook working properly can be difficult, so we have a testing tool that will send you a sample webhook event on demand. </p>
   <p>To use the tool, go to webhooks panel and click the “Test” button for the endpoint you wish to test:</p>
   <p>
-    <img src="{% static "png/webhook-disabled.png" %}"
+    <img src="{% static "png/webhook-disabled-v2.png" %}"
        alt="screenshot of a disabled webhook endpoint"
        class="img-responsive img-rounded shadow center-block"
        height="261"
@@ -164,7 +168,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
       <p><strong>In the “As JSON” tab</strong>, you can ask our server to send a test event to your endpoint. When you click “Send Webhook Test Event” a new event is created with the information shown and is sent to your endpoint. Test events are not retried, but can be seen in the “Test Logs” tab.
       </p>
       <p>
-        <img src="{% static "png/test-json-webhook-event.png" %}"
+        <img src="{% static "png/test-json-webhook-event-v2.png" %}"
            alt="screenshot of the webhook json test modal"
            class="img-responsive img-rounded shadow center-block"
            height="261"
@@ -174,7 +178,7 @@ def testing_webhook(request: HttpRequest) -> HttpResponse:
     <li>
       <p><strong>In the “As cURL”</strong> tab, you can copy/paste a curl command that can be used to send a test event to your local dev environment.</p>
       <p>
-        <img src="{% static "png/test-curl-webhook-event.png" %}"
+        <img src="{% static "png/test-curl-webhook-event-v2.png" %}"
            alt="screenshot of the webhook curl test modal"
            class="img-responsive img-rounded shadow center-block"
            height="261"
