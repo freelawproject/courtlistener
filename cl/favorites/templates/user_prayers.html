@@ -59,7 +59,7 @@
                 </a>
               </td>
               <td>
-                <a href="{% url "view_docket" docket.pk docket.slug %}#entry-{{ rd.docket_entry.entry_number }}">
+                <a href="{% url "view_recap_document" docket.pk rd.docket_entry.entry_number docket.slug %}">
                   {{ rd.document_number }}
                 </a>
               </td>
