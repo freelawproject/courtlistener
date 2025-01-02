@@ -99,7 +99,7 @@ ipython = "^8.28.0"
 time-machine = "^2.16.0"
 dateparser = "1.2.0"
 types-dateparser = "^1.2.0.20240420"
-uvicorn = {extras = ["standard"], version = "^0.32.0"}
+uvicorn = {extras = ["standard"], version = "^0.34.0"}
 daphne = "^4.1.2"
 httpx = {extras = ["http2"], version = "^0.28.1"}
 django-model-utils = "^5.0.0"
