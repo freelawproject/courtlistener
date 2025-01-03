@@ -6,14 +6,15 @@
 {% load tz %}
 {% load humanize %}
 
-{% block title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
-{% block og_title %}{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block title %}{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block og_title %}{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
 {% block description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
 {% block og_description %}CourtListener lets you request purchase of legal documents. View the document requests for {{ requested_user }}.{% endblock %}
 
 {% block content %}
   <div class="col-xs-12">
-    <h1 class="text-center">{% if is_page_owner %}Your RECAP Requests {% else %}RECAP Requests for: {{ requested_user }}{% endif %}</h1>
+    <h1 class="text-center v-offset-below-3">{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %}</h1>
+    {% if is_page_owner %}<h3 class="text-center"><b>{{ count|intcomma }}</b> prayers granted totaling <b>${{total_cost|floatformat:2 }}</b>.</h3>{% endif %}
   </div>
 
   <div class="col-xs-12" id="prayer_summary" hx-swap-oob="true"
@@ -24,9 +25,6 @@
   >
     <div class="well well-sm">
       {% if is_page_owner %}
-      <p>
-        You have had <b>{{ count|intcomma }}</b> requests fulfilled for documents that cost <b>${{total_cost|floatformat:2 }}</b>.
-      </p>
       <p>
         {% if is_eligible %}You are eligible to make document requests.{% else %}You have reached your daily limit; wait 24 hours to make new requests.{% endif %}
       </p>
