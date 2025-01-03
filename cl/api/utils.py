@@ -1,7 +1,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta, timezone
-from itertools import chain
+from itertools import batched, chain
 from typing import Any, Dict, List, Set, TypedDict, Union
 
 import eyecite
@@ -723,9 +723,15 @@ def invert_user_logs(
     pipe = r.pipeline()
 
     dates = make_date_str_list(start, end)
+    versions = ["v3", "v4"]
     for d in dates:
-        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1, withscores=True)
-        pipe.zrange(f"api:v4.user.d:{d}.counts", 0, -1, withscores=True)
+        for v in versions:
+            pipe.zrange(
+                f"api:{v}.user.d:{d}.counts",
+                0,
+                -1,
+                withscores=True,
+            )
 
     # results contains alternating v3/v4 API usage data for each date queried.
     # For example, if querying 2023-01-01 to 2023-01-02, results might look like:
@@ -754,8 +760,8 @@ def invert_user_logs(
         out[_user_id].setdefault("total", 0)
         out[_user_id]["total"] += _count
 
-    for d, v3_data, v4_data in zip(dates, results[::2], results[1::2]):
-        for user_id, count in chain(v3_data, v4_data):
+    for d, api_usage in zip(dates, batched(results, len(versions))):
+        for user_id, count in chain(*api_usage):
             update_user_counts(user_id, count, d)
 
     # Sort the values
