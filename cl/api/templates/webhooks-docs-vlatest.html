@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load extras %}
+{% load waffle_tags %}
 
 {% block title %}Webhook API &ndash; CourtListener.com{% endblock %}
 {% block description %}
@@ -421,11 +422,10 @@ xargs -I % curl -X POST \
     </li>
     <li>
       <p><strong>v2</strong> - This release introduces support for Case Law Search Alerts results with nested documents.</p>
-      <p>You can now select the webhook version when configuring an endpoint. For most event types, there are no differences between <code>v1</code> and <code>v2</code>, as the payload remains unchanged.
+      <p>You can now select the webhook version when configuring an endpoint. For most webhook event types, there are no differences between <code>v1</code> and <code>v2</code>, as the payload remains unchanged.
       </p>
-      <p>However, for the Search Alert event type, the <code>v2</code> payload now includes results with nested documents for search types that support it, such as Case Law. If you select <code>v1</code>, the payload remains unchanged from the previous version.
-      </p>
-      <p>For other search types, such as Oral Arguments, the payload in <code>v2</code> is identical to that in <code>v1</code>.</p>
+      <p>In the Search Alert webhook event type, the Oral Arguments search response remains identical between <code>v1</code> and <code>v2</code>.</p>
+      <p>For Case Law {% flag "recap-alerts-active" %}and RECAP{% endflag %} <code>v2</code> now includes nested results, which are based on the new changes introduced in <code>v4</code> of the <a href="{% url "search_api_help" version="v4" %}">Search API.</a></p>
     </li>
   </ul>
 </div>
