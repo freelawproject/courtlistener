@@ -474,6 +474,10 @@ async def validate_for_wot(request: HttpRequest) -> HttpResponse:
     return HttpResponse("bcb982d1e23b7091d5cf4e46826c8fc0")
 
 
+async def components(request: HttpRequest) -> HttpResponse:
+    return TemplateResponse(request, "components.html", {"private": True})
+
+
 async def ratelimited(
     request: HttpRequest, exception: Exception
 ) -> HttpResponse:
