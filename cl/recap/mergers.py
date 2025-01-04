@@ -934,16 +934,25 @@ async def add_docket_entries(
             rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
-            try:
-                params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
-                rd = await RECAPDocument.objects.acreate(
-                    document_number=docket_entry["document_number"] or "",
-                    is_available=False,
-                    **params,
-                )
-            except ValidationError:
-                # Happens from race conditions.
-                continue
+            rd = None
+            if de_created is False and not appelate_court_id_exists:
+                try:
+                    # Check for documents with a bad pacer_doc_id
+                    rd = await RECAPDocument.objects.aget(**params)
+                except RECAPDocument.DoesNotExist:
+                    # Fallback to creating document
+                    pass
+            if rd is None:
+                try:
+                    params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
+                    rd = await RECAPDocument.objects.acreate(
+                        document_number=docket_entry["document_number"] or "",
+                        is_available=False,
+                        **params,
+                    )
+                except ValidationError:
+                    # Happens from race conditions.
+                    continue
             rds_created.append(rd)
         except RECAPDocument.MultipleObjectsReturned:
             logger.info(
