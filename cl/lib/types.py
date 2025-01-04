@@ -195,8 +195,17 @@ class BasePositionMapping:
 @dataclass
 class EsMainQueries:
     search_query: Search
+    boost_mode: str
     parent_query: QueryString | None = None
     child_query: QueryString | None = None
+
+
+@dataclass
+class EsJoinQueries:
+    main_query: QueryString | list
+    parent_query: QueryString | None
+    child_query: QueryString | None
+    has_text_query: bool
 
 
 @dataclass
