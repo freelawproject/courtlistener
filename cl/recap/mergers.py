@@ -942,6 +942,20 @@ async def add_docket_entries(
                 except RECAPDocument.DoesNotExist:
                     # Fallback to creating document
                     pass
+                except RECAPDocument.MultipleObjectsReturned:
+                    duplicate_rd_queryset = RECAPDocument.objects.filter(
+                        **params
+                    )
+                    rd_with_pdf_queryset = duplicate_rd_queryset.filter(
+                        is_available=True
+                    ).exclude(filepath_local="")
+                    if await rd_with_pdf_queryset.aexists():
+                        rd = await rd_with_pdf_queryset.alatest("date_created")
+                    else:
+                        rd = await duplicate_rd_queryset.alatest(
+                            "date_created"
+                        )
+                    await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
             if rd is None:
                 try:
                     params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
