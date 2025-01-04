@@ -971,7 +971,8 @@ async def add_docket_entries(
                 rd = await duplicate_rd_queryset.alatest("date_created")
             await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
 
-        rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
+        if docket_entry["pacer_doc_id"]:
+            rd.pacer_doc_id = docket_entry["pacer_doc_id"]
         description = docket_entry.get("short_description")
         if rd.document_type == RECAPDocument.PACER_DOCUMENT and description:
             rd.description = description
