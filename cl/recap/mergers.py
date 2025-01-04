@@ -823,18 +823,14 @@ async def get_or_make_docket_entry(
 
 
 async def clean_duplicate_documents(params) -> RECAPDocument:
-    duplicate_rd_queryset = RECAPDocument.objects.filter(
-        **params
-    )
+    duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
     rd_with_pdf_queryset = duplicate_rd_queryset.filter(
         is_available=True
     ).exclude(filepath_local="")
     if await rd_with_pdf_queryset.aexists():
         rd = await rd_with_pdf_queryset.alatest("date_created")
     else:
-        rd = await duplicate_rd_queryset.alatest(
-            "date_created"
-        )
+        rd = await duplicate_rd_queryset.alatest("date_created")
     await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
     return rd
 
