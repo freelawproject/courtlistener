@@ -822,8 +822,8 @@ async def get_or_make_docket_entry(
     return de, de_created
 
 
-async def clean_duplicate_documents(params:dict[str, Any]) -> RECAPDocument:
-    """ Removes duplicate RECAPDocuments, keeping the most recent with PDF if
+async def clean_duplicate_documents(params: dict[str, Any]) -> RECAPDocument:
+    """Removes duplicate RECAPDocuments, keeping the most recent with PDF if
     available or otherwise the most recent overall.
 
     :param params: Query parameters to filter the RECAPDocuments.
