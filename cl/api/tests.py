@@ -1,8 +1,10 @@
 import json
+from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any, Dict
 from unittest import mock
+from unittest.mock import MagicMock, patch
 from urllib.parse import parse_qs, urlparse
 
 from asgiref.sync import async_to_sync, sync_to_async
@@ -29,7 +31,7 @@ from cl.api.api_permissions import V3APIPermission
 from cl.api.factories import WebhookEventFactory, WebhookFactory
 from cl.api.models import WEBHOOK_EVENT_STATUS, WebhookEvent, WebhookEventType
 from cl.api.pagination import VersionBasedPagination
-from cl.api.utils import LoggingMixin, get_logging_prefix
+from cl.api.utils import LoggingMixin, get_logging_prefix, invert_user_logs
 from cl.api.views import build_chart_data, coverage_data, make_court_variable
 from cl.api.webhooks import send_webhook_event
 from cl.audio.api_views import AudioViewSet
@@ -3297,3 +3299,159 @@ class CountParameterTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 0)
+
+
+class TestApiUsage(SimpleTestCase):
+    """Tests for combining v3 and v4 API usage data"""
+
+    def setUp(self):
+        """
+        Set up test environment before each test.
+        We create fresh mocks to avoid state bleeding between tests.
+        """
+        self.mock_redis = MagicMock()
+        self.mock_pipeline = MagicMock()
+        self.mock_redis.pipeline.return_value = self.mock_pipeline
+
+    @patch("cl.api.utils.get_redis_interface")
+    def test_single_date_combined_usage(self, mock_get_redis):
+        """
+        Test that for a single date:
+        1. Both v3 and v4 usage is fetched
+        2. Counts are properly combined
+        3. The output format matches template expectations
+        """
+        mock_get_redis.return_value = self.mock_redis
+
+        self.mock_pipeline.execute.return_value = [
+            # First result: v3 API data
+            [("1", 100.0), ("2", 50.0)],
+            # Second result: v4 API data
+            [("1", 50.0), ("2", 25.0)],
+        ]
+
+        results = invert_user_logs(
+            start="2023-01-01", end="2023-01-01", add_usernames=False
+        )
+
+        expected = defaultdict(dict)
+        expected[1] = OrderedDict({"2023-01-01": 150, "total": 150})
+        expected[2] = OrderedDict({"2023-01-01": 75, "total": 75})
+
+        self.assertEqual(results, expected)
+
+    @patch("cl.api.utils.get_redis_interface")
+    def test_multiple_dates_combined_usage(self, mock_get_redis):
+        """
+        Test that across multiple dates:
+        1. API usage is correctly combined from both v3 and v4
+        2. Totals accumulate properly across dates
+        3. The data structure matches template expectations
+        4. Date ordering is preserved
+        """
+        mock_get_redis.return_value = self.mock_redis
+        self.mock_pipeline.execute.return_value = [
+            # January 1st - v3 API
+            [("1", 100.0), ("2", 50.0)],
+            # January 1st - v4 API
+            [("1", 50.0), ("2", 25.0)],
+            # January 2nd - v3 API
+            [("1", 200.0), ("2", 100.0)],
+            # January 2nd - v4 API
+            [("1", 100.0), ("2", 50.0)],
+        ]
+
+        results = invert_user_logs(
+            start="2023-01-01", end="2023-01-02", add_usernames=False
+        )
+
+        # User 1:
+        #   Jan 1: 150 (100 from v3 + 50 from v4)
+        #   Jan 2: 300 (200 from v3 + 100 from v4)
+        #   Total: 450
+        # User 2:
+        #   Jan 1: 75 (50 from v3 + 25 from v4)
+        #   Jan 2: 150 (100 from v3 + 50 from v4)
+        #   Total: 225
+        expected = defaultdict(dict)
+        expected[1] = OrderedDict(
+            {"2023-01-01": 150, "2023-01-02": 300, "total": 450}
+        )
+        expected[2] = OrderedDict(
+            {"2023-01-01": 75, "2023-01-02": 150, "total": 225}
+        )
+
+        self.assertEqual(results, expected)
+
+    @patch("cl.api.utils.get_redis_interface")
+    def test_anonymous_user_handling(self, mock_get_redis):
+        """
+        Test the handling of anonymous users, which have special requirements:
+        1. Both 'None' and 'AnonymousUser' should be treated as the same user
+        2. They should be combined under 'AnonymousUser' in the output
+        3. Their usage should be summed correctly across both identifiers
+        4. They should work with both API versions
+        """
+        mock_get_redis.return_value = self.mock_redis
+        self.mock_pipeline.execute.return_value = [
+            # January 1st - v3
+            [
+                ("None", 30.0),
+                ("1", 100.0),
+                ("AnonymousUser", 20.0),
+            ],
+            # January 1st - v4
+            [
+                ("AnonymousUser", 25.0),
+                ("1", 50.0),
+            ],
+            # January 2nd - v3
+            [("None", 40.0), ("1", 200.0)],
+            # January 2nd - v4
+            [
+                ("1", 100.0),
+                ("AnonymousUser", 35.0),
+            ],
+        ]
+
+        results = invert_user_logs(
+            start="2023-01-01", end="2023-01-02", add_usernames=False
+        )
+
+        expected = defaultdict(dict)
+        # Expected results:
+        # Anonymous user on Jan 1:
+        #   - v3: 30 (None) + 20 (AnonymousUser) = 50
+        #   - v4: 25 (AnonymousUser) = 25
+        #   - Total for Jan 1: 75
+        # Anonymous user on Jan 2:
+        #   - v3: 40 (None) = 40
+        #   - v4: 35 (AnonymousUser) = 35
+        #   - Total for Jan 2: 75
+        # Anonymous total across all dates: 150
+        expected["AnonymousUser"] = OrderedDict(
+            {
+                "2023-01-01": 75,
+                "2023-01-02": 75,
+                "total": 150,
+            }
+        )
+        expected[1] = OrderedDict(
+            {
+                "2023-01-01": 150,
+                "2023-01-02": 300,
+                "total": 450,
+            }
+        )
+
+        self.assertEqual(results, expected)
+
+        self.assertNotIn("None", results)
+
+        self.assertIn("AnonymousUser", results)
+
+        # Verify ordering is maintained even with anonymous users
+        anonymous_data = results["AnonymousUser"]
+        dates = list(anonymous_data.keys())
+        dates.remove("total")
+        self.assertEqual(dates, ["2023-01-01", "2023-01-02"])

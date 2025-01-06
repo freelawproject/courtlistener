@@ -136,14 +136,26 @@ class WebhooksViewSet(ModelViewSet):
                     {"endpoint_url": webhook.url, "webhook_version": version}
                 ).strip()
             case WebhookEventType.SEARCH_ALERT:
-                event_template = loader.get_template(
-                    "includes/search_alert_webhook_dummy.txt"
+                event_template = (
+                    loader.get_template(
+                        "includes/search_alert_webhook_dummy.txt"
+                    )
+                    if version == WebhookVersions.v1
+                    else loader.get_template(
+                        "includes/search_alert_webhook_dummy_v2.txt"
+                    )
                 )
                 event_dummy_content = event_template.render(
                     {"webhook_version": version}
                 ).strip()
-                event_curl_template = loader.get_template(
-                    "includes/search_alert_webhook_dummy_curl.txt"
+                event_curl_template = (
+                    loader.get_template(
+                        "includes/search_alert_webhook_dummy_curl.txt"
+                    )
+                    if version == WebhookVersions.v1
+                    else loader.get_template(
+                        "includes/search_alert_webhook_dummy_curl_v2.txt"
+                    )
                 )
                 event_dummy_curl = event_curl_template.render(
                     {"endpoint_url": webhook.url, "webhook_version": version}

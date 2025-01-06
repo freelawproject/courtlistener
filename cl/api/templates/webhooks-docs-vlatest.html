@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load extras %}
+{% load waffle_tags %}
 
 {% block title %}Webhook API &ndash; CourtListener.com{% endblock %}
 {% block description %}
@@ -216,7 +217,7 @@
   <p>Fixed webhook endpoints can be re-enabled in the webhooks panel.
   </p>
   <p>
-    <img src="{% static "png/re-enable-webhook.png" %}"
+    <img src="{% static "png/re-enable-webhook-v2.png" %}"
        alt="screenshot of how to re-enable a webhook endpoint"
        class="img-responsive img-rounded shadow center-block"
        height="261"
@@ -418,6 +419,13 @@ xargs -I % curl -X POST \
     <li>
       <p><strong>v1</strong> First release
       </p>
+    </li>
+    <li>
+      <p><strong>v2</strong> - This release introduces support for Case Law Search Alerts results with nested documents.</p>
+      <p>You can now select the webhook version when configuring an endpoint. For most webhook event types, there are no differences between <code>v1</code> and <code>v2</code>, as the payload remains unchanged.
+      </p>
+      <p>In the Search Alert webhook event type, the Oral Arguments search response remains identical between <code>v1</code> and <code>v2</code>.</p>
+      <p>For Case Law {% flag "recap-alerts-active" %}and RECAP{% endflag %} <code>v2</code> now includes nested results, which are based on the new changes introduced in <code>v4</code> of the <a href="{% url "search_api_help" version="v4" %}">Search API.</a></p>
     </li>
   </ul>
 </div>

@@ -200,7 +200,7 @@ async def get_user_prayers(user: User) -> QuerySet[RECAPDocument]:
             prayer_status=F("prayers__status"),
             prayer_date_created=F("prayers__date_created"),
         )
-        .order_by("prayers__date_created")
+        .order_by("-prayers__date_created")
     )
 
     return documents
