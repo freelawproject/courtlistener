@@ -2607,10 +2607,11 @@ def apply_custom_score_to_main_query(
         main_order_by == "score desc"
         and cd["type"] in valid_decay_relevance_types
     ):
-        date_field = str(valid_decay_relevance_types[cd["type"]]["field"])
-        scale = int(valid_decay_relevance_types[cd["type"]]["scale"])
-        decay = float(valid_decay_relevance_types[cd["type"]]["decay"])
-        min_score = float(valid_decay_relevance_types[cd["type"]]["min_score"])
+        decay_settings = valid_decay_relevance_types[cd["type"]]
+        date_field = str(decay_settings["field"])
+        scale = int(decay_settings["scale"])
+        decay = float(decay_settings["decay"])
+        min_score = float(decay_settings["min_score"])
         query = build_decay_relevance_score(
             query,
             date_field,
