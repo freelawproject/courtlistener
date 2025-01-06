@@ -822,6 +822,24 @@ async def get_or_make_docket_entry(
     return de, de_created
 
 
+async def keep_latest_rd_document(queryset: QuerySet) -> RECAPDocument:
+    """Removes duplicate RECAPDocuments, keeping the most recent with PDF if
+    available or otherwise the most recent overall.
+
+    :param params: RECAPDocument QuerySet to clean duplicates from.
+    :return: The matched RECAPDocument after cleaning.
+    """
+    rd_with_pdf_queryset = queryset.filter(
+        is_available=True
+    ).exclude(filepath_local="")
+    if await rd_with_pdf_queryset.aexists():
+        rd = await rd_with_pdf_queryset.alatest("date_created")
+    else:
+        rd = await queryset.alatest("date_created")
+    await queryset.exclude(pk=rd.pk).adelete()
+    return rd
+
+
 async def clean_duplicate_documents(params: dict[str, Any]) -> RECAPDocument:
     """Removes duplicate RECAPDocuments, keeping the most recent with PDF if
     available or otherwise the most recent overall.
@@ -830,15 +848,7 @@ async def clean_duplicate_documents(params: dict[str, Any]) -> RECAPDocument:
     :return: The matched RECAPDocument after cleaning.
     """
     duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
-    rd_with_pdf_queryset = duplicate_rd_queryset.filter(
-        is_available=True
-    ).exclude(filepath_local="")
-    if await rd_with_pdf_queryset.aexists():
-        rd = await rd_with_pdf_queryset.alatest("date_created")
-    else:
-        rd = await duplicate_rd_queryset.alatest("date_created")
-    await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
-    return rd
+    return await keep_latest_rd_document(duplicate_rd_queryset)
 
 
 async def add_docket_entries(
@@ -1627,14 +1637,7 @@ async def clean_duplicate_attachment_entries(
     )
     async for dupe in dupes.aiterator():
         duplicate_rd_queryset = rds.filter(pacer_doc_id=dupe.pacer_doc_id)
-        rd_with_pdf_queryset = duplicate_rd_queryset.filter(
-            is_available=True
-        ).exclude(filepath_local="")
-        if await rd_with_pdf_queryset.aexists():
-            keep_rd = await rd_with_pdf_queryset.alatest("date_created")
-        else:
-            keep_rd = await duplicate_rd_queryset.alatest("date_created")
-        await duplicate_rd_queryset.exclude(pk=keep_rd.pk).adelete()
+        await keep_latest_rd_document(duplicate_rd_queryset)
 
 
 async def merge_attachment_page_data(
