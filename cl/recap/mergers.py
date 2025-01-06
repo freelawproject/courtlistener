@@ -823,10 +823,10 @@ async def get_or_make_docket_entry(
 
 
 async def keep_latest_rd_document(queryset: QuerySet) -> RECAPDocument:
-    """Removes duplicate RECAPDocuments, keeping the most recent with PDF if
-    available or otherwise the most recent overall.
+    """Retains the most recent item with a PDF, if available otherwise,
+    retains the most recent item overall.
 
-    :param params: RECAPDocument QuerySet to clean duplicates from.
+    :param queryset: RECAPDocument QuerySet to clean duplicates from.
     :return: The matched RECAPDocument after cleaning.
     """
     rd_with_pdf_queryset = queryset.filter(is_available=True).exclude(
@@ -981,10 +981,10 @@ async def add_docket_entries(
                         is_available=False,
                         **params,
                     )
+                    rds_created.append(rd)
                 except ValidationError:
                     # Happens from race conditions.
                     continue
-            rds_created.append(rd)
         except RECAPDocument.MultipleObjectsReturned:
             logger.info(
                 "Multiple recap documents found for document entry number'%s' "
