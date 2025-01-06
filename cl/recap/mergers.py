@@ -829,9 +829,9 @@ async def keep_latest_rd_document(queryset: QuerySet) -> RECAPDocument:
     :param params: RECAPDocument QuerySet to clean duplicates from.
     :return: The matched RECAPDocument after cleaning.
     """
-    rd_with_pdf_queryset = queryset.filter(
-        is_available=True
-    ).exclude(filepath_local="")
+    rd_with_pdf_queryset = queryset.filter(is_available=True).exclude(
+        filepath_local=""
+    )
     if await rd_with_pdf_queryset.aexists():
         rd = await rd_with_pdf_queryset.alatest("date_created")
     else:
