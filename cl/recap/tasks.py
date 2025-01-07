@@ -763,15 +763,8 @@ async def find_subdocket_pdf_rds(
         pq.pk
     ]  # Add the original pq to the list of pqs to process
 
-    appellate_court_ids = [
-        court_pk
-        async for court_pk in (
-            Court.federal_courts.appellate_pacer_courts().values_list(
-                "pk", flat=True
-            )
-        )
-    ]
-    if pq.court_id in appellate_court_ids:
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    if await appellate_court_ids.filter(pk=pq.court_id).aexists():
         # Abort the process for appellate documents. Subdockets cannot be found
         # in appellate cases.
         return pqs_to_process_pks
