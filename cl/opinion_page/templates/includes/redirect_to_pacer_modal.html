@@ -1,4 +1,6 @@
 {% load humanize %}
+{% load waffle_tags %}
+
 <div id="open-modal-on-load"
      class="modal hidden-print text-left"
      role="dialog"
@@ -21,16 +23,24 @@
        {% endif %}
       </div>
       <div class="modal-footer">
-        <p>
+        <div class="flex flex-row justify-content-end gap-2">
           {% if not request.COOKIES.recap_install_plea %}
-            <a href="https://free.law/recap/"
-                       class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
+            <div>
+              <a href="https://free.law/recap/" class="btn btn-success btn-sm recap_install_plea">Install RECAP</a>
+            </div>
           {% endif %}
-          <a class="btn btn-primary btn-sm"
+          <div>
+            <a class="btn btn-primary btn-sm"
                href="{{ rd.pacer_url }}"
                rel="nofollow"
                target="_blank"><i class="fa fa-dollar"></i>&nbsp;Buy on PACER</a>
-        </p>
+          </div>
+          {% flag "pray-and-pay" %}
+            <div class="prayer-button" data-gap-size="2px">
+              {% include "includes/pray_and_pay_htmx/pray_button.html" with prayer_exists=rd.prayer_exists document_id=rd.id count=rd.prayer_count regular_size=True%}
+            </div>
+          {% endflag %}
+        </div>
       </div>
     </div>
   </div>

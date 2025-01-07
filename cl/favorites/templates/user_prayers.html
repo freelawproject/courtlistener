@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load extras %}
+{% load text_filters %}
+{% load static %}
+{% load pacer %}
+{% load tz %}
+{% load humanize %}
+
+{% block title %}{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block og_title %}{% if is_page_owner %}Your PACER document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %} – CourtListener.com{% endblock %}
+{% block description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
+{% block og_description %}CourtListener lets you request the purchase of legal documents. View the documents requested by {{ requested_user }}.{% endblock %}
+
+{% block content %}
+  <div class="col-xs-12">
+    <h1 class="text-center v-offset-below-3">{% if is_page_owner %}Your PACER Document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %}</h1>
+    {% if is_page_owner %}<h3 class="text-center"><b>{{ count|intcomma }}</b> prayers granted totaling <b>${{total_cost|floatformat:2 }}</b>.</h3>{% endif %}
+  </div>
+
+  <div class="col-xs-12" id="prayer_summary" hx-swap-oob="true"
+    {% if request.user.is_authenticated %}
+    hx-get="{% url 'user_prayers' request.user.username %}"
+    hx-trigger="prayersListChanged from:body" hx-swap="none"
+    {%endif %}
+  >
+    <div class="well well-sm">
+      {% if is_page_owner %}
+      <p>
+        {% if is_eligible %}You are eligible to make document requests.{% else %}You have reached your daily limit; wait 24 hours to make new requests.{% endif %}
+      </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-xs-12" id="prayer_list" hx-swap-oob="true">
+    <div class="table-responsive">
+      <table class="settings-table table">
+        <thead>
+            <tr>
+              <th>Court</th>
+              <th>Case Name</th>
+              <th>Document Number</th>
+              <th>Document Description</th>
+              <th>Requested On</th>
+              <th>Status</th>
+              {% if is_page_owner %}<th>Action</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for rd in rd_with_prayers %}
+            <tr>
+              <td>{{ rd.docket_entry.docket.court.citation_string }}</td>
+              {% with docket=rd.docket_entry.docket %}
+              <td>
+                <a href="{% url "view_docket" docket.pk docket.slug %}">
+                  {{ docket|best_case_name|safe|v_wrapper }} ({{ docket.docket_number }})
+                </a>
+              </td>
+              <td>
+                <a href="{% url "view_recap_document" docket.pk rd.docket_entry.entry_number docket.slug %}">
+                  {{ rd.document_number }}
+                </a>
+              </td>
+              {% endwith %}
+              <td>{{ rd.description }}</td>
+              <td>{{ rd.prayer_date_created|date:"M j, Y"  }}</td>
+              <td>{% if rd.prayer_status == 1 %} Pending {% elif rd.prayer_status == 2 %}
+                <div class="btn-group hidden-xs col-sm-4 col-md-3 hidden-print flex">
+                  {% if rd.filepath_local %}
+                    <a href="{{ rd.filepath_local.url }}"
+                        rel="nofollow"
+                        role="button"
+                        class="btn btn-primary btn-xs"
+                            {% if rd.date_upload %}
+                        title="Uploaded {{ rd.date_upload|datetime_in_utc }}"
+                            {% endif %}>
+                      Download PDF
+                    </a>
+                    <button type="button"
+                            class="btn btn-primary btn-xs dropdown-toggle"
+                            data-toggle="dropdown"
+                            aria-haspopup="true"
+                            aria-expanded="false">
+                      <span class="caret"></span>
+                      <span class="sr-only">Toggle Dropdown</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                      <li>
+                        <a href="{{ rd.filepath_local.url }}" rel="nofollow">From
+                          CourtListener</a>
+                      </li>
+                      {% if rd.filepath_ia %}
+                        <li>
+                          <a href="{{ rd.filepath_ia }}"
+                              rel="nofollow">From
+                            Internet Archive</a>
+                        </li>
+                      {% endif %}
+                    </ul>
+                    {% endif %}
+                </div>
+                {% endif %}
+              </td>
+              {% if is_page_owner and rd.prayer_status != 2 %}
+                <td>
+                  <div class="flex justify-content-center">
+                    <form id="pray_{{rd.pk}}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-swap="none"
+                      hx-post="{% url 'delete_prayer' rd.pk %}" hx-indicator="#delete-spinner-{{rd.pk}}">
+                      <input type="hidden" name="source" value="user_prayer_list">
+                      <button class="btn btn-danger btn-xs">
+                        <i class="fa fa-trash-o"></i>
+                      </button>
+                    </form>
+                    &nbsp;
+                    <span id="delete-spinner-{{rd.pk}}" class="htmx-hidden-indicator" >
+                      <i class="fa fa-spinner fa-spin fa-lg"></i>
+                    </span>
+                  </div>
+                </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2">No document requests made. Consider making one!</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}
+
+{% block footer-scripts %}
+  <script defer type="text/javascript"
+            src="{% static "js/buy_pacer_modal.js" %}"></script>
+  {% if DEBUG %}
+    <script src="{% static "js/htmx.js" %}"></script>
+    <script src="{% static "js/fix-toolbar-for-htmx.js" %}"></script>
+  {% else %}
+    <script src="{% static "js/htmx.min.js" %}"></script>
+  {% endif %}
+  {% include "includes/buy_pacer_modal.html" %}
+{% endblock %}

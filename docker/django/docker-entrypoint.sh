@@ -21,7 +21,7 @@ case "$1" in
 'web-prod')
     # Tips:
     # 1. Set high number of --workers. Docs recommend 2-4× core count
-    # 2. Set --limit-request-line to high value to allow long Solr queries
+    # 2. Set --limit-request-line to high value to allow long search queries
     # 3. Set --max-requests to reset each worker once in a while
     exec gunicorn cl.asgi:application \
         --chdir /opt/courtlistener/ \

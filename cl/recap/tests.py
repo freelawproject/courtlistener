@@ -79,7 +79,7 @@ from cl.recap.management.commands.remove_appellate_entries_with_long_numbers imp
     clean_up_duplicate_appellate_entries,
 )
 from cl.recap.management.commands.reprocess_recap_dockets import (
-    extract_unextracted_rds_and_add_to_solr,
+    extract_unextracted_rds,
 )
 from cl.recap.mergers import (
     add_attorney,
@@ -1070,6 +1070,102 @@ class RecapUploadsTest(TestCase):
             successful_pq[0].docket_id,
             d_1.pk,
             msg="Didn't get the expected docket ID.",
+        )
+
+    def test_match_recap_document_with_wrong_pacer_doc_id(self, mock_upload):
+        """Confirm that when an existing RECAPDocument has an invalid
+        pacer_doc_id, we can still match it after excluding the pacer_doc_id
+        from the lookup.
+        """
+
+        de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                RECAPEmailDocketEntryDataFactory(
+                    pacer_doc_id="04505578690",
+                    document_number=5,
+                )
+            ],
+        )
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court, entry_number=5
+        )
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            pacer_doc_id="04505578691",
+            document_number="5",
+            description="",
+        )
+        # Add the docket entry with the updated pacer_doc_id
+        async_to_sync(add_docket_entries)(de.docket, de_data["docket_entries"])
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            recap_documents.count(), 1, msg="Wrong number of RECAPDocuments"
+        )
+        rd.refresh_from_db()
+        self.assertEqual(
+            rd.description,
+            de_data["docket_entries"][0]["short_description"],
+            msg="The short description doesn't match.",
+        )
+        self.assertEqual(
+            rd.pacer_doc_id,
+            de_data["docket_entries"][0]["pacer_doc_id"],
+            msg="The pacer_doc_id doesn't match.",
+        )
+
+    def test_match_recap_document_with_wrong_pacer_doc_id_duplicated(
+        self, mock_upload
+    ):
+        """Confirm that when an existing RECAPDocument has an invalid
+        pacer_doc_id, we can still match it after excluding the pacer_doc_id
+        from the lookup, even if there is more than one PACER_DOCUMENT that
+        belongs to the docket entry.
+        """
+
+        de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                RECAPEmailDocketEntryDataFactory(
+                    pacer_doc_id="04505578690",
+                    document_number=5,
+                )
+            ],
+        )
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court, entry_number=5
+        )
+        RECAPDocumentFactory(
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            docket_entry=de,
+            pacer_doc_id="04505578691",
+            document_number="5",
+            description="",
+        )
+        rd_2 = RECAPDocumentFactory(
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            docket_entry=de,
+            pacer_doc_id="04505578691",
+            document_number="6",
+            description="",
+            is_available=True,
+        )
+        # Add the docket entry with the updated pacer_doc_id, remove the
+        # duplicated RD, and keep the one that is available.
+        async_to_sync(add_docket_entries)(de.docket, de_data["docket_entries"])
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            recap_documents.count(), 1, msg="Wrong number of RECAPDocuments"
+        )
+        rd_2.refresh_from_db()
+        self.assertEqual(
+            rd_2.description,
+            de_data["docket_entries"][0]["short_description"],
+            msg="The short description doesn't match.",
+        )
+        self.assertEqual(
+            rd_2.pacer_doc_id,
+            de_data["docket_entries"][0]["pacer_doc_id"],
+            msg="The pacer_doc_id doesn't match.",
         )
 
 
@@ -6226,7 +6322,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         ]
         self.assertEqual(len(rd_needs_extraction), 2)
 
-        extract_unextracted_rds_and_add_to_solr("celery")
+        extract_unextracted_rds("celery")
 
         rd_needs_extraction_after = [
             x.pk
@@ -6265,7 +6361,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         self.assertEqual(rd[0].sha1, "asdfasdfasdfasdfasdfasddf")
         self.assertEqual(rd[0].date_upload, date_upload)
 
-        extract_unextracted_rds_and_add_to_solr("celery")
+        extract_unextracted_rds("celery")
         # File related fields should be cleaned up after the failed extraction.
         self.assertEqual(rd[0].is_available, False)
         self.assertEqual(rd[0].file_size, None)

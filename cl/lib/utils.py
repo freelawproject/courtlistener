@@ -249,6 +249,8 @@ def cleanup_main_query(query_string: str) -> str:
     """
     inside_a_phrase = False
     cleaned_items = []
+    # Replace smart quotes with standard double quotes for consistency.
+    query_string = re.sub(r"[“”]", '"', query_string)
     for item in re.split(r'([^a-zA-Z0-9_\-^~":]+)', query_string):
         if not item:
             continue
@@ -330,8 +332,8 @@ def check_unbalanced_quotes(query: str) -> bool:
     :param query: The input query string
     :return: True if the query contains unbalanced quotes. Otherwise False
     """
-    quotes_count = query.count('"')
-    return quotes_count % 2 != 0
+    all_quotes = re.findall(r"[“”\"]", query)
+    return len(all_quotes) % 2 != 0
 
 
 def remove_last_symbol_occurrence(
@@ -382,6 +384,8 @@ def sanitize_unbalanced_quotes(query: str) -> str:
     :param query: The input query string
     :return: The sanitized query string, after removing unbalanced quotes.
     """
+    # Replace smart quotes with standard double quotes for consistency.
+    query = re.sub(r"[“”]", '"', query)
     quotes_count = query.count('"')
     while quotes_count % 2 != 0:
         query, quotes_count = remove_last_symbol_occurrence(
