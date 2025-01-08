@@ -28,7 +28,7 @@ from cl.favorites.models import Prayer
 from cl.search.models import RECAPDocument
 
 
-async def prayer_eligible(user: User) -> bool:
+async def prayer_eligible(user: User) -> tuple[bool, int]:
     allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
 
     now = timezone.now()
@@ -39,13 +39,15 @@ async def prayer_eligible(user: User) -> bool:
         user=user, date_created__gte=last_24_hours
     ).acount()
 
-    return prayer_count < allowed_prayer_count
+    return prayer_count < allowed_prayer_count, (
+        allowed_prayer_count - prayer_count
+    )
 
 
 async def create_prayer(
     user: User, recap_document: RECAPDocument
 ) -> Prayer | None:
-    if await prayer_eligible(user) and not recap_document.is_available:
+    if (await prayer_eligible(user))[0] and not recap_document.is_available:
         new_prayer, created = await Prayer.objects.aget_or_create(
             user=user, recap_document=recap_document
         )

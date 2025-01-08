@@ -67,7 +67,7 @@ class PrayerSerializer(DynamicFieldsMixin, serializers.ModelSerializer):
             )
 
         # Check if the user is eligible to create a new prayer
-        if not async_to_sync(prayer_eligible)(user):
+        if not async_to_sync(prayer_eligible)(user)[0]:
             raise ValidationError(
                 f"You have reached the maximum number of prayers ({settings.ALLOWED_PRAYER_COUNT}) allowed in the last 24 hours."
             )

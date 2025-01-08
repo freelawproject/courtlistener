@@ -699,7 +699,7 @@ class RECAPPrayAndPay(TestCase):
         current_time = now()
         with time_machine.travel(current_time, tick=False):
             # No user prayers in the last 24 hours yet for this user.
-            user_is_eligible = await prayer_eligible(self.user)
+            user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertTrue(user_is_eligible)
 
             # Add prays for this user.
@@ -709,7 +709,7 @@ class RECAPPrayAndPay(TestCase):
 
             user_prays = Prayer.objects.filter(user=self.user)
             self.assertEqual(await user_prays.acount(), 1)
-            user_is_eligible = await prayer_eligible(self.user)
+            user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertTrue(user_is_eligible)
 
             await sync_to_async(PrayerFactory)(
@@ -719,7 +719,7 @@ class RECAPPrayAndPay(TestCase):
 
             # After two prays (ALLOWED_PRAYER_COUNT) in the last 24 hours.
             # The user is no longer eligible to create more prays
-            user_is_eligible = await prayer_eligible(self.user)
+            user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertFalse(user_is_eligible)
 
         with time_machine.travel(
@@ -730,7 +730,7 @@ class RECAPPrayAndPay(TestCase):
                 user=self.user, recap_document=self.rd_3
             )
             self.assertEqual(await user_prays.acount(), 3)
-            user_is_eligible = await prayer_eligible(self.user)
+            user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertTrue(user_is_eligible)
 
     async def test_create_prayer(self) -> None:
