@@ -39,7 +39,9 @@ async def prayer_eligible(user: User) -> Tuple[bool, int]:
         user=user, date_created__gte=last_24_hours
     ).acount()
 
-    return prayer_count < allowed_prayer_count, (allowed_prayer_count - prayer_count)
+    return prayer_count < allowed_prayer_count, (
+        allowed_prayer_count - prayer_count
+    )
 
 
 async def create_prayer(
