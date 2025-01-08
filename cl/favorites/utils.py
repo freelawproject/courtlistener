@@ -28,7 +28,7 @@ from cl.favorites.models import Prayer
 from cl.search.models import RECAPDocument
 
 
-async def prayer_eligible(user: User) -> Tuple[bool, int]:
+async def prayer_eligible(user: User) -> tuple[bool, int]:
     allowed_prayer_count = settings.ALLOWED_PRAYER_COUNT
 
     now = timezone.now()
