@@ -1,5 +1,5 @@
 import random
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from cl.recap.models import PacerFetchQueue
 from cl.search.factories import (
@@ -61,14 +61,26 @@ class BulkFetchPacerDocsTest(TestCase):
         )
         self.assertEqual(self.big_docs_count, self.big_docs_created.count())
 
-    @patch("time.sleep")
-    @patch("cl.search.management.commands.pacer_bulk_fetch.do_pacer_fetch")
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.build_pdf_retrieval_task_chain"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+    )
     def test_document_filtering(
         self,
-        mock_fetch,
-        mock_sleep,
+        mock_pacer_cookies,
+        mock_chain_builder,
+        mock_throttle,
     ):
         """Test document filtering according to command arguments passed."""
+        # Setup mock chain
+        mock_chain = MagicMock()
+        mock_chain_builder.return_value = mock_chain
+
         self.command.handle(
             min_page_count=self.big_page_count,
             request_interval=1.0,
@@ -77,7 +89,7 @@ class BulkFetchPacerDocsTest(TestCase):
         )
 
         self.assertEqual(
-            mock_fetch.call_count,
+            mock_chain.apply_async.call_count,
             self.big_docs_count,
             f"Expected {self.big_docs_count} documents to be processed",
         )
@@ -93,40 +105,58 @@ class BulkFetchPacerDocsTest(TestCase):
         big_doc_ids = self.big_docs_created.values_list("id", flat=True)
         self.assertSetEqual(set(enqueued_doc_ids), set(big_doc_ids))
 
-    @patch("time.sleep")
-    @patch("cl.search.management.commands.pacer_bulk_fetch.do_pacer_fetch")
-    def test_rate_limiting(self, mock_fetch, mock_sleep):
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.build_pdf_retrieval_task_chain"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+    )
+    def test_rate_limiting(
+        self,
+        mock_pacer_cookies,
+        mock_chain_builder,
+        mock_throttle,
+    ):
         """Test rate limiting."""
-        interval = 2.0
+        # Setup mock chain
+        mock_chain = MagicMock()
+        mock_chain_builder.return_value = mock_chain
+
         self.command.handle(
             min_page_count=1000,
-            request_interval=interval,
             username=self.user.username,
             testing=True,
         )
 
         self.assertEqual(
-            mock_sleep.call_count,
-            mock_fetch.call_count - 1,
-            "Sleep should be called between each fetch",
+            mock_throttle.call_count,
+            self.big_docs_count,
+            "CeleryThrottle.maybe_wait should be called for each document",
         )
 
-        for call in mock_sleep.call_args_list:
-            self.assertEqual(
-                call.args[0],
-                interval,
-                f"Expected sleep interval of {interval} seconds",
-            )
-
-    @patch("time.sleep")
-    @patch("cl.search.management.commands.pacer_bulk_fetch.do_pacer_fetch")
-    def test_error_handling(self, mock_fetch, mock_sleep):
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.build_pdf_retrieval_task_chain"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+    )
+    def test_error_handling(
+        self,
+        mock_pacer_cookies,
+        mock_chain_builder,
+        mock_throttle,
+    ):
         """Test that errors are handled gracefully"""
-        mock_fetch.side_effect = Exception("PACER API error")
+        mock_chain_builder.side_effect = Exception("Chain building error")
 
         self.command.handle(
             min_page_count=1000,
-            request_interval=1.0,
             username=self.user.username,
             testing=True,
         )
@@ -134,40 +164,56 @@ class BulkFetchPacerDocsTest(TestCase):
         self.assertEqual(
             PacerFetchQueue.objects.count(),
             self.big_docs_count,
+            "PacerFetchQueue objects should still be created even if chain building fails",
         )
 
-    @patch("time.sleep")
-    @patch("cl.search.management.commands.pacer_bulk_fetch.do_pacer_fetch")
-    def test_round_robin(self, mock_fetch, mock_sleep):
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.CeleryThrottle.maybe_wait"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.build_pdf_retrieval_task_chain"
+    )
+    @patch(
+        "cl.search.management.commands.pacer_bulk_fetch.get_or_cache_pacer_cookies"
+    )
+    def test_round_robin(
+        self,
+        mock_pacer_cookies,
+        mock_chain_builder,
+        mock_throttle,
+    ):
         """
         Verify that each call to 'execute_round' never processes the same court
         more than once.
         """
+        mock_chain = MagicMock()
+        mock_chain_builder.return_value = mock_chain
+
         calls_per_round = []
         original_execute_round = self.command.execute_round
 
         def track_rounds_side_effect(remaining_courts, options, is_last_round):
             """
-            Compares the mock_fetch calls before and after calling execute_round,
-            then saves new calls that occurred during this round.
+            Tracks PacerFetchQueue creation before and after calling execute_round
+            to identify which courts were processed in each round.
             """
-            start_index = len(mock_fetch.call_args_list)
+            start_count = PacerFetchQueue.objects.count()
             updated_remaining = original_execute_round(
                 remaining_courts, options, is_last_round
             )
-            end_index = len(mock_fetch.call_args_list)
-            current_round_calls = mock_fetch.call_args_list[
-                start_index:end_index
+            end_count = PacerFetchQueue.objects.count()
+
+            # Get the fetch queues created in this round
+            current_round_queues = PacerFetchQueue.objects.order_by("pk")[
+                start_count:end_count
             ]
-            calls_per_round.append(current_round_calls)
+            calls_per_round.append(current_round_queues)
 
             return updated_remaining
 
         with patch.object(
             Command, "execute_round", side_effect=track_rounds_side_effect
         ):
-            # Run command with patched execute_round to save do_pacer_fetch
-            # calls in each round
             self.command.handle(
                 min_page_count=1000,
                 request_interval=1.0,
@@ -175,14 +221,11 @@ class BulkFetchPacerDocsTest(TestCase):
                 testing=True,
             )
 
-        for round_index, round_calls in enumerate(calls_per_round, start=1):
+        for round_index, round_queues in enumerate(calls_per_round, start=1):
             court_ids_this_round = []
 
-            for call in round_calls:
-                fetch_queue_obj = call.args[0]
-                court_id = (
-                    fetch_queue_obj.recap_document.docket_entry.docket.court_id
-                )
+            for queue in round_queues:
+                court_id = queue.recap_document.docket_entry.docket.court_id
                 court_ids_this_round.append(court_id)
 
             self.assertEqual(
