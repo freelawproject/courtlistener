@@ -1,14 +1,16 @@
 import logging
-import time
 from datetime import datetime
 
 from django.contrib.auth.models import User
 from django.core.management.base import CommandError
 from django.db.models import Q
 
+from cl import settings
+from cl.lib.celery_utils import CeleryThrottle
 from cl.lib.command_utils import VerboseCommand
+from cl.lib.pacer_session import get_or_cache_pacer_cookies
 from cl.recap.models import REQUEST_TYPE, PacerFetchQueue
-from cl.recap.tasks import do_pacer_fetch
+from cl.recap.tasks import build_pdf_retrieval_task_chain
 from cl.search.models import Court, RECAPDocument
 
 logger = logging.getLogger(__name__)
@@ -24,6 +26,10 @@ class Command(VerboseCommand):
         self.courts_with_docs = {}
         self.total_launched = 0
         self.total_errors = 0
+        self.pacer_username = None
+        self.pacer_password = None
+        self.throttle = None
+        self.queue_name = None
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
@@ -44,8 +50,12 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--username",
             type=str,
-            required=True,
-            help="Username to associate with the processing queues",
+            help="Username to associate with the processing queues (defaults to 'recap-email')",
+        )
+        parser.add_argument(
+            "--queue-name",
+            type=str,
+            help="Celery queue name used for processing tasks",
         )
         parser.add_argument(
             "--testing",
@@ -61,6 +71,25 @@ class Command(VerboseCommand):
                 level=logging.INFO,
                 format="%(asctime)s - %(levelname)s - %(message)s",
             )
+
+    def setup_celery(self, options) -> None:
+        """Setup Celery by setting the queue_name and throttle."""
+        self.queue_name = options.get("queue_name", "pacer_bulk_fetch")
+        self.throttle = CeleryThrottle(queue_name=self.queue_name)
+
+    def handle_pacer_session(self, options) -> None:
+        """Make sure we have an active PACER session for the user."""
+        self.pacer_username = options.get(
+            "pacer_username", settings.PACER_USERNAME
+        )
+        self.pacer_password = options.get(
+            "pacer_password", settings.PACER_PASSWORD
+        )
+        get_or_cache_pacer_cookies(
+            self.user.pk,
+            username=self.pacer_username,
+            password=self.pacer_password,
+        )
 
     def set_user(self, username: str) -> None:
         """Get user or raise CommandError"""
@@ -113,17 +142,18 @@ class Command(VerboseCommand):
             ]
 
     def enqueue_pacer_fetch(self, doc: dict) -> None:
+        self.throttle.maybe_wait()
+
         fq = PacerFetchQueue.objects.create(
             request_type=REQUEST_TYPE.PDF,
             recap_document_id=doc.get("id"),
             user_id=self.user.pk,
         )
-        do_pacer_fetch(fq)
-
+        build_pdf_retrieval_task_chain(fq).apply_async(queue=self.queue_name)
         self.total_launched += 1
         logger.info(
             f"Launched download for doc {doc.get('id')} from court {doc.get('docket_entry__docket__court_id')}"
-            f"Progress: {self.total_launched}/{len(self.recap_documents)}"
+            f"\nProgress: {self.total_launched}/{len(self.recap_documents)}"
         )
 
     def execute_round(
@@ -148,9 +178,6 @@ class Command(VerboseCommand):
                 # If this court doesn't have any more docs, remove from dict:
                 if len(remaining_courts[court_id]) == 0:
                     remaining_courts_copy.pop(court_id)
-                # Don't sleep in very last iteration:
-                if not is_last_round or court_index < len(court_keys) - 1:
-                    time.sleep(float(options.get("request_interval", 2.0)))
 
         return remaining_courts_copy
 
@@ -176,11 +203,13 @@ class Command(VerboseCommand):
 
     def handle(self, *args, **options) -> None:
         self.setup_logging(options.get("testing", False))
+        self.setup_celery(options)
 
         logger.info("Starting pacer_bulk_fetch command")
 
         try:
-            self.set_user(options.get("username", ""))
+            self.set_user(options.get("username", "recap-email"))
+            self.handle_pacer_session(options)
 
             self.identify_documents(options)
 
