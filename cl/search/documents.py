@@ -355,6 +355,11 @@ class AudioPercolator(AudioDocumentBase):
 
     def prepare_percolator_query(self, instance):
         qd = QueryDict(instance.query.encode(), mutable=True)
+        if "order_by" in qd:
+            # sorting key is not required in percolator queries. Adding it
+            # generates a custom function score for decay relevance, which breaks
+            # percolator queries.
+            del qd["order_by"]
         search_form = SearchForm(qd)
         if not search_form.is_valid():
             logger.warning(
@@ -1988,6 +1993,9 @@ class RECAPPercolator(DocketDocument, ESRECAPDocument):
         from cl.alerts.utils import build_plain_percolator_query
 
         qd = QueryDict(instance.query.encode(), mutable=True)
+        # For RECAP percolator queries, we use build_plain_percolator_query to
+        # build the query. It does not add a custom function_score, so there is
+        # no need to remove the order_by sorting key as it is ignored.
         search_form = SearchForm(qd)
         if not search_form.is_valid():
             logger.warning(

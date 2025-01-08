@@ -945,13 +945,13 @@ files = [
 
 [[package]]
 name = "django"
-version = "5.1.2"
+version = "5.1.4"
 description = "A high-level Python web framework that encourages rapid development and clean, pragmatic design."
 optional = false
 python-versions = ">=3.10"
 files = [
-    {file = "Django-5.1.2-py3-none-any.whl", hash = "sha256:f11aa87ad8d5617171e3f77e1d5d16f004b79a2cf5d2e1d2b97a6a1f8e9ba5ed"},
-    {file = "Django-5.1.2.tar.gz", hash = "sha256:bd7376f90c99f96b643722eee676498706c9fd7dc759f55ebfaf2c08ebcdf4f0"},
+    {file = "Django-5.1.4-py3-none-any.whl", hash = "sha256:236e023f021f5ce7dee5779de7b286565fdea5f4ab86bae5338e3f7b69896cf0"},
+    {file = "Django-5.1.4.tar.gz", hash = "sha256:de450c09e91879fa5a307f696e57c851955c910a438a35e6b4c895e86bedc82a"},
 ]
 
 [package.dependencies]
@@ -2319,13 +2319,13 @@ setuptools = "*"
 
 [[package]]
 name = "juriscraper"
-version = "2.6.48"
+version = "2.6.49"
 description = "An API to scrape American court websites for metadata."
 optional = false
 python-versions = "*"
 files = [
-    {file = "juriscraper-2.6.48-py27-none-any.whl", hash = "sha256:f2e198cb66a5d3f1423ec4928fc76e1f25c13d0caafc2a6262a7d158c39eab8e"},
-    {file = "juriscraper-2.6.48.tar.gz", hash = "sha256:bc138e2c5776f55ef96c10f4a4185d0fec80d83e555e25d1f3fb4b384d399c53"},
+    {file = "juriscraper-2.6.49-py27-none-any.whl", hash = "sha256:5954c15747ee5a922d8388db9bb1649100bf8376c39122dc2f4ede2b437b8d0b"},
+    {file = "juriscraper-2.6.49.tar.gz", hash = "sha256:28254a22584cfd92a47bb91f9f3bc9139514ffdddfdad1085eacdc70f79fa264"},
 ]
 
 [package.dependencies]
@@ -5692,4 +5692,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.13, <3.14"
-content-hash = "8703160c5832be62299f5a926fa8670aed8715cb7c03dc7dd7be2d1a5c84fb2a"
+content-hash = "49aab347be47355db92d0faabdfdb28120a588fb5694887e3e730cca312a0945"
