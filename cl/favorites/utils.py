@@ -47,7 +47,7 @@ async def prayer_eligible(user: User) -> tuple[bool, int]:
 async def create_prayer(
     user: User, recap_document: RECAPDocument
 ) -> Prayer | None:
-    if await prayer_eligible(user)[0] and not recap_document.is_available:
+    if (await prayer_eligible(user))[0] and not recap_document.is_available:
         new_prayer, created = await Prayer.objects.aget_or_create(
             user=user, recap_document=recap_document
         )

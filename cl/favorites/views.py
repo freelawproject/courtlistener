@@ -212,7 +212,7 @@ async def create_prayer_view(
     user = request.user
     is_htmx_request = request.META.get("HTTP_HX_REQUEST", False)
     regular_size = bool(request.POST.get("regular_size"))
-    if not await prayer_eligible(request.user)[0]:
+    if not (await prayer_eligible(request.user))[0]:
         if is_htmx_request:
             return TemplateResponse(
                 request,
