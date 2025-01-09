@@ -65,7 +65,7 @@ info_tips = (
     % reverse("advanced_oa"),
     'CourtListener has an <a href="%s">API</a> so anybody can easily use our data.'
     % reverse("api_index"),
-    'Oral argument podcasts <a href="%s">are available in variety of apps</a> like iTunes, Stitcher Radio, and Google Music.'
+    'Oral argument podcasts <a href="%s">are available in variety of apps</a> like iTunes, Pocket Casts, and Google Music.'
     % reverse("podcasts"),
     "We have more than a million minutes of oral argument audio. More than anywhere else on the Internet.",
     # RECAP & PACER
