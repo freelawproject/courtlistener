@@ -240,8 +240,12 @@ class BulkFetchPacerDocsTest(TestCase):
                 court_id = queue.recap_document.docket_entry.docket.court_id
                 court_ids_this_round.append(court_id)
 
-            self.assertEqual(
-                len(court_ids_this_round),
-                len(set(court_ids_this_round)),
-                f"Round {round_index} had duplicate courts: {court_ids_this_round}",
-            )
+            with self.subTest(
+                court_ids_this_round=court_ids_this_round,
+                round_index=round_index,
+            ):
+                self.assertEqual(
+                    len(court_ids_this_round),
+                    len(set(court_ids_this_round)),
+                    f"Round {round_index} had duplicate courts: {court_ids_this_round}",
+                )
