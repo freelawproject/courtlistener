@@ -12,6 +12,7 @@ from cl.lib.elasticsearch_utils import (
     build_cardinality_count,
     build_es_main_query,
     build_sort_results,
+    clean_count_query,
     do_collapse_count_query,
     do_count_query,
     do_es_api_query,
@@ -21,7 +22,6 @@ from cl.lib.elasticsearch_utils import (
     set_results_highlights,
 )
 from cl.lib.search_utils import store_search_api_query
-from cl.lib.utils import map_to_docket_entry_sorting
 from cl.search.constants import SEARCH_HL_TAG, cardinality_query_unique_ids
 from cl.search.documents import (
     AudioDocument,
@@ -64,7 +64,7 @@ def get_object_list(request, cd, paginator):
         case SEARCH_TYPES.RECAP | SEARCH_TYPES.DOCKETS:
             search_query = ESRECAPDocument.search()
         case _:
-            search_query = None
+            raise ElasticBadRequestError("Unsupported search type.")
 
     if use_default_query:
         main_query, _, _ = build_es_main_query(search_query, cd)
@@ -260,12 +260,8 @@ class CursorESList:
         self.main_query = self.main_query.sort(default_sorting, unique_sorting)
 
         # Cardinality query parameters
-        query = Q(self.main_query.to_dict(count=True)["query"])
+        main_count_query = clean_count_query(self.main_query)
         unique_field = cardinality_query_unique_ids[self.clean_data["type"]]
-        search_document = self.cardinality_base_document[
-            self.clean_data["type"]
-        ]
-        main_count_query = search_document.search().query(query)
         cardinality_query = build_cardinality_count(
             main_count_query, unique_field
         )
@@ -273,9 +269,15 @@ class CursorESList:
         # Build a cardinality query to count child documents.
         child_cardinality_query = None
         child_cardinality_count_response = None
-        if self.child_docs_query:
+        if (
+            self.child_docs_query
+            and self.clean_data["type"] == SEARCH_TYPES.RECAP
+        ):
             child_unique_field = cardinality_query_unique_ids[
                 SEARCH_TYPES.RECAP_DOCUMENT
+            ]
+            search_document = self.cardinality_base_document[
+                self.clean_data["type"]
             ]
             child_count_query = search_document.search().query(
                 self.child_docs_query
@@ -292,7 +294,10 @@ class CursorESList:
             )
             # If a cardinality query is available for the search_type, add it
             # to the multi-search query.
-            if child_cardinality_query:
+            if (
+                child_cardinality_query
+                and self.clean_data["type"] == SEARCH_TYPES.RECAP
+            ):
                 multi_search = multi_search.add(child_cardinality_query)
 
             responses = multi_search.execute()

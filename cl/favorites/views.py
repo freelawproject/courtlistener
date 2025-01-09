@@ -212,7 +212,7 @@ async def create_prayer_view(
     user = request.user
     is_htmx_request = request.META.get("HTTP_HX_REQUEST", False)
     regular_size = bool(request.POST.get("regular_size"))
-    if not await prayer_eligible(request.user):
+    if not (await prayer_eligible(request.user))[0]:
         if is_htmx_request:
             return TemplateResponse(
                 request,
@@ -291,7 +291,7 @@ async def user_prayers_view(
 
     count, total_cost = await get_user_prayer_history(requested_user)
 
-    is_eligible = await prayer_eligible(requested_user)
+    is_eligible, num_remaining = await prayer_eligible(requested_user)
 
     context = {
         "rd_with_prayers": rd_with_prayers,
@@ -300,6 +300,7 @@ async def user_prayers_view(
         "count": count,
         "total_cost": total_cost,
         "is_eligible": is_eligible,
+        "num_remaining": num_remaining,
         "private": False,
     }
 
