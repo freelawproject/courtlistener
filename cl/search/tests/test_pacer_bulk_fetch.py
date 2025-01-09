@@ -125,11 +125,23 @@ class BulkFetchPacerDocsTest(TestCase):
         mock_chain = MagicMock()
         mock_chain_builder.return_value = mock_chain
 
+        rate_limit = "10/m"
         self.command.handle(
             min_page_count=1000,
+            rate_limit=rate_limit,
             username=self.user.username,
             testing=True,
         )
+
+        # Verify the rate limit was passed correctly
+        for call in mock_chain_builder.call_args_list:
+            with self.subTest(call=call):
+                _, kwargs = call
+                self.assertEqual(
+                    kwargs.get("rate_limit"),
+                    rate_limit,
+                    "Rate limit should be passed to chain builder",
+                )
 
         self.assertEqual(
             mock_throttle.call_count,
