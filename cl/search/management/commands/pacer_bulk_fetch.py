@@ -30,12 +30,13 @@ class Command(VerboseCommand):
         self.pacer_password = None
         self.throttle = None
         self.queue_name = None
+        self.rate_limit = None
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
-            "--request-interval",
+            "--rate-limit",
             type=float,
-            help="Seconds between requests",
+            help="The maximum rate for requests, e.g. '1/m', or '10/2h' or similar. Defaults to 1/2s",
         )
         parser.add_argument(
             "--min-page-count",
@@ -50,7 +51,7 @@ class Command(VerboseCommand):
         parser.add_argument(
             "--username",
             type=str,
-            help="Username to associate with the processing queues (defaults to 'recap-email')",
+            help="Username to associate with the processing queues (defaults to 'recap')",
         )
         parser.add_argument(
             "--queue-name",
@@ -73,8 +74,9 @@ class Command(VerboseCommand):
             )
 
     def setup_celery(self, options) -> None:
-        """Setup Celery by setting the queue_name and throttle."""
+        """Setup Celery by setting the queue_name, rate_limit and throttle."""
         self.queue_name = options.get("queue_name", "pacer_bulk_fetch")
+        self.rate_limit = options.get("rate_limit", "1/2s")
         self.throttle = CeleryThrottle(queue_name=self.queue_name)
 
     def handle_pacer_session(self, options) -> None:
@@ -149,7 +151,10 @@ class Command(VerboseCommand):
             recap_document_id=doc.get("id"),
             user_id=self.user.pk,
         )
-        build_pdf_retrieval_task_chain(fq).apply_async(queue=self.queue_name)
+        build_pdf_retrieval_task_chain(
+            fq,
+            rate_limit=self.rate_limit,
+        ).apply_async(queue=self.queue_name)
         self.total_launched += 1
         logger.info(
             f"Launched download for doc {doc.get('id')} from court {doc.get('docket_entry__docket__court_id')}"
@@ -208,7 +213,7 @@ class Command(VerboseCommand):
         logger.info("Starting pacer_bulk_fetch command")
 
         try:
-            self.set_user(options.get("username", "recap-email"))
+            self.set_user(options.get("username", "recap"))
             self.handle_pacer_session(options)
 
             self.identify_documents(options)
