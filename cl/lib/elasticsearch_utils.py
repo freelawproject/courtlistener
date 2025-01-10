@@ -488,7 +488,6 @@ def build_text_filter(field: str, value: str) -> List:
     if value:
         if isinstance(value, str):
             validate_query_syntax(value, QueryType.FILTER)
-
         return [
             Q(
                 "query_string",

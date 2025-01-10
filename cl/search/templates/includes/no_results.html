@@ -33,6 +33,8 @@
         Did you forget to close one or more parentheses?
       {% elif error_message == "unbalanced_quotes" %}
         Did you forget to close one or more quotes?
+      {% elif error_message == "disallowed_wildcard_pattern" %}
+        The query contains a disallowed wildcard pattern.
       {% endif %}
     {% else %}
       encountered an error.
