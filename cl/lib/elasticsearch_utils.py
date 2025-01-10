@@ -43,12 +43,14 @@ from cl.lib.types import (
 )
 from cl.lib.utils import (
     check_for_proximity_tokens,
+    check_query_for_disallowed_wildcards,
     check_unbalanced_parenthesis,
     check_unbalanced_quotes,
     cleanup_main_query,
     get_array_of_selected_fields,
     lookup_child_courts,
     map_to_docket_entry_sorting,
+    perform_special_character_replacements,
 )
 from cl.people_db.models import Position
 from cl.search.constants import (
@@ -77,6 +79,7 @@ from cl.search.constants import (
 )
 from cl.search.exception import (
     BadProximityQuery,
+    DisallowedWildcardPattern,
     ElasticBadRequestError,
     QueryType,
     UnbalancedParenthesesQuery,
@@ -488,6 +491,9 @@ def build_text_filter(field: str, value: str) -> List:
     if value:
         if isinstance(value, str):
             validate_query_syntax(value, QueryType.FILTER)
+            if check_query_for_disallowed_wildcards(value):
+                raise DisallowedWildcardPattern(QueryType.FILTER)
+            value = perform_special_character_replacements(value)
         return [
             Q(
                 "query_string",

@@ -457,6 +457,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             docket=DocketFactory(
                 court=cls.child_court_2_2, docket_number="36-2000"
             ),
+            judges="Computer point",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
@@ -471,6 +472,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
             docket=DocketFactory(
                 court=cls.child_gand_2, docket_number="38-1000"
             ),
+            judges="Composition plant",
             precedential_status=PRECEDENTIAL_STATUS.PUBLISHED,
             sub_opinions=RelatedFactory(
                 OpinionWithChildrenFactory,
@@ -1085,6 +1087,74 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                         msg=f"Failed on: {test_case['label']} missing {expected_str}",
                     )
 
+    def test_support_search_connectors_filters(self) -> None:
+        """Verify that new supported custom search connectors yield the
+        expected results.
+        """
+
+        tests = [
+            {
+                "label": "But not %",
+                "search_params": {
+                    "case_name": "Strickland % Lorem % America",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["1:21-cv-1234"],
+            },
+            {
+                "label": "& connector test",
+                "search_params": {
+                    "case_name": "Strickland & Lorem",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["123456"],
+            },
+            {
+                "label": "! Root expander suffix",
+                "search_params": {
+                    "judge": "!Comp",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Universal Character *",
+                "search_params": {
+                    "judge": "p**nt",
+                },
+                "expected_count": 2,
+                "expected_in_content": ["36-2000", "38-1000"],
+            },
+            {
+                "label": "Combined operators",
+                "search_params": {
+                    "case_name": "Calif*rnia & !Nev",
+                },
+                "expected_count": 1,
+                "expected_in_content": ["38-1000"],
+            },
+        ]
+
+        for test_case in tests:
+            with self.subTest(label=test_case["label"]):
+                response = self.client.get(
+                    reverse("show_results"),
+                    test_case["search_params"],
+                )
+                actual = self.get_article_count(response)
+                self.assertEqual(
+                    actual,
+                    test_case["expected_count"],
+                    msg=f"Failed on: {test_case['label']}",
+                )
+                decoded_content = response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on: {test_case['label']} missing {expected_str}",
+                    )
+
     def test_disallowed_wildcard_pattern(self) -> None:
         """Verify that expensive wildcard queries thrown an error."""
 
@@ -1107,6 +1177,24 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     "q": "*ing",
                 },
             },
+            {
+                "label": "Disallowed ! in short queries - Filter.",
+                "search_params": {
+                    "case_name": "!ap",
+                },
+            },
+            {
+                "label": "Disallowed * at the end in short queries  - Filter.",
+                "search_params": {
+                    "judge": "ap*",
+                },
+            },
+            {
+                "label": "Disallowed * at the beginning  - Filter.",
+                "search_params": {
+                    "case_name": "*ing",
+                },
+            },
         ]
 
         for test_case in tests:
@@ -1117,7 +1205,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 )
                 decoded_content = response.content.decode()
                 self.assertIn(
-                    "The query contains a disallowed wildcard pattern.",
+                    "The query contains a disallowed expensive wildcard pattern",
                     decoded_content,
                     msg=f"Failed on: {test_case['label']}, no disallowed wildcard pattern error.",
                 )
