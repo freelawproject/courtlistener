@@ -112,7 +112,7 @@ types-pytz = "^2024.2.0.20241003"
 psycopg = {version = "3.2.3", extras = ["binary", "pool"]}
 boto3 = "^1.35.44"
 drf-dynamic-fields = "^0.4.0"
-django-ses = {extras = ["events"], version = "^4.1.1"}
+django-ses = {extras = ["events"], version = "^4.3.1"}
 juriscraper = "^2.6.26"
 
 
