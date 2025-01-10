@@ -1069,6 +1069,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
 
         for test_case in tests:
             with self.subTest(label=test_case["label"]):
+                # Frontend
                 response = self.client.get(
                     reverse("show_results"),
                     test_case["search_params"],
@@ -1085,6 +1086,24 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                         expected_str,
                         decoded_content,
                         msg=f"Failed on: {test_case['label']} missing {expected_str}",
+                    )
+
+                # API
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(
+                    len(api_response.data["results"]),
+                    test_case["expected_count"],
+                    msg=f"Failed on API: {test_case['label']}",
+                )
+                decoded_content = api_response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
                     )
 
     def test_support_search_connectors_filters(self) -> None:
@@ -1137,6 +1156,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
 
         for test_case in tests:
             with self.subTest(label=test_case["label"]):
+                # Frontend
                 response = self.client.get(
                     reverse("show_results"),
                     test_case["search_params"],
@@ -1152,7 +1172,25 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     self.assertIn(
                         expected_str,
                         decoded_content,
-                        msg=f"Failed on: {test_case['label']} missing {expected_str}",
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
+                    )
+
+                # API
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(
+                    len(api_response.data["results"]),
+                    test_case["expected_count"],
+                    msg=f"Failed on API: {test_case['label']}",
+                )
+                decoded_content = api_response.content.decode()
+                for expected_str in test_case["expected_in_content"]:
+                    self.assertIn(
+                        expected_str,
+                        decoded_content,
+                        msg=f"Failed on Frontend: {test_case['label']} missing {expected_str}",
                     )
 
     def test_disallowed_wildcard_pattern(self) -> None:
@@ -1208,6 +1246,30 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     "The query contains a disallowed expensive wildcard pattern",
                     decoded_content,
                     msg=f"Failed on: {test_case['label']}, no disallowed wildcard pattern error.",
+                )
+
+                # API V4
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v4"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(api_response.status_code, 400)
+                self.assertEqual(
+                    api_response.data["detail"],
+                    "The query contains a disallowed expensive wildcard pattern.",
+                    msg="Failed for V4",
+                )
+
+                # API V3
+                api_response = self.client.get(
+                    reverse("search-list", kwargs={"version": "v3"}),
+                    test_case["search_params"],
+                )
+                self.assertEqual(api_response.status_code, 400)
+                self.assertEqual(
+                    api_response.data["detail"],
+                    "The query contains a disallowed expensive wildcard pattern.",
+                    msg="Failed for V3",
                 )
 
 

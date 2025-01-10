@@ -3094,6 +3094,7 @@ def do_es_api_query(
         UnbalancedParenthesesQuery,
         UnbalancedQuotesQuery,
         BadProximityQuery,
+        DisallowedWildcardPattern,
     ) as e:
         raise ElasticBadRequestError(detail=e.message)
 
