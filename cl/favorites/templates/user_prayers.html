@@ -14,7 +14,7 @@
 {% block content %}
   <div class="col-xs-12">
     <h1 class="text-center v-offset-below-3">{% if is_page_owner %}Your PACER Document Prayers{% else %}PACER Document Requests for: {{ requested_user }}{% endif %}</h1>
-    {% if is_page_owner %}<h3 class="text-center"><b>{{ count|intcomma }}</b> prayers granted totaling <b>${{total_cost|floatformat:2 }}</b> (<b>{{ num_remaining }}</b> remaining today).</h3>{% endif %}
+    {% if is_page_owner %}<h3 class="text-center"><b>{{ count|intcomma }}</b> {{ count|pluralize:"prayer,prayers" }} granted totaling <b>${{total_cost|floatformat:2 }}</b> (<b>{{ num_remaining }}</b> remaining today).</h3>{% endif %}
   </div>
 
   <div class="col-xs-12" id="prayer_summary" hx-swap-oob="true"

@@ -14,8 +14,8 @@
 {% block content %}
   <div class="col-xs-12">
     <h1 class="text-center v-offset-below-3">Community's Most Wanted PACER Documents</h1>
-    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> prayers granted totaling <b>${{ granted_stats.total_cost }}</b>.</h3>
-    <h3 class="text-center"><b>{{ waiting_stats.prayer_count|intcomma }}</b> prayers pending totaling at least <b>${{ waiting_stats.total_cost }}</b>.</h3>
+    <h3 class="text-center"><b>{{ granted_stats.prayer_count|intcomma }}</b> {{ granted_stats.prayer_count|pluralize:"prayer,prayers" }} granted totaling <b>${{ granted_stats.total_cost }}</b>.</h3>
+    <h3 class="text-center"><b>{{ waiting_stats.prayer_count|intcomma }}</b> {{ waiting_stats.prayer_count|pluralize:"prayer,prayers" }} pending totaling at least <b>${{ waiting_stats.total_cost }}</b>.</h3>
   </div>
 
   <div class="col-xs-12">
