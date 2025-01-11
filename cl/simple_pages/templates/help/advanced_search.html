@@ -23,9 +23,10 @@
   <p>If you would like assistance crafting a query, <a href="{% url "contact" %}">let us know</a>. We can sometimes help.
   </p>
 
-  <h3>Intersections: <code>AND</code></h3>
-  <p>This connector is used by default, and so is not usually needed. However, some operators, like the negation operator, can change the default operator to <code>OR</code>. Therefore, in more complicated queries it is good practice to explicitly intersect your tokens by using the <code>AND</code> operator between all words (e.g. <code>immigration AND asylum</code>).
-  </p>
+  <h3>Intersections: <code>AND</code> or <code>&</code></h3>
+  <p>This connector is used by default, and so is not usually needed. However, some operators, like the negation operator, can change the default operator to <code>OR</code>. Therefore, in more complicated queries it is good practice to explicitly intersect your tokens by using the <code>AND</code> or <code>&</code> operator between all words e.g:</p>
+  <p><code>(immigration AND asylum) AND (border OR patrol)</code> or</p>
+  <p><code>(immigration & asylum) & (border OR patrol)</code></p>
 
   <h3>Unions: <code>OR</code></h3>
   <p>Creates an <code>OR</code> comparison between words (e.g. <code>immigration OR asylum</code>).
@@ -40,6 +41,11 @@
   <p>This query does "immigration" <em>or</em> "border" but not "border patrol":</p>
   <p><code>immigration border -"border patrol"</code>.</p>
 
+  <h3>But not : <code>NOT</code> or <code>%</code></h3>
+  <p>The <code>NOT</code> operator or <code>%</code> serves as an alternative way to exclude terms from your search results. This operator is particularly useful when combined with other boolean operators or grouped queries to refine your search precision:</p>
+  <p><code>"border patrol" NOT (immigration OR asylum)</code> or</p>
+  <p><code>"border patrol" % (immigration OR asylum)</code></p>
+
   <h3>Phrase and Exact Queries: <code>" "</code></h3>
   <p>Creates a phrase search (e.g. <code>"border patrol"</code>).</p>
   <p>You can also use <code>" "</code> to perform an exact query, which will not apply stemming or match synonyms.</p>
@@ -51,17 +57,27 @@
   <p>Using parentheses will group parts of a query (e.g. <code>(customs OR "border patrol") AND asylum</code>). Parentheses can be nested as deeply as needed.
   </p>
 
-  <h3>Wildcards and Fuzzy Search: <code>*</code>, <code>?</code>, and <code>~</code></h3>
-  <p>Using an asterisk (<strong>*</strong>) allows wildcard searches. For example, <code>immigra*</code> finds all words beginning with "immigra". This can also be used at the beginning or middle of words, at both the beginning and the end of a word, or even all three. For example, you can find all words containing two esses side-by-side with the following query: <code>*ss*</code>. You could also find words with two esses separated by other letters with a query such as: <code>*s*s*</code>. This would find cases containing words like "<strong>s</strong>u<strong>s</strong>an" or   "as<strong>s</strong>i<strong>s</strong>tant".
-  </p>
+  <h3>Wildcards and Fuzzy Search: <code>*</code>, <code>!</code>, <code>?</code> and <code>~</code></h3>
+  <p>Using an asterisk (<code>*</code>) allows for wildcard searches. For example, <code>immigra*</code> finds all words that begin with "immigra". Alternatively, you can use an exclamation mark (<code>!</code>) at the beginning of a word for the same purpose. For instance, <code>!immigra</code> matches words that start with "immigra".</p>
 
-  <p>The question mark character (<strong>?</strong>) can be used similarly as a single letter wildcard. For example, this would find cases containing the word "immigrant" or "emmigration": <code>?mmigra*</code>
-  </p>
+  <p><code>*</code> can also be used inside words, where it acts as a single-character wildcard. For example, a query like <code>gr*mm*r</code> would match cases containing both "gr<strong>a</strong>mm<strong>a</strong>r" and "gr<strong>i</strong>mm<strong>e</strong>r".</p>
+  <p>The question mark character (<code>?</code>) can be used similarly as a single-character wildcard. Unlike <code>*</code>, it is allowed at the beginning of words. For example, this would find cases containing the word "immigrant" or "emmigration": <code>?mmigra*</code>.</p>
 
-  <p>Fuzzy search can be applied using the tilde character (<strong>~</strong>) after a word. This is an advanced parameter that allows searches for misspellings or different variations of a word's spelling. For example, searching for <code>immigrant~</code> would find words similar to "immigrant". Values can also be added after the tilde to indicate how similar different spellings must be. The default value, if none is given, is 0.5. Values can range between 0 and 1, with 1 being exact, and 0 being very sloppy. Fuzzy searches tend to broaden the result set, thus lowering precision, but also casting a wider net.
-  </p>
+  <p>Fuzzy search can be applied using the tilde character (<strong>~</strong>) after a word. This is an advanced parameter that allows searches for misspellings or variations in a word's spelling. For example, searching for <code>immigrant~</code> would find words similar to "immigrant." Values can also be added after the tilde to specify the maximum number of changes allowed, where a change refers to the insertion, deletion, substitution of a single character, or transposition of two adjacent characters. The default value, if none is given, is 2. Allowed values are 1 and 2.  Fuzzy searches tend to broaden the result set, thus lowering precision, but also casting a wider net.</p>
 
-  <h3>Proximity: <code>~</code></h3>
+  <h3 id="disallowed-expensive-wildcards">Disallowed Expensive Wildcards</h3>
+  <p>The following types of wildcard queries are disabled due to performance issues:</p>
+
+  <strong><code>*</code> at the beginning of terms</strong>
+  <p>Queries like <code>*ing</code> are disallowed because they require examining all terms in the index, which is highly resource-intensive.</p>
+
+  <strong>Multiple endings with <code>*</code> or <code>!</code> in short terms</strong>
+
+  <p>Queries that match multiple endings are only allowed if the base word has at least three characters. Therefore, queries like <code>a*</code>, <code>bc*</code>, <code>!a</code>, or <code>!bc</code> are disallowed due to performance issues.</p>
+  <p>Performing a query like these will throw an error with the message:</p>
+  <p><code>The query contains a disallowed expensive wildcard pattern.</code></p>
+
+  <h3 id="proximity">Proximity: <code>~</code></h3>
   <p>Using a tilde character (<strong>~</strong>) after a phrase will ensure that the words in the phrase are within a desired distance of each other. For example <code>"border fence"~50</code> would find the words border and fence within 50 words of each other.
   </p>
 
