@@ -1242,9 +1242,14 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     test_case["search_params"],
                 )
                 decoded_content = response.content.decode()
+                tree = html.fromstring(decoded_content)
+                h2_error_element = tree.xpath('//h2[@class="alt"]')[0]
+                h2_text_error = "".join(
+                    h2_error_element.xpath(".//text()")
+                ).strip()
                 self.assertIn(
                     "The query contains a disallowed expensive wildcard pattern",
-                    decoded_content,
+                    h2_text_error,
                     msg=f"Failed on: {test_case['label']}, no disallowed wildcard pattern error.",
                 )
 
