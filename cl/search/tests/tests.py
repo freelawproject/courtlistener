@@ -1248,7 +1248,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                     h2_error_element.xpath(".//text()")
                 ).strip()
                 self.assertIn(
-                    "The query contains a disallowed expensive wildcard pattern",
+                    "The query contains a disallowed wildcard pattern.",
                     h2_text_error,
                     msg=f"Failed on: {test_case['label']}, no disallowed wildcard pattern error.",
                 )
@@ -1261,7 +1261,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 self.assertEqual(api_response.status_code, 400)
                 self.assertEqual(
                     api_response.data["detail"],
-                    "The query contains a disallowed expensive wildcard pattern.",
+                    "The query contains a disallowed wildcard pattern.",
                     msg="Failed for V4",
                 )
 
@@ -1273,7 +1273,7 @@ class ESCommonSearchTest(ESIndexTestCase, TestCase):
                 self.assertEqual(api_response.status_code, 400)
                 self.assertEqual(
                     api_response.data["detail"],
-                    "The query contains a disallowed expensive wildcard pattern.",
+                    "The query contains a disallowed wildcard pattern.",
                     msg="Failed for V3",
                 )
 

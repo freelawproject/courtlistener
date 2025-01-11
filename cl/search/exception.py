@@ -61,4 +61,4 @@ class ElasticBadRequestError(APIException):
 class DisallowedWildcardPattern(SyntaxQueryError):
     """Query contains a disallowed wildcard pattern"""
 
-    message = "The query contains a disallowed expensive wildcard pattern."
+    message = "The query contains a disallowed wildcard pattern."
