@@ -1,12 +1,13 @@
 from admin_cursor_paginator import CursorPaginatorAdmin
 from django.contrib import admin
 from django.db.models import QuerySet
-from django.forms import ModelForm
 from django.http import HttpRequest
 
-from cl.alerts.admin import DocketAlertInline
+from cl.alerts.models import DocketAlert
+from cl.lib.admin import build_admin_url
 from cl.lib.cloud_front import invalidate_cloudfront
 from cl.lib.models import THUMBNAIL_STATUSES
+from cl.lib.string_utils import trunc
 from cl.recap.management.commands.delete_document_from_ia import delete_from_ia
 from cl.search.models import (
     BankruptcyInformation,
@@ -89,7 +90,14 @@ class OpinionClusterAdmin(CursorPaginatorAdmin):
 
 @admin.register(Court)
 class CourtAdmin(admin.ModelAdmin):
-    list_display = ("full_name", "short_name", "position", "in_use", "pk")
+    list_display = (
+        "full_name",
+        "short_name",
+        "position",
+        "in_use",
+        "pk",
+        "jurisdiction",
+    )
     list_filter = (
         "jurisdiction",
         "in_use",
@@ -216,17 +224,36 @@ class RECAPDocumentInline(admin.StackedInline):
 @admin.register(DocketEntry)
 class DocketEntryAdmin(CursorPaginatorAdmin):
     inlines = (RECAPDocumentInline,)
+    search_help_text = (
+        "Search DocketEntries by Docket ID or RECAP sequence number."
+    )
+    search_fields = (
+        "docket__id",
+        "recap_sequence_number",
+    )
+    list_display = (
+        "get_pk",
+        "get_trunc_description",
+        "date_filed",
+        "time_filed",
+        "entry_number",
+        "recap_sequence_number",
+        "pacer_sequence_number",
+    )
     raw_id_fields = ("docket", "tags")
     readonly_fields = (
         "date_created",
         "date_modified",
     )
+    list_filter = ("date_filed", "date_created", "date_modified")
 
+    @admin.display(description="Docket entry")
+    def get_pk(self, obj):
+        return obj.pk
 
-class DocketEntryInline(admin.TabularInline):
-    model = DocketEntry
-    extra = 1
-    raw_id_fields = ("tags",)
+    @admin.display(description="Description")
+    def get_trunc_description(self, obj):
+        return trunc(obj.description, 35, ellipsis="...")
 
 
 @admin.register(OriginatingCourtInformation)
@@ -239,16 +266,24 @@ class OriginatingCourtInformationAdmin(admin.ModelAdmin):
 
 @admin.register(Docket)
 class DocketAdmin(CursorPaginatorAdmin):
+    change_form_template = "admin/docket_change_form.html"
     prepopulated_fields = {"slug": ["case_name"]}
-    inlines = (
-        DocketEntryInline,
-        BankruptcyInformationInline,
-        DocketAlertInline,
+    list_display = (
+        "__str__",
+        "pacer_case_id",
+        "docket_number",
     )
+    search_help_text = "Search dockets by PK, PACER case ID, or Docket number."
+    search_fields = ("pk", "pacer_case_id", "docket_number")
+    inlines = (BankruptcyInformationInline,)
     readonly_fields = (
         "date_created",
         "date_modified",
         "view_count",
+    )
+    autocomplete_fields = (
+        "court",
+        "appeal_from",
     )
     raw_id_fields = (
         "panel",
@@ -259,6 +294,25 @@ class DocketAdmin(CursorPaginatorAdmin):
         "idb_data",
         "parent_docket",
     )
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        """Add links to pre-filtered related admin pages."""
+        extra_context = extra_context or {}
+        query_params = {"docket": object_id}
+
+        extra_context["docket_entries_url"] = build_admin_url(
+            DocketEntry,
+            query_params,
+        )
+
+        extra_context["docket_alerts_url"] = build_admin_url(
+            DocketAlert,
+            query_params,
+        )
+
+        return super().change_view(
+            request, object_id, form_url, extra_context=extra_context
+        )
 
 
 @admin.register(OpinionsCited)

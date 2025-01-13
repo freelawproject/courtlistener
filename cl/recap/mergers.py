@@ -822,6 +822,35 @@ async def get_or_make_docket_entry(
     return de, de_created
 
 
+async def keep_latest_rd_document(queryset: QuerySet) -> RECAPDocument:
+    """Retains the most recent item with a PDF, if available otherwise,
+    retains the most recent item overall.
+
+    :param queryset: RECAPDocument QuerySet to clean duplicates from.
+    :return: The matched RECAPDocument after cleaning.
+    """
+    rd_with_pdf_queryset = queryset.filter(is_available=True).exclude(
+        filepath_local=""
+    )
+    if await rd_with_pdf_queryset.aexists():
+        rd = await rd_with_pdf_queryset.alatest("date_created")
+    else:
+        rd = await queryset.alatest("date_created")
+    await queryset.exclude(pk=rd.pk).adelete()
+    return rd
+
+
+async def clean_duplicate_documents(params: dict[str, Any]) -> RECAPDocument:
+    """Removes duplicate RECAPDocuments, keeping the most recent with PDF if
+    available or otherwise the most recent overall.
+
+    :param params: Query parameters to filter the RECAPDocuments.
+    :return: The matched RECAPDocument after cleaning.
+    """
+    duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
+    return await keep_latest_rd_document(duplicate_rd_queryset)
+
+
 async def add_docket_entries(
     d: Docket,
     docket_entries: list[dict[str, Any]],
@@ -934,17 +963,28 @@ async def add_docket_entries(
             rd = await RECAPDocument.objects.aget(**get_params)
             rds_updated.append(rd)
         except RECAPDocument.DoesNotExist:
-            try:
-                params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
-                rd = await RECAPDocument.objects.acreate(
-                    document_number=docket_entry["document_number"] or "",
-                    is_available=False,
-                    **params,
-                )
-            except ValidationError:
-                # Happens from race conditions.
-                continue
-            rds_created.append(rd)
+            rd = None
+            if de_created is False and not appelate_court_id_exists:
+                try:
+                    # Check for documents with a bad pacer_doc_id
+                    rd = await RECAPDocument.objects.aget(**params)
+                except RECAPDocument.DoesNotExist:
+                    # Fallback to creating document
+                    pass
+                except RECAPDocument.MultipleObjectsReturned:
+                    rd = await clean_duplicate_documents(params)
+            if rd is None:
+                try:
+                    params["pacer_doc_id"] = docket_entry["pacer_doc_id"]
+                    rd = await RECAPDocument.objects.acreate(
+                        document_number=docket_entry["document_number"] or "",
+                        is_available=False,
+                        **params,
+                    )
+                    rds_created.append(rd)
+                except ValidationError:
+                    # Happens from race conditions.
+                    continue
         except RECAPDocument.MultipleObjectsReturned:
             logger.info(
                 "Multiple recap documents found for document entry number'%s' "
@@ -952,17 +992,10 @@ async def add_docket_entries(
             )
             if params["document_type"] == RECAPDocument.ATTACHMENT:
                 continue
-            duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
-            rd_with_pdf_queryset = duplicate_rd_queryset.filter(
-                is_available=True
-            ).exclude(filepath_local="")
-            if await rd_with_pdf_queryset.aexists():
-                rd = await rd_with_pdf_queryset.alatest("date_created")
-            else:
-                rd = await duplicate_rd_queryset.alatest("date_created")
-            await duplicate_rd_queryset.exclude(pk=rd.pk).adelete()
+            rd = await clean_duplicate_documents(params)
 
-        rd.pacer_doc_id = rd.pacer_doc_id or docket_entry["pacer_doc_id"]
+        if docket_entry["pacer_doc_id"]:
+            rd.pacer_doc_id = docket_entry["pacer_doc_id"]
         description = docket_entry.get("short_description")
         if rd.document_type == RECAPDocument.PACER_DOCUMENT and description:
             rd.description = description
@@ -1604,14 +1637,7 @@ async def clean_duplicate_attachment_entries(
     )
     async for dupe in dupes.aiterator():
         duplicate_rd_queryset = rds.filter(pacer_doc_id=dupe.pacer_doc_id)
-        rd_with_pdf_queryset = duplicate_rd_queryset.filter(
-            is_available=True
-        ).exclude(filepath_local="")
-        if await rd_with_pdf_queryset.aexists():
-            keep_rd = await rd_with_pdf_queryset.alatest("date_created")
-        else:
-            keep_rd = await duplicate_rd_queryset.alatest("date_created")
-        await duplicate_rd_queryset.exclude(pk=keep_rd.pk).adelete()
+        await keep_latest_rd_document(duplicate_rd_queryset)
 
 
 async def merge_attachment_page_data(
@@ -1670,17 +1696,10 @@ async def merge_attachment_page_data(
             main_rd = await RECAPDocument.objects.select_related(
                 "docket_entry", "docket_entry__docket"
             ).aget(**params)
+
     except RECAPDocument.MultipleObjectsReturned as exc:
         if pacer_case_id:
-            duplicate_rd_queryset = RECAPDocument.objects.filter(**params)
-            rd_with_pdf_queryset = duplicate_rd_queryset.filter(
-                is_available=True
-            ).exclude(filepath_local="")
-            if await rd_with_pdf_queryset.aexists():
-                keep_rd = await rd_with_pdf_queryset.alatest("date_created")
-            else:
-                keep_rd = await duplicate_rd_queryset.alatest("date_created")
-            await duplicate_rd_queryset.exclude(pk=keep_rd.pk).adelete()
+            await clean_duplicate_documents(params)
             main_rd = await RECAPDocument.objects.select_related(
                 "docket_entry", "docket_entry__docket"
             ).aget(**params)
@@ -1710,23 +1729,7 @@ async def merge_attachment_page_data(
                     break
                 except RECAPDocument.MultipleObjectsReturned as exc:
                     if pacer_case_id:
-                        duplicate_rd_queryset = RECAPDocument.objects.filter(
-                            **params
-                        )
-                        rd_with_pdf_queryset = duplicate_rd_queryset.filter(
-                            is_available=True
-                        ).exclude(filepath_local="")
-                        if await rd_with_pdf_queryset.aexists():
-                            keep_rd = await rd_with_pdf_queryset.alatest(
-                                "date_created"
-                            )
-                        else:
-                            keep_rd = await duplicate_rd_queryset.alatest(
-                                "date_created"
-                            )
-                        await duplicate_rd_queryset.exclude(
-                            pk=keep_rd.pk
-                        ).adelete()
+                        await clean_duplicate_documents(params)
                         main_rd = await RECAPDocument.objects.select_related(
                             "docket_entry", "docket_entry__docket"
                         ).aget(**params)

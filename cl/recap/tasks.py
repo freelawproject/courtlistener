@@ -20,6 +20,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
+from django.db.models import QuerySet
 from django.utils.timezone import now
 from juriscraper.lib.exceptions import PacerLoginException, ParsingException
 from juriscraper.lib.string_utils import CaseNameTweaker, harmonize
@@ -110,9 +111,13 @@ async def process_recap_upload(pq: ProcessingQueue) -> None:
     if pq.upload_type == UPLOAD_TYPE.DOCKET:
         docket = await process_recap_docket(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.ATTACHMENT_PAGE:
-        await process_recap_attachment(pq.pk)
+        sub_docket_att_page_pks = await find_subdocket_att_page_rds(pq.pk)
+        for pq_pk in sub_docket_att_page_pks:
+            await process_recap_attachment(pq_pk)
     elif pq.upload_type == UPLOAD_TYPE.PDF:
-        await process_recap_pdf(pq.pk)
+        sub_docket_pdf_pks = await find_subdocket_pdf_rds(pq.pk)
+        for pq_pk in sub_docket_pdf_pks:
+            await process_recap_pdf(pq_pk)
     elif pq.upload_type == UPLOAD_TYPE.DOCKET_HISTORY_REPORT:
         docket = await process_recap_docket_history_report(pq.pk)
     elif pq.upload_type == UPLOAD_TYPE.APPELLATE_DOCKET:
@@ -645,6 +650,167 @@ async def process_recap_docket(pk):
     }
 
 
+async def get_att_data_from_pq(
+    pq: ProcessingQueue,
+) -> tuple[ProcessingQueue | None, dict | None, str | None]:
+    """Extract attachment data from a ProcessingQueue object.
+
+    :param pq: The ProcessingQueue object.
+    :return: A tuple containing the updated pq, att_data, and text.
+    """
+    try:
+        with pq.filepath_local.open("rb") as file:
+            text = file.read().decode("utf-8")
+    except IOError as exc:
+        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
+        await mark_pq_status(pq, msg, PROCESSING_STATUS.FAILED)
+        return None, None, None
+
+    att_data = get_data_from_att_report(text, pq.court_id)
+    if not att_data:
+        msg = "Not a valid attachment page upload."
+        await mark_pq_status(pq, msg, PROCESSING_STATUS.INVALID_CONTENT)
+        return None, None, None
+
+    if pq.pacer_case_id in ["undefined", "null"]:
+        pq.pacer_case_id = att_data.get("pacer_case_id")
+        await pq.asave()
+
+    return pq, att_data, text
+
+
+def get_main_rds(court_id: str, pacer_doc_id: str) -> QuerySet:
+    """
+    Return the main RECAPDocument queryset for a given court and pacer_doc_id.
+    :param court_id: The court ID to query.
+    :param pacer_doc_id: The pacer document ID.
+    :return: The main RECAPDocument queryset.
+    """
+    main_rds_qs = (
+        RECAPDocument.objects.select_related("docket_entry__docket")
+        .filter(
+            pacer_doc_id=pacer_doc_id,
+            docket_entry__docket__court_id=court_id,
+        )
+        .order_by("docket_entry__docket__pacer_case_id")
+        .distinct("docket_entry__docket__pacer_case_id")
+        .only(
+            "pacer_doc_id",
+            "docket_entry__docket__pacer_case_id",
+            "docket_entry__docket__court_id",
+        )
+    )
+    return main_rds_qs
+
+
+async def find_subdocket_att_page_rds(
+    pk: int,
+) -> list[int]:
+    """Look for RECAP Documents that belong to subdockets, and create a PQ
+    object for each additional attachment page that requires processing.
+
+    :param pk: Primary key of the processing queue item.
+    :return: A list of ProcessingQueue pks to process.
+    """
+
+    pq = await ProcessingQueue.objects.aget(pk=pk)
+    pq, att_data, text = await get_att_data_from_pq(pq)
+    pacer_doc_id = att_data["pacer_doc_id"]
+    main_rds = get_main_rds(pq.court_id, pacer_doc_id).exclude(
+        docket_entry__docket__pacer_case_id=pq.pacer_case_id
+    )
+    pqs_to_process_pks = [
+        pq.pk
+    ]  # Add the original pq to the list of pqs to process
+    original_file_content = text.encode("utf-8")
+    original_file_name = pq.filepath_local.name
+
+    @sync_to_async
+    def save_pq_instances():
+        with transaction.atomic():
+            for main_rd in main_rds:
+                main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
+                # Create additional pqs for each subdocket case found.
+                pq_created = ProcessingQueue.objects.create(
+                    uploader_id=pq.uploader_id,
+                    pacer_doc_id=pacer_doc_id,
+                    pacer_case_id=main_pacer_case_id,
+                    court_id=pq.court_id,
+                    upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+                    filepath_local=ContentFile(
+                        original_file_content, name=original_file_name
+                    ),
+                )
+                pqs_to_process_pks.append(pq_created.pk)
+
+    await save_pq_instances()
+    return pqs_to_process_pks
+
+
+async def find_subdocket_pdf_rds(
+    pk: int,
+) -> list[int]:
+    """Look for RECAP Documents that belong to subdockets, and create a PQ
+    object for each additional PDF upload that requires processing.
+
+    :param pk: Primary key of the processing queue item.
+    :return: A list of ProcessingQueue pks to process.
+    """
+
+    pq = await ProcessingQueue.objects.aget(pk=pk)
+    main_rds = get_main_rds(pq.court_id, pq.pacer_doc_id)
+    pqs_to_process_pks = [
+        pq.pk
+    ]  # Add the original pq to the list of pqs to process
+
+    appellate_court_ids = Court.federal_courts.appellate_pacer_courts()
+    if await appellate_court_ids.filter(pk=pq.court_id).aexists():
+        # Abort the process for appellate documents. Subdockets cannot be found
+        # in appellate cases.
+        return pqs_to_process_pks
+
+    if pq.pacer_case_id:
+        # If pq already has a pacer_case_id, exclude it from the queryset.
+        main_rds = main_rds.exclude(
+            docket_entry__docket__pacer_case_id=pq.pacer_case_id
+        )
+
+    pdf_binary_content = pq.filepath_local.read()
+
+    @sync_to_async
+    def save_pq_instances():
+        with transaction.atomic():
+            for i, main_rd in enumerate(main_rds):
+                if i == 0 and not pq.pacer_case_id:
+                    # If the original PQ does not have a pacer_case_id,
+                    # assign it a pacer_case_id from one of the matched RDs
+                    # to ensure the RD lookup in process_recap_pdf succeeds.
+                    pq.pacer_case_id = (
+                        main_rd.docket_entry.docket.pacer_case_id
+                    )
+                    pq.save()
+                    continue
+
+                main_pacer_case_id = main_rd.docket_entry.docket.pacer_case_id
+                # Create additional pqs for each subdocket case found.
+                pq_created = ProcessingQueue.objects.create(
+                    uploader_id=pq.uploader_id,
+                    pacer_doc_id=pq.pacer_doc_id,
+                    pacer_case_id=main_pacer_case_id,
+                    document_number=pq.document_number,
+                    attachment_number=pq.attachment_number,
+                    court_id=pq.court_id,
+                    upload_type=UPLOAD_TYPE.PDF,
+                    filepath_local=ContentFile(
+                        pdf_binary_content, name=pq.filepath_local.name
+                    ),
+                )
+                pqs_to_process_pks.append(pq_created.pk)
+
+    await save_pq_instances()
+    return pqs_to_process_pks
+
+
 async def process_recap_attachment(
     pk: int,
     tag_names: Optional[List[str]] = None,
@@ -652,7 +818,6 @@ async def process_recap_attachment(
 ) -> Optional[Tuple[int, str, list[RECAPDocument]]]:
     """Process an uploaded attachment page from the RECAP API endpoint.
 
-    :param self: The Celery task
     :param pk: The primary key of the processing queue item you want to work on
     :param tag_names: A list of tag names to add to all items created or
     modified in this function.
@@ -666,30 +831,7 @@ async def process_recap_attachment(
     await mark_pq_status(pq, "", PROCESSING_STATUS.IN_PROGRESS)
     logger.info(f"Processing RECAP item (debug is: {pq.debug}): {pq}")
 
-    try:
-        text = pq.filepath_local.read().decode()
-    except IOError as exc:
-        msg = f"Internal processing error ({exc.errno}: {exc.strerror})."
-        pq_status, msg = await mark_pq_status(
-            pq, msg, PROCESSING_STATUS.FAILED
-        )
-        return pq_status, msg, []
-
-    att_data = get_data_from_att_report(text, pq.court_id)
-    logger.info(f"Parsing completed for item {pq}")
-
-    if att_data == {}:
-        # Bad attachment page.
-        msg = "Not a valid attachment page upload."
-        pq_status, msg = await mark_pq_status(
-            pq, msg, PROCESSING_STATUS.INVALID_CONTENT
-        )
-        return pq_status, msg, []
-
-    if pq.pacer_case_id in ["undefined", "null"]:
-        # Bad data from the client. Fix it with parsed data.
-        pq.pacer_case_id = att_data.get("pacer_case_id")
-        await pq.asave()
+    pq, att_data, text = await get_att_data_from_pq(pq)
 
     if document_number is None:
         document_number = att_data["document_number"]
@@ -723,6 +865,7 @@ async def process_recap_attachment(
     await add_tags_to_objs(tag_names, rds_affected)
     await associate_related_instances(pq, d_id=de.docket_id, de_id=de.pk)
     pq_status, msg = await mark_pq_successful(pq)
+
     return pq_status, msg, rds_affected
 
 
@@ -2751,7 +2894,7 @@ def process_recap_email(
         all_updated_rds += docket_updated.rds_updated
 
     if not is_potentially_sealed_entry:
-        rds_to_extract_add_to_solr = all_attachment_rds + all_created_rds
+        rds_to_extract = all_attachment_rds + all_created_rds
         rds_updated_or_created = (
             all_attachment_rds + all_created_rds + all_updated_rds
         )
@@ -2764,13 +2907,13 @@ def process_recap_email(
         msg = "Successful upload! Nice work."
         status = PROCESSING_STATUS.SUCCESSFUL
     else:
-        rds_to_extract_add_to_solr = []
+        rds_to_extract = []
         self.request.chain = None
         msg = "Could not retrieve Docket Entry"
         status = PROCESSING_STATUS.FAILED
 
     async_to_sync(mark_pq_status)(epq, msg, status, "status_message")
-    return [rd.pk for rd in rds_to_extract_add_to_solr]
+    return [rd.pk for rd in rds_to_extract]
 
 
 def do_recap_document_fetch(epq: EmailProcessingQueue, user: User) -> None:

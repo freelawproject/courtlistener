@@ -66,6 +66,7 @@ from cl.search.documents import (
 )
 from cl.search.exception import (
     BadProximityQuery,
+    DisallowedWildcardPattern,
     UnbalancedParenthesesQuery,
     UnbalancedQuotesQuery,
 )
@@ -228,10 +229,10 @@ def show_results(request: HttpRequest) -> HttpResponse:
         mutable_GET["filed_before"] = date.today()
 
         # Load the render_dict with good results that can be shown in the
-        # "Latest Cases" section
+        # "Latest Opinions" section
         mutable_GET.update(
             {
-                "order_by": "dateArgued desc",
+                "order_by": "dateFiled desc",
                 "type": SEARCH_TYPES.OPINION,
             }
         )
@@ -556,6 +557,9 @@ def do_es_search(
             suggested_query = "proximity_filter"
             if e.error_type == UnbalancedParenthesesQuery.QUERY_STRING:
                 suggested_query = "proximity_query"
+        except DisallowedWildcardPattern:
+            error = True
+            error_message = "disallowed_wildcard_pattern"
         finally:
             # Make sure to always call the _clean_form method
             search_form = _clean_form(

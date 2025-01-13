@@ -17,6 +17,7 @@ from django.core import mail
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db import transaction
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils.timezone import now
@@ -79,7 +80,7 @@ from cl.recap.management.commands.remove_appellate_entries_with_long_numbers imp
     clean_up_duplicate_appellate_entries,
 )
 from cl.recap.management.commands.reprocess_recap_dockets import (
-    extract_unextracted_rds_and_add_to_solr,
+    extract_unextracted_rds,
 )
 from cl.recap.mergers import (
     add_attorney,
@@ -100,6 +101,7 @@ from cl.recap.models import (
     EmailProcessingQueue,
     FjcIntegratedDatabase,
     PacerFetchQueue,
+    PacerHtmlFiles,
     ProcessingQueue,
 )
 from cl.recap.tasks import (
@@ -115,6 +117,7 @@ from cl.recap.tasks import (
     process_recap_claims_register,
     process_recap_docket,
     process_recap_pdf,
+    process_recap_upload,
     process_recap_zip,
 )
 from cl.recap_rss.tasks import merge_rss_feed_contents
@@ -768,6 +771,634 @@ class RecapUploadsTest(TestCase):
         self.assertEqual(
             main_attachment[0].document_type, RECAPDocument.ATTACHMENT
         )
+
+    def test_match_recap_document_with_wrong_pacer_doc_id(self, mock_upload):
+        """Confirm that when an existing RECAPDocument has an invalid
+        pacer_doc_id, we can still match it after excluding the pacer_doc_id
+        from the lookup.
+        """
+
+        de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                RECAPEmailDocketEntryDataFactory(
+                    pacer_doc_id="04505578690",
+                    document_number=5,
+                )
+            ],
+        )
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court, entry_number=5
+        )
+        rd = RECAPDocumentFactory(
+            docket_entry=de,
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            pacer_doc_id="04505578691",
+            document_number="5",
+            description="",
+        )
+        # Add the docket entry with the updated pacer_doc_id
+        async_to_sync(add_docket_entries)(de.docket, de_data["docket_entries"])
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            recap_documents.count(), 1, msg="Wrong number of RECAPDocuments"
+        )
+        rd.refresh_from_db()
+        self.assertEqual(
+            rd.description,
+            de_data["docket_entries"][0]["short_description"],
+            msg="The short description doesn't match.",
+        )
+        self.assertEqual(
+            rd.pacer_doc_id,
+            de_data["docket_entries"][0]["pacer_doc_id"],
+            msg="The pacer_doc_id doesn't match.",
+        )
+
+    def test_match_recap_document_with_wrong_pacer_doc_id_duplicated(
+        self, mock_upload
+    ):
+        """Confirm that when an existing RECAPDocument has an invalid
+        pacer_doc_id, we can still match it after excluding the pacer_doc_id
+        from the lookup, even if there is more than one PACER_DOCUMENT that
+        belongs to the docket entry.
+        """
+
+        de_data = DocketEntriesDataFactory(
+            docket_entries=[
+                RECAPEmailDocketEntryDataFactory(
+                    pacer_doc_id="04505578690",
+                    document_number=5,
+                )
+            ],
+        )
+        de = DocketEntryWithParentsFactory(
+            docket__court=self.court, entry_number=5
+        )
+        RECAPDocumentFactory(
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            docket_entry=de,
+            pacer_doc_id="04505578691",
+            document_number="5",
+            description="",
+        )
+        rd_2 = RECAPDocumentFactory(
+            document_type=RECAPDocument.PACER_DOCUMENT,
+            docket_entry=de,
+            pacer_doc_id="04505578691",
+            document_number="6",
+            description="",
+            is_available=True,
+        )
+        # Add the docket entry with the updated pacer_doc_id, remove the
+        # duplicated RD, and keep the one that is available.
+        async_to_sync(add_docket_entries)(de.docket, de_data["docket_entries"])
+        recap_documents = RECAPDocument.objects.all()
+        self.assertEqual(
+            recap_documents.count(), 1, msg="Wrong number of RECAPDocuments"
+        )
+        rd_2.refresh_from_db()
+        self.assertEqual(
+            rd_2.description,
+            de_data["docket_entries"][0]["short_description"],
+            msg="The short description doesn't match.",
+        )
+        self.assertEqual(
+            rd_2.pacer_doc_id,
+            de_data["docket_entries"][0]["pacer_doc_id"],
+            msg="The pacer_doc_id doesn't match.",
+        )
+
+
+class ReplicateRecapUploadsTest(TestCase):
+    """Test RECAP uploads are properly replicated to subdockets."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get(username="recap")
+        cls.f = SimpleUploadedFile("file.txt", b"file content more content")
+        cls.court = CourtFactory.create(jurisdiction="FD", in_use=True)
+        cls.att_data_2 = AppellateAttachmentPageFactory(
+            attachments=[
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578698", attachment_number=1
+                ),
+                AppellateAttachmentFactory(
+                    pacer_doc_id="04505578699", attachment_number=2
+                ),
+            ],
+            pacer_doc_id="04505578697",
+            pacer_case_id="104491",
+            document_number="1",
+        )
+        cls.de_data_2 = DocketEntriesDataFactory(
+            docket_entries=[
+                DocketEntryDataFactory(
+                    pacer_doc_id="04505578697",
+                    document_number=1,
+                )
+            ],
+        )
+
+        cls.d_1 = DocketFactory(
+            source=Docket.RECAP,
+            docket_number="23-4567",
+            court=cls.court,
+            pacer_case_id="104490",
+        )
+        cls.d_2 = DocketFactory(
+            source=Docket.RECAP,
+            docket_number="23-4567",
+            court=cls.court,
+            pacer_case_id="104491",
+        )
+        cls.d_3 = DocketFactory(
+            source=Docket.RECAP,
+            docket_number="23-4567",
+            court=cls.court,
+            pacer_case_id="104492",
+        )
+
+    def test_processing_subdocket_case_attachment_page(self):
+        """Can we replicate an attachment page upload from a subdocket case
+        to its corresponding RD across all related dockets?
+        """
+
+        # Add the docket entry to every case.
+        async_to_sync(add_docket_entries)(
+            self.d_1, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_2, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_3, self.de_data_2["docket_entries"]
+        )
+
+        # Create an initial PQ.
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+        d_3_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3
+        )
+
+        main_d_1_rd = d_1_recap_document[0]
+        main_d_2_rd = d_2_recap_document[0]
+        main_d_3_rd = d_3_recap_document[0]
+
+        # After adding 1 docket entry, it should only exist its main RD on
+        # every docket
+        self.assertEqual(d_1_recap_document.count(), 1)
+        self.assertEqual(d_2_recap_document.count(), 1)
+        self.assertEqual(d_3_recap_document.count(), 1)
+
+        self.assertEqual(
+            main_d_1_rd.document_type, RECAPDocument.PACER_DOCUMENT
+        )
+        self.assertEqual(
+            main_d_2_rd.document_type, RECAPDocument.PACER_DOCUMENT
+        )
+        self.assertEqual(
+            main_d_3_rd.document_type, RECAPDocument.PACER_DOCUMENT
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: self.att_data_2,
+        ):
+            # Process the attachment page containing 2 attachments.
+            async_to_sync(process_recap_upload)(pq)
+
+        # After adding attachments, it should exist 3 RD on every docket.
+        self.assertEqual(
+            d_1_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_2_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_1.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_3_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_3.pacer_case_id}.",
+        )
+
+        main_d_1_rd.refresh_from_db()
+        main_d_2_rd.refresh_from_db()
+        main_d_3_rd.refresh_from_db()
+        self.assertEqual(
+            main_d_1_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+        self.assertEqual(
+            main_d_2_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+        self.assertEqual(
+            main_d_3_rd.pacer_doc_id,
+            self.de_data_2["docket_entries"][0]["pacer_doc_id"],
+        )
+
+        # Two of them should be attachments.
+        d_1_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        d_2_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+        d_3_attachments = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3,
+            document_type=RECAPDocument.ATTACHMENT,
+        )
+
+        self.assertEqual(
+            d_1_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_1.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_2_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_3_attachments.count(),
+            2,
+            msg=f"Didn't get the expected number of RDs Attachments for the docket with PACER case ID {self.d_3.pacer_case_id}.",
+        )
+
+        att_1_data = self.att_data_2["attachments"][0]
+        att_2_data = self.att_data_2["attachments"][0]
+
+        self.assertEqual(
+            d_1_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_1_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_1_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_2_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_attachments.filter(pacer_doc_id=att_1_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_1_data["attachment_number"],
+        )
+        self.assertEqual(
+            d_2_attachments.filter(pacer_doc_id=att_2_data["pacer_doc_id"])
+            .first()
+            .attachment_number,
+            att_2_data["attachment_number"],
+        )
+
+        # Assert the number of PQs created to process the additional subdocket RDs.
+        pqs_created = ProcessingQueue.objects.all()
+        self.assertEqual(pqs_created.count(), 3)
+
+        pqs_status = {pq.status for pq in pqs_created}
+        self.assertEqual(pqs_status, {PROCESSING_STATUS.SUCCESSFUL})
+
+        pqs_related_dockets = {pq.docket_id for pq in pqs_created}
+        self.assertEqual(
+            pqs_related_dockets, {self.d_1.pk, self.d_2.pk, self.d_3.pk}
+        )
+
+        # 3 PacerHtmlFiles should have been created, one for each case.
+        att_html_created = PacerHtmlFiles.objects.all()
+        self.assertEqual(att_html_created.count(), 3)
+        related_htmls_de = {
+            html.content_object.pk for html in att_html_created
+        }
+        self.assertEqual(
+            {de.pk for de in DocketEntry.objects.all()}, related_htmls_de
+        )
+
+    def test_process_attachments_for_subdocket_pq_with_missing_main_rd(self):
+        """Confirm that if the RD related to the initial PQ is missing,
+        we can still process attachments for subdocket cases where the
+        main RD matches.
+        """
+
+        # Add the docket entry only to d_1.
+        async_to_sync(add_docket_entries)(
+            self.d_1, self.de_data_2["docket_entries"]
+        )
+
+        # Create an initial PQ related to d_1
+        pq = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+
+        # After adding 1 docket entry d_1
+        self.assertEqual(
+            d_1_recap_document.count(),
+            1,
+            msg=f"Didn't get the initial number of RDs for the docket with PACER case ID {self.d_1.pacer_case_id}",
+        )
+        self.assertEqual(
+            d_2_recap_document.count(),
+            0,
+            msg=f"Didn't get the initial number of RDs for the docket with PACER case ID {self.d_2.pacer_case_id}",
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: self.att_data_2,
+        ):
+            # Process the attachment page containing 2 attachments.
+            async_to_sync(process_recap_upload)(pq)
+
+        # After adding attachments, it should exist 3 RD on every docket.
+        self.assertEqual(
+            d_1_recap_document.count(),
+            3,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_2.pacer_case_id}.",
+        )
+        self.assertEqual(
+            d_2_recap_document.count(),
+            0,
+            msg=f"Didn't get the expected number of RDs for the docket with PACER case ID {self.d_1.pacer_case_id}.",
+        )
+
+        pq.refresh_from_db()
+        self.assertEqual(
+            pq.status,
+            PROCESSING_STATUS.FAILED,
+            msg="Didn't get the expected error message.",
+        )
+        self.assertEqual(
+            pq.error_message,
+            "Could not find docket to associate with attachment metadata",
+        )
+
+        successful_pq = ProcessingQueue.objects.all().exclude(pk=pq.pk)
+        self.assertEqual(successful_pq.count(), 1)
+        self.assertEqual(successful_pq[0].status, PROCESSING_STATUS.SUCCESSFUL)
+        self.assertEqual(
+            successful_pq[0].docket_id,
+            self.d_1.pk,
+            msg="Didn't get the expected docket ID.",
+        )
+
+    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    def test_processing_subdocket_case_pdf_upload(self, mock_extract):
+        """Can we duplicate a PDF document upload from a subdocket case to the
+        corresponding RD across all related dockets?
+        """
+
+        # Add the docket entry to every case.
+        async_to_sync(add_docket_entries)(
+            self.d_1, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_2, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_3, self.de_data_2["docket_entries"]
+        )
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+        d_3_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_3
+        )
+
+        main_d_1_rd = d_1_recap_document[0]
+        main_d_2_rd = d_2_recap_document[0]
+        main_d_3_rd = d_3_recap_document[0]
+
+        self.assertFalse(main_d_1_rd.is_available)
+        self.assertFalse(main_d_2_rd.is_available)
+        self.assertFalse(main_d_3_rd.is_available)
+
+        # Two test cases: pacer_case_id and blank pacer_case_id
+        pacer_case_ids = ["104491", ""]
+        for pacer_case_id in pacer_case_ids:
+            with (
+                self.subTest(pacer_case_id=pacer_case_id),
+                transaction.atomic(),
+            ):
+                # Create an initial PQ.
+                pq = ProcessingQueue.objects.create(
+                    court=self.court,
+                    uploader=self.user,
+                    pacer_case_id=pacer_case_id,
+                    pacer_doc_id="04505578697",
+                    document_number=1,
+                    upload_type=UPLOAD_TYPE.PDF,
+                    filepath_local=self.f,
+                )
+
+                # Process the PDF upload.
+                async_to_sync(process_recap_upload)(pq)
+
+                main_d_1_rd.refresh_from_db()
+                main_d_2_rd.refresh_from_db()
+                main_d_3_rd.refresh_from_db()
+
+                self.assertTrue(
+                    main_d_1_rd.is_available,
+                    msg="is_available value doesn't match",
+                )
+                self.assertTrue(
+                    main_d_2_rd.is_available,
+                    msg="is_available value doesn't match",
+                )
+                self.assertTrue(
+                    main_d_3_rd.is_available,
+                    msg="is_available value doesn't match",
+                )
+
+                self.assertTrue(main_d_1_rd.filepath_local)
+                self.assertTrue(main_d_2_rd.filepath_local)
+                self.assertTrue(main_d_3_rd.filepath_local)
+
+                # Assert the number of PQs created to process the additional subdocket RDs.
+                pqs_created = ProcessingQueue.objects.all()
+                self.assertEqual(
+                    pqs_created.count(),
+                    3,
+                    msg="The number of PQs doesn't match.",
+                )
+
+                pqs_status = {pq.status for pq in pqs_created}
+                self.assertEqual(pqs_status, {PROCESSING_STATUS.SUCCESSFUL})
+
+                pqs_related_dockets = {pq.docket_id for pq in pqs_created}
+                self.assertEqual(
+                    pqs_related_dockets,
+                    {self.d_1.pk, self.d_2.pk, self.d_3.pk},
+                )
+                pqs_related_docket_entries = {
+                    pq.docket_entry_id for pq in pqs_created
+                }
+                self.assertEqual(
+                    pqs_related_docket_entries,
+                    {
+                        main_d_1_rd.docket_entry.pk,
+                        main_d_2_rd.docket_entry.pk,
+                        main_d_3_rd.docket_entry.pk,
+                    },
+                )
+                pqs_related_rds = {pq.recap_document_id for pq in pqs_created}
+                self.assertEqual(
+                    pqs_related_rds,
+                    {main_d_1_rd.pk, main_d_2_rd.pk, main_d_3_rd.pk},
+                )
+
+                transaction.set_rollback(True)
+
+    @mock.patch("cl.recap.tasks.extract_recap_pdf_base")
+    def test_processing_subdocket_case_pdf_attachment_upload(
+        self, mock_extract
+    ):
+        """Can we duplicate a PDF attachment document upload from a subdocket
+        case to the corresponding RD across all related dockets?
+        """
+
+        # Add the docket entry to every case.
+        async_to_sync(add_docket_entries)(
+            self.d_1, self.de_data_2["docket_entries"]
+        )
+        async_to_sync(add_docket_entries)(
+            self.d_2, self.de_data_2["docket_entries"]
+        )
+
+        pq_att = ProcessingQueue.objects.create(
+            court=self.court,
+            uploader=self.user,
+            pacer_case_id="104491",
+            upload_type=UPLOAD_TYPE.ATTACHMENT_PAGE,
+            filepath_local=self.f,
+        )
+
+        with mock.patch(
+            "cl.recap.tasks.get_data_from_att_report",
+            side_effect=lambda x, y: self.att_data_2,
+        ):
+            # Process the attachment page containing 2 attachments.
+            async_to_sync(process_recap_upload)(pq_att)
+
+        d_1_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_1
+        )
+        d_2_recap_document = RECAPDocument.objects.filter(
+            docket_entry__docket=self.d_2
+        )
+        self.assertEqual(d_1_recap_document.count(), 3)
+        self.assertEqual(d_2_recap_document.count(), 3)
+
+        att_d_1_rd = d_1_recap_document.filter(attachment_number=2).first()
+        att_d_2_rd = d_2_recap_document.filter(attachment_number=2).first()
+
+        self.assertFalse(att_d_1_rd.is_available)
+        self.assertFalse(att_d_2_rd.is_available)
+
+        # Two test cases: pacer_case_id and blank pacer_case_id
+        pacer_case_ids = ["104491", ""]
+        for pacer_case_id in pacer_case_ids:
+            with (
+                self.subTest(pacer_case_id=pacer_case_id),
+                transaction.atomic(),
+            ):
+                # Create an initial PQ.
+                pq = ProcessingQueue.objects.create(
+                    court=self.court,
+                    uploader=self.user,
+                    pacer_case_id=pacer_case_id,
+                    pacer_doc_id="04505578699",
+                    document_number=1,
+                    attachment_number=2,
+                    upload_type=UPLOAD_TYPE.PDF,
+                    filepath_local=self.f,
+                )
+
+                # Process the PDF upload.
+                async_to_sync(process_recap_upload)(pq)
+
+                att_d_1_rd.refresh_from_db()
+                att_d_2_rd.refresh_from_db()
+
+                self.assertTrue(
+                    att_d_1_rd.is_available,
+                    msg="is_available value doesn't match",
+                )
+                self.assertTrue(
+                    att_d_2_rd.is_available,
+                    msg="is_available value doesn't match",
+                )
+
+                self.assertTrue(att_d_1_rd.filepath_local)
+                self.assertTrue(att_d_2_rd.filepath_local)
+
+                # Assert the number of PQs created to process the additional subdocket RDs.
+                pqs_created = ProcessingQueue.objects.filter(
+                    upload_type=UPLOAD_TYPE.PDF
+                )
+                self.assertEqual(
+                    pqs_created.count(),
+                    2,
+                    msg="The number of PQs doesn't match.",
+                )
+
+                pqs_status = {pq.status for pq in pqs_created}
+                self.assertEqual(pqs_status, {PROCESSING_STATUS.SUCCESSFUL})
+
+                pqs_related_dockets = {pq.docket_id for pq in pqs_created}
+                self.assertEqual(
+                    pqs_related_dockets,
+                    {self.d_1.pk, self.d_2.pk},
+                )
+                pqs_related_docket_entries = {
+                    pq.docket_entry_id for pq in pqs_created
+                }
+                self.assertEqual(
+                    pqs_related_docket_entries,
+                    {
+                        att_d_1_rd.docket_entry.pk,
+                        att_d_2_rd.docket_entry.pk,
+                    },
+                )
+                pqs_related_rds = {pq.recap_document_id for pq in pqs_created}
+                self.assertEqual(
+                    pqs_related_rds,
+                    {att_d_1_rd.pk, att_d_2_rd.pk},
+                )
+
+                transaction.set_rollback(True)
 
 
 @mock.patch("cl.recap.tasks.DocketReport", new=fakes.FakeDocketReport)
@@ -5923,7 +6554,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         ]
         self.assertEqual(len(rd_needs_extraction), 2)
 
-        extract_unextracted_rds_and_add_to_solr("celery")
+        extract_unextracted_rds("celery")
 
         rd_needs_extraction_after = [
             x.pk
@@ -5962,7 +6593,7 @@ class TestRecapDocumentsExtractContentCommand(TestCase):
         self.assertEqual(rd[0].sha1, "asdfasdfasdfasdfasdfasddf")
         self.assertEqual(rd[0].date_upload, date_upload)
 
-        extract_unextracted_rds_and_add_to_solr("celery")
+        extract_unextracted_rds("celery")
         # File related fields should be cleaned up after the failed extraction.
         self.assertEqual(rd[0].is_available, False)
         self.assertEqual(rd[0].file_size, None)

@@ -93,6 +93,7 @@ class RECAPEmailDocketEntryDataFactory(DictFactory):
     pacer_doc_id = Faker("random_id_string")
     pacer_magic_num = Faker("random_id_string")
     pacer_seq_no = Faker("random_id_string")
+    short_description = Faker("text", max_nb_chars=15)
 
 
 class RECAPEmailDocketDataFactory(DictFactory):

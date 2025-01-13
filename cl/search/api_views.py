@@ -1,5 +1,6 @@
 from http import HTTPStatus
 
+from django.db.models import Prefetch
 from rest_framework import pagination, permissions, response, viewsets
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
@@ -220,7 +221,12 @@ class OpinionClusterViewSet(LoggingMixin, viewsets.ModelViewSet):
         "date_modified",
     ]
     queryset = OpinionCluster.objects.prefetch_related(
-        "sub_opinions", "panel", "non_participating_judges", "citations"
+        Prefetch(
+            "sub_opinions", queryset=Opinion.objects.order_by("ordering_key")
+        ),
+        "panel",
+        "non_participating_judges",
+        "citations",
     ).order_by("-id")
 
 

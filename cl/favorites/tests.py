@@ -2,11 +2,13 @@ import math
 import time
 from datetime import date, timedelta
 from http import HTTPStatus
+from unittest.mock import patch
 
 import time_machine
 from asgiref.sync import sync_to_async
 from django.contrib.auth.hashers import make_password
 from django.core import mail
+from django.core.cache import cache
 from django.template.defaultfilters import date as template_date
 from django.test import AsyncClient, override_settings
 from django.urls import reverse
@@ -23,8 +25,10 @@ from cl.favorites.utils import (
     create_prayer,
     delete_prayer,
     get_existing_prayers_in_bulk,
+    get_lifetime_prayer_stats,
     get_prayer_counts_in_bulk,
     get_top_prayers,
+    get_user_prayer_history,
     prayer_eligible,
 )
 from cl.lib.test_helpers import AudioTestCase, SimpleUserDataMixin
@@ -695,7 +699,7 @@ class RECAPPrayAndPay(TestCase):
         current_time = now()
         with time_machine.travel(current_time, tick=False):
             # No user prayers in the last 24 hours yet for this user.
-            user_is_eligible = await prayer_eligible(self.user)
+            user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertTrue(user_is_eligible)
 
             # Add prays for this user.
@@ -705,7 +709,7 @@ class RECAPPrayAndPay(TestCase):
 
             user_prays = Prayer.objects.filter(user=self.user)
             self.assertEqual(await user_prays.acount(), 1)
-            user_is_eligible = await prayer_eligible(self.user)
+            user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertTrue(user_is_eligible)
 
             await sync_to_async(PrayerFactory)(
@@ -715,7 +719,7 @@ class RECAPPrayAndPay(TestCase):
 
             # After two prays (ALLOWED_PRAYER_COUNT) in the last 24 hours.
             # The user is no longer eligible to create more prays
-            user_is_eligible = await prayer_eligible(self.user)
+            user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertFalse(user_is_eligible)
 
         with time_machine.travel(
@@ -726,7 +730,7 @@ class RECAPPrayAndPay(TestCase):
                 user=self.user, recap_document=self.rd_3
             )
             self.assertEqual(await user_prays.acount(), 3)
-            user_is_eligible = await prayer_eligible(self.user)
+            user_is_eligible, _ = await prayer_eligible(self.user)
             self.assertTrue(user_is_eligible)
 
     async def test_create_prayer(self) -> None:
@@ -784,9 +788,9 @@ class RECAPPrayAndPay(TestCase):
         self.assertEqual(await prays.acount(), 6)
 
         top_prayers = await get_top_prayers()
-        self.assertEqual(len(top_prayers), 3)
+        self.assertEqual(await top_prayers.acount(), 3)
         expected_top_prayers = [self.rd_2.pk, self.rd_4.pk, self.rd_3.pk]
-        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
         self.assertEqual(
             actual_top_prayers,
             expected_top_prayers,
@@ -814,9 +818,9 @@ class RECAPPrayAndPay(TestCase):
             await create_prayer(self.user_2, self.rd_3)
 
         top_prayers = await get_top_prayers()
-        self.assertEqual(len(top_prayers), 3)
+        self.assertEqual(await top_prayers.acount(), 3)
         expected_top_prayers = [self.rd_3.pk, self.rd_2.pk, self.rd_4.pk]
-        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
 
         self.assertEqual(
             actual_top_prayers,
@@ -850,7 +854,7 @@ class RECAPPrayAndPay(TestCase):
             )  # 2 prayers, 4 days old
 
         top_prayers = await get_top_prayers()
-        self.assertEqual(len(top_prayers), 4)
+        self.assertEqual(await top_prayers.acount(), 4)
 
         expected_top_prayers = [
             self.rd_4.pk,
@@ -858,7 +862,7 @@ class RECAPPrayAndPay(TestCase):
             self.rd_5.pk,
             self.rd_3.pk,
         ]
-        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
 
         self.assertEqual(
             actual_top_prayers,
@@ -884,6 +888,135 @@ class RECAPPrayAndPay(TestCase):
         self.assertAlmostEqual(
             top_prayers[3].geometric_mean, rd_3_score, places=2
         )
+
+    async def test_get_user_prayer_history(self) -> None:
+        """Does the get_user_prayer_history method work properly?"""
+        # Prayers for user_2
+        await create_prayer(self.user_2, self.rd_4)
+
+        # Prayers for user
+        await create_prayer(self.user, self.rd_2)
+        prayer_rd3 = await create_prayer(self.user, self.rd_3)
+        prayer_rd5 = await create_prayer(self.user, self.rd_5)
+
+        # Verify that the initial prayer count and total cost are 0.
+        count, total_cost = await get_user_prayer_history(self.user)
+        self.assertEqual(count, 0)
+        self.assertEqual(total_cost, 0.0)
+
+        # Update `rd_3`'s page count and set `prayer_rd3`'s status to `GRANTED`
+        self.rd_3.page_count = 2
+        await self.rd_3.asave()
+
+        prayer_rd3.status = Prayer.GRANTED
+        await prayer_rd3.asave()
+
+        # Verify that the count is 1 and total cost is 0.20.
+        count, total_cost = await get_user_prayer_history(self.user)
+        self.assertEqual(count, 1)
+        self.assertEqual(total_cost, 0.20)
+
+        # Update `rd_5`'s page count and set `prayer_rd5`'s status to `GRANTED`
+        self.rd_5.page_count = 40
+        await self.rd_5.asave()
+
+        prayer_rd5.status = Prayer.GRANTED
+        await prayer_rd5.asave()
+
+        # Verify that the count is 2 and the total cost is now 3.20.
+        count, total_cost = await get_user_prayer_history(self.user)
+        self.assertEqual(count, 2)
+        self.assertEqual(total_cost, 3.20)
+
+    @patch("cl.favorites.utils.cache.aget")
+    async def test_get_lifetime_prayer_stats(self, mock_cache_aget) -> None:
+        """Does the get_lifetime_prayer_stats method work properly?"""
+        mock_cache_aget.return_value = None
+
+        # Update page counts for recap documents
+        self.rd_2.page_count = 5
+        await self.rd_2.asave()
+        self.rd_3.page_count = 1
+        await self.rd_3.asave()
+        self.rd_4.page_count = 45
+        await self.rd_4.asave()
+        self.rd_5.page_count = 20
+        await self.rd_5.asave()
+
+        # Create prayer requests for the following user-document pairs:
+        # - User: Recap Document 2, Recap Document 3, Recap Document 5
+        # - User 2: Recap Document 2, Recap Document 3, Recap Document 4
+        await create_prayer(self.user, self.rd_2)
+        await create_prayer(self.user_2, self.rd_2)
+        await create_prayer(self.user, self.rd_3)
+        await create_prayer(self.user_2, self.rd_3)
+        await create_prayer(self.user_2, self.rd_4)
+        await create_prayer(self.user, self.rd_5)
+
+        # Verify expected values for waiting prayers:
+        # - Total count of 6 prayers
+        # - 4 distinct documents
+        # - Total cost of $5.60 (sum of individual document costs)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(prayer_stats.prayer_count, 6)
+        self.assertEqual(prayer_stats.distinct_count, 4)
+        self.assertEqual(prayer_stats.total_cost, "5.60")
+
+        # Verify that no prayers have been granted:
+        # - Zero count of granted prayers
+        # - Zero distinct documents
+        # - Zero total cost
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+        self.assertEqual(prayer_stats.prayer_count, 0)
+        self.assertEqual(prayer_stats.distinct_count, 0)
+        self.assertEqual(prayer_stats.total_cost, "0.00")
+
+        # rd_2 is granted.
+        self.rd_2.is_available = True
+        await self.rd_2.asave()
+
+        # Verify that granting `rd_2` reduces the number of waiting prayers:
+        # - Total waiting prayers should decrease by 2 (as `rd_2` had 2 prayers)
+        # - Distinct documents should decrease by 1
+        # - Total cost should decrease to 5.10 (excluding `rd_2`'s cost)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(prayer_stats.prayer_count, 4)
+        self.assertEqual(prayer_stats.distinct_count, 3)
+        self.assertEqual(prayer_stats.total_cost, "5.10")
+
+        # Verify that granting `rd_2` increases the number of granted prayers:
+        # - Total granted prayers should increase by 2 (as `rd_2` had 2 prayers)
+        # - Distinct documents should increase by 1
+        # - Total cost should increase by 0.50 (the cost of granting `rd_2`)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+        self.assertEqual(prayer_stats.prayer_count, 2)
+        self.assertEqual(prayer_stats.distinct_count, 1)
+        self.assertEqual(prayer_stats.total_cost, "0.50")
+
+        # rd_4 is granted.
+        self.rd_4.is_available = True
+        await self.rd_4.asave()
+
+        # Verify that granting `rd_4` reduces the number of waiting prayers:
+        # - Total waiting prayers should decrease by 3 (2 from `rd_2` and 1 from `rd_4`)
+        # - Distinct documents should decrease by 2 (`rd_2` and `rd_4`)
+        # - Total cost should decrease to 2.10 (excluding costs of `rd_2` and `rd_4`)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.WAITING)
+        self.assertEqual(prayer_stats.prayer_count, 3)
+        self.assertEqual(prayer_stats.distinct_count, 2)
+        self.assertEqual(prayer_stats.total_cost, "2.10")
+
+        # Verify that granting `rd_4` increases the number of granted prayers:
+        # - Total granted prayers should increase by 3 (2 from `rd_2` and 1 from `rd_4`)
+        # - Distinct documents should increase by 1 (`rd_2` and `rd_4` are now granted)
+        # - Total cost should increase by 3.50 (the combined cost of `rd_2` and `rd_4`)
+        prayer_stats = await get_lifetime_prayer_stats(Prayer.GRANTED)
+        self.assertEqual(prayer_stats.prayer_count, 3)
+        self.assertEqual(prayer_stats.distinct_count, 2)
+        self.assertEqual(prayer_stats.total_cost, "3.50")
+
+        await cache.adelete(f"prayer-stats-{Prayer.WAITING}")
+        await cache.adelete(f"prayer-stats-{Prayer.GRANTED}")
 
     async def test_prayers_integration(self) -> None:
         """Integration test for prayers."""
@@ -916,11 +1049,11 @@ class RECAPPrayAndPay(TestCase):
         # Confirm top prayers list is as expected.
         top_prayers = await get_top_prayers()
         self.assertEqual(
-            len(top_prayers), 2, msg="Wrong number of top prayers"
+            await top_prayers.acount(), 2, msg="Wrong number of top prayers"
         )
 
         expected_top_prayers = [rd_6.pk, self.rd_4.pk]
-        actual_top_prayers = [top_rd.pk for top_rd in top_prayers]
+        actual_top_prayers = [top_rd.pk async for top_rd in top_prayers]
         self.assertEqual(
             actual_top_prayers, expected_top_prayers, msg="Wrong top_prayers."
         )
@@ -983,11 +1116,11 @@ class RECAPPrayAndPay(TestCase):
             email_text_content,
         )
         self.assertIn(
-            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'M j, Y')}",
+            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'F j, Y')}",
             email_text_content,
         )
         self.assertIn(
-            f"{len(actual_top_prayers)} people were also waiting for it.",
+            f"{len(actual_top_prayers)} people were waiting for it.",
             email_text_content,
         )
         self.assertIn(
@@ -1000,11 +1133,11 @@ class RECAPPrayAndPay(TestCase):
             html_content,
         )
         self.assertIn(
-            f"{len(actual_top_prayers)} people were also waiting for it.",
+            f"{len(actual_top_prayers)} people were waiting for it.",
             html_content,
         )
         self.assertIn(
-            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'M j, Y')}",
+            f"You requested it on {template_date(make_naive(prayer_1.date_created), 'F j, Y')}",
             html_content,
         )
         self.assertIn(
@@ -1017,9 +1150,13 @@ class RECAPPrayAndPay(TestCase):
         )
 
         top_prayers = await get_top_prayers()
-        self.assertEqual(len(top_prayers), 1, msg="Wrong top_prayers.")
         self.assertEqual(
-            top_prayers[0], self.rd_4, msg="The top prayer didn't match."
+            await top_prayers.acount(), 1, msg="Wrong top_prayers."
+        )
+        self.assertEqual(
+            await top_prayers.afirst(),
+            self.rd_4,
+            msg="The top prayer didn't match.",
         )
 
 

@@ -1,6 +1,7 @@
 import logging
 from collections import OrderedDict, defaultdict
 from datetime import date, datetime, timedelta, timezone
+from itertools import batched, chain
 from typing import Any, Dict, List, Set, TypedDict, Union
 
 import eyecite
@@ -704,56 +705,64 @@ def invert_user_logs(
     end: Union[str, datetime],
     add_usernames: bool = True,
 ) -> Dict[str, Dict[str, int]]:
-    """Invert the user logs for a period of time
+    """Aggregate API usage statistics per user over a date range.
 
-    The user logs have the date in the key and the user as part of the set:
+    - Anonymous users are aggregated under the key 'AnonymousUser'.
+    - Both v3 and v4 API counts are combined in the results.
 
-        'api:v3.user.d:2016-10-01.counts': {
-           mlissner: 22,
-           joe_hazard: 33,
-        }
+    :param start: Beginning date (inclusive) for the query range
+    :param end: End date (inclusive) for the query range
+    :param add_usernames: If True, replaces user IDs with usernames as keys.
+        When False, uses only user IDs as keys.
 
-    This inverts these entries to:
-
-        users: {
-            mlissner: {
-                2016-10-01: 22,
-                total: 22,
-            },
-            joe_hazard: {
-                2016-10-01: 33,
-                total: 33,
-            }
-        }
-    :param start: The beginning date (inclusive) you want the results for. A
-    :param end: The end date (inclusive) you want the results for.
-    :param add_usernames: Stats are stored with the user ID. If this is True,
-    add an alias in the returned dictionary that contains the username as well.
-    :return The inverted dictionary
+    :return: Dictionary mapping user identifiers (usernames if `add_usernames=True`,
+        otherwise user IDs) to their daily API usage counts and totals.
+        Inner dictionaries are ordered by date. Only dates with usage are included.
     """
     r = get_redis_interface("STATS")
     pipe = r.pipeline()
 
     dates = make_date_str_list(start, end)
+    versions = ["v3", "v4"]
     for d in dates:
-        pipe.zrange(f"api:v3.user.d:{d}.counts", 0, -1, withscores=True)
+        for version in versions:
+            pipe.zrange(
+                f"api:{version}.user.d:{d}.counts",
+                0,
+                -1,
+                withscores=True,
+            )
+
+    # results contains alternating v3/v4 API usage data for each date queried.
+    # For example, if querying 2023-01-01 to 2023-01-02, results might look like:
+    # [
+    #     # 2023-01-01 v3 data: [(user_id, count), ...]
+    #     [("1", 100.0), ("2", 50.0)],
+    #     # 2023-01-01 v4 data
+    #     [("1", 50.0), ("2", 25.0)],
+    #     # 2023-01-02 v3 data
+    #     [("1", 200.0), ("2", 100.0)],
+    #     # 2023-01-02 v4 data
+    #     [("1", 100.0), ("2", 50.0)]
+    # ]
+    # We zip this with dates to combine v3/v4 counts per user per day
     results = pipe.execute()
 
-    # results is a list of results for each of the zrange queries above. Zip
-    # those results with the date that created it, and invert the whole thing.
     out: defaultdict = defaultdict(dict)
-    for d, result in zip(dates, results):
-        for user_id, count in result:
-            if user_id == "None" or user_id == "AnonymousUser":
-                user_id = "AnonymousUser"
-            else:
-                user_id = int(user_id)
-            count = int(count)
-            if out.get(user_id):
-                out[user_id][d] = count
-                out[user_id]["total"] += count
-            else:
-                out[user_id] = {d: count, "total": count}
+
+    def update_user_counts(_user_id, _count, _date):
+        user_is_anonymous = _user_id == "None" or _user_id == "AnonymousUser"
+        _user_id = "AnonymousUser" if user_is_anonymous else int(_user_id)
+        _count = int(_count)
+        out.setdefault(_user_id, OrderedDict())
+        out[_user_id].setdefault(_date, 0)
+        out[_user_id][_date] += _count
+        out[_user_id].setdefault("total", 0)
+        out[_user_id]["total"] += _count
+
+    for d, api_usage in zip(dates, batched(results, len(versions))):
+        for user_id, count in chain(*api_usage):
+            update_user_counts(user_id, count, d)
 
     # Sort the values
     for k, v in out.items():
