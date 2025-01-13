@@ -649,8 +649,6 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
         return None
 
     scheduled_hits_to_create = []
-    email_alerts_to_send = []
-    rt_alerts_to_send = []
 
     main_alerts_triggered = response.main_alerts_triggered
     rd_alerts_triggered = response.rd_alerts_triggered
@@ -661,7 +659,6 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
     instance_content_type = ContentType.objects.get(
         app_label=app_label_str, model=model_str.lower()
     )
-    schedule_alert = False
     r = get_redis_interface("CACHE")
     recap_document_hits = [hit.id for hit in rd_alerts_triggered]
     docket_hits = [hit.id for hit in d_alerts_triggered]
@@ -691,7 +688,6 @@ def percolator_response_processing(response: SendAlertsResponse) -> None:
                 transform_percolator_child_document(
                     document_content_copy, hit.meta
                 )
-                schedule_alert = True
                 add_document_hit_to_alert_set(
                     r, alert_triggered.pk, "r", document_content_copy["id"]
                 )

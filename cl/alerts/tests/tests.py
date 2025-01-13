@@ -2033,7 +2033,7 @@ class DocketAlertGetNotesTagsTests(TestCase):
     "cl.lib.es_signal_processor.allow_es_audio_indexing",
     side_effect=lambda x, y: True,
 )
-class SearchAlertsOAESTests(ESIndexTestCase, TestCase, RECAPAlertsAssertions):
+class SearchAlertsOAESTests(ESIndexTestCase, TestCase, SearchAlertsAssertions):
     """Test ES Search Alerts"""
 
     @classmethod
@@ -2639,12 +2639,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, RECAPAlertsAssertions):
             rate=Alert.REAL_TIME,
             name="Test RT Alert OA",
             query="q=docketNumber:19-5739 OR docketNumber:19-5740&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         rt_oa_search_alert_2 = AlertFactory(
             user=self.user_profile.user,
             rate=Alert.REAL_TIME,
             name="Test RT Alert OA 2",
             query="q=docketNumber:19-5741&type=oa",
+            alert_type=SEARCH_TYPES.ORAL_ARGUMENT,
         )
         with mock.patch(
             "cl.api.webhooks.requests.post",
@@ -2804,6 +2806,14 @@ class SearchAlertsOAESTests(ESIndexTestCase, TestCase, RECAPAlertsAssertions):
         rt_oral_argument_1.delete()
         rt_oral_argument_2.delete()
         rt_oral_argument_3.delete()
+
+        # Confirm Stat object is properly created and updated.
+        stats_objects = Stat.objects.all()
+        self.assertEqual(stats_objects.count(), 2)
+        stat_names = set([stat.name for stat in stats_objects])
+        self.assertEqual(stat_names, {"alerts.sent.rt", "alerts.sent.dly"})
+        self.assertEqual(stats_objects[0].count, 1)
+        self.assertEqual(stats_objects[1].count, 1)
 
         # Remove test instances.
         rt_oa_search_alert.delete()
